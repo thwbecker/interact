@@ -1,0 +1,7 @@
+plot 'slipline.80.dat' using 1 : 3 w lp,\
+ 	'slipline.90.dat' using 1 : 3 w lp
+pause -1
+
+plot 'events.80.dat' using 1 : 5 w steps ,\
+	'events.90.dat' using 1 : 5 w steps 
+	

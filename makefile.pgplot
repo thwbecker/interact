@@ -1,0 +1,20 @@
+#
+# flags for pgplot support 
+# use -Ipathname where pathname is the path where pgplot 
+# resides (for header files)
+#
+PGPLOT_DEFINES =  -DUSE_PGPLOT 
+#
+# includes are in target directory, also machine dependent
+PGPLOT_INCLUDES = -I/usr/local/pgplot/
+#
+# these are the pgplot libraries for C and FORTRAN
+#
+# specify the non-shared versions of the pgplot libraries explicitly to avoid
+# having to specify -static for the linker or such
+PGLIBS = -L/usr/local/pgplot/ -lcpgplot -lpgplot \
+	-L/usr/X11R6/lib/ -lX11 -lpng -L/usr/lib/gcc-lib/i386-redhat-linux/3.2.3/ -lg2c -lm
+#
+# these are the pgplot routine object files from interact
+POBJS = $(ODIR)/plotting.o $(ODIR)/plotting_palette.o \
+	$(ODIR)/plotting_palette_.o 

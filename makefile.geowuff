@@ -1,0 +1,81 @@
+#
+# LINUX system dependent flags
+# $Id: makefile.geowuff,v 1.2 2003-01-13 10:16:56-08 tbecker Exp $
+#
+# CONSTANTS
+#
+# constants you might want to change according to the machine specs
+#
+# IMAT_SPARSE_LIM: limit in MB for I matrix size at which the program switches 
+#                  automatically to sparse matrix storage, ~70% of RAM of machine
+# IMAT_SIZE_LIM:   max size of the interaction matrix in MB that we want in 
+#                  in memory, if size is larger AND NO SPARSE STORAGE is invoked
+#                  will read from file. This is so slow, it's next to impossible to work.
+#
+MACHINE_DEFINES = -DIMAT_SPARSE_LIM=1500.0 -DIMAT_SIZE_LIM=1500.1  -DSGI_SUBROUTINE_CONVENTION
+#
+# compilers
+CC = icc
+F77 = ifc
+#CC = gcc
+#F77 = g77
+
+LD = $(F77)
+AR = ar
+
+
+# LINKER FLAGS (without -lm, that get's added later)
+# gcc
+#LDFLAGS = 
+# intel
+LDFLAGS = -tpp6 -xi -ipo -ipo_obj -posixlib  -Vaxlib 
+
+
+
+# X 11 only needed for PGPLOT
+X11LIBDIR = /usr/X11R6/lib/
+#
+# intel
+MATHLIB = -limf -lm
+# gcc
+#MATHLIB = -lm
+#
+# fast execution options, comment out if debug output is wanted
+# for gcc
+#SCARGS = -O3 -march=pentium4 -msse2 -fomit-frame-pointer -funroll-loops \
+#       $(MACHINE_DEFINES) -DLINUX_FORTRAN_CALL_FIX 
+# for icc
+SCARGS = -O3 -tpp6 -xi -ipo -ipo_obj -unroll $(MACHINE_DEFINES)
+
+
+SFARGS = $(SCARGS) 
+#
+# name of interact binary depending on compiler flags
+INTERACT_BINARY_NAME = interact
+
+#
+
+
+# debugging options, comment in for debugging
+# -DSUPER_DUPER_DEBUG
+#SCARGS = -g $(MACHINE_DEFINES) -DLINUX_FORTRAN_CALL_FIX 
+#SCARGS = -g  -DDEBUG -DSUPER_DEBUG  $(MACHINE_DEFINES) -DLINUX_FORTRAN_CALL_FIX 
+#SFARGS = $(SCARGS)
+#
+SFARGSSAVE = $(SFARGS)
+#
+# BLAS
+BLASLIB = -L/usr/geophysics/packages/ATLAS/precompiled_lib/Linux_ATHLON256/ -llapack -lf77blas -lcblas -latlas -L/opt/lib -lgnu_fortran
+#BLASLIB = -L/usr/local/src/atlas_Linux_P4SSE2/lib -llapack -lf77blas -lcblas -latlas -L/opt/lib -lgnu_fortran
+#BLASLIB = -lblas -llapack -L/opt/lib -lgnu_fortran
+
+# other computational routines. LAPACK is needed if USE_NUMREC_SVD is not set
+# (included above, ordering matters)
+
+COMPUTATIONAL_LIBS = $(BLASLIB)
+#
+# where are the modified EISPACK routines from the myeispack.tar.gz
+# file installed?
+EISPACK_LIB = -L$(HOME)/progs/src/eispack/$(ARCH)/ -lmyeis
+
+

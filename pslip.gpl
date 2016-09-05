@@ -1,0 +1,31 @@
+reset
+
+aspect=1.5
+
+
+print "using aspect ratio ",aspect
+
+set dgrid3d
+set hidden3d
+set cntrparam cubicspline
+set contour base
+set term post portrait enh 
+set out 'slip.ps'
+set multiplot
+set size 1,.5
+set origin 0,0
+
+set nokey
+set xlabel 'x/W'
+set ylabel 'y/W'
+
+set zlabel 'u_d'
+splot 'flt.dat' using ($1*aspect) : 2 : 8 w l 
+
+set origin 0,.5
+set zlabel 'u_s'
+splot 'flt.dat' using ($1*aspect) : 2 : 6 w l 
+
+
+set nomultiplot
+set term x11

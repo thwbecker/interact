@@ -1,0 +1,49 @@
+#!cat cevents.dat | \
+#	gawk '{print(log($3))}' | \
+#	gawk -f $HOME/idl_gmt/gutenberg.awk \
+#	mmin=-500 mmax=500 cum=1 > gr.cum.dat
+#!cat cevents.dat | \
+#	gawk '{print(log($3))}' | \
+#	gawk -f $HOME/idl_gmt/gutenberg.awk \
+#	mmin=-500 mmax=500 cum=0 > gr.dat
+
+
+reset
+set xlabel "time / characteristic recurrence time"
+set ylabel 'M_0 / ({/Symbol Ds} w^3)'
+set y2label 'cumulative M_0 / ({/Symbol Ds} w^3)'
+set ytics nomirror
+set y2tics nomirror
+set xrange [0:*]
+set yrange [0:*]
+set key top left
+
+set term post landscape color solid
+set out 'events.ps'
+
+#set multiplot
+#set size 1,.5
+#set origin 0,.5
+plot    'cevents.dat' using 1 : ($3/1e-4) \
+	axes x1y1 title 'moment of event' w impulses,\
+	'cevents.dat' using 1 : ($4/1e-4) \
+	axes x1y2 title 'cumulative moment' w steps
+
+#set origin 0,0
+
+
+
+#set xlabel 'M_0'
+#set ylabel 'n(M_0)/N'
+#set noy2tics
+#set y2label ''
+#set logscale 
+#set key bottom
+#set yrange [1e-4:1]
+
+#plot "< gawk '{print(10**$1,$2)}' gr.dat" title "",\
+#	1e-10*x**(-0.666666) title 'M_0^{-2/3}'
+
+#set nomultiplot
+
+set term x11

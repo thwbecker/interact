@@ -1,0 +1,13 @@
+set xlabel "time"
+set ylabel "cumulative moment"
+set y2label "moment"
+set ytics nomirror
+set y2tics nomirror
+set logscale y2
+set term post enh color solid
+set out "cevents.ps"
+#plot "######" using 1 : 4 axes x1y1 title "cumulative" w steps lw 3,\
+#"< awk -f $HOME/progs/src/interact/consolidate_events.awk ######" axes x1y2 title "cons events" w impulses,\
+#	"######" using 1 : 3 axes x1y2 title "events" w impulses
+plot "< awk -f $HOME/progs/src/interact/consolidate_events.awk ######" axes x1y2 title "events" w impulses,\
+	"######" using 1 : 4 axes x1y1 title "cumulative" w steps lw 3

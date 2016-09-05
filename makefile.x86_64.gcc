@@ -1,0 +1,72 @@
+#
+# LINUX system dependent flags for gcc
+#
+# $Id: makefile.i686,v 1.4 2001/08/18 15:51:59 becker Exp becker $
+#
+# compilers
+CC = gcc
+F77 = /usr/bin/gfortran
+LD = $(F77)
+AR = ar
+# set the compiler flag for library directories
+# usually -L, could be -Wl,-L as for HPUX
+MY_LIBDIR_SPEC = -L
+
+
+
+USE_IPO = 
+
+# LINKER FLAGS (without -lm, that get's added later)
+# gcc
+LDFLAGS = -static 
+
+# X 11 only needed for PGPLOT
+X11LIBDIR = /usr/X11R6/lib/
+#
+MATHLIB = -lm
+#
+# warning options
+GCCWOPT = -Wall 
+#-Werror
+
+# fast execution options, comment out if debug output is wanted
+SCARGS = -O3 -pipe  -funroll-loops -ffast-math -fomit-frame-pointer \
+	$(GCCWOPT)  $(MACHINE_DEFINES) 
+
+
+DEBUG_LIBS = 
+#
+# debugging options, comment in for debugging
+# -DSUPER_DUPER_DEBUG -DDDMALLOC 
+# gcc 
+#SCARGS = -g  $(GCCWOPT) \
+#	-DDEBUG $(MACHINE_DEFINES) 
+#-DMEM_ALLOC_DEBUG \
+#	-DDEBUG -DSUPER_DEBUG  $(MACHINE_DEFINES) 
+#DEBUG_LIBS = -lccmalloc -ldl
+#DEBUG_LIBS = -ldmalloc 
+
+
+#
+# fortran flags
+#
+SFARGS = $(SCARGS) -ffixed-line-length-132  -fmax-errors=0 -x f77-cpp-input
+#
+SFARGSSAVE = $(SFARGS)
+#
+# BLAS
+#BLASLIB =  -llapack -lblas -lg2c
+#BLASLIB -L/usr/local/src/atlas_Linux_HAMMER64SSE2/lib/ -llapack -lcblas -lf77blas -latlas
+#BLASLIB = -L/opt/acml2.5.0/gnu64/lib/ -lacml
+BLASLIB =  $(MATHLIBS)
+
+COMPUTATIONAL_LIBS = $(BLASLIB)
+#
+# where are the modified EISPACK routines from the myeispack.tar.gz
+# file installed?
+EISPACK_LIB = -L$(HOME)/progs/src/eispack/$(ARCH)/ -lmyeis
+
+
+# name of interact binary depending on compiler flags
+INTERACT_BINARY_NAME = interact
+

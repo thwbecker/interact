@@ -1,0 +1,11 @@
+#!/bin/ksh
+#
+# script to plot the cevents.dat file using gnuplot
+#
+infile=${1-cevents}
+string="s/######/$infile.dat/g"
+sed $string $HOME/progs/src/interact/peventfile.gpl > tmp.gpl
+
+gnuplot tmp.gpl
+
+echo $0: output in $infile.ps

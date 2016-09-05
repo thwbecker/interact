@@ -1,0 +1,17 @@
+# plot spatial correlation for stress
+set xlabel 'x/W'
+set ylabel 'r'
+
+set term post enh
+set out 'ssr.ps'
+
+! gawk '{if($3!="Inf")print($1,$3)}' ssr.0.dat > tmp.0.dat
+! gawk '{if($3!="Inf")print($1,$3)}' ssr.1.dat > tmp.1.dat
+! gawk '{if($3!="Inf")print($1,$3)}' ssr.2.dat > tmp.2.dat
+set grid
+plot 'tmp.0.dat' title '{/Symbol s}_{strike}'    w l lw 3,\
+     'tmp.1.dat' title '{/Symbol s}_{dip}'    w l lw 3, \
+     'tmp.2.dat' title '{/Symbol s}_{normal}'    w l lt 4 lw 3
+     
+! rm tmp.0.dat tmp.1.dat tmp.2.dat
+set term x11

@@ -1,0 +1,20 @@
+set parametric
+
+set xlabel 'x'
+set ylabel 'y'
+set zlabel 'z'
+set nokey
+
+
+
+zrot=(zrot+10)%360
+xrot=(xrot+20)%180
+set view xrot,zrot
+
+splot "tmp.dat" w l
+replot
+
+pause -1
+
+reread
+

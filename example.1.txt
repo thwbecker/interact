@@ -1,0 +1,242 @@
+This example describes a simple calculation of a slip distribution on
+a planar fault given a large-scale background stress field. It is
+meant to serve as an example of using "interact" for a single-step
+calculation, solving for slip given stress-boundary conditions.
+
+
+$Id: example.1.txt,v 1.2 2003/01/14 18:43:20 becker Exp $
+
+
+1) Stress boundary condition
+
+
+   Interact uses a Cartesian coordinate system, and the background
+   stress is read in in tensor format like 
+
+   s_xx s_xy s_xz s_yy s_yz s_zz. 
+
+   Say, we know the major compressive stress direction in our study
+   area is N7 degrees W. We can then use the
+   "calc_cart_from_eigen_stress" utility to calculate the stress
+   tensor. Of course, we will have to make several assumptions about
+   the principal stresses (see, e.g., the man page of
+   calc_cart_from_eigen_stress, obtained by typing
+   "calc_cart_from_eigen_stress -h"). Let's say we are only interested
+   in relative quantities. We will assume that the max compressive
+   stress (physical convention used!) is s3=-1, s1 is zero, and s2 in
+   the vertical direction for simplicity. (s1 > s2 > s3 by
+   definition.)
+
+   The horizontal stress field can then be calculated using the "-ah"
+   mode of calc_cart_from_eigen_stress like
+
+   echo 0 0 0  0 -1 7 | calc_cart_from_eigen_stress -ah
+
+   This results in max shear stress of 0.5 (say, in units of the shear
+   modulus, as defined in properties.h). The output of above command
+   reads 
+
+   0 0 0   -0.985148 0.120961 0 -0.0148521 0 0
+
+   The first three numbers are just x,y,z as repeated from the input,
+   and the last six numbers are the stress tensor components as listed
+   above. We want to use those numbers as input for interact, and
+   hence want to create a background loading file, typically called
+   "smlin.in" (see interact -l option). Since this file allows for
+   linearly increasing stress like s_i = a_i + b_i * time, we have to
+   provide both a_i coefficients (the numbers from above) and b_i,
+   which we set to zero since we are only interested in the problem at
+   time=0. The smlin.in file should hence read
+
+    -0.985148 0
+    0.120961 0 
+    0 0	     
+    -0.0148521 0
+    0 0
+    0 0
+
+
+2) Patch geometry
+
+
+   We need to generate a fault patch geometry for the patch input file
+   geom.in. We choose to perform our calculation in a half-space in 3-D
+   (as opposed to 2-D plane strain or stress). There are several ways
+   to generate a patch-format file (see interact -h's description of
+   the geometry input file's format). We could read in quad elements
+   given on four points and fit our rectangular patches to it using
+   the "points2patch" program. However, we choose to use a regular
+   geometry, and want to model a fault that has 10 degree strike
+   azimuth, 80 degrees dip, total length of 7, total width of 3, is
+   located midpoint coordinates  x=0, y=0, z=-2. We pick a
+   discretization of n=20 patches along strike and m=10 patches with
+   depth. The way to generate the patch file is then to use
+   "makefault" like:
+
+   
+   makefault -strike 10 -dip 80 -l 3.5 -w 1.5 -x 0 -y 0 \
+      -z -2 -n 20 -m 10 > geom.in
+
+
+   If we have GMT installed, we can generate a Postscript file
+   visualizing the geometry by running the pgeom script in the
+   interact source directory. Another option is to convert the patch
+   format as in the geom.in file to the Geomview (www.geomview.org)
+   3-D viewers QUAD format using the patch2geom program:
+
+   cat geom.in | patch2geom > geom.quad
+
+   This file can then be viewed using geomview 
+
+   geomview geom.quad.
+
+
+3) Boundary condition file
+
+   Once we are happy with the geometry, we have to specify boundary
+   conditions on each patch and define the output that interact is
+   supposed to generate. This is described in some detail in the man
+   page (interact -h). Here, we shall assume that we are interested in
+   the stresses and displacements at the surface from x,y -15 to 15 in
+   20 steps for the given background stress and completely relaxed,
+   shear stress free conditions after slip in strike and dip direction
+   on the patches. We tell interact about this with the following
+   bc.in file (see, again, interact -h):
+
+   
+   1 1
+   -15  15 20   -15 15 20   0  0 1
+   -1 -1 -1 50
+
+   
+   The first number (1) means: run a one-step calculation (not a
+   loading simulation). Second 1 is for field output requested. Next
+   nine numbers define the x, y, and z limits and the nx, ny, and nz
+   spacings. The last four numbers mean boundary condition "50", shear
+   stress free, on all patches.
+
+   
+4)  Run interact to get the solution on the fault and in the medium.
+
+
+    Typing "interact" runs the program, solves the system of
+    equations, and produces the requested output. We choose to leave
+    out any lithostatic, background pressure that might have been
+    defined in properties.h and so use the -p flag. We also want
+    simple slip distribution output for geomview, and hence use -gv.
+
+
+    interact -pr 0 -gv
+
+
+    The calculation of this example program took ~6s on my P4
+    notebook. Interact is fairly verbose in the progress output and it
+    is often a good idea to read this output to check that nothing
+    went awry.
+    
+    The following output files are produced:
+
+-rw-rw-r--    1 becker   becker         26 Dec 14 18:13 disp.hdr
+-rw-rw-r--    1 becker   becker      36400 Dec 14 18:13 disp.out
+-rw-rw-r--    1 becker   becker      41326 Dec 14 18:13 flt.0.abs.off
+-rw-rw-r--    1 becker   becker      41362 Dec 14 18:13 flt.0.dip.off
+-rw-rw-r--    1 becker   becker      41318 Dec 14 18:13 flt.0.strike.off
+-rw-rw-r--    1 becker   becker      30451 Dec 14 18:13 flt.dat
+-rw-rw-r--    1 becker   becker         26 Dec 14 18:13 stress.hdr
+-rw-rw-r--    1 becker   becker      54400 Dec 14 18:13 stress.out
+-rw-rw-r--    1 becker   becker       7876 Dec 14 18:13 rstress.dat
+	      
+    a) flt.dat holds stress and displacement values on the fault in a
+       local coordinate system (normalized by the half-width). The file
+       should look like
+
+> head flt.dat
+# fault state: note that stresses are only those due to slip and do not include background stress
+#    pos_1/L    pos_2/W       area        s_c    m_d*s_n           u_s           u_n           u_d           s_s           s_n           s_d pach#  grp#
+-2.217e+00 -9.000e-01  1.050e-01  5.146e-02 -7.978e-06 -2.444803e-02  0.000000e+00  1.300301e-01  5.147020e-02 -1.595692e-05 -1.705417e-01     0     0
+-2.217e+00 -7.000e-01  1.050e-01  5.158e-02  9.299e-05 -3.652243e-02  0.000000e+00  1.765070e-01  5.147020e-02  1.859706e-04 -1.705417e-01     1     0
+-2.217e+00 -5.000e-01  1.050e-01  5.176e-02  2.414e-04 -4.517486e-02  0.000000e+00  2.026717e-01  5.147020e-02  4.827618e-04 -1.705417e-01     2     0
+-2.217e+00 -3.000e-01  1.050e-01  5.202e-02  4.581e-04 -5.173977e-02  0.000000e+00  2.189212e-01  5.147020e-02  9.162305e-04 -1.705417e-01     3     0
+-2.217e+00 -1.000e-01  1.050e-01  5.240e-02  7.741e-04 -5.676558e-02  0.000000e+00  2.285411e-01  5.147020e-02  1.548140e-03 -1.705417e-01     4     0
+-2.217e+00  1.000e-01  1.050e-01  5.295e-02  1.235e-03 -6.049417e-02  0.000000e+00  2.325692e-01  5.147020e-02  2.470266e-03 -1.705417e-01     5     0
+-2.217e+00  3.000e-01  1.050e-01  5.376e-02  1.909e-03 -6.295363e-02  0.000000e+00  2.307790e-01  5.147020e-02  3.818176e-03 -1.705417e-01     6     0
+-2.217e+00  5.000e-01  1.050e-01  5.494e-02  2.892e-03 -6.387039e-02  0.000000e+00  2.215254e-01  5.147020e-02  5.783297e-03 -1.705417e-01     7     0
+
+       and columns are locale x and y coordinates, patch area, Coulomb
+       stress, dynamic friction times normal stress, strike, normal, dip
+       slip components, strike, normal, and dip stresses, patch nr, and
+       fault group number.
+
+
+     b) flt.0.abs.off     flt.0.dip.off     flt.0.strike.off
+
+	These files have the absolute slip and strike and dip
+	component slip in Geomview COFF format, i.e. a colored version
+	of the slip distribution in dip direction can be viewed by
+	e.g. typing
+
+	geomview flt.0.dip.off.
+
+
+     c) disp.hdr and disp.out as well as stress.hdr and stress.out
+        hold the field displacement and stress values as requested
+        in the bc.in file.
+
+        disp.hdr and stress.hdr are basically repeats of the
+        geometrical field output information in bc.in, while disp.out
+        is in the format x y z u_x u_y u_z. It should look like
+
+	
+
+	> head disp.out
+-1.5000000e+01 -1.5000000e+01  0.0000000e+00  1.3472522e-03  9.3223515e-04  8.6373700e-05 
+-1.5000000e+01 -1.3421053e+01  0.0000000e+00  1.6438850e-03  1.0731929e-03  1.0030088e-04 
+-1.5000000e+01 -1.1842105e+01  0.0000000e+00  1.9996723e-03  1.2106674e-03  1.1170166e-04 
+-1.5000000e+01 -1.0263158e+01  0.0000000e+00  2.4126745e-03  1.3280967e-03  1.1819703e-04 
+-1.5000000e+01 -8.6842105e+00  0.0000000e+00  2.8693140e-03  1.4031364e-03  1.1702743e-04 
+-1.5000000e+01 -7.1052632e+00  0.0000000e+00  3.3395181e-03  1.4107383e-03  1.0555830e-04 
+-1.5000000e+01 -5.5263158e+00  0.0000000e+00  3.7749831e-03  1.3298903e-03  8.2039121e-05 
+-1.5000000e+01 -3.9473684e+00  0.0000000e+00  4.1143126e-03  1.1528239e-03  4.6378860e-05 
+-1.5000000e+01 -2.3684211e+00  0.0000000e+00  4.2966441e-03  8.9264830e-04  5.5912096e-07 
+-1.5000000e+01 -7.8947368e-01  0.0000000e+00  4.2804210e-03  5.8410811e-04 -5.1606039e-05 
+
+
+       Likewise, stress.out is in the format 
+
+       x y z s_xx s_xy s_xz s_yy s_yz s_zz     
+
+       and should read
+
+>           head stress.out 
+-1.5000000e+01 -1.5000000e+01  0.0000000e+00  1.2769405e-04  2.2292264e-04 -2.7812631e-17  2.5158841e-04  3.6655752e-18 -3.3610267e-17 
+-1.5000000e+01 -1.3421053e+01  0.0000000e+00  2.0932962e-04  2.8772900e-04  1.7192127e-17  2.7629291e-04  7.5925147e-18  3.7811551e-17 
+-1.5000000e+01 -1.1842105e+01  0.0000000e+00  3.2661235e-04  3.5976563e-04 -1.3608649e-17  2.8865822e-04 -1.0371188e-17 -1.8954564e-16 
+-1.5000000e+01 -1.0263158e+01  0.0000000e+00  4.8688392e-04  4.3065177e-04  1.4223003e-17  2.8060100e-04 -3.9391044e-18  1.0976869e-16 
+-1.5000000e+01 -8.6842105e+00  0.0000000e+00  6.9191557e-04  4.8574322e-04 -1.8288876e-17  2.4493167e-04 -1.9495379e-18  6.2768530e-17 
+-1.5000000e+01 -7.1052632e+00  0.0000000e+00  9.3207794e-04  5.0510041e-04 -2.3832455e-17  1.7933697e-04  4.6977221e-18  2.2105527e-16 
+-1.5000000e+01 -5.5263158e+00  0.0000000e+00  1.1814459e-03  4.6857490e-04  3.0480503e-18  9.0751120e-05  8.5451951e-18  1.6195270e-17 
+-1.5000000e+01 -3.9473684e+00  0.0000000e+00  1.3984476e-03  3.6493180e-04 -2.4097063e-17 -3.0613005e-06 -7.0521056e-19 -4.1653692e-17 
+-1.5000000e+01 -2.3684211e+00  0.0000000e+00  1.5357375e-03  2.0097975e-04  4.8578981e-18 -7.7872537e-05  1.2409600e-17 -1.4276910e-16 
+-1.5000000e+01 -7.8947368e-01  0.0000000e+00  1.5573748e-03  4.0433065e-06  4.8467795e-20 -1.1286849e-04 -6.9443930e-18  3.3071554e-17 
+
+
+	where, of course, the order of 1e-17 values should really by
+	identical to zero.
+
+
+ 
+    d) rstress.dat
+
+    This file is meant for debugging, mostly. It lists the resolved
+    strike, dip, and normal stress components on each fault patch that
+    was calculated from the geometry and the stress boundary
+    conditions.
+
+
+Please let me know if anything is unclear.
+
+
+Thorsten Becker (thwbecker@post.harvard.edu)
+
+December 2002
+

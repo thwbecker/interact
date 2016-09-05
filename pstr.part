@@ -1,0 +1,12 @@
+#!/bin/ksh
+
+if [ $8 -eq 2 ];then
+    grdimage $1.grd -C$2 $3 $4 -P -Ba$5:x:/a$5:y:/.:$1:WeSn  $6 -K > $7
+else
+    grdimage $1.grd -C$2 $3 $4 -P -Ba$5:x:/a$5:y:/.:$1:WeSn -O $6 -K >> $7
+fi
+if [ $8 -eq 1 ] ;then
+    grdcontour $1.grd -Ccont.d -P  -O  -K $3 $4 >> $7
+else
+    grdcontour $1.grd -Ccont.d  -P -O  $3 $4 >> $7
+fi

@@ -1,0 +1,69 @@
+#
+# LINUX system dependent flags for intel compilers
+#
+# $Id: makefile.i686,v 1.4 2001/08/18 15:51:59 becker Exp becker $
+#
+#
+# compilers
+CC = icc
+F77 = ifort
+
+LD = $(F77)
+AR = ar
+# set the compiler flag for library directories
+# usually -L, could be -Wl,-L as for HPUX
+MY_LIBDIR_SPEC = -L
+
+#
+# comment this in for performance improvement (?)
+#
+#USE_IPO = -ipo -ipo_obj
+USE_IPO = 
+
+# LINKER FLAGS (without -lm, that get's added later)
+
+LDFLAGS = $(USE_IPO) -nofor_main
+
+
+
+# X 11 only needed for PGPLOT
+X11LIBDIR = /usr/X11R6/lib/
+#
+MATHLIB = -limf
+#
+SCARGS = -O2  $(USE_IPO) -vec_report0  -unroll $(MACHINE_DEFINES) 
+#SCARGS = -O2 $(USE_IPO) -vec_report0  -unroll $(MACHINE_DEFINES) 
+
+
+# debugging options, comment in for debugging
+# -DSUPER_DUPER_DEBUG
+#SCARGS = -g -DDEBUG -DSUPER_DEBUG  $(MACHINE_DEFINES)  
+
+#
+# fortran flags
+#
+SFARGS = $(SCARGS)
+#
+SFARGSSAVE = $(SFARGS)
+#
+# BLAS
+# this was no good for the SVD routine?!
+BLASLIB = -L/opt/lib/mkl811/lib/32 -lmkl_lapack -lmkl_ia32 -lguide -lpthread 
+#
+#BLASLIB = -L/usr/local/src/atlas_Linux_P4SSE2/lib/ -llapack -lcblas -lf77blas -latlas -L$(g2clib) -lg2c -lm
+
+
+
+# other computational routines. LAPACK is needed if USE_NUMREC_SVD is not set
+# (included above, ordering matters)
+
+COMPUTATIONAL_LIBS = $(BLASLIB)
+#
+# where are the modified EISPACK routines from the myeispack.tar.gz
+# file installed?
+EISPACK_LIB = -L$(HOME)/progs/src/eispack/$(ARCH)/ -lmyeis
+
+
+# name of interact binary depending on compiler flags
+INTERACT_BINARY_NAME = interact
+

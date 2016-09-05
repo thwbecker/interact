@@ -1,0 +1,60 @@
+# 
+# HP UNIX flags
+#
+#
+# CONSTANTS
+#
+# constants you might want to change according to the machine size
+#
+# IMAT_SPARSE_LIM: limit in MB for I matrix size at which the program switches 
+#                  automatically to sparse matrix storage, ~70% of RAM of machine
+# IMAT_SIZE_LIM:   max size of the interaction matrix in MB that we want in 
+#                  in memory, if size is larger AND NO SPARSE STORAGE is invoked
+#                  will read from file. This is so slow, it's next to impossible to work.
+# 
+# USE_HPUX_FUNCTIONS: use the "isfinite" function instead of "finite"
+#			to test for non-NaN-ness
+
+MACHINE_DEFINES = -DUSE_HPUX_FUNCTIONS -DIMAT_SPARSE_LIM=200.0 -DIMAT_SIZE_LIM=4000.0 
+#
+#
+CC = gcc
+F77 = f77
+#
+
+LD = $(F77)
+#
+# set the compiler flag for library directories
+#
+MY_LIBDIR_SPEC = -W,-L
+
+LDFLAGS = $(MY_LIBDIR_SPEC)/opt/gcc/lib/gcc-lib/hppa2.0n-hp-hpux11.00/3.0.1/ -lgcc -lc +ppu -K
+#
+SAPARGS =
+#
+# FORTRAN
+SFARGS = +ppu -K $(SAPARGS) 
+SFARGS_SAVE = $(SFARGS)
+
+
+SCARGS = -mpa-risc-2-0 $(SAPARGS) 
+
+LDFLAGS =  $(SAPARGS)
+
+# name of interact binary depending on compiler flags
+INTERACT_BINARY_NAME = interact
+#INTERACT_BINARY_NAME = interact_mp
+
+MATHLIB = -lm
+
+BLASLIB = $(MY_LIBDIR_SPEC)/opt/fortran/lib/pa2.0/ -lblas 
+#
+# for SVD solve, LAPACK is needed if -DUSE_NUMREC_SVD not set
+COMPUTATIONAL_LIBS = $(MY_LIBDIR_SPEC)/usr/lib -lm -llapack
+
+#
+# where are the modified EISPACK routines from the myeispack.tar.gz
+# file installed?
+EISPACK_LIB = $(MY_LIBDIR_SPEC)$(HOME)/progs/src/eispack/$(ARCH)/ \
+	-lmyeis
+

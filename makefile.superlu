@@ -1,0 +1,12 @@
+# flags for superlu routine support
+#
+# 
+SUPERLU_DEFINES = -DUSE_SUPERLU
+#
+# where are the SuperLUinclude files?
+SUPERLU_HOME = $(HOME)/progs/src/SuperLU/
+#
+SUPERLU_INCLUDES = -I$(SUPERLU_HOME)/SRC/
+#
+#
+SUPERLU_LIBS = -L$(SUPERLU_HOME)/ -lsuperlu.$(ARCH)

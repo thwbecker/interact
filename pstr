@@ -1,0 +1,113 @@
+#!/bin/ksh
+# plots the stress field from the stress.out file
+ainc=50
+
+model=${1-stress}
+zl=${2-0}
+extract=${3-1}
+
+iinc=${4-4}
+
+infile=$model.out
+echo $0: determining bounds
+xmin=`gawk -f ~/idl_gmt/min.awk col=1 $infile ` 
+xmax=`gawk -f ~/idl_gmt/max.awk col=1 $infile ` 
+ymin=`gawk -f ~/idl_gmt/min.awk col=2 $infile ` 
+ymax=`gawk -f ~/idl_gmt/max.awk col=2 $infile ` 
+zmin=`gawk -f ~/idl_gmt/min.awk col=3 $infile ` 
+zmax=`gawk -f ~/idl_gmt/max.awk col=3 $infile ` 
+reg=-R$xmin/$xmax/$ymin/$ymax
+inc=-I$iinc
+#lim=5
+#reg=-R-$lim/$lim/-$lim/$lim
+echo $0: $reg
+proj="-JX3.5 -P"
+file=$model.ps
+cmap=stress.cpt
+#makecpt -Cjet -T-0.0001/0.0001/0.00001 > stress.cpt
+makecpt -Cjet -T-1/1/0.05 > stress.cpt
+#makecpt -Cjet -T-0.5/0.5/.05 > stress.cpt
+echo $0: reading from $infile at depth $zl
+
+if [ $extract -eq 1 ];then
+    echo $0: extract grid files
+# sort for depth
+gawk '{if($1!="#" && $1!="" && sqrt(($3-zl)*($3-zl))<1.0e-5)print($0)}' zl=$zl  $infile > tmp.dat
+
+# octahedral normal stress
+gawk '{x=$1;y=$2;z=$3;\
+		    sxx=$4;sxy=$5;sxz=$6;\
+		    syy=$7;syz=$8;szz=$9;\
+		    I1=sxx+syy+szz;\
+		    print(x,y,I1/3.0);}'  tmp.dat | \
+	    xyz2grd $reg  $inc -Gisoc.grd 
+# octahedral shear stress 
+gawk '{x=$1;y=$2;z=$3;\
+		    sxx=$4;sxy=$5;sxz=$6;\
+		    syy=$7;syz=$8;szz=$9;\
+		    I1=sxx+syy+szz;\
+		    I2  = -(syy*szz+szz*sxx+sxx*syy);\
+		    I2 += sxy**2 + sxz**2 + syz**2;\
+		    os  = 0.47140452;\
+		    os *= sqrt(I1**2 + 3.0*I2);\
+		    print(x,y,os);}' tmp.dat | \
+	    xyz2grd  $reg $inc -Gshear.grd 
+
+gawk '{s=$4;print($1,$2,s);}' tmp.dat  | \
+	xyz2grd   $reg $inc -Gsxx.grd -V
+gawk '{s=$5;print($1,$2,s);}' tmp.dat  | \
+	xyz2grd   $reg $inc -Gsxy.grd
+gawk '{s=$6;print($1,$2,s);}' tmp.dat  | \
+	xyz2grd   $reg $inc -Gsxz.grd
+gawk '{s=$7;print($1,$2,s);}' tmp.dat  | \
+	xyz2grd   $reg $inc -Gsyy.grd
+gawk '{s=$8;print($1,$2,s);}' tmp.dat  | \
+	xyz2grd   $reg $inc -Gsyz.grd
+gawk '{s=$9;print($1,$2,s);}' tmp.dat  | \
+	xyz2grd   $reg $inc -Gszz.grd
+
+else
+    echo $0: using old grid files
+
+fi
+
+
+echo 0 A > cont.d
+echo 0.25  >> cont.d
+echo 0.5 A >> cont.d
+echo 0.75 A >> cont.d
+echo 1 A >> cont.d
+
+either=1
+
+if [ $either -eq 1 ];then
+
+#grd2cpt isoc.grd > $cmap
+grdimage isoc.grd -C$cmap $reg $proj  -X0.5 -Y0.5 -Ba$ainc:"x iso":/a$ainc:y:WeSn \
+    -K > $file
+grdcontour isoc.grd -Ccont.d  -O -K $reg $proj >> $file 
+
+#grd2cpt shear.grd > $cmap
+grdimage shear.grd -C$cmap $reg $proj -Ba$ainc:"x shear":/a$ainc:y:WesN \
+    -O -Y4 -K >> $file
+grdcontour shear.grd -Ccont.d  -O -K $reg $proj >> $file 
+
+#grd2cpt sxy.grd > $cmap
+grdimage sxy.grd -C$cmap $reg $proj  -Ba$ainc:"x sxy":/a$ainc:y:wEsN \
+    -O -X4 -K >> $file
+grdcontour sxy.grd -Ccont.d  -O -K $reg $proj >> $file 
+
+#grd2cpt syy.grd > $cmap
+grdimage sxz.grd -C$cmap $reg $proj  -Ba$ainc:"x sxz":/a$ainc:y:wESn \
+    -O -Y-4 -K >> $file
+grdcontour sxz.grd -Ccont.d  -O  $reg $proj >> $file 
+
+
+else
+    offset='-X0'; $HOME/progs/src/interact/pstr.part sxz $cmap $reg $proj $ainc $offset $file 0
+    offset='-X5'; $HOME/progs/src/interact/pstr.part szz $cmap $reg $proj $ainc $offset $file 1
+
+fi
+
+
+echo $0: ouput in $file

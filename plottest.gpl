@@ -1,0 +1,38 @@
+reset
+set surface 
+set term post portrait
+set xlabel '# patches'
+
+set out 'patchconv.ps'
+set multiplot
+set size .5,.5
+set origin 0,.5
+set xlabel 'n'
+set ylabel 'm'
+
+set zlabel 'u_{max}'
+set view 40,80
+splot    'slip.log' using 1 : 2 : 4 title ""  w p pt 7
+
+	
+set origin 0,0
+set zlabel 'u_{avg}'
+splot    'slip.log' using 1 : 2 : 5 title ""  w p pt 7
+
+set origin .5,0
+set ylabel 'u_{max}'
+set xlabel 'n*m'
+plot    'slip.log' using 3: 4 title ""  w p pt 7
+
+set origin .5,.5
+set ylabel 'u_{avg}'
+set xlabel 'n*m'
+plot    'slip.log' using 3: 5 title ""  w p pt 7
+
+	
+
+
+
+set nomultiplot
+
+

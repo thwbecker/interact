@@ -1,0 +1,62 @@
+#!/bin/ksh
+#
+# plot the initial stress heterogeneity in fsi.in
+#
+if [[ ! -s geom.in || ! -s fsi.in ]];then
+    echo $0: either geom.in or fsi.in not found
+    exit
+fi
+echo $0: generating sh.dat from fsi.in and geom.in
+
+# calc spatial stress stats
+calc_stress_stat 1 13
+# generate sh.dat file for plotting
+calc_stress_stat 2 2> /dev/null
+
+asp=2
+inc=0.025
+reg=-R-$asp/$asp/-1/1;proj=-Jx1
+
+makecpt -Cno_green -T-15/15/1 > sh.cpt
+modifycptends  sh.cpt
+
+for type in 1 2 3 ;do
+    if [ $type -eq 1 ];then
+	name=strike
+    elif [ $type -eq 2 ];then
+	name=dip
+    else
+	name=normal
+    fi
+    gawk --assign type=$type --assign sd=1e-4 \
+	'BEGIN{os=3+type-1;}{print($1,$2,$(os)/sd)}' sh.dat | \
+	surface $reg  -I$inc -Gsh.$name.grd -Lld -Lud
+
+done
+
+grdinfo sh.$name.grd
+#
+# plot stress 
+#
+ofile=sh.ps
+grdimage sh.normal.grd -Csh.cpt $reg $proj -P \
+    -Ba1f.1:"x/W":/a1f.1:"y/W"::."@~s@~@-normal@-":WeSn -K > $ofile
+grdimage sh.dip.grd -Csh.cpt $reg $proj  \
+    -Y3.7 -O -K -Ba1f.1:"x/W":/a1f.1:"y/W"::."@~s@~@-dip@-":WeSn >> $ofile
+grdimage sh.strike.grd -Csh.cpt $reg $proj  \
+    -Y3.7 -Ba1f.1:"x/W":/a1f.1:"y/W"::."@~s@~@-strike@-":WeSn -O >> $ofile
+
+echo $0: output in $ofile
+
+
+#
+# plot correlation
+#
+gnuplot pssr.gpl
+
+echo $0: output in ssr.ps
+
+
+rm sh.dat sh.*.grd ssr.?.dat
+
+

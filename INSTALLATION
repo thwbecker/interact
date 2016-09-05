@@ -1,0 +1,482 @@
+################################################################################
+#                                                                              #
+#  interact: model fault interactions using dislocations in an elastic         #
+#            medium                                                            #
+#	                                                                       #
+#  Copyright (C) Thorsten W. Becker 2000 - 2002                                #
+#                                                                              #
+#  Interact uses dc3d.f as provided by Y. Okada as in Okada (BSSA, 1992) and   #
+#  linear algebra routines from SLATEC, LAPACK, and EISPACK.                   #
+#  Might contain material copyrighted by others (e.g. Numerical Recipes etc)   #
+#                                                                              #
+#  See INSTALLATION, README.TXT, and help.txt for documentation and            #
+#  COPYRIGHT and COPYING for the license and warranty disclaimers.             #
+#                                                                              #
+#  If you use interact in real work, a citation to use would be:               #
+#                                                                              #
+#  @Article{becker02c,                                                         #
+#    author = 	 {Becker, T. W. and Schott, B.},                               #
+#    title = 	 {On boundary-element models of elastic fault interaction      #
+#                  (abstract)},                                                # 
+#    journal = 	 {EOS Trans. AGU},                                             #
+#    year = 	 2002,                                                         #
+#    volume =	 83,                                                           #
+#    number =	 47,                                                           #
+#    pages =	 {NG62A-0925}                                                  #
+#  }                                                                           #
+#                                                                              #
+#                                                                              #
+#  $Id: INSTALLATION,v 1.9 2003/01/14 18:42:33 becker Exp $                   #
+#                                                                              #
+#  thwbecker@post.harvard.edu                                                  #
+#                                                                              #
+################################################################################
+
+
+
+This document describes briefly how to compile the "interact" program
+and assorted other programs that come with it on a UNIX-type operating
+system with C and FORTRAN compilers. We will assumes that you have
+some familiarity with the UNIX operating system and compiling programs
+from source codes. If this is not the case, either asked your systems
+administrator for assistance or refer to textbooks such as "UNIX in a
+nutshell". Further, you should have the interact, EISPACK, and SLATEC
+tar files as distributed in the package.tar file together with this
+INSTALLATION instruction. The individual files are named something
+like
+
+interact.121402.tgz slatec_nnls.tgz and myeispack.tgz
+
+
+"SLATEC" and "myeispack" provide basic NNLS matrix solver and
+eigensystem computation libraries. They are adapted from the SLATEC
+and EISPACK packages from www.netlib.org, for further info, see the
+documentation there.  EISPACK and SLATEC are not necessary for
+interact to work, but they improve it's functionality and EISPACK is
+needed for some of the utility programs that come with
+interact. However, you will need the BLAS and LAPACK linear algebra
+routines (see, again, netlib.org) since interact uses SVD and LU
+matrix solvers from those routines.
+
+Typically, your hardware vendor will provide optimized implementations
+that come with the compilers (such as sunperf for SUN or
+complib.sgimath for SGI), as mentioned further down in 4a). On LINUX,
+the libraries libblas.a and liblapack.a are typically in /usr/lib or
+/usr/local/lib. If you don't have a hardware optimized version, you
+should consider getting the ATLAS from netlib.org. We will from now on
+assume that you have BLAS and LAPACK installed, another one for your
+sysadmin?
+
+
+We proceed in four simple steps:
+
+0) unpacking
+1) ARCH environment variable
+2) EISPACK installation
+3) SLATEC installation
+4) interact installation
+
+This should be done in 15 minutes!
+
+
+0) UNPACKING
+
+
+To extract the three tar files that are in package.tar (and you might
+have done that already), use e.g.
+
+gunzip --stdout myeispack.tgz | tar xv
+gunzip --stdout slatec_nnls.tgz | tar xv
+gunzip --stdout interact.121402.tgz | tar xv
+
+Run these shell commands in a place where you store software,
+e.g. $HOME/src/ or system-wide in /usr/local/src or equivalent. In
+most examples below, we will assume that you extract all tar files in
+your $HOME/src directory.
+
+After unpacking, you will end up with three sub-directories,
+interact/, eispack/, and slatec/. The first directory holds the interact
+source codes, the second the EISPACK routines used by the interact
+utilities, and the third the matrix inversion routines of the SLATEC
+package. You can compile interact without SLATEC support (and indeed
+we will have to switch SLATEC support on manually later).
+
+
+1) DEFINE ENVIRONMENT VARIABLE ARCH (AND POSSIBLY CFLAGS etc.)
+
+
+First, we have to define an environment variable named ARCH. It is
+used by the makefiles to make directories that hold object code which
+is different for each hardware platform so that you can have interact
+binaries for different machines in one place. I set ARCH to the output
+of the "uname -a" command in my .cshrc file like
+
+setenv ARCH `uname -a`
+
+
+but you can pick whatever you like as a description for your
+hardware. In csh and tcsh, this is done (for one session only) by
+typing
+
+setenv ARCH i686
+
+e.g. if you are running on a Pentium PC with LINUX. For SUN, you would
+use
+
+setenv ARCH sun4u
+
+for SGI's IP35 platforms
+
+setenv ARCH ip35,
+
+and so on, depending what uname -a gives you. In ksh, the equivalent
+command to set ARCH is
+
+export ARCH=sun4u.
+
+
+From now on, we will assume that ARCH was set to "i686" in the
+examples below.
+
+
+2) EISPACK INSTALLATION
+
+
+Change into the eispack/ sub-directory. Usually, you will have a
+FFLAGS variable defined in your shell for FORTRAN compiler flags. Type
+
+echo $FFLAGS
+
+This should give you something like
+
+-O2 
+
+as output. If FFLAGS is not defined (and the echo command doesn't
+return anything), set FFLAGS to whatever you are happy with for fast
+compilation for your compiler, e.g.
+
+setenv FFLAGS -O3
+
+
+(See the compiler man page.) Then, compile the EISPACK routines and
+put the library in eispack/$ARCH by typing
+
+make
+
+If all went OK, you should have three libraries in eispack/$(ARCH)/
+
+ls eispack/$ARCH/*.a
+
+i686/libmyeis.a  i686/libmyeis_dbl.a  i686/libmyeis_sgl.a
+
+You can test the eigensystem routines by typing
+
+$ARCH/test_dbl
+
+The output should be 
+
+ -0.515729471589258      -0.736976229099578      -0.327985277605683     
+  0.591009048506104     
+  0.170915188827179       0.591009048506104      -0.736976229099578     
+  0.327985277605681     
+   11.3448142827621       0.327985277605682       0.591009048506103     
+  0.736976229099578     
+
+Did it work? Great! If not, check the output of your compiler error
+messages. If you can't work out what went wrong, send me an email,
+please.
+
+
+3) SLATEC INSTALLATION
+
+
+We will assume that you want to use the non-negative least-squares
+matrix solver that SLATEC provides. If you don't want that, or want to
+deal with SLATEC later, skip to 4) and don't uncomment (remove the "#"
+before "include") the SLATEC part in the interact makefile as
+described below.
+
+To start with the installation of SLATEC, assuming you have ARCH
+defined, change to the slatec/ sub-directory. The procedure is very
+similar to that for step 2). If you haven't done so, check to see if
+you have default definitions for compiling FORTRAN code by typing
+
+echo $FFLAGS
+
+in the shell. The output should again look like
+
+-O 
+
+depending on your settings. These flags will be used to compile the
+slatec sources. If all looks OK, type 
+
+make
+
+and see what happens. If all goes well, the makefile will create a
+directory named $ARCH (e.g. i686/) where it will put all object files
+and the libraries later used by interact. Type
+
+ls $ARCH/*.a
+
+The output should look like 
+
+i686/libslatec_dbl.a  i686/libslatec_sgl.a
+
+If those libraries are not there, try to find out why the code didn't
+compile. The makefile will also try to compile small test
+programs. For this to work, the compiler has to find your BLAS (see
+www.netlib.org) libraries. The relevant line in the makefile is line
+12, which says
+
+LOPT = -L/usr/local/lib -lblas
+
+If your BLAS routines in libblas.a are somewhere else, change this
+line to reflect your directory, eg. like
+
+LOPT = -L/usr/local/src/atlas_Linux_P4SSE2/lib/  -lf77blas -latlas
+
+
+if you're using the ATLAS version for Pentium 4. If the libraries and
+the test binaries compiled, you can test your SLATEC routines by typing 
+
+cat a.dat | $(ARCH)/nnls 12 6 6
+
+The result of this should look like:
+
+i686/nnls: m(rows): 12 n(columns): 6, no NN rows
+i686/nnls: completely unconstrained least squares
+i686/nnls: dwnnls returned mode 0
+0.431973
+0.352346
+0.291406
+0.187675
+0.0621971
+-0.158797
+
+Does it look OK? Great! If not, send me an email or compile interact
+without SLATEC support for now and proceed to step 4).
+
+It is not essential to run the SLATEC test programs but you will have
+to work out how to link with LAPACK and BLAS routines for step 4). If
+you are having troubles with the linking part only, you might want to
+ask your system administrator for help.
+
+
+4) INSTALLATION OF INTERACT AND RELATED PROGRAMS
+
+
+Change into the interact/ sub-directory. You will likely now have to
+edit the makefiles by hand. Not a big deal! 
+
+General settings as to the operation of interact are set in
+"makefile", general material properties such as the shear modulus are
+set in "properties.h", and all system-dependent settings should be
+changed in "makefile.$ARCH".  The reasoning behind this setup is that
+you are not likely to change the, say, shear modulus very often
+because it simply affects the scaling. Likewise, you will also not
+want to change the way interact works that often, so we hardwire
+several options to avoid calls to IF statements. After compilation,
+the operation of interact is affected by command line arguments and
+input files.
+
+We provide several hardware and operating system dependent makefiles
+which we have used successfully to compile on different platforms
+
+LINUX: makefile.i686  
+IRIX: makefile.ip27, makefile.ip32, makefile.ip35
+SOLARIS: makefile.sun4u
+
+They are included by the main makefile depending on the settings of
+$ARCH.
+
+If you have one of these OSs, you should edit those files and make
+sure ARCH is set to the suffix of those files. If not, copy one of our
+examples to a makefile for your platform like
+
+cp makefile.i686 makefile.$ARCH
+
+and edit this file. One common problem is the interfacing between
+FORTRAN and C routines. Some compilers, like IRIX or gcc, want a C
+routine `afunc' that calls a FORTRAN routine `bfunc' to be calling
+`bfunc_' instead. We "fix" this with the flag
+SGI_SUBROUTINE_CONVENTION. If this flag is defined with -D (as in
+makefile.ip35, for example), all instances of `afunc' will be replaced
+with `afunc_' by the C preprocessor. This is done in interact.h which
+includes the file `fortran_underscore_convention.h'. So, if your
+compiler wants the underscores, define this flag, else leave it out.
+
+
+A)  MACHINE DEPENDENT SETTINGS
+
+Let's start with the system dependent settings and edit
+makefile.$ARCH.
+
+If you don't want to use the automatic sparse matrix storage (for now,
+you probably don't), set IMAT_SPARSE_LIM and IMAT_SIZE_LIM to the
+maximum memory you have available for programs on your machine in
+MB. In our example, we have 1500MB available and the relevant line
+(line nr ~15) in makefile.i686 reads
+
+MACHINE_DEFINES = -DIMAT_SPARSE_LIM=1500.0 -DIMAT_SIZE_LIM=1500.1 -DSGI_SUBROUTINE_CONVENTION
+
+The last compiler flag, -DSGI_SUBROUTINE_CONVENTION, should be set for
+compiling on IRIX and LINUX, it adds an underscore "_" to FORTRAN
+subroutines that are called from C routines.
+
+Next, edit the compiler settings, e.g. if you are using gcc/g77 you
+should uncomment (remove the "#" in the beginning) the lines (or
+change the ones that are in the example) so that they read
+
+CC = gcc
+F77 = g77
+
+Some compilers will need linking flags (other than "-lm" for the math
+libraries using CC as a linker). For INTEL LINUX we use, e.g.,
+
+LDFLAGS = -ipo -ipo_obj -posixlib  -Vaxlib 
+
+since we want inter procedural optimization (in the CFLAGS) and the
+POSIX and VAX calls. You can probably leave LDFLAGS blank like so
+
+LDFLAGS =
+
+Further down in the file, set your compiler optimization flags like
+
+SCARGS = -O3 
+
+or so. (Again, refer to the compiler man pages. Often, it pays to
+experiment a bit and some flag combinations are significantly faster
+than others.) 
+
+Afterward, tell the compiler where to find the BLAS and LAPACK
+packages (see note above) needed for the SVD and LU solvers by setting
+BLASLIB to something like:
+
+BLASLIB = -L/usr/local/lib -lblas 
+and 
+COMPUTATIONAL_LIBS = -L/usr/local/lib -llapack
+
+if you have libblas.a and liblapack.a in /usr/local/lib. On an SGI,
+you should try
+
+BLASLIB = -lcomplib.sgimath
+and
+COMPUTATIONAL_LIBS = -lcomplib.sgimath
+
+to make use of the hardware optimized versions from SGI. Likewise, for
+SUN use
+
+BLASLIB = -lsunmath -xlic_lib=sunperf -lsunperf
+and
+COMPUTATIONAL_LIBS = -lsunmath -xlic_lib=sunperf -lsunperf
+
+There's a similar thing for IBM R6k architectures.  
+
+Finally, tell the compiler where it can find the EISPACK libraries
+which we compiled in step 2). E.g.
+
+EISPACK_LIB = -L$(HOME)/src/eispack/$(ARCH)/ -lmyeis
+
+if we have put the EISPACK libraries from step 2) in
+$(HOME)/src/eispack/$(ARCH)/
+
+b) GENERAL SETTINGS
+
+Next, edit the main makefile "makefile" for other settings that affect
+the general operation of interact. All of the flags are described in
+the comments in the makefile, for a start let's just go with the
+defaults in the makefile (line numbers ~101 and ~110)
+
+COMMON_DEFINES =  -DBINARY_PATCH_EVENT_FILE  \
+	-DVARIABLE_TIME_STEP \
+	-DCHECK_CI_ONE_WAY -DALLOW_NON_3DQUAD_GEOM
+
+and double precision
+
+MAIN_DEFINES = -DUSE_DOUBLE_PRECISION $(COMMON_DEFINES)
+
+If step 3) (SLATEC installation) worked, comment out the line that
+includes the slatec related makefile
+
+include makefile.slatec
+
+Make sure that in makefile.slatec, the location of the SLATEC
+libraries and include files is specified correctly by setting
+SLATEC_DIR to the directory where slatec_nnls was expanded to. In our
+example from step 3), this was $HOME/src/slatec so that line 10 in
+makefile.slatec should read
+
+SLATEC_DIR = $(HOME)/src/slatec
+
+There are several other options in the makefile for interact, such as
+support for PGPLOT runtime plotting but we will not explore those
+now. You might also want to check if you like the default settings for
+material parameters in properties.h.
+
+Let's try to compile the main programs.
+
+c) COMPILATION
+
+Type 
+
+make
+
+This should compile all objects and several libraries, which will be
+put into the objects/$ARCH/ directory. If the archive library creation
+step worked,
+
+ls objects/$ARCH/*.a
+
+should give
+
+objects/i686/libinput.a  objects/i686/libpatchio.a
+
+if ARCH was set to i686, sat. If all compilations and linking was
+successful, you should end up with several binaries in
+
+ls bin/i686/
+
+calc_cart_from_eigen_stress*  interact*       points2patch*
+calc_eigen_from_cart_stress*  makefault*      project_stress*
+calc_interaction_matrix*      patch2bc*       randomflt*
+calc_stress_stat*             patch2corners*  randomize_strike*
+check_feedback*               patch2geom*     sort_events*
+create_random_mu_file*        patch2group*    tri2patch*
+create_random_stress_file*    patch2xyz*
+generate_slipdia*             patch2xyzvec*
+
+You might want to add the binary directory to your path if you are
+using interact often. Else, you will have to refer to interact using
+the full path name like $HOME/src/interact/bin/$ARCH/interact.
+
+Anyways, the main binary is "interact", all other programs are more or
+less utilities to prepare input for interact and plot output. You
+should refer to the file README.TXT next, it quickly describes what
+some of those programs do. Typing "bin/i686/interact -h" gives you the
+man page of interact which serves as the main documentation of the
+program (this output is also included as file help.txt). You should
+read through this man page before using interact. Then, see the
+example.?.txt files for simple example calculations that are meant to
+illustrate interact's capabilities. Also see my Fall 2002 AGU poster,
+http://www.seismology.harvard.edu/~becker/agu02_disp.pdf, and let me
+know if anything is unclear.
+
+An aside: interact uses the "cproto" program to automatically generate
+the declarations for the C subroutines which are written to the
+auto_proto.h header file. If you ever type "make clean", this file
+will be overwritten because, e.g. the default precision might have
+been changed from double to float. Hence, the makefile tries to
+automatically regenerate auto_proto.h if you subsequently type
+"make". If this step fails, say because you don't have cproto
+installed, *and* you didn't change anything in the subroutine
+declarations, you can retrieve the old auto_proto.h file by copying
+auto_proto.saved.h to auto_proto.h.
+
+If compilation wasn't successful, check the output of the make
+run. Then, send me an email for help.
+
+
+Thorsten Becker (thwbecker@post.harvard.edu)
+
+December 2002
+

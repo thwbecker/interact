@@ -1,0 +1,194 @@
+#!/bin/bash
+#
+# plot displacement and field
+#
+model=${1-disp}			# model name, model.out
+mode=${2-1}			# 
+interpolate=${3-0}		# 
+use_old_grids=${4-0}
+addfault=${5-1}
+xunits="[fault half-length]"
+#sunits="[km]"
+
+if [ $mode -eq 1 ];then
+    i=1
+    j=2
+    k=3
+    l1="x $sunits"
+    l2="y $sunits"
+    l3="z $sunits"
+fi
+if [ $mode -eq 2 ];then
+    i=1
+    j=3
+    k=2
+    l1="x $sunits"
+    l2="z $sunits"
+    l3="y $sunits"
+fi
+if [ $mode -eq 3 ];then
+    i=2
+    j=3
+    k=1
+    l1="y $sunits"
+    l2="z $sunits"
+    l3="x $sunits"
+fi
+
+adjust=0
+adjustcolor=0
+use_contour=0
+proj=-JX7
+#
+# file name
+#
+infile=$model.out
+hdrfile=$model.hdr
+cmap=disp.cpt
+ofile=$model.$mode.ps
+# scale input, if in km, turn into m
+#scale=1e-3
+scale=1
+#scale=500
+
+echo $0: reading from $infile
+if [ ! -s $infile ];then
+    echo $0: $infile is not there
+    exit
+fi
+
+fac=1
+#fac=`gawk '{print($4,$5,$6)}' $infile | gawk -f normline.awk | gawk -f max.awk | gawk '{print($1/0.5*2)}'`
+
+echo $0: fac: $fac
+if [ $interpolate -eq 1 ];then
+    xmin=`gawk -f min.awk col=$i $infile `
+    xmax=`gawk -f max.awk col=$i $infile `
+    ymin=`gawk -f min.awk col=$j $infile `
+    ymax=`gawk -f max.awk col=$j $infile `
+    reg=-R$xmin/$xmax/$ymin/$ymax
+
+    if [ $use_old_grids -ne 1 ]; then
+    if [ $adjust -eq 1 ];    then
+	n=75
+	m=20
+	inc=-I`echo $xmin $xmax $ymin $ymax | gawk '{xr=$2-$1;yr=$4-$3;if(yr>xr)print(yr/n); else print(xr/n)}' n=$n` 
+	ann=`echo $xmin $xmax $ymin $ymax | gawk '{xr=$2-$1;yr=$4-$3;if(yr>xr)print(yr/10); else print(xr/10)}'`
+	vinc=-I`echo $xmin $xmax $ymin $ymax | gawk '{xr=$2-$1;yr=$4-$3;if(yr>xr)print(yr/n); else print(xr/n)}' n=$m` 
+    else
+	ann=5
+	inc=-I2/2
+	vinc=-I8/8
+    fi
+    vmax=`` 
+    echo $0: inc $inc vinc $vinc region $reg 
+    echo $0: mode $mode, i: $i j: $j k: $k
+    cat $infile | gawk '{if($(3+i)<1e10 && $k*$k<1.0e-5)\
+	print($i,$j,$(3+i));}' i=$i j=$j k=$k  | \
+	blockmean $reg $vinc | \
+	surface $reg $vinc -Gu1.grd 
+    cat $infile | gawk '{if($(3+j)<1e10 && $k*$k<1.0e-5)\
+	print($i,$j,$(3+j));}' i=$i j=$j k=$k | \
+	blockmean $reg $vinc | \
+	surface $reg $vinc -Gu2.grd 
+    cat $infile | gawk '{if($(3+k)<1e10 && $k*$k<1.0e-5)\
+	print($i,$j,$(3+k));}' i=$i j=$j k=$k  | \
+	blockmean $reg $inc | \
+	surface  $reg $inc -Gu3.grd 
+   fi
+else
+    ann=2f.2
+    vinc=.2
+
+    read xmin xmax m ymin ymax n zmin zmax o < $hdrfile
+    dx=`echo $xmin $xmax $m | gawk '{print(($2-$1)/($3-1))}'`
+    dy=`echo $ymin $ymax $n | gawk '{print(($2-$1)/($3-1))}'`
+
+    if [ $mode -eq 1 ]; then
+	reg=-R$xmin/$xmax/$ymin/$ymax 
+	inc=-I$dx/$dy
+    elif [ $mode -eq 2 ]; then
+	dz=`echo $zmin $zmax $o | gawk '{print(($2-$1)/($3-1))}'`
+	reg=-R$xmin/$xmax/$zmin/$zmax 
+	inc=-I$dx/$dz
+    else
+	dz=`echo $zmin $zmax $o | gawk '{print(($2-$1)/($3-1))}'`
+	reg=-R$ymin/$ymax/$zmin/$zmax 
+	inc=-I$dy/$dz
+    fi	
+    echo $0: inc $inc  region $reg 
+    echo $0: mode $mode, i: $i j: $j k: $k
+    if [ $use_old_grids -ne 1 ]; then
+	rm u[1-3].grd 2> /dev/null
+	
+	cat $infile | gawk '{if($(3+i)*$(3+i)<1e10 && $k*$k<1.0e-5)
+	    print($i,$j,$(3+i));}' i=$i j=$j k=$k  | \
+	    xyz2grd $reg $inc -Gu1.grd -V
+	cat $infile | gawk '{if($(3+j)*$(3+j)<1e10 && $k*$k<1.0e-5)
+	    print($i,$j,$(3+j));}' i=$i j=$j k=$k | \
+	    xyz2grd $reg $inc -Gu2.grd -V
+	cat $infile | gawk '{if($(3+k)*$(3+k)<1e10 && $k*$k<1.0e-5)
+	    print($i,$j,$(3+k));}' i=$i j=$j k=$k  | \
+	    xyz2grd  $reg $inc -Gu3.grd -V
+    fi
+fi
+for grd in u1 u2 u3;do
+    grdmath $grd.grd $scale DIV = tmp.$$.grd
+    mv tmp.$$.grd $grd.grd
+    echo $0: $grd: `grd2minmax $grd.grd`
+done
+
+echo $0: plotting
+
+if [ $adjustcolor -eq 0 ]
+then
+    makecpt -Cwysiwyg -T-.1/0.1/0.0025 > $cmap
+#    makecpt -Cpolar -T-.1/0.1/0.005 > $cmap
+else
+    grd2cpt u1.grd > $cmap
+fi
+
+if [ $use_contour -ne 1 ]
+then
+    grdimage u3.grd -C$cmap $reg $proj -P -Ba$ann:"$l1":/a$ann:"$l2":WeSn \
+	    -K > $ofile
+else
+    psbasemap $reg $proj -P -Ba$ann:"$l1":/a$ann:"$l2":WeSn \
+	    -K > $ofile
+fi
+#psscale -C$cmap -O -K -D2.5/5.75/5/0.25h >> $ofile
+echo $0: adding vectors
+grdincnr=`grd2incnr u1.grd`
+vinc=`echo $grdincnr $vinc | gawk '{if($1>$2)print($1); else print($2)}'`
+
+grdvector u1.grd u2.grd $reg $proj -O -T -I$vinc -Q0.03/0.08/0.04n.1 -G255 -W0.5 \
+    -S$fac -K >> $ofile
+grdcontour u3.grd $reg $proj -O -K -A50 >> $ofile
+
+psscale -D1/-.32/3/.25h -B.05 -C$cmap -O -K >> $ofile
+
+if [ $use_contour -eq 1 ]
+then
+    echo $0: adding contours
+    grdcontour u3.grd -C0.05 $reg $proj -P  \
+	    -K -O -W1/0/0/0ta >> $ofile
+    grdcontour u3.grd -C0.1 $reg $proj  -P  \
+	    -K -O -W1/0/0/0 >> $ofile
+    grdcontour u3.grd -C0.2 $reg $proj  -Ao -P  \
+	    -K -O -W3/0/0/0 >> $ofile
+fi
+
+if [ $addfault -eq 1 ];then
+    gawk -f $HOME/idl_gmt/geom2xyz.awk i=$i j=$j  geom.in | \
+	psxy -M -W3/255/0/0 -O -K $reg $proj -V >> $ofile 
+fi
+
+echo $0: adding legend
+echo -20 -20 1 0 0 0 0 "1 m" | \
+	psvelo -Se`echo $fac | gawk '{print(1/$1)}'`/0.95/14 \
+	    -G200/0/0 -N -W8/200/0/0 -O  $reg $proj >> $ofile
+
+
+
+#rm u1.grd u2.grd u3.grd
+echo $0: written to $ofile

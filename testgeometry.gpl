@@ -1,0 +1,67 @@
+reset
+set noarrow
+set angle degrees
+
+strike=900
+dip=30
+
+
+
+alpha=90.0-strike
+
+sd=sin(dip)
+cd=cos(dip)
+sa=sin(alpha)
+ca=cos(alpha)
+
+tsx=   ca
+tsy=   sa
+tsz=   0.0
+
+nx= sa*sd
+ny= -ca*sd
+nz=  cd
+
+tdx=  -sa*cd
+tdy=   ca*cd
+tdz=   sd
+
+
+set xrange [-1:1]
+set yrange [-1:1]
+set zrange [-1:1]
+
+set arrow from 0,0,0 to nx, ny, nz
+set label 'n' at nx, ny, nz
+set arrow from 0,0,0 to tsx, tsy, tsz
+set label 't_s' at tsx, tsy, tsz
+set arrow from 0,0,0 to tdx, tdy, tdz
+set label 't_d' at tdx, tdy, tdz
+
+!echo 0 0 0 > tmp.dat
+
+set xlabel 'x'
+set ylabel 'y'
+set zlabel 'z'
+set nokey
+
+set multiplot
+set size .5,.5
+set origin .5,0
+set view 30,30
+splot 'tmp.dat'
+
+set origin .5,.5
+set view 0,0
+splot 'tmp.dat' 
+
+set origin 0,.5
+set view 90,0
+splot 'tmp.dat' 
+
+set origin 0,0
+set view 90,90
+splot 'tmp.dat'
+
+
+set nomultiplot

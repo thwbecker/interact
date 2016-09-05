@@ -1,0 +1,49 @@
+reset
+c=24.0/(7.0*pi)
+f(x)=a*c*sqrt(1.0-(x/a)**2)
+a=1.00582
+
+
+
+
+#set xlabel 'x'
+#fit f(x) 'flt.dat' using 1 : ($2*$2<1e-8?-$6:1/0) via a
+#plot 'flt.dat'     using 1 : ($2*$2<1e-8?-$6:1/0),f(x)
+
+#pause -1
+#set xlabel 'y'
+#fit f(x) 'flt.dat' using 2 : ($1*$1<1e-8?-$6:1/0) via a
+#plot 'flt.dat'     using 2 : ($1*$1<1e-8?-$6:1/0),f(x)
+
+#pause -1
+#set xlabel 'r'
+#fit f(x)  'du.dat' using 3 : 4 via a
+#plot 'du.dat' using 3 : 4 , f(x)
+
+#pause -1
+
+c2=16./7./pi
+set term post portrait
+set out 'pconverge.ps'
+set multiplot
+set size 1,.5
+set origin 0,.5
+set logscale y
+
+set xlabel 'L_{patch} / L_{crack}'
+set ylabel '(u_{BEM}/u_{theor} (A_{BEM}/A_{theor})^{1/2}-1) [%]'
+#set x2tics nomirror
+set xtics nomirror
+set xrange [0.2:0]
+plot 'slip.log' using ($1>1?1/sqrt($1):1/0) : ((($3/sqrt($4/pi))/c-1.0)*100.) \
+	title 'u_{max}' w lp,\
+	'slip.log' using ($1>1?1/sqrt($1):1/0) : ((($2/sqrt($4/pi))/c2-1.0)*100.) \
+	title 'u_{avg}' w lp
+set origin 0,0
+set nologscale y
+rep
+
+
+
+set nomultiplot
+set term x11

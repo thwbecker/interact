@@ -1,0 +1,13 @@
+reset
+
+set xlabel 'I_{cutoff}/|I|_{max}'
+set ylabel '(sparse matrix size - full matrix size) / full matrix size [%]'
+set logscale x
+set nokey
+set term post enh
+set out 'shrink.ps'
+
+plot 'shrink.log' using 1 : (($2-1.)*100.0) w lp , 0
+
+set term x11
+rep

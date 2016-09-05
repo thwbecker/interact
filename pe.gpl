@@ -1,0 +1,4 @@
+plot 'events.40.dat' using 1 : 5 with steps ,\
+ 'events.50.dat' using 1 : 5 with steps,\
+ 'events.60.dat' using 1 : 5 with steps
+

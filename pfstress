@@ -1,0 +1,29 @@
+#!/bin/ksh
+#
+# prints the stress and slip on an individual fault group
+# based on the flt.*.dat files
+#
+flt=${1-0}
+
+echo "set title \"fault $flt\"" > tmp.gpl
+echo "set ylabel \"stress\"" >> tmp.gpl
+echo "set ytics nomirror" >> tmp.gpl
+echo "set xlabel \"time\"" >> tmp.gpl
+echo "set y2label \"slip\"" >> tmp.gpl
+echo "set y2tics nomirror" >> tmp.gpl
+echo "set grid" >> tmp.gpl
+echo "set term post enh color solid" >> tmp.gpl
+echo "set out \"flt.$flt.ps\"" >> tmp.gpl
+echo "set key below" >> tmp.gpl
+echo "plot \"flt.$flt.dat\" using 1 : 2 title \"{/Symbol s}_{Coulomb}\" w lp lt 1, \\" >> tmp.gpl
+echo "\"flt.$flt.dat\"  using 1 : 7 title \"{/Symbol s}_{strike}\" w l lt 2 lw 3,\\" >> tmp.gpl
+echo "\"flt.$flt.dat\"  using 1 : 9 title \"{/Symbol s}_{dip}\" w l lt 3 lw 3,\\" >> tmp.gpl
+echo "\"flt.$flt.dat\"  using 1 : 8 title \"{/Symbol s}_{normal}\" w l lt 4 lw 3,\\" >> tmp.gpl
+echo "0 lt 7 lw 3,\\" >> tmp.gpl
+echo "\"flt.$flt.dat\"  using 1 : 4 axes x1y2 title \"u_{strike}\" w l lt 5 lw 3,\\" >> tmp.gpl
+echo "\"flt.$flt.dat\"  using 1 : 6 axes x1y2 title \"u_{dip}\" w l lt 8 lw 3" >> tmp.gpl
+gnuplot tmp.gpl
+ghostview flt.$flt.ps
+
+
+

@@ -1,0 +1,112 @@
+#!/bin/ksh
+tmpn=/tmp/$USER.$HOST.`date +%s`.pgr
+trap "rm -f $tmpn.* ; exit" 0 1 2  15
+#
+# calculate a cumulative GR statistic based on 
+# a catalog file with moments in it
+#
+#
+# INPUT RELATED
+#
+# catalog file
+efile=${1-cevents.dat}
+# left and right cutoff values
+lcut=${2-0.25}
+rcut=${3-0.95}
+starttime=${4-10}
+consolidate=${5-0}
+#
+# PROCESSING RELATED
+#
+# nr of bins
+nbin=30
+# cumulative or normal GR?
+cumulative=1
+#
+#
+#
+if [ $cumulative -eq 1 ];then
+    psfile=cgr.ps
+else
+    psfile=gr.ps
+fi
+echo $0: using file $efile 
+echo $0: using $nbin bins
+
+
+if [ $consolidate -eq 0 ];then
+    echo $0: using individual events
+    timecol=1
+    col=3
+    # use log_10 to create list
+    gawk 'BEGIN{min=1e20;lt=0.43429448}\
+	{if(($1!="")&&($1!="#")&&($col != "")&&($(timecol) > starttime)){\
+	n++;mag[n]=log($col)*lt;if(mag[n]<min)min=mag[n];}}END{\
+	for(i=1;i<=n;i++)print(mag[i]-min)}' \
+	col=$col timecol=$timecol starttime=$starttime $efile  | \
+	sort -n  > $tmpn.sm
+else
+    echo $0: summing up events at the same time
+    timecol=1
+    col=2
+    # use log_10 to create list
+    gawk -f $HOME/progs/src/interact/consolidate_events.awk $efile | \
+	gawk 'BEGIN{min=1e20;lt=0.43429448}\
+	{if(($1!="")&&($1!="#")&&($col != "")&&($(timecol) > starttime)){\
+	n++;mag[n]=log($col)*lt;if(mag[n]<min)min=mag[n];}}END{\
+	for(i=1;i<=n;i++)print(mag[i]-min)}' \
+	col=$col timecol=$timecol starttime=$starttime   | \
+	sort -n  > $tmpn.sm
+fi
+# calc some stats
+n=`cat $tmpn.sm | wc -l | gawk '{print($1)}' `
+echo $0: n events: $n
+minm=`head -1 $tmpn.sm`
+maxm=`tail -1 $tmpn.sm`
+echo $0: min moment: $minm max moment: $maxm 
+if [ `echo $minm $maxm | gawk '{if($1>$2)print(1);else print(0);}'` -eq 1 ];then
+    echo $0: error, see the sorted events
+    more $tmpn.sm
+    exit
+fi
+
+range=`echo $maxm $minm | gawk '{print($1-$2)}'`
+dx=`echo $range $nbin | gawk '{print($1/$2)}'`
+lcutoff=`echo $lcut $minm $range | gawk '{print($2+$1*$3)}'`
+rcutoff=`echo $rcut $minm $range | gawk '{print($2+$1*$3)}'`
+offset=`echo  $minm $range | gawk '{print($1+$2*0.25)}'`
+
+
+
+echo $0: left and right cutoff for fit: $lcutoff $rcutoff
+echo $0: range: $range dx: $dx
+if [ $cumulative ];then
+    gawk 'BEGIN{i=0;}{if($1>xmin+i*dx){print(xmin+i*dx,(n-NR+1)/n);i++;}}' \
+	xmin=$minm dx=$dx n=$n  $tmpn.sm > n.dat
+    # fit linear regression
+    gawk '{if($1>=lcutoff && $1<=rcutoff)print($1,log($2)*0.43429448)}' \
+	lcutoff=$lcutoff rcutoff=$rcutoff n.dat | \
+	gawk -f linreg.awk | gawk '{print($1,-$2)}' > ab.dat
+    read a b < ab.dat 
+    rm ab.dat
+    # plot 
+    echo set label \"N_{total}=$n, b=`echo $b| gawk '{printf("%5.2f",$1)}'`\" at $offset,0.05 > $tmpn.gpl
+    echo set label \"log_{10} N = a - b log_{10} M_0\" at $offset,0.1 >> $tmpn.gpl
+    
+    echo set term post enh >> $tmpn.gpl
+    echo set out \"$psfile\" >> $tmpn.gpl
+    echo set xlabel \"log_{10}\(M_0\)+C\" >> $tmpn.gpl
+    echo "set ylabel \"cumulative N(M\'_0>{M_0}) / N_{total}\"" >> $tmpn.gpl
+    echo "set yrange [*:1.1]" >> $tmpn.gpl
+    echo set logscale y >> $tmpn.gpl
+    echo plot \"n.dat\" title \"total population\" w steps lt 2 lw 2,\\ >> $tmpn.gpl
+    echo "\"< gawk '{if(\$1>=lcutoff && \$1<=rcutoff)print(\$0)}' lcutoff=$lcutoff rcutoff=$rcutoff n.dat\" title \"subset used for fit\" w steps lt 1 lw 3",\\ >> $tmpn.gpl
+    echo "10**($a- $b * x) title \"fit\" lt 4 lw 3" >> $tmpn.gpl
+    gnuplot $tmpn.gpl
+
+else
+    echo
+fi
+
+echo $0: log_M_0 vs N in n.dat and in $psfile
+

@@ -1,0 +1,54 @@
+#!/bin/bash
+
+threed=0
+aspect=2
+reg=-R-$aspect/$aspect/-1/1
+inc=-I0.05
+proj='-Jx1.7 -Jz2.5 -P'
+annx=f0.1a0.5:"x/W":
+anny=f0.1a0.5:"y/W":
+annz=f0.1a0.5
+awk '{if($1!=""&&$1!="#")print($1*a,$2,$6)}' a=$aspect flt.dat | \
+    surface $reg $inc -Gus.grd -V 
+awk '{if($1!=""&&$1!="#")print($1*a,$2,$7)}' a=$aspect flt.dat | \
+    surface $reg $inc -Gun.grd -V 
+awk '{if($1!=""&&$1!="#")print($1*a,$2,$8)}' a=$aspect flt.dat | \
+    surface $reg $inc -Gud.grd -V 
+view=-E200/40
+
+tmpn=/tmp/tmp.$$
+
+for t in us ud ; do
+    grd2minmax $t.grd > $tmpn.dat
+    read min max < $tmpn.dat
+    makecpt -Chot -T$min/$max/`echo $min $max | awk '{print(($2-$1)/15)}'` \
+	> $tmpn.$t.cpt
+done
+
+#cmp=$HOME/progs/src/interact/slip.cpt
+
+if [ $threed -eq 1 ];then
+
+    grdview ud.grd  -Qsm -C$tmpn.ud.cpt $proj \
+	-B$annx/$anny/$annz:"u@-d@-":WeSnZ $view  -K > slip.ps
+    psscale -C$tmpn.ud.cpt -D6.5/0/3/0.2 -B0.25 -O -K -L -E  >> slip.ps
+
+    grdview us.grd  -Qsm -C$tmpn.ud.cpt $proj \
+	-B$annx/$anny/$annz:"u@-s@-":WeSnZ $view    -Y5 -O >> slip.ps
+    psscale -C$tmpn.us.cpt -D6.5/0/3/0.2 -B0.25 -O -K -L -E  >> slip.ps
+else
+    grdimage ud.grd -C$tmpn.ud.cpt $proj \
+	-B$annx/$anny/:."u@-d@-":WeSn   -K > slip.ps
+    grdcontour ud.grd -C0.05 $proj -O -K -S >> slip.ps
+    psscale -C$tmpn.ud.cpt -D7.1/1.5/3.5/0.2  -O -K -L -E  >> slip.ps
+
+    grdimage us.grd   -C$tmpn.us.cpt $proj \
+	-B$annx/$anny/:."u@-s@-":WeSn     -Y5 -O -K >> slip.ps
+    grdcontour us.grd -C0.05 $proj -O -S -K >> slip.ps
+    psscale -C$tmpn.us.cpt -D7.1/1.5/3.5/0.2  -O  -L -E  >> slip.ps
+fi
+
+modifybb slip.ps 0 0 675 750
+
+
+rm $tmpn.*

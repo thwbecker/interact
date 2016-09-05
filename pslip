@@ -1,0 +1,103 @@
+#!/bin/bash
+#
+# plot slip on fault plane using GMT given in a flt.dat file with format
+#
+#   pos_1/W      pos_2/W  area s_c m_d*s_n   u_s    u_n    u_d     s_s   s_n     s_d pach#  grp#
+# 
+#   where pos_1 and pos_2 are the patches' center coordinates in a fault-group 
+#   local coordinate frame in strike and dip direction, respectively
+#
+# will produce us.grd, un.grd, and ud.grd with strike, normal,
+# and dip components of slip
+#
+# uses the modifybb script to adjust EPS bounding boxes
+# 
+# $Id: pslip,v 1.2 2003/01/21 18:55:26 becker Exp $
+# 
+# file to use
+ifile=${1-flt.dat}
+# displacement scale
+scale=${2-1}
+# use a 3-D plot
+threed=${3-0}
+#
+# check if file available
+#
+if [ ! -s $ifile ];then
+    echo $0: file $ifile not found
+    echo $0: usage:
+    echo $0: $0 flt.dat scale 
+    exit
+fi
+# output file name
+ofile=$ifile.ps
+# determine region
+reg=`minmax $ifile -I1`
+# increments for gridding
+inc=-I0.025
+# projection
+proj='-Jx1.7 -Jz2.5 '
+view=-E200/40
+# annotation
+annx=f0.1a0.5:"x/W":
+anny=f0.1a0.5:"y/W":
+annz=f0.1a0.5
+# temporary files
+tmpn=/tmp/$USER.$HOST.$$.pslip
+trap "rm -f $tmpn.* ; exit" 0 1 2 15
+echo $0: plotting file $ifile with displacement scale $scale 
+#
+# grid data 
+#
+soptions="-Lld -Lud "
+gawk '{if($1!=""&&$1!="#")print($1,$2,$6)}' $ifile | \
+    surface $reg $inc -Gus.grd $soptions # strike
+gawk '{if($1!=""&&$1!="#")print($1,$2,$7)}' $ifile | \
+    surface $reg $inc -Gun.grd $soptions # normal
+gawk '{if($1!=""&&$1!="#")print($1,$2,$8)}' $ifile | \
+    surface $reg $inc -Gud.grd $soptions # dip 
+#
+# rescale the grids and make colorscales
+#
+for t in us un ud ; do 
+    # rescale
+    grdmath $t.grd $scale DIV = $tmpn.grd;mv $tmpn.grd $t.grd
+    # get max/min
+    grdinfo -C $t.grd | gawk '{min=$6;max=$7;
+                if(min==max){min-=1;max+=1;}
+                range=max-min;
+                print(min,max,range/16)}' > $tmpn.dat
+    read min max dx < $tmpn.dat
+    makecpt -Cpolar -T$min/$max/$dx > $tmpn.$t.cpt
+done
+
+#cmp=$HOME/progs/src/interact/slip.cpt
+
+if [ $threed -eq 1 ];then
+    
+    grdview ud.grd  -Qsm -C$tmpn.ud.cpt $proj -P \
+	-B$annx/$anny/$annz:"u@-d@-":WeSnZ $view  -K > $ofile
+    psscale -N50 -C$tmpn.ud.cpt -D6.5/0/3/0.2 -B0.25 -O -K -L -E  >> $ofile
+
+    grdview us.grd  -Qsm -C$tmpn.ud.cpt $proj \
+	-B$annx/$anny/$annz:"u@-s@-":WeSnZ $view    -K -Y5 -O >> $ofile
+    psscale -N50 -C$tmpn.us.cpt -D6.5/0/3/0.2 -B0.25 -O  -L -E  >> $ofile
+else
+    grdimage ud.grd -C$tmpn.ud.cpt $proj  -P \
+	-B$annx/$anny/:."u@-d@-":WeSn   -K > $ofile
+    #grdcontour ud.grd -C0.1 $proj -O -K -S >> $ofile
+    psscale -N50 -C$tmpn.ud.cpt -D7.1/1.5/3.5/0.2  -B.5/:"u@-d@- [$scale]": \
+	-O -K -L -E  >> $ofile
+
+    grdimage us.grd   -C$tmpn.us.cpt $proj \
+	-B$annx/$anny/:."u@-s@-":WeSn     -Y5 -O -K >> $ofile
+    #grdcontour us.grd -C0.1 $proj -O -S -K >> $ofile
+    psscale -N50 -C$tmpn.us.cpt -D7.1/1.5/3.5/0.2  -B.5/:"u@-s@- [$scale]": \
+	-O  -L -E  >> $ofile
+fi
+
+modifybb $ofile 0 0 675 750 2> /dev/null
+
+echo $0: output in $ofile
+
+

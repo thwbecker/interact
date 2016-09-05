@@ -1,0 +1,24 @@
+# flags for slatec NNLS routine support
+#
+# use SLATEC at all? if not, only parts of code will not work
+# 
+#SLATEC_DEFINES = -DUSE_SLATEC_NNLS 
+#
+#
+# where did we put the SLATEC distribution form slatec_nnls.tar?
+#
+SLATEC_DIR = $(HOME)/progs/src/slatec
+#
+# where are the slatec include files?
+#
+SLATEC_INCLUDES = -I$(SLATEC_DIR)/
+#
+# where is the slatec library? include both double and single
+# versions, which to call will be decided within code
+# the type of $(BLASLIB) will be decided in makefile.$(ARCH) to allow 
+# for ATLAS type of blas/linpack
+#
+SLATEC_LIBS = -L$(SLATEC_DIR)/$(ARCH)/ \
+	-lslatec_sgl -lslatec_dbl  $(BLASLIB) 
+	
+
