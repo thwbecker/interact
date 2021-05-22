@@ -1,1 +1,1 @@
-/home/walter/becker/awk/linreg.awk
+../../../awk/linreg.awk

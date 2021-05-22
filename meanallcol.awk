@@ -1,1 +1,1 @@
-/home/walter/becker/awk/meanallcol.awk
+../../../awk/meanallcol.awk

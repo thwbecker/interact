@@ -1,1 +1,1 @@
-/home/walter/becker/awk/max.awk
+../../../awk/max.awk

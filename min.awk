@@ -1,1 +1,1 @@
-/home/walter/becker/awk/min.awk
+../../../awk/min.awk

@@ -1,1 +1,1 @@
-/home/walter/becker/awk/normline.awk
+../../../awk/normline.awk

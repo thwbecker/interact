@@ -4,8 +4,8 @@
 #
 gfile=${1-geom.in}
 fsfile=${2-flt.dat}
-type=${3-1} # strike: 1 dip: 2 abs: 3
-fac=${4-0.5}
+type=${3-3} # strike: 1 dip: 2 abs: 3
+
 if [[ ! -s $gfile || ! -s $fsfile ]];then
     echo $0: $gfile or $fsfile not found
     exit
@@ -26,7 +26,7 @@ gawk '{if((substr($1,1,1)!="#")&&(NF>8))print($6/s,$8/s,$7/s,sqrt($6*$6+$8*$8+$7
 minmax -C tmp.$$.slip  > tmp.$$.dat
 read min1 max1 min2 max2 min3 max3 < tmp.$$.dat ; rm tmp.$$.dat
 
-absslipmax=`gawk '{print($4)}' tmp.$$.slip | minmax  -C  | gawk '{print($2*.75)}'`
+absslipmax=`gawk '{print($4)}' tmp.$$.slip | minmax  -C  | gawk '{print($2)}'`
 if [[ `lc tmp.$$.xyz` -ne `lc tmp.$$.cvec`  \
     || `lc tmp.$$.cvec` -ne `lc tmp.$$.slip` ]];then
     echo $0: length mismatch
@@ -37,31 +37,39 @@ fi
 #ann=-Ba.5f.1/a.5f.1:"[10 km]":/a.5f.1WeSnZ+
 #proj="-Jx3 -Jz3 -E200/25"
 
-reg=`minmax tmp.$$.xyz -I1`/-30/0
-ann=-Ba100f10:"west-east [km]":/a100f10:"north-south [km]":/a20f2WESNZ+
-proj="-Jx0.02 -Jz0.02 -E210/30"
+#reg=`minmax tmp.$$.xyz -I1`/-30/0
+reg=`minmax tmp.$$.xyz -I1`/-40/0
+#ann=-Ba100f10:"west-east [km]":/a100f10:"north-south [km]":/a20f2WESNZ+
+ann=-Ba10f1:"west-east [km]":/a10f1:"north-south [km]":/a10f1:"depth [km]":WESNZ+
+#proj="-Jx0.02 -Jz0.02 -E210/30"
+proj="-Jx.1 -Jz.1 -E50/30"
 
-cmp=haxby
-if [ $type -eq 1 ];then
-    echo $min1 $max1  | gawk -v fac=$fac '{s1=sqrt($1*$1)*fac;s2=sqrt($2*$2)*fac;if(s1>s2)printf("-T%g/%g/%g %.0f",-s1,s1,s1/50,s1/5);else printf("-T%g/%g/%g %.0f",-s2,s2,s2/50,s2/5)}' > tmp.$$.dat
+#cmp=haxby
+cmp=roma
+if [ $type -eq 1 ];then		# strike
+    echo $min1 $max1  | gawk  '{printf("-T%g/%g/%g %f",$1,$2,($2-$1)/15,($2-$1)/3)}' > tmp.$$.dat
     read tstring ls < tmp.$$.dat ; rm tmp.$$.dat
-    makecpt $tstring -C$cmp > tmp.cpt
+    makecpt $tstring -I -C$cmp > tmp.cpt
     #makecpt -T-0.04/0.04/0.005 -C$cmp > tmp.cpt
     #makecpt -T-2000/2000/100 -C$cmp > tmp.cpt;ls=500
     use=22
     label="u@-strike@-"
-elif [ $type -eq 2 ];then
+    ends=-E
+elif [ $type -eq 2 ];then	#  dip
+    ends=-E
     makecpt -T-0.4/0.4/0.05 -C$cmp > tmp.cpt
     use=23
     ls=0.2
     label="u@-dip@-"
-elif [ $type -eq 3 ];then
-    makecpt -T0/$absslipmax/0.01 -C$cmp > tmp.cpt
+elif [ $type -eq 3 ];then	# total
+    echo $absslipmax
+    makecpt -T0/$absslipmax/0.1 -I -C$cmp > tmp.cpt
     #makecpt -T0/0.05/.001 -C$cmp > tmp.cpt;ls=0.025
     #makecpt -T0/1/0.01 -C$cmp > tmp.cpt 
     use=25
-    ls=20
+    ls=0.5
     label="u@-abs@-"
+    ends=-Ef
 fi
 ofile=slip.3d.$type.ps
 # slip is strike, dip, normal
@@ -72,11 +80,13 @@ paste tmp.$$.cvec tmp.$$.slip | \
 gawk '{printf("> -Z%g \n",$(use));\
     print($1,$2,$3);print($4,$5,$6);\
     print($7,$8,$9);print($10,$11,$12);}' use=$use | \
-    psxyz $reg $proj -P -L -M  -Ctmp.cpt \
-    "$ann"  -K > $ofile
-psscale -Ctmp.cpt -D13/.25/6/.2h -E -B$ls:"$fsfile":/:"$label": -O >> $ofile
+    psxyz $reg $proj -P -L -m  -Ctmp.cpt \
+	  "$ann"  -K > $ofile
+echo $ls
+psscale -Ctmp.cpt -Dx3/.25/3/.2h $ends -B$ls/:"$label": -O >> $ofile
 echo $0: output in $ofile
-    
+
+modifybb $ofile    
 
 rm tmp.$$.cvec tmp.$$.slip tmp.$$.xyz tmp.cpt 2> /dev/null
 

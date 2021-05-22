@@ -5,7 +5,7 @@
 #  interact: model fault interactions using dislocations in an elastic         #
 #            medium                                                            #
 #	                                                                       #
-#    Copyright (C) Thorsten W. Becker 2000 - 2002                              #
+#    Copyright (C) Thorsten W. Becker 2000 - 2021                              #
 #                                                                              #
 #    Unteract uses dc3d.f as provided by Y. Okada as in Okada (BSSA, 1992) and #
 #    linear algebra routines from SLATEC, LAPACK, and EISPACK.                 #
@@ -38,8 +38,6 @@ this is the main  subroutine
 for documentation, type 
 
 interact -h
-
-$Id: main.c,v 1.58 2011/01/07 07:19:58 becker Exp $
 
 
 

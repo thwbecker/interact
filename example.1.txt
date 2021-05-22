@@ -220,7 +220,7 @@ $Id: example.1.txt,v 1.2 2003/01/14 18:43:20 becker Exp $
 -1.5000000e+01 -7.8947368e-01  0.0000000e+00  1.5573748e-03  4.0433065e-06  4.8467795e-20 -1.1286849e-04 -6.9443930e-18  3.3071554e-17 
 
 
-	where, of course, the order of 1e-17 values should really by
+	where, of course, the order of 1e-17 values should really be
 	identical to zero.
 
 

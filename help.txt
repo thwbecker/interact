@@ -5,6 +5,7 @@ usage, and input as well as output formats of interact.
 
 For further assistance, refer to INSTALLATION and README.TXT
 
+
 main: binary: interact
 main: compiled for double precision on May 22 2021 at 12:35:25, initializing
 init: version: $Id: init.c,v 2.51 2011/01/09 02:02:43 becker Exp $

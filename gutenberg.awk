@@ -1,1 +1,1 @@
-/home/walter/becker/awk/gutenberg.awk
+../../../awk/gutenberg.awk
