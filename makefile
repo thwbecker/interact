@@ -1,11 +1,10 @@
 ################################################################################
 #
 #
-#  (C) Thorsten Becker, becker@eps.harvard.edu
+#  (C) Thorsten Becker, thwbecker@post.harvard.edu
 #
 #  makefile for interact and related programs
 #
-# $Id: makefile,v 1.45 2005/10/28 16:25:09 becker Exp becker $
 #
 #################################################################################
 #
@@ -86,7 +85,7 @@
 #  -DUSE_GEOPROJECT          use geoproject and produce code that allows for I/O
 #                            using geographic coordinates and projections. for this to
 #                            work, you will have to have GMT (www.gmt.soest.hawaii.edu)
-#                            installed
+#                            installed - THIS USES GMT < VERSION 5
 #  Example settings:
 #
 #  example with latency:

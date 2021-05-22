@@ -60,7 +60,7 @@ c     integer INDEX(N)
 c     AM_PREC A(MDA,N), B(M), W(N), X(N), ZZ(M)   
       integer INDEX(*)  
       AM_PREC A(MDA,*), B(*), W(*), X(*), ZZ(*)   
-      AM_PREC ALPHA, ASAVE, CC, DIFF, DUMMY, FACTOR, RNORM
+      AM_PREC ALPHA, ASAVE, CC, DIFF, DUMMY(1), FACTOR, RNORM
       AM_PREC SM, SS, T, TEMP, TWO, UNORM, UP, WMAX
       AM_PREC ZERO, ZTEST
       parameter(FACTOR = 0.01d0)

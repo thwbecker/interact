@@ -1,16 +1,16 @@
 #
 # flags for geoprojection support 
 # for this to work, you will have to have the GMT libraries 
-# installed
+# installed - version 4.X.X needed
 #
 # use -Ipathname where pathname is the path where GMT and netcdf
 # reside (for header files)
 #
 GEOPROJECT_DEFINES =  -DUSE_GEOPROJECT 
 #
-GEOPROJECT_INCLUDES = -I$(GMTHOME)/src/ -I$(NETCDFHOME)/include/
+GEOPROJECT_INCLUDES = -I$(GMT4HOME)/src/ -I$(NETCDFHOME)/include/
 #
-GEOPROJECT_LIBS =  $(MY_LIBDIR_SPEC)$(GMTHOME)/lib/ -lgmt \
+GEOPROJECT_LIBS =  $(MY_LIBDIR_SPEC)$(GMT4HOME)/lib/ -lgmt \
 	$(MY_LIBDIR_SPEC)$(NETCDFHOME)/lib/ -lnetcdf
 #
 # these are the GEOPROJECT object files from interact
