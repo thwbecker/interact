@@ -25,8 +25,6 @@
 #    pages =	 {NG62A-0925}                                                  #
 #  }                                                                           #
 #                                                                              #
-#  $Id: README.TXT,v 1.13 2003/08/16 11:15:53 becker Exp $                     #
-#                                                                              #
 #  thwbecker@post.harvard.edu                                                  #
 #                                                                              #
 ################################################################################
@@ -101,7 +99,7 @@ patch2geom:
 
 patch2xyz:
 	converts a patch file (with fault segments) into a file that
-	holds the geometry in a xyz file to be read with GMT
+	holds the geometry in a xyz file to be read with GMT (<5)
 
 create_random_stress_file:
 	create fsi.in input file for interact which holds randomly

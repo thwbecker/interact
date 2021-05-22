@@ -1,0 +1,23 @@
+#!/bin/bash
+#
+# example to compute slip on an thrust fault (see example.1.txt and help.txt for background)
+# from far field loading
+#
+# make fault geometry
+makefault -strike 0 -dip 30 -l 50 -w 25 -x 0 -y 0 -z -15 -n 35 -m 20 > geom.in
+# plot geometry
+pgeom
+# background stress at 60 degrees azimuth for loading file
+echo 0 0 0 0 -1 60 | calc_cart_from_eigen_stress -ah | gawk '{for(i=4;i<=NF;i++)print($i,0)}' > smlin.in
+
+# boundary conditions and output, shear stress free
+cat <<EOF > bc.in
+1 1
+-15  15 20   -15 15 20   0  0 1
+-1 -1 -1 50 0
+EOF
+
+# run computation
+interact -pr 0
+# plot fault slip in 3D
+pfltslip3d

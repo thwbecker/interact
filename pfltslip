@@ -1,0 +1,60 @@
+#!/bin/bash
+#
+# plot fault slip - THERE"s ALOS PFLTSLIP3D
+#
+threed=1
+aspect=2
+reg=-R-$aspect/$aspect/-1/1
+scale=1e-4
+
+inc=-I0.025
+proj='-Jx1.7 -Jz2.5 -P'
+annx=f0.1a0.5:"x/W":
+anny=f0.1a0.5:"y/W":
+annz=f0.1a0.5
+# grid the fault slip
+awk '{if($1!=""&&$1!="#")print($1*a,$2,$6/s)}' s=$scale a=$aspect flt.dat | \
+    surface $reg $inc -Gus.grd  
+awk '{if($1!=""&&$1!="#")print($1*a,$2,$7/s)}' s=$scale a=$aspect flt.dat | \
+    surface $reg $inc -Gun.grd  
+awk '{if($1!=""&&$1!="#")print($1*a,$2,$8/s)}' s=$scale a=$aspect flt.dat | \
+    surface $reg $inc -Gud.grd  
+view=-E200/40
+
+tmpn=/tmp/tmp.$$
+ofile=flt.slip.ps
+
+
+for t in us ud ; do
+    grd2cpt $t.grd -E21 -Chot > $tmpn.$t.cpt
+done
+
+#cmp=$HOME/progs/src/interact/slip.cpt
+
+if [ $threed -eq 1 ];then
+
+    grdview ud.grd  -Qsm -C$tmpn.ud.cpt $proj \
+	-B$annx/$anny/$annz:"u@-d@-":WeSnZ $view  -K > $ofile
+    psscale -C$tmpn.ud.cpt -D6.5/0/3/0.2 -B0.25 -O -K -L -E  >> $ofile
+
+    grdview us.grd  -Qsm -C$tmpn.ud.cpt $proj \
+	-B$annx/$anny/$annz:"u@-s@-":WeSnZ $view    -Y5 -O >> $ofile
+    psscale -C$tmpn.us.cpt -D6.5/0/3/0.2 -B0.25 -O -K -L -E  >> $ofile
+else
+    grdimage ud.grd -C$tmpn.ud.cpt $proj \
+	-B$annx/$anny/:."u@-d@-":WeSn   -K > $ofile
+    grdcontour ud.grd -C0.1 $proj -O -K -S >> $ofile
+    psscale -C$tmpn.ud.cpt -D7.1/1.5/3.8/0.2  -B0.1/:"u@-d@- [$scale]": \
+	-O -K -L -E  >> $ofile
+
+    grdimage us.grd   -C$tmpn.us.cpt $proj \
+	-B$annx/$anny/:."u@-s@-":WeSn     -Y5 -O -K >> $ofile
+    grdcontour us.grd -C0.1 $proj -O -S -K >> $ofile
+    psscale -C$tmpn.us.cpt -D7.1/1.5/3.8/0.2  -B1/:"u@-s@- [$scale]": \
+	-O  -L -E  >> $ofile
+fi
+
+modifybb $ofile 0 0 675 750
+echo $0: output in $ofile
+
+rm $tmpn.*

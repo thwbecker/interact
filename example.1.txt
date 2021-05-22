@@ -106,7 +106,7 @@ $Id: example.1.txt,v 1.2 2003/01/14 18:43:20 becker Exp $
    
    1 1
    -15  15 20   -15 15 20   0  0 1
-   -1 -1 -1 50
+   -1 -1 -1 50 0
 
    
    The first number (1) means: run a one-step calculation (not a

@@ -18,15 +18,15 @@ if [ ! -s $infile ];then
     echo $0: can not find $infile
     exit
 fi
-cat $infile | patch2xyz $shrink > $tmpn.dat 2> /dev/null
+cat $infile | patch2xyz  > $tmpn.dat #2> /dev/null
 
 if [ $fixedrange -eq 0 ];then
-    xmin=`gawk -f ~/awk/min.awk col=1 $tmpn.dat | awk '{print($1-1)}' ` 
-    xmax=`gawk -f ~/awk/max.awk col=1 $tmpn.dat | awk '{print($1+1)}'` 
-    ymin=`gawk -f ~/awk/min.awk col=2 $tmpn.dat | awk '{print($1-1)}' ` 
-    ymax=`gawk -f ~/awk/max.awk col=2 $tmpn.dat | awk '{print($1+1)}'` 
-    zmin=`gawk -f ~/awk/min.awk col=3 $tmpn.dat | awk '{print($1-1)}'` 
-    zmax=`gawk -f ~/awk/max.awk col=3 $tmpn.dat | awk '{print($1+1)}'` 
+    xmin=`gawk -f min.awk col=1 $tmpn.dat | awk '{print($1-1)}' ` 
+    xmax=`gawk -f max.awk col=1 $tmpn.dat | awk '{print($1+1)}'` 
+    ymin=`gawk -f min.awk col=2 $tmpn.dat | awk '{print($1-1)}' ` 
+    ymax=`gawk -f max.awk col=2 $tmpn.dat | awk '{print($1+1)}'` 
+    zmin=`gawk -f min.awk col=3 $tmpn.dat | awk '{print($1-1)}'` 
+    zmax=`gawk -f max.awk col=3 $tmpn.dat | awk '{print($1+1)}'` 
 #    zmax=0 
     dax=`echo $xmin $xmax | awk '{print(($2-$1)/6)}'`
     day=`echo $ymin $ymax | awk '{print(($2-$1)/6)}'`
@@ -66,24 +66,26 @@ scl=`echo $dax $day | \
 reg=-R$xmin/$xmax/$ymin/$ymax/$zmin/$zmax
 echo $0: determined region of $reg
 echo $0: z axis is downscaled by $zscaling
+
+
 proj="-Jx$scl -P -Jz`echo $scl | \
     gawk '{print($1/z)}' z=$zscaling`  -E135/30"
 
 echo $0: reading from $tmpn.dat
 # plot the stuff for real
-psxyz $tmpn.dat $reg -L -M $proj $ann -G200/200/200  -K > $file
+psxyz $tmpn.dat $reg -L -m $proj $ann -G200/200/200  -K > $file
 
 if [ $projection -eq 1 ];then
     # projection on lowest z level
     gawk '{print($1,$2,zmin)}' zmin=$zmin $tmpn.dat  | \
-	psxyz $reg  -L -M $proj -K -W2 -O >> $file
+	psxyz $reg  -L -m $proj -K -W2 -O >> $file
     # projection on max y level
     gawk '{print($1,ymax,$3)}' ymax=$ymax $tmpn.dat  | \
-	psxyz  $reg -L -M $proj -O -K -W2 >> $file
+	psxyz  $reg -L -m $proj -O -K -W2 >> $file
     # projection on x min level
     gawk '{if($1==">")print(">");else print(xmin,$2,$3)}' \
 	xmin=$xmin $tmpn.dat  | \
-	psxyz $reg -L -M $proj -O -K -W2  >> $file
+	psxyz $reg -L -m $proj -O -K -W2  >> $file
 fi
 # plot plane.xyz points
 if [ -s plane.xyz ];then
@@ -91,7 +93,8 @@ if [ -s plane.xyz ];then
 	psxyz plane.xyz $reg  $proj  -K -O  -Sa0.1 >> $file
 fi
 # and put some frame around it
-psxyz $tmpn.dat $reg -L -M $proj -W1  -O $ann >> $file
+psxyz $tmpn.dat $reg -L -m $proj -W1  -O $ann >> $file
 
 echo $0: output in $file
+modifybb $file
 rm $tmpn*

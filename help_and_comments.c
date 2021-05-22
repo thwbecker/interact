@@ -3,9 +3,8 @@
 /*
   interact: model fault interactions using dislocations in a 
             halfspace
-  (C) Thorsten Becker, becker@eps.harvard.edu
+  (C) Thorsten Becker, thwbecker@post.havard.edu
 
-  $Id: help_and_comments.c,v 1.45 2003/03/22 07:59:38 becker Exp $
 */
 /*
   print some documentation
@@ -684,14 +683,12 @@ void phelp(void)
   PE("");
   PE(" -h  prints out this help message and exits to the operating system");
   PE("");
-  PE("(C) Thorsten Becker, thwbecker@post.harvard.edu, 1999 - 2002");
+  PE("(C) Thorsten Becker, thwbecker@post.harvard.edu, 1999 - 2021");
   PE("    interact - boundary element code for elastic half-spaces");
   PE("    Main 3-D dislocation code based on dc3d.f by Y. Okada, as of Okada, BSSA, 1992");
   PE("    2-D segment slip solution from Crouch and Starfield (1973)");
   PE("    May include routines based on copyrighted software of others.");
   PE("    Distributed under the GNU public license, see \"COPYING\".");
-  PE("");
-  PE("    $Id: help_and_comments.c,v 1.45 2003/03/22 07:59:38 becker Exp $");
   PE("");
 }
 #undef PE

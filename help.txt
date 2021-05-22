@@ -5,11 +5,10 @@ usage, and input as well as output formats of interact.
 
 For further assistance, refer to INSTALLATION and README.TXT
 
-
 main: binary: interact
-main: compiled for double precision on Sep 10 2014 at 18:33:22, initializing
+main: compiled for double precision on May 22 2021 at 12:35:25, initializing
 init: version: $Id: init.c,v 2.51 2011/01/09 02:02:43 becker Exp $
-init: compiled on Sep 10 2014 18:33:19
+init: compiled on May 22 2021 12:15:51
 
 Interact: calculate fault stresses and displacements in a half space or in 2-D
           using a boundary element approach.
@@ -24,7 +23,7 @@ When stresses (stress tensor components) or pressure are referred to, positive v
 extensional and compressional regimes, respectively (physics convention).
 
 Output is written to files and in real-time to X11 if PGPLOT support was compiled in.
-(No PGPlot support, X11 output unavailable. Compile with USE_PGPLOT flag set, if wanted.)
+(PGPlot support was compiled in.)
 
 (1) The fault geometry is input via the file "geom.in",
     a list of fault patches.
@@ -470,12 +469,10 @@ OPTIONS:
 
  -h  prints out this help message and exits to the operating system
 
-(C) Thorsten Becker, thwbecker@post.harvard.edu, 1999 - 2002
+(C) Thorsten Becker, thwbecker@post.harvard.edu, 1999 - 2021
     interact - boundary element code for elastic half-spaces
     Main 3-D dislocation code based on dc3d.f by Y. Okada, as of Okada, BSSA, 1992
     2-D segment slip solution from Crouch and Starfield (1973)
     May include routines based on copyrighted software of others.
     Distributed under the GNU public license, see "COPYING".
-
-    $Id: help_and_comments.c,v 1.45 2003/03/22 07:59:38 becker Exp $
 
