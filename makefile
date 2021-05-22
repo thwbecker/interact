@@ -119,7 +119,7 @@ include makefile.$(ARCH)
 #
 # add this for pgplot support, otherwise comment it out
 # you will use runtime plotting capabilities
-#include makefile.pgplot
+include makefile.pgplot
 #
 # add this for slatec NNLS routine support, otherwise comment it out
 # you will use NNLS solving capabilities
@@ -558,7 +558,7 @@ $(BDIR)/fit_simple_stress_from_cart: $(ODIR)/fit_simple_stress_from_cart.o $(ODI
 $(BDIR)/plotevents: $(ODIR)/plotevents.o $(ODIR)/plotting.o \
 	$(ODIR)/plotting_palette.o $(ODIR)/mysincos.o $(ODIR)/llgeo.o \
 	$(ODIR)/geometry.o $(GEN_P_INC)  $(LIBLIST) 
-	$(CC) $(LDFLAGS) $(ODIR)/plotevents.o $(ODIR)/llgeo.o \
+	$(LD) $(LDFLAGS) $(ODIR)/plotevents.o $(ODIR)/llgeo.o \
 		$(ODIR)/geometry.o $(ODIR)/plotting_palette.o \
 		$(ODIR)/myopen.o $(ODIR)/plotting.o \
 		-o  $(BDIR)/plotevents  $(PGLIBS) $(LIBS) 

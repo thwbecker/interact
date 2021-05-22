@@ -35,7 +35,7 @@ and half-space dislocation program "interact" as well as several tools
 that go with it. 
 
 To compile, edit the makefile as described in the INSTALLATION
-document and type 'gmake all'. (The normal make might give you
+document and type 'make all'. (The normal make might give you
 problems, the GNU gmake is therefore to be preferred.) 
 
 General settings as to the operation of interact are set in
@@ -243,33 +243,3 @@ check_feedback:
 
 
 
-
-
-
-################################################################################
-#  interact: model fault interactions using dislocations in a halfspace        #
-#                                                                              #
-#    Copyright (C) 2000-2002 Thorsten W. Becker                                #
-#                                                                              #
-#    uses dc3d.f by Y. Okada as in Okada, BSSA, 1992                           #
-#                                                                              #
-#    This program is free software; you can redistribute it and/or modify      #
-#    it under the terms of the GNU General Public License as published by      #
-#    the Free Software Foundation; either version 2 of the License, or         #
-#    (at your option) any later version.                                       #
-#                                                                              #
-#    This program is distributed in the hope that it will be useful,           #
-#    but WITHOUT ANY WARRANTY; without even the implied warranty of            #
-#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the             #
-#    GNU General Public License for more details.                              #
-#                                                                              #
-#    In addition, interact is not to be used for any military purposes or      #
-#    for any other activities that are against the spirit as expressed         #
-#    in the Student Pugwash Pledge (www.spusa.org/pugwash/pledge.html).        #
-#                                                                              #
-#    You should have received a copy of the GNU General Public License         #
-#    along with this program; see the file COPYING.  If not, write to          #
-#    the Free Software Foundation, Inc., 59 Temple Place - Suite 330,          #
-#    Boston, MA 02111-1307, USA.                                               #
-#                                                                              #
-################################################################################
