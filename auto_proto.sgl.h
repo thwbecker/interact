@@ -316,9 +316,11 @@ void find_range(int *, int *, float, float, float, float, float *, float *, floa
 FILE *myopen(char *, char *);
 /* myprojectsimple.c */
 void myprojectsimple(double *, double *, double, double, double, int);
+double oblique_setup(double, double, double *, double, double, double *, GMT_LONG);
 void make_euler_matrix(double *, double *, double);
 void matrix_3v(double *, double *, double *);
 void matrix_2v(double *, double *, double *);
+void sphere_project_setup(double, double, double *, double, double, double *, double, double *, double *, GMT_LONG);
 void oblique_transform(double, double, double *, double *, double *, double *);
 /* mysincos.c */
 void my_sincos_deg(float *, float *, float);
@@ -364,7 +366,19 @@ void spread(float, float *, int, float, int);
 void realft(float *, int, int);
 void four1(float *, int, int);
 /* plotevents.c */
+void drawset(int *, int, int, int, struct pa *);
 /* plotting.c */
+void update_plots(struct med *, struct flt *);
+void init_plot_window(struct med *, struct flt *);
+void close_plot_window(struct med *, struct flt *);
+void plot_time_label(struct med *, struct flt *, int);
+void plot_patch(int, struct med *, struct flt *, int, int);
+void plot_projected_patch(int, struct med *, struct flt *, int, int);
+void plot_time_tics(struct med *, struct flt *, float);
+void add_to_plotting_list(int, int **, int *);
+void plot_quake(int, struct med *, struct flt *);
+void plot_moment_array(struct med *, float *, int);
+void psticks(float *, float *, int);
 /* points2patch.c */
 unsigned short read_points_local(float *, int *, unsigned short, FILE *);
 /* print_patch_geometry.c */
