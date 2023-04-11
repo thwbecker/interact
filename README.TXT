@@ -3,7 +3,7 @@
 #  interact: model fault interactions using dislocations in an elastic         #
 #            medium                                                            #
 #	                                                                       #
-#  Copyright (C) Thorsten W. Becker 2000 - 2021                                #
+#  Copyright (C) Thorsten W. Becker 2000 - 2022                                #
 #                                                                              #
 #  Interact uses dc3d.f as provided by Y. Okada as in Okada (BSSA, 1992) and   #
 #  linear algebra routines from SLATEC, LAPACK, and EISPACK.                   #
@@ -56,8 +56,8 @@ makefiles. The output of 'interact -h' is supplied as the file
 
 The example.?.txt files describe some simple example calculations to,
 hopefully, elucidate the usage of interact and affiliated programs.
-(See also our Fall 2002 AGU poster at
-http://www.seismology.harvard.edu/~becker/agu02_disp.pdf).
+(See our Fall 2002 AGU poster at
+http:///www-udc.ig.utexas.edu/external/becker/agu02_disp.pdf).
 
 Typing 'make' will compile most programs, see the makefile. If you
 want all tools, type 'make really_all'. 
@@ -68,6 +68,8 @@ that are provided in addition follows with short descriptions what
 they do. For each program, more information can be obtained by typing
 'program -h'.
 
+IN PARTICULAR, THE INPUT FORMATS ETC. ARE DESCRIBED WHEN TYPING
+interact -h
 
 1) main program:
 

@@ -1,0 +1,111 @@
+#!/bin/bash
+
+reg=-R-30/60/-60/80/-20/0
+scale=0.1
+proj="-Jx$scale -Jz$scale -E30/20 "
+
+fs=""
+for mode in 1 2;do
+    if [ $mode = 1 ];then
+	athetaf=10
+	nx=40
+	nzfac=0.3
+    else
+	athetaf=2
+	nx=25
+	nzfac=1
+    fi
+# make geometry
+    gawk -v nx=$nx -v athetaf=$athetaf -v nzfac=$nzfac \
+	 -f generate_curved.awk > geom.$mode.in
+    cat geom.$mode.in | patch2xyz  > geom.$mode.xyz
+    
+    #reg=`minmax -I.1 geom.xyz -m`/-15/0
+   
+    psxyz -m $reg $proj  geom.$mode.xyz -m -P -L -Ggray \
+	  -W0.5  -Ba5f1:"x":/a5f1:"y":/a5f1WESNZ+0  > geom.$mode.ps
+    modifybb geom.$mode.ps
+    fs="$fs geom.$mode.ps"
+done
+
+for stype in 0 3;do
+    for bc in 50 51;do
+	if [ $bc = 50 ];then
+	    bclabel="stress free"
+	elif [ $bc = 51 ];then
+	    bclabel="Coulomb stress drop"
+	else
+	    bclabel="NaN"
+	fi
+
+	for mode in 1 2;do
+	   
+	    
+    
+	    
+	    if [ $bc = 50 ];then
+		umax=8
+	    else
+		umax=5
+	    fi
+	    if [ ! -s flt.$mode.$bc.dat ];then
+		cp geom.$mode.in geom.in
+		cat <<EOF > bc.in
+1 0
+-1 -1 -1 $bc 1
+EOF
+		# friction coefficients
+		gawk '{print(0.7,0.3)}' geom.in > fp.in
+		# stress tensor
+		cat <<EOF > smlin.in
+-0.25e4 0
+0.433e4 0
+0 0
+-0.75e4 0
+0 0
+0 0
+EOF
+		# need to fix / what's the sign convention?
+		#echo 0 0 0 5e4 1e4 30 | calc_cart_from_eigen_stress -ah | \
+		    #    gawk '{for(i=4;i<=9;i++)print($i,0)}' > smlin.in
+		
+		interact
+		mv flt.dat flt.$mode.$bc.dat
+		rm bc.in geom.in fp.in
+	    else
+		echo $0: WARNING: reusing flt.$mode.$bc.dat
+	    fi
+	    
+	
+	    ofile=slip.$mode.$bc.$stype.ps
+	    if [ $stype = 3 ];then
+		label="|u|"
+		llabel="total slip"
+		ends=-Ef
+		lspc=`echo $umax | gawk '{print($1/8)}'`
+		makecpt -T0/$umax/`echo $umax | gawk '{print($1/20)}'` -I -Croma > vel.cpt
+	    else
+		ends=-E
+		label="u@-strike@-"
+		llabel="strike component"
+		lspc=`echo $umax | gawk '{print($1/4)}'`
+		umaxh=`echo $umax | gawk '{print($1)}'`
+		makecpt -T-$umaxh/$umaxh/`echo $umax | gawk '{print($1/10)}'` -I -Cvik > vel.cpt
+	    fi
+	    cat geom.$mode.in | patch2xyz flt.$mode.$bc.dat $stype > geom.xyz	
+	    psxyz -m $reg $proj geom.xyz -m -P -L -Cvel.cpt \
+		  -Ba5f1:"x":/a5f1:"y":/a5f1:."geometry $mode, $bclabel, $llabel":WESNZ+0 -K > $ofile
+	    psscale -D4/6.5/5/.25h $ends  -B$lspc/:"$label": -Cvel.cpt -O >> $ofile
+	    modifybb $ofile
+	    fs="$fs $ofile"
+	    rm geom.xyz 
+	done
+	
+
+    done
+
+done
+
+epsmerge -par -x 2 -y 5 $fs > flt_comp.ps
+psconvert -Tf flt_comp.ps
+rm flt_comp.ps $fs
