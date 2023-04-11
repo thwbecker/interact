@@ -1,15 +1,7 @@
-This file contains the help page that can be extracted
-from the interact program by typing "interact -h".
-This man-page type document describes the main features,
-usage, and input as well as output formats of interact.
-
-For further assistance, refer to INSTALLATION and README.TXT
-
-
 main: binary: interact
-main: compiled for double precision on May 22 2021 at 12:35:25, initializing
+main: compiled for double precision on Apr  9 2023 at 19:29:33, initializing
 init: version: $Id: init.c,v 2.51 2011/01/09 02:02:43 becker Exp $
-init: compiled on May 22 2021 12:15:51
+init: compiled on Apr  9 2023 19:29:28
 
 Interact: calculate fault stresses and displacements in a half space or in 2-D
           using a boundary element approach.
