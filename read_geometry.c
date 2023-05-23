@@ -1,7 +1,7 @@
 /*
   interact: model fault interactions using dislocations in a 
             halfspace
-  (C) Thorsten Becker, becker@eps.harvard.edu
+  (C) Thorsten Becker, thwbecker@post.harvard.edu
 
   $Id: read_geometry.c,v 1.28 2003/03/02 07:33:49 becker Exp $
 */

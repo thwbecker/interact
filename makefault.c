@@ -207,7 +207,7 @@ int main(int argc, char **argv)
   divide_fault_in_patches(0,fault,&patch,&nrpatches,seg,circular,TRUE,
 			  srand,drand,&seed);
 #ifdef ALLOW_NON_3DQUAD_GEOM
-  fprintf(stderr,"makefault: x: (%g, %g, %g) l: %g w: %g s: %g d: %g grp: %i n: %5i m: %5i patches: %5i scaling: %11e %s",
+  fprintf(stderr,"makefault: x: (%g, %g, %g) l: %g w: %g s: %g d: %g grp: %i n: %5i m: %5i patches: %5i scaling: %11e %s\n",
 	  fault[0].x[X],fault[0].x[Y],fault[0].x[Z],
 	  fault[0].l,fault[0].w,fault[0].strike,
 	  fault[0].dip,fault[0].group,seg[0],seg[1],nrpatches,CHAR_FAULT_DIM,
@@ -217,7 +217,7 @@ int main(int argc, char **argv)
   else
     fprintf(stderr,"\n");
 #else
-  fprintf(stderr,"makefault: x: (%g, %g, %g) l: %g w: %g s: %g d: %g grp: %i n: %5i m: %5i patches: %5i scaling: %11e",
+  fprintf(stderr,"makefault: x: (%g, %g, %g) l: %g w: %g s: %g d: %g grp: %i n: %5i m: %5i patches: %5i scaling: %11e\n",
 	  fault[0].x[X],fault[0].x[Y],fault[0].x[Z],
 	  fault[0].l,fault[0].w,fault[0].strike,
 	  fault[0].dip,fault[0].group,seg[0],seg[1],nrpatches,CHAR_FAULT_DIM);

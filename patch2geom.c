@@ -5,8 +5,8 @@
 //
 /* 
 
-this file can also produce colored slip COFF files using 
-geom.in and a headerless flt.nohdr.dat file
+   this file can also produce colored slip COFF files using geom.in
+   and a headerless flt.nohdr.dat file 
 
 
  */

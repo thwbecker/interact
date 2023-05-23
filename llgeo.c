@@ -147,6 +147,17 @@ float distance_float(float *x,float *y, int n)
   if(tmp <= 0.0)return 0.0;else return(sqrt(tmp));
 }
 
+void assign_to_vector(float *x,float val, int n)
+{
+  int i;
+  for(i=0;i<n;i++)
+    x[i]= val;
+}
+void assign_to_vector_3d(float *x,float val)
+{
+  x[X] = x[Y] = x[Z] = val;
+}
+
 /* 
 
    Square of Euclidian norm of vector difference in 3D and n

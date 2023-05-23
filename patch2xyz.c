@@ -22,6 +22,8 @@ int main(int argc, char **argv)
     fprintf(stderr,"if flt.dat is given, will print slip or stress\n");
     fprintf(stderr,"\twhere 0: strike 1: dip 2: normal 3: vector slip\n");
     fprintf(stderr,"\twhere 10: strike 11: dip 12: normal 13: vector stress\n");
+    fprintf(stderr,"\twhere 14: is Coulomb stress for strike\n");
+    fprintf(stderr,"\twhere 15: is Coulomb stress for vector shear\n");
     fprintf(stderr,"if shrink_patches is set, will make patches smaller for plotting\n");
     fprintf(stderr,"if use_scalar is set, will interpret the flt.dat to be a list of scalars to use for each patch\n");
     exit(-1);
@@ -97,6 +99,15 @@ int main(int argc, char **argv)
 			   fault[i].s[DIP]*fault[i].s[DIP] +
 			   fault[i].s[NORMAL]*fault[i].s[NORMAL]);
 	  break;
+	case 14:
+	  scalar[i] = fabs(fault[i].s[STRIKE]) - STATIC_MU * fault[i].s[NORMAL];
+	  break;
+	case 15:
+	  scalar[i] = sqrt(fault[i].s[STRIKE]*fault[i].s[STRIKE]+
+			   fault[i].s[DIP]   *fault[i].s[DIP]) -
+	    STATIC_MU * fault[i].s[NORMAL];
+	  break;
+	  
 	default:
 	  fprintf(stderr,"%s: slip component %i undefined\n",argv[0],comp);
 	  exit(-1);

@@ -45,6 +45,13 @@ int main(int argc, char **argv)
   fprintf(stderr,"%s: read %i locations from %s, matrix is %i (data) by %i (model)\n",
 	  argv[0],medium->olocnr,argv[2],medium->olocnr*disp_dim,
 	  abs(slip_modes)*medium->nrflt);
+  if(0){
+    /* print relative fault location */
+    for(j=0;j < medium->nrflt;j++)
+      fprintf(stderr,"%i x %11g y %11g z %11g l %11g w %11g\n",
+	      j+1,fault[j].x[X],fault[j].x[Y],fault[j].x[Z],fault[j].pos[X],fault[j].pos[Y]);
+
+  }
   if(1){			/* do in memory, should be faster
 				   (less evaluations of Okada */
     calc_design_matrix(medium,fault,disp_dim,slip_modes);

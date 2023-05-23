@@ -14,6 +14,9 @@
    read in the fault slip file after the fact, need fault to be
    initialized
 
+   this reads in the version with the two header lines, unless told
+   otherwise
+
 */
 
 void read_fltdat(char *filename,struct flt *fault,struct med *medium, 
@@ -39,7 +42,9 @@ void read_fltdat(char *filename,struct flt *fault,struct med *medium,
     in=stdin;
   }
 
-  /* read header */
+  /* 
+     read two header 
+  */
   getline(&line,&size_dummy,in);free(line);line=NULL;
   getline(&line,&size_dummy,in);free(line);line=NULL;
 
