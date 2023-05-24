@@ -12,7 +12,7 @@ int main(int argc, char **argv)
   struct med *medium;
   int i,comp=0;
   int opmode=PSXYZ_MODE;
-  COMP_PRECISION *scalar,min,max;
+  COMP_PRECISION *scalar=NULL,min,max;
   my_boolean shrink_patches=FALSE,
     read_slip = FALSE,verbose = TRUE,use_scalar = FALSE;
   FILE *in;
@@ -21,7 +21,7 @@ int main(int argc, char **argv)
 	    argv[0],comp,(int)shrink_patches,(int)use_scalar);
     fprintf(stderr,"if flt.dat is given, will print slip or stress\n");
     fprintf(stderr,"\twhere 0: strike 1: dip 2: normal 3: vector slip\n");
-    fprintf(stderr,"\twhere 10: strike 11: dip 12: normal 13: vector stress\n");
+    fprintf(stderr,"\twhere 10: strike 11: dip 12: normal 13: vector shear\n");
     fprintf(stderr,"\twhere 14: is Coulomb stress for strike\n");
     fprintf(stderr,"\twhere 15: is Coulomb stress for vector shear\n");
     fprintf(stderr,"if shrink_patches is set, will make patches smaller for plotting\n");
@@ -53,7 +53,7 @@ int main(int argc, char **argv)
       fprintf(stderr,"%s: reading scalar values from %s\n",
 	      argv[0],argv[1]);
       in = myopen(argv[1],"r");
-      scalar = (COMP_PRECISION *)calloc(medium->nrflt,sizeof(COMP_PRECISION));
+      scalar = (COMP_PRECISION *)realloc(scalar,medium->nrflt*sizeof(COMP_PRECISION));
       min = 1e20; max = -1e20;
       for(i=0;i < medium->nrflt;i++){
 	if(fscanf(in,ONE_CP_FORMAT,(scalar+i)) !=1 ){
@@ -96,8 +96,7 @@ int main(int argc, char **argv)
 	  break;
 	case 13:
 	  scalar[i] = sqrt(fault[i].s[STRIKE]*fault[i].s[STRIKE] + 
-			   fault[i].s[DIP]*fault[i].s[DIP] +
-			   fault[i].s[NORMAL]*fault[i].s[NORMAL]);
+			   fault[i].s[DIP]*fault[i].s[DIP]);
 	  break;
 	case 14:
 	  scalar[i] = fabs(fault[i].s[STRIKE]) - STATIC_MU * fault[i].s[NORMAL];
