@@ -40,7 +40,7 @@ USE_IPO =
 
 # LINKER FLAGS (without -lm, that get's added later)
 
-LDFLAGS = $(USE_IPO)  -posixlib -nofor_main -Vaxlib -static
+LDFLAGS = $(USE_IPO)  -posixlib -nofor_main -Vaxlib # -static
 
 # X 11 only needed for PGPLOT
 X11LIBDIR = /usr/X11R6/lib/
@@ -74,7 +74,8 @@ COMPUTATIONAL_LIBS = $(BLASLIB)
 #
 # where are the modified EISPACK routines from the myeispack.tar.gz
 # file installed?
-EISPACK_LIB = -L$(HOME)/progs/src/eispack/$(ARCH)/ -lmyeis
+EISPACK_DIR = eispack/
+EISPACK_LIB = -L$(EISPACK_DIR)/ -lmyeis
 
 
 # name of interact binary depending on compiler flags

@@ -36,8 +36,8 @@ USE_IPO =
 
 # LINKER FLAGS (without -lm, that get's added later)
 # gcc
-LDFLAGS = -static
-#LDFLAGS = 
+#LDFLAGS = -static
+LDFLAGS = 
 
 # X 11 only needed for PGPLOT
 X11LIBDIR = /usr/X11R6/lib/
@@ -82,15 +82,14 @@ BLASLIB =  $(MATHLIBS)
 COMPUTATIONAL_LIBS = $(BLASLIB)
 #
 # where are the modified EISPACK routines from the myeispack.tar.gz
+EISPACK_DIR = eispack/
 # file installed?
-EISPACK_LIB = -Leispack/$(ARCH)/ -lmyeis
+EISPACK_LIB = -L$(EISPACK_DIR)/ -lmyeis
 
 
 # name of interact binary depending on compiler flags
 INTERACT_BINARY_NAME = interact
 
 
-include makefile.x86_64.gcc
-#include makefile.x86_64.icc
 
 
