@@ -442,9 +442,7 @@ void add_to_active_fault_list(int, int **, int *, unsigned short **);
 void add_to_right_hand_side(double, double **, double **, int *);
 void add_solution(int, unsigned short *, double *, int *, struct med *, struct flt *, unsigned short, unsigned short, double);
 void assemble_a_matrix(double *, int, unsigned short *, int, int *, struct flt *, struct med *);
-void assemble_ap_matrix(double *, int, int, unsigned short *, unsigned short *, int, int, int *, int *, struct flt *, struct med *);
 /* solve_mode_dependend.c */
-void assemble_ap_matrix_4(double *, int, int, unsigned short *, unsigned short *, int, int, int *, int *, struct flt *, struct med *);
 void assemble_a_matrix_4(double *, int, unsigned short *, int, int *, struct flt *, struct med *);
 void add_quake_stress_4(unsigned short *, double *, int, struct flt *, struct med *);
 unsigned short check_coulomb_stress_feedback_4(int, int, struct flt *, struct med *, unsigned short, unsigned short, int *, double);

@@ -107,7 +107,7 @@ include makefile.pgplot
 #
 # add this for slatec NNLS routine support, otherwise comment it out
 # you will use NNLS solving capabilities
-include makefile.slatec
+#include makefile.slatec
 #
 # add this for superlu support, otherwise comment it out
 # you will loose sparse matrix SuperLU LU solver capabilities
@@ -637,6 +637,12 @@ libraries: $(LIBLIST)
 
 $(EISPACK_DIR)/libmyeis.a:
 	cd $(EISPACK_DIR); make ; cd -
+
+$(SLATEC_DIR)/libslatec_dbl.a:
+	cd $(SLATEC_DIR); make ; cd -
+
+$(SLATEC_DIR)/libslatec_sgl.a:
+	cd $(SLATEC_DIR); make ; cd -
 
 $(ODIR)/libpatchio.a: $(PATCH_IO_OBJS)
 	$(AR) rv $(ODIR)/libpatchio.a $(PATCH_IO_OBJS)
