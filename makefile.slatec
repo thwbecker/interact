@@ -7,7 +7,7 @@
 #
 # where did we put the SLATEC distribution form slatec_nnls.tar?
 #
-SLATEC_DIR = $(HOME)/progs/src/slatec
+SLATEC_DIR = slatec/
 #
 # where are the slatec include files?
 #

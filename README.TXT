@@ -3,7 +3,7 @@
 #  interact: model fault interactions using dislocations in an elastic         #
 #            medium                                                            #
 #	                                                                       #
-#  Copyright (C) Thorsten W. Becker 2000 - 2022                                #
+#  Copyright (C) Thorsten W. Becker 2000 - 2023                                #
 #                                                                              #
 #  Interact uses dc3d.f as provided by Y. Okada as in Okada (BSSA, 1992) and   #
 #  linear algebra routines from SLATEC, LAPACK, and EISPACK.                   #
@@ -41,13 +41,13 @@ problems, the GNU gmake is therefore to be preferred.)
 General settings as to the operation of interact are set in
 "makefile", material properties such as the shear modulus are set in
 "properties.h", and all system-dependent settings should be changed in
-"makefile.$ARCH".  The reasoning behind this setup is that you are not
-likely to change the, say, shear modulus very often because it simply
-affects the scaling. Likewise, you will also not want to change the
-way interact works that frequently, so we hardwire several options to
-avoid calls to IF statements for efficiency. After compilation, the
-operation of interact is affected by command line arguments and input
-files.
+"makefile.gcc" or similar.  The reasoning behind this setup is that
+you are not likely to change the, say, shear modulus very often
+because it simply affects the scaling. Likewise, you will also not
+want to change the way interact works that frequently, so we hardwire
+several options to avoid calls to IF statements for efficiency. After
+compilation, the operation of interact is affected by command line
+arguments and input files.
 
 For documentation, use 'program -h' after compilation, and refer to
 the numerous comments in the source code as well as in the

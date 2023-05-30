@@ -23,8 +23,9 @@ void solve(struct med *medium,struct flt *fault)
   FILE *aio;
   int i;
 #ifdef USE_SLATEC_NNLS
-  A_MATRIX_PREC *x,prgopt[1]={1.0},rnorm,*work;
+  A_MATRIX_PREC *x,prgopt[1]={1.0},rnorm,*work,dummy;
   int n,m,*iwork,mode,l,nm,j;
+  FILE *out1,*out2;
 #endif
   char command_str[STRLEN];
   wcutoff = (A_MATRIX_PREC)medium->wcutoff;
@@ -358,8 +359,8 @@ void solve(struct med *medium,struct flt *fault)
       fprintf(stderr,"solve: solving constrained system using NNLS, n: %i\n",
 	      medium->nreq_con);
     /* call NNLS */
-    nnls_driver(a,medium->xsol_con,medium->b_con,
-		medium->nreq_con,medium->nreq_con);
+    nnls_driver_i(a,medium->xsol_con,medium->b_con,
+		  medium->nreq_con,medium->nreq_con);
     free(a);
   }
   /* 

@@ -19,6 +19,7 @@ struct fgrp{
 	       groups, slip in [strike,dip,normal, x,y,z]
 	       
 	    */
+  float strike[3], dip[3], normal[3]; /* mean orientation */
 };
 
 /*
@@ -122,6 +123,10 @@ struct med{
     needed at one point
   */
   int iter, total_iter, max_iter_realized;
+  /* 
+     how to compute group local locations: 0: old 1: new
+  */
+  int group_geom_mode;
   /* 
      geometrical boundaries for fault geometry 
   */

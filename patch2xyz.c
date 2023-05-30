@@ -14,14 +14,14 @@ int main(int argc, char **argv)
   int opmode=PSXYZ_MODE;
   COMP_PRECISION *scalar=NULL,min,max;
   my_boolean shrink_patches=FALSE,
-    read_slip = FALSE,verbose = TRUE,use_scalar = FALSE;
+    read_slip = FALSE,verbose = FALSE,use_scalar = FALSE;
   FILE *in;
   if(argc > 5){
     fprintf(stderr,"%s [flt.dat] [disp_component, %i] [shrink_patches, %i] [use_scalar, %i]\n\t reads in patch format from stdin and writes GMT xyz to stdout\n",
 	    argv[0],comp,(int)shrink_patches,(int)use_scalar);
     fprintf(stderr,"if flt.dat is given, will print slip or stress\n");
     fprintf(stderr,"\twhere 0: strike 1: dip 2: normal 3: vector slip\n");
-    fprintf(stderr,"\twhere 10: strike 11: dip 12: normal 13: vector shear\n");
+    fprintf(stderr,"\twhere 10: strike 11: dip 12: normal 13: vector shear stress\n");
     fprintf(stderr,"\twhere 14: is Coulomb stress for strike\n");
     fprintf(stderr,"\twhere 15: is Coulomb stress for vector shear\n");
     fprintf(stderr,"if shrink_patches is set, will make patches smaller for plotting\n");
@@ -98,10 +98,10 @@ int main(int argc, char **argv)
 	  scalar[i] = sqrt(fault[i].s[STRIKE]*fault[i].s[STRIKE] + 
 			   fault[i].s[DIP]*fault[i].s[DIP]);
 	  break;
-	case 14:
-	  scalar[i] = fabs(fault[i].s[STRIKE]) - STATIC_MU * fault[i].s[NORMAL];
+	case 14:		/* Coulomb with strike shear? */
+	  scalar[i] = fault[i].s[STRIKE] - STATIC_MU * fault[i].s[NORMAL];
 	  break;
-	case 15:
+	case 15:		/* Coulomb with total shear? */
 	  scalar[i] = sqrt(fault[i].s[STRIKE]*fault[i].s[STRIKE]+
 			   fault[i].s[DIP]   *fault[i].s[DIP]) -
 	    STATIC_MU * fault[i].s[NORMAL];
@@ -116,7 +116,7 @@ int main(int argc, char **argv)
 	if(scalar[i]>max)max=scalar[i];
       }
     }
-    fprintf(stderr,"%s: min: %g max: %g from scalar mode\n",argv[0],min,max);
+    fprintf(stderr,"%s: output min: %e max: %e from scalar mode %i\n",argv[0],min,max,comp);
   }
 
   for(i=0;i < medium->nrflt;i++){

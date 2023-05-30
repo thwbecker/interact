@@ -8,7 +8,6 @@ void block_save_solution_and_faults(double *, int, int, struct bflt *, double *,
 void block_load_solution_and_faults(double **, int *, int *, struct bflt **, double **, struct prj **, FILE *, unsigned short *, unsigned short *);
 void block_eval_blockvec(double *, double, int, double *, struct prj *, double *);
 /* block_evaluate_solution.c */
-/* blockinvert.c */
 /* block_levmarq.c */
 void run_lm(struct bmd *, long int *, struct prj, double *, unsigned short, unsigned short, double, double *, unsigned short, unsigned short, double, unsigned short, unsigned short, unsigned short, int, int, char **);
 /* block_matrix.c */
@@ -77,9 +76,14 @@ void calc_dir_diff_vec(double *, double *, double *, int, unsigned short);
 double calc_dir_diff(double, double, unsigned short);
 void cart_mat_from_horsym(double, double, double, double *);
 void rescale_observed_stresses(double *, double *, double *, double, double *, unsigned short, struct bmd *, unsigned short, unsigned short);
+/* blockinvert.c */
 /* calc_cart_from_eigen_stress.c */
 unsigned short read_vecs(int, double *, double *, double *, double *, double *);
 void ccfes_help(char **);
+/* calc_design_matrix.c */
+void print_help_local2(char *, int, int);
+void calc_design_matrix(struct med *, struct flt *, int, int);
+void print_design_matrix(struct med *, struct flt *, int, int, FILE *);
 /* calc_eigen_from_cart_stress.c */
 void fehelp(char **);
 /* calc_interaction_matrix.c */
@@ -165,6 +169,7 @@ int calc_absolute_shear_stress(double *, int, struct flt *);
 /* fstress2hor.c */
 /* generate_random_2d.c */
 /* generate_slipdia.c */
+/* geo_okada.c */
 /* geometry.c */
 void calc_lhemi_proj(double, double, double *);
 void resolve_force(double *, double [3][3], double *);
@@ -197,7 +202,6 @@ void calc_mean_quad_coord(double *, double *);
 void calc_centroid_quad(double *, double *);
 void calculate_position_of_patch(struct med *, struct flt *);
 void compute_cartesian_slip(double *, double *, struct flt *);
-/* geo_okada.c */
 /* get_projected_fault_parameters.c */
 void get_projected_fault_parameters(double [2][2], double, double *, double *, double *, double *, double *, double *);
 /* help_and_comments.c */
@@ -244,6 +248,8 @@ double project_vector(double *, double *);
 double distance_3d(double *, double *);
 double distance(double *, double *, int);
 float distance_float(float *, float *, int);
+void assign_to_vector(float *, float, int);
+void assign_to_vector_3d(float *, float);
 double distance_squared_3d(double *, double *);
 double distance_squared(double *, double *, int);
 float distance_squared_float(float *, float *, int);
@@ -327,7 +333,7 @@ void my_sincos_deg(double *, double *, double);
 void my_sincos_deg_ftn(double *, double *, double *);
 void my_sincos(double *, double *, double);
 /* nnls.c */
-void nnls_driver(double *, double *, double *, int, int);
+void nnls_driver_i(double *, double *, double *, int, int);
 /* optimize.c */
 void optimize(struct flt *, struct med *);
 double distsq(struct flt *, struct flt *);
@@ -436,7 +442,9 @@ void add_to_active_fault_list(int, int **, int *, unsigned short **);
 void add_to_right_hand_side(double, double **, double **, int *);
 void add_solution(int, unsigned short *, double *, int *, struct med *, struct flt *, unsigned short, unsigned short, double);
 void assemble_a_matrix(double *, int, unsigned short *, int, int *, struct flt *, struct med *);
+void assemble_ap_matrix(double *, int, int, unsigned short *, unsigned short *, int, int, int *, int *, struct flt *, struct med *);
 /* solve_mode_dependend.c */
+void assemble_ap_matrix_4(double *, int, int, unsigned short *, unsigned short *, int, int, int *, int *, struct flt *, struct med *);
 void assemble_a_matrix_4(double *, int, unsigned short *, int, int *, struct flt *, struct med *);
 void add_quake_stress_4(unsigned short *, double *, int, struct flt *, struct med *);
 unsigned short check_coulomb_stress_feedback_4(int, int, struct flt *, struct med *, unsigned short, unsigned short, int *, double);

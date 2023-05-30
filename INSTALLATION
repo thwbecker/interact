@@ -71,10 +71,9 @@ sysadmin?
 We proceed in four simple steps:
 
 0) unpacking
-1) ARCH environment variable
-2) EISPACK installation
-3) SLATEC installation
-4) interact installation
+1) EISPACK installation
+2) SLATEC installation
+3) interact installation
 
 This should be done in 15 minutes!
 
@@ -101,45 +100,7 @@ utilities, and the third the matrix inversion routines of the SLATEC
 package. You can compile interact without SLATEC support (and indeed
 we will have to switch SLATEC support on manually later).
 
-
-1) DEFINE ENVIRONMENT VARIABLE ARCH (AND POSSIBLY CFLAGS etc.)
-
-
-First, we have to define an environment variable named ARCH. It is
-used by the makefiles to make directories that hold object code which
-is different for each hardware platform so that you can have interact
-binaries for different machines in one place. I set ARCH to the output
-of the "uname -a" command in my .cshrc file like
-
-setenv ARCH `uname -a`
-
-
-but you can pick whatever you like as a description for your
-hardware. In csh and tcsh, this is done (for one session only) by
-typing
-
-setenv ARCH i686
-
-e.g. if you are running on a Pentium PC with LINUX. For SUN, you would
-use
-
-setenv ARCH sun4u
-
-for SGI's IP35 platforms
-
-setenv ARCH ip35,
-
-and so on, depending what uname -a gives you. In ksh, the equivalent
-command to set ARCH is
-
-export ARCH=sun4u.
-
-
-From now on, we will assume that ARCH was set to "i686" in the
-examples below.
-
-
-2) EISPACK INSTALLATION
+1) EISPACK INSTALLATION
 
 
 Change into the eispack/ sub-directory. Usually, you will have a
@@ -159,19 +120,19 @@ setenv FFLAGS -O3
 
 
 (See the compiler man page.) Then, compile the EISPACK routines and
-put the library in eispack/$ARCH by typing
+put the library in eispack by typing
 
 make
 
-If all went OK, you should have three libraries in eispack/$(ARCH)/
+If all went OK, you should have three libraries in eispack/
 
-ls eispack/$ARCH/*.a
+ls eispack/*.a
 
-i686/libmyeis.a  i686/libmyeis_dbl.a  i686/libmyeis_sgl.a
+libmyeis.a  libmyeis_dbl.a  libmyeis_sgl.a
 
 You can test the eigensystem routines by typing
 
-$ARCH/test_dbl
+test_dbl
 
 The output should be 
 
@@ -187,7 +148,7 @@ messages. If you can't work out what went wrong, send me an email,
 please.
 
 
-3) SLATEC INSTALLATION
+2) SLATEC INSTALLATION
 
 
 We will assume that you want to use the non-negative least-squares
@@ -196,10 +157,10 @@ deal with SLATEC later, skip to 4) and don't uncomment (remove the "#"
 before "include") the SLATEC part in the interact makefile as
 described below.
 
-To start with the installation of SLATEC, assuming you have ARCH
-defined, change to the slatec/ sub-directory. The procedure is very
-similar to that for step 2). If you haven't done so, check to see if
-you have default definitions for compiling FORTRAN code by typing
+To start with the installation of SLATEC, change to the slatec/
+sub-directory. The procedure is very similar to that for step 2). If
+you haven't done so, check to see if you have default definitions for
+compiling FORTRAN code by typing
 
 echo $FFLAGS
 
@@ -213,14 +174,14 @@ slatec sources. If all looks OK, type
 make
 
 and see what happens. If all goes well, the makefile will create a
-directory named $ARCH (e.g. i686/) where it will put all object files
+directory  where it will put all object files
 and the libraries later used by interact. Type
 
-ls $ARCH/*.a
+ls *.a
 
 The output should look like 
 
-i686/libslatec_dbl.a  i686/libslatec_sgl.a
+libslatec_dbl.a  libslatec_sgl.a
 
 If those libraries are not there, try to find out why the code didn't
 compile. The makefile will also try to compile small test
@@ -239,7 +200,7 @@ LOPT = -L/usr/local/src/atlas_Linux_P4SSE2/lib/  -lf77blas -latlas
 if you're using the ATLAS version for Pentium 4. If the libraries and
 the test binaries compiled, you can test your SLATEC routines by typing 
 
-cat a.dat | $(ARCH)/nnls 12 6 6
+cat a.dat | nnls 12 6 6
 
 The result of this should look like:
 
@@ -271,7 +232,7 @@ edit the makefiles by hand. Not a big deal!
 General settings as to the operation of interact are set in
 "makefile", general material properties such as the shear modulus are
 set in "properties.h", and all system-dependent settings should be
-changed in "makefile.$ARCH".  The reasoning behind this setup is that
+changed in "makefile.gcc".  The reasoning behind this setup is that
 you are not likely to change the, say, shear modulus very often
 because it simply affects the scaling. Likewise, you will also not
 want to change the way interact works that often, so we hardwire
@@ -279,43 +240,27 @@ several options to avoid calls to IF statements. After compilation,
 the operation of interact is affected by command line arguments and
 input files.
 
-We provide several hardware and operating system dependent makefiles
-which we have used successfully to compile on different platforms
-
-LINUX: makefile.i686  
-IRIX: makefile.ip27, makefile.ip32, makefile.ip35
-SOLARIS: makefile.sun4u
-
-They are included by the main makefile depending on the settings of
-$ARCH.
-
-If you have one of these OSs, you should edit those files and make
-sure ARCH is set to the suffix of those files. If not, copy one of our
-examples to a makefile for your platform like
-
-cp makefile.i686 makefile.$ARCH
-
-and edit this file. One common problem is the interfacing between
-FORTRAN and C routines. Some compilers, like IRIX or gcc, want a C
-routine `afunc' that calls a FORTRAN routine `bfunc' to be calling
-`bfunc_' instead. We "fix" this with the flag
-SGI_SUBROUTINE_CONVENTION. If this flag is defined with -D (as in
-makefile.ip35, for example), all instances of `afunc' will be replaced
-with `afunc_' by the C preprocessor. This is done in interact.h which
-includes the file `fortran_underscore_convention.h'. So, if your
-compiler wants the underscores, define this flag, else leave it out.
+One common problem is the interfacing between FORTRAN and C
+routines. Some compilers, like IRIX or gcc, want a C routine `afunc'
+that calls a FORTRAN routine `bfunc' to be calling `bfunc_'
+instead. We "fix" this with the flag SGI_SUBROUTINE_CONVENTION. If
+this flag is defined with -D (as in makefile.ip35, for example), all
+instances of `afunc' will be replaced with `afunc_' by the C
+preprocessor. This is done in interact.h which includes the file
+`fortran_underscore_convention.h'. So, if your compiler wants the
+underscores, define this flag, else leave it out.
 
 
 A)  MACHINE DEPENDENT SETTINGS
 
 Let's start with the system dependent settings and edit
-makefile.$ARCH.
+makefile.gcc
 
 If you don't want to use the automatic sparse matrix storage (for now,
 you probably don't), set IMAT_SPARSE_LIM and IMAT_SIZE_LIM to the
 maximum memory you have available for programs on your machine in
 MB. In our example, we have 1500MB available and the relevant line
-(line nr ~15) in makefile.i686 reads
+(line nr ~15) in makefile.gcc reads
 
 MACHINE_DEFINES = -DIMAT_SPARSE_LIM=1500.0 -DIMAT_SIZE_LIM=1500.1 -DSGI_SUBROUTINE_CONVENTION
 
@@ -375,10 +320,10 @@ There's a similar thing for IBM R6k architectures.
 Finally, tell the compiler where it can find the EISPACK libraries
 which we compiled in step 2). E.g.
 
-EISPACK_LIB = -L$(HOME)/src/eispack/$(ARCH)/ -lmyeis
+EISPACK_LIB = -Leispack/ -lmyeis
 
 if we have put the EISPACK libraries from step 2) in
-$(HOME)/src/eispack/$(ARCH)/
+eispack/
 
 b) GENERAL SETTINGS
 
@@ -422,19 +367,19 @@ Type
 make
 
 This should compile all objects and several libraries, which will be
-put into the objects/$ARCH/ directory. If the archive library creation
+put into the objects/ directory. If the archive library creation
 step worked,
 
-ls objects/$ARCH/*.a
+ls objects/*.a
 
 should give
 
-objects/i686/libinput.a  objects/i686/libpatchio.a
+objects/libinput.a  objects/libpatchio.a
 
-if ARCH was set to i686, sat. If all compilations and linking was
-successful, you should end up with several binaries in
+If all compilations and linking was successful, you should end up with
+several binaries in
 
-ls bin/i686/
+ls bin
 
 calc_cart_from_eigen_stress*  interact*       points2patch*
 calc_eigen_from_cart_stress*  makefault*      project_stress*
@@ -447,7 +392,7 @@ generate_slipdia*             patch2xyzvec*
 
 You might want to add the binary directory to your path if you are
 using interact often. Else, you will have to refer to interact using
-the full path name like $HOME/src/interact/bin/$ARCH/interact.
+the full path name like $HOME/src/interact/bin/interact.
 
 Anyways, the main binary is "interact", all other programs are more or
 less utilities to prepare input for interact and plot output. You

@@ -1,0 +1,117 @@
+head	1.1;
+access;
+symbols;
+locks; strict;
+comment	@# @;
+
+
+1.1
+date	2002.11.09.13.25.57;	author becker;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.1
+log
+@Initial revision
+@
+text
+@#
+# to compile, edit i1mach.f, r1mach.f and d1mach.f for individual
+# machine constants and change the compiler options below
+#
+# SGI
+#CFLAGS = -Ofast=$(ARCH)
+#LOPT = -IPA
+# LINUX
+#CFLAGS = -O2
+#LOPT = -L/usr/geophysics/packages/ATLAS/precompiled_lib/Linux_ATHLON256/  -lf77blas -latlas
+LOPT = -L/opt/lib/ -lblas 
+#
+#FFLAGS = $(CFLAGS)
+#
+# cat a.dat | nnls 12 6 6
+#
+# should then yield:
+#nnls: m(rows): 12 n(columns): 6, no NN rows
+#nnls: completely unconstrained least squares
+#nnls: dwnnls returned mode 0
+#0.431973
+#0.352346
+#0.291406
+#0.187675
+#0.0621971
+#-0.158797
+#
+# and 
+#> cat a.dat | nnls 12 6 0
+#nnls: m(rows): 12 n(columns): 6, NN: rows 1 to 6
+#nnls: completely non-negative  least squares
+#nnls: dwnnls returned mode 0
+#0.545299
+#0.271659
+#0.251962
+#0.0937723
+#0.0285226
+#0
+#
+# same for the single precision version.
+#
+
+
+L_SGL_FLAGS = -L$(ARCH)/  -I. -lslatec_sgl $(LOPT)
+
+L_DBL_FLAGS = -L$(ARCH)/ -I.  -lslatec_dbl $(LOPT) 
+
+
+SLATEC_DBL_OBJS = $(ARCH)/d1mach.o $(ARCH)/dh12.o $(ARCH)/dwnlit.o $(ARCH)/dwnlsm.o \
+	$(ARCH)/dwnlt1.o \
+	$(ARCH)/dwnlt2.o $(ARCH)/dwnlt3.o $(ARCH)/dwnnls.o $(ARCH)/fdump.o \
+	$(ARCH)/i1mach.o $(ARCH)/j4save.o \
+	$(ARCH)/xercnt.o $(ARCH)/xerhlt.o $(ARCH)/xermsg.o $(ARCH)/xerprn.o \
+	$(ARCH)/xersve.o $(ARCH)/xgetua.o
+
+SLATEC_SGL_OBJS = $(ARCH)/r1mach.o $(ARCH)/h12.o $(ARCH)/wnlit.o $(ARCH)/wnlsm.o \
+	$(ARCH)/wnlt1.o \
+	$(ARCH)/wnlt2.o $(ARCH)/wnlt3.o $(ARCH)/wnnls.o $(ARCH)/fdump.o \
+	$(ARCH)/i1mach.o $(ARCH)/j4save.o \
+	$(ARCH)/xercnt.o $(ARCH)/xerhlt.o $(ARCH)/xermsg.o $(ARCH)/xerprn.o \
+	$(ARCH)/xersve.o $(ARCH)/xgetua.o
+
+
+all:	$(ARCH)/libslatec_sgl.a $(ARCH)/libslatec_dbl.a \
+	 $(ARCH)/nnls  $(ARCH)/nnls_sgl  \
+
+$(ARCH)/nnls: $(ARCH)/nnls.o $(ARCH)/libslatec_dbl.a
+	$(F77) $(ARCH)/nnls.o  -o $(ARCH)/nnls $(L_DBL_FLAGS) 
+
+$(ARCH)/nnls_sgl: $(ARCH)/nnls_sgl.o $(ARCH)/libslatec_sgl.a
+	$(F77) $(ARCH)/nnls_sgl.o  -o $(ARCH)/nnls_sgl $(L_SGL_FLAGS)   
+
+$(ARCH)/nnls_sgl.o:
+	$(CC) -c nnls.c $(CFLAGS) -DSINGLE_PREC -o $(ARCH)/nnls_sgl.o
+
+$(ARCH)/est_nnls_sgl.o:
+	$(CC) -c test_nnls.c $(CFLAGS) -DSINGLE_PREC \
+		-o $(ARCH)/test_nnls_sgl.o
+
+$(ARCH)/%.o: %.c
+	$(CC) -c $(CFLAGS) $< -o $(ARCH)/$*.o
+
+$(ARCH)/%.o: %.f
+	$(F77) -c $(FFLAGS) $< -o $(ARCH)/$*.o
+
+$(ARCH)/libslatec_sgl.a: $(SLATEC_SGL_OBJS)
+	$(AR) -rv $(ARCH)/libslatec_sgl.a $(SLATEC_SGL_OBJS)
+
+$(ARCH)/libslatec_dbl.a: $(SLATEC_DBL_OBJS)
+	$(AR) -rv $(ARCH)/libslatec_dbl.a $(SLATEC_DBL_OBJS)
+
+
+clean:
+	rm $(ARCH)/*.o $(ARCH)/*.a
+@

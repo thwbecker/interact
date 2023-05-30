@@ -387,7 +387,8 @@ my_boolean check_coulomb_stress_feedback_3(int, int, struct flt *, struct med *,
 my_boolean check_coulomb_stress_feedback_4(int, int, struct flt *, struct med *, my_boolean, my_boolean,int*,COMP_PRECISION);
 
 
-
+void print_design_matrix(struct med *,struct flt *,int , int , FILE *);
+void calc_design_matrix(struct med *,struct flt *,int , int );
 
 #ifdef DMALLOC
 #include "dmalloc.h"

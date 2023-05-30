@@ -1,0 +1,108 @@
+head	1.1;
+access;
+symbols;
+locks
+	becker:1.1; strict;
+comment	@ * @;
+
+
+1.1
+date	2004.01.25.03.52.33;	author becker;	state Exp;
+branches;
+next	;
+
+
+desc
+@@
+
+
+1.1
+log
+@Initial revision
+@
+text
+@#include <stdio.h>
+#include "slatec_src.h"
+
+#ifdef SINGLE_PREC
+#define COMP_PRECISION float
+#define DATA_FORMAT "%f"
+#else
+#define DATA_FORMAT "%lf"
+#define COMP_PRECISION double
+#endif
+/* 
+
+driver for the nnsl routine from slatec
+
+solve A.x = b with x_i >= 0 
+
+A(m,n), b(m), x(n)
+
+l = n: identical to least squares solution
+l = 0: all parameters constrained to be non-negative
+ 
+*/
+void nnls_driver(int m,int n, int l,
+		 COMP_PRECISION *a,
+		 COMP_PRECISION *b, 
+		 COMP_PRECISION *x,
+		 COMP_PRECISION *rnorm,
+		 int *mode)
+{
+  COMP_PRECISION *atmp,*work;
+  COMP_PRECISION prgopt[1]={1.0};
+  int me,ma,*iwork,i,nm;
+
+  // number of exact equations
+  me=0;
+  // number of least squares equations
+  ma=m;
+  iwork=(int *)malloc(sizeof(int)*(me+ma+n));
+  work=(COMP_PRECISION *)malloc(sizeof(COMP_PRECISION)
+				*(me+ma+5*n));
+  atmp=(COMP_PRECISION *)malloc(sizeof(COMP_PRECISION)
+				*((m+1)*n));
+  if(!iwork || !work || !atmp){
+    fprintf(stderr,"nnls_dirver: memory allocation error\n");
+    exit(-1);
+  }
+  /* reassign A and b to atmp */
+  nm = n * m;
+  /* A matrix */
+  for(i=0;i < nm;i++)
+    atmp[i] = a[i];
+  /* b vector */
+  for(i=0;i < m;i++)
+    atmp[nm+i] = b[i];
+#ifdef SINGLE_PREC
+  wnnls_(atmp, &m, &me, &ma, &n, &l, prgopt, x, rnorm, mode,
+	 iwork, work);
+#else
+  dwnnls_(atmp, &m, &me, &ma, &n, &l, prgopt, x, rnorm, mode,
+	  iwork, work);
+#endif
+  free(atmp);free(iwork);free(work);
+}
+
+void nnls_driver_ftn(int *m,int *n, int *l,
+		     COMP_PRECISION *a,
+		     COMP_PRECISION *b, 
+		     COMP_PRECISION *x,
+		     COMP_PRECISION *rnorm,
+		     int *mode)
+{
+  nnls_driver(*m,*n,*l,a,b,x,rnorm,mode);
+}
+void nnls_driver_ftn__(int *m,int *n, int *l,
+		      COMP_PRECISION *a,
+		      COMP_PRECISION *b, 
+		      COMP_PRECISION *x,
+		      COMP_PRECISION *rnorm,
+		      int *mode)
+{
+
+  nnls_driver_ftn(m,n,l,a,b,x,rnorm,mode);
+
+}
+@

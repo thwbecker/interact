@@ -1,0 +1,84 @@
+#
+# LINUX system dependent flags
+# $Id: makefile.i686,v 1.4 2001/08/18 15:51:59 becker Exp becker $
+#
+# CONSTANTS
+#
+# constants you might want to change according to the machine specs
+#
+# IMAT_SPARSE_LIM: limit in MB for I matrix size at which the program switches 
+#                  automatically to sparse matrix storage, ~70% of RAM of machine
+# IMAT_SIZE_LIM:   max size of the interaction matrix in MB that we want in 
+#                  in memory, if size is larger AND NO SPARSE STORAGE is invoked
+#                  will read from file. This is so slow, it's next to impossible to work.
+#
+MACHINE_DEFINES = -DIMAT_SPARSE_LIM=8000.0 \
+	-DIMAT_SIZE_LIM=4000.1  \
+	-DSGI_SUBROUTINE_CONVENTION 
+#	-DSGI_SUBROUTINE_CONVENTION -DNO_LAPACK3
+#
+# LINUX system dependent flags for intel compilers
+#
+# $Id: makefile.i686,v 1.4 2001/08/18 15:51:59 becker Exp becker $
+#
+#
+# compilers
+CC = icc
+F77 = ifort
+
+LD = $(F77)
+AR = ar
+# set the compiler flag for library directories
+# usually -L, could be -Wl,-L as for HPUX
+MY_LIBDIR_SPEC = -L
+
+#
+# comment this in for performance improvement (?)
+#
+#USE_IPO = -ipo -ipo_obj
+USE_IPO = 
+
+# LINKER FLAGS (without -lm, that get's added later)
+
+LDFLAGS = $(USE_IPO)  -posixlib -nofor_main -Vaxlib -static
+
+# X 11 only needed for PGPLOT
+X11LIBDIR = /usr/X11R6/lib/
+#
+MATHLIB = -limf
+#
+SCARGS = -O3  $(USE_IPO) -Werror -vec_report0  -unroll $(MACHINE_DEFINES) 
+#SCARGS = -g -Werror $(MACHINE_DEFINES) 
+#SCARGS = -fast $(MACHINE_DEFINES) 
+#SCARGS = -O3 $(USE_IPO) -vec_report0  -unroll $(MACHINE_DEFINES) 
+
+
+# debugging options, comment in for debugging
+# -DSUPER_DUPER_DEBUG
+#SCARGS = -g -DDEBUG -DSUPER_DEBUG  $(MACHINE_DEFINES)  
+
+#
+# fortran flags
+#
+SFARGS = $(SCARGS)
+#
+SFARGSSAVE = $(SFARGS)
+#
+# BLAS
+BLASLIB = $(MATHLIBS) 
+
+# other computational routines. LAPACK is needed if USE_NUMREC_SVD is not set
+# (included above, ordering matters)
+
+COMPUTATIONAL_LIBS = $(BLASLIB)
+#
+# where are the modified EISPACK routines from the myeispack.tar.gz
+# file installed?
+EISPACK_LIB = -L$(HOME)/progs/src/eispack/$(ARCH)/ -lmyeis
+
+
+# name of interact binary depending on compiler flags
+INTERACT_BINARY_NAME = interact
+
+
+

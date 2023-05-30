@@ -14,29 +14,12 @@
 #
 # Then type "make" and "interact -h" after succesful compilation for the help page.
 #
-# YOU WILL HAVE TO HAVE THE FOLLOWING ENVIRONMENT VARIABLES DEFINED:
-#
-# ARCH = architecture of the machine, e.g. ip27 or i686, that's what you get with
-# uname -m | awk '{print(tolower($1))}'
-#
-# all machine dependent compiler flags are in makefile.$(ARCH)
-#  where ARCH is 
-#  ip27 or ip32 for SGI
-#  i686 or something for LINUX 
-#  sun4d or sun4u for SUN and so on
-#
-# you should edit the makefile.$(ARCH) files for machine specific settings such
-# as compiler flags, memory limits and the like
-#
-# other flags (switches) should be set here, ie. added to the 
-# MAIN_DEFINES line as in the examples below. 
-#
-# for calc_eigen_from_cart_stress you need EISPACK in the modified form as 
-# supplied in the myeispack.tar.gz file. 
-# Extract this files to the location as specified at the end
-# of the makefile.$(ARCH) (by default $(HOME)/progs/src/eispack) 
-# and run "make" in that directory to create the modified
-# EISPACK libraries first
+# 
+# for calc_eigen_from_cart_stress you need EISPACK in the modified
+# form as supplied in the myeispack.tar.gz file.  Extract this files
+# to the location as specified at the end of the makefile.gcc (by
+# default eispack/) and run "make" in that directory to create the
+# modified EISPACK libraries first
 #
 #
 # WARNING:
@@ -80,7 +63,7 @@
 #                            recipes. Default is from LAPACK since numerical reps
 #                            didn't work for -O:fast=ip27 compilation on IRIX systems
 #                            If this is not set, you will have to specify the flags
-#                            for the inclusion of LAPACK in the makefile.$ARCH files.
+#                            for the inclusion of LAPACK in the makefile.gcc files.
 #
 #  -DUSE_GEOPROJECT          use geoproject and produce code that allows for I/O
 #                            using geographic coordinates and projections. for this to
@@ -106,16 +89,17 @@ MAIN_DEFINES = $(COMMON_DEFINES)
 #
 #
 # directory for object files
-ODIR = objects/$(ARCH)/
+ODIR = objects/
 # directory for binaries
-BDIR = bin/$(ARCH)/
+BDIR = bin/
 #
 # choice of Okada routine, comment out if modified routine is used
 OKROUTINE = $(ODIR)/dc3d.o
 # 
 # include the machine dependent flags
 # 
-include makefile.$(ARCH)
+include makefile.gcc
+#include makefile.icc
 #
 # add this for pgplot support, otherwise comment it out
 # you will use runtime plotting capabilities
@@ -264,7 +248,8 @@ GEN_P_INC = interact.h precision_single.h precision_double.h \
 	structures.h macros.h auto_proto.h auto_proto.sgl.h fortran_proto.h \
 	filenames.h properties.h blockinvert.h
 
-LIBLIST = $(ODIR)/libpatchio.a $(ODIR)/libinput.a 
+LIBLIST = $(ODIR)/libpatchio.a $(ODIR)/libinput.a $(EISPACK_DIR)/libmyeis.a
+
 LIBLIST_SGL = 	$(ODIR)/libpatchio.sgl.a $(ODIR)/libinput.sgl.a
 
 #
@@ -295,7 +280,7 @@ inoise: noisefile $(BDIR)/interact_noise.$(NOISELEVEL)
 
 tools: misc_tools random_geom_tools random_prop_tools
 
-misc_tools: $(BDIR)/makefault $(BDIR)/calc_interaction_matrix \
+misc_tools: $(BDIR)/makefault $(BDIR)/calc_interaction_matrix $(BDIR)/calc_design_matrix \
 		$(BDIR)/project_stress $(BDIR)/calc_eigen_from_cart_stress \
 	$(BDIR)/check_feedback $(BDIR)/fit_simple_stress_from_cart \
 	$(BDIR)/calc_cart_from_eigen_stress \
@@ -333,31 +318,17 @@ pgplot_progs:  $(BDIR)/plotevents $(BDIR)/read_bin_events
 #
 
 clean: 
-	rm -rf $(ODIR)/*.o $(ODIR)/*.a  $(ODIR)/rii_files/ *.ps *.dat rii_files/ \
-	auto_proto.h auto_proto.sgl.h
-
+	rm -rf $(ODIR)/*.o $(ODIR)/*.a  
 dist_clean:
-	rm -rf $(BDIR)/*
+	rm -rf $(BDIR)/* auto_proto.h auto_proto.sgl.h
 
 obj_directories:
-	if [ ! -s ./objects/ ]; then\
-		mkdir objects;\
-	fi;
-	if [ ! -s ./objects/ ]; then\
-		mkdir objects;\
-	fi;
 	if [ ! -s $(ODIR) ];then \
-		mkdir $(ODIR);\
+		mkdir -p $(ODIR);\
 	fi;\
-	if [ ! -s ./bin/ ];then\
-		mkdir bin;\
+	if [ ! -s $(BDIR) ];then\
+		mkdir -p $(BDIR);\
 	fi;\
-	if [ ! -s ./bin ];then\
-		mkdir bin;\
-	fi;\
-	if [ ! -s bin/$(ARCH)/ ];then \
-		mkdir bin/$(ARCH);\
-	fi;
 
 saved:
 	cp $(BDIR)/$(INTERACT_BINARY_NAME) $(BDIR)/interact_saved;\
@@ -511,6 +482,13 @@ $(BDIR)/calc_interaction_matrix: $(ODIR)/coulomb_stress.o \
 	-o $(BDIR)/calc_interaction_matrix $(LIBS) $(SUPERLU_LIBS) \
 		$(PGLIBS) $(SLATEC_LIBS) 
 
+$(BDIR)/calc_design_matrix: $(ODIR)/calc_design_matrix.o  \
+	$(ODIR)/coulomb_stress.o $(GEN_P_INC) \
+	 $(LIBLIST) 
+	$(LD) $(LDFLAGS) $(ODIR)/calc_design_matrix.o   $(ODIR)/coulomb_stress.o \
+	-o $(BDIR)/calc_design_matrix $(LIBS) $(SUPERLU_LIBS) \
+		$(PGLIBS) $(SLATEC_LIBS) 
+
 
 $(BDIR)/test_sparse: $(ODIR)/test_sparse.o $(ODIR)/coulomb_stress.o $(GEN_P_INC)  $(LIBLIST) 
 	$(LD) $(LDFLAGS)  $(ODIR)/test_sparse.o $(ODIR)/coulomb_stress.o \
@@ -576,7 +554,7 @@ $(BDIR)/blockinvert_sph: $(GEN_P_INC)  $(GEOPROJECT_OBJS) $(LIBLIST) \
 		$(MY_LIBDIR_SPEC)$(ODIR)/ $(MATHLIB)   $(GEOPROJECT_OBJS)			\
 		-o  $(BDIR)/blockinvert_sph   -linput -lpatchio		\
 		$(GEOPROJECT_LIBS)					\
-		$(DEBUG_LIBS) $(EISPACK_LIB) $(PGLIBS) 		$(COMPUTATIONAL_LIBS) 
+		$(DEBUG_LIBS) $(EISPACK_LIB) $(PGLIBS) 		$(COMPUTATIONAL_LIBS)  $(SLATEC_LIBS)
 
 $(BDIR)/fstress2hor: $(GEN_P_INC)  $(LIBLIST) $(GEOPROJECT_OBJS)\
 		$(FSTRESS2HOR_OBJS) $(ODIR)/fstress2hor.o
@@ -656,6 +634,9 @@ auto_proto.sgl.h:
 # libraries
 #
 libraries: $(LIBLIST)
+
+$(EISPACK_DIR)/libmyeis.a:
+	cd $(EISPACK_DIR); make ; cd -
 
 $(ODIR)/libpatchio.a: $(PATCH_IO_OBJS)
 	$(AR) rv $(ODIR)/libpatchio.a $(PATCH_IO_OBJS)
@@ -774,6 +755,7 @@ $(ODIR)/%.o:	%.f $(GEN_P_INC)
 
 $(ODIR)/%.o:	%.F $(GEN_P_INC)
 	$(F77) $(FFLAGS) -DUSE_DOUBLE_PRECISION -c $<  -o $(ODIR)/$*.o
+
 # single prec versions
 $(ODIR)/%.sgl.o:	%.c $(GEN_P_INC)
 	$(CC) $(CFLAGS) -c $< -o $(ODIR)/$*.sgl.o

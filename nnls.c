@@ -30,8 +30,8 @@
 #ifdef DEBUG
  #define CHECK_B_NORM 
 #endif
-void nnls_driver(A_MATRIX_PREC *a,A_MATRIX_PREC *xsol, 
-		 A_MATRIX_PREC *b,int m,int n)
+void nnls_driver_i(A_MATRIX_PREC *a,A_MATRIX_PREC *xsol, 
+		    A_MATRIX_PREC *b,int m,int n)
 {
   int i,mode,*index;
   A_MATRIX_PREC rnorm,*w,*zz;
