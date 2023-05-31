@@ -68,7 +68,8 @@
 #  -DUSE_GEOPROJECT          use geoproject and produce code that allows for I/O
 #                            using geographic coordinates and projections. for this to
 #                            work, you will have to have GMT (www.gmt.soest.hawaii.edu)
-#                            installed - THIS USES GMT < VERSION 5
+#                            installed - THIS USES GMT < VERSION 5 - this is set in makefile.geoproject
+# 			     which is commented out by default
 #  Example settings:
 #
 #  example with latency:
@@ -115,7 +116,7 @@ include makefile.pgplot
 #
 # add this for geoprojection support
 #
-include makefile.geoproject
+#include makefile.geoproject
 
 # add up all define flags
 DEFINE_FLAGS = $(MAIN_DEFINES) $(SLATEC_DEFINES) \
