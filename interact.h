@@ -45,6 +45,20 @@
 #ifdef USE_GEOPROJECT
 #include "gmt.h" 
 #endif
+/* list of projections
+
+don't expect anything to work....
+*/
+
+#define PROJECT_AZI 0		/* 
+				   simple projection given 
+				   clon/clat and azimuth
+				   
+				 */
+#define OMERC_AZI 1		/* oblique Mercator lon/lat/azi */
+#define OMERC_POLE 2		/* oblique Mercator lon/lat plon/plat */
+#define LCONFORM 3		/* Lambert conic conformal 
+				 lon/lat/latp1/latp2 */
 
 /* 
 
@@ -86,7 +100,9 @@
 #include "macros.h"
 // filenames
 #include "filenames.h"
+#ifdef USE_GEOPROJECT
 #include "geoproject.h"
+#endif
 
 // which random number generator should we use?
 //#define RAND_GEN ran1
@@ -341,10 +357,9 @@ singular value will be set to zero
 #define POSU(i, j, k, l) (((k * nxy)+(i * medium->n[Y])+(j))*3+(l))
 // the fault and medium structures
 #include "structures.h"
+#ifdef USE_GEOPROJECT
 // geographic projection routines
 #include "myprojectsimple.h"
-
-#ifdef USE_GEOPROJECT 
 extern void GMT_end(int, char **);
 #endif
 //
@@ -370,3 +385,11 @@ extern void GMT_end(int, char **);
 #include "dmalloc.h"
 #endif
 
+void assemble_ap_matrix_1(A_MATRIX_PREC *,int ,int ,my_boolean *,my_boolean *,int ,int ,
+			  int *,int *,struct flt *,struct med *);
+void assemble_ap_matrix_2(A_MATRIX_PREC *,int ,int ,my_boolean *,my_boolean *,int ,int ,
+			  int *,int *,struct flt *,struct med *);
+void assemble_ap_matrix_3(A_MATRIX_PREC *,int ,int ,my_boolean *,my_boolean *,int ,int ,
+			  int *,int *,struct flt *,struct med *);
+void assemble_ap_matrix_4(A_MATRIX_PREC *,int ,int ,my_boolean *,my_boolean *,int ,int ,
+			  int *,int *,struct flt *,struct med *);

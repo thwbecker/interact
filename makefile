@@ -620,6 +620,7 @@ auto_proto.h:
 		`ls *.c | grep -v solve_mode_dependent.c | grep -v geoproject.c `  | \
 		grep -v "void main("  | grep -v "int main(" > tmp.h;\
 	mv tmp.h auto_proto.h
+
 auto_proto.sgl.h: 
 	rm -f auto_proto.sgl.h 2> /dev/null;\
 	touch auto_proto.sgl.h;\
