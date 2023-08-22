@@ -79,7 +79,12 @@
 #              DEFINE_FLAGS =  \
 #                      -DBINARY_PATCH_EVENT_FILE -DUSE_DOUBLE_PRECISION 
 #
-COMMON_DEFINES =  -DBINARY_PATCH_EVENT_FILE -DCHECK_CI_ONE_WAY 
+
+MY_PRECISION = -DUSE_DOUBLE_PRECISION
+#MY_PRECISION = -DUSE_MIXED_PRECISION
+#MY_PRECISION = 			#single
+
+COMMON_DEFINES =  -DBINARY_PATCH_EVENT_FILE -DCHECK_CI_ONE_WAY -DNO_OPENING_MODES
 #
 # noise level for random interact version. this version 
 # doesn't get compiled automatically.
@@ -615,7 +620,7 @@ auto_proto.h:
 	rm -f auto_proto.h 2> /dev/null;\
 	touch auto_proto.h;\
 	cproto  $(DEFINE_FLAGS)  $(GEOPROJECT_INCLUDES) \
-		$(PGPLOT_DEFINES) $(PGPLOT_INCLUDES) -DUSE_DOUBLE_PRECISION \
+		$(PGPLOT_DEFINES) $(PGPLOT_INCLUDES) $(MY_PRECISION) \
 		$(SLATEC_INCLUDES)  $(SUPERLU_INCLUDES)  -f2 -q \
 		`ls *.c | grep -v solve_mode_dependent.c | grep -v geoproject.c `  | \
 		grep -v "void main("  | grep -v "int main(" > tmp.h;\
@@ -668,7 +673,7 @@ $(ODIR)/libinput.sgl.a: $(INPUT_OBJS_SGL)
 #
 #
 $(ODIR)/numrec_svd_routines.o: numrec_svd_routines.F $(GEN_P_INC)
-	$(F77) -c  $(FFLAGS) numrec_svd_routines.F -DUSE_DOUBLE_PRECISION -o $(ODIR)/numrec_svd_routines.o
+	$(F77) -c  $(FFLAGS) numrec_svd_routines.F $(MY_PRECISION) -o $(ODIR)/numrec_svd_routines.o
 $(ODIR)/numrec_svd_routines.sgl.o: numrec_svd_routines.F $(GEN_P_INC)
 	$(F77) -c  $(FFLAGS) numrec_svd_routines.F -o $(ODIR)/numrec_svd_routines.sgl.o
 #
@@ -676,16 +681,16 @@ $(ODIR)/numrec_svd_routines.sgl.o: numrec_svd_routines.F $(GEN_P_INC)
 #
 $(ODIR)/solve_mode_dependend_1.o: solve_mode_dependend.c $(GEN_P_INC)
 	$(CC) $(CFLAGS) -c solve_mode_dependend.c \
-	-DCOMP_MODE_1 -DUSE_DOUBLE_PRECISION -o  $(ODIR)/solve_mode_dependend_1.o
+	-DCOMP_MODE_1 $(MY_PRECISION) -o  $(ODIR)/solve_mode_dependend_1.o
 $(ODIR)/solve_mode_dependend_2.o: solve_mode_dependend.c $(GEN_P_INC)
 	$(CC) $(CFLAGS) -c solve_mode_dependend.c \
-	-DCOMP_MODE_2 -DUSE_DOUBLE_PRECISION -o  $(ODIR)/solve_mode_dependend_2.o
+	-DCOMP_MODE_2 $(MY_PRECISION) -o  $(ODIR)/solve_mode_dependend_2.o
 $(ODIR)/solve_mode_dependend_3.o: solve_mode_dependend.c $(GEN_P_INC)
 	$(CC) $(CFLAGS) -c solve_mode_dependend.c \
-	-DCOMP_MODE_3 -DUSE_DOUBLE_PRECISION -o  $(ODIR)/solve_mode_dependend_3.o
+	-DCOMP_MODE_3 $(MY_PRECISION) -o  $(ODIR)/solve_mode_dependend_3.o
 $(ODIR)/solve_mode_dependend_4.o: solve_mode_dependend.c $(GEN_P_INC)
 	$(CC) $(CFLAGS) -c solve_mode_dependend.c \
-	-DCOMP_MODE_4 -DUSE_DOUBLE_PRECISION -o  $(ODIR)/solve_mode_dependend_4.o
+	-DCOMP_MODE_4 $(MY_PRECISION) -o  $(ODIR)/solve_mode_dependend_4.o
 #
 # single prec
 $(ODIR)/solve_mode_dependend_1.sgl.o: solve_mode_dependend.c $(GEN_P_INC)
@@ -703,23 +708,23 @@ $(ODIR)/solve_mode_dependend_4.sgl.o: solve_mode_dependend.c $(GEN_P_INC)
 #
 # spherical versions of the blockinvert code
 $(ODIR)/blockinvert.sph.o:	blockinvert.c $(GEN_P_INC)
-	$(CC) $(CFLAGS) -DBLOCK_SPHERICAL -c $< -DUSE_DOUBLE_PRECISION -o  $(ODIR)/blockinvert.sph.o
+	$(CC) $(CFLAGS) -DBLOCK_SPHERICAL -c $< $(MY_PRECISION) -o  $(ODIR)/blockinvert.sph.o
 $(ODIR)/block_matrix.sph.o:	block_matrix.c $(GEN_P_INC)
-	$(CC) $(CFLAGS) -DBLOCK_SPHERICAL  -c $< -DUSE_DOUBLE_PRECISION -o  $(ODIR)/block_matrix.sph.o
+	$(CC) $(CFLAGS) -DBLOCK_SPHERICAL  -c $< $(MY_PRECISION) -o  $(ODIR)/block_matrix.sph.o
 $(ODIR)/read_stress_observations.sph.o:	read_stress_observations.c $(GEN_P_INC)
-	$(CC) $(CFLAGS) -DBLOCK_SPHERICAL  -c $< -DUSE_DOUBLE_PRECISION -o  $(ODIR)/read_stress_observations.sph.o
+	$(CC) $(CFLAGS) -DBLOCK_SPHERICAL  -c $< $(MY_PRECISION) -o  $(ODIR)/read_stress_observations.sph.o
 $(ODIR)/block_read_gps.sph.o:	block_read_gps.c $(GEN_P_INC)
-	$(CC) $(CFLAGS) -DBLOCK_SPHERICAL  -c $< -DUSE_DOUBLE_PRECISION -o  $(ODIR)/block_read_gps.sph.o
+	$(CC) $(CFLAGS) -DBLOCK_SPHERICAL  -c $< $(MY_PRECISION) -o  $(ODIR)/block_read_gps.sph.o
 $(ODIR)/block_output.sph.o:	block_output.c $(GEN_P_INC)
-	$(CC) $(CFLAGS) -DBLOCK_SPHERICAL  -c $< -DUSE_DOUBLE_PRECISION -o  $(ODIR)/block_output.sph.o
+	$(CC) $(CFLAGS) -DBLOCK_SPHERICAL  -c $< $(MY_PRECISION) -o  $(ODIR)/block_output.sph.o
 $(ODIR)/block_solve.sph.o:	block_solve.c $(GEN_P_INC)
-	$(CC) $(CFLAGS) -DBLOCK_SPHERICAL  -c $< -DUSE_DOUBLE_PRECISION -o  $(ODIR)/block_solve.sph.o
+	$(CC) $(CFLAGS) -DBLOCK_SPHERICAL  -c $< $(MY_PRECISION) -o  $(ODIR)/block_solve.sph.o
 $(ODIR)/block_read_bflt.sph.o:	block_read_bflt.c $(GEN_P_INC)
-	$(CC) $(CFLAGS) -DBLOCK_SPHERICAL  -c $< -DUSE_DOUBLE_PRECISION -o  $(ODIR)/block_read_bflt.sph.o
+	$(CC) $(CFLAGS) -DBLOCK_SPHERICAL  -c $< $(MY_PRECISION) -o  $(ODIR)/block_read_bflt.sph.o
 $(ODIR)/block_stress.sph.o:	block_stress.c $(GEN_P_INC)
-	$(CC) $(CFLAGS) -DBLOCK_SPHERICAL  -c $< -DUSE_DOUBLE_PRECISION -o  $(ODIR)/block_stress.sph.o
+	$(CC) $(CFLAGS) -DBLOCK_SPHERICAL  -c $< $(MY_PRECISION) -o  $(ODIR)/block_stress.sph.o
 $(ODIR)/block_read_euler.sph.o:	block_read_euler.c $(GEN_P_INC)
-	$(CC) $(CFLAGS) -DBLOCK_SPHERICAL  -c $< -DUSE_DOUBLE_PRECISION -o  $(ODIR)/block_read_euler.sph.o
+	$(CC) $(CFLAGS) -DBLOCK_SPHERICAL  -c $< $(MY_PRECISION) -o  $(ODIR)/block_read_euler.sph.o
 # single
 $(ODIR)/blockinvert.sph.sgl.o:	blockinvert.c $(GEN_P_INC)
 	$(CC) $(CFLAGS) -DBLOCK_SPHERICAL -c $<  -o  $(ODIR)/blockinvert.sph.sgl.o
@@ -745,7 +750,7 @@ $(ODIR)/block_read_euler.sph.sgl.o:	block_read_euler.c $(GEN_P_INC)
 $(ODIR)/coulomb_noise_stress.$(NOISELEVEL).o: coulomb_stress.c $(GEN_P_INC) noise.dat
 	$(CC) $(CFLAGS) -c coulomb_stress.c \
 	-DADD_COULOMB_STRESS_NOISE=$(NOISELEVEL) \
-	-DUSE_DOUBLE_PRECISION -o  $(ODIR)/coulomb_noise_stress.$(NOISELEVEL).o
+	$(MY_PRECISION) -o  $(ODIR)/coulomb_noise_stress.$(NOISELEVEL).o
 
 $(ODIR)/coulomb_noise_stress.$(NOISELEVEL).sgl.o: coulomb_stress.c $(GEN_P_INC) noise.dat
 	$(CC) $(CFLAGS) -c coulomb_stress.c \
@@ -756,13 +761,13 @@ $(ODIR)/coulomb_noise_stress.$(NOISELEVEL).sgl.o: coulomb_stress.c $(GEN_P_INC) 
 # some generic rules with normal dependencies
 #
 $(ODIR)/%.o:	%.c $(GEN_P_INC)
-	$(CC) $(CFLAGS)  -DUSE_DOUBLE_PRECISION -c $< -o $(ODIR)/$*.o
+	$(CC) $(CFLAGS)  $(MY_PRECISION) -c $< -o $(ODIR)/$*.o
 
 $(ODIR)/%.o:	%.f $(GEN_P_INC)
-	$(F77) $(FFLAGS) -DUSE_DOUBLE_PRECISION -c $< -o $(ODIR)/$*.o
+	$(F77) $(FFLAGS) $(MY_PRECISION) -c $< -o $(ODIR)/$*.o
 
 $(ODIR)/%.o:	%.F $(GEN_P_INC)
-	$(F77) $(FFLAGS) -DUSE_DOUBLE_PRECISION -c $<  -o $(ODIR)/$*.o
+	$(F77) $(FFLAGS) $(MY_PRECISION) -c $<  -o $(ODIR)/$*.o
 
 # single prec versions
 $(ODIR)/%.sgl.o:	%.c $(GEN_P_INC)

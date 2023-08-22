@@ -836,11 +836,9 @@ void calculate_position_of_patch(struct med *medium, struct flt *fault)
 #endif
   for(i=0;i<medium->nrflt;i++){
     for(j=0;j<2;j++){
-      if(fabs(grp[fault[i].group].prange[nlength])>EPS_COMP_PREC){
+      if(fabs(grp[fault[i].group].prange[nlength]) > EPS_COMP_PREC){
 	fault[i].pos[j] /= grp[fault[i].group].prange[nlength];
       }
-      if(fabs(fault[i].pos[j]) < EPS_COMP_PREC)
-	fault[i].pos[j] = 0.0;
 #ifdef DEBUG
       if(fault[i].pos[j] < pmin[j])
 	pmin[j] = fault[i].pos[j];

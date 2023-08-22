@@ -1,12 +1,12 @@
 #define COMP_PRECISION double 
 #define C_PREC real*8
 
-#define I_MATRIX_PREC double
-#define A_MATRIX_PREC double
-#define AM_PREC real*8
+#define I_MATRIX_PREC float
+#define A_MATRIX_PREC float
+#define AM_PREC real*4
 
 #define EPS_COMP_PREC 7.0e-15
-#define EPS_AMAT_PREC 7.0e-15
+#define EPS_AMAT_PREC 7.0e-7
 
 #define ONE_CP_FORMAT "%lf"
 #define ONE_IP_FORMAT "%lf"
@@ -24,5 +24,4 @@
 #define IIF_CP_FORMAT "%i %i %lf"
 #define IF_CP_FORMAT "%i %lf"
 #define FLTDAT_FORMAT "%f %f %lf %lf %lf %lf %lf %lf %lf %lf %lf %i %i"
-#define FLTDAT_BLK_FORMAT "%*f %*f %*f %*f %*f %lf %lf %lf %*f %*f %*f %*i %*i"
 #define EISPACK_RS rs_

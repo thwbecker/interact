@@ -14,7 +14,7 @@
 #
 MACHINE_DEFINES = -DIMAT_SPARSE_LIM=8000.0 \
 	-DIMAT_SIZE_LIM=4000.1  \
-	-DSGI_SUBROUTINE_CONVENTION 
+	-DSGI_SUBROUTINE_CONVENTION -DSUN_TRIG_FUNCTIONS
 #	-DSGI_SUBROUTINE_CONVENTION -DNO_LAPACK3
 
 #
@@ -50,7 +50,8 @@ GCCWOPT = -Wall
 
 # fast execution options, comment out if debug output is wanted
 #SCARGS = -O3 -pipe  -funroll-loops -ffast-math -fomit-frame-pointer $(GCCWOPT)  $(MACHINE_DEFINES)
-SCARGS = -Ofast $(GCCWOPT)  $(MACHINE_DEFINES) 
+#SCARGS = -Ofast $(GCCWOPT)  $(MACHINE_DEFINES)
+SCARGS = -O3 $(GCCWOPT)  $(MACHINE_DEFINES) 
 
 
 DEBUG_LIBS = 
@@ -58,8 +59,7 @@ DEBUG_LIBS =
 # debugging options, comment in for debugging
 # -DSUPER_DUPER_DEBUG -DDDMALLOC 
 # gcc 
-#SCARGS = -g  $(GCCWOPT) \
-#	-DDEBUG $(MACHINE_DEFINES) 
+#SCARGS = -g  $(GCCWOPT) -DDEBUG $(MACHINE_DEFINES) 
 #-DMEM_ALLOC_DEBUG \
 #	-DDEBUG -DSUPER_DEBUG  $(MACHINE_DEFINES) 
 #DEBUG_LIBS = -lccmalloc -ldl

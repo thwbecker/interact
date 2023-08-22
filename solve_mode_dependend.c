@@ -204,7 +204,7 @@ void assemble_a_matrix_4(A_MATRIX_PREC *a,int naflt,
 			 struct flt *fault,struct med *medium)
 #endif
 {
-  int i,j,k,l,eqc1,eqc2,eqc2nreq,ip1,ip2,istep;
+  long int i,j,k,l,eqc1,eqc2,eqc2nreq,ip1,ip2,istep;
   A_MATRIX_PREC cf;
 #ifndef COMP_MODE_1
   A_MATRIX_PREC itmp;

@@ -22,6 +22,7 @@ void solve(struct med *medium,struct flt *fault)
   static int izero=0;
   FILE *aio;
   int i;
+  long int isize;
 #ifdef USE_SLATEC_NNLS
   A_MATRIX_PREC *x,prgopt[1]={1.0},rnorm,*work,dummy;
   int n,m,*iwork,mode,l,nm,j;
@@ -183,13 +184,25 @@ void solve(struct med *medium,struct flt *fault)
       using LU, SVD or other methods
 
     */
-    if((a=(A_MATRIX_PREC *)malloc(sizeof(A_MATRIX_PREC)*SQUARE(medium->nreq)))
-       ==NULL){
-      fprintf(stderr,"solve: memory error for unconstrained A: n: %i by %i dsz: %i tsize: %g MB\n",
-	      medium->nreq,medium->nreq,(int)sizeof(A_MATRIX_PREC),
-	      (double)sizeof(A_MATRIX_PREC)
-	      *SQUARE((double)medium->nreq)/(double)ONE_MEGABYTE);
-	exit(-1);
+    isize  = ((long int)sizeof(A_MATRIX_PREC)) * ((long int)medium->nreq*(long int)medium->nreq);
+    //fprintf(stderr,"%i %li %li %li %i %li\n",medium->nreq,(long int)SQUARE(medium->nreq),(long int)medium->nreq*(long int)medium->nreq,(long int)medium->nreq*(long int)medium->nreq*(long int)sizeof(A_MATRIX_PREC),(int)isize,isize);
+    fprintf(stderr,"solve: attempting to allocate %li bytes, %g MB\n",isize,(double)isize/ONE_MEGABYTE);
+    if((a=(A_MATRIX_PREC *)malloc((size_t)isize)) == NULL){
+      fprintf(stderr,"solve: memory error for unconstrained A: (%p) n: %i by %i dsz: %i tsize: %g MB\n",
+	      a,medium->nreq,medium->nreq,(int)sizeof(A_MATRIX_PREC),((double)isize)/ONE_MEGABYTE);
+      /* check what would have been ok */
+      isize  = (long int)((double)isize/10);
+      for(i=1;i<10;i++){
+	if((a=(A_MATRIX_PREC *)malloc((size_t)(isize*(long int)i)))==NULL){
+	  fprintf(stderr,"solve: failing at %i %g MB\n",i,((double)isize)/(double)(ONE_MEGABYTE));
+	  exit(-1);
+	}else{
+	  fprintf(stderr,"solve: OK at %i/10\n",i);
+	  free(a);
+	}
+      }
+	
+      exit(-1);
     }	
     if(medium->debug)
       fprintf(stderr,"solve: unconstrained part A is %5i by %i\n",
@@ -300,9 +313,12 @@ void solve(struct med *medium,struct flt *fault)
 						&medium->is1,&medium->is2,
 						&medium->val,aio);
       fclose(aio);
-      if(medium->debug)
-	if(!medium->save_amat)// if A is not to be saved, remove
-	  sprintf(command_str,"rm %s",A_MATRIX_FILE);system(command_str);
+      if(medium->debug){
+	if(!medium->save_amat){// if A is not to be saved, remove
+	  sprintf(command_str,"rm %s",A_MATRIX_FILE);
+	  system(command_str);
+	}
+      }
       fprintf(stderr,"solve: unconstrained: conversion complete (sparse size: %g MB) gain: %g\n",
 	      (double)sparse_size/ONE_MEGABYTE,
 	      (COMP_PRECISION)full_size/(COMP_PRECISION)sparse_size);

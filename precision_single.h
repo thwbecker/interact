@@ -28,6 +28,7 @@
 #define IIF_CP_FORMAT "%i %i %f"
 #define IF_CP_FORMAT "%i %f"
 #define FLTDAT_FORMAT "%f %f %f %f %f %f %f %f %f %f %f %i %i"
+#define FLTDAT_BLK_FORMAT "%*f %*f %*f %*f %*f %f %f %f %*f %*f %*f %*i %*i"
 
 #define EISPACK_RS s_rs_
 

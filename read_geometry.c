@@ -118,7 +118,7 @@ void read_geometry(char *patch_filename,struct med **medium,
 	if(!half_plane)
 	  (*fault+i)->type = TWO_DIM_SEGMENT_PLANE_STRAIN;
 	else
-	  (*fault+i)->type = TWO_DIM_HALFPLANE_PLANE_STRAIN;
+ 	  (*fault+i)->type = TWO_DIM_HALFPLANE_PLANE_STRAIN;
       }
       nr_2d++;
     }else if(((*fault+i)->w < 0)&&((*fault+i)->l< 0)){
@@ -147,7 +147,7 @@ void read_geometry(char *patch_filename,struct med **medium,
 			   &(*fault+i)->cos_alpha,&tmpdbl,&(*fault+i)->area);
       (*fault+i)->dip=(float)RAD2DEGF(tmpdbl);
       (*fault+i)->l = (*fault+i)->w = (*fault+i)->area;
-      alpha=RAD2DEGF(asin((*fault+i)->sin_alpha));
+      alpha = RAD2DEGF(asin((*fault+i)->sin_alpha));
       (*fault+i)->strike= 90.0 - alpha;
 #ifdef DEBUG
       fprintf(stderr,"read_geometry: fault %i is triangular, x1: (%g, %g, %g) x2: (%g, %g, %g) x3: (%g, %g, %g), area: %g\n",
@@ -175,7 +175,7 @@ void read_geometry(char *patch_filename,struct med **medium,
 	regular, rectangular patch
 
       */
-      (*fault+i)->type=RECTANGULAR_PATCH; 
+      (*fault+i)->type = RECTANGULAR_PATCH; 
     }
 #else
     if(((*fault+i)->l <= 0)||((*fault+i)->w <= 0)){
@@ -229,10 +229,10 @@ void read_geometry(char *patch_filename,struct med **medium,
       alpha= 90.0 - (*fault+i)->strike;
       my_sincos_deg(&(*fault+i)->sin_alpha,&(*fault+i)->cos_alpha,
 		    (COMP_PRECISION)alpha);
-      if(fabs((*fault+i)->sin_alpha)< EPS_COMP_PREC)
-	(*fault+i)->sin_alpha=0.0;
-      if(fabs((*fault+i)->cos_alpha)< EPS_COMP_PREC)
-	(*fault+i)->cos_alpha=0.0;
+      /* if(fabs((*fault+i)->sin_alpha)< EPS_COMP_PREC) */
+      /* 	(*fault+i)->sin_alpha=0.0; */
+      /* if(fabs((*fault+i)->cos_alpha)< EPS_COMP_PREC) */
+      /* 	(*fault+i)->cos_alpha=0.0; */
 #ifdef ALLOW_NON_3DQUAD_GEOM
     }
 #endif

@@ -32,7 +32,7 @@ int main(int argc, char **argv)
   */
   fprintf(stderr,"%s: reading six component stress state from stdin\n",
 	  argv[0]);
-  fscanf(stdin,"%lf %lf %lf %lf %lf %lf",
+  fscanf(stdin, SIX_CP_FORMAT,
 	 (sc_ref6),(sc_ref6+1),(sc_ref6+2),(sc_ref6+3),
 	 (sc_ref6+4),(sc_ref6+5));
   convert_6sym_to_9_matrix(sc_ref6,sc_ref);

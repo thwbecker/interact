@@ -38,10 +38,7 @@
 #include <limits.h>
 #include <sys/types.h>
 #include <unistd.h>
-#ifdef SUN_TRIG_FUNCTIONS
-// use this as a test for running on Solaris
-#include <ieeefp.h>
-#endif
+
 #ifdef USE_GEOPROJECT
 #include "gmt.h" 
 #endif
@@ -75,6 +72,8 @@ don't expect anything to work....
 #endif
 #ifdef USE_DOUBLE_PRECISION
 #include "precision_double.h"
+#elif defined USE_MIXED_PRECISION /* no good */
+#include "precision_mixed.h"
 #else
 #include "precision_single.h"
 #endif

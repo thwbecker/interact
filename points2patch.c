@@ -71,7 +71,7 @@ int main(int argc, char **argv)
     adjust_area=(my_boolean)i;
   }
   if(argc > 2)
-    sscanf(argv[2],"%lf",&dx);
+    sscanf(argv[2],ONE_CP_FORMAT,&dx);
   if(argc > 3)
     sscanf(argv[3],"%i",&i);
   use_code = (my_boolean)i;

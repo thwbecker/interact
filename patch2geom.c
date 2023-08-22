@@ -43,7 +43,7 @@ int main(int argc, char **argv)
     fprintf(stderr,"%s: attemping to read slip values from flt.nohdr.dat\n",argv[0]);
     in=myopen("flt.nohdr.dat","r");
     for(i=0;i<medium->nrflt;i++){ /* read in slip values from headerless file */
-      if(fscanf(in,"%*f %*f %*f %*f %*f %lf %lf %lf %*f %*f %*f %*i %*i",
+      if(fscanf(in,FLTDAT_BLK_FORMAT,
 		&fault[i].u[STRIKE],&fault[i].u[DIP],&fault[i].u[NORMAL])!=3){
 	fprintf(stderr,"%s: read error file  flt.nohdr.dat, patch %i\n",
 		argv[0],i+1);

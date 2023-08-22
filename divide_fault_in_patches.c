@@ -188,8 +188,6 @@ void get_flt_location(struct flt *fault,COMP_PRECISION *dx,COMP_PRECISION *dy,
   for(k=0;k<3;k++){
     fault->x[k]  = corner[k]+(0.5+(COMP_PRECISION)i)*dx[k];
     fault->x[k] += (0.5+(COMP_PRECISION)j)*dy[k];
-    if(fabs(fault->x[k])<EPS_COMP_PREC)
-      fault->x[k]=0.0;
   }
 }  
 

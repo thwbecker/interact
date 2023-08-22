@@ -8,6 +8,7 @@ void block_save_solution_and_faults(double *, int, int, struct bflt *, double *,
 void block_load_solution_and_faults(double **, int *, int *, struct bflt **, double **, struct prj **, FILE *, unsigned short *, unsigned short *);
 void block_eval_blockvec(double *, double, int, double *, struct prj *, double *);
 /* block_evaluate_solution.c */
+/* blockinvert.c */
 /* block_levmarq.c */
 void run_lm(struct bmd *, long int *, struct prj, double *, unsigned short, unsigned short, double, double *, unsigned short, unsigned short, double, unsigned short, unsigned short, unsigned short, int, int, char **);
 /* block_matrix.c */
@@ -76,7 +77,6 @@ void calc_dir_diff_vec(double *, double *, double *, int, unsigned short);
 double calc_dir_diff(double, double, unsigned short);
 void cart_mat_from_horsym(double, double, double, double *);
 void rescale_observed_stresses(double *, double *, double *, double, double *, unsigned short, struct bmd *, unsigned short, unsigned short);
-/* blockinvert.c */
 /* calc_cart_from_eigen_stress.c */
 unsigned short read_vecs(int, double *, double *, double *, double *, double *);
 void ccfes_help(char **);
@@ -169,7 +169,6 @@ int calc_absolute_shear_stress(double *, int, struct flt *);
 /* fstress2hor.c */
 /* generate_random_2d.c */
 /* generate_slipdia.c */
-/* geo_okada.c */
 /* geometry.c */
 void calc_lhemi_proj(double, double, double *);
 void resolve_force(double *, double [3][3], double *);
@@ -202,6 +201,7 @@ void calc_mean_quad_coord(double *, double *);
 void calc_centroid_quad(double *, double *);
 void calculate_position_of_patch(struct med *, struct flt *);
 void compute_cartesian_slip(double *, double *, struct flt *);
+/* geo_okada.c */
 /* get_projected_fault_parameters.c */
 void get_projected_fault_parameters(double [2][2], double, double *, double *, double *, double *, double *, double *);
 /* help_and_comments.c */
