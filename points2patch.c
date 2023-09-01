@@ -59,7 +59,7 @@ int main(int argc, char **argv)
 	    argv[0],argv[0],adjust_area,dx,use_code);
     fprintf(stderr,"\tif adjust_area is set, will attempt to make input and output same area\n");
     fprintf(stderr,"\tformat:\n\tx1_x x1_y x1_z x2_x x2_y x2_z ...\n\n");
-    fprintf(stderr,"\tto form a regular quad, points have to be in FE (CCW) ordering\n");
+    fprintf(stderr,"\tto form a regular quad, points have to be in FE (CCW) ordering, starting lower left\n");
     fprintf(stderr,"\tassumes that patch can be described by dip and strike only, no rake!\n");
     fprintf(stderr,"\twrites patch format to stdout\n");
     fprintf(stderr,"\tdx (%g) will subdivide the faults into patches with dx width/length\n",dx);

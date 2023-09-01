@@ -92,6 +92,8 @@ void initialize(struct med **medium, struct flt **fault,
 		my_boolean init_system,COMP_PRECISION wcutoff,
 		my_boolean no_interactions)
 {
+  int serr;
+  char tmpstring[STRLEN];
   //
   // read in the main model description files
   //
@@ -112,9 +114,16 @@ void initialize(struct med **medium, struct flt **fault,
     fprintf(stderr,"initialize: WARNING: using constant time steps\n");
 
   if(((*medium)->debug=debug)){
-     fprintf(stderr,"initialize: running in debugging mode, output in *cleared* directory /tmp/interact/\n");
-     system("mkdir /tmp/interact 2> /dev/null");
-     system("/bin/rm /tmp/interact/* 2> /dev/null");
+    fprintf(stderr,"initialize: running in debugging mode, output in directory %s\n",INT_TMP_DIR);
+    snprintf(tmpstring,STRLEN,"mkdir -p %s",INT_TMP_DIR);
+    serr = 0;
+    serr = system(tmpstring);
+    snprintf(tmpstring,STRLEN,"/bin/rm %s/*",INT_TMP_DIR);
+    serr+= system(tmpstring);
+    if(serr){
+      fprintf(stderr,"initialize: could not make temporary output dir %s\n",INT_TMP_DIR);
+      exit(-1);
+    }
   }
   //
   // read in boundary conditions, e.g. what kind of simulations, if
@@ -254,7 +263,7 @@ void initialize(struct med **medium, struct flt **fault,
 */
 void init_files(struct med **medium,struct flt **fault)
 {
-  int i;
+  int i,serr;
   char tmpstring[STRLEN],tmpstring2[STRLEN];
   /* 
      initialize files 
@@ -264,7 +273,7 @@ void init_files(struct med **medium,struct flt **fault)
     (*medium)->flt_stress_out=
       malloc(sizeof(FILE *)*(*medium)->nrgrp);
     for(i=0;i<(*medium)->nrgrp;i++){
-      sprintf(tmpstring,"%s.%i.dat",FAULT_DATA_PREFIX,i);
+      snprintf(tmpstring,STRLEN,"%s.%i.dat",FAULT_DATA_PREFIX,i);
       (*medium)->flt_stress_out[i]=myopen(tmpstring,"w");
       fprintf((*medium)->flt_stress_out[i],
 	      "# fault patch group %i\n",i);
@@ -329,7 +338,7 @@ void init_files(struct med **medium,struct flt **fault)
 
 void terminate(struct med *medium, struct flt *fault)
 {
-  int i;
+  int i,serr;
   char tmpstr[STRLEN];
   fprintf(stderr,"terminate: closing files and cleaning up\n");
   if(medium->flt_stress_init){
@@ -354,12 +363,15 @@ void terminate(struct med *medium, struct flt *fault)
     else{// we shall remove the I matrix
       fprintf(stderr,"terminate: removing the interaction matrix files \"%s\" and \"%s\"\n",
 	       medium->mfname,medium->hfname);
-      sprintf(tmpstr,"rm -f %s %s.hdr",medium->mfname,medium->hfname);
-      system(tmpstr);
+      snprintf(tmpstr,STRLEN,"rm  %s %s.hdr",medium->mfname,medium->hfname);
+      serr = system(tmpstr);
+      if(serr){
+	fprintf(stderr,"initialize: error with %s\n",tmpstr);
+	exit(-1);
+      }
     }
   }else{// I matrix was kept in memory but might still be on file
-
-
+    ;
   }
 #ifdef USE_PGPPLOT
   close_plot_window(medium,fault);

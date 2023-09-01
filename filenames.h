@@ -26,6 +26,8 @@
 // and PID and ".hdr" for the header file
 #define INTERACTION_MATRIX_FILE "/tmp/i"
 
+#define INT_TMP_DIR "/tmp/interact/" /* for debugging output */
+
 #define A_MATRIX_FILE "a.dat"
 #define B_VECTOR_FILE "b.dat"
 #define A_CON_MATRIX_FILE "ac.dat"

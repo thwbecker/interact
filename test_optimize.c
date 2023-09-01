@@ -13,7 +13,7 @@ int main(int argc,char **argv)
   int i;
   COMP_PRECISION maxdist,*dummy;
   
-  read_geometry(GEOMETRY_FILE,&medium,&fault,FALSE,FALSE,FALSE);
+  read_geometry(GEOMETRY_FILE,&medium,&fault,FALSE,FALSE,FALSE,FALSE);
   maxdist=max_dist(fault,medium);
 
   fprintf(stderr,"%s: total distance before: %g\n",

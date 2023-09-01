@@ -6,12 +6,11 @@
   $Id: lusolve.c,v 1.10 2003/01/13 06:44:58 becker Exp $
 
 */
-#include <math.h>
-#include <stdio.h>
 #include "interact.h"
 /* 
 
-   solve a singular linear equation system by LAPACK LU decomposition
+   solve a singular linear equation system by LAPACK or SCALAPACK LU
+   decomposition
 
    A x = b
    where A is m by n, b is m by 1
@@ -28,7 +27,7 @@
 void lu_driver(A_MATRIX_PREC *a,A_MATRIX_PREC *xsol,
 	       A_MATRIX_PREC *b,int m,int n,struct med *medium)
 {
-  int *ipiv,info;
+  int *ipiv,info,*desca,*descb;
   static int iunity = 1;
   A_MATRIX_PREC dummy,*bcopy;
   static int print_count=0;
@@ -67,10 +66,12 @@ void lu_driver(A_MATRIX_PREC *a,A_MATRIX_PREC *xsol,
   // solve by LU decomposition 
   //
 #ifdef A_MATRIX_SINGLE_PREC
+  /* single prec solver call */
   sgesv_(&n,&iunity,a,&n,ipiv,b,&n,&info);
   if(info != 0){// error in xGESV routine
     fprintf(stderr,"lu_driver: sgesv error code: %i\n",info);
 #else
+  /* double prec solver call  */
   dgesv_(&n,&iunity,a,&n,ipiv,b,&n,&info);
   if(info != 0){// error in xGESV routine
     fprintf(stderr,"lu_driver: dgesv error code: %i\n",info);

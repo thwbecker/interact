@@ -276,7 +276,7 @@ void assemble_a_matrix_4(A_MATRIX_PREC *a,int naflt,
 	      // sparse matrix storage
 	      *(a+eqc2nreq+eqc1) = (A_MATRIX_PREC)
 		get_nrs_sparse_el(POSII(nameaf[k],l),POSIJ(nameaf[i],j),
-			      medium->is1,medium->val);
+				  medium->is1,medium->val);
 	      if(cf != 0.0){
 		itmp=(A_MATRIX_PREC)get_nrs_sparse_el(POSII(nameaf[k],l),
 						      POSIJ(nameaf[i],NORMAL),

@@ -137,7 +137,7 @@ int main(int argc, char **argv)
       fprintf(stderr,"\t            -tw and -tl override -n and -m settings if they are set to\n");
       fprintf(stderr,"\t            non-negative values\n\n");
       fprintf(stderr,"\tuse -srand  value for std of strike randomization on patch level  (%g)\n",srand);
-      fprintf(stderr,"\tuse -drand  value for std of strike randomization on patch level  (%g)\n",drand);
+      fprintf(stderr,"\tuse -drand  value for std of dip    randomization on patch level  (%g)\n",drand);
       fprintf(stderr,"\tuse -seed   value for random seed in case srand or drand != 0 (%i)\n\n",(int)seed);
       fprintf(stderr,"\tuse -stime  value for stop time in bc file (%g)\n",stop_time);
       fprintf(stderr,"\tuse -circ         for circular patch\n");
