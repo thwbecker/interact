@@ -37,7 +37,7 @@ int main(void)
   in=myopen(GEOMETRY_FILE,"r");
   out=myopen("tmp.dat","w");
   n=0;
-  while(fscanf(in,PATCH_CP_FORMAT,&fault[n].x[X],&fault[n].x[Y],&fault[n].x[Z],
+  while(fscanf(in,PATCH_CP_FORMAT,&fault[n].x[INT_X],&fault[n].x[INT_Y],&fault[n].x[INT_Z],
 	       &fault[n].strike,&fault[n].dip,&fault[n].l,&fault[n].w,
 	       &fault[n].group)==8){
     fault=realloc(fault,sizeof(struct flt)*(n+2));
@@ -50,9 +50,9 @@ int main(void)
     fault[n].area = fault[n].l * fault[n].w * 4.0;
     calculate_corners(corner,(fault+n),&dummy,&dummy);
     for(j=0;j<4;j++){
-      patch[n].x[j]=(float)corner[j][X];
-      patch[n].y[j]=(float)corner[j][Y];
-      patch[n].z[j]=(float)corner[j][Z];
+      patch[n].x[j]=(float)corner[j][INT_X];
+      patch[n].y[j]=(float)corner[j][INT_Y];
+      patch[n].z[j]=(float)corner[j][INT_Z];
       // extrema
       for(i=0;i<3;i++){
 	if(xmax[i]<corner[j][i])
@@ -61,9 +61,9 @@ int main(void)
 	  xmin[i]=corner[j][i];
       }
     }
-    patch[n].x[4]=(float)corner[0][X];
-    patch[n].y[4]=(float)corner[0][Y];
-    patch[n].z[4]=(float)corner[0][Z];
+    patch[n].x[4]=(float)corner[0][INT_X];
+    patch[n].y[4]=(float)corner[0][INT_Y];
+    patch[n].z[4]=(float)corner[0][INT_Z];
     n++;
   }
   fclose(in);
@@ -77,8 +77,8 @@ int main(void)
     xmax[j]*=1.1;
   }
   */
-  tloc[X]=(xmax[X]+xmin[X])/2.0;
-  tloc[Y]=xmax[Y]*0.9;
+  tloc[INT_X]=(xmax[INT_X]+xmin[INT_X])/2.0;
+  tloc[INT_Y]=xmax[INT_Y]*0.9;
   /* create X window */
   if(cpgbeg(i, "/xwindow", 1, 1) != 1)exit(-1);
   // want three pages
@@ -86,11 +86,11 @@ int main(void)
   // device size
   cpgpap(10, .33);
   /* set up axis */
-  cpgenv(xmin[X], xmax[X], xmin[Y], xmax[Y], 1, 0);
+  cpgenv(xmin[INT_X], xmax[INT_X], xmin[INT_Y], xmax[INT_Y], 1, 0);
   cpglab ("x", "y", "x-y");
-  cpgenv(xmin[Y], xmax[Y], xmin[Z], xmax[Z], 1, 0);
+  cpgenv(xmin[INT_Y], xmax[INT_Y], xmin[INT_Z], xmax[INT_Z], 1, 0);
   cpglab ("y", "z", "y-z");
-  cpgenv(xmin[X], xmax[X], xmin[Z], xmax[Z], 1, 0);
+  cpgenv(xmin[INT_X], xmax[INT_X], xmin[INT_Z], xmax[INT_Z], 1, 0);
   cpglab ("x", "z", "x-z");
   /* 
      draw lines first time around, using the al array 
@@ -149,12 +149,12 @@ int main(void)
 	if(optime != -1){/* delete old title (time) */
 	  cpgqci(&oc);cpgsci(0);
 	  sprintf(tmpstr,"time=%10.5f",optime);
-	  cpgtext(tloc[X],tloc[Y],tmpstr);
+	  cpgtext(tloc[INT_X],tloc[INT_Y],tmpstr);
 	  cpgsci(oc);
 	}
 	/* write new time */
 	sprintf(tmpstr,"time=%10.5f",otime);
-	cpgtext(tloc[X],tloc[Y],tmpstr);
+	cpgtext(tloc[INT_X],tloc[INT_Y],tmpstr);
 	optime=otime;
 	/* draw the old active set  */
 	drawset(al,naf,2,1,patch);

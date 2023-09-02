@@ -182,7 +182,7 @@ void print_fault_data(char *filename,struct med *medium,struct flt *fault)
 #ifdef ALLOW_NON_3DQUAD_GEOM
 	if(fault[i].type == TRIANGULAR)
 	  fprintf(out,"%10.3e %10.3e %10.3e ",
-		  fault[i].x[X],fault[i].x[Y],fault[i].x[Z]);
+		  fault[i].x[INT_X],fault[i].x[INT_Y],fault[i].x[INT_Z]);
 #endif
 	fprintf(out,"\n");
       }
@@ -383,11 +383,11 @@ void print_stress(struct med *medium,struct flt *fault)
     // output on grid
     //
     fiddle_with_limits_for_plot(medium,&nz,&use_fault_plane,dx,TRUE);
-    nxy=medium->n[X] * medium->n[Y];// for array access in POSS
+    nxy=medium->n[INT_X] * medium->n[INT_Y];// for array access in POSS
     out=myopen(STRESS_OUT_FILE,"w");
-    for(i=0,x[X]=medium->pxmin[X];i<medium->n[X];x[X]+=dx[X],i++)
-      for(j=0,x[Y]=medium->pxmin[Y];j<medium->n[Y];x[Y]+=dx[Y],j++)
-	for(k=0,x[Z]=medium->pxmin[Z];k<nz;x[Z]+=dx[Z],k++){
+    for(i=0,x[INT_X]=medium->pxmin[INT_X];i<medium->n[INT_X];x[INT_X]+=dx[INT_X],i++)
+      for(j=0,x[INT_Y]=medium->pxmin[INT_Y];j<medium->n[INT_Y];x[INT_Y]+=dx[INT_Y],j++)
+	for(k=0,x[INT_Z]=medium->pxmin[INT_Z];k<nz;x[INT_Z]+=dx[INT_Z],k++){
 	  // check if all stresses are finite
 	  if(medium->suppress_nan_output){
 	    for(l=0;l<6;l++)
@@ -397,19 +397,19 @@ void print_stress(struct med *medium,struct flt *fault)
 	    l=6;
 	  }
 	  if(l == 6){
-	    if(!use_fault_plane || medium->ok[i*medium->n[Y]+j]){
+	    if(!use_fault_plane || medium->ok[i*medium->n[INT_Y]+j]){
 	      for(m=0;m<3;m++){
 		x[m]=reformat_small(x[m]);
 		fprintf(out,"%14.7e ",x[m]);
 	      }
 	      /* if stresses are in a 6 component vector, then
 		 
-		   s[0] = sm[X][X];
-		   s[1] = sm[X][Y];
-		   s[2] = sm[X][Z];
-		   s[3] = sm[Y][Y];
-		   s[4] = sm[Y][Z];
-		   s[5] = sm[Z][Z];
+		   s[0] = sm[INT_X][INT_X];
+		   s[1] = sm[INT_X][INT_Y];
+		   s[2] = sm[INT_X][INT_Z];
+		   s[3] = sm[INT_Y][INT_Y];
+		   s[4] = sm[INT_Y][INT_Z];
+		   s[5] = sm[INT_Z][INT_Z];
 	      */
 	      for(l=0;l<6;l++)
 		fprintf(out,"%14.7e ",medium->s[POSS(i, j, k, l)]);
@@ -423,9 +423,9 @@ void print_stress(struct med *medium,struct flt *fault)
 
     out=myopen(STRESS_HDR_FILE,"w");
     fprintf(out,"%g %g %i %g %g %i %g %g %i\n",
-	    medium->pxmin[X],medium->pxmax[X],medium->n[X],
-	    medium->pxmin[Y],medium->pxmax[Y],medium->n[Y],
-	    medium->pxmin[Z],medium->pxmax[Z],medium->n[Z]);
+	    medium->pxmin[INT_X],medium->pxmax[INT_X],medium->n[INT_X],
+	    medium->pxmin[INT_Y],medium->pxmax[INT_Y],medium->n[INT_Y],
+	    medium->pxmin[INT_Z],medium->pxmax[INT_Z],medium->n[INT_Z]);
     fclose(out);
     fprintf(stderr,"print_stress: dimension information in \"%s\"\n",
 	    STRESS_HDR_FILE);
@@ -471,19 +471,19 @@ void print_stress_on_fault(struct med *medium,struct flt *fault,int nrf)
   FILE *out;
   my_boolean use_fault_plane;
   fiddle_with_limits_for_plot(medium,&nz,&use_fault_plane,dx,TRUE);
-  nxy = medium->n[X] * medium->n[Y];
+  nxy = medium->n[INT_X] * medium->n[INT_Y];
   out=myopen(FAULT_STRESS_OUT_FILE,"w");
-  for(i=0,x[X]=medium->pxmin[X];i<medium->n[X];x[X]+=dx[X],i++)
-    for(j=0,x[Y]=medium->pxmin[Y];j<medium->n[Y];x[Y]+=dx[Y],j++)
-      for(k=0,x[Z]=medium->pxmin[Z];k<nz;x[Z]+=dx[Z],k++){
-	if(!use_fault_plane || medium->ok[i*medium->n[Y]+j]){
-	  fprintf(out,"%14.7e %14.7e %14.7e ",x[X],x[Y],x[Z]);
-	  sm[X][X]=medium->s[POSS(i, j, k, 0)];
-	  sm[X][Y]=sm[Y][X]=medium->s[POSS(i, j, k, 1)];
-	  sm[X][Z]=sm[Z][X]=medium->s[POSS(i, j, k, 2)];
-	  sm[Y][Y]=medium->s[POSS(i, j, k, 3)];
-	  sm[Y][Z]=sm[Z][Y]=medium->s[POSS(i, j, k, 4)];
-	  sm[Z][Z]=medium->s[POSS(i, j, k, 5)];
+  for(i=0,x[INT_X]=medium->pxmin[INT_X];i<medium->n[INT_X];x[INT_X]+=dx[INT_X],i++)
+    for(j=0,x[INT_Y]=medium->pxmin[INT_Y];j<medium->n[INT_Y];x[INT_Y]+=dx[INT_Y],j++)
+      for(k=0,x[INT_Z]=medium->pxmin[INT_Z];k<nz;x[INT_Z]+=dx[INT_Z],k++){
+	if(!use_fault_plane || medium->ok[i*medium->n[INT_Y]+j]){
+	  fprintf(out,"%14.7e %14.7e %14.7e ",x[INT_X],x[INT_Y],x[INT_Z]);
+	  sm[INT_X][INT_X]=medium->s[POSS(i, j, k, 0)];
+	  sm[INT_X][INT_Y]=sm[INT_Y][INT_X]=medium->s[POSS(i, j, k, 1)];
+	  sm[INT_X][INT_Z]=sm[INT_Z][INT_X]=medium->s[POSS(i, j, k, 2)];
+	  sm[INT_Y][INT_Y]=medium->s[POSS(i, j, k, 3)];
+	  sm[INT_Y][INT_Z]=sm[INT_Z][INT_Y]=medium->s[POSS(i, j, k, 4)];
+	  sm[INT_Z][INT_Z]=medium->s[POSS(i, j, k, 5)];
 	  calc_three_stress_components(sm,fault[nrf].normal,fault[nrf].t_strike,
 				       fault[nrf].normal,fault[nrf].t_dip,
 				       &st,&sn,&sd);
@@ -516,16 +516,16 @@ void print_displacement(struct med *medium,struct flt *fault)
   if(medium->print_bulk_fields){
     // on grid
     fiddle_with_limits_for_plot(medium,&nz,&use_fault_plane,dx,TRUE);
-    nxy = medium->n[X] * medium->n[Y];// for POSU
+    nxy = medium->n[INT_X] * medium->n[INT_Y];// for POSU
     if(nxy * nz == 0){
       fprintf(stderr,"print_displacement: error: nx: %i ny: %i nz: %i\n",
-	     medium->n[X],medium->n[Y],nz);
+	     medium->n[INT_X],medium->n[INT_Y],nz);
       exit(-1);
     }
     out=myopen(DISP_OUT_FILE,"w");
-    for(i=0,x[X]=medium->pxmin[X];i<medium->n[X];x[X]+=dx[X],i++)
-      for(j=0,x[Y]=medium->pxmin[Y];j<medium->n[Y];x[Y]+=dx[Y],j++)
-	for(k=0,x[Z]=medium->pxmin[Z];k<nz;x[Z]+=dx[Z],k++){
+    for(i=0,x[INT_X]=medium->pxmin[INT_X];i<medium->n[INT_X];x[INT_X]+=dx[INT_X],i++)
+      for(j=0,x[INT_Y]=medium->pxmin[INT_Y];j<medium->n[INT_Y];x[INT_Y]+=dx[INT_Y],j++)
+	for(k=0,x[INT_Z]=medium->pxmin[INT_Z];k<nz;x[INT_Z]+=dx[INT_Z],k++){
 	  if(medium->suppress_nan_output){
 	    for(l=0;l<3;l++)
 	      if(!FINITE_TEST(medium->u[POSU(i, j, k, l)]))
@@ -534,7 +534,7 @@ void print_displacement(struct med *medium,struct flt *fault)
 	    l=3;
 	  }
 	  if(l==3){
-	    if(!use_fault_plane || medium->ok[i*medium->n[Y]+j]){
+	    if(!use_fault_plane || medium->ok[i*medium->n[INT_Y]+j]){
 	      for(m=0;m<3;m++){
 		x[m]=reformat_small(x[m]);
 		fprintf(out,"%14.7e ",x[m]);
@@ -551,9 +551,9 @@ void print_displacement(struct med *medium,struct flt *fault)
     fprintf(stderr,"print_displacement: format: x y z u_x u_y u_z\n");
     out=myopen(DISP_HDR_FILE,"w");
     fprintf(out,"%g %g %i %g %g %i %g %g %i\n",
-	    medium->pxmin[X],medium->pxmax[X],medium->n[X],
-	    medium->pxmin[Y],medium->pxmax[Y],medium->n[Y],
-	    medium->pxmin[Z],medium->pxmax[Z],medium->n[Z]);
+	    medium->pxmin[INT_X],medium->pxmax[INT_X],medium->n[INT_X],
+	    medium->pxmin[INT_Y],medium->pxmax[INT_Y],medium->n[INT_Y],
+	    medium->pxmin[INT_Z],medium->pxmax[INT_Z],medium->n[INT_Z]);
     fclose(out);
     fprintf(stderr,"print_displacement: dimension information in \"%s\"\n",
 	    DISP_HDR_FILE);
@@ -652,12 +652,12 @@ void flush_moment_stack(struct med *medium)
 	      medium->fault_group[i].slip[STRIKE]/medium->fault_group[i].sarea,
 	      medium->fault_group[i].slip[DIP]/medium->fault_group[i].sarea,
 	      medium->fault_group[i].slip[NORMAL]/medium->fault_group[i].sarea,
-	      medium->fault_group[i].slip[3+X]/medium->fault_group[i].sarea,
-	      medium->fault_group[i].slip[3+Y]/medium->fault_group[i].sarea,
-	      medium->fault_group[i].slip[3+Z]/medium->fault_group[i].sarea,
-	      medium->fault_group[i].cent[X]/medium->fault_group[i].sarea,
-	      medium->fault_group[i].cent[Y]/medium->fault_group[i].sarea,
-	      medium->fault_group[i].cent[Z]/medium->fault_group[i].sarea);
+	      medium->fault_group[i].slip[3+INT_X]/medium->fault_group[i].sarea,
+	      medium->fault_group[i].slip[3+INT_Y]/medium->fault_group[i].sarea,
+	      medium->fault_group[i].slip[3+INT_Z]/medium->fault_group[i].sarea,
+	      medium->fault_group[i].cent[INT_X]/medium->fault_group[i].sarea,
+	      medium->fault_group[i].cent[INT_Y]/medium->fault_group[i].sarea,
+	      medium->fault_group[i].cent[INT_Z]/medium->fault_group[i].sarea);
       if(medium->debug)
 	fprintf(stderr,
 		"event: %20.15e %5i %10.3e %10.3e %10.3e %10.3e %10.3e %10.3e %10.3e %10.3e %10.3e %10.3e\n",
@@ -669,12 +669,12 @@ void flush_moment_stack(struct med *medium)
 		medium->fault_group[i].slip[STRIKE]/medium->fault_group[i].sarea,
 		medium->fault_group[i].slip[DIP]/medium->fault_group[i].sarea,
 		medium->fault_group[i].slip[NORMAL]/medium->fault_group[i].sarea,
-		medium->fault_group[i].slip[3+X]/medium->fault_group[i].sarea,
-		medium->fault_group[i].slip[3+Y]/medium->fault_group[i].sarea,
-		medium->fault_group[i].slip[3+Z]/medium->fault_group[i].sarea,
-		medium->fault_group[i].cent[X]/medium->fault_group[i].sarea,
-		medium->fault_group[i].cent[Y]/medium->fault_group[i].sarea,
-		medium->fault_group[i].cent[Z]/medium->fault_group[i].sarea);
+		medium->fault_group[i].slip[3+INT_X]/medium->fault_group[i].sarea,
+		medium->fault_group[i].slip[3+INT_Y]/medium->fault_group[i].sarea,
+		medium->fault_group[i].slip[3+INT_Z]/medium->fault_group[i].sarea,
+		medium->fault_group[i].cent[INT_X]/medium->fault_group[i].sarea,
+		medium->fault_group[i].cent[INT_Y]/medium->fault_group[i].sarea,
+		medium->fault_group[i].cent[INT_Z]/medium->fault_group[i].sarea);
       
     }
   // flush every couple of lines
@@ -718,27 +718,27 @@ void fiddle_with_limits_for_plot(struct med *medium,int *nz,
       fprintf(stderr,"fiddle_with_limits_for_plot: bulk fields were not initialized, failed");
       exit(-1);
     }
-  if(medium->n[Z]<0){
+  if(medium->n[INT_Z]<0){
     *nz=1;// uses fault plane set up
     *use_fault_plane =TRUE;
   }else{
-    *nz=medium->n[Z];
+    *nz=medium->n[INT_Z];
     *use_fault_plane = FALSE;
   }
-  if(medium->n[X]<2)
-    dx[X]=0.0;
+  if(medium->n[INT_X]<2)
+    dx[INT_X]=0.0;
   else
-    dx[X]=(medium->pxmax[X]-medium->pxmin[X])/
-      ((COMP_PRECISION)(medium->n[X]-1));
-  if(medium->n[Y]<2)
-    dx[Y]=0.0;
+    dx[INT_X]=(medium->pxmax[INT_X]-medium->pxmin[INT_X])/
+      ((COMP_PRECISION)(medium->n[INT_X]-1));
+  if(medium->n[INT_Y]<2)
+    dx[INT_Y]=0.0;
   else
-    dx[Y]=(medium->pxmax[Y]-medium->pxmin[Y])/
-      ((COMP_PRECISION)(medium->n[Y]-1));
+    dx[INT_Y]=(medium->pxmax[INT_Y]-medium->pxmin[INT_Y])/
+      ((COMP_PRECISION)(medium->n[INT_Y]-1));
   if(*nz<2)
-    dx[Z]=0.0;
+    dx[INT_Z]=0.0;
   else
-    dx[Z]=(medium->pxmax[Z]-medium->pxmin[Z])/
+    dx[INT_Z]=(medium->pxmax[INT_Z]-medium->pxmin[INT_Z])/
       ((COMP_PRECISION)(*nz-1));
 }
 

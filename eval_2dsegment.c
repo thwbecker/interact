@@ -52,9 +52,9 @@ void eval_2dsegment_plane_strain(COMP_PRECISION *x,
     pfac4 = POISSON_NU;
 #ifdef DEBUG
   COMP_PRECISION l,w,corners[4][3];
-  if(x[Z] != 0.0){
+  if(x[INT_Z] != 0.0){
     fprintf(stderr,"eval_2dsegment_plane_strain: z coordinate has to be zero: z: %g\n",
-	    x[Z]);
+	    x[INT_Z]);
     exit(-1);
   }
 #endif
@@ -62,8 +62,8 @@ void eval_2dsegment_plane_strain(COMP_PRECISION *x,
      shift and rotate observational point into local reference frame. 
      first, move fault to origin
   */
-  dx[X] = x[X] - fault->x[X];
-  dx[Y] = x[Y] - fault->x[Y];
+  dx[INT_X] = x[INT_X] - fault->x[INT_X];
+  dx[INT_Y] = x[INT_Y] - fault->x[INT_Y];
   //
   // then line up fault strike with the x-axis, ie. rotate dx into the
   // fault local system x_local
@@ -82,8 +82,8 @@ void eval_2dsegment_plane_strain(COMP_PRECISION *x,
     calculate_corners(corners,fault,&l,&w);
     fprintf(stderr,
 	    "eval_2dsegment_plane_strain: SINGULAR: x: (%g, %g) segment: (%g, %g) to (%g, %g)\n",
-	    x_local[X],x_local[Y],corners[0][X],corners[0][Y],
-	    corners[1][X],corners[1][Y]);
+	    x_local[INT_X],x_local[INT_Y],corners[0][INT_X],corners[0][INT_Y],
+	    corners[1][INT_X],corners[1][INT_Y]);
 #endif
     set_stress_and_disp_nan(sm_global,u_global);
   }else{
@@ -98,9 +98,9 @@ void eval_2dsegment_plane_strain(COMP_PRECISION *x,
     // stresses
     get_2dseg_stress(sm_local,disp,x_local,f4,f5,f6,f7);
     // no shear stresses with z for plain strain since exz and eyz = 0
-    sm_local[X][Z] = sm_local[Z][X] = sm_local[Z][Y] = sm_local[Y][Z] = 0.0;
+    sm_local[INT_X][INT_Z] = sm_local[INT_Z][INT_X] = sm_local[INT_Z][INT_Y] = sm_local[INT_Y][INT_Z] = 0.0;
     // from plane strain: szz = \nu/ (sxx + syy)
-    sm_local[Z][Z] = pfac4 * (sm_local[X][X] + sm_local[Y][Y]);
+    sm_local[INT_Z][INT_Z] = pfac4 * (sm_local[INT_X][INT_X] + sm_local[INT_Y][INT_Y]);
     /* 
 
        rotate displacements back into global frame this subroutine
@@ -108,7 +108,7 @@ void eval_2dsegment_plane_strain(COMP_PRECISION *x,
 
     */
     rotate_vec2d(u,u_global,fault->cos_alpha,-fault->sin_alpha);
-    u_global[Z] = 0.0;
+    u_global[INT_Z] = 0.0;
     /* 
        rotate stress matrix back into global field 
     */
@@ -134,14 +134,14 @@ void eval_2dsegment_plane_stress(COMP_PRECISION *x,struct flt *fault,
     pfac5 = POISSON_NU/(TWO_TIMES_SHEAR_MODULUS*(1.0+POISSON_NU));
 #ifdef DEBUG
   COMP_PRECISION l,w,corners[4][3];
-  if(x[Z] != 0.0){
+  if(x[INT_Z] != 0.0){
     fprintf(stderr,"eval_2dsegment_plane_stress: z coordinate has to be zero: z: %g\n",
-	    x[Z]);
+	    x[INT_Z]);
     exit(-1);
   }
 #endif
-  dx[X] = x[X] - fault->x[X];
-  dx[Y] = x[Y] - fault->x[Y];
+  dx[INT_X] = x[INT_X] - fault->x[INT_X];
+  dx[INT_Y] = x[INT_Y] - fault->x[INT_Y];
   rotate_vec2d(dx,x_local,fault->cos_alpha,fault->sin_alpha);
   get_2dseg_geo(x_local,fault->l,&c1, &c2,&c12, &c22,&c3, 
 		&c4,&c32, &c42,&y2,iret);
@@ -150,8 +150,8 @@ void eval_2dsegment_plane_stress(COMP_PRECISION *x,struct flt *fault,
     calculate_corners(corners,fault,&l,&w);
     fprintf(stderr,
 	    "eval_2dsegment_plane_stress: SINGULAR: x: (%g, %g) segment: (%g, %g) to (%g, %g)\n",
-	    x_local[X],x_local[Y],corners[0][X],corners[0][Y],
-	    corners[1][X],corners[1][Y]);
+	    x_local[INT_X],x_local[INT_Y],corners[0][INT_X],corners[0][INT_Y],
+	    corners[1][INT_X],corners[1][INT_Y]);
 #endif
     set_stress_and_disp_nan(sm_global,u_global);
   }else{
@@ -160,13 +160,13 @@ void eval_2dsegment_plane_stress(COMP_PRECISION *x,struct flt *fault,
     get_2dseg_disp(u,disp,x_local,f2,f3,f4,f5,pfac2,pfac3);
     get_2dseg_stress(sm_local,disp,x_local,f4,f5,f6,f7);
     // no shear stresses with z 
-    sm_local[X][Z] = sm_local[Z][X] = sm_local[Z][Y] = sm_local[Y][Z] = 0.0;
-    sm_local[Z][Z] = 0.0;
+    sm_local[INT_X][INT_Z] = sm_local[INT_Z][INT_X] = sm_local[INT_Z][INT_Y] = sm_local[INT_Y][INT_Z] = 0.0;
+    sm_local[INT_Z][INT_Z] = 0.0;
     rotate_vec2d(u,u_global,fault->cos_alpha,-fault->sin_alpha);
     rotate_mat_z(sm_local,sm_global,fault->cos_alpha,-fault->sin_alpha);
     // u_z is undefined without plate thickness, but we shall volunteer
     // e_zz = - pfac5 (s_xx + s_yy) instead
-    u_global[Z] = -pfac5 * (sm_global[X][X] + sm_global[Y][Y]);
+    u_global[INT_Z] = -pfac5 * (sm_global[INT_X][INT_X] + sm_global[INT_Y][INT_Y]);
   }
 
 }
@@ -192,13 +192,13 @@ void eval_2dsegment_plane_strain_basic(COMP_PRECISION *x,
     pfac4 = POISSON_NU;
 #ifdef DEBUG
   COMP_PRECISION l,w,corners[4][3];
-  if(x[Z] != 0.0){
+  if(x[INT_Z] != 0.0){
     fprintf(stderr,"eval_2dsegment_plane_strain_basic: z coordinate has to be zero: z: %g\n",
-	    x[Z]);exit(-1);
+	    x[INT_Z]);exit(-1);
   }
   if(norm(fault->x,2) > EPS_COMP_PREC){
     fprintf(stderr,"eval_2dsegment_plane_strain_basic: error, fault origin should be 0,0 but is %g, %g\n",
-	    fault->x[X],fault->x[Y]);exit(-1);
+	    fault->x[INT_X],fault->x[INT_Y]);exit(-1);
   }
 #endif
   if(fault->strike != 90.0){
@@ -212,8 +212,8 @@ void eval_2dsegment_plane_strain_basic(COMP_PRECISION *x,
     calculate_corners(corners,fault,&l,&w);
     fprintf(stderr,
 	    "eval_2dsegment_plane_strain_basic: SINGULAR: x: (%g, %g) segment: (%g, %g) to (%g, %g)\n",
-	    x[X],x[Y],corners[0][X],corners[0][Y],
-	    corners[1][X],corners[1][Y]);
+	    x[INT_X],x[INT_Y],corners[0][INT_X],corners[0][INT_Y],
+	    corners[1][INT_X],corners[1][INT_Y]);
 #endif
     set_stress_and_disp_nan(sm_global,u_global);
   }else{
@@ -221,9 +221,9 @@ void eval_2dsegment_plane_strain_basic(COMP_PRECISION *x,
 		   c32,c42,pfac1,y2,x);
     get_2dseg_disp(u_global,disp,x,f2,f3,f4,f5,pfac2,pfac3);
     get_2dseg_stress(sm_global,disp,x,f4,f5,f6,f7);
-    sm_global[X][Z] = sm_global[Z][X] = sm_global[Z][Y] = sm_global[Y][Z] = 0.0;
-    sm_global[Z][Z] = pfac4 * (sm_global[X][X] + sm_global[Y][Y]);
-    u_global[Z] = 0.0;
+    sm_global[INT_X][INT_Z] = sm_global[INT_Z][INT_X] = sm_global[INT_Z][INT_Y] = sm_global[INT_Y][INT_Z] = 0.0;
+    sm_global[INT_Z][INT_Z] = pfac4 * (sm_global[INT_X][INT_X] + sm_global[INT_Y][INT_Y]);
+    u_global[INT_Z] = 0.0;
   }
 }
 void eval_2dsegment_plane_stress_basic(COMP_PRECISION *x,
@@ -243,13 +243,13 @@ void eval_2dsegment_plane_stress_basic(COMP_PRECISION *x,
     pfac5 = POISSON_NU/(TWO_TIMES_SHEAR_MODULUS*(1.0+POISSON_NU));
 #ifdef DEBUG
   COMP_PRECISION l,w,corners[4][3];
-  if(x[Z] != 0.0){
+  if(x[INT_Z] != 0.0){
     fprintf(stderr,"eval_2dsegment: z coordinate has to be zero: z: %g\n",
-	    x[Z]);exit(-1);
+	    x[INT_Z]);exit(-1);
   }  
   if(norm(fault->x,2) > EPS_COMP_PREC){
     fprintf(stderr,"eval_2dsegment_plane_stress_basic: error, fault origin should be 0,0 but is %g, %g\n",
-	    fault->x[X],fault->x[Y]);exit(-1);
+	    fault->x[INT_X],fault->x[INT_Y]);exit(-1);
   }
 #endif
   if(fault->strike != 90.0){
@@ -263,8 +263,8 @@ void eval_2dsegment_plane_stress_basic(COMP_PRECISION *x,
     calculate_corners(corners,fault,&l,&w);
     fprintf(stderr,
 	    "eval_2dsegment_plane_stress_basic: SINGULAR: x: (%g, %g) segment: (%g, %g) to (%g, %g)\n",
-	    x[X],x[Y],corners[0][X],corners[0][Y],corners[1][X],
-	    corners[1][Y]);
+	    x[INT_X],x[INT_Y],corners[0][INT_X],corners[0][INT_Y],corners[1][INT_X],
+	    corners[1][INT_Y]);
 #endif
    set_stress_and_disp_nan(sm_global,u_global);
   }else{
@@ -272,9 +272,9 @@ void eval_2dsegment_plane_stress_basic(COMP_PRECISION *x,
 		   c3,c4,c32,c42,pfac1,y2,x);
     get_2dseg_disp(u_global,disp,x,f2,f3,f4,f5,pfac2,pfac3);
     get_2dseg_stress(sm_global,disp,x,f4,f5,f6,f7);
-    sm_global[X][Z] = sm_global[Z][X] = sm_global[Z][Y] = sm_global[Y][Z] = 0.0;
-    sm_global[Z][Z] = 0.0;
-    u_global[Z] = -pfac5 * (sm_global[X][X] + sm_global[Y][Y]);
+    sm_global[INT_X][INT_Z] = sm_global[INT_Z][INT_X] = sm_global[INT_Z][INT_Y] = sm_global[INT_Y][INT_Z] = 0.0;
+    sm_global[INT_Z][INT_Z] = 0.0;
+    u_global[INT_Z] = -pfac5 * (sm_global[INT_X][INT_X] + sm_global[INT_Y][INT_Y]);
   }
 
 }
@@ -292,9 +292,9 @@ void get_2dseg_geo(COMP_PRECISION *x,COMP_PRECISION l,
 		   COMP_PRECISION *c32,COMP_PRECISION *c42,
 		   COMP_PRECISION *y2, int *iret)
 {
-  *c1  = x[X] - l;// x - a
-  *c2  = x[X] + l;// x + a
-  *y2  = x[Y] * x[Y];
+  *c1  = x[INT_X] - l;// x - a
+  *c2  = x[INT_X] + l;// x + a
+  *y2  = x[INT_Y] * x[INT_Y];
   *c12 = (*c1) * (*c1);
   *c22 = (*c2) * (*c2);
   *c3 = (*c12) + (*y2);
@@ -338,16 +338,16 @@ void get_2dseg_ffac(COMP_PRECISION *f2,  COMP_PRECISION *f3,
   //                                   =  pi for |x|<a y=0+
   //                                   = -pi for |x|<a,y=0-
   //
-  *f3 =     -(atan2(x[Y],c1)       -       atan2(x[Y],c2))/pfac1;
-  *f4 =      (x[Y]/c3              -              x[Y]/c4)/pfac1;
+  *f3 =     -(atan2(x[INT_Y],c1)       -       atan2(x[INT_Y],c2))/pfac1;
+  *f4 =      (x[INT_Y]/c3              -              x[INT_Y]/c4)/pfac1;
   *f5 =      (        c1/c3        -                c2/c4)/pfac1;
   *f6 =      ((c12 - y2)/c32       -         (c22-y2)/c42)/pfac1;
-  *f7 =      2.0*x[Y]*(c1/c32-                     c2/c42)/pfac1;
+  *f7 =      2.0*x[INT_Y]*(c1/c32-                     c2/c42)/pfac1;
 }
 		   
 /*
   
-assign part of the displacements, u[Z] depends on approximation
+assign part of the displacements, u[INT_Z] depends on approximation
 
 */
 void get_2dseg_disp(COMP_PRECISION *u,COMP_PRECISION *disp,
@@ -360,12 +360,12 @@ void get_2dseg_disp(COMP_PRECISION *u,COMP_PRECISION *disp,
   COMP_PRECISION tmp[4];
   tmp[0] = 2.0*f3*pfac2;
   tmp[1] = f2*pfac3;
-  tmp[2] = f5*x[Y];
-  tmp[3] = f4*x[Y];
-  u[X]  = disp[STRIKE] * (     tmp[0] - tmp[2]);
-  u[X] -= disp[NORMAL] * (-    tmp[1] - tmp[3]);
-  u[Y]  = disp[STRIKE] * (     tmp[1] - tmp[3]);
-  u[Y] -= disp[NORMAL] * (     tmp[0] + tmp[2]);
+  tmp[2] = f5*x[INT_Y];
+  tmp[3] = f4*x[INT_Y];
+  u[INT_X]  = disp[STRIKE] * (     tmp[0] - tmp[2]);
+  u[INT_X] -= disp[NORMAL] * (-    tmp[1] - tmp[3]);
+  u[INT_Y]  = disp[STRIKE] * (     tmp[1] - tmp[3]);
+  u[INT_Y] -= disp[NORMAL] * (     tmp[0] + tmp[2]);
 }
 /*
   
@@ -379,17 +379,17 @@ void get_2dseg_stress(COMP_PRECISION sm[3][3],
 		      COMP_PRECISION f6,COMP_PRECISION f7)
 {
   COMP_PRECISION tmp[4];
-  tmp[0] = x[Y]*f6;
-  tmp[1] = x[Y]*f7;
+  tmp[0] = x[INT_Y]*f6;
+  tmp[1] = x[INT_Y]*f7;
   tmp[2] = TWO_TIMES_SHEAR_MODULUS*disp[STRIKE];
   tmp[3] = TWO_TIMES_SHEAR_MODULUS*disp[NORMAL];
-  sm[X][X] =tmp[2]*(2.0*f4 + tmp[0]);
-  sm[X][X]-=tmp[3]*(   -f5 + tmp[1]);
-  sm[Y][Y] =tmp[2]*(       - tmp[0]);
-  sm[Y][Y]-=tmp[3]*(   -f5 - tmp[1]);
-  sm[X][Y] =tmp[2]*(   -f5 + tmp[1]);
-  sm[X][Y]-=tmp[3]*(       - tmp[0]);
-  sm[Y][X] = sm[X][Y];
+  sm[INT_X][INT_X] =tmp[2]*(2.0*f4 + tmp[0]);
+  sm[INT_X][INT_X]-=tmp[3]*(   -f5 + tmp[1]);
+  sm[INT_Y][INT_Y] =tmp[2]*(       - tmp[0]);
+  sm[INT_Y][INT_Y]-=tmp[3]*(   -f5 - tmp[1]);
+  sm[INT_X][INT_Y] =tmp[2]*(   -f5 + tmp[1]);
+  sm[INT_X][INT_Y]-=tmp[3]*(       - tmp[0]);
+  sm[INT_Y][INT_X] = sm[INT_X][INT_Y];
 }
 /*  
 
@@ -422,10 +422,10 @@ void eval_2dsegment_plane_strain_tdd(COMP_PRECISION *x,
     chi = 3.0 - 4.0 * pr;
     init = TRUE;
   }
-  if((ihalf)&&(x[Y] > 0)){	/* half-plane in air */
+  if((ihalf)&&(x[INT_Y] > 0)){	/* half-plane in air */
     set_stress_and_disp_nan(sm_global,u_global);
   }else{
-    tdd_coeff((x+X),(x+Y),&fault->x[X],&fault->x[Y],
+    tdd_coeff((x+INT_X),(x+INT_Y),&fault->x[INT_X],&fault->x[INT_Y],
 	      &fault->l,&fault->cos_alpha,&fault->sin_alpha,
 	      &ihalf,&pr,&pr1,&pr2,&con,&cons,&chi,
 	      (sxx+STRIKE),(sxx+NORMAL),(syy+STRIKE),(syy+NORMAL),
@@ -433,22 +433,22 @@ void eval_2dsegment_plane_strain_tdd(COMP_PRECISION *x,
 	      (uy+STRIKE),(uy+NORMAL),iret);
     if(!(*iret)){
       /* add up contribution from strike and normal motion */
-      u_global[X] = ux[STRIKE] * disp[STRIKE] - 
+      u_global[INT_X] = ux[STRIKE] * disp[STRIKE] - 
 	ux[NORMAL] * disp[NORMAL];
-      u_global[Y] = uy[STRIKE] * disp[STRIKE] -
+      u_global[INT_Y] = uy[STRIKE] * disp[STRIKE] -
 	uy[NORMAL] * disp[NORMAL];
-      u_global[Z] = 0.0;
+      u_global[INT_Z] = 0.0;
       /* stresses */
-      sm_global[X][X] = sxx[STRIKE] * disp[STRIKE] -
+      sm_global[INT_X][INT_X] = sxx[STRIKE] * disp[STRIKE] -
 	sxx[NORMAL] * disp[NORMAL];
-      sm_global[Y][X] = sm_global[X][Y] = 
+      sm_global[INT_Y][INT_X] = sm_global[INT_X][INT_Y] = 
 	sxy[STRIKE] * disp[STRIKE] -
 	sxy[NORMAL] * disp[NORMAL];
-      sm_global[Y][Y] = syy[STRIKE] * disp[STRIKE] -
+      sm_global[INT_Y][INT_Y] = syy[STRIKE] * disp[STRIKE] -
 	syy[NORMAL] * disp[NORMAL];
-      sm_global[X][Z] = sm_global[Z][X] = sm_global[Z][Y] = 
-	sm_global[Y][Z] = 0.0;
-      sm_global[Z][Z] = pr * (sm_global[X][X] + sm_global[Y][Y]);
+      sm_global[INT_X][INT_Z] = sm_global[INT_Z][INT_X] = sm_global[INT_Z][INT_Y] = 
+	sm_global[INT_Y][INT_Z] = 0.0;
+      sm_global[INT_Z][INT_Z] = pr * (sm_global[INT_X][INT_X] + sm_global[INT_Y][INT_Y]);
     }else{
       set_stress_and_disp_nan(sm_global,u_global);
     }

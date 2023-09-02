@@ -118,9 +118,9 @@ void get_point_on_gc(COMP_PRECISION lon1, COMP_PRECISION lat1,
 
   a = sin((1.0 - f) * (*d))/sd;
   b = sin(f * (*d))/sd;
-  x[X] =  a*clat1*clon1 +  b*clat2*clon2;
-  x[Y] =  a*clat1*slon1 +  b*clat2*slon2;
-  x[Z] =  a*slat1       +  b*slat2;
+  x[INT_X] =  a*clat1*clon1 +  b*clat2*clon2;
+  x[INT_Y] =  a*clat1*slon1 +  b*clat2*slon2;
+  x[INT_Z] =  a*slat1       +  b*slat2;
   xyz2lonlat(x,lon,lat);
 }
 /* 
@@ -156,9 +156,9 @@ void lonlat2xyz(COMP_PRECISION lon, COMP_PRECISION lat,
   COMP_PRECISION clon,slon,clat,slat;
   my_sincos(&slon,&clon,lon);
   my_sincos(&slat,&clat,lat);
-  xc[X]=clat * clon;
-  xc[Y]=clat * slon; 
-  xc[Z]=slat;
+  xc[INT_X]=clat * clon;
+  xc[INT_Y]=clat * slon; 
+  xc[INT_Z]=slat;
 }
 void lonlat2xyz_deg(COMP_PRECISION lon, COMP_PRECISION lat,
 		    COMP_PRECISION *xc)
@@ -166,9 +166,9 @@ void lonlat2xyz_deg(COMP_PRECISION lon, COMP_PRECISION lat,
   COMP_PRECISION clon,slon,clat,slat;
   my_sincos(&slon,&clon,DEG2RADF(lon));
   my_sincos(&slat,&clat,DEG2RADF(lat));
-  xc[X]=clat * clon;
-  xc[Y]=clat * slon; 
-  xc[Z]=slat;
+  xc[INT_X]=clat * clon;
+  xc[INT_Y]=clat * slon; 
+  xc[INT_Z]=slat;
 }
 /*
   
@@ -178,15 +178,15 @@ void lonlat2xyz_deg(COMP_PRECISION lon, COMP_PRECISION lat,
 void xyz2lonlat(COMP_PRECISION *xc, COMP_PRECISION *lon,
 		COMP_PRECISION *lat)
 {
-  *lat = atan2(xc[Z],hypot(xc[X],xc[Y]));
-  *lon = atan2(xc[Y],xc[X]);
+  *lat = atan2(xc[INT_Z],hypot(xc[INT_X],xc[INT_Y]));
+  *lon = atan2(xc[INT_Y],xc[INT_X]);
 }
 // same in degrees
 void xyz2lonlat_deg(COMP_PRECISION *xc, COMP_PRECISION *lon,
 		    COMP_PRECISION *lat)
 {
-  *lat = atan2(xc[Z],hypot(xc[X],xc[Y]));
-  *lon = atan2(xc[Y],xc[X]);
+  *lat = atan2(xc[INT_Z],hypot(xc[INT_X],xc[INT_Y]));
+  *lon = atan2(xc[INT_Y],xc[INT_X]);
   *lat = RAD2DEGF(*lat);
   *lon = RAD2DEGF(*lon);
 }
@@ -199,9 +199,9 @@ void pv2cv(COMP_PRECISION *xp,COMP_PRECISION *xc,
   int i;
   // convert vector
   for(i=0;i<3;i++){
-    xc[i]  = polar_base[R*3+i]     * xp[R]; /* r contribution */
-    xc[i] += polar_base[THETA*3+i] * xp[THETA]; /* theta contribution */
-    xc[i] += polar_base[PHI*3+i]   * xp[PHI]; /* phi  contribution */
+    xc[i]  = polar_base[INT_R*3+i]     * xp[INT_R]; /* r contribution */
+    xc[i] += polar_base[INT_THETA*3+i] * xp[INT_THETA]; /* theta contribution */
+    xc[i] += polar_base[INT_PHI*3+i]   * xp[INT_PHI]; /* phi  contribution */
   }
 }
 
@@ -213,9 +213,9 @@ void cv2pv(COMP_PRECISION *xc,COMP_PRECISION *xp,
   int i,j;
   // convert vector
   for(i=j=0;i<3;i++,j+=3){
-    xp[i]  = polar_base[j+X] * xc[X]; /* x contribution */
-    xp[i] += polar_base[j+Y] * xc[Y]; /* y contribution */
-    xp[i] += polar_base[j+Z] * xc[Z]; /* z contribution */
+    xp[i]  = polar_base[j+INT_X] * xc[INT_X]; /* x contribution */
+    xp[i] += polar_base[j+INT_Y] * xc[INT_Y]; /* y contribution */
+    xp[i] += polar_base[j+INT_Z] * xc[INT_Z]; /* z contribution */
   }
 }
 
@@ -235,15 +235,15 @@ void calculate_polar_base(COMP_PRECISION lon, COMP_PRECISION lat,
   my_sincos(&st,&ct,theta);
   my_sincos(&sp,&cp,phi);
   // r base vector, R*3+i
-  polar_base[R*3+X]= st * cp;
-  polar_base[R*3+Y]= st * sp;
-  polar_base[R*3+Z]= ct;
+  polar_base[INT_R*3+INT_X]= st * cp;
+  polar_base[INT_R*3+INT_Y]= st * sp;
+  polar_base[INT_R*3+INT_Z]= ct;
   // theta base vector, THETA*3+i
-  polar_base[THETA*3+X]= ct * cp;
-  polar_base[THETA*3+Y]= ct * sp;
-  polar_base[THETA*3+Z]= -st;
+  polar_base[INT_THETA*3+INT_X]= ct * cp;
+  polar_base[INT_THETA*3+INT_Y]= ct * sp;
+  polar_base[INT_THETA*3+INT_Z]= -st;
   // phi base vector, PHI*3+i
-  polar_base[PHI*3+X]= -sp;
-  polar_base[PHI*3+Y]=  cp;
-  polar_base[PHI*3+Z]= 0.0;
+  polar_base[INT_PHI*3+INT_X]= -sp;
+  polar_base[INT_PHI*3+INT_Y]=  cp;
+  polar_base[INT_PHI*3+INT_Z]= 0.0;
 }

@@ -88,9 +88,9 @@ int main(int argc, char **argv)
   nrpatches=0;
   while(read_points_local(x,&code, use_code, stdin)){
     for(i=0;i<4;i++)
-      if(x[i*3+Z] > 0.0){
+      if(x[i*3+INT_Z] > 0.0){
 	fprintf(stderr,"%s: rectangle %i: point %i: z should be <= 0 (%g, %g, %g)\n",
-		argv[0],medium->nrflt+1,i+1,x[i*3+X],x[i*3+Y],x[i*3+Z]);
+		argv[0],medium->nrflt+1,i+1,x[i*3+INT_X],x[i*3+INT_Y],x[i*3+INT_Z]);
 	exit(-1);
       }
 
@@ -124,12 +124,12 @@ my_boolean read_points_local(COMP_PRECISION *x,int *code, my_boolean read_code, 
   int i,c=0;
   if(read_code){
     for(i=0;i<4;i++)
-      c+= fscanf(stdin,THREE_CPI_FORMAT,&x[X+i*3],&x[Y+i*3],&x[Z+i*3],code);
+      c+= fscanf(stdin,THREE_CPI_FORMAT,&x[INT_X+i*3],&x[INT_Y+i*3],&x[INT_Z+i*3],code);
     if(c == 16)
       ok = TRUE;
   }else{
     for(i=0;i<4;i++)
-      c+= fscanf(stdin,THREE_CP_FORMAT,&x[X+i*3],&x[Y+i*3],&x[Z+i*3]);
+      c+= fscanf(stdin,THREE_CP_FORMAT,&x[INT_X+i*3],&x[INT_Y+i*3],&x[INT_Z+i*3]);
     if(c == 12)
       ok = TRUE;
   }

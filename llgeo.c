@@ -32,17 +32,17 @@
 void rotate_vec(COMP_PRECISION *xin, COMP_PRECISION *xout,
 		COMP_PRECISION cos_alpha, COMP_PRECISION sin_alpha)
 {
-  xout[X]= ( cos_alpha * xin[X]) + (sin_alpha * xin[Y]);
-  xout[Y]= (-sin_alpha * xin[X]) + (cos_alpha * xin[Y]);
-  xout[Z]=  xin[Z];
+  xout[INT_X]= ( cos_alpha * xin[INT_X]) + (sin_alpha * xin[INT_Y]);
+  xout[INT_Y]= (-sin_alpha * xin[INT_X]) + (cos_alpha * xin[INT_Y]);
+  xout[INT_Z]=  xin[INT_Z];
 }
 // similar for 2-D in X-Y plane
 //   WARNING: this routine doesn't take azimuth but direction!
 void rotate_vec2d(COMP_PRECISION *xin, COMP_PRECISION *xout,
 		  COMP_PRECISION cos_alpha, COMP_PRECISION sin_alpha)
 {
-  xout[X]= ( cos_alpha * xin[X]) + (sin_alpha * xin[Y]);
-  xout[Y]= (-sin_alpha * xin[X]) + (cos_alpha * xin[Y]);
+  xout[INT_X]= ( cos_alpha * xin[INT_X]) + (sin_alpha * xin[INT_Y]);
+  xout[INT_Y]= (-sin_alpha * xin[INT_X]) + (cos_alpha * xin[INT_Y]);
 }
 
 /* 
@@ -88,17 +88,17 @@ void rotate_mat_z(COMP_PRECISION xin[3][3],
   sin_square=sin_alpha*sin_alpha;
   sin_cos=cos_alpha*sin_alpha;
   /* has to be optimized */
-  xout[X][X]=(xin[X][X]*cos_square + xin[Y][Y]*sin_square + 
-	      (xin[X][Y]*2.0*sin_alpha*cos_alpha));
-  xout[X][Y]=xout[Y][X]=(xin[X][Y]*(cos_square-sin_square) + 
-			 (-xin[X][X] + xin[Y][Y])*sin_cos);
-  xout[X][Z]=xout[Z][X]=(xin[X][Z]*cos_alpha + 
-			 xin[Y][Z]*sin_alpha);
-  xout[Y][Y]=(xin[Y][Y]*cos_square - (2.0*xin[X][Y]*sin_cos) + 
-	      xin[X][X]*sin_square);
-  xout[Y][Z]=xout[Z][Y]=(xin[Y][Z]*cos_alpha - 
-			 xin[X][Z]*sin_alpha);
-  xout[Z][Z]=xin[Z][Z];
+  xout[INT_X][INT_X]=(xin[INT_X][INT_X]*cos_square + xin[INT_Y][INT_Y]*sin_square + 
+	      (xin[INT_X][INT_Y]*2.0*sin_alpha*cos_alpha));
+  xout[INT_X][INT_Y]=xout[INT_Y][INT_X]=(xin[INT_X][INT_Y]*(cos_square-sin_square) + 
+			 (-xin[INT_X][INT_X] + xin[INT_Y][INT_Y])*sin_cos);
+  xout[INT_X][INT_Z]=xout[INT_Z][INT_X]=(xin[INT_X][INT_Z]*cos_alpha + 
+			 xin[INT_Y][INT_Z]*sin_alpha);
+  xout[INT_Y][INT_Y]=(xin[INT_Y][INT_Y]*cos_square - (2.0*xin[INT_X][INT_Y]*sin_cos) + 
+	      xin[INT_X][INT_X]*sin_square);
+  xout[INT_Y][INT_Z]=xout[INT_Z][INT_Y]=(xin[INT_Y][INT_Z]*cos_alpha - 
+			 xin[INT_X][INT_Z]*sin_alpha);
+  xout[INT_Z][INT_Z]=xin[INT_Z][INT_Z];
 }
 
 
@@ -155,7 +155,7 @@ void assign_to_vector(float *x,float val, int n)
 }
 void assign_to_vector_3d(float *x,float val)
 {
-  x[X] = x[Y] = x[Z] = val;
+  x[INT_X] = x[INT_Y] = x[INT_Z] = val;
 }
 
 /* 
@@ -168,9 +168,9 @@ COMP_PRECISION distance_squared_3d(COMP_PRECISION *x,
 				   COMP_PRECISION *y)
 {
   COMP_PRECISION tmp,tmp1;
-  tmp1=x[X]-y[X];tmp  = tmp1*tmp1;
-  tmp1=x[Y]-y[Y];tmp += tmp1*tmp1;
-  tmp1=x[Z]-y[Z];tmp += tmp1*tmp1;
+  tmp1=x[INT_X]-y[INT_X];tmp  = tmp1*tmp1;
+  tmp1=x[INT_Y]-y[INT_Y];tmp += tmp1*tmp1;
+  tmp1=x[INT_Z]-y[INT_Z];tmp += tmp1*tmp1;
   return(tmp);
 }
 COMP_PRECISION distance_squared(COMP_PRECISION *x,
@@ -226,9 +226,9 @@ COMP_PRECISION dotp(COMP_PRECISION *x,COMP_PRECISION *y,
 COMP_PRECISION dotp_3d(COMP_PRECISION *x,COMP_PRECISION *y)
 {
   COMP_PRECISION tmp;
-  tmp  = x[X]*y[X];
-  tmp += x[Y]*y[Y];
-  tmp += x[Z]*y[Z];
+  tmp  = x[INT_X]*y[INT_X];
+  tmp += x[INT_Y]*y[INT_Y];
+  tmp += x[INT_Z]*y[INT_Z];
   return(tmp);
 }
 /*
@@ -302,7 +302,7 @@ void normalize_3d(COMP_PRECISION *x)
   COMP_PRECISION length;
   length = norm_3d(x);
   if(length != 0.0){
-    x[X] /= length;x[Y] /= length;x[Z] /= length;
+    x[INT_X] /= length;x[INT_Y] /= length;x[INT_Z] /= length;
   }
 }
 //  \vec{a} = \vec{b}
@@ -315,7 +315,7 @@ void a_equals_b_vector(COMP_PRECISION *a,COMP_PRECISION *b,
 }
 void a_equals_b_vector_3d(COMP_PRECISION *a,COMP_PRECISION *b)
 {
-  a[X] = b[X];a[Y] = b[Y];a[Z] = b[Z];
+  a[INT_X] = b[INT_X];a[INT_Y] = b[INT_Y];a[INT_Z] = b[INT_Z];
 }
 void swap_ab_vector_3d(COMP_PRECISION *a,COMP_PRECISION *b)
 {
@@ -329,7 +329,7 @@ void swap_ab_vector_3d(COMP_PRECISION *a,COMP_PRECISION *b)
 // where f is a scalar
 void scale_vector_3d(COMP_PRECISION *a,COMP_PRECISION f)
 {
-  a[X] *= f;a[Y] *= f;a[Z] *= f;
+  a[INT_X] *= f;a[INT_Y] *= f;a[INT_Z] *= f;
 }
 // do \vec{a} = f * \vec{a}
 void scale_vector(COMP_PRECISION *a,COMP_PRECISION f, int n)
@@ -348,7 +348,7 @@ void add_b_to_a_vector(COMP_PRECISION *a,COMP_PRECISION *b, int n)
 // do \vec{a} = \vec{a} + \vec{b} for 3-D
 void add_b_to_a_vector_3d(COMP_PRECISION *a,COMP_PRECISION *b)
 {
-  a[X] += b[X];a[Y] += b[Y];a[Z] += b[Z];
+  a[INT_X] += b[INT_X];a[INT_Y] += b[INT_Y];a[INT_Z] += b[INT_Z];
 }
 // do \vec{a} = \vec{a} - \vec{b}
 void sub_b_from_a_vector(COMP_PRECISION *a,COMP_PRECISION *b,int n)
@@ -360,18 +360,18 @@ void sub_b_from_a_vector(COMP_PRECISION *a,COMP_PRECISION *b,int n)
 // do \vec{a} = \vec{a} - \vec{b} for 3-D
 void sub_b_from_a_vector_3d(COMP_PRECISION *a,COMP_PRECISION *b)
 {
-  a[X] -= b[X];a[Y] -= b[Y];a[Z] -= b[Z];
+  a[INT_X] -= b[INT_X];a[INT_Y] -= b[INT_Y];a[INT_Z] -= b[INT_Z];
 }
 // \vec{c} = \vec{a} + \vec{b}
 void c_eq_a_plus_b_3d(COMP_PRECISION *c,COMP_PRECISION *a,
 		      COMP_PRECISION *b)
 {
-  c[X] = a[X] + b[X];c[Y] = a[Y] + b[Y];c[Z] = a[Z] + b[Z];
+  c[INT_X] = a[INT_X] + b[INT_X];c[INT_Y] = a[INT_Y] + b[INT_Y];c[INT_Z] = a[INT_Z] + b[INT_Z];
 }
 // \vec{c} = \vec{a} - \vec{b}
 void c_eq_a_minus_b_3d(COMP_PRECISION *c,COMP_PRECISION *a,COMP_PRECISION *b)
 {
-  c[X] = a[X] - b[X];c[Y] = a[Y] - b[Y];c[Z] = a[Z] - b[Z];
+  c[INT_X] = a[INT_X] - b[INT_X];c[INT_Y] = a[INT_Y] - b[INT_Y];c[INT_Z] = a[INT_Z] - b[INT_Z];
 }
 // \vec{c} = \vec{a} - \vec{b}
 void c_eq_a_minus_b(COMP_PRECISION *c,COMP_PRECISION *a,COMP_PRECISION *b, int n)
@@ -388,9 +388,9 @@ void c_eq_a_minus_b(COMP_PRECISION *c,COMP_PRECISION *a,COMP_PRECISION *b, int n
 void cross_product(COMP_PRECISION *a,COMP_PRECISION *b,
 		   COMP_PRECISION *c)
 {
-  c[X] = b[Z] * a[Y] - b[Y] * a[Z];
-  c[Y] = b[X] * a[Z] - b[Z] * a[X];
-  c[Z] = b[Y] * a[X] - b[X] * a[Y];
+  c[INT_X] = b[INT_Z] * a[INT_Y] - b[INT_Y] * a[INT_Z];
+  c[INT_Y] = b[INT_X] * a[INT_Z] - b[INT_Z] * a[INT_X];
+  c[INT_Z] = b[INT_Y] * a[INT_X] - b[INT_X] * a[INT_Y];
 }
 /*
 
@@ -455,7 +455,7 @@ COMP_PRECISION square(COMP_PRECISION x)
 */
 COMP_PRECISION tracemat9(COMP_PRECISION *s)
 {
-  return s[XX] + s[YY] + s[ZZ];
+  return s[INT_XX] + s[INT_YY] + s[INT_ZZ];
 
 }
 /*

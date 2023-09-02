@@ -197,13 +197,13 @@ singular value will be set to zero
 #define DIP 1
 #define NORMAL 2
 
-#define X 0
-#define Y 1
-#define Z 2
+#define INT_X 0
+#define INT_Y 1
+#define INT_Z 2
 
-#define R 0
-#define THETA 1
-#define PHI 2
+#define INT_R 0
+#define INT_THETA 1
+#define INT_PHI 2
 
 #define EIGEN_E1 2      /* the eigenvalues returned by calc_eigensystem_sym
 		     are sorted ascendingly, hence if e1 > e2 > e3,
@@ -218,15 +218,15 @@ singular value will be set to zero
 // YX YY YZ   1 4 7
 // Zx ZY ZZ   2 5 8
 // 
-#define XX 0 
-#define XY 3
-#define XZ 6
-#define YY 4
-#define YZ 7
-#define ZZ 8
-#define YX 1 
-#define ZX 2
-#define ZY 5
+#define INT_XX 0 
+#define INT_XY 3
+#define INT_XZ 6
+#define INT_YY 4
+#define INT_YZ 7
+#define INT_ZZ 8
+#define INT_YX 1 
+#define INT_ZX 2
+#define INT_ZY 5
 
 
 
@@ -352,8 +352,8 @@ singular value will be set to zero
 #define POSIJ(i,l) ((i)*3+(l))
 
 // references to 3D deformation and stress fields
-#define POSS(i, j, k, l) (((k * nxy)+(i * medium->n[Y])+(j))*6+(l))
-#define POSU(i, j, k, l) (((k * nxy)+(i * medium->n[Y])+(j))*3+(l))
+#define POSS(i, j, k, l) (((k * nxy)+(i * medium->n[INT_Y])+(j))*6+(l))
+#define POSU(i, j, k, l) (((k * nxy)+(i * medium->n[INT_Y])+(j))*3+(l))
 // the fault and medium structures
 #include "structures.h"
 #ifdef USE_GEOPROJECT

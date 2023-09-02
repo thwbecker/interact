@@ -86,7 +86,7 @@ int main(int argc, char **argv)
 		 projection->clat,projection->azi,dummy,dummy,
 		 projection->lat1,projection->lat2,(int)FALSE);
       printf("%12g %12g %12g %12g %12g %12g %12g 0\n",
-	     px[X],px[Y],px[Z],fault[i].azi,
+	     px[INT_X],px[INT_Y],px[INT_Z],fault[i].azi,
 	     fault[i].dip,fault[i].l,fault[i].w);
 
     }    
@@ -126,8 +126,8 @@ int main(int argc, char **argv)
 	     as zeroes
 	  */
 	  block_eval_geookada(x,(disp+os1),lfu,ls,u_evaldepth,
-			      s_evaldepth,fault[i].x[X],
-			      fault[i].x[Y],fault[i].x[Z],
+			      s_evaldepth,fault[i].x[INT_X],
+			      fault[i].x[INT_Y],fault[i].x[INT_Z],
 			      fault[i].azi,fault[i].dip,
 			      fault[i].l,fault[i].w,
 			      fault[i].ca, fault[i].sa,&iret,
@@ -147,15 +147,15 @@ int main(int argc, char **argv)
       /* 
 	 output 
       */
-      fprintf(stdout,"%12g %12g ",x[X],x[Y]);
+      fprintf(stdout,"%12g %12g ",x[INT_X],x[INT_Y]);
       /* output of block and fault vel */
       fprintf(stdout,"%17.8e %17.8e %17.8e\t %17.8e %17.8e %17.8e ",
-	      bu[X],bu[Y],bu[Z],fu[X],fu[Y],fu[Z]);
+	      bu[INT_X],bu[INT_Y],bu[INT_Z],fu[INT_X],fu[INT_Y],fu[INT_Z]);
       fprintf(stderr,"%s: observation %5i\r",argv[0],n);
       /* output of fault-related stresses (there are no others)  */
       fprintf(stdout,"%17.8e %17.8e %17.8e %17.8e %17.8e %17.8e ",
-	      s[X][X],s[X][Y],s[X][Z],
-	      s[Y][Y],s[Y][Z],s[Z][Z]);
+	      s[INT_X][INT_X],s[INT_X][INT_Y],s[INT_X][INT_Z],
+	      s[INT_Y][INT_Y],s[INT_Y][INT_Z],s[INT_Z][INT_Z]);
       fprintf(stdout,"\n");
     }
     fprintf(stderr,"\n");

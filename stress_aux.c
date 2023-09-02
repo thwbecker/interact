@@ -90,12 +90,12 @@ void stress_vec_from_hstate(COMP_PRECISION s1h,
 void expand_stress_matrix6to9(COMP_PRECISION *s)
 {
   COMP_PRECISION sloc[9];
-  sloc[XX] = s[0];
-  sloc[YX] = sloc[XY] = s[1];
-  sloc[ZX] = sloc[XZ] = s[2];
-  sloc[YY] = s[3];
-  sloc[ZY] = sloc[YZ] = s[4];
-  sloc[ZZ] = s[5];
+  sloc[INT_XX] = s[0];
+  sloc[INT_YX] = sloc[INT_XY] = s[1];
+  sloc[INT_ZX] = sloc[INT_XZ] = s[2];
+  sloc[INT_YY] = s[3];
+  sloc[INT_ZY] = sloc[INT_YZ] = s[4];
+  sloc[INT_ZZ] = s[5];
   a_equals_b_vector(s,sloc,9);
 }
 /* 
@@ -105,9 +105,9 @@ void expand_stress_matrix6to9(COMP_PRECISION *s)
 void convert_6sym_to_9_matrix(COMP_PRECISION *s6, 
 			      COMP_PRECISION s[3][3])
 {
-  s[X][X] = s6[0];s[X][Y] = s6[1];s[X][Z] = s6[2];
-  s[Y][X] = s6[1];s[Y][Y] = s6[3];s[Y][Z] = s6[4];
-  s[Z][X] = s6[2];s[Z][Y] = s6[4];s[Z][Z] = s6[5];
+  s[INT_X][INT_X] = s6[0];s[INT_X][INT_Y] = s6[1];s[INT_X][INT_Z] = s6[2];
+  s[INT_Y][INT_X] = s6[1];s[INT_Y][INT_Y] = s6[3];s[INT_Y][INT_Z] = s6[4];
+  s[INT_Z][INT_X] = s6[2];s[INT_Z][INT_Y] = s6[4];s[INT_Z][INT_Z] = s6[5];
 
 }
 

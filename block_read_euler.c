@@ -117,8 +117,8 @@ void read_constrained_euler_poles(struct bmd *mod,char **argv,
 	if(mod->first_c == -1)
 	  mod->first_c = i;
 	fprintf(stderr,"%s: block %c motion constrained to: wx: %11g wy: %11g wz: %11g (deg/Myr)\n",
-		argv[0],bname(i),mod->xsol[i*3+X]/gfac,mod->xsol[i*3+Y]/gfac,
-		mod->xsol[i*3+Z]/gfac);
+		argv[0],bname(i),mod->xsol[i*3+INT_X]/gfac,mod->xsol[i*3+INT_Y]/gfac,
+		mod->xsol[i*3+INT_Z]/gfac);
       }else{
 	/* test for continuity */
 	if(mod->first_c > 0){

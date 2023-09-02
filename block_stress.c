@@ -81,12 +81,12 @@ void block_scale_stresses(COMP_PRECISION *v,COMP_PRECISION *vsig,
     */
     obs_trace =  tracemat9(sobs);
     traceadd = (mod_trace - obs_trace)/3.0; /* to be added */
-    sobs[XX] += traceadd;sobs[YY] += traceadd;sobs[ZZ] += traceadd;
+    sobs[INT_XX] += traceadd;sobs[INT_YY] += traceadd;sobs[INT_ZZ] += traceadd;
     //
     // re-assign to actual observation vector
     //
-    v[os  ] = sobs[XX];v[os+1] = sobs[XY];v[os+2] = sobs[XZ];
-    v[os+3] = sobs[YY];v[os+4] = sobs[YZ];v[os+5] = sobs[ZZ];
+    v[os  ] = sobs[INT_XX];v[os+1] = sobs[INT_XY];v[os+2] = sobs[INT_XZ];
+    v[os+3] = sobs[INT_YY];v[os+4] = sobs[INT_YZ];v[os+5] = sobs[INT_ZZ];
   }
   if((no_rel_stress_amp_scale)||(rescale_total_rms)){
     /* 
@@ -142,9 +142,9 @@ void calc_horizontal_stress(COMP_PRECISION *s6,
   COMP_PRECISION s[9],sloc2d[4],eval[2],evec[4];
   a_equals_b_vector(s,s6,6);
   expand_stress_matrix6to9(s);
-  sloc2d[0] = s[XX];
-  sloc2d[1] = sloc2d[2] = s[XY];
-  sloc2d[3] = s[YY];
+  sloc2d[0] = s[INT_XX];
+  sloc2d[1] = sloc2d[2] = s[INT_XY];
+  sloc2d[3] = s[INT_YY];
   /* this routine returns values and vectors sorted as
      e2 < e1 */
   calc_eigensystem_sym2d(sloc2d,eval,evec,TRUE);
@@ -229,8 +229,8 @@ void cart_mat_from_horsym(COMP_PRECISION e1,COMP_PRECISION e2,
   // get cartesian stresses by rotation
   rotate_mat(s,sr,r);
   /* asign to short format matrix */
-  s6[0]=sr[X][X];s6[1]=sr[X][Y];s6[2]=sr[X][Z];
-  s6[3]=sr[Y][Y];s6[4]=sr[Y][Z];s6[5]=sr[Z][Z];
+  s6[0]=sr[INT_X][INT_X];s6[1]=sr[INT_X][INT_Y];s6[2]=sr[INT_X][INT_Z];
+  s6[3]=sr[INT_Y][INT_Y];s6[4]=sr[INT_Y][INT_Z];s6[5]=sr[INT_Z][INT_Z];
 }
 
 /* 

@@ -77,8 +77,8 @@ void print_patch_geometry_and_bc(int flt_offset,struct flt *fault,
     case POINT_SOURCE:{
       // L' = -aspect_ratio = - L/W , W' = area = 4 L W
       fprintf(out,"%19.12e %19.12e %19.12e %10.6f %10.6f %19.12e %19.12e %6i\n",
-	      fault[flt_offset].x[X], fault[flt_offset].x[Y], 
-	      fault[flt_offset].x[Z],fault[flt_offset].strike,
+	      fault[flt_offset].x[INT_X], fault[flt_offset].x[INT_Y], 
+	      fault[flt_offset].x[INT_Z],fault[flt_offset].strike,
 	      fault[flt_offset].dip,-fault[flt_offset].l/fault[flt_offset].w,
 	      4.0*fault[flt_offset].w*fault[flt_offset].l,fault[flt_offset].group);
       break;
@@ -87,8 +87,8 @@ void print_patch_geometry_and_bc(int flt_offset,struct flt *fault,
     case TWO_DIM_SEGMENT_PLANE_STRESS:
     case RECTANGULAR_PATCH:{// normal rectangular fault, this is the default
       fprintf(out,"%19.12e %19.12e %19.12e %10.6f %10.6f %19.12e %19.12e %6i\n",
-	      fault[flt_offset].x[X], fault[flt_offset].x[Y], 
-	      fault[flt_offset].x[Z],fault[flt_offset].strike,
+	      fault[flt_offset].x[INT_X], fault[flt_offset].x[INT_Y], 
+	      fault[flt_offset].x[INT_Z],fault[flt_offset].strike,
 	      fault[flt_offset].dip,
 	      fault[flt_offset].l,fault[flt_offset].w,fault[flt_offset].group);
       break;
@@ -97,9 +97,9 @@ void print_patch_geometry_and_bc(int flt_offset,struct flt *fault,
       fprintf(out,"%15.8e %15.8e %15.8e %10.6f %10.6f %15.8e %15.8e %6i ",
 	      999.,999.,999.,999.,999.,-1.,-1.,fault[flt_offset].group);
       fprintf(out,"%15.8e %15.8e %15.8e %15.8e %15.8e %15.8e %15.8e %15.8e %15.8e\n",
-	      fault[flt_offset].xt[X],fault[flt_offset].xt[Y],fault[flt_offset].xt[Z],
-	      fault[flt_offset].xt[3+X],fault[flt_offset].xt[3+Y],fault[flt_offset].xt[3+Z],
-      	      fault[flt_offset].xt[6+X],fault[flt_offset].xt[6+Y],fault[flt_offset].xt[6+Z]);
+	      fault[flt_offset].xt[INT_X],fault[flt_offset].xt[INT_Y],fault[flt_offset].xt[INT_Z],
+	      fault[flt_offset].xt[3+INT_X],fault[flt_offset].xt[3+INT_Y],fault[flt_offset].xt[3+INT_Z],
+      	      fault[flt_offset].xt[6+INT_X],fault[flt_offset].xt[6+INT_Y],fault[flt_offset].xt[6+INT_Z]);
       break;
     }
     default:
@@ -111,7 +111,7 @@ void print_patch_geometry_and_bc(int flt_offset,struct flt *fault,
 #else
     // only rectangular
     fprintf(out,"%15.8e %15.8e %15.8e %10.6f %10.6f %15.8e %15.8e %6i\n",
-	    fault[flt_offset].x[X], fault[flt_offset].x[Y], fault[flt_offset].x[Z],fault[flt_offset].strike,
+	    fault[flt_offset].x[INT_X], fault[flt_offset].x[INT_Y], fault[flt_offset].x[INT_Z],fault[flt_offset].strike,
 	    fault[flt_offset].dip,fault[flt_offset].l,fault[flt_offset].w,fault[flt_offset].group);
 #endif
     break;
@@ -186,22 +186,22 @@ void print_patch_geometry_and_bc(int flt_offset,struct flt *fault,
       lfac = fault[flt_offset].l * 0.2;
       for(l=0;l<3;l++)
 	x[l] = corner[0][l] + fault[flt_offset].normal[l] * lfac;
-      fprintf(out,"%g %g %g\n",x[X]/CHAR_FAULT_DIM,x[Y]/CHAR_FAULT_DIM,x[Z]/CHAR_FAULT_DIM);
+      fprintf(out,"%g %g %g\n",x[INT_X]/CHAR_FAULT_DIM,x[INT_Y]/CHAR_FAULT_DIM,x[INT_Z]/CHAR_FAULT_DIM);
       for(l=0;l<3;l++)
 	x[l] = corner[0][l] - fault[flt_offset].normal[l] * lfac;
-      fprintf(out,"%g %g %g\n",x[X]/CHAR_FAULT_DIM,x[Y]/CHAR_FAULT_DIM,x[Z]/CHAR_FAULT_DIM);
+      fprintf(out,"%g %g %g\n",x[INT_X]/CHAR_FAULT_DIM,x[INT_Y]/CHAR_FAULT_DIM,x[INT_Z]/CHAR_FAULT_DIM);
       for(l=0;l<3;l++)
 	x[l] = corner[0][l];
-      fprintf(out,"%g %g %g\n",x[X]/CHAR_FAULT_DIM,x[Y]/CHAR_FAULT_DIM,x[Z]/CHAR_FAULT_DIM);
+      fprintf(out,"%g %g %g\n",x[INT_X]/CHAR_FAULT_DIM,x[INT_Y]/CHAR_FAULT_DIM,x[INT_Z]/CHAR_FAULT_DIM);
       for(l=0;l<3;l++)
 	x[l] = corner[1][l];
-      fprintf(out,"%g %g %g\n",x[X]/CHAR_FAULT_DIM,x[Y]/CHAR_FAULT_DIM,x[Z]/CHAR_FAULT_DIM);
+      fprintf(out,"%g %g %g\n",x[INT_X]/CHAR_FAULT_DIM,x[INT_Y]/CHAR_FAULT_DIM,x[INT_Z]/CHAR_FAULT_DIM);
       for(l=0;l<3;l++)
 	x[l] = corner[1][l] + fault[flt_offset].normal[l] * lfac;
-      fprintf(out,"%g %g %g\n",x[X]/CHAR_FAULT_DIM,x[Y]/CHAR_FAULT_DIM,x[Z]/CHAR_FAULT_DIM);
+      fprintf(out,"%g %g %g\n",x[INT_X]/CHAR_FAULT_DIM,x[INT_Y]/CHAR_FAULT_DIM,x[INT_Z]/CHAR_FAULT_DIM);
       for(l=0;l<3;l++)
 	x[l] = corner[1][l] - fault[flt_offset].normal[l] * lfac;
-      fprintf(out,"%g %g %g\n",x[X]/CHAR_FAULT_DIM,x[Y]/CHAR_FAULT_DIM,x[Z]/CHAR_FAULT_DIM);
+      fprintf(out,"%g %g %g\n",x[INT_X]/CHAR_FAULT_DIM,x[INT_Y]/CHAR_FAULT_DIM,x[INT_Z]/CHAR_FAULT_DIM);
       break;
     }
     case POINT_SOURCE:
@@ -289,12 +289,12 @@ void print_patch_geometry_and_bc(int flt_offset,struct flt *fault,
   }
   case VEC_OUT_MODE:{
     fprintf(out,"%12.5e %12.5e %12.5e\t %12.5e %12.5e %12.5e\t %12.5e %12.5e %12.5e\n",
-	   fault[flt_offset].t_strike[X],fault[flt_offset].t_strike[Y],
-	   fault[flt_offset].t_strike[Z],
-	   fault[flt_offset].t_dip[X],fault[flt_offset].t_dip[Y],
-	   fault[flt_offset].t_dip[Z],
-	   fault[flt_offset].normal[X],fault[flt_offset].normal[Y],
-	   fault[flt_offset].normal[Z]);
+	   fault[flt_offset].t_strike[INT_X],fault[flt_offset].t_strike[INT_Y],
+	   fault[flt_offset].t_strike[INT_Z],
+	   fault[flt_offset].t_dip[INT_X],fault[flt_offset].t_dip[INT_Y],
+	   fault[flt_offset].t_dip[INT_Z],
+	   fault[flt_offset].normal[INT_X],fault[flt_offset].normal[INT_Y],
+	   fault[flt_offset].normal[INT_Z]);
     break;
   }
   case XYZ_AND_VEC_MODE:{
@@ -317,12 +317,12 @@ void print_patch_geometry_and_bc(int flt_offset,struct flt *fault,
       }
     }
     fprintf(out,"%12.5e %12.5e %12.5e %12.5e %12.5e %12.5e %12.5e %12.5e %12.5e\n",
-	    fault[flt_offset].t_strike[X],fault[flt_offset].t_strike[Y],
-	    fault[flt_offset].t_strike[Z],
-	    fault[flt_offset].t_dip[X],fault[flt_offset].t_dip[Y],
-	    fault[flt_offset].t_dip[Z],
-	    fault[flt_offset].normal[X],fault[flt_offset].normal[Y],
-	    fault[flt_offset].normal[Z]);
+	    fault[flt_offset].t_strike[INT_X],fault[flt_offset].t_strike[INT_Y],
+	    fault[flt_offset].t_strike[INT_Z],
+	    fault[flt_offset].t_dip[INT_X],fault[flt_offset].t_dip[INT_Y],
+	    fault[flt_offset].t_dip[INT_Z],
+	    fault[flt_offset].normal[INT_X],fault[flt_offset].normal[INT_Y],
+	    fault[flt_offset].normal[INT_Z]);
     break;
   }
   default:{

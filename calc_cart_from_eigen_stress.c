@@ -41,9 +41,9 @@ int main(int argc, char **argv)
 	  fprintf(stderr,"%s: error, evectors %i and %i not orthogonal, dotp:  %g\n",
 		  argv[0],i+1,j+1,dotp_3d((evec+i3),(evec+j*3)));
 	  fprintf(stderr,"%s: evec %i: %g %g %g\n",
-		  argv[0],i+1,evec[i3+X],evec[i3+Y],evec[i3+Z]);
+		  argv[0],i+1,evec[i3+INT_X],evec[i3+INT_Y],evec[i3+INT_Z]);
 	  fprintf(stderr,"%s: evec %i: %g %g %g\n",
-		  argv[0],j+1,evec[j*3+X],evec[j*3+Y],evec[j*3+Z]);
+		  argv[0],j+1,evec[j*3+INT_X],evec[j*3+INT_Y],evec[j*3+INT_Z]);
 	  exit(-1);
 	}
       // assemble rotion matrix, prepare stress matrix
@@ -56,7 +56,7 @@ int main(int argc, char **argv)
     // get cartesian stresses by rotation
     rotate_mat(s,sr,r);
     fprintf(stdout,"%g %g %g \t%g %g %g %g %g %g\n",
-	    x,y,z,sr[X][X],sr[X][Y],sr[X][Z],sr[Y][Y],sr[Y][Z],sr[Z][Z]);
+	    x,y,z,sr[INT_X][INT_X],sr[INT_X][INT_Y],sr[INT_X][INT_Z],sr[INT_Y][INT_Y],sr[INT_Y][INT_Z],sr[INT_Z][INT_Z]);
     
   }
   exit(0);
@@ -70,9 +70,9 @@ my_boolean read_vecs(int imode, COMP_PRECISION *x,COMP_PRECISION *y,
   COMP_PRECISION strike[3],dip[3],s1h,s2h,azi;
   if(imode == 0){// read in cartesian format
     rcnt = fscanf(stdin,FIFTEEN_CP_FORMAT,x,y,z,
-		  (eval),  (evec+X),(evec+Y),(evec+Z),
-		  (eval+1),(evec+3+X),(evec+3+Y),(evec+3+Z),
-		  (eval+2),(evec+6+X),(evec+6+Y),(evec+6+Z));
+		  (eval),  (evec+INT_X),(evec+INT_Y),(evec+INT_Z),
+		  (eval+1),(evec+3+INT_X),(evec+3+INT_Y),(evec+3+INT_Z),
+		  (eval+2),(evec+6+INT_X),(evec+6+INT_Y),(evec+6+INT_Z));
     if(rcnt == 15)return TRUE; else return FALSE;
   }else if(imode == 1){// read in strike dip format
     rcnt = fscanf(stdin,TWELVE_CP_FORMAT,x,y,z,

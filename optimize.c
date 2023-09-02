@@ -52,9 +52,9 @@ void optimize(struct flt *fault,struct med *medium)
 COMP_PRECISION distsq(struct flt *a, struct flt *b)
 {
   COMP_PRECISION x,tmpd;
-  tmpd = a->x[X] - b->x[X];x = SQUARE(tmpd);
-  tmpd = a->x[Y] - b->x[Y];x+= SQUARE(tmpd);
-  tmpd = a->x[Z] - b->x[Z];x+= SQUARE(tmpd);
+  tmpd = a->x[INT_X] - b->x[INT_X];x = SQUARE(tmpd);
+  tmpd = a->x[INT_Y] - b->x[INT_Y];x+= SQUARE(tmpd);
+  tmpd = a->x[INT_Z] - b->x[INT_Z];x+= SQUARE(tmpd);
   return x;
 }
 COMP_PRECISION max_dist(struct flt *fault, 

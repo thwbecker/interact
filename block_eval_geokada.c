@@ -56,23 +56,21 @@ void block_eval_geookada(COMP_PRECISION *xl,
   //
   // project observational point in fault local system
   a_equals_b_vector(x,xl,2);
-  //fprintf(stderr,"x: %12g %12g  ",x[X],x[Y]);
   geoproject(x, px, FLT_ROT_PROJECTION,
 	     flon,flat,fazi,dummy, dummy, 
 	     dummy, dummy, (int)FALSE);
   //fprintf(stderr,"p: %11g %11g %11g ",flon,flat,fazi);
   if(eval_disp){
     /* evaluate velocities at udepth */
-    px[Z] = -udepth;			
+    px[INT_Z] = -udepth;			
     //
     // evaluate displacements in rotated frame
-    //fprintf(stderr,"px: %12g %12g %12g ",px[X],px[Y],px[Z]);
     eval_rectangle_basic(px,fl,fw,fdip,-fz,disp,pu,ps,iret);
     /* this will also return stresses, but possibly at 
        different depth from sdepth */
     if(*iret){
       fprintf(stderr,"block_eval_geookada: WARNING: singular at obs point: %g, %g, %g\n",
-	      *(xl+X),*(xl+Y),udepth);
+	      *(xl+INT_X),*(xl+INT_Y),udepth);
       /* NaN returns zeros */
       for(i=0;i < 3;i++){
 	u[i]=0.0;
@@ -94,11 +92,11 @@ void block_eval_geookada(COMP_PRECISION *xl,
       rotate_mat_z(ps,s,fca,-fsa);
     }else{
       /* reevaluate stresses, since different depth */
-      px[Z] = -sdepth;
+      px[INT_Z] = -sdepth;
       eval_rectangle_basic(px,fl,fw,fdip,-fz,disp,pu,ps,iret);
       if(*iret){
 	fprintf(stderr,"block_eval_geookada: WARNING: singular at obs point: %g, %g, %g\n",
-		*(xl+X),*(xl+Y),sdepth);
+		*(xl+INT_X),*(xl+INT_Y),sdepth);
 	/* return stresses as zeroes if NaN */
 	for(i=0;i < 3;i++){
 	  for(j=0;j < 3;j++)
@@ -235,9 +233,9 @@ void block_load_solution_and_faults(COMP_PRECISION **x,
     if(fread((*x +os),sizeof(COMP_PRECISION),(*nrf),in) != (*nrf))
       READ_ERROR("");
     for(i=0;i < (*nrf);i++){
-      if((*fault+i)->x[Z] * 2 != *(*x+os+i)){
+      if((*fault+i)->x[INT_Z] * 2 != *(*x+os+i)){
 	fprintf(stderr,"block_load_solution_and_faults: locking depth error fault %i, z: %g ld: %g\n",
-		i+1,(*fault+i)->x[Z], *(*x+os+i));
+		i+1,(*fault+i)->x[INT_Z], *(*x+os+i));
 	exit(-1);
       }
     }
@@ -294,7 +292,7 @@ void block_eval_blockvec(COMP_PRECISION *xy,COMP_PRECISION z,
     }
     init = TRUE;
   }
-  x[X] = xy[X];x[Y] = xy[Y];x[Z]=z;
+  x[INT_X] = xy[INT_X];x[INT_Y] = xy[INT_Y];x[INT_Z]=z;
   // projection observation to global projected reference frame
   geoproject(x,px,projection->type,projection->clon,
 	     projection->clat,projection->azi,dummy,dummy,
@@ -303,9 +301,9 @@ void block_eval_blockvec(COMP_PRECISION *xy,COMP_PRECISION z,
   // where A is ( -o_y 1 0 )
   //            (  o_x 0 1 )
   //
-  lbu[X] = -px[Y] * xsol[bcode*BLOCK_NBASE] + xsol[bcode*BLOCK_NBASE+1];
-  lbu[Y] =  px[X] * xsol[bcode*BLOCK_NBASE] + xsol[bcode*BLOCK_NBASE+2];
-  lbu[Z] = 0.0;
+  lbu[INT_X] = -px[INT_Y] * xsol[bcode*BLOCK_NBASE] + xsol[bcode*BLOCK_NBASE+1];
+  lbu[INT_Y] =  px[INT_X] * xsol[bcode*BLOCK_NBASE] + xsol[bcode*BLOCK_NBASE+2];
+  lbu[INT_Z] = 0.0;
 }
 
  

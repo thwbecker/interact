@@ -235,22 +235,22 @@ void assemble_block_a(COMP_PRECISION **a,COMP_PRECISION *gpx,
 	      if(irow == 0)	                        /*     0 */
 		*(*a+offset+i)= 0.0; 
 	      else if(irow == 1) 
-		*(*a+offset+i)=  -mod->gcx[inode*3+Z];  /*  -r_z */
+		*(*a+offset+i)=  -mod->gcx[inode*3+INT_Z];  /*  -r_z */
 	      else
-		*(*a+offset+i)=   mod->gcx[inode*3+Y];  /*   r_y */
+		*(*a+offset+i)=   mod->gcx[inode*3+INT_Y];  /*   r_y */
 
 	    }else if(j == 1){	/* second sub-col */
 	      if(irow == 0)
-		*(*a+offset+i)=   mod->gcx[inode*3+Z];	/*   r_z */
+		*(*a+offset+i)=   mod->gcx[inode*3+INT_Z];	/*   r_z */
 	      else if(irow == 1)
 		*(*a+offset+i)=  0.0;                   /*     0 */
 	      else
-		*(*a+offset+i)=  -mod->gcx[inode*3+X];   /* -r_x */
+		*(*a+offset+i)=  -mod->gcx[inode*3+INT_X];   /* -r_x */
 	    }else{  /* third sub-col  */
 	      if(irow == 0)
-		*(*a+offset+i)= -mod->gcx[inode*3+Y];   /* -r_y */
+		*(*a+offset+i)= -mod->gcx[inode*3+INT_Y];   /* -r_y */
 	      else if(irow == 1)
-		*(*a+offset+i)=  mod->gcx[inode*3+X];   /*  r_x */
+		*(*a+offset+i)=  mod->gcx[inode*3+INT_X];   /*  r_x */
 	      else
 		*(*a+offset+i)=  0.0;                   /*  0  */
 	    }
@@ -268,9 +268,9 @@ void assemble_block_a(COMP_PRECISION **a,COMP_PRECISION *gpx,
 	    */
 	    if(j == 0){	/* first sub-col: omega */
 	      if(irow==0)
-		*(*a+offset+i)= -gpx[inode*BLOCK_DIM+Y]; /* - x_data_y */
+		*(*a+offset+i)= -gpx[inode*BLOCK_DIM+INT_Y]; /* - x_data_y */
 	      else 
-		*(*a+offset+i)=  gpx[inode*BLOCK_DIM+X]; /*   x_data_x */
+		*(*a+offset+i)=  gpx[inode*BLOCK_DIM+INT_X]; /*   x_data_x */
 	    }else if(j == 1){	/* second sub-col: vx_0 */
 	      if(irow==0)
 		*(*a+offset+i)=1.0;
@@ -358,7 +358,7 @@ void assemble_block_d(COMP_PRECISION **d,struct bflt *fault,
     d_size = tsize;
   }
 #ifdef BLOCK_SPHERICAL
-  xp[R] = 0.0;
+  xp[INT_R] = 0.0;
 #endif
   for(i=0;i < nflt;i++){		/* i: fault loop */
     if((!fault[i].vertical)&&(nslip < 2)){
@@ -381,8 +381,8 @@ void assemble_block_d(COMP_PRECISION **d,struct bflt *fault,
       for(k=0;k < nrp;k++){	/* k: loop through observational points */
 #ifdef BLOCK_SPHERICAL
 	// convert polar, rotated displacements to cartesian
-	xp[THETA]= -(fault+i)->v[k].vc[idir][Y];
-	xp[PHI] =   (fault+i)->v[k].vc[idir][X];
+	xp[INT_THETA]= -(fault+i)->v[k].vc[idir][INT_Y];
+	xp[INT_PHI] =   (fault+i)->v[k].vc[idir][INT_X];
 	irow = k * 3;
 	pv2cv(xp,(*d + offset + irow),(mod->pbase + k*9));
 #else
@@ -645,21 +645,21 @@ void assemble_block_f(COMP_PRECISION **f,struct bflt *fault,
 	      if(l == 0)
 		*(s+offset+irow)=   0.0;                  /*      0 */
 	      else if(l == 1) 
-		*(s+offset+irow)=  -fault[i].xc[Z] * fac; /*   -r_z */
+		*(s+offset+irow)=  -fault[i].xc[INT_Z] * fac; /*   -r_z */
 	      else
-		*(s+offset+irow)=   fault[i].xc[Y] * fac; /*    r_y */
+		*(s+offset+irow)=   fault[i].xc[INT_Y] * fac; /*    r_y */
 	    }else if(j == 1){	/* second sub-col */
 	      if(l == 0)
-		*(s+offset+irow)=   fault[i].xc[Z] * fac; /* r_z */
+		*(s+offset+irow)=   fault[i].xc[INT_Z] * fac; /* r_z */
 	      else if(l == 1)
 		*(s+offset+irow)=   0.0;                  /*   0 */
 	      else
-		*(s+offset+irow)=  -fault[i].xc[X]* fac; /* -r_x */
+		*(s+offset+irow)=  -fault[i].xc[INT_X]* fac; /* -r_x */
 	    }else{  /* third sub-col  */
 	      if(l == 0)
-		*(s+offset+irow)= -fault[i].xc[Y] * fac; /* -r_y */
+		*(s+offset+irow)= -fault[i].xc[INT_Y] * fac; /* -r_y */
 	      else if(l == 1)
-		*(s+offset+irow)=  fault[i].xc[X] * fac; /*  r_x */
+		*(s+offset+irow)=  fault[i].xc[INT_X] * fac; /*  r_x */
 	      else
 		*(s+offset+irow)=  0.0;                  /*    0 */
 	    }
@@ -671,9 +671,9 @@ void assemble_block_f(COMP_PRECISION **f,struct bflt *fault,
 				   fault midpoint (with respect to 
 				   the genral, not local projection)
 				*/
-		*(*f+offset+irow)= -fault[i].px[Y] * fac;
+		*(*f+offset+irow)= -fault[i].px[INT_Y] * fac;
 	      else 
-		*(*f+offset+irow)=  fault[i].px[X] * fac;
+		*(*f+offset+irow)=  fault[i].px[INT_X] * fac;
 	    else if(j == 1)	/* second sub-col: vx_0 */
 	      if(l==0)
 		*(*f+offset+irow) = fac; /* 1 or -1 */
@@ -718,9 +718,9 @@ void assemble_block_f(COMP_PRECISION **f,struct bflt *fault,
       for(l=0;l < BLOCK_DIM;l++){ /* row dimension loop */
 	irow = BLOCK_DIM * k + l;
 	if(l==0)// lon or phi direction
-	  *(b+offset+irow) =  fault[k].pbase[PHI*3  +j];
+	  *(b+offset+irow) =  fault[k].pbase[INT_PHI*3  +j];
 	else// lat or -theta direction
-	  *(b+offset+irow) = -fault[k].pbase[THETA*3+j];
+	  *(b+offset+irow) = -fault[k].pbase[INT_THETA*3+j];
       }
     }
   }
@@ -1606,8 +1606,8 @@ void convert_cart_sol(COMP_PRECISION *vmodc,COMP_PRECISION *vmod,
   for(i=j=0;i < mod->nrgp;i++,j+=BLOCK_DIM){
     /* go from cartesian to polar (lon/lat)  */
     cv2pv((vmodc+i*3),pv,(mod->pbase+i*9));
-    vmod[j+X] =  pv[PHI];
-    vmod[j+Y] = -pv[THETA];
+    vmod[j+INT_X] =  pv[INT_PHI];
+    vmod[j+INT_Y] = -pv[INT_THETA];
   }
   a_equals_b_vector((vmod+mod->mgd),(vmodc+mod->m1),
 		    (mod->m2+mod->nfdamp+mod->nxdamp));

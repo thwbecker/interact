@@ -113,8 +113,8 @@ void read_bflt(struct bmd *mod,COMP_PRECISION global_locking_depth,
     n = norig = norig4 = 0;
     new_fault(&mod->fault,n);    
     while(fscanf(in,"%lf %lf %lf %lf %lf %i %i %lf %lf ",
-		 (exloc+norig4+  X),(exloc+norig4  +Y),
-		 (exloc+norig4+2+X),(exloc+norig4+2+Y),
+		 (exloc+norig4+  INT_X),(exloc+norig4  +INT_Y),
+		 (exloc+norig4+2+INT_X),(exloc+norig4+2+INT_Y),
 		 &dip,(lblock),(lblock+1),&lfac,&locking_depth) == 9){
       for(i=0;i < 2;i++){
 	if((lblock[i] <= 0) && (lblock[i] > mod->nrb)){
@@ -157,19 +157,19 @@ void read_bflt(struct bmd *mod,COMP_PRECISION global_locking_depth,
 	//
 	// check if this geometry path has been read in already
 	//
-	lonlat2xyz(exloc[norig4  +X],exloc[norig4  +Y],(xctest1));
-	lonlat2xyz(exloc[norig4+2+X],exloc[norig4+2+Y],(xctest1+3));
+	lonlat2xyz(exloc[norig4  +INT_X],exloc[norig4  +INT_Y],(xctest1));
+	lonlat2xyz(exloc[norig4+2+INT_X],exloc[norig4+2+INT_Y],(xctest1+3));
 	j = norig - 1;
 	for(i=0;i < j;i++){
-	  lonlat2xyz(exloc[i*4  +X],exloc[i*4  +Y],(xctest2));
-	  lonlat2xyz(exloc[i*4+2+X],exloc[i*4+2+Y],(xctest2+3));
+	  lonlat2xyz(exloc[i*4  +INT_X],exloc[i*4  +INT_Y],(xctest2));
+	  lonlat2xyz(exloc[i*4+2+INT_X],exloc[i*4+2+INT_Y],(xctest2+3));
 	  if(((distance_squared_3d(xctest1,xctest2) < eps2) &&
 	      (distance_squared_3d((xctest1+3),(xctest2+3)) < eps2))||
 	     ((distance_squared_3d((xctest1+3),xctest2) < eps2) &&
 	      (distance_squared_3d(xctest1,(xctest2+3)) < eps2))){
 	    fprintf(stderr,"block_read_bflt: error, fault geometry %i: (%g, %g) - (%g, %g) already read in as orig code %i\n",
-		    norig+1,exloc[norig4+X],exloc[norig4+Y],
-		    exloc[norig4+2+X],exloc[norig4+2+Y],i+1);
+		    norig+1,exloc[norig4+INT_X],exloc[norig4+INT_Y],
+		    exloc[norig4+2+INT_X],exloc[norig4+2+INT_Y],i+1);
 	    exit(-1);
 	  }
 	}
@@ -249,7 +249,7 @@ void read_bflt(struct bmd *mod,COMP_PRECISION global_locking_depth,
 	  }
 	  for(fac=df,i=0;i<nnf;i++,fac += df){
 	    get_point_on_gc(rlon[0],rlat[0],rlon[1],rlat[1],
-			    fac,(newloc+X),(newloc+Y),&dummy);
+			    fac,(newloc+INT_X),(newloc+INT_Y),&dummy);
 	    for(j=0;j<2;j++)
 	      newloc[j] = RAD2DEGF(newloc[j]);
 	    for(j=0;j<2;j++){	/* assign to new fault */
@@ -311,14 +311,14 @@ void read_bflt(struct bmd *mod,COMP_PRECISION global_locking_depth,
     */
     for(i=0;i < mod->nflt;i++)
       for(j=0;j<2;j++)
-	if((mod->fault+i)->ex[j][X] < 0)
-	  (mod->fault+i)->ex[j][X] += 360.0;
+	if((mod->fault+i)->ex[j][INT_X] < 0)
+	  (mod->fault+i)->ex[j][INT_X] += 360.0;
     /* output? */
     if(echo_input)
       for(i=0;i < mod->nflt;i++){
 	fprintf(stderr,"flt %4i: (%12g, %12g) - (%12g, %12g) l: %11g w: %11g bcode: %3i %3i azi: %11g dip: %g lfac: %g ld: %g\n",
-		i+1,(mod->fault+i)->ex[0][X],(mod->fault+i)->ex[0][Y],
-		(mod->fault+i)->ex[1][X],(mod->fault+i)->ex[1][Y],
+		i+1,(mod->fault+i)->ex[0][INT_X],(mod->fault+i)->ex[0][INT_Y],
+		(mod->fault+i)->ex[1][INT_X],(mod->fault+i)->ex[1][INT_Y],
 		(mod->fault+i)->l,(mod->fault+i)->w,
 		(mod->fault+i)->block[0]+1,
 		(mod->fault+i)->block[1]+1,
@@ -339,8 +339,8 @@ void read_bflt(struct bmd *mod,COMP_PRECISION global_locking_depth,
 	      string);
       for(i=0;i < mod->nflt;i++){
 	fprintf(gout,"%.9f %.9f %.9f %.9f %11g %5i %5i %11g %11g\n",
-		(mod->fault+i)->ex[0][X],(mod->fault+i)->ex[0][Y],
-		(mod->fault+i)->ex[1][X],(mod->fault+i)->ex[1][Y],
+		(mod->fault+i)->ex[0][INT_X],(mod->fault+i)->ex[0][INT_Y],
+		(mod->fault+i)->ex[1][INT_X],(mod->fault+i)->ex[1][INT_Y],
 		(mod->fault+i)->dip,
 		(mod->fault+i)->block[0]+1,
 		(mod->fault+i)->block[1]+1,(mod->fault+i)->lfac,
@@ -412,7 +412,7 @@ void generate_new_fault(struct bflt **fault,int *lblock, int *n,
   */
 
   a_equals_b_vector((*fault+(*n))->x,(*fault+(*n))->sx,2); /* lon and lat */
-  (*fault+(*n))->x[Z] = -depth;	/* depth z is negative below ground */
+  (*fault+(*n))->x[INT_Z] = -depth;	/* depth z is negative below ground */
   if((*fault+(*n))->l < 1.0e-6){
     fprintf(stderr,"error: block_read_bflt: error: fault half length: %g\n",
 	    (*fault+(*n))->l);
@@ -463,10 +463,10 @@ void generate_new_fault(struct bflt **fault,int *lblock, int *n,
 
   */
   // coordinates 
-  lonlat2xyz_deg((*fault+(*n))->x[X],(*fault+(*n))->x[Y],
+  lonlat2xyz_deg((*fault+(*n))->x[INT_X],(*fault+(*n))->x[INT_Y],
 		 (*fault+(*n))->xc);
   // polar base
-  calculate_polar_base((*fault+(*n))->x[X],(*fault+(*n))->x[Y],
+  calculate_polar_base((*fault+(*n))->x[INT_X],(*fault+(*n))->x[INT_Y],
 		       (*fault+(*n))->pbase);
 #endif
 
@@ -483,8 +483,8 @@ void generate_new_fault(struct bflt **fault,int *lblock, int *n,
 					projection,TRUE,*n);
 #ifdef SUPERDUPER_DEBUG  
   fprintf(stderr,"flt %i: x: %g, %g px: %g, %g (proj: %i: %g/%g/%g)\n", 
-   	  *n,(*fault+(*n))->x[X],(*fault+(*n))->x[Y], 
-	  (*fault+(*n))->px[X],(*fault+(*n))->px[Y], 
+   	  *n,(*fault+(*n))->x[INT_X],(*fault+(*n))->x[INT_Y], 
+	  (*fault+(*n))->px[INT_X],(*fault+(*n))->px[INT_Y], 
 	  projection.type,projection.clon,projection.clat, 
 	  projection.azi); 
 #endif
@@ -603,9 +603,9 @@ void get_bflt_intcoeff(struct bflt **fault, int iflt,
       */
       a_equals_b_vector(x,(gx+i*BLOCK_DIM),2); 
       /* evaluate velocities at surface */
-      x[Z] = 0.0;			
-      geoproject(x, px,FLT_ROT_PROJECTION ,(*fault+iflt)->x[X],
-		 (*fault+iflt)->x[Y],(*fault+iflt)->azi,
+      x[INT_Z] = 0.0;			
+      geoproject(x, px,FLT_ROT_PROJECTION ,(*fault+iflt)->x[INT_X],
+		 (*fault+iflt)->x[INT_Y],(*fault+iflt)->azi,
 		 dummy, dummy, dummy, dummy, (int)FALSE);
       for(j=0;j < 3;j++){	/* assign all slip modes */
 	/* set up unity slip vector */
@@ -614,11 +614,11 @@ void get_bflt_intcoeff(struct bflt **fault, int iflt,
 	eval_rectangle_basic(px,(*fault+iflt)->l,
 			     (*fault+iflt)->w,
 			     (*fault+iflt)->dip,
-			     -(*fault+iflt)->x[Z],
+			     -(*fault+iflt)->x[INT_Z],
 			     disp,pu,ps,&iret);
 	if((iret)&&(j==0)){
 	  fprintf(stderr,"block_read_bflt: error: singular at fault %i GPS vel obs point %i: %g, %g\n",
-		  iflt+1,i+1,*(gx+i*BLOCK_DIM+X),*(gx+i*BLOCK_DIM+Y));
+		  iflt+1,i+1,*(gx+i*BLOCK_DIM+INT_X),*(gx+i*BLOCK_DIM+INT_Y));
 	  exit(-1);
 	}
 	// rotate pu back into the observational frame
@@ -629,10 +629,10 @@ void get_bflt_intcoeff(struct bflt **fault, int iflt,
 	  (*fault+iflt)->v[i].vc[j][k] = u[k];
 #ifdef SUPERDUPER_DEBUG
 	fprintf(out,"flt: %i op: %i  gx: %g %g ogx: %g %g u(%1i): %g %g\n",
-		iflt+1,i+1,(*fault+iflt)->x[X],(*fault+iflt)->x[Y],
-		gx[i*BLOCK_DIM+X],gx[i*BLOCK_DIM+Y],j+1,
-		(*fault+iflt)->v[i].vc[j][X],
-		(*fault+iflt)->v[i].vc[j][Y]);
+		iflt+1,i+1,(*fault+iflt)->x[INT_X],(*fault+iflt)->x[INT_Y],
+		gx[i*BLOCK_DIM+INT_X],gx[i*BLOCK_DIM+INT_Y],j+1,
+		(*fault+iflt)->v[i].vc[j][INT_X],
+		(*fault+iflt)->v[i].vc[j][INT_Y]);
 #endif
       }
     }
@@ -649,11 +649,11 @@ void get_bflt_intcoeff(struct bflt **fault, int iflt,
 			     points for stresses */
       a_equals_b_vector(x,(sx+i*BLOCK_DIM),2); 
       /* the observational frame counts  z depths negative */
-      x[Z] = -stress_depths[i];
+      x[INT_Z] = -stress_depths[i];
       // stress observational point in the fault local
       // projection
-      geoproject(x,px,FLT_ROT_PROJECTION,(*fault+iflt)->x[X],
-		 (*fault+iflt)->x[Y],(*fault+iflt)->azi,
+      geoproject(x,px,FLT_ROT_PROJECTION,(*fault+iflt)->x[INT_X],
+		 (*fault+iflt)->x[INT_Y],(*fault+iflt)->azi,
 		 dummy, dummy, dummy, dummy, (int)FALSE);
       for(j=0;j < 3;j++){	/* use all slip modes */
 	// get a displacement vector with fac slip
@@ -663,11 +663,11 @@ void get_bflt_intcoeff(struct bflt **fault, int iflt,
 	eval_rectangle_basic(px,(*fault+iflt)->l,
 			     (*fault+iflt)->w,
 			     (*fault+iflt)->dip,
-			     -(*fault+iflt)->x[Z],
+			     -(*fault+iflt)->x[INT_Z],
 			     disp,pu,ps,&iret);
 	if((iret)&&(j==0)){
 	  fprintf(stderr,"block_read_bflt: error: singular at fault %i stress obs point %i: %g, %g\n",
-		  iflt+1,i+1,*(sx+i*BLOCK_DIM+X),*(sx+i*BLOCK_DIM+Y));
+		  iflt+1,i+1,*(sx+i*BLOCK_DIM+INT_X),*(sx+i*BLOCK_DIM+INT_Y));
 	  exit(-1);
 	}
 	// rotate ps back into the observational frame
@@ -677,12 +677,12 @@ void get_bflt_intcoeff(struct bflt **fault, int iflt,
 	   stress tensor s(k,l) for slip in the j direction at stress
 	   observation i for fault iflt 
 	*/
-	(*fault+iflt)->s[i].sc[j][0] = s[X][X] / SHEAR_MODULUS;
-	(*fault+iflt)->s[i].sc[j][1] = s[X][Y] / SHEAR_MODULUS;
-	(*fault+iflt)->s[i].sc[j][2] = s[X][Z] / SHEAR_MODULUS;
-	(*fault+iflt)->s[i].sc[j][3] = s[Y][Y] / SHEAR_MODULUS;
-	(*fault+iflt)->s[i].sc[j][4] = s[Y][Z] / SHEAR_MODULUS;
-	(*fault+iflt)->s[i].sc[j][5] = s[Z][Z] / SHEAR_MODULUS;
+	(*fault+iflt)->s[i].sc[j][0] = s[INT_X][INT_X] / SHEAR_MODULUS;
+	(*fault+iflt)->s[i].sc[j][1] = s[INT_X][INT_Y] / SHEAR_MODULUS;
+	(*fault+iflt)->s[i].sc[j][2] = s[INT_X][INT_Z] / SHEAR_MODULUS;
+	(*fault+iflt)->s[i].sc[j][3] = s[INT_Y][INT_Y] / SHEAR_MODULUS;
+	(*fault+iflt)->s[i].sc[j][4] = s[INT_Y][INT_Z] / SHEAR_MODULUS;
+	(*fault+iflt)->s[i].sc[j][5] = s[INT_Z][INT_Z] / SHEAR_MODULUS;
       }
     }
   }
@@ -743,9 +743,9 @@ void print_fault_geometry(struct bflt *fault,int nflt, FILE *gout)
   
   for(i=0;i<nflt;i++)
     fprintf(gout,"%g %g %g %g\t%g %g %g\t%g %g\t%g %g\n",
-	    fault[i].ex[0][X], fault[i].ex[0][Y],
-	    fault[i].ex[1][X], fault[i].ex[1][Y],
-	    fault[i].x[X],fault[i].x[Y],fault[i].x[Z],
+	    fault[i].ex[0][INT_X], fault[i].ex[0][INT_Y],
+	    fault[i].ex[1][INT_X], fault[i].ex[1][INT_Y],
+	    fault[i].x[INT_X],fault[i].x[INT_Y],fault[i].x[INT_Z],
 	    fault[i].azi, fault[i].dip,
 	    fault[i].l,fault[i].w);
 }
@@ -774,8 +774,8 @@ void assign_fault_locking_depth_parameters(struct bflt *fault,
   }
 #endif
   /* depth of center of patch */
-  fault->x[Z] = -ld/2.0;	/* x[Z] is < 0 */
-  fault->w = -fault->x[Z]/sin((fault->dip)*DEG2RAD);
+  fault->x[INT_Z] = -ld/2.0;	/* x[INT_Z] is < 0 */
+  fault->w = -fault->x[INT_Z]/sin((fault->dip)*DEG2RAD);
   /* 
 
      move the mid point coordinates according to the fault dip
@@ -784,7 +784,7 @@ void assign_fault_locking_depth_parameters(struct bflt *fault,
   if(!fault->vertical){
     //
     // mid point of fault trace at surface
-    a_equals_b_vector(x,fault->sx,2);x[Z]=0.0; 
+    a_equals_b_vector(x,fault->sx,2);x[INT_Z]=0.0; 
     // go to projected system
     geoproject(x,px,projection.type,projection.clon,
 	       projection.clat,projection.azi, dummy, dummy,
@@ -804,8 +804,8 @@ void assign_fault_locking_depth_parameters(struct bflt *fault,
 	       projection.lat1,projection.lat2,(int)TRUE);
     if(verbose)
       fprintf(stderr,"flt: %i dip: %g smp: (%g, %g) ctr: (%g, %g, %g)\n",
-	      nflt,fault->dip,x[X],x[Y],fault->x[X],fault->x[Y], 
-	      fault->x[Z]);
+	      nflt,fault->dip,x[INT_X],x[INT_Y],fault->x[INT_X],fault->x[INT_Y], 
+	      fault->x[INT_Z]);
   }
   //
   // convert the fault patch center to general projected 
@@ -842,8 +842,8 @@ int new_fault(struct bflt **flt, int n)
 void init_bflt(struct bflt *fault)
 {
   fault->block[0] = fault->block[1] = 0;
-  fault->x[X]=fault->x[Y]=fault->x[Z] = 0.0;
-  fault->px[X]=fault->px[Y]=fault->px[Z] = 0.0;
+  fault->x[INT_X]=fault->x[INT_Y]=fault->x[INT_Z] = 0.0;
+  fault->px[INT_X]=fault->px[INT_Y]=fault->px[INT_Z] = 0.0;
   // so that we can use realloc
   fault->s = NULL;
   fault->v = NULL;

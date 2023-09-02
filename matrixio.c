@@ -274,7 +274,7 @@ void print_system(A_MATRIX_PREC *a, A_MATRIX_PREC *x,
 void print_sym3x3matrix(COMP_PRECISION a[3][3], FILE *out)
 {
   fprintf(out,"%12.5e %12.5e %12.5e %12.5e %12.5e %12.5e\n",
-	  a[X][X],a[X][Y],a[X][Z],a[Y][Y],a[Y][Z],a[Z][Z]);
+	  a[INT_X][INT_X],a[INT_X][INT_Y],a[INT_X][INT_Z],a[INT_Y][INT_Y],a[INT_Y][INT_Z],a[INT_Z][INT_Z]);
 }
 
 /*
@@ -458,7 +458,7 @@ void print_b_vector(A_MATRIX_PREC *b,int n, FILE *out,
 void print_3x3_matrix(COMP_PRECISION a[3][3],FILE *out)
 {
   fprintf(out,"%11g %11g %11g %11g %11g %11g %11g %11g %11g\n",
-	  a[X][X],a[X][Y],a[X][Z],
-	  a[Y][X],a[Y][Y],a[Y][Z],
-	  a[Z][X],a[Z][Y],a[Z][Z]);
+	  a[INT_X][INT_X],a[INT_X][INT_Y],a[INT_X][INT_Z],
+	  a[INT_Y][INT_X],a[INT_Y][INT_Y],a[INT_Y][INT_Z],
+	  a[INT_Z][INT_X],a[INT_Z][INT_Y],a[INT_Z][INT_Z]);
 }

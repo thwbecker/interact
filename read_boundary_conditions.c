@@ -274,29 +274,29 @@ void read_one_step_bc(FILE *in,struct med *medium,struct flt *fault,
        geometry for field outputs 
     */
     if(fscanf(in,FIELD_CP_FORMAT ,
-	      &medium->pxmin[X],&medium->pxmax[X],&medium->n[X],
-	      &medium->pxmin[Y],&medium->pxmax[Y],&medium->n[Y],
-	      &medium->pxmin[Z],&medium->pxmax[Z],&medium->n[Z])!=9){
+	      &medium->pxmin[INT_X],&medium->pxmax[INT_X],&medium->n[INT_X],
+	      &medium->pxmin[INT_Y],&medium->pxmax[INT_Y],&medium->n[INT_Y],
+	      &medium->pxmin[INT_Z],&medium->pxmax[INT_Z],&medium->n[INT_Z])!=9){
       fprintf(stderr,"read_boundary_conditions: read error grid bounds\n");
       exit(-1);
     }
-    if(medium->n[Z] >= 0){// normal grid
+    if(medium->n[INT_Z] >= 0){// normal grid
       fprintf(stderr,"read_boundary_conditions: xmin: %11g xmax: %11g n: %5i dx: %11g\n",
-	      medium->pxmin[X],medium->pxmax[X],
-	      medium->n[X],medium->n[X]!=1?(medium->pxmax[X]-medium->pxmin[X])/
-	      ((COMP_PRECISION)(medium->n[X]-1)):0);
+	      medium->pxmin[INT_X],medium->pxmax[INT_X],
+	      medium->n[INT_X],medium->n[INT_X]!=1?(medium->pxmax[INT_X]-medium->pxmin[INT_X])/
+	      ((COMP_PRECISION)(medium->n[INT_X]-1)):0);
       fprintf(stderr,"read_boundary_conditions: ymin: %11g ymax: %11g m: %5i dy: %11g\n",
-	      medium->pxmin[Y],medium->pxmax[Y],
-	      medium->n[Y],medium->n[Y]!=1?(medium->pxmax[Y]-medium->pxmin[Y])/
-	      ((COMP_PRECISION)(medium->n[Y]-1)):0.0);
+	      medium->pxmin[INT_Y],medium->pxmax[INT_Y],
+	      medium->n[INT_Y],medium->n[INT_Y]!=1?(medium->pxmax[INT_Y]-medium->pxmin[INT_Y])/
+	      ((COMP_PRECISION)(medium->n[INT_Y]-1)):0.0);
       fprintf(stderr,"read_boundary_conditions: zmin: %11g zmax: %11g o: %5i dz: %11g\n",
-	      medium->pxmin[Z],medium->pxmax[Z],
-	      medium->n[Z],medium->n[Z]!=1?(medium->pxmax[Z]-medium->pxmin[Z])/
-	      ((COMP_PRECISION)(medium->n[Z]-1)):0.0);
+	      medium->pxmin[INT_Z],medium->pxmax[INT_Z],
+	      medium->n[INT_Z],medium->n[INT_Z]!=1?(medium->pxmax[INT_Z]-medium->pxmin[INT_Z])/
+	      ((COMP_PRECISION)(medium->n[INT_Z]-1)):0.0);
     }else{
-      if(medium->n[Z] < -2){
+      if(medium->n[INT_Z] < -2){
 	fprintf(stderr,"read_boundary_conditions: error: nz: %i\n",
-		medium->n[Z]);
+		medium->n[INT_Z]);
 	exit(-1);
       }
       //
@@ -305,15 +305,15 @@ void read_one_step_bc(FILE *in,struct med *medium,struct flt *fault,
       //
       fprintf(stderr,"read_boundary_conditions: uses field output within the average fault plane of group 0\n");
       fprintf(stderr,"read_boundary_conditions: strike extent: min: %g max: %g n: %i d_strike: %g\n",
-	      medium->pxmin[X],medium->pxmax[X],
-	      medium->n[X],
-	      (medium->n[X]!=1)?(medium->pxmax[X]-medium->pxmin[X])/
-	      ((COMP_PRECISION)(medium->n[X]-1)):0);
+	      medium->pxmin[INT_X],medium->pxmax[INT_X],
+	      medium->n[INT_X],
+	      (medium->n[INT_X]!=1)?(medium->pxmax[INT_X]-medium->pxmin[INT_X])/
+	      ((COMP_PRECISION)(medium->n[INT_X]-1)):0);
       fprintf(stderr,"read_boundary_conditions: %s extent:   min: %g max: %g m: %i d_%s:    %g\n",
-	      (medium->n[Z] == -1)?("dip"):("normal"),medium->pxmin[Y],medium->pxmax[Y],
-	      medium->n[Y],(medium->n[Z] == -1)?("dip"):("normal"),
-	      (medium->n[Y]!=1)?(medium->pxmax[Y]-medium->pxmin[Y])/
-	      ((COMP_PRECISION)(medium->n[Y]-1)):0.0);
+	      (medium->n[INT_Z] == -1)?("dip"):("normal"),medium->pxmin[INT_Y],medium->pxmax[INT_Y],
+	      medium->n[INT_Y],(medium->n[INT_Z] == -1)?("dip"):("normal"),
+	      (medium->n[INT_Y]!=1)?(medium->pxmax[INT_Y]-medium->pxmin[INT_Y])/
+	      ((COMP_PRECISION)(medium->n[INT_Y]-1)):0.0);
     }
   }else{
     fprintf(stderr,"read_boundary_conditions: will not print bulk fields\n");
@@ -334,8 +334,8 @@ void read_one_step_bc(FILE *in,struct med *medium,struct flt *fault,
     medium->xoloc=(float *)malloc((i+3)*sizeof(float));
     if(!medium->xoloc)MEMERROR("");
     tmp_in=myopen(OLOC_FILE,"r");
-    while(fscanf(tmp_in,"%f %f %f",(medium->xoloc+i+X),
-		 (medium->xoloc+i+Y),(medium->xoloc+i+Z))==3){
+    while(fscanf(tmp_in,"%f %f %f",(medium->xoloc+i+INT_X),
+		 (medium->xoloc+i+INT_Y),(medium->xoloc+i+INT_Z))==3){
       medium->olocnr++;i+=3;
       medium->xoloc=(float *)realloc(medium->xoloc,(i+3)*sizeof(float));
       if(!medium->xoloc)MEMERROR("");
@@ -470,8 +470,8 @@ void read_one_step_bc(FILE *in,struct med *medium,struct flt *fault,
 		     sin_global_dip_rad,   cos_global_dip_rad);
 #ifdef SUPER_DEBUG
       fprintf(stderr," vec: s: (%10.3e,%10.3e,%10.3e) d: (%10.3e,%10.3e,%10.3e) n: (%10.3e,%10.3e,%10.3e)\n",
-	      gstrike[X],gstrike[Y],gstrike[Z],gdip[X],gdip[Y],gdip[Z],
-	      gnormal[X],gnormal[Y],gnormal[Z]);
+	      gstrike[INT_X],gstrike[INT_Y],gstrike[INT_Z],gdip[INT_X],gdip[INT_Y],gdip[INT_Z],
+	      gnormal[INT_X],gnormal[INT_Y],gnormal[INT_Z]);
 #endif
     } /* end rotate_to_local part */
     /* 

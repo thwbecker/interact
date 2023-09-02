@@ -194,8 +194,8 @@ void block_output(struct bmd *mod,my_boolean rigid,
 	  argv[0]);
   if(norm_3d(mod->omega_corr) > EPS_COMP_PREC)
     fprintf(stderr,"%s: omega output will include the previous correction of %g, %g, %g\n",
-	    argv[0],mod->omega_corr[X]/BLOCK_GFAC, 
-	    mod->omega_corr[Y]/BLOCK_GFAC,mod->omega_corr[Z]/BLOCK_GFAC);
+	    argv[0],mod->omega_corr[INT_X]/BLOCK_GFAC, 
+	    mod->omega_corr[INT_Y]/BLOCK_GFAC,mod->omega_corr[INT_Z]/BLOCK_GFAC);
   for(i=0;i < mod->nrb;i++){
     /* 
 
@@ -230,9 +230,9 @@ void block_output(struct bmd *mod,my_boolean rigid,
     if(verbose)
       fprintf(stderr,"%s: block %c (%2i): wx: %12g (%12g) wy: %12g (%12g) wz: %12g (%12g) (deg/Myr) %s\n",
 	      argv[0],bname(i),i+1,
-	      mod->xsol[i*BLOCK_NBASE+X]/BLOCK_GFAC,(i<nrbf)?(mod->sigma[i*BLOCK_NBASE+X]/BLOCK_GFAC):(NaN),
-	      mod->xsol[i*BLOCK_NBASE+Y]/BLOCK_GFAC,(i<nrbf)?(mod->sigma[i*BLOCK_NBASE+Y]/BLOCK_GFAC):(NaN),
-	      mod->xsol[i*BLOCK_NBASE+Z]/BLOCK_GFAC,(i<nrbf)?(mod->sigma[i*BLOCK_NBASE+Z]/BLOCK_GFAC):(NaN),
+	      mod->xsol[i*BLOCK_NBASE+INT_X]/BLOCK_GFAC,(i<nrbf)?(mod->sigma[i*BLOCK_NBASE+INT_X]/BLOCK_GFAC):(NaN),
+	      mod->xsol[i*BLOCK_NBASE+INT_Y]/BLOCK_GFAC,(i<nrbf)?(mod->sigma[i*BLOCK_NBASE+INT_Y]/BLOCK_GFAC):(NaN),
+	      mod->xsol[i*BLOCK_NBASE+INT_Z]/BLOCK_GFAC,(i<nrbf)?(mod->sigma[i*BLOCK_NBASE+INT_Z]/BLOCK_GFAC):(NaN),
 	      (mod->changed_reference_frame)?("again in orig RF"):("in orig RF"));
     /* 
 
@@ -245,11 +245,11 @@ void block_output(struct bmd *mod,my_boolean rigid,
 
     */
     fprintf(out,"%.7e %.7e %.7e %.7e %.7e %.7e\t\t%.7e %.7e %.7e\n",
-	    mod->xsol[i*BLOCK_NBASE+X]/BLOCK_GFAC,mod->sigma[i*BLOCK_NBASE+X]/BLOCK_GFAC,
-	    mod->xsol[i*BLOCK_NBASE+Y]/BLOCK_GFAC,mod->sigma[i*BLOCK_NBASE+Y]/BLOCK_GFAC,
-	    mod->xsol[i*BLOCK_NBASE+Z]/BLOCK_GFAC,mod->sigma[i*BLOCK_NBASE+Z]/BLOCK_GFAC,
-	    mod->block[i].xrigid[X]/BLOCK_GFAC,mod->block[i].xrigid[Y]/BLOCK_GFAC,
-	    mod->block[i].xrigid[Z]/BLOCK_GFAC);
+	    mod->xsol[i*BLOCK_NBASE+INT_X]/BLOCK_GFAC,mod->sigma[i*BLOCK_NBASE+INT_X]/BLOCK_GFAC,
+	    mod->xsol[i*BLOCK_NBASE+INT_Y]/BLOCK_GFAC,mod->sigma[i*BLOCK_NBASE+INT_Y]/BLOCK_GFAC,
+	    mod->xsol[i*BLOCK_NBASE+INT_Z]/BLOCK_GFAC,mod->sigma[i*BLOCK_NBASE+INT_Z]/BLOCK_GFAC,
+	    mod->block[i].xrigid[INT_X]/BLOCK_GFAC,mod->block[i].xrigid[INT_Y]/BLOCK_GFAC,
+	    mod->block[i].xrigid[INT_Z]/BLOCK_GFAC);
     if(0){
       /* 
 	 
@@ -278,9 +278,9 @@ void block_output(struct bmd *mod,my_boolean rigid,
 				   convenience in post-processing  */
       for(j=0;j < mod->nrb;j++)
 	fprintf(out2,"%c %c %.7e %.7e %.7e\n",bname(i),bname(j),
-		(mod->xsol[i*BLOCK_NBASE+X]-mod->xsol[j*BLOCK_NBASE+X])/BLOCK_GFAC,
-		(mod->xsol[i*BLOCK_NBASE+Y]-mod->xsol[j*BLOCK_NBASE+Y])/BLOCK_GFAC,
-		(mod->xsol[i*BLOCK_NBASE+Z]-mod->xsol[j*BLOCK_NBASE+Z])/BLOCK_GFAC);
+		(mod->xsol[i*BLOCK_NBASE+INT_X]-mod->xsol[j*BLOCK_NBASE+INT_X])/BLOCK_GFAC,
+		(mod->xsol[i*BLOCK_NBASE+INT_Y]-mod->xsol[j*BLOCK_NBASE+INT_Y])/BLOCK_GFAC,
+		(mod->xsol[i*BLOCK_NBASE+INT_Z]-mod->xsol[j*BLOCK_NBASE+INT_Z])/BLOCK_GFAC);
 #endif
   }
   fclose(out);
@@ -319,15 +319,15 @@ void block_output(struct bmd *mod,my_boolean rigid,
       calc_geo_euler_pole(omega_block,&lon,&lat,&mag);
       if(norm_3d(omega_ref) < 1e-7){
 	fprintf(stderr,"%s: block %c (%2i): lon: %8.3f lat: %8.3f mag: %6.3f (%6.3f %6.3f %6.3f) (deg/Myr, wrt: SCEC)\n",
-		argv[0],bname(i),i+1,lon,lat,mag,omega_block[X]/BLOCK_GFAC,omega_block[Y]/BLOCK_GFAC,omega_block[Z]/BLOCK_GFAC);
+		argv[0],bname(i),i+1,lon,lat,mag,omega_block[INT_X]/BLOCK_GFAC,omega_block[INT_Y]/BLOCK_GFAC,omega_block[INT_Z]/BLOCK_GFAC);
       }else{
 	if(i != reference_block)
 	  fprintf(stderr,"%s: block %c (%2i): lon: %8.3f lat: %8.3f mag: %6.3f (%6.3f %6.3f %6.3f) (deg/Myr, wrt: block %c)\n",
-		  argv[0],bname(i),i+1,lon,lat,mag,omega_block[X]/BLOCK_GFAC,omega_block[Y]/BLOCK_GFAC,omega_block[Z]/BLOCK_GFAC,
+		  argv[0],bname(i),i+1,lon,lat,mag,omega_block[INT_X]/BLOCK_GFAC,omega_block[INT_Y]/BLOCK_GFAC,omega_block[INT_Z]/BLOCK_GFAC,
 		  bname(reference_block));
 	else
 	  fprintf(stderr,"%s: block %c (%2i): lon: %8.3f lat: %8.3f mag: %6.3f (%6.3f %6.3f %6.3f) (deg/Myr, reference block)\n",
-		  argv[0],bname(i),i+1,lon,lat,mag,omega_block[X]/BLOCK_GFAC,omega_block[Y]/BLOCK_GFAC,omega_block[Z]/BLOCK_GFAC);
+		  argv[0],bname(i),i+1,lon,lat,mag,omega_block[INT_X]/BLOCK_GFAC,omega_block[INT_Y]/BLOCK_GFAC,omega_block[INT_Z]/BLOCK_GFAC);
       }
     }
     if(vref_out){
@@ -383,8 +383,8 @@ void block_output(struct bmd *mod,my_boolean rigid,
     for(j=0;j < mod->nflt;i++,j++) /* LEAVE this loop in to inc i */
       fprintf(out,"%15.7f %15.7f %15.7f %15.7f %15.7f %11g %6i %6i\n",
 	      mod->xsol[i],
-	      mod->fault[j].ex[0][X],mod->fault[j].ex[0][Y],
-	      mod->fault[j].ex[1][X],mod->fault[j].ex[1][Y],
+	      mod->fault[j].ex[0][INT_X],mod->fault[j].ex[0][INT_Y],
+	      mod->fault[j].ex[1][INT_X],mod->fault[j].ex[1][INT_Y],
 	      mod->fault[j].dip,
 	      mod->fault[j].block[0]+1,mod->fault[j].block[1]+1);
     fclose(out);
@@ -453,19 +453,19 @@ void block_output(struct bmd *mod,my_boolean rigid,
 	 array hold the correction. if we are interested in the nullspace,
 	 we will not apply this correction
       */
-      vshift[X] = mod->vcorp[j+X];vshift[Y] = mod->vcorp[j+Y];
+      vshift[INT_X] = mod->vcorp[j+INT_X];vshift[INT_Y] = mod->vcorp[j+INT_Y];
     }else{
-      vshift[X] = vshift[Y] = 0.0;
+      vshift[INT_X] = vshift[INT_Y] = 0.0;
     }
     fprintf(out,"%12g %12g %12g %12g %12g %12g %12g %12g %12g\n",
-	    mod->gx[j+X],mod->gx[j+Y],
-	    mod->vmod[j+X], 
-	    mod->vmod[j+Y],
-	    mod->v[j+X] + vshift[X] - mod->vmod[j+X],/* pontentially shift orig velocities back */
-	    mod->v[j+Y] + vshift[Y] - mod->vmod[j+Y],
-	    mod->sigv[j+X], mod->sigv[j+Y],mod->rho[i]);
-    mean_vmisfit += hypot(mod->v[j+X] + vshift[X] - mod->vmod[j+X],
-			  mod->v[j+Y] + vshift[Y] - mod->vmod[j+Y]);
+	    mod->gx[j+INT_X],mod->gx[j+INT_Y],
+	    mod->vmod[j+INT_X], 
+	    mod->vmod[j+INT_Y],
+	    mod->v[j+INT_X] + vshift[INT_X] - mod->vmod[j+INT_X],/* pontentially shift orig velocities back */
+	    mod->v[j+INT_Y] + vshift[INT_Y] - mod->vmod[j+INT_Y],
+	    mod->sigv[j+INT_X], mod->sigv[j+INT_Y],mod->rho[i]);
+    mean_vmisfit += hypot(mod->v[j+INT_X] + vshift[INT_X] - mod->vmod[j+INT_X],
+			  mod->v[j+INT_Y] + vshift[INT_Y] - mod->vmod[j+INT_Y]);
   }
   fclose(out);
   fprintf(stderr,"%s: written %i predicted velocities to %s, mean misfit: %g\n",
@@ -515,8 +515,8 @@ void block_output(struct bmd *mod,my_boolean rigid,
       calc_geo_euler_pole((omega+i*3),&lon,&lat,&mag);
       fprintf(stderr,"fsr: block %c (%2i): model w: %6.3f, %6.3f, %6.3f (deg/Myr) lon lat r: %8.3f %8.3f %6.3f\n",
 	      bname(i),i+1,
-	      omega[i*3+X]/BLOCK_GFAC,omega[i*3+Y]/BLOCK_GFAC,
-	      omega[i*3+Z]/BLOCK_GFAC,lon,lat,mag);
+	      omega[i*3+INT_X]/BLOCK_GFAC,omega[i*3+INT_Y]/BLOCK_GFAC,
+	      omega[i*3+INT_Z]/BLOCK_GFAC,lon,lat,mag);
     }
   }
   /* 
@@ -576,8 +576,8 @@ void block_output(struct bmd *mod,my_boolean rigid,
     //
     out=myopen(SLIPOUT_FILE,"w");
     for(i=0;i < mod->nflt;i++){
-      fprintf(out,"%11g %11g ",mod->fault[i].x[X], mod->fault[i].x[Y]);
-      disp[i*3+X] = disp[i*3+Y] = disp[i*3+Z] = 0.0;
+      fprintf(out,"%11g %11g ",mod->fault[i].x[INT_X], mod->fault[i].x[INT_Y]);
+      disp[i*3+INT_X] = disp[i*3+INT_Y] = disp[i*3+INT_Z] = 0.0;
       for(j=0;j < mod->nslip;j++){	/* slip modes:
 					   
 					strike or normal/dip 
@@ -611,8 +611,8 @@ void block_output(struct bmd *mod,my_boolean rigid,
 	else
 	  sign = 1.0;
 	fprintf(out,"%11.4e %11.4e %11.4e %11.4e ",
-		vslip[i*mod->nslip+j] * mod->fault[i].evec[idir*3+X],// v_e
-		vslip[i*mod->nslip+j] * mod->fault[i].evec[idir*3+Y],// v_u
+		vslip[i*mod->nslip+j] * mod->fault[i].evec[idir*3+INT_X],// v_e
+		vslip[i*mod->nslip+j] * mod->fault[i].evec[idir*3+INT_Y],// v_u
 		sign * vslip[i*mod->nslip+j],                   // u_i
 		fabs(vsigma[i*mod->nslip+j]));// sig(u_i)
 
@@ -668,9 +668,9 @@ void block_output(struct bmd *mod,my_boolean rigid,
     for(os1=mod->mgd,i=0;i < mod->nrsp;i++,os1+=6){/* loop through all stress points */
       // coordinates
       fprintf(out2,"%11g %11g ",
-	      mod->sx[BLOCK_DIM*i+X],mod->sx[BLOCK_DIM*i+Y]);
+	      mod->sx[BLOCK_DIM*i+INT_X],mod->sx[BLOCK_DIM*i+INT_Y]);
       fprintf(out3,"%11g %11g ",
-	      mod->sx[BLOCK_DIM*i+X],mod->sx[BLOCK_DIM*i+Y]);
+	      mod->sx[BLOCK_DIM*i+INT_X],mod->sx[BLOCK_DIM*i+INT_Y]);
       // print to stress.fit file
       for(j=0;j < 6;j++){
 	fprintf(out2,"%11g ",mod->vmod[os1+j]);
@@ -759,9 +759,9 @@ void print_horizontal_stress(COMP_PRECISION *s,FILE *out)
   COMP_PRECISION loc_azi,evec[4],eval[2],sloc2d[4];
   //
   // assign horizontal components of stress tensor
-  sloc2d[0] = s[XX];
-  sloc2d[1] = sloc2d[2] = s[XY];
-  sloc2d[3] = s[YY];
+  sloc2d[0] = s[INT_XX];
+  sloc2d[1] = sloc2d[2] = s[INT_XY];
+  sloc2d[3] = s[INT_YY];
   /* this routine returns values and vectors sorted as
      e2 < e1 
   */
@@ -788,7 +788,7 @@ void print_projected_stress(COMP_PRECISION *s, FILE *out)
   calc_eigensystem_sym3d(s,eval,evec,TRUE);
   // assign hor components of eigenvectors
   for(j=0;j<3;j++)		/* horizontal component */
-    evalh[j] = eval[j] * sqrt(1.0-SQUARE(evec[j*3+Z]));
+    evalh[j] = eval[j] * sqrt(1.0-SQUARE(evec[j*3+INT_Z]));
   sort_eigen(isort, eval);	/* sort by abs(EV) */
   for(j=0;j<3;j++){		
     loc_azi = vec_to_strike((evec+isort[j]*3));
@@ -1075,7 +1075,7 @@ void print_simple_vel(COMP_PRECISION *gx,
   out = myopen(filename,"w");
   for(i=j=0;i < nrgp;i++,j+=BLOCK_DIM)
     fprintf(out,"%12g %12g %12g %12g %12g %12g %12g\n",
-	    gx[j+X],gx[j+Y],
-	    v[j+X],v[j+Y],vsig[j+X],vsig[j+Y],rho[i]);
+	    gx[j+INT_X],gx[j+INT_Y],
+	    v[j+INT_X],v[j+INT_Y],vsig[j+INT_X],vsig[j+INT_Y],rho[i]);
   fclose(out);
 }

@@ -196,19 +196,19 @@ void calc_fields(struct med *medium,struct flt *fault,
     fiddle_with_limits_for_plot(medium,&nz,&use_fault_plane,dx,FALSE);
     fprintf(stderr,"calc_fields: calculating bulk stress and displacement fields...\n");
     fprintf(stderr,"calc_fields: field dimensions: %i %i %i %i\n",
-	    nz,medium->n[Y],medium->n[X],6);
+	    nz,medium->n[INT_Y],medium->n[INT_X],6);
   }
   if(medium->read_oloc_from_file){
     // output on xyz tripels as read from file
-    medium->n[X] = medium->n[Y] = 1;
-    medium->n[Z] = nz = medium->olocnr;
+    medium->n[INT_X] = medium->n[INT_Y] = 1;
+    medium->n[INT_Z] = nz = medium->olocnr;
     fprintf(stderr,"calc_fields: calculating fields for %i spotted observations\n",
-	    medium->n[Z]);
+	    medium->n[INT_Z]);
   }
-  nxy = medium->n[X] * medium->n[Y];
-  if(!(nz*nxy*6)){
-    fprintf(stderr,"calc_fields: bound of stress/displacement array error: %i\n",
-	    nz*nxy*6);
+  nxy = medium->n[INT_X] * medium->n[INT_Y];
+  if(!(nz*nxy)){
+    fprintf(stderr,"calc_fields: bound of stress/displacement array error: nz %i nxy %i\n",
+	    nz,nxy);
     exit(-1);
   }
   if((medium->s=(float *)calloc(nz*nxy*6,sizeof(float)))==NULL)
@@ -226,26 +226,26 @@ void calc_fields(struct med *medium,struct flt *fault,
     //
     //
     // determine if any of the locations are above zero
-    // x[X]/x[Y] is used for direction along strike and dip
+    // x[INT_X]/x[INT_Y] is used for direction along strike and dip
     if(use_fault_plane){
       //
-      // obtain the average strike and dip or normal vectors depending on n[Z]
+      // obtain the average strike and dip or normal vectors depending on n[INT_Z]
       //
       get_fault_plane_basevec(flt_mean_x,vec_1,vec_2,fault,medium);
       vec_to_angles(vec_1, &d1, &s1);
       vec_to_angles(vec_2, &d2, &s2);
       fprintf(stderr,"calc_fields: avg. fault plane: x:(%g,%g,%g), v_s: strike: %g dip: %g, v_%s: strike: %g dip: %g\n",
-	      flt_mean_x[X],flt_mean_x[Y],flt_mean_x[Z],
-	      s1,d1,(medium->n[Z]==-1)?("d"):("n"),s2,d2);
+	      flt_mean_x[INT_X],flt_mean_x[INT_Y],flt_mean_x[INT_Z],
+	      s1,d1,(medium->n[INT_Z]==-1)?("d"):("n"),s2,d2);
       if(!(medium->ok=(my_boolean *)malloc(nxy*sizeof(my_boolean))))
 	MEMERROR("calc_fields: 3");
       // check if the output is OK
-      for(o1=i=not_ok=0,x[X]=medium->pxmin[X];
-	  i<medium->n[X];
-	  x[X]+=dx[X], i++,o1 += medium->n[Y])
-	for(j=0,x[Y]=medium->pxmin[Y];j<medium->n[Y];x[Y]+=dx[Y],j++){
+      for(o1=i=not_ok=0,x[INT_X]=medium->pxmin[INT_X];
+	  i<medium->n[INT_X];
+	  x[INT_X]+=dx[INT_X], i++,o1 += medium->n[INT_Y])
+	for(j=0,x[INT_Y]=medium->pxmin[INT_Y];j<medium->n[INT_Y];x[INT_Y]+=dx[INT_Y],j++){
 	  get_local_x_on_plane(xl,x,flt_mean_x,vec_1,vec_2);
-	  if(xl[Z]<=0.0){
+	  if(xl[INT_Z]<=0.0){
 	    medium->ok[o1+j]=TRUE;
 	  }else{
 	    medium->ok[o1+j]=FALSE;
@@ -254,37 +254,37 @@ void calc_fields(struct med *medium,struct flt *fault,
 	}
       if(not_ok)
 	fprintf(stderr,"calc_fields: %i out of %i points were not appropriate for plane mode\n",
-		not_ok,medium->n[Y]*medium->n[X]);
+		not_ok,medium->n[INT_Y]*medium->n[INT_X]);
     }
     if(include_background_stress || include_background_displacement){
       fprintf(stderr,"calc_fields: WARNING: including background stress\n");
       /* include background stress, else zero */
-      for(k=0,x[Z]=medium->pxmin[Z];k<nz;x[Z]+=dx[Z],k++)
-	for(i=0,x[X]=medium->pxmin[X];i<medium->n[X];x[X]+=dx[X],i++)
-	  for(j=0,x[Y]=medium->pxmin[Y];j<medium->n[Y];x[Y]+=dx[Y],j++){
-	    if(!use_fault_plane || medium->ok[i*medium->n[Y]+j]){
+      for(k=0,x[INT_Z]=medium->pxmin[INT_Z];k<nz;x[INT_Z]+=dx[INT_Z],k++)
+	for(i=0,x[INT_X]=medium->pxmin[INT_X];i<medium->n[INT_X];x[INT_X]+=dx[INT_X],i++)
+	  for(j=0,x[INT_Y]=medium->pxmin[INT_Y];j<medium->n[INT_Y];x[INT_Y]+=dx[INT_Y],j++){
+	    if(!use_fault_plane || medium->ok[i*medium->n[INT_Y]+j]){
 	      if(use_fault_plane){
 		// determine position along the fault plane
 		get_local_x_on_plane(xl,x,flt_mean_x,vec_1,vec_2);
 	      }else{
-		xl[X]=x[X];xl[Y]=x[Y];xl[Z]=x[Z];
+		xl[INT_X]=x[INT_X];xl[INT_Y]=x[INT_Y];xl[INT_Z]=x[INT_Z];
 	      }
 	      if(include_background_displacement){
 		background_disp(u,xl,medium,a,b);
-		p1=POSU(i,j,k,X);
-		medium->u[p1++] = (float)u[X];
-		medium->u[p1++] = (float)u[Y];
-		medium->u[p1]   = (float)u[Z];
+		p1=POSU(i,j,k,INT_X);
+		medium->u[p1++] = (float)u[INT_X];
+		medium->u[p1++] = (float)u[INT_Y];
+		medium->u[p1]   = (float)u[INT_Z];
 	      }
 	      if(include_background_stress){
 		background_stress(sm,xl,medium->time,a,b,medium->pressure);
 		p2=POSS(i,j,k,0);
-		medium->s[p2++] = (float)sm[X][X];
-		medium->s[p2++] = (float)sm[X][Y];
-		medium->s[p2++] = (float)sm[X][Z];
-		medium->s[p2++] = (float)sm[Y][Y];
-		medium->s[p2++] = (float)sm[Y][Z];
-		medium->s[p2]   = (float)sm[Z][Z];
+		medium->s[p2++] = (float)sm[INT_X][INT_X];
+		medium->s[p2++] = (float)sm[INT_X][INT_Y];
+		medium->s[p2++] = (float)sm[INT_X][INT_Z];
+		medium->s[p2++] = (float)sm[INT_Y][INT_Y];
+		medium->s[p2++] = (float)sm[INT_Y][INT_Z];
+		medium->s[p2]   = (float)sm[INT_Z][INT_Z];
 	      }
 	    }
 	  }
@@ -296,25 +296,25 @@ void calc_fields(struct med *medium,struct flt *fault,
     //
     if(include_background_stress || include_background_displacement){
       fprintf(stderr,"calc_fields: WARNING: including background stress\n");
-      for(i=j=0;i<medium->n[Z];i++,j+=3){
+      for(i=j=0;i<medium->n[INT_Z];i++,j+=3){
 	for(k=0;k<3;k++)
 	  xl[k] = (COMP_PRECISION)medium->xoloc[j+k];
 	if(include_background_displacement){
 	  background_disp(u,xl,medium,a,b);
 	  p1 = j;
-	  medium->u[p1++] = (float)u[X];
-	  medium->u[p1++] = (float)u[Y];
-	  medium->u[p1]   = (float)u[Z];
+	  medium->u[p1++] = (float)u[INT_X];
+	  medium->u[p1++] = (float)u[INT_Y];
+	  medium->u[p1]   = (float)u[INT_Z];
 	}
 	if(include_background_stress){
 	  background_stress(sm,xl,medium->time,a,b,medium->pressure);
 	  p2= i * 6;
-	  medium->s[p2++] = (float)sm[X][X];
-	  medium->s[p2++] = (float)sm[X][Y];
-	  medium->s[p2++] = (float)sm[X][Z];
-	  medium->s[p2++] = (float)sm[Y][Y];
-	  medium->s[p2++] = (float)sm[Y][Z];
-	  medium->s[p2]   = (float)sm[Z][Z];
+	  medium->s[p2++] = (float)sm[INT_X][INT_X];
+	  medium->s[p2++] = (float)sm[INT_X][INT_Y];
+	  medium->s[p2++] = (float)sm[INT_X][INT_Z];
+	  medium->s[p2++] = (float)sm[INT_Y][INT_Y];
+	  medium->s[p2++] = (float)sm[INT_Y][INT_Z];
+	  medium->s[p2]   = (float)sm[INT_Z][INT_Z];
 	}
       }
     }
@@ -326,34 +326,34 @@ void calc_fields(struct med *medium,struct flt *fault,
     if(medium->print_plane_coord){
       out=myopen(PLANE_COORD_FILE,"w");
       fprintf(out,"# format:\n#\txg[X] xg[Y] xg[Z] xl[X] xl[Y]\n#\twith v_s: (%g,%g,%g) v_%s: (%g,%g,%g)\n#\n",
-	      vec_1[X],vec_1[Y],vec_1[Z],(medium->n[Z]==-1)?("d"):("n"),
-	      vec_2[X],vec_2[Y],vec_2[Z]);
+	      vec_1[INT_X],vec_1[INT_Y],vec_1[INT_Z],(medium->n[INT_Z]==-1)?("d"):("n"),
+	      vec_2[INT_X],vec_2[INT_Y],vec_2[INT_Z]);
       fprintf(stderr,"calc_fields: writing fault plane coordinates to \"%s\"\n",
 	      PLANE_COORD_FILE);
     }
-    for(k=0,x[Z]=medium->pxmin[Z];k<nz;x[Z]+=dx[Z],k++)
-      for(i=0,x[X]=medium->pxmin[X];i<medium->n[X];x[X]+=dx[X],i++)
-	for(j=0,x[Y]=medium->pxmin[Y];j<medium->n[Y];x[Y]+=dx[Y],j++){
+    for(k=0,x[INT_Z]=medium->pxmin[INT_Z];k<nz;x[INT_Z]+=dx[INT_Z],k++)
+      for(i=0,x[INT_X]=medium->pxmin[INT_X];i<medium->n[INT_X];x[INT_X]+=dx[INT_X],i++)
+	for(j=0,x[INT_Y]=medium->pxmin[INT_Y];j<medium->n[INT_Y];x[INT_Y]+=dx[INT_Y],j++){
 	  //fprintf(stderr,"calc_fields: working on %04i/%04i/%04i\r",k,i,j);
-	  if(!use_fault_plane || medium->ok[i*medium->n[Y]+j]){
+	  if(!use_fault_plane || medium->ok[i*medium->n[INT_Y]+j]){
 	    if(use_fault_plane){
 	      // determine position along the fault plane
 	      get_local_x_on_plane(xl,x,flt_mean_x,vec_1,vec_2);
 	    }else{
-	      xl[X]=x[X];xl[Y]=x[Y];xl[Z]=x[Z];
+	      xl[INT_X]=x[INT_X];xl[INT_Y]=x[INT_Y];xl[INT_Z]=x[INT_Z];
 	    }
 	    if(medium->print_plane_coord)
-	      fprintf(out,"%g %g %g %g %g\n",xl[X],xl[Y],xl[Z],x[X],x[Y]);
-	    if(xl[Z] > 0.0){
-	      if(xl[Z] > 1.0e-10){
+	      fprintf(out,"%g %g %g %g %g\n",xl[INT_X],xl[INT_Y],xl[INT_Z],x[INT_X],x[INT_Y]);
+	    if(xl[INT_Z] > 0.0){
+	      if(xl[INT_Z] > 1.0e-10){
 		fprintf(stderr,"calc_fields: positive depth in loop, kij: %i %i %i x: (%g, %g, %g)\n",
-			k,i,j,xl[X],xl[Y],xl[Z]);
+			k,i,j,xl[INT_X],xl[INT_Y],xl[INT_Z]);
 		exit(-1);
 	      }else{
-		xl[Z]=0.0;
+		xl[INT_Z]=0.0;
 	      }
 	    }
-	    p1=POSU(i,j,k,X);
+	    p1=POSU(i,j,k,INT_X);
 	    p2=POSS(i,j,k,0);
 	    for(o=0;o<medium->nrflt;o++){
 	      if(norm_3d(fault[o].u) >= EPS_COMP_PREC){
@@ -362,15 +362,15 @@ void calc_fields(struct med *medium,struct flt *fault,
 		//
 		eval_green(xl,(fault+o),fault[o].u,u,sm,&iret);
 		if(!iret){
-		  medium->u[p1]   += (float)u[X];
-		  medium->u[p1+1] += (float)u[Y];
-		  medium->u[p1+2] += (float)u[Z];
-		  medium->s[p2]   += (float)sm[X][X];
-		  medium->s[p2+1] += (float)sm[X][Y];
-		  medium->s[p2+2] += (float)sm[X][Z];
-		  medium->s[p2+3] += (float)sm[Y][Y];
-		  medium->s[p2+4] += (float)sm[Y][Z];
-		  medium->s[p2+5] += (float)sm[Z][Z];
+		  medium->u[p1]   += (float)u[INT_X];
+		  medium->u[p1+1] += (float)u[INT_Y];
+		  medium->u[p1+2] += (float)u[INT_Z];
+		  medium->s[p2]   += (float)sm[INT_X][INT_X];
+		  medium->s[p2+1] += (float)sm[INT_X][INT_Y];
+		  medium->s[p2+2] += (float)sm[INT_X][INT_Z];
+		  medium->s[p2+3] += (float)sm[INT_Y][INT_Y];
+		  medium->s[p2+4] += (float)sm[INT_Y][INT_Z];
+		  medium->s[p2+5] += (float)sm[INT_Z][INT_Z];
 		}else{
 		  singular_count++;
 		  medium->u[p1] = medium->nan;
@@ -396,13 +396,13 @@ void calc_fields(struct med *medium,struct flt *fault,
     for(i=j=0;i<medium->olocnr;i++,j+=3){
       for(k=0;k<3;k++)
 	xl[k]=(COMP_PRECISION)medium->xoloc[j+k];
-      if(xl[Z] > 0.0){
-	if(xl[Z] > 1.0e-10){
+      if(xl[INT_Z] > 0.0){
+	if(xl[INT_Z] > 1.0e-10){
 	  fprintf(stderr,"calc_fields: positive depth for location %i x: (%g, %g, %g)\n",
-		  k,xl[X],xl[Y],xl[Z]);
+		  k,xl[INT_X],xl[INT_Y],xl[INT_Z]);
 	  exit(-1);
 	}else{
-	  xl[Z]=0.0;
+	  xl[INT_Z]=0.0;
 	}
       }
       p1 = j;
@@ -414,15 +414,15 @@ void calc_fields(struct med *medium,struct flt *fault,
 	  //
 	  eval_green(xl,(fault+o),fault[o].u,u,sm,&iret);
 	  if(!iret){
-	    medium->u[p1]   += (float)u[X];
-	    medium->u[p1+1] += (float)u[Y];
-	    medium->u[p1+2] += (float)u[Z];
-	    medium->s[p2]   += (float)sm[X][X];
-	    medium->s[p2+1] += (float)sm[X][Y];
-	    medium->s[p2+2] += (float)sm[X][Z];
-	    medium->s[p2+3] += (float)sm[Y][Y];
-	    medium->s[p2+4] += (float)sm[Y][Z];
-	    medium->s[p2+5] += (float)sm[Z][Z];
+	    medium->u[p1]   += (float)u[INT_X];
+	    medium->u[p1+1] += (float)u[INT_Y];
+	    medium->u[p1+2] += (float)u[INT_Z];
+	    medium->s[p2]   += (float)sm[INT_X][INT_X];
+	    medium->s[p2+1] += (float)sm[INT_X][INT_Y];
+	    medium->s[p2+2] += (float)sm[INT_X][INT_Z];
+	    medium->s[p2+3] += (float)sm[INT_Y][INT_Y];
+	    medium->s[p2+4] += (float)sm[INT_Y][INT_Z];
+	    medium->s[p2+5] += (float)sm[INT_Z][INT_Z];
 	  }else{
 	    singular_count++;
 	    medium->u[p1]   = medium->nan;
@@ -464,18 +464,18 @@ void background_stress(COMP_PRECISION sm[3][3], COMP_PRECISION *x,
 {
   COMP_PRECISION locp;
 #ifdef HYDROSTATIC_PRESSURE
-  locp = -(x[Z]/HYDROSTATIC_PRESSURE) * pressure; 
+  locp = -(x[INT_Z]/HYDROSTATIC_PRESSURE) * pressure; 
 #else
   locp = pressure; 
 #endif
   /* isotropic elements, compression negative */
-  sm[X][X] = a[0] + time * b[0] - locp;
-  sm[Y][Y] = a[3] + time * b[3] - locp;
-  sm[Z][Z] = a[5] + time * b[5] - locp;
+  sm[INT_X][INT_X] = a[0] + time * b[0] - locp;
+  sm[INT_Y][INT_Y] = a[3] + time * b[3] - locp;
+  sm[INT_Z][INT_Z] = a[5] + time * b[5] - locp;
   /* off diagonal elements  */  
-  sm[X][Y]=sm[Y][X] = a[1] + time * b[1];
-  sm[X][Z]=sm[Z][X] = a[2] + time * b[2];
-  sm[Y][Z]=sm[Z][Y] = a[4] + time * b[4];
+  sm[INT_X][INT_Y]=sm[INT_Y][INT_X] = a[1] + time * b[1];
+  sm[INT_X][INT_Z]=sm[INT_Z][INT_X] = a[2] + time * b[2];
+  sm[INT_Y][INT_Z]=sm[INT_Z][INT_Y] = a[4] + time * b[4];
 }
 void background_disp(COMP_PRECISION *u, COMP_PRECISION *x, 
 		     struct med *medium,COMP_PRECISION *a,
@@ -503,8 +503,8 @@ void background_disp(COMP_PRECISION *u, COMP_PRECISION *x,
     fprintf(stderr,"background_disp: EXITING: background displacement is inaccurate since no simple shear stressing\n");
     exit(-1);
   }
-  u[X]=medium->time * (b[1]/SHEAR_MODULUS)*u[Y];
-  u[Y]=u[Z]=0.0;
+  u[INT_X]=medium->time * (b[1]/SHEAR_MODULUS)*u[INT_Y];
+  u[INT_Y]=u[INT_Z]=0.0;
 }
 /*
 
@@ -519,8 +519,8 @@ void get_local_x_on_plane(COMP_PRECISION *xl,COMP_PRECISION *x,
   int i;
   for(i=0;i<3;i++){
     xl[i]  = flt_mean_x[i];
-    xl[i] += vec_1[i] * x[X];
-    xl[i] += vec_2[i] * x[Y];
+    xl[i] += vec_1[i] * x[INT_X];
+    xl[i] += vec_2[i] * x[INT_Y];
   }
 }
 /*
@@ -529,7 +529,7 @@ void get_local_x_on_plane(COMP_PRECISION *xl,COMP_PRECISION *x,
   obtain average faulkt plane vectors and location
   on return flt_mean_x will hold the mean location and vec_1 and vec_2
   the mean strike and dip or the mean strike and normal vectors, depending
-  on the n[Z] flag, -1 or -2 
+  on the n[INT_Z] flag, -1 or -2 
 
 
  */
@@ -542,7 +542,7 @@ void get_fault_plane_basevec(COMP_PRECISION *flt_mean_x,
   // and mean location of patches
   for(i=0;i<3;i++)
     vec_1[i]=vec_2[i]=flt_mean_x[i]=0.0;
-  if(medium->n[Z] == -1){
+  if(medium->n[INT_Z] == -1){
     fprintf(stderr,"get_fault_plane_basevec: base vectors are average strike and dip of fault group 0\n");
     for(n=i=0;i<medium->nrflt;i++)
       if(fault[i].group == 0){
@@ -553,7 +553,7 @@ void get_fault_plane_basevec(COMP_PRECISION *flt_mean_x,
 	  vec_2[j]        += fault[i].t_dip[j];
 	}
       }
-  }else if(medium->n[Z] == -2){
+  }else if(medium->n[INT_Z] == -2){
     fprintf(stderr,"get_fault_plane_basevec: base vectors are average strike and normal of fault group 0\n");
     for(n=i=0;i<medium->nrflt;i++)
       if(fault[i].group == 0){
@@ -566,7 +566,7 @@ void get_fault_plane_basevec(COMP_PRECISION *flt_mean_x,
       }
   }else{
     fprintf(stderr,"get_fault_plane_basevec: medium->n[Z] has to be -1 or -2 but is %i\n",
-	    medium->n[Z]);
+	    medium->n[INT_Z]);
     exit(-1);
   }
   if(n)
@@ -597,16 +597,16 @@ void calc_deviatoric_stress(COMP_PRECISION sm[3][3],COMP_PRECISION dm[3][3],
 			    COMP_PRECISION *pressure, COMP_PRECISION *s2)
 {
   int i,j;
-  *pressure= -(sm[X][X] + sm[Y][Y] + sm[Z][Z])/3.0;
+  *pressure= -(sm[INT_X][INT_X] + sm[INT_Y][INT_Y] + sm[INT_Z][INT_Z])/3.0;
  
   for(i=0;i<3;i++)
     for(j=0;j<3;j++)
       dm[i][j] = sm[i][j] + ((i==j)?(*pressure):(0.0));
   /* second invariant of deviatoric tensor */
-  *s2 = sqrt(0.5* (dm[X][X] * dm[X][X] + 
-		   dm[X][Y] * dm[X][Y] * 2.0 + 
-		   dm[Y][Y] * dm[Y][Y] + 
-		   dm[Y][Z] * dm[Y][Z] * 2.0 + 
-		   dm[Z][Z] * dm[Z][Z] + 
-		   dm[X][Z] * dm[X][Z] * 2.0));
+  *s2 = sqrt(0.5* (dm[INT_X][INT_X] * dm[INT_X][INT_X] + 
+		   dm[INT_X][INT_Y] * dm[INT_X][INT_Y] * 2.0 + 
+		   dm[INT_Y][INT_Y] * dm[INT_Y][INT_Y] + 
+		   dm[INT_Y][INT_Z] * dm[INT_Y][INT_Z] * 2.0 + 
+		   dm[INT_Z][INT_Z] * dm[INT_Z][INT_Z] + 
+		   dm[INT_X][INT_Z] * dm[INT_X][INT_Z] * 2.0));
 }

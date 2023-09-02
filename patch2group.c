@@ -34,7 +34,7 @@ int main(int argc,char **argv)
   // output in patch format 
   for(i=0;i<medium->nrgrp;i++)
     fprintf(stdout,"%g %g %g %g %g %g %g %i\n",
-	    grp[i].center[X],grp[i].center[Y],grp[i].center[Z],
+	    grp[i].center[INT_X],grp[i].center[INT_Y],grp[i].center[INT_Z],
 	    vec_to_strike(grp[i].strike_vec),vec_to_dip(grp[i].dip_vec),
 	    grp[i].prange[STRIKE],grp[i].prange[DIP],i);
 

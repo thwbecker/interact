@@ -39,7 +39,7 @@ int main(int argc, char **argv)
     check the fault assignment by comparing the 
     centroid locations
   */
-  x[Z] = 0.0;
+  x[INT_Z] = 0.0;
   fprintf(stderr,"%s: read centroids ok, testing %i faults\n",
 	  argv[0],mod->nflt);
   for(i=0;i < mod->nflt;i++){
@@ -50,18 +50,18 @@ int main(int argc, char **argv)
 
       */
       a_equals_b_vector(x,(cx+(mod->fault+i)->block[j]*2),2); 
-      geoproject(x, px, FLT_ROT_PROJECTION,(mod->fault+i)->x[X],
-		 (mod->fault+i)->x[Y],(mod->fault+i)->azi,dummy, 
+      geoproject(x, px, FLT_ROT_PROJECTION,(mod->fault+i)->x[INT_X],
+		 (mod->fault+i)->x[INT_Y],(mod->fault+i)->azi,dummy, 
 		 dummy, dummy, dummy, (int)FALSE);
-      dir[j] = -px[Y] / norm(px,2);
+      dir[j] = -px[INT_Y] / norm(px,2);
     }
     if(0)
       fprintf(stderr,"flt %3i: (%12g, %12g) a: %12g lc: %12g, %12g dir: %12g rc: %12g, %12g dir: %12g\n",
-	      i+1,mod->fault[i].x[X],mod->fault[i].x[Y],mod->fault[i].azi,
-	      cx[mod->fault[i].block[0]*2+X],
-	      cx[mod->fault[i].block[0]*2+Y],dir[0],
-	      cx[mod->fault[i].block[1]*2+X],
-	      cx[mod->fault[i].block[1]*2+Y],dir[1]);
+	      i+1,mod->fault[i].x[INT_X],mod->fault[i].x[INT_Y],mod->fault[i].azi,
+	      cx[mod->fault[i].block[0]*2+INT_X],
+	      cx[mod->fault[i].block[0]*2+INT_Y],dir[0],
+	      cx[mod->fault[i].block[1]*2+INT_X],
+	      cx[mod->fault[i].block[1]*2+INT_Y],dir[1]);
     /*
 
       check if block are on the correct side
@@ -91,8 +91,8 @@ int main(int argc, char **argv)
   out = myopen("fltcodes.gmt","w");
   for(i=0;i < mod->nflt;i++){
     fprintf(stdout,"%15.10f %15.10f %15.10f %15.10f %12g %5i %5i %12g %12g\n",
-	    mod->fault[i].ex[0][X],mod->fault[i].ex[0][Y],
-	    mod->fault[i].ex[1][X],mod->fault[i].ex[1][Y],
+	    mod->fault[i].ex[0][INT_X],mod->fault[i].ex[0][INT_Y],
+	    mod->fault[i].ex[1][INT_X],mod->fault[i].ex[1][INT_Y],
 	    mod->fault[i].dip,mod->fault[i].block[0]+1,mod->fault[i].block[1]+1,
 	    mod->fault[i].lfac,mod->fault[i].ld);
     //
@@ -102,9 +102,9 @@ int main(int argc, char **argv)
       // mod->fault number, l/r, center location offset-location, block code
       if(j==1)lfac = - lfac;
       fprintf(out,"%i %i %g %g %g %g %i\n",
-	      i+1,j+1,mod->fault[i].x[X],mod->fault[i].x[Y],
-	      mod->fault[i].x[X] + lfac * mod->fault[i].evec[NORMAL*3+X],
-	      mod->fault[i].x[Y] + lfac * mod->fault[i].evec[NORMAL*3+Y],
+	      i+1,j+1,mod->fault[i].x[INT_X],mod->fault[i].x[INT_Y],
+	      mod->fault[i].x[INT_X] + lfac * mod->fault[i].evec[NORMAL*3+INT_X],
+	      mod->fault[i].x[INT_Y] + lfac * mod->fault[i].evec[NORMAL*3+INT_Y],
 	      mod->fault[i].block[j]+1);
     }
   }

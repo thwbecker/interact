@@ -48,13 +48,14 @@ int main(int argc, char **argv)
   }}
   // read in stress state
   fprintf(stderr,"%s: reading s_ij (6 components)\n",argv[0]);
-  fscanf(stdin,SIX_CP_FORMAT,&sm[X][X],&sm[X][Y],&sm[X][Z],
-	 &sm[Y][Y],&sm[Y][Z],&sm[Z][Z]);
-  sm[Y][X] = sm[X][Y];
-  sm[Z][X] = sm[X][Z];
-  sm[Z][Y] = sm[Y][Z];
+  fscanf(stdin,SIX_CP_FORMAT,
+	 &sm[INT_X][INT_X],&sm[INT_X][INT_Y],&sm[INT_X][INT_Z],
+	 &sm[INT_Y][INT_Y],&sm[INT_Y][INT_Z],&sm[INT_Z][INT_Z]);
+  sm[INT_Y][INT_X] = sm[INT_X][INT_Y];
+  sm[INT_Z][INT_X] = sm[INT_X][INT_Z];
+  sm[INT_Z][INT_Y] = sm[INT_Y][INT_Z];
   fprintf(stderr,"%s: sxx: %g sxx: %g sxx: %g sxx: %g sxx: %g sxx: %g\n",
-	  argv[0],sm[X][X],sm[X][Y],sm[X][Z],sm[Y][Y],sm[Y][Z],sm[Z][Z]);
+	  argv[0],sm[INT_X][INT_X],sm[INT_X][INT_Y],sm[INT_X][INT_Z],sm[INT_Y][INT_Y],sm[INT_Y][INT_Z],sm[INT_Z][INT_Z]);
   
   
   for(strike = 0.0;strike <= 360.0;strike += dstrike)
@@ -81,7 +82,7 @@ int main(int argc, char **argv)
       //
       // output is x and y in the hemisphere projection and 
       // the resulting plunge angle
-      fprintf(stdout,"%g %g %g\n",xhemi[X],xhemi[Y],
+      fprintf(stdout,"%g %g %g\n",xhemi[INT_X],xhemi[INT_Y],
 	      atan2(tstress[DIP],tstress[STRIKE])/PI);
 
     }

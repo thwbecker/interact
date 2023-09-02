@@ -248,13 +248,13 @@ int main(int argc, char **argv)
   */
   maxl=0;
   while(fscanf(INPUT_CHANNELL,RS_CP_FORMAT,
-	       &fault[nr_inp_flts].x[X], &fault[nr_inp_flts].x[Y], 
-	       &fault[nr_inp_flts].x[Z], &fault[nr_inp_flts].dip,
+	       &fault[nr_inp_flts].x[INT_X], &fault[nr_inp_flts].x[INT_Y], 
+	       &fault[nr_inp_flts].x[INT_Z], &fault[nr_inp_flts].dip,
 	       &fault[nr_inp_flts].l, &fault[nr_inp_flts].w,
 	       &fault[nr_inp_flts].group) == 7){
-    if((fault[nr_inp_flts].x[Z]<lower_depth)||(fault[nr_inp_flts].x[Z]>upper_depth)){
+    if((fault[nr_inp_flts].x[INT_Z]<lower_depth)||(fault[nr_inp_flts].x[INT_Z]>upper_depth)){
       fprintf(stderr,"%s: z value fault %i (%g) does not work with preset bounds %g (lower) and %g (upper)\n",
-	      argv[0],nr_inp_flts,fault[nr_inp_flts].x[Z],lower_depth,upper_depth);
+	      argv[0],nr_inp_flts,fault[nr_inp_flts].x[INT_Z],lower_depth,upper_depth);
       exit(-1);
     }
     // for now don't check for variable friction
@@ -383,15 +383,15 @@ int main(int argc, char **argv)
       // move depth around to allow for more patches to be inserted
       if(depth_adjust){
 	tmpw=fault[i].w*sin_dip;
-	oldz=fault[i].x[Z];
+	oldz=fault[i].x[INT_Z];
 	// this is the range that z will be spread over
 	depthstd=dastdw*fault[i].w;
-	fault[i].x[Z] = oldz ;//+ mygauss_randnr(depthstd,&seed);
+	fault[i].x[INT_Z] = oldz ;//+ mygauss_randnr(depthstd,&seed);
 	iter2=0;
-	while(((fault[i].x[Z]+tmpw > upper_depth)||
-	       (fault[i].x[Z]-tmpw < lower_depth))&&
+	while(((fault[i].x[INT_Z]+tmpw > upper_depth)||
+	       (fault[i].x[INT_Z]-tmpw < lower_depth))&&
 	      (iter2 < MAXITER)){
-	  fault[i].x[Z] = oldz + mygauss_randnr(depthstd,&seed);
+	  fault[i].x[INT_Z] = oldz + mygauss_randnr(depthstd,&seed);
 	  iter2++;
 	}
 	if(iter2==MAXITER){

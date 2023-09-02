@@ -114,6 +114,9 @@ include makefile.pgplot
 # add this for slatec NNLS routine support, otherwise comment it out
 # you will use NNLS solving capabilities
 #include makefile.slatec
+
+# petsc, will override some of the flags
+include makefile.petsc
 #
 # add this for superlu support, otherwise comment it out
 # you will loose sparse matrix SuperLU LU solver capabilities
@@ -121,19 +124,21 @@ include makefile.pgplot
 #
 # add this for geoprojection support
 #
-#include makefile.geoproject
+include makefile.geoproject
 
 # add up all define flags
-DEFINE_FLAGS = $(MAIN_DEFINES) $(SLATEC_DEFINES) \
+DEFINE_FLAGS = $(MAIN_DEFINES) $(SLATEC_DEFINES) $(PETSC_DEFINES) \
 	$(PGPLOT_DEFINES) $(SUPERLU_DEFINES)  \
 	$(GEOPROJECT_DEFINES)
 # defines and pgplot flags
 FLAGS = $(DEFINE_FLAGS) $(PGPLOT_INCLUDES) $(SLATEC_INCLUDES) \
-	$(SUPERLU_INCLUDES) $(GEOPROJECT_INCLUDES)
+	$(SUPERLU_INCLUDES) $(GEOPROJECT_INCLUDES) $(PETSC_INCLUDES) 
 # C and FORTRAN compiler specific flags, add them to the 
+
+
 # other flags
-CFLAGS = $(FLAGS) $(SCARGS)
-FFLAGS = $(FLAGS) $(SFARGS)
+CFLAGS = $(FLAGS) $(SCARGS) $(MACHINE_DEFINES)
+FFLAGS = $(FLAGS) $(SFARGS) $(MACHINE_DEFINES) 
 
 
 
@@ -228,8 +233,8 @@ BLOCKINVERT_SPH_OBJS = $(ODIR)/block_read_bflt.sph.o \
 	$(ODIR)/block_matrix.sph.o	\
 	$(ODIR)/block_read_gps.sph.o \
 	$(ODIR)/read_stress_observations.sph.o	\
-	$(ODIR)/block_solve.sph.o		\
-	$(ODIR)/eigensystem.o 			\
+	$(ODIR)/block_solve.sph.o 	\
+	$(ODIR)/eigensystem.o 	 \
 	$(ODIR)/levmarq_numrec.o $(ODIR)/block_output.sph.o  \
 	$(ODIR)/block_stress.sph.o $(ODIR)/block_levmarq.o 
 
@@ -299,7 +304,6 @@ random_prop_tools: $(BDIR)/create_random_stress_file \
 	$(BDIR)/create_random_mu_file $(BDIR)/calc_stress_stat
 
 
-
 geographic_tools: $(BDIR)/blockinvert_sph $(BDIR)/geo_okada  \
 	$(BDIR)/block_checkflt $(BDIR)/block_evaluate_solution \
 	$(BDIR)/fstress2hor	$(BDIR)/fstress2eig \
@@ -315,7 +319,8 @@ geom_converters: $(BDIR)/points2patch $(BDIR)/tri2patch
 
 test:    $(ODIR)/test_stuff 
 
-matrix_test_progs: $(BDIR)/test_sparse $(BDIR)/test_optimize
+matrix_test_progs: $(BDIR)/test_sparse $(BDIR)/test_optimize $(BDIR)/test_solvers \
+	$(BDIR)/ex_dense
 
 pgplot_progs:  $(BDIR)/plotevents $(BDIR)/read_bin_events 
 
@@ -506,6 +511,16 @@ $(BDIR)/test_optimize: $(ODIR)/test_optimize.o $(ODIR)/optimize.o  \
 	 $(ODIR)/optimize.o  \
 	-o $(BDIR)/test_optimize $(LIBS) $(SUPERLU_LIBS) $(SLATEC_LIBS) $(PGLIBS)
 
+$(BDIR)/test_solvers: $(ODIR)/test_solvers.o $(GEN_P_INC)  $(LIBLIST) 
+	$(MPILD) $(LDFLAGS)  $(ODIR)/test_solvers.o \
+	-o $(BDIR)/test_solvers $(PETSC_LIBS) $(LIBS) $(SUPERLU_LIBS) \
+	$(SLATEC_LIBS) $(PGLIBS) 
+
+$(BDIR)/ex_dense: $(ODIR)/ex_dense.o $(GEN_P_INC)  $(LIBLIST) 
+	$(MPILD) $(LDFLAGS)  $(ODIR)/ex_dense.o \
+	-o $(BDIR)/ex_dense $(PETSC_LIBS) $(LIBS) $(SUPERLU_LIBS) \
+	$(SLATEC_LIBS) $(PGLIBS) 
+
 $(BDIR)/project_stress: $(ODIR)/project_stress.o $(ODIR)/mysincos.o \
 	$(ODIR)/llgeo.o $(ODIR)/geometry.o  $(GEN_P_INC)  $(LIBLIST) 
 	$(LD) $(LDFLAGS) $(ODIR)/project_stress.o  $(ODIR)/llgeo.o \
@@ -555,8 +570,8 @@ $(BDIR)/read_bin_events: $(ODIR)/read_bin_events.o $(INTERACT_OBJS) $(GEN_P_INC)
 
 
 $(BDIR)/blockinvert_sph: $(GEN_P_INC)  $(GEOPROJECT_OBJS) $(LIBLIST) \
-		$(BLOCKINVERT_SPH_OBJS)  $(ODIR)/blockinvert.sph.o
-	$(LD) $(LDFLAGS) $(BLOCKINVERT_SPH_OBJS) $(ODIR)/blockinvert.sph.o \
+		$(BLOCKINVERT_SPH_OBJS)  $(ODIR)/blockinvert.sph.o  
+	$(LD) $(LDFLAGS) $(BLOCKINVERT_SPH_OBJS) $(ODIR)/blockinvert.sph.o  \
 		$(MY_LIBDIR_SPEC)$(ODIR)/ $(MATHLIB)   $(GEOPROJECT_OBJS)			\
 		-o  $(BDIR)/blockinvert_sph   -linput -lpatchio		\
 		$(GEOPROJECT_LIBS)					\
@@ -756,6 +771,13 @@ $(ODIR)/coulomb_noise_stress.$(NOISELEVEL).sgl.o: coulomb_stress.c $(GEN_P_INC) 
 	$(CC) $(CFLAGS) -c coulomb_stress.c \
 	-DADD_COULOMB_STRESS_NOISE=$(NOISELEVEL) \
 	-o  $(ODIR)/coulomb_noise_stress.$(NOISELEVEL).sgl.o
+# 
+$(ODIR)/test_solvers.o:	test_solvers.c $(GEN_P_INC)
+	$(MPICC) $(CFLAGS)  $(MY_PRECISION) -c test_solvers.c -o $(ODIR)/test_solvers.o
+$(ODIR)/ex_dense.o:	ex_dense.c $(GEN_P_INC)
+	$(MPICC) $(CFLAGS)  $(MY_PRECISION) -c ex_dense.c -o $(ODIR)/ex_dense.o
+
+
 
 #
 # some generic rules with normal dependencies

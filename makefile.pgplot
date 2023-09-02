@@ -13,8 +13,7 @@ PGPLOT_INCLUDES = -I/usr/local/pgplot/
 # specify the non-shared versions of the pgplot libraries explicitly to avoid
 # having to specify -static for the linker or such
 PGLIBS = -L/usr/local/pgplot/ -lcpgplot -lpgplot \
-	-L/usr/X11R6/lib/ -lX11 -lpng
-#-L/usr/lib/gcc-lib/i386-redhat-linux/3.2.3/ -lg2c -lm
+	-L$(X11LIBDIR) -lX11 -lpng
 #
 # these are the pgplot routine object files from interact
 POBJS = $(ODIR)/plotting.o $(ODIR)/plotting_palette.o \

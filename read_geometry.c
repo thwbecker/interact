@@ -97,8 +97,8 @@ void read_geometry(char *patch_filename,struct med **medium,
     start geometry line input loop
 
   */
-  while(fscanf(in,PATCH_CP_FORMAT,&(*fault+i)->x[X],&(*fault+i)->x[Y],
-	       &(*fault+i)->x[Z],&(*fault+i)->strike,&(*fault+i)->dip,
+  while(fscanf(in,PATCH_CP_FORMAT,&(*fault+i)->x[INT_X],&(*fault+i)->x[INT_Y],
+	       &(*fault+i)->x[INT_Z],&(*fault+i)->strike,&(*fault+i)->dip,
 	       &(*fault+i)->l,&(*fault+i)->w,&tmpint) == 8){
 
 #ifdef ALLOW_NON_3DQUAD_GEOM
@@ -108,7 +108,7 @@ void read_geometry(char *patch_filename,struct med **medium,
 	2-D element
 	
       */
-      if(((*fault+i)->dip != 90.0)||((*fault+i)->x[Z] != 0.0)){
+      if(((*fault+i)->dip != 90.0)||((*fault+i)->x[INT_Z] != 0.0)){
 	fprintf(stderr,"read_geometry: width 0 selects: 2D mode: dip, z should be 90, and 0, respectively\n");
 	exit(-1);
       }
@@ -132,12 +132,12 @@ void read_geometry(char *patch_filename,struct med **medium,
       if(!(*fault+i)->xt)MEMERROR("read_geometry");
       // next nine fields are nodal coordinates
       if(fscanf(in,NINE_CP_FORMAT,
-		&(*fault+i)->xt[  X],&(*fault+i)->xt[  Y],
-		&(*fault+i)->xt[  Z],
-		&(*fault+i)->xt[3+X],&(*fault+i)->xt[3+Y],
-		&(*fault+i)->xt[3+Z],
-		&(*fault+i)->xt[6+X],&(*fault+i)->xt[6+Y],
-		&(*fault+i)->xt[6+Z])!=9)
+		&(*fault+i)->xt[  INT_X],&(*fault+i)->xt[  INT_Y],
+		&(*fault+i)->xt[  INT_Z],
+		&(*fault+i)->xt[3+INT_X],&(*fault+i)->xt[3+INT_Y],
+		&(*fault+i)->xt[3+INT_Z],
+		&(*fault+i)->xt[6+INT_X],&(*fault+i)->xt[6+INT_Y],
+		&(*fault+i)->xt[6+INT_Z])!=9)
 	READ_ERROR("read_geometry");
       // x will be the centroid, to be calculated
       calc_centroid_tri((*fault+i)->xt,(*fault+i)->x);
@@ -151,9 +151,9 @@ void read_geometry(char *patch_filename,struct med **medium,
       (*fault+i)->strike= 90.0 - alpha;
 #ifdef DEBUG
       fprintf(stderr,"read_geometry: fault %i is triangular, x1: (%g, %g, %g) x2: (%g, %g, %g) x3: (%g, %g, %g), area: %g\n",
-	      i,(*fault+i)->xt[  X],(*fault+i)->xt[  Y],(*fault+i)->xt[  Z],
-	      (*fault+i)->xt[3+X],(*fault+i)->xt[3+Y],(*fault+i)->xt[3+Z],
-	      (*fault+i)->xt[6+X],(*fault+i)->xt[6+Y],(*fault+i)->xt[6+Z],
+	      i,(*fault+i)->xt[  INT_X],(*fault+i)->xt[  INT_Y],(*fault+i)->xt[  INT_Z],
+	      (*fault+i)->xt[3+INT_X],(*fault+i)->xt[3+INT_Y],(*fault+i)->xt[3+INT_Z],
+	      (*fault+i)->xt[6+INT_X],(*fault+i)->xt[6+INT_Y],(*fault+i)->xt[6+INT_Z],
 	      (*fault+i)->w);
 #endif
       nr_triangle++;
@@ -187,9 +187,9 @@ void read_geometry(char *patch_filename,struct med **medium,
       exit(-1);
     }
 #endif
-    if((*fault+i)->x[Z] > 0){
+    if((*fault+i)->x[INT_Z] > 0){
       fprintf(stderr,"read_geometry: patch %i: z has to be < 0, mid point z: %g\n",
-	      i,(*fault+i)->x[Z]);
+	      i,(*fault+i)->x[INT_Z]);
       exit(-1);
     }
     if(tmpint < 0){
@@ -250,9 +250,9 @@ void read_geometry(char *patch_filename,struct med **medium,
 	    i,90.0-alpha,(*fault+i)->dip,(*fault+i)->sin_alpha,
 	    (*fault+i)->cos_alpha,sin_dip,cos_dip);
     fprintf(stderr," vec: s: (%10.3e,%10.3e,%10.3e) d: (%10.3e,%10.3e,%10.3e) n: (%10.3e,%10.3e,%10.3e)\n",
-	    (*fault+i)->t_strike[X],(*fault+i)->t_strike[Y],(*fault+i)->t_strike[Z],
-	    (*fault+i)->t_dip[X],(*fault+i)->t_dip[Y],(*fault+i)->t_dip[Z],
-	    (*fault+i)->normal[X],(*fault+i)->normal[Y],(*fault+i)->normal[Z]);
+	    (*fault+i)->t_strike[INT_X],(*fault+i)->t_strike[INT_Y],(*fault+i)->t_strike[INT_Z],
+	    (*fault+i)->t_dip[INT_X],(*fault+i)->t_dip[INT_Y],(*fault+i)->t_dip[INT_Z],
+	    (*fault+i)->normal[INT_X],(*fault+i)->normal[INT_Y],(*fault+i)->normal[INT_Z]);
 #endif
 #ifdef ALLOW_NON_3DQUAD_GEOM
     if((*fault+i)->type != TRIANGULAR){
@@ -266,19 +266,19 @@ void read_geometry(char *patch_filename,struct med **medium,
 #endif
       for(j=0;j<jlim;j++){
 	// check depth alignment
-	if(corner[j][Z] > eps_for_z){
+	if(corner[j][INT_Z] > eps_for_z){
 	  fprintf(stderr,"read_geometry: patch %i, corner %i above surface, z: %20.10e (eps: %g)\n",
-		  i,j,corner[j][Z],eps_for_z);
-	  fprintf(stderr,"z: %g w: %g dip: %g\n",(*fault+i)->x[Z],(*fault+i)->w,(*fault+i)->dip);
+		  i,j,corner[j][INT_Z],eps_for_z);
+	  fprintf(stderr,"z: %g w: %g dip: %g\n",(*fault+i)->x[INT_Z],(*fault+i)->w,(*fault+i)->dip);
 	  fprintf(stderr,"read_geometry: exiting\n");
 	  exit(-1);
 	}
 #ifdef ALLOW_NON_3DQUAD_GEOM
 	if((*fault+i)->type == TWO_DIM_HALFPLANE_PLANE_STRAIN){
 	  /* check if segment is sticking out into the air */
-	  if((corner[0][Y] > 0 )||(corner[1][Y] > 0)){
+	  if((corner[0][INT_Y] > 0 )||(corner[1][INT_Y] > 0)){
 	    fprintf(stderr,"read_geometry: error, half-plane segment %i endpoints: %g,%g and %g,%g\n",
-		    i,corner[0][X] ,corner[0][Y],corner[1][X] ,corner[1][Y]);
+		    i,corner[0][INT_X] ,corner[0][INT_Y],corner[1][INT_X] ,corner[1][INT_Y]);
 	    exit(-1);
 	  }
 	}
@@ -381,8 +381,8 @@ void read_geometry(char *patch_filename,struct med **medium,
   if((*medium)->nrflt<=(*medium)->max_nr_flt_files)
     for(i=0;i<(*medium)->nrflt;i++)
       fprintf(stderr,"read_geometry: fault %4i: x: (%9.6g, %9.6g, %9.6g) strike: %6.2f dip: %6.2f half_length: %6.3g aspect: %9.6g\n",
-	      i,(*fault+i)->x[X],(*fault+i)->x[Y],
-	      (*fault+i)->x[Z],(*fault+i)->strike,(*fault+i)->dip,(*fault+i)->l,
+	      i,(*fault+i)->x[INT_X],(*fault+i)->x[INT_Y],
+	      (*fault+i)->x[INT_Z],(*fault+i)->strike,(*fault+i)->dip,(*fault+i)->l,
 	      (*fault+i)->l/(*fault+i)->w);
   if(verbose){
     fprintf(stderr,"read_geometry: read in %i fault patch(es)\nread_geometry: half length: min/mean/max: %g/%g/%g\nread_geometry: half width:  min/mean/max: %g/%g/%g\n",

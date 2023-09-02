@@ -51,8 +51,8 @@ void read_stress_observations(struct bmd *mod,
   */
   npdim = 0;
   np6 = mod->mgd;
-  while(fscanf(in,"%lf %lf",(mod->sx+npdim+X),
-	       (mod->sx+npdim+Y)) == 2){
+  while(fscanf(in,"%lf %lf",(mod->sx+npdim+INT_X),
+	       (mod->sx+npdim+INT_Y)) == 2){
     for(i=0;i < 6;i++)		/* read in tensor */
       if(fscanf(in,"%lf",(mod->v+np6+i)) != 1){
 	fprintf(stderr,"read_stress_observations: read error\n");
@@ -146,14 +146,14 @@ void read_stress_observations(struct bmd *mod,
 	exit(-1);
       }
       if(dist_on_sphere_deg(lon,lat,
-			    *(mod->sx+i*BLOCK_DIM+X),
-			    *(mod->sx+i*BLOCK_DIM+Y))>
+			    *(mod->sx+i*BLOCK_DIM+INT_X),
+			    *(mod->sx+i*BLOCK_DIM+INT_Y))>
 	 1e-7){
 	fprintf(stderr,"read_stress_observations: read error stress.depth file\n");
 	fprintf(stderr,"read_stress_observations: location of entry %i: %g %g\n",
 		i+1,lon,lat);
 	fprintf(stderr,"read_stress_observations: location of stress observation %i: %g %g\n",
-		i+1,*(mod->sx+i*BLOCK_DIM+X),*(mod->sx+i*BLOCK_DIM+Y));
+		i+1,*(mod->sx+i*BLOCK_DIM+INT_X),*(mod->sx+i*BLOCK_DIM+INT_Y));
 	exit(-1);
       }
     }

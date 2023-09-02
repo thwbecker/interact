@@ -1,3 +1,4 @@
+#include "interact.h"
 #include "geoproject.h"
 
 /*
@@ -189,32 +190,32 @@ void geoproject(double *in, double *out, int projection,
 	 DO INVERSE TRANSFORMATION 
       */
       if (unit) {
-	in[X] *= u_scale;
-	in[Y] *= u_scale;
+	in[INT_X] *= u_scale;
+	in[INT_Y] *= u_scale;
       }
-      in[X] *= project_info.x_scale;
-      in[Y] *= project_info.y_scale;
-      in[X] += project_info.x0;
-      in[Y] += project_info.y0;
-      GMT_xy_to_geo (&out[X], &out[Y], in[X], in[Y]);
+      in[INT_X] *= project_info.x_scale;
+      in[INT_Y] *= project_info.y_scale;
+      in[INT_X] += project_info.x0;
+      in[INT_Y] += project_info.y0;
+      GMT_xy_to_geo (&out[INT_X], &out[INT_Y], in[INT_X], in[INT_Y]);
       // go to -180 ... 180 system
-      if(out[X]>180)
-	out[X] -= 360;
+      if(out[INT_X]>180)
+	out[INT_X] -= 360;
     } else {		
       /* 
 	 DO FORWARD TRANSFORMATION 
       */
-      GMT_geo_to_xy (in[X], in[Y], &out[X], &out[Y]);
-      out[X] -= project_info.x0;
-      out[Y] -= project_info.y0;
-      out[X] /= project_info.x_scale;
-      out[Y] /= project_info.y_scale;
+      GMT_geo_to_xy (in[INT_X], in[INT_Y], &out[INT_X], &out[INT_Y]);
+      out[INT_X] -= project_info.x0;
+      out[INT_Y] -= project_info.y0;
+      out[INT_X] /= project_info.x_scale;
+      out[INT_Y] /= project_info.y_scale;
       if (unit) {
-	out[X] *= u_scale;
-	out[Y] *= u_scale;
+	out[INT_X] *= u_scale;
+	out[INT_Y] *= u_scale;
       }
     }
-    out[Z] = in[Z];
+    out[INT_Z] = in[INT_Z];
   }else{
     myprojectsimple(in,out,lon,lat,azi,0); 
   }

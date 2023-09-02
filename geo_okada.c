@@ -63,7 +63,7 @@ int main(int argc, char **argv)
   //
   // input format is: lon lat z
   //
-  while(fscanf(stdin,"%lf %lf %lf",(x+X),(x+Y),(x+Z))==3){
+  while(fscanf(stdin,"%lf %lf %lf",(x+INT_X),(x+INT_Y),(x+INT_Z))==3){
     geoproject(x, px, FLT_ROT_PROJECTION, center[0], center[1], azi,
 	       dummy, dummy, dummy, dummy, (int)FALSE);
     //
@@ -84,13 +84,13 @@ int main(int argc, char **argv)
       //
       // geographic output of displacements in lon lat azi length format
       fprintf(out1,"%g %g %g %g\n",
-	      x[X],x[Y],vec_to_strike(u),hypot(u[X],u[Y]));
+	      x[INT_X],x[INT_Y],vec_to_strike(u),hypot(u[INT_X],u[INT_Y]));
       // cartesian output of displacements in projected frame
       fprintf(out2,"%g %g %g %g\n",
-	      px[X],px[Y],vec_to_strike(pu),hypot(pu[X],pu[Y]));
+	      px[INT_X],px[INT_Y],vec_to_strike(pu),hypot(pu[INT_X],pu[INT_Y]));
     }
     // output of lon lat ve vn to stdout
-    fprintf(stdout,"%g %g %g %g\n",x[X],x[Y],u[X],u[Y]);
+    fprintf(stdout,"%g %g %g %g\n",x[INT_X],x[INT_Y],u[INT_X],u[INT_Y]);
   }
   if(dxfout){
     fclose(out1);fclose(out2);

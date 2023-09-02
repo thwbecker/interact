@@ -113,7 +113,7 @@ int main(int argc, char **argv)
 	u[j] += fault[i].t_dip[j]    * fault[i].u[DIP];
 	u[j] += fault[i].normal[j]   * fault[i].u[NORMAL];
       }
-      printf("%g %g %g\n",u[X],u[Y],u[Z]);
+      printf("%g %g %g\n",u[INT_X],u[INT_Y],u[INT_Z]);
     }
 
   }

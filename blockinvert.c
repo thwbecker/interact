@@ -540,14 +540,14 @@ int main(int argc, char **argv)
   if(input_control){
     for(i=j=0;i < mod->nrgp;i++,j+=BLOCK_DIM)
       fprintf(stderr,"vel: %5i: x: %11g %11g px: %11g %11g v: %11g %11g sigv: %11g %11g rho: %11g bc: %3i %s\n",
-	      i+1,mod->gx[j+X], mod->gx[j+Y],mod->gpx[j+X], 
-	      mod->gpx[j+Y],mod->v[j+X],mod->v[j+Y],
-	      mod->sigv[j+X],mod->sigv[j+Y],
+	      i+1,mod->gx[j+INT_X], mod->gx[j+INT_Y],mod->gpx[j+INT_X], 
+	      mod->gpx[j+INT_Y],mod->v[j+INT_X],mod->v[j+INT_Y],
+	      mod->sigv[j+INT_X],mod->sigv[j+INT_Y],
 	      mod->rho[i],mod->bcode[j]+1,
 	      (mod->block[mod->bcode[j]].fixed)?("fixed"):(""));
     for(i=0,j=mod->mgd;i < mod->nrsp;i++,j+=6)
       fprintf(stderr,"str: %5i: x: %11g %11g sxx: %g (%g) sxy: %g (%g) sxz: %g (%g) syy: %g (%g) syz: %g (%g) szz: %g (%g)\n",
-	      i+1,*(mod->sx+i*BLOCK_DIM+X),*(mod->sx+i*BLOCK_DIM+Y),
+	      i+1,*(mod->sx+i*BLOCK_DIM+INT_X),*(mod->sx+i*BLOCK_DIM+INT_Y),
 	      mod->v[j],mod->sigv[j],mod->v[j+1],mod->sigv[j+1],mod->v[j+2],mod->sigv[j+2],mod->v[j+3],
 	      mod->sigv[j+3],mod->v[j+4],mod->sigv[j+4],mod->v[j+5],mod->sigv[j+5]);
   }
@@ -776,9 +776,9 @@ int main(int argc, char **argv)
 	   argv[0]);
     for(i=j=0;i < mod->nrb;i++,j+=BLOCK_NBASE){
       if(fscanf(stdin,"%lf %lf %lf %lf %lf %lf %lf %lf %lf",
-		(mod->xsol+j+X),(mod->sigma+j+X),
-		(mod->xsol+j+Y),(mod->sigma+j+Y),
-		(mod->xsol+j+Z),(mod->sigma+j+Z),
+		(mod->xsol+j+INT_X),(mod->sigma+j+INT_X),
+		(mod->xsol+j+INT_Y),(mod->sigma+j+INT_Y),
+		(mod->xsol+j+INT_Z),(mod->sigma+j+INT_Z),
 		&dummy,&dummy,&dummy) != 9){
 	fprintf(stderr,"%s: omega input read error\n",argv[0]);
 	exit(-1);
@@ -972,7 +972,7 @@ int main(int argc, char **argv)
 #endif
     /* 
 
-    END OF MATRIX ASSEMBLY PART, NOW SOLVE
+    END OF MATRIX ASSEMBLINT_Y PART, NOW SOLVE
 
     
     */

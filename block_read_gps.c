@@ -58,7 +58,7 @@ void read_gps_velocities(struct bmd *mod,struct prj *projection,
   // initialize 
   mod->nrgp = mod->nrb = 0;
   //
-  xcmean[X]=xcmean[Y]=xcmean[Z]=0.0;
+  xcmean[INT_X]=xcmean[INT_Y]=xcmean[INT_Z]=0.0;
   minlat = FLT_MAX;maxlat = FLT_MIN;
   //
   // input file
@@ -104,9 +104,9 @@ void read_gps_velocities(struct bmd *mod,struct prj *projection,
      start velocity input loop
   */
   while(fscanf(in,"%lf %lf %lf %lf %lf %lf %lf %i",
-	       (mod->gx+npdim+X),(mod->gx+npdim+Y), /* lon lat in degrees */
-	       (mod->v+npdim+X),(mod->v+npdim+Y), /* ve vn in mm/yr */
-	       (mod->sigv+npdim+X),(mod->sigv+npdim+Y),	/* uncertainties */
+	       (mod->gx+npdim+INT_X),(mod->gx+npdim+INT_Y), /* lon lat in degrees */
+	       (mod->v+npdim+INT_X),(mod->v+npdim+INT_Y), /* ve vn in mm/yr */
+	       (mod->sigv+npdim+INT_X),(mod->sigv+npdim+INT_Y),	/* uncertainties */
 	       (mod->rho+mod->nrgp),&loc_bcode) == 8){ /* rho (correlation) and 
 							  block code */
     /*
@@ -115,19 +115,19 @@ void read_gps_velocities(struct bmd *mod,struct prj *projection,
       mean, and for possible use in spherical calculation
       
     */
-    lonlat2xyz_deg(mod->gx[npdim+X],mod->gx[npdim+Y],(mod->gcx+3*mod->nrgp)); 
+    lonlat2xyz_deg(mod->gx[npdim+INT_X],mod->gx[npdim+INT_Y],(mod->gcx+3*mod->nrgp)); 
     add_b_to_a_vector_3d(xcmean,(mod->gcx+3*mod->nrgp)); /* add to mean */
-    if(mod->gx[npdim+Y] > maxlat)
-      maxlat = mod->gx[npdim+Y];
-    if(mod->gx[npdim+Y] < minlat)
-      minlat = mod->gx[npdim+Y];
+    if(mod->gx[npdim+INT_Y] > maxlat)
+      maxlat = mod->gx[npdim+INT_Y];
+    if(mod->gx[npdim+INT_Y] < minlat)
+      minlat = mod->gx[npdim+INT_Y];
     /*
       
       sigma uncertainties
       
     */
-    if((fabs(mod->sigv[npdim+X]) < EPS_COMP_PREC)||
-       (fabs(mod->sigv[npdim+Y]) < EPS_COMP_PREC)){
+    if((fabs(mod->sigv[npdim+INT_X]) < EPS_COMP_PREC)||
+       (fabs(mod->sigv[npdim+INT_Y]) < EPS_COMP_PREC)){
       fprintf(stderr,"%s: read_gps_velocities: error: at least one sigma value is zero\n",
 	      argv[0]);
       exit(-1);
@@ -311,12 +311,12 @@ void read_gps_velocities(struct bmd *mod,struct prj *projection,
 	      i+1,mod->fblock_sites[i*BLOCK_DIM+0],mod->fblock_sites[i*BLOCK_DIM+1]);
   }
   mod->changed_reference_frame = FALSE;	/* this might get reset below */
-  mod->omega_corr[X] = mod->omega_corr[Y] = mod->omega_corr[Z] = 0.0;
+  mod->omega_corr[INT_X] = mod->omega_corr[INT_Y] = mod->omega_corr[INT_Z] = 0.0;
   if(*remove_net_trans >= 0){		
     /* 
        
     FIND NET ROTATION FOR A SINGLE BLOCK AND REMOVE IT FROM THE
-    VELOCITY FIELD
+    VELOCITINT_Y FIELD
     
     */
     if(*remove_net_trans >= mod->nrb){
@@ -339,9 +339,9 @@ void read_gps_velocities(struct bmd *mod,struct prj *projection,
 			    TRUE,mod->select_fblock_sites, /* compute misfit */
 			    mod->fblock_sites,mod->fblock_nsites);
     fprintf(stderr,"%s: read_gps_velocities: removing best-fit omega: (%g, %g, %g) (deg/Myr) from block %c\n",
-	    argv[0],mod->omega_corr[X]/gfac,
-	    mod->omega_corr[Y]/gfac,
-	    mod->omega_corr[Z]/gfac,
+	    argv[0],mod->omega_corr[INT_X]/gfac,
+	    mod->omega_corr[INT_Y]/gfac,
+	    mod->omega_corr[INT_Z]/gfac,
 	    bname(*remove_net_trans));
     /* 
 
@@ -411,8 +411,8 @@ void read_gps_velocities(struct bmd *mod,struct prj *projection,
 			    mod->fblock_sites,mod->fblock_nsites);
     if(!remove_global_net_rotation){
       /* reset omega_corr */
-      mod->omega_corr[X] = mod->omega_corr[Y] =
-	mod->omega_corr[Z] = 0.0;
+      mod->omega_corr[INT_X] = mod->omega_corr[INT_Y] =
+	mod->omega_corr[INT_Z] = 0.0;
     }
 #else
     fprintf(stderr,"%s: read_gps_velocities: error, not implemented for cartesian\n",
@@ -469,7 +469,7 @@ void project_gps_coordinates(COMP_PRECISION *x, COMP_PRECISION *px,
 	  argv[0],projection->type,projection->clon,
 	  projection->clat,projection->azi,
 	  projection->lat1,projection->lat2);  
-  gin[Z] = 0.0;
+  gin[INT_Z] = 0.0;
   for(i=j=0;i < n;i++,j+=dim){
     /* 
        project lon lat to projected coordinates
@@ -495,7 +495,7 @@ void project_gps_coordinates(COMP_PRECISION *x, COMP_PRECISION *px,
     average the block centroid coordinate in cartesian
 
     */				/* gout gets reused */
-    lonlat2xyz(gin[X],gin[Y],gout);
+    lonlat2xyz(gin[INT_X],gin[INT_Y],gout);
     add_b_to_a_vector_3d(block[bcode[j]].center,gout);
   }
   for(i=0;i < nrb;i++)
@@ -515,7 +515,7 @@ void block_read_centroids(COMP_PRECISION **cx, int *nrb)
   in=myopen(BLOCK_CENTROID_FILE,"r");
   i=0;
   *cx=(COMP_PRECISION *)malloc(sizeof(COMP_PRECISION)*BLOCK_DIM);
-  while(fscanf(in,"%lf %lf",(*cx+BLOCK_DIM*i+X),(*cx+BLOCK_DIM*i+Y))==2){
+  while(fscanf(in,"%lf %lf",(*cx+BLOCK_DIM*i+INT_X),(*cx+BLOCK_DIM*i+INT_Y))==2){
     i++;
     *cx=(COMP_PRECISION *)
       realloc(*cx,sizeof(COMP_PRECISION)*BLOCK_DIM*(i+1));
@@ -611,9 +611,9 @@ void find_spherical_rotation(struct bmd *mod,int code,
 
       */
       nconstrained++;
-      aloc[0][0]=              0.0;aloc[0][1]=  mod->gcx[i*3+Z];aloc[0][2]= -mod->gcx[i*3+Y];
-      aloc[1][0]= -mod->gcx[i*3+Z];aloc[1][1]=              0.0;aloc[1][2]=  mod->gcx[i*3+X];
-      aloc[2][0]=  mod->gcx[i*3+Y];aloc[2][1]= -mod->gcx[i*3+X];aloc[2][2]=              0.0;
+      aloc[0][0]=              0.0;aloc[0][1]=  mod->gcx[i*3+INT_Z];aloc[0][2]= -mod->gcx[i*3+INT_Y];
+      aloc[1][0]= -mod->gcx[i*3+INT_Z];aloc[1][1]=              0.0;aloc[1][2]=  mod->gcx[i*3+INT_X];
+      aloc[2][0]=  mod->gcx[i*3+INT_Y];aloc[2][1]= -mod->gcx[i*3+INT_X];aloc[2][2]=              0.0;
       //print_matrix_C(&aloc[0][0],3,3,stderr,FALSE);fprintf(stderr,"\n");
       my_vecrealloc(&a,(m+3)*n,"a loc");my_vecrealloc(&b,(m+3),"b loc");
       my_vecrealloc(&aorig,(m+3)*n,"aorig loc");my_vecrealloc(&borig,(m+3),"borig loc");
@@ -675,14 +675,14 @@ void find_spherical_rotation(struct bmd *mod,int code,
       (code >= 0)?(sprintf(cstring,"%c",bname(code))):(sprintf(cstring,"%2i",code));
       if(use_model_vel)
 	fprintf(stderr,"fsr: model w: %6.3f, %6.3f, %6.3f (deg/Myr) lon lat r: %8.3f %8.3f %6.3f (%3i pts, bn: %s) %s %s\n",
-		reformat_small(omega[X]/gfac),reformat_small(omega[Y]/gfac),
-		reformat_small(omega[Z]/gfac),lon,lat,reformat_small(mag),m/3,cstring,
+		reformat_small(omega[INT_X]/gfac),reformat_small(omega[INT_Y]/gfac),
+		reformat_small(omega[INT_Z]/gfac),lon,lat,reformat_small(mag),m/3,cstring,
 		(code < 0)?("global"):(""),
 		(mod->changed_reference_frame)?("mod. RF"):("orig. RF"));
       else
 	fprintf(stderr,"fsr: input w: %6.3f, %6.3f, %6.3f (deg/Myr) lon lat r: %8.3f %8.3f %6.3f (%3i pts, bs: %s) %s %s\n",
-		reformat_small(omega[X]/gfac),reformat_small(omega[Y]/gfac),
-		reformat_small(omega[Z]/gfac),lon,lat,reformat_small(mag),m/3,cstring,
+		reformat_small(omega[INT_X]/gfac),reformat_small(omega[INT_Y]/gfac),
+		reformat_small(omega[INT_Z]/gfac),lon,lat,reformat_small(mag),m/3,cstring,
 		(code < 0)?("global"):(""),
 		(mod->changed_reference_frame)?("mod. RF"):("orig. RF"));
     }
@@ -710,9 +710,9 @@ void find_spherical_rotation(struct bmd *mod,int code,
       
       */
       for(i=j=0;i<m;i+=3,j++){
-	a[    i*3+0]=  0.0;            a[    i*3+1]=  mod->gcx[j*3+Z];a[    i*3+2]= -mod->gcx[j*3+Y];
-	a[(i+1)*3+0]= -mod->gcx[j*3+Z];a[(i+1)*3+1]=  0.0;            a[(i+1)*3+2]=  mod->gcx[j*3+X];
-	a[(i+2)*3+0]=  mod->gcx[j*3+Y];a[(i+2)*3+1]= -mod->gcx[j*3+X];a[(i+2)*3+2]=  0.0;
+	a[    i*3+0]=  0.0;            a[    i*3+1]=  mod->gcx[j*3+INT_Z];a[    i*3+2]= -mod->gcx[j*3+INT_Y];
+	a[(i+1)*3+0]= -mod->gcx[j*3+INT_Z];a[(i+1)*3+1]=  0.0;            a[(i+1)*3+2]=  mod->gcx[j*3+INT_X];
+	a[(i+2)*3+0]=  mod->gcx[j*3+INT_Y];a[(i+2)*3+1]= -mod->gcx[j*3+INT_X];a[(i+2)*3+2]=  0.0;
       }
       /* flip */
       for(i=0;i<m;i++)
@@ -730,7 +730,7 @@ void find_spherical_rotation(struct bmd *mod,int code,
 	   remove the best-fit net rotation velocity field 
 	*/
 	fprintf(stderr,"find_spherical_rotation: WARNING: removing rotation component of (%g, %g, %g)\n",
-		omega[X]/gfac,omega[Y]/gfac,omega[Z]/gfac);
+		omega[INT_X]/gfac,omega[INT_Y]/gfac,omega[INT_Z]/gfac);
 	remove_cvel_from_vel(mod, loc_vc, m);
 #ifdef DEBUG
 	/* 
@@ -748,9 +748,9 @@ void find_spherical_rotation(struct bmd *mod,int code,
 	for(i=j=0;i < mod->nrgp;i++,j+=BLOCK_DIM){
 	  cv2pv((loc_vc+i*3),vp, (mod->pbase+i*9));
 	  fprintf(out,"%12g %12g %12g %12g %12g %12g %12g\n",
-		  mod->gx[j+X],mod->gx[j+Y],
-		  vp[PHI],-vp[THETA],mod->sigv[j+X], 
-		  mod->sigv[j+Y],mod->rho[i]);
+		  mod->gx[j+INT_X],mod->gx[j+INT_Y],
+		  vp[INT_PHI],-vp[INT_THETA],mod->sigv[j+INT_X], 
+		  mod->sigv[j+INT_Y],mod->rho[i]);
 	}
 	fclose(out);
 #endif	
@@ -775,7 +775,7 @@ void init_gps_pbase(struct bmd *mod)
   my_vecrealloc(&mod->pbase,9*mod->nrgp,"init_gps_pbase 1");
   for(i=0;i<mod->nrgp;i++){
     // spherical basis vectors
-    calculate_polar_base(mod->gx[i*BLOCK_DIM+X],mod->gx[i*BLOCK_DIM+Y],
+    calculate_polar_base(mod->gx[i*BLOCK_DIM+INT_X],mod->gx[i*BLOCK_DIM+INT_Y],
 			 (mod->pbase+i*9));
   }
   mod->pbase_init = TRUE;
@@ -804,8 +804,8 @@ void init_cart_gps_velsig(struct bmd *mod,my_boolean use_model)
       /* convert the velocities and uncertainties to cartesian 
 	 vectors */
       // velocities
-      xp[R] = 0.0;xp[THETA] = -mod->vmod[i*BLOCK_DIM+Y];
-      xp[PHI]=mod->vmod[i*BLOCK_DIM+X];
+      xp[INT_R] = 0.0;xp[INT_THETA] = -mod->vmod[i*BLOCK_DIM+INT_Y];
+      xp[INT_PHI]=mod->vmod[i*BLOCK_DIM+INT_X];
       pv2cv(xp,(mod->vmodc+i*3),(mod->pbase+i*9));
     }
     mod->cvelmod_init = TRUE;
@@ -818,9 +818,9 @@ void init_cart_gps_velsig(struct bmd *mod,my_boolean use_model)
     my_vecrealloc(&mod->sigvc,3*mod->nrgp,"init_cart_gps_velsig 2");
     my_vecrealloc(&mod->vc,3*mod->nrgp,"init_cart_gps_velsig 1");
     for(i=0;i<mod->nrgp;i++){
-      xp[R] = 0.0;
-      xp[THETA] = -mod->v[i*BLOCK_DIM+Y]; /* south */
-      xp[PHI]=mod->v[i*BLOCK_DIM+X]; /* west */
+      xp[INT_R] = 0.0;
+      xp[INT_THETA] = -mod->v[i*BLOCK_DIM+INT_Y]; /* south */
+      xp[INT_PHI]=mod->v[i*BLOCK_DIM+INT_X]; /* west */
       pv2cv(xp,(mod->vc+i*3),(mod->pbase+i*9));
       convert_sig_p2c((mod->sigv+i*BLOCK_DIM),(mod->sigvc+i*3),
 		      (mod->pbase+i*9));
@@ -851,8 +851,8 @@ void calculate_c2p_gps(COMP_PRECISION *vc, COMP_PRECISION *vp,
   my_vecrealloc(&mod->v,BLOCK_DIM * mod->nrgp,"calc_c2p");
   for(i=0;i<mod->nrgp;i++){
     cv2pv((vc+i*3),xp, (mod->pbase+i*9));
-    vp[i*BLOCK_DIM+X] =  xp[PHI];  /* v_West */
-    vp[i*BLOCK_DIM+Y] = -xp[THETA];	/* v_North */
+    vp[i*BLOCK_DIM+INT_X] =  xp[INT_PHI];  /* v_West */
+    vp[i*BLOCK_DIM+INT_Y] = -xp[INT_THETA];	/* v_North */
   }
 }
 /*
@@ -867,11 +867,11 @@ void convert_sig_p2c(COMP_PRECISION *vsig,COMP_PRECISION *vsigx,
 {
   COMP_PRECISION xp[3];
   int i;
-  xp[THETA] = -vsig[Y];
-  xp[PHI]   =  vsig[X];
+  xp[INT_THETA] = -vsig[INT_Y];
+  xp[INT_PHI]   =  vsig[INT_X];
   /* this turns out to be a well behaved solution */
-  xp[R]     = (vsig[X]+vsig[Y])/2.0;
-  //xp[R] = hypot(vsig[X],vsig[Y]); /* that's OK, too */
+  xp[INT_R]     = (vsig[INT_X]+vsig[INT_Y])/2.0;
+  //xp[R] = hypot(vsig[INT_X],vsig[INT_Y]); /* that's OK, too */
   pv2cv(xp,vsigx,pbase);
   for(i=0;i<3;i++){
     if(vsigx[i] < 0)

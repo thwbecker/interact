@@ -151,15 +151,15 @@ int main(int argc, char **argv)
 	icnt=0;
 	tmpdbl = fault[i].w * sin_dip;
 	do{
-	  assign_random(&fault[i].x[Z],z0,z1,dz,&seed,random_mode);
+	  assign_random(&fault[i].x[INT_Z],z0,z1,dz,&seed,random_mode);
 	  icnt++;
-	}while((fault[i].x[Z]  + tmpdbl > 0) && (icnt < iclim));
+	}while((fault[i].x[INT_Z]  + tmpdbl > 0) && (icnt < iclim));
 	if(icnt == iclim){
 	  fprintf(stderr,"%s: reached iteration limit of %i in fault depth assignment loop\n",
 		  argv[0],iclim);
 	  fprintf(stderr,"%s: w: %g dip: %g z0: %g dz: %g\n",argv[0],fault[i].w,fault[i].dip,
 		  z0,dz);
-	  fprintf(stderr,"%s: ztop: %g\n",argv[0],fault[i].x[Z]  + tmpdbl);
+	  fprintf(stderr,"%s: ztop: %g\n",argv[0],fault[i].x[INT_Z]  + tmpdbl);
 	  exit(-1);
 	}
 	asp = -1;
@@ -181,16 +181,16 @@ int main(int argc, char **argv)
 	iclim = 10000;
 	icnt=0;
 	do{
-	  assign_random(&fault[i].x[Z],z0,z1,dz,&seed,random_mode);
+	  assign_random(&fault[i].x[INT_Z],z0,z1,dz,&seed,random_mode);
 	  asp = -1;
 	  while(asp <= 0)
 	    assign_random(&asp,aspect0,aspect1,daspect,&seed,random_mode);
 	  fault[i].w = sqrt(fault[i].area/(4.*asp));
 	  tmpdbl = fault[i].w * sin_dip;
-	  //fprintf(stderr,"%g a: %g %g %g\n",fault[i].w,asp,fault[i].x[Z],sin_dip);
+	  //fprintf(stderr,"%g a: %g %g %g\n",fault[i].w,asp,fault[i].x[INT_Z],sin_dip);
 	  icnt++;
-	}while(((fault[i].x[Z] + tmpdbl > 0 )||
-		(fault[i].w > (MAX_SEIS_DEPTH+fault[i].x[Z])/sin_dip))
+	}while(((fault[i].x[INT_Z] + tmpdbl > 0 )||
+		(fault[i].w > (MAX_SEIS_DEPTH+fault[i].x[INT_Z])/sin_dip))
 	       &&(icnt < iclim));
 	if(icnt == iclim){
 	  fprintf(stderr,"%s: -gra reached iteration limit of %i in fault depth assignment loop\n",
@@ -205,8 +205,8 @@ int main(int argc, char **argv)
       fault[i].area = fault[i].l * fault[i].w * 4.0;
 
 
-      assign_random(&fault[i].x[X],x0,x1,dx,&seed,random_mode);
-      assign_random(&fault[i].x[Y],y0,y1,dy,&seed,random_mode);
+      assign_random(&fault[i].x[INT_X],x0,x1,dx,&seed,random_mode);
+      assign_random(&fault[i].x[INT_Y],y0,y1,dy,&seed,random_mode);
 
      
       if(!hit){

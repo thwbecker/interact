@@ -53,8 +53,9 @@ int main(int argc, char **args)
   PetscCallMPI(MPI_Comm_size(PETSC_COMM_WORLD, &comm_size));
   PetscCallMPI(MPI_Comm_rank(PETSC_COMM_WORLD, &comm_rank));
 
-  m = 5000;
-  n = 5000;
+  //m = n = 5000;
+  m = n = 100;
+  //n = 5000;
   
   PetscCall(PetscOptionsGetInt(NULL, NULL, "-assemble_type", &assemble_type, NULL));
   
@@ -187,6 +188,7 @@ int main(int argc, char **args)
   PetscCall(PCFactorSetMatSolverType(pc, MATSOLVERPETSC));
   //PetscCall(PCFactorSetMatSolverType(pc, MATSOLVERUMFPACK));
   //PetscCall(PCFactorSetMatSolverType(pc, MATSOLVERSUPERLU_DIST));
+  //PetscCall(PCFactorSetMatSolverType(pc, MATSOLVERELEMENTAL));
   //PetscCall(PCFactorSetMatSolverType(pc, MATSOLVERMUMPS));
 
   PetscCall(KSPSetFromOptions(ksp));

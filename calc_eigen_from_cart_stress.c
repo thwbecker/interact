@@ -33,9 +33,9 @@ int main(int argc, char **argv)
     }
   }
   while(fscanf(stdin,NINE_CP_FORMAT,&x,&y,&z,
-	       &sm[X][X],&sm[X][Y],&sm[X][Z],
-	       &sm[Y][Y],&sm[Y][Z],&sm[Z][Z])==9){
-    sm[Y][X] = sm[X][Y];sm[Z][X] = sm[X][Z];sm[Z][Y] = sm[Y][Z];
+	       &sm[INT_X][INT_X],&sm[INT_X][INT_Y],&sm[INT_X][INT_Z],
+	       &sm[INT_Y][INT_Y],&sm[INT_Y][INT_Z],&sm[INT_Z][INT_Z])==9){
+    sm[INT_Y][INT_X] = sm[INT_X][INT_Y];sm[INT_Z][INT_X] = sm[INT_X][INT_Z];sm[INT_Z][INT_Y] = sm[INT_Y][INT_Z];
     // calculate eigenvalues
     eigensystem3d(sm,eval,evec);
     fprintf(stdout,"%g %g %g\t\t",x,y,z);
@@ -44,12 +44,12 @@ int main(int argc, char **argv)
 	vec_to_angles((evec+i*3),&dip,&strike);
 	fprintf(stdout,"%g %g %g       \t\t",eval[i],strike,dip);
       }else{
-	if((z_unity)&&(fabs(evec[i*3+Z])>EPS_COMP_PREC))
+	if((z_unity)&&(fabs(evec[i*3+INT_Z])>EPS_COMP_PREC))
 	  fprintf(stdout,"%g %9.6f %9.6f %9.6f\t\t",
-		  eval[i],evec[i*3+X]/evec[i*3+Z],evec[i*3+Y]/evec[i*3+Z],1.0);
+		  eval[i],evec[i*3+INT_X]/evec[i*3+INT_Z],evec[i*3+INT_Y]/evec[i*3+INT_Z],1.0);
 	else
 	  fprintf(stdout,"%g %9.6f %9.6f %9.6f\t\t",
-		  eval[i],evec[i*3+X],evec[i*3+Y],evec[i*3+Z]);
+		  eval[i],evec[i*3+INT_X],evec[i*3+INT_Y],evec[i*3+INT_Z]);
       }
     }
     fprintf(stdout,"\n");

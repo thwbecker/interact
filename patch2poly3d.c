@@ -122,9 +122,9 @@ int main(int argc, char **argv)
     printf("*------- --- ----- ---------- ---------- --------- ------ ------ ------ ------ ------ ------ --- --- ---\n");
     printf("OGrid  %i  ds  global  global  global  %g %g %g %g %g %g %i %i %i\n\n",
 	   dim,
-	   medium->pxmin[X], medium->pxmin[Y],  medium->pxmin[Z],
-	   medium->pxmax[X], medium->pxmax[Y],  medium->pxmax[Z],
-	   medium->n[X],medium->n[Y],medium->n[Z]);
+	   medium->pxmin[INT_X], medium->pxmin[INT_Y],  medium->pxmin[INT_Z],
+	   medium->pxmax[INT_X], medium->pxmax[INT_Y],  medium->pxmax[INT_Z],
+	   medium->n[INT_X],medium->n[INT_Y],medium->n[INT_Z]);
 	   
 	   
 
@@ -171,13 +171,13 @@ int main(int argc, char **argv)
 	    printf("* element %6i from patch %6i group %3i\n",
 		   ecnt,j,i);
 	    printf("v g%03if%06ia global %24.15e %24.15e %24.15e\n",
-		   i,j,corner[0][X],corner[0][Y],corner[0][Z]);
+		   i,j,corner[0][INT_X],corner[0][INT_Y],corner[0][INT_Z]);
 	    printf("v g%03if%06ib global %24.15e %24.15e %24.15e\n",
-		   i,j,corner[1][X],corner[1][Y],corner[1][Z]);
+		   i,j,corner[1][INT_X],corner[1][INT_Y],corner[1][INT_Z]);
 	    printf("v g%03if%06ic global %24.15e %24.15e %24.15e\n",
-		   i,j,corner[2][X],corner[2][Y],corner[2][Z]);
+		   i,j,corner[2][INT_X],corner[2][INT_Y],corner[2][INT_Z]);
 	    printf("v g%03if%06id global %24.15e %24.15e %24.15e\n",
-		   i,j,corner[3][X],corner[3][Y],corner[3][Z]);
+		   i,j,corner[3][INT_X],corner[3][INT_Y],corner[3][INT_Z]);
 	    
 	    /* elements
 	       e nrnd csys btype bval1 bval2 bval3 nnd1 nnd2 nnd3 ...
@@ -201,11 +201,11 @@ int main(int argc, char **argv)
 	    printf("* element %6i from patch %6i group %3i, triangle one\n",
 		   ecnt,j,i);
 	    printf("v g%03if%06ia global %24.15e %24.15e %24.15e\n",
-		   i,j,corner[0][X],corner[0][Y],corner[0][Z]);
+		   i,j,corner[0][INT_X],corner[0][INT_Y],corner[0][INT_Z]);
 	    printf("v g%03if%06ib global %24.15e %24.15e %24.15e\n",
-		   i,j,corner[1][X],corner[1][Y],corner[1][Z]);
+		   i,j,corner[1][INT_X],corner[1][INT_Y],corner[1][INT_Z]);
 	    printf("v g%03if%06ic global %24.15e %24.15e %24.15e\n",
-		   i,j,corner[2][X],corner[2][Y],corner[2][Z]);
+		   i,j,corner[2][INT_X],corner[2][INT_Y],corner[2][INT_Z]);
 	    sprintf(bcstring,"%1s%1s%1s %15.8e %15.8e %15.8e",
 		    (slip_type_bc(fault[i].mode[DIP]))?("b"):("t"),
 		    (slip_type_bc(fault[i].mode[STRIKE]))?("b"):("t"),
@@ -220,11 +220,11 @@ int main(int argc, char **argv)
 	    printf("* element %6i from patch %6i group %3i, triangle two\n",
 		   ecnt,j,i);
 	    printf("v g%03if%06ia global %24.15e %24.15e %24.15e\n",
-		   i,j,corner[0][X],corner[0][Y],corner[0][Z]);
+		   i,j,corner[0][INT_X],corner[0][INT_Y],corner[0][INT_Z]);
 	    printf("v g%03if%06ic global %24.15e %24.15e %24.15e\n",
-		   i,j,corner[2][X],corner[2][Y],corner[2][Z]);
+		   i,j,corner[2][INT_X],corner[2][INT_Y],corner[2][INT_Z]);
 	    printf("v g%03if%06id global %24.15e %24.15e %24.15e\n",
-		   i,j,corner[3][X],corner[3][Y],corner[3][Z]);
+		   i,j,corner[3][INT_X],corner[3][INT_Y],corner[3][INT_Z]);
 	    sprintf(bcstring,"%1s%1s%1s %15.8e %15.8e %15.8e",
 		    (slip_type_bc(fault[i].mode[DIP]))?("b"):("t"),
 		    (slip_type_bc(fault[i].mode[STRIKE]))?("b"):("t"),
@@ -253,13 +253,13 @@ int main(int argc, char **argv)
 	printf("* element %6i from patch %6i group %3i\n",
 	       ecnt,j,i);
 	printf("v g%03if%06ia global %24.15e %24.15e %24.15e\n",
-	       i,j,corner[0][X],corner[0][Y],corner[0][Z]);
+	       i,j,corner[0][INT_X],corner[0][INT_Y],corner[0][INT_Z]);
 	printf("v g%03if%06ib global %24.15e %24.15e %24.15e\n",
-	       i,j,corner[1][X],corner[1][Y],corner[1][Z]);
+	       i,j,corner[1][INT_X],corner[1][INT_Y],corner[1][INT_Z]);
 	printf("v g%03if%06ic global %24.15e %24.15e %24.15e\n",
-	       i,j,corner[2][X],corner[2][Y],corner[2][Z]);
+	       i,j,corner[2][INT_X],corner[2][INT_Y],corner[2][INT_Z]);
 	printf("v g%03if%06id global %24.15e %24.15e %24.15e\n",
-	       i,j,corner[3][X],corner[3][Y],corner[3][Z]);
+	       i,j,corner[3][INT_X],corner[3][INT_Y],corner[3][INT_Z]);
 	
 	/* elements
 	   e nrnd csys btype bval1 bval2 bval3 nnd1 nnd2 nnd3 ...

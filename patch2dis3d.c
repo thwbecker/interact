@@ -63,12 +63,12 @@ int main(int argc, char **argv)
 	     FALSE,FALSE,PRESSURE_DEF,FALSE,FALSE,FALSE,TRUE,FALSE,FALSE,
 	     SVD_THRESHOLD,FALSE);
   /* check output options for conformity */
-  if((medium->n[X] <= 1) || medium->n[Y] <= 1){
+  if((medium->n[INT_X] <= 1) || medium->n[INT_Y] <= 1){
     fprintf(stderr,"%s: error nx and ny have to be > 1 \n",
 	    argv[0]);
     exit(-1);
   }
-  if(medium->n[Z]!=1){
+  if(medium->n[INT_Z]!=1){
     fprintf(stderr,"%s: error, nz has to be unity, i.e. plane output\n",
 	    argv[0]);
     exit(-1);
@@ -125,7 +125,7 @@ int main(int argc, char **argv)
   printf("START\nautomatically produced by %s\n",argv[0]);
   /* major parameters */
   printf("CPARM\n%i %i %i %i %g %g %g\n",
-	 medium->n[X]*medium->n[Y]*medium->n[Z],
+	 medium->n[INT_X]*medium->n[INT_Y]*medium->n[INT_Z],
 	 nup,nsp,nup+nsp,POISSON_NU, SHEAR_MODULUS,
 	 STATIC_MU);
   printf("ITER\n1000 0.00001 1.0 1\nREMOTE\n1\n");
@@ -145,7 +145,7 @@ int main(int argc, char **argv)
 	printf("FP1\n");
 	plabel=TRUE;
       }
-      get_dis3d_parameters(fault[i].x[X],fault[i].x[Y],fault[i].x[Z], 
+      get_dis3d_parameters(fault[i].x[INT_X],fault[i].x[INT_Y],fault[i].x[INT_Z], 
 			   (COMP_PRECISION)fault[i].w,(COMP_PRECISION)fault[i].dip,
 			   (COMP_PRECISION)fault[i].strike,&xd,&yd,&w1,&w2);
 
@@ -179,7 +179,7 @@ int main(int argc, char **argv)
 	printf("FP3\n");
 	plabel=TRUE;
       }
-      get_dis3d_parameters(fault[i].x[X],fault[i].x[Y],fault[i].x[Z], 
+      get_dis3d_parameters(fault[i].x[INT_X],fault[i].x[INT_Y],fault[i].x[INT_Z], 
 			   (COMP_PRECISION)fault[i].w,(COMP_PRECISION)fault[i].dip,
 			   (COMP_PRECISION)fault[i].strike,&xd,&yd,&w1,&w2);
       /*
@@ -239,13 +239,13 @@ int main(int argc, char **argv)
   }
   printf("PRINT\nCO3\nLL\n");
   printf("%g %g %i %g %g %i %g\n",
-	 medium->pxmin[X],(medium->pxmax[X]-medium->pxmin[X])/
-	 (COMP_PRECISION)(medium->n[X]-1),
-	 medium->n[X],
-	 medium->pxmin[Y],(medium->pxmax[Y]-medium->pxmin[Y])/
-	 (COMP_PRECISION)(medium->n[Y]-1),
-	 medium->n[Y],
-	 medium->pxmin[Z]);
+	 medium->pxmin[INT_X],(medium->pxmax[INT_X]-medium->pxmin[INT_X])/
+	 (COMP_PRECISION)(medium->n[INT_X]-1),
+	 medium->n[INT_X],
+	 medium->pxmin[INT_Y],(medium->pxmax[INT_Y]-medium->pxmin[INT_Y])/
+	 (COMP_PRECISION)(medium->n[INT_Y]-1),
+	 medium->n[INT_Y],
+	 medium->pxmin[INT_Z]);
   printf("DISP\nPRINT\nSTRESS\nPRINT\nSTOP\n");
 
   exit(0);

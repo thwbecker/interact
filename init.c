@@ -600,7 +600,7 @@ void read_stress_fac(my_boolean read_stress_relation_factors,COMP_PRECISION *a,
   }
   // default location to evaluate stress
   // (doesn't matter if stress is homogeneous)
-  x[X] = x[Y] = x[Z] = 0.0;
+  x[INT_X] = x[INT_Y] = x[INT_Z] = 0.0;
   if(bpressure != 0.0){
 #ifdef HYDROSTATIC_PRESSURE
     fprintf(stderr,"read_stress_fac: to this a depth dependent background pressure of %g will be added\n",
@@ -612,26 +612,27 @@ void read_stress_fac(my_boolean read_stress_relation_factors,COMP_PRECISION *a,
   }
   // stress at time t=0
   fprintf(stderr,"read_stress_fac: at x:(%10.3e, %10.3e, %10.3e) and time t: 0\n",
-	  x[X],x[Y],x[Z]);
+	  x[INT_X],x[INT_Y],x[INT_Z]);
   background_stress(sm,x,0.0,a,b,bpressure);
   fprintf(stderr,"read_stress_fac: stress matrix: ((%10.3e,%10.3e,%10.3e),\n",
-	  sm[X][X],sm[X][Y],sm[X][Z]);
+	  sm[INT_X][INT_X],sm[INT_X][INT_Y],sm[INT_X][INT_Z]);
   fprintf(stderr,"read_stress_fac: stress matrix:  (%10.3e,%10.3e,%10.3e),\n",
-	  sm[Y][X],sm[Y][Y],sm[Y][Z]);	 
+	  sm[INT_Y][INT_X],sm[INT_Y][INT_Y],sm[INT_Y][INT_Z]);	 
   fprintf(stderr,"read_stress_fac: stress matrix:  (%10.3e,%10.3e,%10.3e))\n",
-	  sm[Z][X],sm[Z][Y],sm[Z][Z]);
+	  sm[INT_Z][INT_X],sm[INT_Z][INT_Y],sm[INT_Z][INT_Z]);
   // deviatoric
   calc_deviatoric_stress(sm,dm,&loc_pressure,&s2);
   fprintf(stderr,"read_stress_fac: dev. stress vec: (%10.3e, %10.3e, %10.3e, %10.3e, %10.3e, %10.3e) pressure: %10.3e sII: %10.3e\n",
-	  dm[X][X],dm[X][Y],dm[X][Z],
-	  dm[Y][Y],dm[Y][Z],dm[Z][Z],loc_pressure,s2);
+	  dm[INT_X][INT_X],dm[INT_X][INT_Y],dm[INT_X][INT_Z],
+	  dm[INT_Y][INT_Y],dm[INT_Y][INT_Z],dm[INT_Z][INT_Z],loc_pressure,s2);
 
   // stress at time t=1
   background_stress(sm,x,1.0,a,b,bpressure);
   calc_deviatoric_stress(sm,dm,&loc_pressure,&s2);
-  fprintf(stderr,"read_stress_fac: at x:(%10.3e, %10.3e, %10.3e) and time t: 1\n",x[X],x[Y],x[Z]);
+  fprintf(stderr,"read_stress_fac: at x:(%10.3e, %10.3e, %10.3e) and time t: 1\n",x[INT_X],x[INT_Y],x[INT_Z]);
   fprintf(stderr,"read_stress_fac: dev. stress vec: (%10.3e, %10.3e, %10.3e, %10.3e, %10.3e, %10.3e) pressure: %10.3e sII: %10.3e\n",
-	  dm[X][X],dm[X][Y],dm[X][Z],dm[Y][Y],dm[Y][Z],dm[Z][Z],loc_pressure,s2);
+	  dm[INT_X][INT_X],dm[INT_X][INT_Y],dm[INT_X][INT_Z],dm[INT_Y][INT_Y],dm[INT_Y][INT_Z],dm[INT_Z][INT_Z],
+	  loc_pressure,s2);
 
   if(fabs(loc_pressure) < EPS_COMP_PREC)
     fprintf(stderr,"read_stress_fac: WARNING: total background pressure is zero\n");

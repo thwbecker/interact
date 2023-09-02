@@ -1,6 +1,5 @@
 #
 # LINUX system dependent flags
-# $Id: makefile.i686,v 1.4 2001/08/18 15:51:59 becker Exp becker $
 #
 # CONSTANTS
 #
@@ -15,7 +14,7 @@
 MACHINE_DEFINES = -DIMAT_SPARSE_LIM=8000.0 \
 	-DIMAT_SIZE_LIM=4000.1  \
 	-DSGI_SUBROUTINE_CONVENTION -DSUN_TRIG_FUNCTIONS
-#	-DSGI_SUBROUTINE_CONVENTION -DNO_LAPACK3
+#	-DSGI_SUBROUTINE_CONVENTION 
 
 #
 # LINUX system dependent flags for gcc
@@ -23,13 +22,14 @@ MACHINE_DEFINES = -DIMAT_SPARSE_LIM=8000.0 \
 #
 # compilers
 CC = gcc
+MPICC = mpicc
 F77 = /usr/bin/gfortran
 LD = $(F77)
+MPILD = mpif77
 AR = ar
 # set the compiler flag for library directories
 # usually -L, could be -Wl,-L as for HPUX
 MY_LIBDIR_SPEC = -L
-
 
 
 USE_IPO = 
@@ -40,7 +40,7 @@ USE_IPO =
 LDFLAGS = 
 
 # X 11 only needed for PGPLOT
-X11LIBDIR = /usr/X11R6/lib/
+X11LIBDIR = /usr/lib/x86_64-linux-gnu/
 #
 MATHLIB = -lm
 #
@@ -48,10 +48,11 @@ MATHLIB = -lm
 GCCWOPT = -Wall 
 #-Werror
 
+# this may be overridden 
 # fast execution options, comment out if debug output is wanted
-#SCARGS = -O3 -pipe  -funroll-loops -ffast-math -fomit-frame-pointer $(GCCWOPT)  $(MACHINE_DEFINES)
-#SCARGS = -Ofast $(GCCWOPT)  $(MACHINE_DEFINES)
-SCARGS = -O3 $(GCCWOPT)  $(MACHINE_DEFINES) 
+#SCARGS = -O3 -pipe  -funroll-loops -ffast-math -fomit-frame-pointer $(GCCWOPT)
+#SCARGS = -Ofast $(GCCWOPT)
+SCARGS = -O3 $(GCCWOPT)  
 
 
 DEBUG_LIBS = 
@@ -74,9 +75,6 @@ SFARGS = $(SCARGS) -ffixed-line-length-132  -fmax-errors=0 -x f77-cpp-input
 SFARGSSAVE = $(SFARGS)
 #
 # BLAS
-#BLASLIB =  -llapack -lblas -lg2c
-#BLASLIB -L/usr/local/src/atlas_Linux_HAMMER64SSE2/lib/ -llapack -lcblas -lf77blas -latlas
-#BLASLIB = -L/opt/acml2.5.0/gnu64/lib/ -lacml
 BLASLIB =  $(MATHLIBS)
 
 COMPUTATIONAL_LIBS = $(BLASLIB)
@@ -85,6 +83,10 @@ COMPUTATIONAL_LIBS = $(BLASLIB)
 EISPACK_DIR = eispack/
 # file installed?
 EISPACK_LIB = -L$(EISPACK_DIR)/ -lmyeis
+
+#
+# Petsc
+#PETSC_DIR = $(HOME)/progs/src/petsc/arch-linux-c-opt/
 
 
 # name of interact binary depending on compiler flags

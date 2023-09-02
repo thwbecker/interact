@@ -71,7 +71,7 @@ int main(int argc, char **argv)
   
   if(n==1){
     /* single fault for debugging */
-    fault[0].x[X] = fault[0].x[Y] = fault[0].x[Z] = 0.0;
+    fault[0].x[INT_X] = fault[0].x[INT_Y] = fault[0].x[INT_Z] = 0.0;
     fault[0].l = 2;
     fault[0].w = 0;
     fault[0].strike = 0;
@@ -92,9 +92,9 @@ int main(int argc, char **argv)
       /* 
 	 location 
       */
-      assign_random(&fault[i].x[X],fxmin,fxmean,fxrange,&seed,random_mode);
-      assign_random(&fault[i].x[Y],fxmin,fxmean,fxrange,&seed,random_mode);
-      fault[i].x[Z] = 0.0;
+      assign_random(&fault[i].x[INT_X],fxmin,fxmean,fxrange,&seed,random_mode);
+      assign_random(&fault[i].x[INT_Y],fxmin,fxmean,fxrange,&seed,random_mode);
+      fault[i].x[INT_Z] = 0.0;
       /* 
        strike 
       */
@@ -117,11 +117,11 @@ int main(int argc, char **argv)
   evaluate stress
 
   */
-  x[Z] = 0.0;
-  for(i=0,x[Y]=ymin;i<ny;i++,x[Y]+=dy){	/* y loop */
-    for(j=0,x[X]=xmin;j<nx;j++,x[X]+=dx){ /* x loop */
+  x[INT_Z] = 0.0;
+  for(i=0,x[INT_Y]=ymin;i<ny;i++,x[INT_Y]+=dy){	/* y loop */
+    for(j=0,x[INT_X]=xmin;j<nx;j++,x[INT_X]+=dx){ /* x loop */
       /* init the important stress componenents */
-      s[X][X] = s[X][Y] = s[Y][Y] = 0.0;
+      s[INT_X][INT_X] = s[INT_X][INT_Y] = s[INT_Y][INT_Y] = 0.0;
       for(k=0;k < n;k++){		
 	/* 
 	   sum over faults 
@@ -130,17 +130,17 @@ int main(int argc, char **argv)
 	eval_2dsegment_plane_strain(x,(fault+k),fault[k].u,ul,sl,&err);
 	if(!err){
 	  /* non-infinite, add only three components */
-	  s[X][X] += sl[X][X];
-	  s[X][Y] += sl[X][Y];
-	  s[Y][Y] += sl[Y][Y];
+	  s[INT_X][INT_X] += sl[INT_X][INT_X];
+	  s[INT_X][INT_Y] += sl[INT_X][INT_Y];
+	  s[INT_Y][INT_Y] += sl[INT_Y][INT_Y];
 	}else{
 	  fprintf(stderr,"%s: solution infinite at location x,y: %g, %g, fault %i\n",
-		  argv[0],x[X],x[Y],k+1);
+		  argv[0],x[INT_X],x[INT_Y],k+1);
 	}
       }	/* end fault loop */
       /* output */
       fprintf(stdout,"%11g %11g\t%11g %11g %11g\n",
-	      x[X],x[Y],s[X][X],s[X][Y],s[Y][Y]);
+	      x[INT_X],x[INT_Y],s[INT_X][INT_X],s[INT_X][INT_Y],s[INT_Y][INT_Y]);
     }
   }
   free(fault);

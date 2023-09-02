@@ -36,8 +36,8 @@ int main(int argc, char **argv)
   medium->xoloc = (float *)malloc(sizeof(float)*2);
   in = myopen(argv[2],"r");
   while(fscanf(in,"%f %f",
-	       (medium->xoloc+medium->olocnr*2+X),
-	       (medium->xoloc+medium->olocnr*2+Y))==2){
+	       (medium->xoloc+medium->olocnr*2+INT_X),
+	       (medium->xoloc+medium->olocnr*2+INT_Y))==2){
     medium->olocnr++;
     medium->xoloc = (float *)realloc(medium->xoloc,sizeof(float)*(medium->olocnr+1)*2);
   }
@@ -49,7 +49,7 @@ int main(int argc, char **argv)
     /* print relative fault location */
     for(j=0;j < medium->nrflt;j++)
       fprintf(stderr,"%i x %11g y %11g z %11g l %11g w %11g\n",
-	      j+1,fault[j].x[X],fault[j].x[Y],fault[j].x[Z],fault[j].pos[X],fault[j].pos[Y]);
+	      j+1,fault[j].x[INT_X],fault[j].x[INT_Y],fault[j].x[INT_Z],fault[j].pos[INT_X],fault[j].pos[INT_Y]);
 
   }
   if(1){			/* do in memory, should be faster
@@ -63,10 +63,10 @@ int main(int argc, char **argv)
       opmode = 1;
     }
     slip_modes = abs(slip_modes);
-    x[Z] = 0;
+    x[INT_Z] = 0;
     for(i=0;i < medium->olocnr;i++){
-      x[X] = medium->xoloc[i*2+X];
-      x[Y] = medium->xoloc[i*2+Y];
+      x[INT_X] = medium->xoloc[i*2+INT_X];
+      x[INT_Y] = medium->xoloc[i*2+INT_Y];
       for(l=0;l < disp_dim;l++){
 	for(j=0;j < medium->nrflt;j++){
 	  for(k=0;k < slip_modes;k++){
@@ -112,12 +112,12 @@ void calc_design_matrix(struct med *medium,struct flt *fault,int disp_dim, int s
   medium->val = (I_MATRIX_PREC *)calloc(sizeof(I_MATRIX_PREC),n);
   if(!medium->val){fprintf(stderr," mem error, %i\n",n);exit(-1);}
 
-  x[Z] = 0;			/* always on surface */
+  x[INT_Z] = 0;			/* always on surface */
   disp[NORMAL]=0;		/* never normal slip */
   
   for(i=0;i < medium->olocnr;i++){
-    x[X] = medium->xoloc[i*2+X];
-    x[Y] = medium->xoloc[i*2+Y];
+    x[INT_X] = medium->xoloc[i*2+INT_X];
+    x[INT_Y] = medium->xoloc[i*2+INT_Y];
     for(j=0;j < medium->nrflt;j++){
       for(k=0;k < slip_modes;k++){
 	if(opmode == 1)

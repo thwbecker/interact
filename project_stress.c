@@ -72,11 +72,11 @@ int main(int argc, char **argv)
        s_strike s_dip s_normal
     */
    
-    while(fscanf(stdin,NINE_CP_FORMAT,&x,&y,&z,&sm[X][X],&sm[X][Y],&sm[X][Z],
-		 &sm[Y][Y],&sm[Y][Z],&sm[Z][Z])==9){
-      sm[Y][X] = sm[X][Y];
-      sm[Z][X] = sm[X][Z];
-      sm[Z][Y] = sm[Y][Z];
+    while(fscanf(stdin,NINE_CP_FORMAT,&x,&y,&z,&sm[INT_X][INT_X],&sm[INT_X][INT_Y],&sm[INT_X][INT_Z],
+		 &sm[INT_Y][INT_Y],&sm[INT_Y][INT_Z],&sm[INT_Z][INT_Z])==9){
+      sm[INT_Y][INT_X] = sm[INT_X][INT_Y];
+      sm[INT_Z][INT_X] = sm[INT_X][INT_Z];
+      sm[INT_Z][INT_Y] = sm[INT_Y][INT_Z];
       calc_three_stress_components(sm,fault->normal,fault->t_strike,
 				   fault->normal,fault->t_dip,&st,&sn,&sd);
 #ifdef PRINT_BASE_VECTORS
@@ -99,11 +99,11 @@ int main(int argc, char **argv)
       rake_vec[i]+= sr * fault->t_dip[i];
     } 
     while(fscanf(stdin,NINE_CP_FORMAT,
-		 &x,&y,&z,&sm[X][X],&sm[X][Y],&sm[X][Z],
-		 &sm[Y][Y],&sm[Y][Z],&sm[Z][Z])==9){
-      sm[Y][X]=sm[X][Y];
-      sm[Z][X]=sm[X][Z];
-      sm[Z][Y]=sm[Y][Z];
+		 &x,&y,&z,&sm[INT_X][INT_X],&sm[INT_X][INT_Y],&sm[INT_X][INT_Z],
+		 &sm[INT_Y][INT_Y],&sm[INT_Y][INT_Z],&sm[INT_Z][INT_Z])==9){
+      sm[INT_Y][INT_X]=sm[INT_X][INT_Y];
+      sm[INT_Z][INT_X]=sm[INT_X][INT_Z];
+      sm[INT_Z][INT_Y]=sm[INT_Y][INT_Z];
       resolve_force(fault->normal,sm,trac);
       st = project_vector(trac,rake_vec);
       sn = project_vector(trac,fault->normal);

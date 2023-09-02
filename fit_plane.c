@@ -140,18 +140,18 @@ void fit_plane(int n,
     exit(-1);
   }
 #endif
-  dip   = RAD2DEGF(acos(p[6+Z]));
-  alpha = RAD2DEGF(atan2(-p[6+X],p[6+Y]));
+  dip   = RAD2DEGF(acos(p[6+INT_Z]));
+  alpha = RAD2DEGF(atan2(-p[6+INT_X],p[6+INT_Y]));
   my_sincos_deg(sin_alpha,cos_alpha,(COMP_PRECISION)alpha);
   my_sincos_deg(&sin_dip,&cos_dip,(COMP_PRECISION)dip);
   if(dip != 0.0){// check which sign of dip we need
     if(*sin_alpha != 0.0){ // can we use sin_alha to check sign?
-      if((p[6+X]/(*sin_alpha))/sin_dip < 0){// should be positive
+      if((p[6+INT_X]/(*sin_alpha))/sin_dip < 0){// should be positive
 	dip = -dip;
 	sin_dip= -sin_dip;
       }
     }else{// have to use n_y and cos_alpga, should be negative
-      if((p[6+Y]/(*cos_alpha))/sin_dip > 0){
+      if((p[6+INT_Y]/(*cos_alpha))/sin_dip > 0){
 	dip = -dip;
 	sin_dip= -sin_dip;
       }
@@ -227,8 +227,8 @@ void points2patch(struct flt *fault,COMP_PRECISION *xq,
 #endif
   /*
     fprintf(stderr,"before: x: %g %g %g; %g %g %g; %g %g %g; %g %g %g\n",
-    xq[X],xq[Y],xq[Z], xq[X+3],xq[Y+3],xq[Z+3], xq[X+6],xq[Y+6],xq[Z+6], 
-    xq[X+9],xq[Y+9],xq[Z+9]);
+    xq[INT_X],xq[INT_Y],xq[INT_Z], xq[INT_X+3],xq[INT_Y+3],xq[INT_Z+3], xq[INT_X+6],xq[INT_Y+6],xq[INT_Z+6], 
+    xq[INT_X+9],xq[INT_Y+9],xq[INT_Z+9]);
   */
   // fit to plane and calculate g and h vectors
   fit_plane(4,xq,fault->t_strike,fault->t_dip,fault->normal,

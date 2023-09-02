@@ -21,10 +21,10 @@ void calc_lhemi_proj(COMP_PRECISION dip, COMP_PRECISION strike,
 {
   COMP_PRECISION plunge,sinpl,cospl;
   plunge= (90.0-dip) * DEG2RAD;
-  x[Z]  = sin((PIHALF-plunge)/2.0);
+  x[INT_Z]  = sin((PIHALF-plunge)/2.0);
   my_sincos_deg(&sinpl,&cospl,90.0+strike);
-  x[X] = x[Z] * sinpl;
-  x[Y] = x[Z] * cospl;
+  x[INT_X] = x[INT_Z] * sinpl;
+  x[INT_Y] = x[INT_Z] * cospl;
 }
 
 /* 
@@ -68,17 +68,17 @@ void calc_base_vecs(COMP_PRECISION *strike,COMP_PRECISION *normal,
 {
   /* tangential vector in strike direction, by definition 
      this vector is in the x-y plane */
-  strike[X]=  cos_alpha;
-  strike[Y]=  sin_alpha;
-  strike[Z]=  0.0;
+  strike[INT_X]=  cos_alpha;
+  strike[INT_Y]=  sin_alpha;
+  strike[INT_Z]=  0.0;
   /* normal vector on fault plane */
-  normal[X]=   sin_alpha * sin_dip;
-  normal[Y]=  -cos_alpha * sin_dip;
-  normal[Z]=   cos_dip;
+  normal[INT_X]=   sin_alpha * sin_dip;
+  normal[INT_Y]=  -cos_alpha * sin_dip;
+  normal[INT_Z]=   cos_dip;
   /* tangential vector in dip direction */
-  dip[X]=  -sin_alpha * cos_dip;
-  dip[Y]=   cos_alpha * cos_dip;
-  dip[Z]=   sin_dip;
+  dip[INT_X]=  -sin_alpha * cos_dip;
+  dip[INT_Y]=   cos_alpha * cos_dip;
+  dip[INT_Z]=   sin_dip;
 }
 
 /*
@@ -301,7 +301,7 @@ void calculate_seg_corners(COMP_PRECISION corner[4][3],struct flt *fault,
     // lower right
     corner[1][i]=fault->x[i]+sx;
   }
-  corner[0][Z] = corner[1][Z] = 0.0;
+  corner[0][INT_Z] = corner[1][INT_Z] = 0.0;
 }
 
 /*
@@ -374,12 +374,12 @@ void get_gh_tri_vec(COMP_PRECISION *xt,// 3 points in FE ordering
 		    COMP_PRECISION *gvec,// output
 		    COMP_PRECISION *hvec)// output
 {
-  gvec[X]=xt[3+X]-xt[ +X];
-  gvec[Y]=xt[3+Y]-xt[ +Y];
-  gvec[Z]=xt[3+Z]-xt[ +Z];
-  hvec[X]=xt[6+X]-xt[ +X];
-  hvec[Y]=xt[6+Y]-xt[ +Y];
-  hvec[Z]=xt[6+Z]-xt[ +Z];
+  gvec[INT_X]=xt[3+INT_X]-xt[ +INT_X];
+  gvec[INT_Y]=xt[3+INT_Y]-xt[ +INT_Y];
+  gvec[INT_Z]=xt[3+INT_Z]-xt[ +INT_Z];
+  hvec[INT_X]=xt[6+INT_X]-xt[ +INT_X];
+  hvec[INT_Y]=xt[6+INT_Y]-xt[ +INT_Y];
+  hvec[INT_Z]=xt[6+INT_Z]-xt[ +INT_Z];
 }
 
 /*
@@ -410,9 +410,9 @@ void get_gh_quad_vec(COMP_PRECISION *xq,// four points in FE ordering
   c_eq_a_plus_b_3d(b,(xq+9),(xq+6));scale_vector_3d(b,0.5);
   c_eq_a_minus_b_3d(gvec,a,xc);
   c_eq_a_minus_b_3d(hvec,b,xc);
-  if(fabs(gvec[Z])>fabs(hvec[Z])) // dip should indicate depth
+  if(fabs(gvec[INT_Z])>fabs(hvec[INT_Z])) // dip should indicate depth
     swap_ab_vector_3d(gvec,hvec);
-  else if(gvec[Z] == hvec[Z]){// in plane
+  else if(gvec[INT_Z] == hvec[INT_Z]){// in plane
     if(fabs(vec_to_strike(hvec)) > fabs(vec_to_strike(gvec)))
       swap_ab_vector_3d(gvec,hvec);
   }
@@ -427,34 +427,34 @@ my_boolean check_planar(COMP_PRECISION *x)
 {
   COMP_PRECISION vec[4][3],normal[3];
   static COMP_PRECISION eps=EPS_COMP_PREC * 1000.0;
-  c_eq_a_minus_b_3d(&vec[0][X],(x+3+X),(x+X));// get vectors along the edges
-  c_eq_a_minus_b_3d(&vec[1][X],(x+6+X),(x+3+X));
-  c_eq_a_minus_b_3d(&vec[2][X],(x+9+X),(x+6+X));
-  c_eq_a_minus_b_3d(&vec[3][X],(x+X),(x+9+X));
-  cross_product(&vec[0][X],&vec[1][X],normal);
-  if((project_vector(&vec[2][X],normal) > eps)||
-     (project_vector(&vec[2][X],normal) > eps)){
+  c_eq_a_minus_b_3d(&vec[0][INT_X],(x+3+INT_X),(x+INT_X));// get vectors along the edges
+  c_eq_a_minus_b_3d(&vec[1][INT_X],(x+6+INT_X),(x+3+INT_X));
+  c_eq_a_minus_b_3d(&vec[2][INT_X],(x+9+INT_X),(x+6+INT_X));
+  c_eq_a_minus_b_3d(&vec[3][INT_X],(x+INT_X),(x+9+INT_X));
+  cross_product(&vec[0][INT_X],&vec[1][INT_X],normal);
+  if((project_vector(&vec[2][INT_X],normal) > eps)||
+     (project_vector(&vec[2][INT_X],normal) > eps)){
     /* 
        fprintf(stderr,"check_planar: rectangular element points possibly not on plane\n");
        fprintf(stderr,"check_planar: points: %g %g %g; %g %g %g; %g %g %g; %g %g %g\n",
-       x[X],x[Y],x[Z], x[X+3],x[Y+3],x[Z+3], x[X+6],x[Y+6],x[Z+6], 
-       x[X+9],x[Y+9],x[Z+9]);
+       x[INT_X],x[INT_Y],x[INT_Z], x[INT_X+3],x[INT_Y+3],x[INT_Z+3], x[INT_X+6],x[INT_Y+6],x[INT_Z+6], 
+       x[INT_X+9],x[INT_Y+9],x[INT_Z+9]);
     */
     return(FALSE);
   }
   // check right angles
-  if((fabs(project_vector(&vec[0][X],&vec[1][X])) > eps)||
-     (fabs(project_vector(&vec[1][X],&vec[2][X])) > eps)||
-     (fabs(project_vector(&vec[2][X],&vec[3][X])) > eps)){
+  if((fabs(project_vector(&vec[0][INT_X],&vec[1][INT_X])) > eps)||
+     (fabs(project_vector(&vec[1][INT_X],&vec[2][INT_X])) > eps)||
+     (fabs(project_vector(&vec[2][INT_X],&vec[3][INT_X])) > eps)){
     /*
       fprintf(stderr,"check_planar: rectangular element points possibly not all 90 degree angles\n");
       fprintf(stderr,"check_planar: points: %g %g %g; %g %g %g; %g %g %g; %g %g %g\n",
-      x[X],x[Y],x[Z], x[X+3],x[Y+3],x[Z+3], x[X+6],x[Y+6],x[Z+6], 
-      x[X+9],x[Y+9],x[Z+9]);
+      x[INT_X],x[INT_Y],x[INT_Z], x[INT_X+3],x[INT_Y+3],x[INT_Z+3], x[INT_X+6],x[INT_Y+6],x[INT_Z+6], 
+      x[INT_X+9],x[INT_Y+9],x[INT_Z+9]);
       fprintf(stderr,"check_planar: dotps: 01: %g 12: %g 23: %g\n",
-      project_vector(&vec[0][X],&vec[1][X]),
-      project_vector(&vec[1][X],&vec[2][X]),
-      project_vector(&vec[2][X],&vec[3][X]));
+      project_vector(&vec[0][INT_X],&vec[1][INT_X]),
+      project_vector(&vec[1][INT_X],&vec[2][INT_X]),
+      project_vector(&vec[2][INT_X],&vec[3][INT_X]));
     */
     return(FALSE);
   }
@@ -474,24 +474,24 @@ void get_alpha_dip_tri_gh(COMP_PRECISION *xt,COMP_PRECISION *sin_alpha,
   COMP_PRECISION normal[3],nl,alpha,gvec[3],hvec[3];
   int i;
   get_gh_tri_vec(xt,gvec,hvec);
-  //fprintf(stderr,"g: %g %g %g\n",gvec[X],gvec[Y],gvec[Z]);
-  //fprintf(stderr,"h: %g %g %g\n",hvec[X],hvec[Y],hvec[Z]);
+  //fprintf(stderr,"g: %g %g %g\n",gvec[INT_X],gvec[INT_Y],gvec[INT_Z]);
+  //fprintf(stderr,"h: %g %g %g\n",hvec[INT_X],hvec[INT_Y],hvec[INT_Z]);
   cross_product(gvec,hvec,normal);
-  //fprintf(stderr,"n: %g %g %g\n",normal[X],normal[Y],normal[Z]);
+  //fprintf(stderr,"n: %g %g %g\n",normal[INT_X],normal[INT_Y],normal[INT_Z]);
   nl=norm_3d(normal);
   if(nl == 0.0){
     fprintf(stderr,"get_alpha_dip_tri_gh: triangle degenerate:\n");
     for(i=0;i<3;i++)
       fprintf(stderr,"%i: x: %g y: %g z: %g\n",i+1,
-	      xt[i*3+X],xt[i*3+Y],xt[i*3+Z]);
+	      xt[i*3+INT_X],xt[i*3+INT_Y],xt[i*3+INT_Z]);
     exit(-1);
   }
   *area= nl/2.0;
-  //normal[X]/=nl; not needed
-  normal[Y]/=nl;
-  normal[Z]/=nl;
-  *dip= acos(normal[Z]);
-  alpha=acos(normal[Y]);
+  //normal[INT_X]/=nl; not needed
+  normal[INT_Y]/=nl;
+  normal[INT_Z]/=nl;
+  *dip= acos(normal[INT_Z]);
+  alpha=acos(normal[INT_Y]);
   // might have to check for bounds
   check_angles(dip,&alpha);
   my_sincos(sin_alpha,cos_alpha,(COMP_PRECISION)alpha);
@@ -574,14 +574,14 @@ void calc_group_geometry(struct med *medium,struct flt *fault,
   for(i=0;i<medium->nrflt;i++){
 #ifdef ATZ_NATZ_VOODOO_GNATZ
     fprintf(stderr,"mx: %g %g %g ms: %g %g %g md: %g %g %g P: %6.3f %6.3f\n",
-	    grp[fault[i].group].center[X],grp[fault[i].group].center[Y],
-	    grp[fault[i].group].center[Z],
-	    grp[fault[i].group].strike_vec[X],
-	    grp[fault[i].group].strike_vec[Y],
-	    grp[fault[i].group].strike_vec[Z],
-	    grp[fault[i].group].dip_vec[X],
-	    grp[fault[i].group].dip_vec[Y],
-	    grp[fault[i].group].dip_vec[Z],
+	    grp[fault[i].group].center[INT_X],grp[fault[i].group].center[INT_Y],
+	    grp[fault[i].group].center[INT_Z],
+	    grp[fault[i].group].strike_vec[INT_X],
+	    grp[fault[i].group].strike_vec[INT_Y],
+	    grp[fault[i].group].strike_vec[INT_Z],
+	    grp[fault[i].group].dip_vec[INT_X],
+	    grp[fault[i].group].dip_vec[INT_Y],
+	    grp[fault[i].group].dip_vec[INT_Z],
 	    fault[i].pos[STRIKE]/dist_max,fault[i].pos[DIP]/dist_max);
 #endif
     // determine actual extent of corners of patch
@@ -647,23 +647,23 @@ void angles_to_vec(COMP_PRECISION dip, COMP_PRECISION strike, COMP_PRECISION *x)
   my_sincos_deg(&sin_dip,&cos_dip,dip);
   my_sincos_deg(&sin_strike,&cos_strike,strike);
 
-  x[X] = cos_dip * sin_strike;
-  x[Y] = cos_dip * cos_strike;
-  x[Z] = sin_dip;
+  x[INT_X] = cos_dip * sin_strike;
+  x[INT_Y] = cos_dip * cos_strike;
+  x[INT_Z] = sin_dip;
 }
 /*
   determine the strike angle in degree from any given 3D vector
 */
 COMP_PRECISION vec_to_strike(COMP_PRECISION *x)
 {
-  return(atan2(x[X],x[Y])*RAD2DEG);
+  return(atan2(x[INT_X],x[INT_Y])*RAD2DEG);
 }
 /*
   determine the dip angle in degree from any given 3D vector
 */
 COMP_PRECISION vec_to_dip(COMP_PRECISION *x)
 {
-  return(atan2(x[Z],hypot(x[X],x[Y]))*RAD2DEG);
+  return(atan2(x[INT_Z],hypot(x[INT_X],x[INT_Y]))*RAD2DEG);
 }
 /* 
    check for the dip being between 0 and 90 degrees
@@ -711,9 +711,9 @@ void globalx(COMP_PRECISION *xt, COMP_PRECISION g,COMP_PRECISION h,
 {
   COMP_PRECISION tmp;
   tmp=1.0-g-h;
-  x[X] = tmp * xt[X] + g * xt[3+X] + h * xt[6+X];
-  x[Y] = tmp * xt[Y] + g * xt[3+Y] + h * xt[6+Y];
-  x[Z] = tmp * xt[Z] + g * xt[3+Z] + h * xt[6+Z];
+  x[INT_X] = tmp * xt[INT_X] + g * xt[3+INT_X] + h * xt[6+INT_X];
+  x[INT_Y] = tmp * xt[INT_Y] + g * xt[3+INT_Y] + h * xt[6+INT_Y];
+  x[INT_Z] = tmp * xt[INT_Z] + g * xt[3+INT_Z] + h * xt[6+INT_Z];
 }
 //
 // determines the centroid of a triangular element
@@ -721,9 +721,9 @@ void globalx(COMP_PRECISION *xt, COMP_PRECISION g,COMP_PRECISION h,
 // output is xc
 void calc_centroid_tri(COMP_PRECISION *xt,COMP_PRECISION *xc)
 {
-  xc[X] = (xt[  +X] + xt[3+X] + xt[6+X])/3.0;
-  xc[Y] = (xt[  +Y] + xt[3+Y] + xt[6+Y])/3.0;
-  xc[Z] = (xt[  +Z] + xt[3+Z] + xt[6+Z])/3.0;
+  xc[INT_X] = (xt[  +INT_X] + xt[3+INT_X] + xt[6+INT_X])/3.0;
+  xc[INT_Y] = (xt[  +INT_Y] + xt[3+INT_Y] + xt[6+INT_Y])/3.0;
+  xc[INT_Z] = (xt[  +INT_Z] + xt[3+INT_Z] + xt[6+INT_Z])/3.0;
 }
 //
 // determines the mean coordinates of a rectangular element
@@ -731,9 +731,9 @@ void calc_centroid_tri(COMP_PRECISION *xt,COMP_PRECISION *xc)
 //
 void calc_mean_quad_coord(COMP_PRECISION *xq,COMP_PRECISION *xc)
 {
-  xc[X] = (xq[  +X] + xq[3+X] + xq[6+X] + xq[9+X])/4.0;
-  xc[Y] = (xq[  +Y] + xq[3+Y] + xq[6+Y] + xq[9+Y])/4.0;
-  xc[Z] = (xq[  +Z] + xq[3+Z] + xq[6+Z] + xq[9+Z])/4.0;
+  xc[INT_X] = (xq[  +INT_X] + xq[3+INT_X] + xq[6+INT_X] + xq[9+INT_X])/4.0;
+  xc[INT_Y] = (xq[  +INT_Y] + xq[3+INT_Y] + xq[6+INT_Y] + xq[9+INT_Y])/4.0;
+  xc[INT_Z] = (xq[  +INT_Z] + xq[3+INT_Z] + xq[6+INT_Z] + xq[9+INT_Z])/4.0;
 }
 /*
   
@@ -745,7 +745,7 @@ void calc_centroid_quad(COMP_PRECISION *xq, COMP_PRECISION *xc)
 {
   COMP_PRECISION area[2],xt[9],c[3];
   int i,j;
-  xc[X]=xc[Y]=xc[Z]=0.0;
+  xc[INT_X]=xc[INT_Y]=xc[INT_Z]=0.0;
   for(j=0;j<2;j++){// two triangles
     for(i=0;i<3;i++){
       xt[  i]=xq[(j==1?6:0)+i];

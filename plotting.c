@@ -100,14 +100,14 @@ void init_plot_window(struct med *medium, struct flt *fault)
     for(i=0;i<2;i++)
       range[i]= (medium->xmax[i] - medium->xmin[i])*0.05;
 
-    cpgenv(medium->xmin[X]-range[X], 
-	   medium->xmax[X]+range[X], 
-	   medium->xmin[Y]-range[X], 
-	   medium->xmax[Y]+range[Y], 1, 0);
+    cpgenv(medium->xmin[INT_X]-range[INT_X], 
+	   medium->xmax[INT_X]+range[INT_X], 
+	   medium->xmin[INT_Y]-range[INT_X], 
+	   medium->xmax[INT_Y]+range[INT_Y], 1, 0);
     cpglab("x", "y", "map view");
     /* determine position of time label */
-    medium->tloc[X]=((medium->xmax[X]+medium->xmin[X])/2.0);
-    medium->tloc[Y]=(medium->xmax[Y]+range[Y]*2);
+    medium->tloc[INT_X]=((medium->xmax[INT_X]+medium->xmin[INT_X])/2.0);
+    medium->tloc[INT_Y]=(medium->xmax[INT_Y]+range[INT_Y]*2);
     for(i=0;i<medium->nrflt;i++)
       plot_patch(i,medium, fault,1,medium->lw_def);
     /* write title */
@@ -121,7 +121,7 @@ void init_plot_window(struct med *medium, struct flt *fault)
        second window 
     */
     cpgslct(medium->x_window[1]);
-    cpgenv(medium->xmin[X], medium->xmax[X], 
+    cpgenv(medium->xmin[INT_X], medium->xmax[INT_X], 
 	   0.0, medium->stop_time, 0, 2);
     
     cpglab("x", "time", "x-t view");
@@ -172,7 +172,7 @@ void plot_time_label(struct med *medium,
   cpgqci(&oc);
   cpgsci(color);
   sprintf(tmpstr,"time=%10.5f",medium->x_plot_time);
-  cpgtext(medium->tloc[X],medium->tloc[Y],tmpstr);
+  cpgtext(medium->tloc[INT_X],medium->tloc[INT_Y],tmpstr);
   cpgsci(oc);
 }
 void plot_patch(int flt,struct med *medium, struct flt *fault,int color, int width)
@@ -181,10 +181,10 @@ void plot_patch(int flt,struct med *medium, struct flt *fault,int color, int wid
   /* determine geometry */
   cos_alpha=fault[flt].cos_alpha*fault[flt].l;
   sin_alpha=fault[flt].sin_alpha*fault[flt].l;
-  x[0]=fault[flt].x[X]+cos_alpha;
-  y[0]=fault[flt].x[Y]+sin_alpha;
-  x[1]=fault[flt].x[X]-cos_alpha;
-  y[1]=fault[flt].x[Y]-sin_alpha;
+  x[0]=fault[flt].x[INT_X]+cos_alpha;
+  y[0]=fault[flt].x[INT_Y]+sin_alpha;
+  x[1]=fault[flt].x[INT_X]-cos_alpha;
+  y[1]=fault[flt].x[INT_Y]-sin_alpha;
   /* draw patch */
   cpgsci(color);
   cpgslw(width);
@@ -200,8 +200,8 @@ void plot_projected_patch(int flt,struct med *medium, struct flt *fault,int colo
   y[1]=y[0]=y[0]+(float)medium->x_scroll_inc/2.0;
   /* x coordinates depend on fault */
   cos_alpha=fault[flt].cos_alpha * fault[flt].l;
-  x[0]=fault[flt].x[X]-cos_alpha;
-  x[1]=fault[flt].x[X]+cos_alpha;
+  x[0]=fault[flt].x[INT_X]-cos_alpha;
+  x[1]=fault[flt].x[INT_X]+cos_alpha;
   /* draw patch */
   cpgsci(color);
   cpgslw(width);

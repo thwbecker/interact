@@ -1,0 +1,28 @@
+# flags for PETSC support
+#
+
+PETSc.pc := $(PETSC_DIR)/$(PETSC_ARCH)/lib/pkgconfig/PETSc.pc
+
+# Additional libraries that support pkg-config can be added to the list of PACKAGES below.
+PACKAGES := $(PETSc.pc)
+
+CC := $(shell pkg-config --variable=ccompiler $(PACKAGES))
+CXX := $(shell pkg-config --variable=cxxcompiler $(PACKAGES))
+FC := $(shell pkg-config --variable=fcompiler $(PACKAGES))
+SCARGS_OTHER := $(shell pkg-config --cflags-only-other $(PACKAGES))
+SCARGS := $(shell pkg-config --variable=cflags_extra $(PACKAGES)) $(CFLAGS_OTHER)
+CXXFLAGS := $(shell pkg-config --variable=cxxflags_extra $(PACKAGES)) $(CFLAGS_OTHER)
+SFARGS := $(shell pkg-config --variable=fflags_extra $(PACKAGES))
+CPPFLAGS := $(shell pkg-config --cflags-only-I $(PACKAGES))
+PETSC_LDIR := $(shell pkg-config --libs-only-L --libs-only-other $(PACKAGES))
+PETSC_LDIR += $(patsubst -L%, $(shell pkg-config --variable=ldflag_rpath $(PACKAGES))%, $(shell pkg-config --libs-only-L $(PACKAGES)))
+PETSC_LIBADD := $(shell pkg-config --libs-only-l $(PACKAGES)) -lm
+
+
+PETSC_INCLUDES = -I$(PETSC_DIR)/include/ $(CPPFLAGS)
+#
+#
+PETSC_LIBS = -L$(PETSC_DIR)/lib/  $(PETSC_LDIR) $(PETSC_LIBADD) -lpetsc
+
+	
+
