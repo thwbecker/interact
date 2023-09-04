@@ -670,10 +670,18 @@ int par_assemble_a_matrix(int naflt,my_boolean *sma,int nreq,int *nameaf,
     see routine below for the logic of the stress assignments
   */
   PetscInt i,j,k,l,eqc1,eqc2,eqc2nreq,ip1,ip2;
-  PetscScalar cf,avalue,itmp;
+  PetscScalar cf,*avalues=NULL,itmp;
+  PetscInt *col_idx;
   int iret;
   fprintf(stderr,"par_assemble_a_matrix: core %03i/%03i: assigning row %5i to %i\n",
 	  medium->comm_rank,medium->comm_size,medium->rs,medium->re);
+
+  PetscCall(PetscCalloc(nreq*sizeof(PetscScalar), &avalues));
+  PetscCall(PetscCalloc(nreq*sizeof(PetscInt), &col_idx));
+  for (j=0; j < nreq; j++) {
+    col_idx[j] = j;
+  }
+
   
   // dimensions of A matrix (without b column)
   // m = n = nreq;
@@ -697,7 +705,6 @@ int par_assemble_a_matrix(int naflt,my_boolean *sma,int nreq,int *nameaf,
 	  
 	  for(l=0;l < 3;l++){
 	    if(sma[ip2+l]){// flip around matrix ordering
-	      
 	      if((eqc1 >= medium->rs)&&(eqc1 < medium->re)){
 		/* 
 		   actually compute
@@ -708,12 +715,12 @@ int par_assemble_a_matrix(int naflt,my_boolean *sma,int nreq,int *nameaf,
 			  (int)nameaf[i],(int)nameaf[k],(int)l,(int)j,cf);
 #endif
 		if(medium->no_interactions && (fault[i].group != fault[k].group)){
-		  avalue = 0;
+		  avalues[eqc2] = 0;
 		}else{
 		  //
 		  // calculate interaction coefficients right now
 		  //
-		  avalue = (PetscScalar)
+		  avalues[eqc2] = (PetscScalar)
 		    interaction_coefficient(nameaf[i],nameaf[k],l,j,fault,&iret);
 		  if(cf != 0.0){	/* coulomb addition */
 		    itmp=(PetscScalar)
@@ -723,20 +730,25 @@ int par_assemble_a_matrix(int naflt,my_boolean *sma,int nreq,int *nameaf,
 			      (int)nameaf[i],(int)nameaf[k],(int)l,(int)j);
 		      itmp=0.0;
 		    }
-		    avalue +=  itmp * cf;
+		    avalues[eqc2] +=  itmp * cf;
 		  }
 		}
-	   	PetscCall(MatSetValue(medium->pA, eqc1, eqc2, avalue, ADD_VALUES));
+	   	//PetscCall(MatSetValue(medium->pA, eqc1, eqc2, avalues[eqc2], ADD_VALUES));
 	      }
 	      eqc2++;
 	      eqc2nreq += nreq;
 	    }
 	  }
 	}
+	if((eqc1 >= medium->rs)&&(eqc1 < medium->re))
+	  PetscCall(MatSetValues(medium->pA, 1, &eqc1, nreq, col_idx, avalues, ADD_VALUES));
 	eqc1++; 
       }
     }
   }
+  PetscCall(PetscFree(col_idx));
+  PetscCall(PetscFree(avalues));
+  return(0);
 }
 
 #endif
