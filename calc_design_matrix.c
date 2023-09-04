@@ -16,6 +16,7 @@ int main(int argc, char **argv)
   int slip_modes=2;		/* 2: strike and dip 1: strike -1: dip */
   COMP_PRECISION u[3],sm[3][3],disp[3],x[3];
   int i,j,k,l,iret,opmode;
+  medium=(struct med *)calloc(1,sizeof(struct med)); /* init as zeros */
   if(argc<3)
     print_help_local2(argv[0],disp_dim,slip_modes);
   if(argc>3)

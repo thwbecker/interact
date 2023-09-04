@@ -25,35 +25,42 @@ void initialize_stress_state(struct flt *fault,struct med *medium,
     /* 
        resolve the loading function as incremental increase on faults 
     */
-    fprintf(stderr,"initialize_stress_state: assuming loading is linear with time\n");
+    HEADNODE{
+      fprintf(stderr,"initialize_stress_state: assuming loading is linear with time\n");
 #ifdef HYDROSTATIC_PRESSURE
-    fprintf(stderr,"initialize_stress_state: assuming hydrostatic pressure scales as %g/%g\n",
-	    medium->pressure,CHAR_FAULT_DIM);
+      fprintf(stderr,"initialize_stress_state: assuming hydrostatic pressure scales as %g/%g\n",
+	      medium->pressure,CHAR_FAULT_DIM);
 #else
-    fprintf(stderr,"initialize_stress_state: pressure is held constant at %g at all depths\n",
-	    medium->pressure);
+      fprintf(stderr,"initialize_stress_state: pressure is held constant at %g at all depths\n",
+	      medium->pressure);
 #endif
+    }
     if((medium->cohesion != 0.0) || (medium->cohesion!=COHESION_DEF))
-      fprintf(stderr,"initialize_stress_state: WARNING: the cohesion was set to %g\n",
-	      medium->cohesion);
+      HEADNODE
+	fprintf(stderr,"initialize_stress_state: WARNING: the cohesion was set to %g\n",
+		medium->cohesion);
     if(read_initial_fault_stress){
       in=fopen(FAULT_STRESS_INIT_FILE,"r");
-      if(in)
-	fprintf(stderr,"initialize_stress_state: WARNING: reading initial non-hydrostatic stresses for faults from \"%s\"\n",
-		FAULT_STRESS_INIT_FILE);
-      else{
-	fprintf(stderr,"initialize_stress_state: could not find initial stress file \"%s\", using homogeneous values\n",
-		FAULT_STRESS_INIT_FILE);
+      if(in){
+	HEADNODE
+	  fprintf(stderr,"initialize_stress_state: WARNING: reading initial non-hydrostatic stresses for faults from \"%s\"\n",
+		  FAULT_STRESS_INIT_FILE);
+      }else{
+	HEADNODE
+	  fprintf(stderr,"initialize_stress_state: could not find initial stress file \"%s\", using homogeneous values\n",
+		  FAULT_STRESS_INIT_FILE);
 	read_initial_fault_stress=FALSE;
       }
     }
 #ifdef DEBUG
-    fprintf(stderr,"initialize_stress_state: initial stresses (including hydrostatic part):\n");
+    HEADNODE
+      fprintf(stderr,"initialize_stress_state: initial stresses (including hydrostatic part):\n");
 #endif
     if(medium->variable_time_step)
       if(medium->dt0 != 1.0){
-	fprintf(stderr,"initialize_stress_state: error, for adjustable time step to work, need dt0=1 (%g)\n",
-		medium->dt0);
+	HEADNODE
+	  fprintf(stderr,"initialize_stress_state: error, for adjustable time step to work, need dt0=1 (%g)\n",
+		  medium->dt0);
 	exit(-1);
       }
     for(i=0;i<medium->nrflt;i++){
@@ -87,8 +94,9 @@ void initialize_stress_state(struct flt *fault,struct med *medium,
       // read in additional initial stress from file
       if(read_initial_fault_stress){
 	if(fscanf(in,THREE_CP_FORMAT,(as+STRIKE),(as+DIP),(as+NORMAL)) != 3){
-	  fprintf(stderr,"initialize_stress_state: could not read 3 components of init stress for fault %i\n",
-		  i+1);
+	  HEADNODE
+	    fprintf(stderr,"initialize_stress_state: could not read 3 components of init stress for fault %i\n",
+		    i+1);
 	  exit(-1);
 	}else{
 	  fault[i].s[STRIKE] += as[STRIKE];
@@ -98,20 +106,23 @@ void initialize_stress_state(struct flt *fault,struct med *medium,
       }
 #ifdef SUPER_DEBUG
       calc_absolute_shear_stress_and_inc(&abs_tau,&abs_tau1,i,fault);
-      fprintf(stderr,"s(t0): flt %5i: s: %25.16e d: %25.16e n: %25.16e C: %25.16e\n",
-	      i,fault[i].s[STRIKE],fault[i].s[DIP],fault[i].s[NORMAL],
-	      coulomb_stress(abs_tau,(COMP_PRECISION)fault[i].mu_s,
-			     fault[i].s[NORMAL],medium->cohesion));
-      fprintf(stderr,"s(t0+dt):         s: %25.16e d: %25.16e n: %25.16e C: %25.16e\n",
-	      fault[i].s[STRIKE]+fault[i].sinc[STRIKE],
-	      fault[i].s[DIP]   +fault[i].sinc[DIP],
-	      fault[i].s[NORMAL]+fault[i].sinc[NORMAL],
-	      coulomb_stress(abs_tau1,(COMP_PRECISION)fault[i].mu_s,
-			     fault[i].s[NORMAL]+fault[i].sinc[NORMAL],
-			     medium->cohesion));
+      HEADNODE{
+	fprintf(stderr,"s(t0): flt %5i: s: %25.16e d: %25.16e n: %25.16e C: %25.16e\n",
+		i,fault[i].s[STRIKE],fault[i].s[DIP],fault[i].s[NORMAL],
+		coulomb_stress(abs_tau,(COMP_PRECISION)fault[i].mu_s,
+			       fault[i].s[NORMAL],medium->cohesion));
+	fprintf(stderr,"s(t0+dt):         s: %25.16e d: %25.16e n: %25.16e C: %25.16e\n",
+		fault[i].s[STRIKE]+fault[i].sinc[STRIKE],
+		fault[i].s[DIP]   +fault[i].sinc[DIP],
+		fault[i].s[NORMAL]+fault[i].sinc[NORMAL],
+		coulomb_stress(abs_tau1,(COMP_PRECISION)fault[i].mu_s,
+			       fault[i].s[NORMAL]+fault[i].sinc[NORMAL],
+			       medium->cohesion));
+      }
       
       if(!FINITE_TEST(fault[i].s[STRIKE])|| !FINITE_TEST(fault[i].s[DIP]) || !FINITE_TEST(fault[i].s[NORMAL])){
-	fprintf(stderr,"initialize_stress_state: stresses not finite, error!\n");
+	HEADNODE
+	  fprintf(stderr,"initialize_stress_state: stresses not finite, error!\n");
 	exit(-1);
       }
 #endif
@@ -138,7 +149,8 @@ void update_stress_state(struct flt *fault,struct med *medium)
     */
 #ifdef DEBUG
     if(medium->dt != medium->dt0){
-      fprintf(stderr,"update_stress_state: expecting dt = dt0\n");
+      HEADNODE
+	fprintf(stderr,"update_stress_state: expecting dt = dt0\n");
       exit(-1);
     }
 #endif
@@ -156,7 +168,8 @@ void update_stress_state(struct flt *fault,struct med *medium)
     */
 #ifdef DEBUG
     if(medium->dt0 != 1.0){
-      fprintf(stderr,"update_stress_state: dt0 should be 1\n");
+      HEADNODE
+	fprintf(stderr,"update_stress_state: dt0 should be 1\n");
       exit(-1);
     }
 #endif 
@@ -194,27 +207,31 @@ void calc_fields(struct med *medium,struct flt *fault,
     //
     // check if we want a projection plane or 3d field
     fiddle_with_limits_for_plot(medium,&nz,&use_fault_plane,dx,FALSE);
-    fprintf(stderr,"calc_fields: calculating bulk stress and displacement fields...\n");
-    fprintf(stderr,"calc_fields: field dimensions: %i %i %i %i\n",
-	    nz,medium->n[INT_Y],medium->n[INT_X],6);
+    HEADNODE{
+      fprintf(stderr,"calc_fields: calculating bulk stress and displacement fields...\n");
+      fprintf(stderr,"calc_fields: field dimensions: %i %i %i %i\n",
+	      nz,medium->n[INT_Y],medium->n[INT_X],6);
+    }
   }
   if(medium->read_oloc_from_file){
     // output on xyz tripels as read from file
     medium->n[INT_X] = medium->n[INT_Y] = 1;
     medium->n[INT_Z] = nz = medium->olocnr;
-    fprintf(stderr,"calc_fields: calculating fields for %i spotted observations\n",
-	    medium->n[INT_Z]);
+    HEADNODE
+      fprintf(stderr,"calc_fields: calculating fields for %i spotted observations\n",
+	      medium->n[INT_Z]);
   }
   nxy = medium->n[INT_X] * medium->n[INT_Y];
   if(!(nz*nxy)){
-    fprintf(stderr,"calc_fields: bound of stress/displacement array error: nz %i nxy %i\n",
-	    nz,nxy);
+    HEADNODE
+      fprintf(stderr,"calc_fields: bound of stress/displacement array error: nz %i nxy %i\n",
+	      nz,nxy);
     exit(-1);
   }
   if((medium->s=(float *)calloc(nz*nxy*6,sizeof(float)))==NULL)
-    MEMERROR("calc_fields: stress array");
+    PMEMERROR("calc_fields: stress array");
   if((medium->u=(float *)calloc(nz*nxy*3,sizeof(float)))==NULL)
-    MEMERROR("calc_fields: displacement array");
+    PMEMERROR("calc_fields: displacement array");
   /*
     
     background stress and displacement first
@@ -234,11 +251,12 @@ void calc_fields(struct med *medium,struct flt *fault,
       get_fault_plane_basevec(flt_mean_x,vec_1,vec_2,fault,medium);
       vec_to_angles(vec_1, &d1, &s1);
       vec_to_angles(vec_2, &d2, &s2);
-      fprintf(stderr,"calc_fields: avg. fault plane: x:(%g,%g,%g), v_s: strike: %g dip: %g, v_%s: strike: %g dip: %g\n",
-	      flt_mean_x[INT_X],flt_mean_x[INT_Y],flt_mean_x[INT_Z],
-	      s1,d1,(medium->n[INT_Z]==-1)?("d"):("n"),s2,d2);
+      HEADNODE
+	fprintf(stderr,"calc_fields: avg. fault plane: x:(%g,%g,%g), v_s: strike: %g dip: %g, v_%s: strike: %g dip: %g\n",
+		flt_mean_x[INT_X],flt_mean_x[INT_Y],flt_mean_x[INT_Z],
+		s1,d1,(medium->n[INT_Z]==-1)?("d"):("n"),s2,d2);
       if(!(medium->ok=(my_boolean *)malloc(nxy*sizeof(my_boolean))))
-	MEMERROR("calc_fields: 3");
+	PMEMERROR("calc_fields: 3");
       // check if the output is OK
       for(o1=i=not_ok=0,x[INT_X]=medium->pxmin[INT_X];
 	  i<medium->n[INT_X];
@@ -253,11 +271,13 @@ void calc_fields(struct med *medium,struct flt *fault,
 	  }
 	}
       if(not_ok)
-	fprintf(stderr,"calc_fields: %i out of %i points were not appropriate for plane mode\n",
-		not_ok,medium->n[INT_Y]*medium->n[INT_X]);
+	HEADNODE
+	  fprintf(stderr,"calc_fields: %i out of %i points were not appropriate for plane mode\n",
+		  not_ok,medium->n[INT_Y]*medium->n[INT_X]);
     }
     if(include_background_stress || include_background_displacement){
-      fprintf(stderr,"calc_fields: WARNING: including background stress\n");
+      HEADNODE
+	fprintf(stderr,"calc_fields: WARNING: including background stress\n");
       /* include background stress, else zero */
       for(k=0,x[INT_Z]=medium->pxmin[INT_Z];k<nz;x[INT_Z]+=dx[INT_Z],k++)
 	for(i=0,x[INT_X]=medium->pxmin[INT_X];i<medium->n[INT_X];x[INT_X]+=dx[INT_X],i++)
@@ -295,7 +315,8 @@ void calc_fields(struct med *medium,struct flt *fault,
     // output locations are given on xyz tripels
     //
     if(include_background_stress || include_background_displacement){
-      fprintf(stderr,"calc_fields: WARNING: including background stress\n");
+      HEADNODE
+	fprintf(stderr,"calc_fields: WARNING: including background stress\n");
       for(i=j=0;i<medium->n[INT_Z];i++,j+=3){
 	for(k=0;k<3;k++)
 	  xl[k] = (COMP_PRECISION)medium->xoloc[j+k];
@@ -322,129 +343,134 @@ void calc_fields(struct med *medium,struct flt *fault,
   /* 
      add up contributions from all faults 
   */
-  if(medium->print_bulk_fields){
-    if(medium->print_plane_coord){
-      out=myopen(PLANE_COORD_FILE,"w");
-      fprintf(out,"# format:\n#\txg[X] xg[Y] xg[Z] xl[X] xl[Y]\n#\twith v_s: (%g,%g,%g) v_%s: (%g,%g,%g)\n#\n",
-	      vec_1[INT_X],vec_1[INT_Y],vec_1[INT_Z],(medium->n[INT_Z]==-1)?("d"):("n"),
-	      vec_2[INT_X],vec_2[INT_Y],vec_2[INT_Z]);
-      fprintf(stderr,"calc_fields: writing fault plane coordinates to \"%s\"\n",
-	      PLANE_COORD_FILE);
-    }
-    for(k=0,x[INT_Z]=medium->pxmin[INT_Z];k<nz;x[INT_Z]+=dx[INT_Z],k++)
-      for(i=0,x[INT_X]=medium->pxmin[INT_X];i<medium->n[INT_X];x[INT_X]+=dx[INT_X],i++)
-	for(j=0,x[INT_Y]=medium->pxmin[INT_Y];j<medium->n[INT_Y];x[INT_Y]+=dx[INT_Y],j++){
-	  //fprintf(stderr,"calc_fields: working on %04i/%04i/%04i\r",k,i,j);
-	  if(!use_fault_plane || medium->ok[i*medium->n[INT_Y]+j]){
-	    if(use_fault_plane){
-	      // determine position along the fault plane
-	      get_local_x_on_plane(xl,x,flt_mean_x,vec_1,vec_2);
-	    }else{
-	      xl[INT_X]=x[INT_X];xl[INT_Y]=x[INT_Y];xl[INT_Z]=x[INT_Z];
-	    }
-	    if(medium->print_plane_coord)
-	      fprintf(out,"%g %g %g %g %g\n",xl[INT_X],xl[INT_Y],xl[INT_Z],x[INT_X],x[INT_Y]);
-	    if(xl[INT_Z] > 0.0){
-	      if(xl[INT_Z] > 1.0e-10){
-		fprintf(stderr,"calc_fields: positive depth in loop, kij: %i %i %i x: (%g, %g, %g)\n",
-			k,i,j,xl[INT_X],xl[INT_Y],xl[INT_Z]);
-		exit(-1);
+  HEADNODE{
+    if(medium->print_bulk_fields){
+      if(medium->print_plane_coord){
+	out=myopen(PLANE_COORD_FILE,"w");
+	fprintf(out,"# format:\n#\txg[X] xg[Y] xg[Z] xl[X] xl[Y]\n#\twith v_s: (%g,%g,%g) v_%s: (%g,%g,%g)\n#\n",
+		vec_1[INT_X],vec_1[INT_Y],vec_1[INT_Z],(medium->n[INT_Z]==-1)?("d"):("n"),
+		vec_2[INT_X],vec_2[INT_Y],vec_2[INT_Z]);
+	fprintf(stderr,"calc_fields: writing fault plane coordinates to \"%s\"\n",
+		PLANE_COORD_FILE);
+      }
+      for(k=0,x[INT_Z]=medium->pxmin[INT_Z];k<nz;x[INT_Z]+=dx[INT_Z],k++)
+	for(i=0,x[INT_X]=medium->pxmin[INT_X];i<medium->n[INT_X];x[INT_X]+=dx[INT_X],i++)
+	  for(j=0,x[INT_Y]=medium->pxmin[INT_Y];j<medium->n[INT_Y];x[INT_Y]+=dx[INT_Y],j++){
+	    //fprintf(stderr,"calc_fields: working on %04i/%04i/%04i\r",k,i,j);
+	    if(!use_fault_plane || medium->ok[i*medium->n[INT_Y]+j]){
+	      if(use_fault_plane){
+		// determine position along the fault plane
+		get_local_x_on_plane(xl,x,flt_mean_x,vec_1,vec_2);
 	      }else{
-		xl[INT_Z]=0.0;
+		xl[INT_X]=x[INT_X];xl[INT_Y]=x[INT_Y];xl[INT_Z]=x[INT_Z];
 	      }
-	    }
-	    p1=POSU(i,j,k,INT_X);
-	    p2=POSS(i,j,k,0);
-	    for(o=0;o<medium->nrflt;o++){
-	      if(norm_3d(fault[o].u) >= EPS_COMP_PREC){
-		//
-		// actual fault contribution is accounted for HERE
-		//
-		eval_green(xl,(fault+o),fault[o].u,u,sm,&iret);
-		if(!iret){
-		  medium->u[p1]   += (float)u[INT_X];
-		  medium->u[p1+1] += (float)u[INT_Y];
-		  medium->u[p1+2] += (float)u[INT_Z];
-		  medium->s[p2]   += (float)sm[INT_X][INT_X];
-		  medium->s[p2+1] += (float)sm[INT_X][INT_Y];
-		  medium->s[p2+2] += (float)sm[INT_X][INT_Z];
-		  medium->s[p2+3] += (float)sm[INT_Y][INT_Y];
-		  medium->s[p2+4] += (float)sm[INT_Y][INT_Z];
-		  medium->s[p2+5] += (float)sm[INT_Z][INT_Z];
+	      if(medium->print_plane_coord)
+		fprintf(out,"%g %g %g %g %g\n",xl[INT_X],xl[INT_Y],xl[INT_Z],x[INT_X],x[INT_Y]);
+	      if(xl[INT_Z] > 0.0){
+		if(xl[INT_Z] > 1.0e-10){
+		  fprintf(stderr,"calc_fields: positive depth in loop, kij: %i %i %i x: (%g, %g, %g)\n",
+			  k,i,j,xl[INT_X],xl[INT_Y],xl[INT_Z]);
+		  exit(-1);
 		}else{
-		  singular_count++;
-		  medium->u[p1] = medium->nan;
-		  medium->u[p1+1] = medium->nan;
-		  medium->u[p1+2] = medium->nan;
-		  medium->s[p2] = medium->nan;
-		  medium->s[p2+1] = medium->nan;
-		  medium->s[p2+2] = medium->nan;
-		  medium->s[p2+3] = medium->nan;
-		  medium->s[p2+4] = medium->nan;
-		  medium->s[p2+5] = medium->nan;
+		  xl[INT_Z]=0.0;
+		}
+	      }
+	      p1=POSU(i,j,k,INT_X);
+	      p2=POSS(i,j,k,0);
+	      for(o=0;o<medium->nrflt;o++){
+		if(norm_3d(fault[o].u) >= EPS_COMP_PREC){
+		  //
+		  // actual fault contribution is accounted for HERE
+		  //
+		  eval_green(xl,(fault+o),fault[o].u,u,sm,&iret);
+		  if(!iret){
+		    medium->u[p1]   += (float)u[INT_X];
+		    medium->u[p1+1] += (float)u[INT_Y];
+		    medium->u[p1+2] += (float)u[INT_Z];
+		    medium->s[p2]   += (float)sm[INT_X][INT_X];
+		    medium->s[p2+1] += (float)sm[INT_X][INT_Y];
+		    medium->s[p2+2] += (float)sm[INT_X][INT_Z];
+		    medium->s[p2+3] += (float)sm[INT_Y][INT_Y];
+		    medium->s[p2+4] += (float)sm[INT_Y][INT_Z];
+		    medium->s[p2+5] += (float)sm[INT_Z][INT_Z];
+		  }else{
+		    singular_count++;
+		    medium->u[p1] = medium->nan;
+		    medium->u[p1+1] = medium->nan;
+		    medium->u[p1+2] = medium->nan;
+		    medium->s[p2] = medium->nan;
+		    medium->s[p2+1] = medium->nan;
+		    medium->s[p2+2] = medium->nan;
+		    medium->s[p2+3] = medium->nan;
+		    medium->s[p2+4] = medium->nan;
+		    medium->s[p2+5] = medium->nan;
+		  }
 		}
 	      }
 	    }
 	  }
-	}
-    if(medium->print_plane_coord)
-      fclose(out);
+      if(medium->print_plane_coord)
+	fclose(out);
+    }
   }
   singular_count=0;
-  if(medium->read_oloc_from_file){
-    // output given on spotted locations
-    for(i=j=0;i<medium->olocnr;i++,j+=3){
-      for(k=0;k<3;k++)
-	xl[k]=(COMP_PRECISION)medium->xoloc[j+k];
-      if(xl[INT_Z] > 0.0){
-	if(xl[INT_Z] > 1.0e-10){
-	  fprintf(stderr,"calc_fields: positive depth for location %i x: (%g, %g, %g)\n",
-		  k,xl[INT_X],xl[INT_Y],xl[INT_Z]);
-	  exit(-1);
-	}else{
-	  xl[INT_Z]=0.0;
-	}
-      }
-      p1 = j;
-      p2 = i * 6;
-      for(o=0;o<medium->nrflt;o++){
-	if(norm_3d(fault[o].u) >= EPS_COMP_PREC){
-	  //
-	  // actual fault contribution is accounted for HERE
-	  //
-	  eval_green(xl,(fault+o),fault[o].u,u,sm,&iret);
-	  if(!iret){
-	    medium->u[p1]   += (float)u[INT_X];
-	    medium->u[p1+1] += (float)u[INT_Y];
-	    medium->u[p1+2] += (float)u[INT_Z];
-	    medium->s[p2]   += (float)sm[INT_X][INT_X];
-	    medium->s[p2+1] += (float)sm[INT_X][INT_Y];
-	    medium->s[p2+2] += (float)sm[INT_X][INT_Z];
-	    medium->s[p2+3] += (float)sm[INT_Y][INT_Y];
-	    medium->s[p2+4] += (float)sm[INT_Y][INT_Z];
-	    medium->s[p2+5] += (float)sm[INT_Z][INT_Z];
+  HEADNODE{
+    if(medium->read_oloc_from_file){
+      // output given on spotted locations
+      for(i=j=0;i<medium->olocnr;i++,j+=3){
+	for(k=0;k<3;k++)
+	  xl[k]=(COMP_PRECISION)medium->xoloc[j+k];
+	if(xl[INT_Z] > 0.0){
+	  if(xl[INT_Z] > 1.0e-10){
+	    fprintf(stderr,"calc_fields: positive depth for location %i x: (%g, %g, %g)\n",
+		    k,xl[INT_X],xl[INT_Y],xl[INT_Z]);
+	    exit(-1);
 	  }else{
-	    singular_count++;
-	    medium->u[p1]   = medium->nan;
-	    medium->u[p1+1] = medium->nan;
-	    medium->u[p1+2] = medium->nan;
-	    medium->s[p2]   = medium->nan;
-	    medium->s[p2+1] = medium->nan;
-	    medium->s[p2+2] = medium->nan;
-	    medium->s[p2+3] = medium->nan;
-	    medium->s[p2+4] = medium->nan;
-	    medium->s[p2+5] = medium->nan;
+	    xl[INT_Z]=0.0;
+	  }
+	}
+	p1 = j;
+	p2 = i * 6;
+	for(o=0;o<medium->nrflt;o++){
+	  if(norm_3d(fault[o].u) >= EPS_COMP_PREC){
+	    //
+	    // actual fault contribution is accounted for HERE
+	    //
+	    eval_green(xl,(fault+o),fault[o].u,u,sm,&iret);
+	    if(!iret){
+	      medium->u[p1]   += (float)u[INT_X];
+	      medium->u[p1+1] += (float)u[INT_Y];
+	      medium->u[p1+2] += (float)u[INT_Z];
+	      medium->s[p2]   += (float)sm[INT_X][INT_X];
+	      medium->s[p2+1] += (float)sm[INT_X][INT_Y];
+	      medium->s[p2+2] += (float)sm[INT_X][INT_Z];
+	      medium->s[p2+3] += (float)sm[INT_Y][INT_Y];
+	      medium->s[p2+4] += (float)sm[INT_Y][INT_Z];
+	      medium->s[p2+5] += (float)sm[INT_Z][INT_Z];
+	    }else{
+	      singular_count++;
+	      medium->u[p1]   = medium->nan;
+	      medium->u[p1+1] = medium->nan;
+	      medium->u[p1+2] = medium->nan;
+	      medium->s[p2]   = medium->nan;
+	      medium->s[p2+1] = medium->nan;
+	      medium->s[p2+2] = medium->nan;
+	      medium->s[p2+3] = medium->nan;
+	      medium->s[p2+4] = medium->nan;
+	      medium->s[p2+5] = medium->nan;
+	    }
 	  }
 	}
       }
     }
   }
-  if(singular_count)
-    fprintf(stderr,"calc_fields: WARNING: there were %i singular entries in the field\n",
-	    singular_count);
-  else
-    fprintf(stderr,"calc_fields: done, no singular entries in the field\n");
-  
+  HEADNODE{
+    if(singular_count)
+      fprintf(stderr,"calc_fields: WARNING: there were %i singular entries in the field\n",
+	      singular_count);
+    else
+      fprintf(stderr,"calc_fields: done, no singular entries in the field\n");
+  }
   medium->bulk_field_init=TRUE;
 }
 

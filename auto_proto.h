@@ -213,11 +213,11 @@ void check_parameters_and_init(int, char **, struct med **, struct flt **, unsig
 void initialize(struct med **, struct flt **, unsigned short, int, unsigned short, unsigned short, double, double *, double *, unsigned short, unsigned short, unsigned short, double, unsigned short, double, unsigned short, unsigned short, unsigned short, unsigned short, unsigned short, unsigned short, unsigned short, short int, unsigned short, unsigned short, double, unsigned short, unsigned short, unsigned short, unsigned short, unsigned short, unsigned short, double, unsigned short);
 void init_files(struct med **, struct flt **);
 void terminate(struct med *, struct flt *);
-void init_parameters(char **, int, unsigned short *, unsigned short *, unsigned short *, unsigned short *, double *, int *, unsigned short *, unsigned short *, unsigned short *, double *, unsigned short *, double *, unsigned short *, unsigned short *, unsigned short *, unsigned short *, unsigned short *, unsigned short *, unsigned short *, short int *, unsigned short *, unsigned short *, double *, unsigned short *, unsigned short *, unsigned short *, unsigned short *, unsigned short *, double *, unsigned short *);
+void init_parameters(char **, int, unsigned short *, unsigned short *, unsigned short *, unsigned short *, double *, int *, unsigned short *, unsigned short *, unsigned short *, double *, unsigned short *, double *, unsigned short *, unsigned short *, unsigned short *, unsigned short *, unsigned short *, unsigned short *, unsigned short *, short int *, unsigned short *, unsigned short *, double *, unsigned short *, unsigned short *, unsigned short *, unsigned short *, unsigned short *, double *, unsigned short *, int);
 void advance_argument(int *, int, char **);
 char *name_boolean(unsigned short);
 unsigned short toggle(unsigned short *);
-void read_stress_fac(unsigned short, double *, double *, double);
+void read_stress_fac(unsigned short, double *, double *, double, struct med *);
 /* input.c */
 int read_moment_file(float **, float **, float *, float *, int *, unsigned short);
 int read_patch_event_file(float *, int *, int *, float *, float *, FILE *, struct med *);
@@ -429,7 +429,7 @@ int AreaSign(tPointi, tPointi, tPointi);
 unsigned short crosses(double *, double *);
 /* simul_gr.c */
 /* solve.c */
-void solve(struct med *, struct flt *);
+int solve(struct med *, struct flt *);
 void init_equation_system(struct med *, struct flt *);
 void add_to_active_fault_list(int, int **, int *, unsigned short **);
 void add_to_right_hand_side(double, double **, double **, int *);

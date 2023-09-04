@@ -226,7 +226,16 @@ struct med{
     x_scroll_inc;
 #endif
   COMP_PRECISION nan;		/* remember to initialize  */
-
+  /*  */
+#ifdef USE_PETSC
+  PetscMPIInt comm_size, comm_rank;
+  PetscInt    rs, re, rn;
+  Mat         pA;
+  Vec         pb;
+  PetscInt    *indices;
+#else
+  unsigned int comm_size,comm_rank;
+#endif
 };
 
 /*

@@ -16,6 +16,7 @@ int main(int argc, char **argv)
   my_boolean shrink_patches=FALSE,
     read_slip = FALSE,verbose = FALSE,use_scalar = FALSE;
   FILE *in;
+  medium=(struct med *)calloc(1,sizeof(struct med)); 
   if(argc > 5){
     fprintf(stderr,"%s [flt.dat] [disp_component, %i] [shrink_patches, %i] [use_scalar, %i]\n\t reads in patch format from stdin and writes GMT xyz to stdout\n",
 	    argv[0],comp,(int)shrink_patches,(int)use_scalar);

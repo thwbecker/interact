@@ -116,7 +116,7 @@ void print_fault_stress_and_slip(struct med *medium,struct flt *fault,
 	  /* get average */
 	  if(n[i])
 	    val[i][j] /= (COMP_PRECISION)n[i]; /* find mean */
-	    fprintf(medium->flt_stress_out[i],"%g ",val[i][j]);
+	  fprintf(medium->flt_stress_out[i],"%g ",val[i][j]);
 	}
 #ifdef SEARCH_VAL_EXTREMA
 	fprintf(medium->flt_stress_out[i],"%g %g",val_min[i][0],

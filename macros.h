@@ -21,7 +21,10 @@
 
 #define TOGV(x) (((x==FALSE)?(TRUE):(FALSE)))
 #define MEMERROR(x) {fprintf(stderr,"%s: memory allocation error\nexiting now.\n",x);exit(-1);}
+#define PMEMERROR(x) {if(medium->comm_rank==0)fprintf(stderr,"%s: memory allocation error\nexiting now.\n",x);exit(-1);}
 #define READ_ERROR(x) {fprintf(stderr,"read error file \"%s\", exiting\n",x);exit(-1);}
+#define PERROR(x) {if(medium->comm_rank==0)fprintf(stderr,"ERROR: %s\n",x);exit(-1);}
+#define HEADNODE if(medium->comm_rank==0)
 /* 
    real constants 
 */

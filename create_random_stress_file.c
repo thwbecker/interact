@@ -16,6 +16,7 @@ int main(int argc, char **argv)
   long seed;
   float *dist;
   COMP_PRECISION hrange[3],std[3],*st,cs,stat[4],fac[3],slength,ts[3],dfac,std0[3];
+  medium=(struct med *)calloc(1,sizeof(struct med));
   // defaults
   std0[0]=std0[1]=std0[2] = 1;// STD in multiples of the stress drop
   mode = 0;

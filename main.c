@@ -56,12 +56,20 @@ int main(int argc, char **argv)
   COMP_PRECISION a[6],b[6];
   int i;
   char filename[200];
-  fprintf(stderr,"main: binary: %s\nmain: compiled for %s precision on %s at %s, initializing\n",
-	  argv[0],(sizeof(COMP_PRECISION)==sizeof(double))?("double"):("single"),
-	  __DATE__,__TIME__);
-  check_parameters_and_init(argc,argv,&medium,&fault,
-			    &read_initial_fault_stress,
-			    a,b);
+  medium=(struct med *)calloc(1,sizeof(struct med)); /* init as zeros */
+
+#ifdef USE_PETSC
+  PetscFunctionBegin;
+  PetscCall(PetscInitialize(&argc, &argv, (char *)0, NULL));
+  PetscCallMPI(MPI_Comm_size(PETSC_COMM_WORLD, &medium->comm_size));
+  PetscCallMPI(MPI_Comm_rank(PETSC_COMM_WORLD, &medium->comm_rank));
+#else
+  medium->comm_size = 1;
+#endif
+  if(medium->comm_rank==0)
+    fprintf(stderr,"main: binary: %s\nmain: compiled for %s precision, initializing\n",
+	    argv[0],(sizeof(COMP_PRECISION)==sizeof(double))?("double"):("single"));
+  check_parameters_and_init(argc,argv,&medium,&fault,&read_initial_fault_stress,a,b);
   // decide which mode we are in and execute main loops
   switch(medium->op_mode){
     /*
@@ -71,6 +79,13 @@ int main(int argc, char **argv)
     */
   case SIMULATE_LOADING_AND_PLOT:
   case SIMULATE_LOADING:{
+    /* 
+       loading simulation is only serial 
+    */
+    if(medium->comm_size > 1){
+      fprintf(stderr,"main: loading simulation only set up for serial, CPU %i",medium->comm_rank);
+      terminate(medium,fault);
+    }
     if(medium->nr_flt_mode != 1){
       fprintf(stderr,"main: for simulate loading, only one fault mode can be used\n");
       exit(-1);
@@ -129,13 +144,16 @@ int main(int argc, char **argv)
       add solution without calling the quake output routine
        
     */
-    if(medium->int_mat_init)
-      print_interaction_matrix(medium,fault);
+    if(medium->comm_rank==0)
+      if(medium->int_mat_init)
+	print_interaction_matrix(medium,fault);
+
     if((medium->naflt)||(medium->naflt_con)){
       solve(medium,fault);
 #ifdef DEBUG
-      fprintf(stderr,"main: now adding %i unconst. and %i const. solutions\n",
-	      medium->nreq,medium->nreq_con);
+      HEADNODE
+	fprintf(stderr,"main: now adding %i unconst. and %i const. solutions\n",
+		medium->nreq,medium->nreq_con);
 #endif
       // don't add to moment list, calculate the stress change, add use
       // the normal sign convention: FT 1.0
@@ -148,30 +166,34 @@ int main(int argc, char **argv)
 		     medium,fault,FALSE,TRUE,1.0);
     }
     if(medium->print_bulk_fields || medium->read_oloc_from_file){
-      calc_fields(medium,fault,FALSE,FALSE,a,b);
+      HEADNODE
+	calc_fields(medium,fault,FALSE,FALSE,a,b);
 #ifdef DEBUG
-      fprintf(stderr,"main: field calculation ok\n");
-#endif
-#ifdef DEBUG
-      fprintf(stderr,"main: output of solution\n");
-#endif
-      print_stress(medium,fault);
-      print_displacement(medium,fault);
-      /*  print_stress_on_fault(medium,fault,0);  */
-    }
-    print_fault_data(ONE_STEP_FAULT_DATA_FILE,medium,fault);
-    if(medium->geomview_output)
-      // output for geomview
-      for(i=0;i<medium->nrgrp;i++){
-	sprintf(filename,"flt.%i.abs.off",i);
-	print_group_data_geom(filename,medium,fault,i,0,0.0);
-	sprintf(filename,"flt.%i.strike.off",i);
-	print_group_data_geom(filename,medium,fault,i,1,0.0);
-	sprintf(filename,"flt.%i.dip.off",i);
-	print_group_data_geom(filename,medium,fault,i,2,0.0);
+      HEADNODE{
+	fprintf(stderr,"main: field calculation ok\n");
+	fprintf(stderr,"main: output of solution\n");
       }
+#endif
+      HEADNODE{
+	print_stress(medium,fault);
+	print_displacement(medium,fault);
+	/*  print_stress_on_fault(medium,fault,0);  */
+      }
+    }
+    HEADNODE{
+      print_fault_data(ONE_STEP_FAULT_DATA_FILE,medium,fault);
+      if(medium->geomview_output)
+	// output for geomview
+	for(i=0;i<medium->nrgrp;i++){
+	  sprintf(filename,"flt.%i.abs.off",i);
+	  print_group_data_geom(filename,medium,fault,i,0,0.0);
+	  sprintf(filename,"flt.%i.strike.off",i);
+	  print_group_data_geom(filename,medium,fault,i,1,0.0);
+	  sprintf(filename,"flt.%i.dip.off",i);
+	  print_group_data_geom(filename,medium,fault,i,2,0.0);
+	}
+    }
     break;
   }}
-  terminate(medium,fault); 
-  exit(0);
+  terminate(medium,fault);
 }

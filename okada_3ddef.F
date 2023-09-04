@@ -44,7 +44,8 @@ C
       COMMON /C2/XI2,ET2,Q2,R,dum2(20)
       DIMENSION  U(12,3),DU(12,3),DUA(12,3),DUB(12,3),DUC(12,3)
       DATA  F0/0.D0/                                                    
-      DATA EPS/1.D-6/                                                   
+!     DATA EPS/1.D-6/
+      DATA EPS/1.D-15/                                                   
 C-----                                                                  
       IF(Z.GT.0.) THEN
 	  		WRITE(6,'('' ** POSITIVE Z WAS GIVEN IN SUB-DC3D'')') 
@@ -542,7 +543,8 @@ C
       COMMON /C0/ALP1,ALP2,ALP3,ALP4,ALP5,
      &           SD,CD,SDSD,CDCD,SDCD,S2D,C2D  
       DATA F0,F1,F2,PI2/0.D0,1.D0,2.D0,6.283185307179586D0/             
-      DATA EPS/1.D-6/                                                   
+!     DATA EPS/1.D-6/
+      DATA EPS/1.D-15/                                                   
 C-----                                                                  
       ALP1=(F1-ALPHA)/F2                                                
       ALP2= ALPHA/F2                                                    

@@ -79,7 +79,7 @@ void eval_green_basic(COMP_PRECISION *x,struct flt *fault,
   if((fault->strike != 90)||(norm(fault->x,2) > EPS_COMP_PREC)){
     fprintf(stderr,"eval_green_basic: fault should have strike=90 and be at origin\n");
     fprintf(stderr,"eval_green_basic: strike: %g x,y: %g,%g\n",
-	    fault->strike,fault->x[X],fault->x[Y]);
+	    fault->strike,fault->x[INT_X],fault->x[INT_Y]);
     exit(-1);
   }
 #endif
@@ -90,7 +90,7 @@ void eval_green_basic(COMP_PRECISION *x,struct flt *fault,
 			 (COMP_PRECISION)fault->l,
 			 (COMP_PRECISION)fault->w,
 			 (COMP_PRECISION)fault->dip,
-			 (COMP_PRECISION) -fault->x[Z],
+			 (COMP_PRECISION) -fault->x[INT_Z],
 			 disp,u_global,sm_global,iret);
     break;
   }

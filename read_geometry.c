@@ -32,8 +32,15 @@ void read_geometry(char *patch_filename,struct med **medium,
   static my_boolean init=FALSE;
 #ifdef ALLOW_NON_3DQUAD_GEOM
   int nr_pt_src=0,nr_triangle=0,nr_2d=0;
-  COMP_PRECISION tmpdbl;
+  COMP_PRECISION tmpdbl;  
 #endif
+  if(init){
+    if((*medium)->comm_rank == 0)
+      fprintf(stderr,"read_geometry: error: routine should only be called once\n");
+    exit(-1);
+  }
+  if((*medium)->comm_rank != 0)
+    verbose = 0;
   /* 
 
      READ IN FAULT GEOMETRY in the patch format as 
@@ -44,40 +51,33 @@ void read_geometry(char *patch_filename,struct med **medium,
     if(verbose)
       fprintf(stderr,"read_geometry: reading geometry from file \"%s\"\n",
 	      patch_filename);
-    in=myopen(patch_filename,"r");
+    in = myopen(patch_filename,"r");
   }else{
     if(verbose)
       fprintf(stderr,"read_geometry: reading geometry from stdin\n");
-    in=stdin;
+    in = stdin;
   }
   if(read_fault_properties){
     in2=fopen(FAULT_PROP_FILE,"r");
-    if(in2)
-      fprintf(stderr,"read_geometry: WARNING: reading fault properties from from \"%s\"\n",
-	      FAULT_PROP_FILE);
-    else{
-      fprintf(stderr,"read_geometry: could not open \"%s\" for fault properties, using default values\n",
-	      FAULT_PROP_FILE);
+    if(in2){
+      if((*medium)->comm_rank == 0)
+	fprintf(stderr,"read_geometry: WARNING: reading fault properties from from \"%s\"\n",
+		FAULT_PROP_FILE);
+    }else{
+      if((*medium)->comm_rank == 0)
+	fprintf(stderr,"read_geometry: could not open \"%s\" for fault properties, using default values\n",
+		FAULT_PROP_FILE);
       read_fault_properties=FALSE;
     }
   }
-  /*
-    
-    initialize the medium structure
 
-
-  */
-  if(init){
-    fprintf(stderr,"read_geometry: error: routine should only be called once\n");
-    exit(-1);
-  }
-  if((*medium=(struct med *)calloc(1,sizeof(struct med)))
-       ==NULL)MEMERROR("read_geometry: 1:");
+ 
 #ifdef ALLOW_NON_3DQUAD_GEOM
   // kind of elastic approximation for 2D segments
   (*medium)->twod_approx_is_plane_stress = twod_approx_is_plane_stress;
   if(((*medium)->twod_approx_is_plane_stress)&&(half_plane)){
-    fprintf(stderr,"read_geometry: error: half-plane only implemented for plane strain\n");
+    if((*medium)->comm_rank == 0)
+      fprintf(stderr,"read_geometry: error: half-plane only implemented for plane strain\n");
     exit(-1);
   }
 #endif
@@ -109,7 +109,8 @@ void read_geometry(char *patch_filename,struct med **medium,
 	
       */
       if(((*fault+i)->dip != 90.0)||((*fault+i)->x[INT_Z] != 0.0)){
-	fprintf(stderr,"read_geometry: width 0 selects: 2D mode: dip, z should be 90, and 0, respectively\n");
+	 if((*medium)->comm_rank == 0)
+	   fprintf(stderr,"read_geometry: width 0 selects: 2D mode: dip, z should be 90, and 0, respectively\n");
 	exit(-1);
       }
       if((*medium)->twod_approx_is_plane_stress)
@@ -150,11 +151,12 @@ void read_geometry(char *patch_filename,struct med **medium,
       alpha = RAD2DEGF(asin((*fault+i)->sin_alpha));
       (*fault+i)->strike= 90.0 - alpha;
 #ifdef DEBUG
-      fprintf(stderr,"read_geometry: fault %i is triangular, x1: (%g, %g, %g) x2: (%g, %g, %g) x3: (%g, %g, %g), area: %g\n",
-	      i,(*fault+i)->xt[  INT_X],(*fault+i)->xt[  INT_Y],(*fault+i)->xt[  INT_Z],
-	      (*fault+i)->xt[3+INT_X],(*fault+i)->xt[3+INT_Y],(*fault+i)->xt[3+INT_Z],
-	      (*fault+i)->xt[6+INT_X],(*fault+i)->xt[6+INT_Y],(*fault+i)->xt[6+INT_Z],
-	      (*fault+i)->w);
+      if((*medium)->comm_rank == 0)
+	fprintf(stderr,"read_geometry: fault %i is triangular, x1: (%g, %g, %g) x2: (%g, %g, %g) x3: (%g, %g, %g), area: %g\n",
+		i,(*fault+i)->xt[  INT_X],(*fault+i)->xt[  INT_Y],(*fault+i)->xt[  INT_Z],
+		(*fault+i)->xt[3+INT_X],(*fault+i)->xt[3+INT_Y],(*fault+i)->xt[3+INT_Z],
+		(*fault+i)->xt[6+INT_X],(*fault+i)->xt[6+INT_Y],(*fault+i)->xt[6+INT_Z],
+		(*fault+i)->w);
 #endif
       nr_triangle++;
     }else if((*fault+i)->l < 0){
@@ -163,8 +165,9 @@ void read_geometry(char *patch_filename,struct med **medium,
 	point source
 	
       */
-      fprintf(stderr,"read_geometry: fault %i: point source: area %g and \"aspect ratio\": %g\n",
-	      i,(*fault+i)->w,-(*fault+i)->l);
+      if((*medium)->comm_rank == 0)
+	fprintf(stderr,"read_geometry: fault %i: point source: area %g and \"aspect ratio\": %g\n",
+		i,(*fault+i)->w,-(*fault+i)->l);
       // W will hold the `fault' area, read in as w'
       (*fault+i)->area = (*fault+i)->w;
       (*fault+i)->type=POINT_SOURCE;
@@ -179,22 +182,26 @@ void read_geometry(char *patch_filename,struct med **medium,
     }
 #else
     if(((*fault+i)->l <= 0)||((*fault+i)->w <= 0)){
-      fprintf(stderr,"read_geometry: fault %i: half length l and width have to be >= 0 (%g/%g)!\n",
-	      i,(*fault+i)->l,(*fault+i)->w);
-      fprintf(stderr,"read_geometry: if 2-D, point source, or triangular elements were\n");
-      fprintf(stderr,"read_geometry: what you were looking for,\n");
-      fprintf(stderr,"read_geometry: recompile with  ALLOW_NON_3DQUAD_GEOM flag set\n");
+      if((*medium)->comm_rank == 0){
+	fprintf(stderr,"read_geometry: fault %i: half length l and width have to be >= 0 (%g/%g)!\n",
+		i,(*fault+i)->l,(*fault+i)->w);
+	fprintf(stderr,"read_geometry: if 2-D, point source, or triangular elements were\n");
+	fprintf(stderr,"read_geometry: what you were looking for,\n");
+	fprintf(stderr,"read_geometry: recompile with  ALLOW_NON_3DQUAD_GEOM flag set\n");
+      }
       exit(-1);
     }
 #endif
     if((*fault+i)->x[INT_Z] > 0){
-      fprintf(stderr,"read_geometry: patch %i: z has to be < 0, mid point z: %g\n",
-	      i,(*fault+i)->x[INT_Z]);
+      if((*medium)->comm_rank == 0)
+	fprintf(stderr,"read_geometry: patch %i: z has to be < 0, mid point z: %g\n",
+		i,(*fault+i)->x[INT_Z]);
       exit(-1);
     }
     if(tmpint < 0){
-      fprintf(stderr,"read_geometry: smallest allowed group number is 0, not %i\n",
-	      tmpint);
+      if((*medium)->comm_rank == 0)
+	fprintf(stderr,"read_geometry: smallest allowed group number is 0, not %i\n",
+		tmpint);
       exit(-1);
     }else{
       (*fault+i)->group=(unsigned int)tmpint;
@@ -246,13 +253,15 @@ void read_geometry(char *patch_filename,struct med **medium,
 		   (*fault+i)->sin_alpha,
 		   (*fault+i)->cos_alpha,sin_dip,cos_dip);
 #ifdef SUPER_DEBUG
-    fprintf(stderr,"fault %5i: strike: %g dip: %g sc_alpha:  %10.3e/%10.3e sc_dip: %10.3e/%10.3e\n",
-	    i,90.0-alpha,(*fault+i)->dip,(*fault+i)->sin_alpha,
-	    (*fault+i)->cos_alpha,sin_dip,cos_dip);
-    fprintf(stderr," vec: s: (%10.3e,%10.3e,%10.3e) d: (%10.3e,%10.3e,%10.3e) n: (%10.3e,%10.3e,%10.3e)\n",
-	    (*fault+i)->t_strike[INT_X],(*fault+i)->t_strike[INT_Y],(*fault+i)->t_strike[INT_Z],
-	    (*fault+i)->t_dip[INT_X],(*fault+i)->t_dip[INT_Y],(*fault+i)->t_dip[INT_Z],
-	    (*fault+i)->normal[INT_X],(*fault+i)->normal[INT_Y],(*fault+i)->normal[INT_Z]);
+    if((*medium)->comm_rank == 0){
+      fprintf(stderr,"fault %5i: strike: %g dip: %g sc_alpha:  %10.3e/%10.3e sc_dip: %10.3e/%10.3e\n",
+	      i,90.0-alpha,(*fault+i)->dip,(*fault+i)->sin_alpha,
+	      (*fault+i)->cos_alpha,sin_dip,cos_dip);
+      fprintf(stderr," vec: s: (%10.3e,%10.3e,%10.3e) d: (%10.3e,%10.3e,%10.3e) n: (%10.3e,%10.3e,%10.3e)\n",
+	      (*fault+i)->t_strike[INT_X],(*fault+i)->t_strike[INT_Y],(*fault+i)->t_strike[INT_Z],
+	      (*fault+i)->t_dip[INT_X],(*fault+i)->t_dip[INT_Y],(*fault+i)->t_dip[INT_Z],
+	      (*fault+i)->normal[INT_X],(*fault+i)->normal[INT_Y],(*fault+i)->normal[INT_Z]);
+    }
 #endif
 #ifdef ALLOW_NON_3DQUAD_GEOM
     if((*fault+i)->type != TRIANGULAR){
@@ -267,18 +276,22 @@ void read_geometry(char *patch_filename,struct med **medium,
       for(j=0;j<jlim;j++){
 	// check depth alignment
 	if(corner[j][INT_Z] > eps_for_z){
-	  fprintf(stderr,"read_geometry: patch %i, corner %i above surface, z: %20.10e (eps: %g)\n",
-		  i,j,corner[j][INT_Z],eps_for_z);
-	  fprintf(stderr,"z: %g w: %g dip: %g\n",(*fault+i)->x[INT_Z],(*fault+i)->w,(*fault+i)->dip);
-	  fprintf(stderr,"read_geometry: exiting\n");
+	  if((*medium)->comm_rank == 0){
+	    fprintf(stderr,"read_geometry: patch %i, corner %i above surface, z: %20.10e (eps: %g)\n",
+		    i,j,corner[j][INT_Z],eps_for_z);
+	    fprintf(stderr,"z: %g w: %g dip: %g\n",(*fault+i)->x[INT_Z],(*fault+i)->w,(*fault+i)->dip);
+	    fprintf(stderr,"read_geometry: exiting\n");
+	  }
 	  exit(-1);
 	}
 #ifdef ALLOW_NON_3DQUAD_GEOM
 	if((*fault+i)->type == TWO_DIM_HALFPLANE_PLANE_STRAIN){
 	  /* check if segment is sticking out into the air */
 	  if((corner[0][INT_Y] > 0 )||(corner[1][INT_Y] > 0)){
-	    fprintf(stderr,"read_geometry: error, half-plane segment %i endpoints: %g,%g and %g,%g\n",
-		    i,corner[0][INT_X] ,corner[0][INT_Y],corner[1][INT_X] ,corner[1][INT_Y]);
+	    if((*medium)->comm_rank == 0){
+	      fprintf(stderr,"read_geometry: error, half-plane segment %i endpoints: %g,%g and %g,%g\n",
+		      i,corner[0][INT_X] ,corner[0][INT_Y],corner[1][INT_X] ,corner[1][INT_Y]);
+	    }
 	    exit(-1);
 	  }
 	}
@@ -294,21 +307,29 @@ void read_geometry(char *patch_filename,struct med **medium,
     }
 #endif
     if(read_fault_properties){
+      if(!in2){
+	if((*medium)->comm_rank == 0)
+	  fprintf(stderr,"read_geometry: in2 stream not open?!\n");
+	exit(-1);
+      }
       /* 
 	 frictional properties, static and dynamic 
 	 either read from file (-f switch)
       */
       if(fscanf(in2,"%f %f",&(*fault+i)->mu_s,&(*fault+i)->mu_d)!=2){
-	fprintf(stderr,"read_geometry: read error: properties file: %s\n",
-		FAULT_PROP_FILE);
-	fprintf(stderr,"read_geometry: could not read two parameters for fault %i\n",
-		i);
+	if((*medium)->comm_rank == 0){
+	  fprintf(stderr,"read_geometry: read error: properties file: %s\n",
+		  FAULT_PROP_FILE);
+	  fprintf(stderr,"read_geometry: could not read two parameters for fault %i\n",
+		  i);
+	}
 	exit(-1);
       }
       d_mu=(*fault+i)->mu_s - (*fault+i)->mu_d;
       if(d_mu > 1 || d_mu < 0){
-	fprintf(stderr,"read_geometry: WARNING: Delta mu is %g for fault %i\n",
-		d_mu,i);
+	if((*medium)->comm_rank == 0)
+	  fprintf(stderr,"read_geometry: WARNING: Delta mu is %g for fault %i\n",
+		  d_mu,i);
       }
     }else{
       // or use constant values
@@ -345,12 +366,15 @@ void read_geometry(char *patch_filename,struct med **medium,
   // now we have the number of faults
   (*medium)->nrflt = i;
   if(!(*medium)->nrflt){
-    fprintf(stderr,"read_geometry: did not read in any faults from geometry file\n");
-    fprintf(stderr,"read_geometry: %s %i\n",patch_filename,(*medium)->nrflt);
+    if((*medium)->comm_rank == 0){
+      fprintf(stderr,"read_geometry: did not read in any faults from geometry file\n");
+      fprintf(stderr,"read_geometry: %s %i\n",patch_filename,(*medium)->nrflt);
+    }
     exit(-1);
   }
   if((*medium)->nrflt > 99998)
-    fprintf(stderr,"read_geometry: WARNING: parts of the program I/O might not work for more patches than 99999!\n");
+    if((*medium)->comm_rank == 0)
+      fprintf(stderr,"read_geometry: WARNING: parts of the program I/O might not work for more patches than 99999!\n");
   *fault=(struct flt *)
     realloc(*fault,sizeof(struct flt)*(*medium)->nrflt);
   //
@@ -358,8 +382,9 @@ void read_geometry(char *patch_filename,struct med **medium,
   //
   for((*medium)->nrgrp=i=0;i<(*medium)->nrflt;i++){
     if((*fault+i)->group > (*medium)->nrflt-1){
-      fprintf(stderr,"read_geometry: fault %i has group %i, should be between 0 and %i (nr of patches - 1)\n",
-	      i,(*fault+i)->group,(*medium)->nrflt-1);
+      if((*medium)->comm_rank == 0)
+	fprintf(stderr,"read_geometry: fault %i has group %i, should be between 0 and %i (nr of patches - 1)\n",
+		i,(*fault+i)->group,(*medium)->nrflt-1);
       exit(-1);
     }
     if((*fault+i)->group+1 > (*medium)->nrgrp)
@@ -380,10 +405,11 @@ void read_geometry(char *patch_filename,struct med **medium,
   
   if((*medium)->nrflt<=(*medium)->max_nr_flt_files)
     for(i=0;i<(*medium)->nrflt;i++)
-      fprintf(stderr,"read_geometry: fault %4i: x: (%9.6g, %9.6g, %9.6g) strike: %6.2f dip: %6.2f half_length: %6.3g aspect: %9.6g\n",
-	      i,(*fault+i)->x[INT_X],(*fault+i)->x[INT_Y],
-	      (*fault+i)->x[INT_Z],(*fault+i)->strike,(*fault+i)->dip,(*fault+i)->l,
-	      (*fault+i)->l/(*fault+i)->w);
+      if((*medium)->comm_rank == 0)
+	fprintf(stderr,"read_geometry: fault %4i: x: (%9.6g, %9.6g, %9.6g) strike: %6.2f dip: %6.2f half_length: %6.3g aspect: %9.6g\n",
+		i,(*fault+i)->x[INT_X],(*fault+i)->x[INT_Y],
+		(*fault+i)->x[INT_Z],(*fault+i)->strike,(*fault+i)->dip,(*fault+i)->l,
+		(*fault+i)->l/(*fault+i)->w);
   if(verbose){
     fprintf(stderr,"read_geometry: read in %i fault patch(es)\nread_geometry: half length: min/mean/max: %g/%g/%g\nread_geometry: half width:  min/mean/max: %g/%g/%g\n",
 	    (*medium)->nrflt,lmin,(*medium)->lmean,lmax,wmin,(*medium)->wmean,wmax);
@@ -408,12 +434,14 @@ void read_geometry(char *patch_filename,struct med **medium,
       fprintf(stderr,"read_geometry: would improve speed and size requirements of interact\n");
     }
   }else{
-    fprintf(stderr,"read_geometry: WARNING: read in %i 2D elements, %i points, %i triangles, and %i rectangles\n",
-	    nr_2d,nr_pt_src,nr_triangle,(*medium)->nrflt - nr_triangle - nr_pt_src - nr_2d);
-    if(nr_2d)
-      fprintf(stderr,"read_geometry: two dimensional approximation: plane %s %s\n",
-	      ((*medium)->twod_approx_is_plane_stress)?("stress"):("strain"),
-	      (half_plane)?("(half plane)"):("(full plane)"));
+    if((*medium)->comm_rank == 0){
+      fprintf(stderr,"read_geometry: WARNING: read in %i 2D elements, %i points, %i triangles, and %i rectangles\n",
+	      nr_2d,nr_pt_src,nr_triangle,(*medium)->nrflt - nr_triangle - nr_pt_src - nr_2d);
+      if(nr_2d)
+	fprintf(stderr,"read_geometry: two dimensional approximation: plane %s %s\n",
+		((*medium)->twod_approx_is_plane_stress)?("stress"):("strain"),
+		(half_plane)?("(half plane)"):("(full plane)"));
+    }
   }
 #endif
   //

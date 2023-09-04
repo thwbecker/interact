@@ -13,13 +13,15 @@ SCARGS_OTHER := $(shell pkg-config --cflags-only-other $(PACKAGES))
 SCARGS := $(shell pkg-config --variable=cflags_extra $(PACKAGES)) $(CFLAGS_OTHER)
 CXXFLAGS := $(shell pkg-config --variable=cxxflags_extra $(PACKAGES)) $(CFLAGS_OTHER)
 SFARGS := $(shell pkg-config --variable=fflags_extra $(PACKAGES))
+
+
 CPPFLAGS := $(shell pkg-config --cflags-only-I $(PACKAGES))
 PETSC_LDIR := $(shell pkg-config --libs-only-L --libs-only-other $(PACKAGES))
 PETSC_LDIR += $(patsubst -L%, $(shell pkg-config --variable=ldflag_rpath $(PACKAGES))%, $(shell pkg-config --libs-only-L $(PACKAGES)))
 PETSC_LIBADD := $(shell pkg-config --libs-only-l $(PACKAGES)) -lm
 
 
-PETSC_INCLUDES = -I$(PETSC_DIR)/include/ $(CPPFLAGS)
+PETSC_INCLUDES = -I$(PETSC_DIR)/include/ $(CPPFLAGS) -DUSE_PETSC
 #
 #
 PETSC_LIBS = -L$(PETSC_DIR)/lib/  $(PETSC_LDIR) $(PETSC_LIBADD) -lpetsc

@@ -40,13 +40,13 @@ int main(int argc, char **args)
   Mat         A;
   KSP         ksp;
   PC          pc;
-  PetscInt    i, j, m, n, rs, re, rank, assemble_type = 3;
+  PetscInt    i, j, m, n, rs, re, rank, assemble_type = 0;
   PetscMPIInt comm_size, comm_rank;
   PetscScalar *values=NULL, val=0;
   PetscInt    *col_idx=NULL;
   PetscReal   norm;
   const PetscInt *ranges;
-  PetscInt lm, ln, dn, on;
+
   
   PetscFunctionBegin;
   PetscCall(PetscInitialize(&argc, &args, (char *)0, help));
@@ -56,22 +56,25 @@ int main(int argc, char **args)
   m = 50;
   n = 50;
   
-  //PetscCall(PetscOptionsGetInt(NULL, NULL, "-assemble_type", &assemble_type, NULL));
+  PetscCall(PetscOptionsGetInt(NULL, NULL, "-assemble_type", &assemble_type, NULL));
+  
   PetscCall(MatCreate(PETSC_COMM_WORLD, &A));
   PetscCall(MatSetSizes(A, PETSC_DECIDE, PETSC_DECIDE, m, n));
   PetscCall(MatSetType(A, MATDENSE));
   PetscCall(MatSetFromOptions(A));
   PetscCall(MatSetUp(A));
 
-  /* preallocate */
-  PetscCall(MatGetLocalSize(A, &lm, &ln));
-  dn = ln;
-  on = n - ln;
-  PetscCall(MatSeqAIJSetPreallocation(A, n, NULL));
-  PetscCall(MatMPIAIJSetPreallocation(A, dn, NULL, on, NULL));
+  {
+    PetscInt lm, ln, dn, on;
+    
+    PetscCall(MatGetLocalSize(A, &lm, &ln));
+    dn = ln;
+    on = n - ln;
+    PetscCall(MatSeqAIJSetPreallocation(A, n, NULL));
+    PetscCall(MatMPIAIJSetPreallocation(A, dn, NULL, on, NULL));
+  }
 
-
-
+  PetscCall(MatGetOwnershipRange(A, &rs, &re));
   
   PetscCall(PetscCalloc(n*sizeof(PetscScalar), &values));
   PetscCall(PetscCalloc(n*sizeof(PetscInt), &col_idx));
@@ -79,8 +82,6 @@ int main(int argc, char **args)
     col_idx[j] = j;
   }
 
-
-  PetscCall(MatGetOwnershipRange(A, &rs, &re));
   /* Assemble matrix */
   switch (assemble_type) {
     case 0: /* sequential */
@@ -208,6 +209,7 @@ int main(int argc, char **args)
   /* PetscCall(PCFactorSetMatSolverType(pc, MATSOLVERSUPERLU_DIST)); */
   /* #endif */
 
+  
   PetscCall(KSPSetFromOptions(ksp));
 
   PetscCall(KSPSolve(ksp, b, x));

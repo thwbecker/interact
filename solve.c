@@ -14,24 +14,38 @@
 */
 #include "interact.h"
 
-void solve(struct med *medium,struct flt *fault)
+int solve(struct med *medium,struct flt *fault)
 {
   A_MATRIX_PREC *a,wmax,*sv=NULL,*dummyp=NULL,wcutoff;
   char solver_name[STRLEN];
   size_t full_size,sparse_size;
   static int izero=0;
   FILE *aio;
-  int i;
   long int isize;
 #ifdef USE_SLATEC_NNLS
   A_MATRIX_PREC *x,prgopt[1]={1.0},rnorm,*work,dummy;
-  int n,m,*iwork,mode,l,nm,j;
+  int *iwork,mode,l,nm;
   FILE *out1,*out2;
 #endif
+#ifdef USE_PETSC
+  Vec         px, pr,pxout;
+  KSP         pksp;
+  PC          ppc;
+  PetscInt    i, j, m, n;
+  PetscScalar *values=NULL;
+  //PetscInt    *col_idx=NULL;
+  PetscReal   norm;
+  PetscInt lm, ln, dn, on;
+  VecScatter ctx;
+#else
+  unsigned int i,j,m,n;
+#endif
+
+  
   char command_str[STRLEN];
   wcutoff = (A_MATRIX_PREC)medium->wcutoff;
 
-  if(medium->debug){
+  if(medium->debug&&(medium->comm_rank==0)){
     print_equations(medium->naflt,medium->sma,medium->nameaf,
 		    medium->b,medium->nreq,"ucstr.",
 		    fault);
@@ -69,12 +83,19 @@ void solve(struct med *medium,struct flt *fault)
       mixed NNLS and least squares from NNLS package
 
     */
+    if(medium->comm_size>1){
+      if(medium->comm_rank==0)
+	fprintf(stderr,"solve: SLATEC MIX NNLS only serial, %i cores requested\n",medium->comm_size);
+      exit(-1);
+    }
 #ifndef USE_SLATEC_NNLS
-    fprintf(stderr,"solve: for mixed contrained/uncontrained solution, have to use SLATEC\n");
-    fprintf(stderr,"solve: library functions. Read the makefile, and compile with -lslatec_???.\n");
+    if(medium->comm_rank==0){
+      fprintf(stderr,"solve: for mixed contrained/uncontrained solution, have to use SLATEC\n");
+      fprintf(stderr,"solve: library functions. Read the makefile, and compile with -lslatec_???.\n");
+    }
     exit(-1);
 #else
-    if(medium->debug)
+    if(medium->debug&&(medium->comm_rank==0))
       fprintf(stderr,"solve: using slatec nnls routine, uc: %i c: %i\n",
 	      medium->nreq,medium->nreq_con);
     m = medium->nreq + medium->nreq_con;
@@ -100,13 +121,15 @@ void solve(struct med *medium,struct flt *fault)
       assemble A part of the A' matrix 
     */
     if(medium->use_old_amat){
-      fprintf(stderr,"solve: slatec_nnls: WARNING: using old A matrix!\n");
+      if(medium->comm_rank==0)
+	fprintf(stderr,"solve: slatec_nnls: WARNING: using old A matrix!\n");
       read_a_matrix_from_file(a,m,n,A_MATRIX_FILE,"mixed A");
     }else
       assemble_ap_matrix(a,medium->naflt, medium->naflt_con,medium->sma,   
 			 medium->sma_con,medium->nreq,  medium->nreq_con,
 			 medium->nameaf,medium->nameaf_con,fault,medium);
     if(medium->save_amat){// write A in binary to file
+      
       print_a_matrix_to_file(a,m,n,A_MATRIX_FILE,"mixed A");
     }
     // now b part of A'
@@ -184,160 +207,278 @@ void solve(struct med *medium,struct flt *fault)
       using LU, SVD or other methods
 
     */
-    isize  = ((long int)sizeof(A_MATRIX_PREC)) * ((long int)medium->nreq*(long int)medium->nreq);
-    //fprintf(stderr,"%i %li %li %li %i %li\n",medium->nreq,(long int)SQUARE(medium->nreq),(long int)medium->nreq*(long int)medium->nreq,(long int)medium->nreq*(long int)medium->nreq*(long int)sizeof(A_MATRIX_PREC),(int)isize,isize);
-    fprintf(stderr,"solve: attempting to allocate %li bytes, %g MB\n",isize,(double)isize/ONE_MEGABYTE);
-    if((a=(A_MATRIX_PREC *)malloc((size_t)isize)) == NULL){
-      fprintf(stderr,"solve: memory error for unconstrained A: (%p) n: %i by %i dsz: %i tsize: %g MB\n",
-	      a,medium->nreq,medium->nreq,(int)sizeof(A_MATRIX_PREC),((double)isize)/ONE_MEGABYTE);
-      /* check what would have been ok */
-      isize  = (long int)((double)isize/10);
-      for(i=1;i<10;i++){
-	if((a=(A_MATRIX_PREC *)malloc((size_t)(isize*(long int)i)))==NULL){
-	  fprintf(stderr,"solve: failing at %i %g MB\n",i,((double)isize)/(double)(ONE_MEGABYTE));
-	  exit(-1);
-	}else{
-	  fprintf(stderr,"solve: OK at %i/10\n",i);
-	  free(a);
-	}
+    if(medium->comm_size>1){
+      /* parallel solve using PETSC */
+      if(medium->comm_rank==0)
+	fprintf(stderr,"solve: attempting parallel LU solve, %i cores requested\n",medium->comm_size);
+      if(medium->use_old_amat || medium->save_amat){
+	if(medium->comm_rank==0)
+	  fprintf(stderr,"solve: matrix I/O not implemented yet\n");
+	exit(-1);
       }
-	
+      if(medium->solver_mode != LU_SOLVER){
+	if(medium->comm_rank==0)
+	  fprintf(stderr,"solve: only LU solve availabled\n");
+	exit(-1);
+      }
+#ifndef USE_PETSC
+      if(medium->comm_rank==0)
+	fprintf(stderr,"solve: parallel solve required Petsc compile\n");
       exit(-1);
-    }	
-    if(medium->debug)
-      fprintf(stderr,"solve: unconstrained part A is %5i by %i\n",
-	      medium->nreq,medium->nreq);
-    if(medium->use_old_amat){
-      fprintf(stderr,"solve: unconstrained: WARNING: using old A matrix!\n");
-      read_a_matrix_from_file(a,medium->nreq,medium->nreq,A_MATRIX_FILE,
-			      "unconstrained A");
-    }else
-      assemble_a_matrix(a,medium->naflt,medium->sma,medium->nreq,medium->nameaf,
-			fault,medium);
-    if(medium->save_amat){// write A in binary to file
-      print_a_matrix_to_file(a,medium->nreq,medium->nreq,
-			     A_MATRIX_FILE,"unconstrained A");
-      print_vector_file(medium->b,medium->nreq,B_VECTOR_FILE,"b vector");
-    }
-    if(medium->debug)
-      if((medium->op_mode == ONE_STEP_CALCULATION)&&(!medium->save_amat))
-	// output of binary A for debugging
-	print_a_matrix_to_file(a,medium->nreq,medium->nreq,A_MATRIX_FILE,
-			       "unconstrained A");
-    if((medium->op_mode == ONE_STEP_CALCULATION)||(medium->debug)){
-      // output of solver method only for one-step calculation
-      switch(medium->solver_mode){
-      case LU_SOLVER:
-	sprintf(solver_name,"LAPACK LU");
-	break;
-      case SVD_SOLVER:
+#else
+      /* 
+
+	 Petsc parallel LU 
+	 
+      */
+      m = n = medium->nreq;
+      PetscCall(MatCreate(PETSC_COMM_WORLD, &(medium->pA)));
+      PetscCall(MatSetSizes(medium->pA, PETSC_DECIDE, PETSC_DECIDE, m, n));
+      PetscCall(MatSetType(medium->pA, MATDENSE));
+      PetscCall(MatSetFromOptions(medium->pA));
+      PetscCall(MatSetUp(medium->pA));
+      /* preallocate */
+      PetscCall(MatGetLocalSize(medium->pA, &lm, &ln));
+      dn = ln;on = n - ln;
+      PetscCall(MatSeqAIJSetPreallocation(medium->pA, n, NULL));
+      PetscCall(MatMPIAIJSetPreallocation(medium->pA, dn, NULL, on, NULL));
+      /* parallel assembly */
+      PetscCall(MatGetOwnershipRange(medium->pA, &medium->rs, &medium->re));
+      medium->rn = medium->re  - medium->rs;
+      PetscCall(PetscCalloc(medium->rn*sizeof(PetscInt), &medium->indices));
+      for(j=0,i=medium->rs;i<medium->re;i++,j++)
+	medium->indices[j] = i;
+      /* assemble A */
+      par_assemble_a_matrix(medium->naflt,medium->sma,medium->nreq,medium->nameaf,
+			    fault,medium);
+      /*
+	Always call MatAssemblyBegin(A, MAT_FINAL_ASSEMBLY).
+	MatAssemblyBegin() is collective and must be called on all ranks.
+      */
+      PetscCall(MatAssemblyBegin(medium->pA, MAT_FINAL_ASSEMBLY));
+      PetscCall(MatAssemblyEnd(medium->pA, MAT_FINAL_ASSEMBLY));
+      if(medium->comm_rank == 0)
+	fprintf(stderr,"solve: parallel assembly done\n");
+      //MatView(pA,PETSC_VIEWER_STDOUT_WORLD);
+  
+      PetscCall(MatCreateVecs(medium->pA, &medium->pb, &px)); /* For A x = b: x -> left, b -> right */
+      
+      /* assign right hand side */
+      PetscCall(VecSetValues(medium->pb,medium->rn,
+			     medium->indices,medium->b,INSERT_VALUES));
+      PetscCall(VecAssemblyBegin(medium->pb));
+      PetscCall(VecAssemblyEnd(medium->pb));
+      /* 
+	 solver
+      */
+      PetscCall(KSPCreate(PETSC_COMM_WORLD, &pksp));
+      PetscCall(KSPSetOperators(pksp, medium->pA, medium->pA));
+      PetscCall(KSPSetType(pksp, KSPPREONLY));
+      PetscCall(KSPGetPC(pksp, &ppc));
+      PetscCall(PCSetType(ppc, PCLU));
+      /* override at run time via -pc_factor_mat_solver_type xxx */
+      PetscCall(PCFactorSetMatSolverType(ppc, MATSOLVERPETSC));
+      PetscCall(KSPSetFromOptions(pksp));
+      /* solve step */
+      PetscCall(KSPSolve(pksp, medium->pb, px));
+      if(medium->debug)
+	PetscCall(KSPView(pksp, PETSC_VIEWER_STDERR_WORLD));
+    
+      /* 
+	 distribute to zero node
+      */
+      PetscCall(VecScatterCreateToZero(px,&ctx,&pxout));
+      // scatter as many times as you need
+      PetscCall(VecScatterBegin(ctx,px,pxout,INSERT_VALUES,SCATTER_FORWARD));
+      PetscCall(VecScatterEnd(ctx,px,pxout,INSERT_VALUES,SCATTER_FORWARD));
+      // destroy scatter context and local vector when no longer needed
+      PetscCall(VecScatterDestroy(&ctx));
+      /* assign to x solution vector */
+      if(medium->comm_rank == 0){
+	PetscCall(VecGetArray(pxout,&values));
+	memcpy(medium->xsol,values,m*sizeof(PetscScalar));
+	PetscCall(VecRestoreArray(pxout,&values));
+	PetscCall(PetscFree(values));
+      }
+      if(medium->debug){
+	PetscCall(VecDuplicate(px, &pr));
+	/* check residual */
+	PetscCall(MatMult(medium->pA, px, pr)); /* r = A x */
+	PetscCall(VecAXPY(pr, -1.0, medium->pb)); /* r <- r - b */
+	PetscCall(VecNorm(pr, NORM_2, &norm));
+	PetscCall(PetscPrintf(PETSC_COMM_WORLD, "Norm of residual %1.10e\n", (double)norm));
+	PetscCall(VecDestroy(&pr));
+      }
+      PetscCall(PetscFree(medium->indices));      
+      PetscCall(VecDestroy(&pxout));
+      PetscCall(VecDestroy(&px));
+      PetscCall(VecDestroy(&medium->pb));
+      PetscCall(MatDestroy(&medium->pA));
+      PetscCall(KSPDestroy(&pksp));
+      /* 
+	 petsc done 
+      */
+#endif
+    }else{			/* serial assembly */
+      isize  = ((long int)sizeof(A_MATRIX_PREC)) * ((long int)medium->nreq*(long int)medium->nreq);
+      fprintf(stderr,"solve: attempting to allocate %g MB for A matrix\n",(double)isize/ONE_MEGABYTE);
+      if((a=(A_MATRIX_PREC *)malloc((size_t)isize)) == NULL){ /* do some testing for memory error */
+	fprintf(stderr,"solve: memory error for unconstrained A: (%p) n: %i by %i dsz: %i tsize: %g MB\n",
+		a,medium->nreq,medium->nreq,(int)sizeof(A_MATRIX_PREC),((double)isize)/ONE_MEGABYTE);
+	/* check what would have been ok */
+	isize  = (long int)((double)isize/10);
+	for(i=1;i<10;i++){
+	  if((a=(A_MATRIX_PREC *)malloc((size_t)(isize*(long int)i)))==NULL){
+	    fprintf(stderr,"solve: failing at %i %g MB\n",i,((double)isize)/(double)(ONE_MEGABYTE));
+	    exit(-1);
+	  }else{
+	    fprintf(stderr,"solve: OK at %i/10\n",i);
+	    free(a);
+	  }
+	}
+	exit(-1);
+      }	
+      if(medium->debug)
+	fprintf(stderr,"solve: unconstrained part A is %5i by %i\n",
+		medium->nreq,medium->nreq);
+      if(medium->use_old_amat){
+	fprintf(stderr,"solve: unconstrained: WARNING: using old A matrix!\n");
+	read_a_matrix_from_file(a,medium->nreq,medium->nreq,A_MATRIX_FILE,
+				"unconstrained A");
+      }else{
+	assemble_a_matrix(a,medium->naflt,medium->sma,medium->nreq,medium->nameaf,
+			  fault,medium);
+      }
+      if(medium->save_amat){// write A in binary to file
+	print_a_matrix_to_file(a,medium->nreq,medium->nreq,
+			       A_MATRIX_FILE,"unconstrained A");
+	print_vector_file(medium->b,medium->nreq,B_VECTOR_FILE,"b vector");
+      }
+      if(medium->debug)
+	if((medium->op_mode == ONE_STEP_CALCULATION)&&(!medium->save_amat))
+	  // output of binary A for debugging
+	  print_a_matrix_to_file(a,medium->nreq,medium->nreq,A_MATRIX_FILE,
+				 "unconstrained A");
+      if((medium->op_mode == ONE_STEP_CALCULATION)||(medium->debug)){
+	// output of solver method only for one-step calculation
+	switch(medium->solver_mode){
+	case LU_SOLVER:
+	  sprintf(solver_name,"LAPACK LU");
+	  break;
+	case SVD_SOLVER:
 #ifdef USE_NUMREC_SVD
-	sprintf(solver_name,"NUMREC SVD (wmax: %.3e)",medium->wcutoff);
+	  sprintf(solver_name,"NUMREC SVD (wmax: %.3e)",medium->wcutoff);
 #else
 #ifdef USE_LAPACK_DAC
-	sprintf(solver_name,"LAPACK SVD (gelsd, wmax: %.3e)",medium->wcutoff);
+	  sprintf(solver_name,"LAPACK SVD (gelsd, wmax: %.3e)",medium->wcutoff);
 #else
-	sprintf(solver_name,"LAPACK SVD (gelss, wmax: %.3e)",medium->wcutoff);
+	  sprintf(solver_name,"LAPACK SVD (gelss, wmax: %.3e)",medium->wcutoff);
 #endif
 #endif
+	  break;
+	case SPARSE_SOLVER:
+	  sprintf(solver_name,"SuperLU sparse LU solver");
+	  break;
+	default:
+	  fprintf(stderr,"solve: error, don't know solver mode %i\n",
+		  medium->solver_mode);
+	  exit(-1);
+	}
+	fprintf(stderr,"solve: unconstrained system, time: %11g, n: %5i, solver mode: %s\n",
+		medium->time,medium->nreq,solver_name);
+      }
+      //
+      // solve A . x = b 
+      //
+      switch(medium->solver_mode){
+      case LU_SOLVER:// should be pretty fast 
+	lu_driver(a,medium->xsol,medium->b,
+		  medium->nreq,medium->nreq,medium);
+	free(a);
+	break;
+      case SVD_SOLVER:// gives least-squares solution in case A is singular
+	
+#ifdef USE_NUMREC_SVD
+	svd_driver_numrec(a,medium->xsol,medium->b,medium->nreq,
+			  medium->nreq,&wcutoff,
+			  medium->op_mode,&wmax,FALSE,
+			  &sv,&dummyp,izero,
+			  FALSE,0,FALSE,TRUE,medium->debug);
+	free(dummyp);
+#else
+	svd_driver_lapack(a,medium->xsol,medium->b,medium->nreq,
+			  medium->nreq,&wcutoff,
+			  medium->op_mode,&wmax,&sv,izero,TRUE,medium->debug);
+#endif
+	if(medium->save_amat){
+	  fprintf(stderr,"solve: saving singular values to %s\n",SV_FILE);
+	  aio=myopen(SV_FILE,"w");
+	  for(i=0;i<medium->nreq;i++)
+	    fprintf(aio,"%20.7e %20.7e\n",sv[i],sv[i]/sv[0]);
+	  fclose(aio);
+	}
+	free(a);free(sv);
 	break;
       case SPARSE_SOLVER:
-	sprintf(solver_name,"SuperLU sparse LU solver");
+#ifndef USE_SUPERLU
+	fprintf(stderr,"solve: unconstrained: the sparse SuperLU driver is only available when SuperLU\n");
+	fprintf(stderr,"solve: unconstrained: support was compiled in. Recompile with -DUSE_SUPERLU set.\n");
+	exit(-1);
+#endif
+	//
+	// the sparse solver is meant only for the one-step 
+	// calculation
+	if(medium->op_mode != ONE_STEP_CALCULATION){
+	  fprintf(stderr,"solve: unconstrained: the sparse Ax=b solver is no good for loading simulations\n");
+	  fprintf(stderr,"solve: unconstrained: choose SVD or LU, instead\n");
+	  exit(-1);
+	}
+	// print A matrix to file if not printed already
+	if(!medium->save_amat)
+	  print_a_matrix_to_file(a,medium->nreq,medium->nreq,
+				 A_MATRIX_FILE,"unconstrained A");
+	// free A and open file pointer
+	free(a);aio=myopen(A_MATRIX_FILE,"r");
+	full_size =  sizeof(A_MATRIX_PREC) * SQUARE(medium->nreq);
+	fprintf(stderr,"solve: unconstrained converting A (full size: %g MB) to sparse, coff: %g\n",
+		(double)full_size/ONE_MEGABYTE,medium->i_mat_cutoff);
+	// create a CCS sparse representation 
+	sparse_size = create_ccs_sparse_from_file(medium->nreq,
+						  medium->i_mat_cutoff,
+						  &medium->is1,&medium->is2,
+						  &medium->val,aio);
+	fclose(aio);
+	if(medium->debug){
+	  if(!medium->save_amat){// if A is not to be saved, remove
+	    sprintf(command_str,"rm %s",A_MATRIX_FILE);
+	    system(command_str);
+	  }
+	}
+	fprintf(stderr,"solve: unconstrained: conversion complete (sparse size: %g MB) gain: %g\n",
+		(double)sparse_size/ONE_MEGABYTE,
+		(COMP_PRECISION)full_size/(COMP_PRECISION)sparse_size);
+	//
+	// solve CCS sparse system
+	//
+	sparse_driver(medium->is1, medium->is2,medium->val, medium->xsol, medium->b,
+		      medium->nreq,medium);
+	// free sparse matrix pointers
+	free(medium->is1);free(medium->is2);free(medium->val);
 	break;
       default:
-	fprintf(stderr,"solve: error, don't know solver mode %i\n",
+	fprintf(stderr,"solve: unconstrained: solver mode %i undefined\n",
 		medium->solver_mode);
 	exit(-1);
       }
-      fprintf(stderr,"solve: unconstrained system, time: %11g, n: %5i, solver mode: %s\n",
-	      medium->time,medium->nreq,solver_name);
-    }
-    //
-    // solve A . x = b 
-    //
-    switch(medium->solver_mode){
-    case LU_SOLVER:// should be pretty fast 
-      lu_driver(a,medium->xsol,medium->b,
-		medium->nreq,medium->nreq,medium);
-      free(a);
-      break;
-    case SVD_SOLVER:// gives least-squares solution in case A is singular
-
-#ifdef USE_NUMREC_SVD
-      svd_driver_numrec(a,medium->xsol,medium->b,medium->nreq,
-			medium->nreq,&wcutoff,
-			medium->op_mode,&wmax,FALSE,
-			&sv,&dummyp,izero,
-			FALSE,0,FALSE,TRUE,medium->debug);
-      free(dummyp);
-#else
-      svd_driver_lapack(a,medium->xsol,medium->b,medium->nreq,
-			medium->nreq,&wcutoff,
-			medium->op_mode,&wmax,&sv,izero,TRUE,medium->debug);
-#endif
-      if(medium->save_amat){
-	fprintf(stderr,"solve: saving singular values to %s\n",SV_FILE);
-	aio=myopen(SV_FILE,"w");
-	for(i=0;i<medium->nreq;i++)
-	  fprintf(aio,"%20.7e %20.7e\n",sv[i],sv[i]/sv[0]);
-	fclose(aio);
-      }
-      free(a);free(sv);
-      break;
-    case SPARSE_SOLVER:
-#ifndef USE_SUPERLU
-      fprintf(stderr,"solve: unconstrained: the sparse SuperLU driver is only available when SuperLU\n");
-      fprintf(stderr,"solve: unconstrained: support was compiled in. Recompile with -DUSE_SUPERLU set.\n");
-      exit(-1);
-#endif
-      //
-      // the sparse solver is meant only for the one-step 
-      // calculation
-      if(medium->op_mode != ONE_STEP_CALCULATION){
-	fprintf(stderr,"solve: unconstrained: the sparse Ax=b solver is no good for loading simulations\n");
-	fprintf(stderr,"solve: unconstrained: choose SVD or LU, instead\n");
-	exit(-1);
-      }
-      // print A matrix to file if not printed already
-      if(!medium->save_amat)
-	print_a_matrix_to_file(a,medium->nreq,medium->nreq,
-			       A_MATRIX_FILE,"unconstrained A");
-      // free A and open file pointer
-      free(a);aio=myopen(A_MATRIX_FILE,"r");
-      full_size =  sizeof(A_MATRIX_PREC) * SQUARE(medium->nreq);
-      fprintf(stderr,"solve: unconstrained converting A (full size: %g MB) to sparse, coff: %g\n",
-	      (double)full_size/ONE_MEGABYTE,medium->i_mat_cutoff);
-      // create a CCS sparse representation 
-      sparse_size = create_ccs_sparse_from_file(medium->nreq,
-						medium->i_mat_cutoff,
-						&medium->is1,&medium->is2,
-						&medium->val,aio);
-      fclose(aio);
-      if(medium->debug){
-	if(!medium->save_amat){// if A is not to be saved, remove
-	  sprintf(command_str,"rm %s",A_MATRIX_FILE);
-	  system(command_str);
-	}
-      }
-      fprintf(stderr,"solve: unconstrained: conversion complete (sparse size: %g MB) gain: %g\n",
-	      (double)sparse_size/ONE_MEGABYTE,
-	      (COMP_PRECISION)full_size/(COMP_PRECISION)sparse_size);
-      //
-      // solve CCS sparse system
-      //
-      sparse_driver(medium->is1, medium->is2,medium->val, medium->xsol, medium->b,
-		    medium->nreq,medium);
-      // free sparse matrix pointers
-      free(medium->is1);free(medium->is2);free(medium->val);
-      break;
-    default:
-      fprintf(stderr,"solve: unconstrained: solver mode %i undefined\n",
-	      medium->solver_mode);
-      exit(-1);
-    }
-    // write x to stderr
-    //print_b_vector(medium->xsol,medium->nreq,stderr,&dummy,FALSE);
+      // write x to stderr
+      //print_b_vector(medium->xsol,medium->nreq,stderr,&dummy,FALSE);
+    } /* end serial direct solve part */
   }else if(medium->nreq_con){
+    if(medium->comm_size>1){
+      if(medium->comm_rank==0)
+	fprintf(stderr,"solve: NNLS only serial, %i cores requested\n",medium->comm_size);
+      exit(-1);
+    }
     /*
 
       SOLUTION OF CONSTRAINED SET OF EQUATIONS 
@@ -386,115 +527,6 @@ void solve(struct med *medium,struct flt *fault)
   */
   if(medium->debug)
     fprintf(stderr,"solve: solvers done\n");
-}
-
-/* 
-   reset all eqn systems and counters 
-*/
-
-void init_equation_system(struct med *medium,struct flt *fault)
-{
-  int i;
-  static my_boolean initialized=FALSE;
-  // reset the active equation counters for normal and
-  medium->naflt=medium->nreq=0;
-  // positivity constraint equations
-  medium->naflt_con=medium->nreq_con=0;
-  if(!initialized){// first time allocation
-    initialized=TRUE;
-  }else{
-    // were allocated already, need to free them first
-    // why did the reallocate version cease to work at 
-    // some point?
-    free(medium->sma);free(medium->sma_con);
-    free(medium->nameaf);free(medium->nameaf_con);
-    free(medium->b);free(medium->b_con);
-    free(medium->xsol);free(medium->xsol_con);
-  }
-  medium->sma=(my_boolean *)malloc(3*sizeof(my_boolean));
-  medium->sma_con=(my_boolean *)malloc(3*sizeof(my_boolean));
-  for(i=0;i<3;i++){
-    medium->sma[i]=INACTIVE;
-    medium->sma_con[i]=INACTIVE;
-  }
-  medium->nameaf=(int *)calloc(1,sizeof(int));
-  medium->nameaf_con =(int *)calloc(1,sizeof(int)); 
-  medium->b=(A_MATRIX_PREC *)calloc(1,sizeof(A_MATRIX_PREC));
-  medium->xsol=(A_MATRIX_PREC *)calloc(1,sizeof(A_MATRIX_PREC));
-  medium->b_con=(A_MATRIX_PREC *)calloc(1,sizeof(A_MATRIX_PREC));
-  medium->xsol_con=(A_MATRIX_PREC *)calloc(1,sizeof(A_MATRIX_PREC));
-  if(medium->debug)
-    if((!medium->sma)||(!medium->sma_con)||(!medium->nameaf)||
-       (!medium->nameaf_con)||(!medium->b)||(!medium->b_con)||
-       (!medium->xsol)||!(medium->xsol_con))
-      MEMERROR("solve: init_equation_system:");
-  // reset all fault activation flags
-  for(i=0;i<medium->nrflt;i++)
-    fault[i].active=FALSE;
-  // reset all group activation flags
-  medium->nr_active_groups=0;
-  for(i=0;i<medium->nrgrp;i++)
-    medium->fault_group[i].active=FALSE;
-}
-
-/* 
-
-   add fault to active fault list and increment counter 
-
-*/
-void add_to_active_fault_list(int aflt,int **al,int *naf,my_boolean **sma)
-{
-  int ip;
-  /* assign active fault name */
-  (*al)[*naf]=aflt;
-#ifdef DEBUG
-  // check codes which have been assigned already
-  if((*(*sma+ *naf*3)>3)||(*(*sma+ *naf*3+1)>3)||(*(*sma+ *naf*3+2)>3)){
-    fprintf(stderr,"add_to_active_fault_list: fault %i: code screw up: sma 1/2/3: %i %i %i\n",
-	    *naf,*(*sma+ *naf*3),*(*sma+ *naf*3+1),*(*sma+ *naf*3+2));
-    exit(-1);
-  }
-#endif
-  // increment number of active faults, now *naf is new index
-  *naf += 1;
-  /* grow slide mode array */
-  if((*sma=(my_boolean *)realloc(*sma,sizeof(my_boolean)*3*
-			      (*naf+1)))==NULL)
-    MEMERROR("add_to_active_fault_list: 1");
-  // zero out new codes
-  ip = *naf * 3;
-  *(*sma + ip + STRIKE)=INACTIVE;
-  *(*sma + ip + DIP)=   INACTIVE;
-  *(*sma + ip + NORMAL)=INACTIVE;
-  /* grow active fault array */
-  if((*al=(int *)realloc(*al,sizeof(int)*(*naf+1)))==NULL)
-    MEMERROR("add_to_active_fault_list: 2");
-}
-
-/* 
-
-   add to x value to right hand side (b), grow b, grow x, 
-   and increment counter 
-
-*/
-void add_to_right_hand_side(COMP_PRECISION bval,A_MATRIX_PREC **b,
-			    COMP_PRECISION **xsol, int *nreq)
-{
-  size_t i;
-  (*b)[*nreq]=(A_MATRIX_PREC)bval;
-  *nreq += 1;//increment equation counter
-  // resizing size
-  i= (*nreq + 1)*sizeof(A_MATRIX_PREC);
-  // grow b
-  if((*b=(A_MATRIX_PREC *)realloc(*b,i))==NULL)
-    MEMERROR("add_to_right_hand_side:");
-  // grow x
-  if((*xsol=(A_MATRIX_PREC *)realloc(*xsol,i))==NULL)
-    MEMERROR("add_to_right_hand_side:");
-#ifdef SUPER_DUPER_DEBUG
-  fprintf(stderr,"add_to_right_hand_side: adding %20.10e as eq. %5i\n",
-	  bval,*nreq);
-#endif
 }
 
 /* 
@@ -628,4 +660,83 @@ void assemble_ap_matrix(A_MATRIX_PREC *a,int naflt,int naflt_con,
 }
 #endif
 
+#ifdef USE_PETSC
 
+
+int par_assemble_a_matrix(int naflt,my_boolean *sma,int nreq,int *nameaf,
+			  struct flt *fault,struct med *medium)
+{
+  /*
+    see routine below for the logic of the stress assignments
+  */
+  PetscInt i,j,k,l,eqc1,eqc2,eqc2nreq,ip1,ip2;
+  PetscScalar cf,avalue,itmp;
+  int iret;
+  fprintf(stderr,"par_assemble_a_matrix: core %03i/%03i: assigning row %5i to %i\n",
+	  medium->comm_rank,medium->comm_size,medium->rs,medium->re);
+  
+  // dimensions of A matrix (without b column)
+  // m = n = nreq;
+  /*
+    COMMENT: the flipped sign for constrained
+    faults was determined in interact.c
+    
+    nameaf[i]: observing fault
+    j: stress component on observing fault
+    nameaf[k]: slipping fault
+    l: slip mode on slipping fault
+    
+  */
+  for(eqc1=ip1=i=0;i < naflt;i++,ip1+=3){
+    for(j=0;j < 3;j++){
+      if(sma[ip1+j]){
+	// normal correction for Coulomb?
+	cf = (j==NORMAL)?(0.0):fault[nameaf[i]].cf[j];
+	
+	for(eqc2=eqc2nreq=ip2=k=0;k < naflt;k++,ip2+=3){ /* fast loop */
+	  
+	  for(l=0;l < 3;l++){
+	    if(sma[ip2+l]){// flip around matrix ordering
+	      
+	      if((eqc1 >= medium->rs)&&(eqc1 < medium->re)){
+		/* 
+		   actually compute
+		*/
+#ifdef SUPER_DUPER_DEBUG
+		if(cf != 0.0)
+		  fprintf(stderr,"par_assemble_a_matrix: i: %i j: %i k: %i l: %i cf: %g\n",
+			  (int)nameaf[i],(int)nameaf[k],(int)l,(int)j,cf);
+#endif
+		if(medium->no_interactions && (fault[i].group != fault[k].group)){
+		  avalue = 0;
+		}else{
+		  //
+		  // calculate interaction coefficients right now
+		  //
+		  avalue = (PetscScalar)
+		    interaction_coefficient(nameaf[i],nameaf[k],l,j,fault,&iret);
+		  if(cf != 0.0){	/* coulomb addition */
+		    itmp=(PetscScalar)
+		      interaction_coefficient(nameaf[i],nameaf[k],l,NORMAL,fault,&iret);
+		    if(iret){
+		      fprintf(stderr,"assemble_a_matrix_3: WARNING: encountered iret: i/j/k/l: %i/%i/%i/%i\n",
+			      (int)nameaf[i],(int)nameaf[k],(int)l,(int)j);
+		      itmp=0.0;
+		    }
+		    avalue +=  itmp * cf;
+		  }
+		}
+	   	PetscCall(MatSetValue(medium->pA, eqc1, eqc2, avalue, ADD_VALUES));
+	      }
+	      eqc2++;
+	      eqc2nreq += nreq;
+	    }
+	  }
+	}
+	eqc1++; 
+      }
+    }
+  }
+}
+
+#endif

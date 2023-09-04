@@ -31,8 +31,13 @@ void check_parameters_and_init(int argc, char **argv,
   short int solver_mode;
   COMP_PRECISION pressure,med_cohesion,min_stress_drop,wcutoff;
   I_MATRIX_PREC i_mat_cutoff;
-  fprintf(stderr,"init: version: $Id: init.c,v 2.51 2011/01/09 02:02:43 becker Exp $\n");
-  fprintf(stderr,"init: compiled on %s %s\n",__DATE__,__TIME__);
+  if((*medium)->comm_rank==0){
+    fprintf(stderr,"init: version: $Id: init.c,v 2.51 2011/01/09 02:02:43 becker Exp $\n");
+    if((*medium)->comm_size==1)
+      fprintf(stderr,"init: compiled on %s %s, running in serial\n",__DATE__,__TIME__);
+    else
+      fprintf(stderr,"init: compiled on %s %s, running on %i cores\n",__DATE__,__TIME__,(*medium)->comm_size);
+  }
   // initialization phase, get parameters from command
   // line options
   init_parameters(argv,argc, &read_fault_properties,
@@ -48,7 +53,7 @@ void check_parameters_and_init(int argc, char **argv,
 		  &suppress_nan_output,&geomview_output,&pressure,
 		  &twod_approx_is_plane_stress,&print_plane_coord,
 		  &half_plane,&variable_time_step,&debug,&wcutoff,
-		  &no_interactions);
+		  &no_interactions,(*medium)->comm_rank);
   // load files, etc
   initialize(medium,fault,read_fault_properties,max_nr_flt_files,
 	     suppress_interactions,whole_fault_mode,med_cohesion,a,b,
@@ -100,14 +105,16 @@ void initialize(struct med **medium, struct flt **fault,
   // first, need the FAULT GEOMETRY, and calculate the position of patches
   // also, allocate space and initialize the medium structure
   //
+  
   read_geometry(GEOMETRY_FILE,medium,fault,read_fault_properties,
 		twod_approx_is_plane_stress,half_plane,TRUE);
-  fprintf(stderr,"initialize: all stress values are based on a shear modulus of %g\n",
-	  SHEAR_MODULUS);
+  if((*medium)->comm_rank==0)
+    fprintf(stderr,"initialize: all stress values are based on a shear modulus of %g\n",
+	    SHEAR_MODULUS);
   // assign the background pressure 
   (*medium)->pressure = pressure;
   // read in the background stressing factors, 
-  read_stress_fac(read_stress_relation_factors,a,b,pressure);
+  read_stress_fac(read_stress_relation_factors,a,b,pressure,*medium);
   /* check for time stepping before reading in BCs */
   (*medium)->variable_time_step = variable_time_step;
   if(!(*medium)->variable_time_step)
@@ -263,7 +270,7 @@ void initialize(struct med **medium, struct flt **fault,
 */
 void init_files(struct med **medium,struct flt **fault)
 {
-  int i,serr;
+  int i;
   char tmpstring[STRLEN],tmpstring2[STRLEN];
   /* 
      initialize files 
@@ -330,54 +337,7 @@ void init_files(struct med **medium,struct flt **fault)
     }
   }
 }
-/*
 
-  close files and clean up
-
- */
-
-void terminate(struct med *medium, struct flt *fault)
-{
-  int i,serr;
-  char tmpstr[STRLEN];
-  fprintf(stderr,"terminate: closing files and cleaning up\n");
-  if(medium->flt_stress_init){
-    for(i=0;i<medium->nrgrp;i++)
-      fclose(medium->flt_stress_out[i]);
-  }
-  if(medium->events_init){
-    fclose(medium->events_out); 
-    /* purge the rest of the activations, if any */
-    if(medium->moment_release_init)
-      flush_moment_stack(medium);
-    fclose(medium->cevents_out);
-  }
-  if(medium->slip_line_init)
-    for(i=0;i<medium->nrgrp;i++)
-      fclose(medium->slip_line_out[i]);
-  if(medium->read_int_mat_from_file){// I matrix was written to file
-    fclose(medium->i_mat_in);
-    if(medium->save_imat)// we want to save it
-      fprintf(stderr,"terminate: WARNING: leaving I matrix files \"%s\" and \"%s\" (big?)\n",
-	      medium->mfname,medium->hfname);
-    else{// we shall remove the I matrix
-      fprintf(stderr,"terminate: removing the interaction matrix files \"%s\" and \"%s\"\n",
-	       medium->mfname,medium->hfname);
-      snprintf(tmpstr,STRLEN,"rm  %s %s.hdr",medium->mfname,medium->hfname);
-      serr = system(tmpstr);
-      if(serr){
-	fprintf(stderr,"initialize: error with %s\n",tmpstr);
-	exit(-1);
-      }
-    }
-  }else{// I matrix was kept in memory but might still be on file
-    ;
-  }
-#ifdef USE_PGPPLOT
-  close_plot_window(medium,fault);
-#endif 
-  exit(medium->op_state);
-}
 
 void init_parameters(char **argv, int argc, my_boolean *read_fault_properties,
 		     my_boolean *read_initial_fault_stress,
@@ -402,7 +362,8 @@ void init_parameters(char **argv, int argc, my_boolean *read_fault_properties,
 		     my_boolean *variable_time_step,
 		     my_boolean *debug,
 		     COMP_PRECISION *wcutoff,
-		     my_boolean *no_interactions)
+		     my_boolean *no_interactions,
+		     int rank)
 {
   int i;
   /* 
@@ -443,7 +404,8 @@ void init_parameters(char **argv, int argc, my_boolean *read_fault_properties,
   */
   for(i=1;i<argc;i++){
     if(strcmp(argv[i],"-h")==0 || strcmp(argv[i],"-?")==0){// help
-      phelp();
+      if(rank==0)
+	phelp();
       exit(-1);
     }else if(strcmp(argv[i],"-f")==0){// fault prop file
       toggle(read_fault_properties);
@@ -499,8 +461,10 @@ void init_parameters(char **argv, int argc, my_boolean *read_fault_properties,
       advance_argument(&i,argc,argv);
       sscanf(argv[i],ONE_CP_FORMAT,med_cohesion);
 #ifdef NO_COHESION
-      fprintf(stderr,"init_parameters program was compiled with NO_COHESION option\n");
-      fprintf(stderr,"init_parameters therefore, cohesion is always zero and -c does not make sense\n");
+      if(rank == 0){
+	fprintf(stderr,"init_parameters program was compiled with NO_COHESION option\n");
+	fprintf(stderr,"init_parameters therefore, cohesion is always zero and -c does not make sense\n");
+      }
       exit(-1);
 #endif
     }else if(strcmp(argv[i],"-ms")==0){// minimum stress drop
@@ -519,9 +483,17 @@ void init_parameters(char **argv, int argc, my_boolean *read_fault_properties,
     }else if(strcmp(argv[i],"-wc")==0){// SVD wmax
       advance_argument(&i,argc,argv);
       sscanf(argv[i],ONE_CP_FORMAT,wcutoff);
+#ifdef USE_PETSC
+      /* petsc options for pass through */
+    }else if(strcmp(argv[i],"-pc_factor_mat_solver_type")){
+      advance_argument(&i,argc,argv);
+    }else if(strcmp(argv[i],"-mat_type")){
+      advance_argument(&i,argc,argv);
+#endif
     }else{
-      fprintf(stderr,"init_parameters can not use parameter %s, use -h for help page\n",
-	      argv[i]);
+      if(rank == 0)
+	fprintf(stderr,"init_parameters can not use parameter %s, use -h for help page\n",
+		argv[i]);
       exit(-1);
     }
   }
@@ -570,7 +542,8 @@ my_boolean toggle(my_boolean *variable)
 
 */
 void read_stress_fac(my_boolean read_stress_relation_factors,COMP_PRECISION *a,
-		     COMP_PRECISION *b, COMP_PRECISION bpressure)
+		     COMP_PRECISION *b, COMP_PRECISION bpressure,
+		     struct med *medium)
 {
   int i;
   FILE *in;
@@ -583,59 +556,71 @@ void read_stress_fac(my_boolean read_stress_relation_factors,COMP_PRECISION *a,
   // default is simple shear, \sigma_xy
   b[1]=STRESSING_RATE;
   //
-  if(!read_stress_relation_factors)
-     fprintf(stderr,"read_stress_fac: using default simple shear stress relation for loading\n");
-  else if(!(in=fopen(STRESS_RELATION_FILE,"r"))){
-    fprintf(stderr,"read_stress_fac: can not open \"%s\", will use default background stressing\n",
-	    STRESS_RELATION_FILE);
+  if(!read_stress_relation_factors){
+    HEADNODE
+      fprintf(stderr,"read_stress_fac: using default simple shear stress relation for loading\n");
+  }else if(!(in=fopen(STRESS_RELATION_FILE,"r"))){
+    HEADNODE
+      fprintf(stderr,"read_stress_fac: can not open \"%s\", will use default background stressing\n",
+	      STRESS_RELATION_FILE);
   }else{
     for(i=0;i < 6;i++)// read in in sxx sxy sxz syy syz szz format for A and B
       if(fscanf(in,TWO_CP_FORMAT,(a+i),(b+i))!=2){
-	fprintf(stderr,"read_stress_fac: error reading, need six a_i b_i pairs\n");
+	HEADNODE
+	  fprintf(stderr,"read_stress_fac: error reading, need six a_i b_i pairs\n");
 	exit(-1);
       }
     fclose(in);
-    fprintf(stderr,"read_stress_fac: read stress relation in vec[6] format from \"%s\"\n",
-	    STRESS_RELATION_FILE);
+    HEADNODE
+      fprintf(stderr,"read_stress_fac: read stress relation in vec[6] format from \"%s\"\n",
+	      STRESS_RELATION_FILE);
   }
   // default location to evaluate stress
   // (doesn't matter if stress is homogeneous)
   x[INT_X] = x[INT_Y] = x[INT_Z] = 0.0;
   if(bpressure != 0.0){
 #ifdef HYDROSTATIC_PRESSURE
-    fprintf(stderr,"read_stress_fac: to this a depth dependent background pressure of %g will be added\n",
-	    bpressure);
+    HEADNODE
+      fprintf(stderr,"read_stress_fac: to this a depth dependent background pressure of %g will be added\n",
+	      bpressure);
 #else
-    fprintf(stderr,"read_stress_fac: to this a constant background pressure of %g will be added\n",
-	    bpressure);
+    HEADNODE
+      fprintf(stderr,"read_stress_fac: to this a constant background pressure of %g will be added\n",
+	      bpressure);
 #endif
   }
   // stress at time t=0
-  fprintf(stderr,"read_stress_fac: at x:(%10.3e, %10.3e, %10.3e) and time t: 0\n",
-	  x[INT_X],x[INT_Y],x[INT_Z]);
+  HEADNODE
+    fprintf(stderr,"read_stress_fac: at x:(%10.3e, %10.3e, %10.3e) and time t: 0\n",
+	    x[INT_X],x[INT_Y],x[INT_Z]);
   background_stress(sm,x,0.0,a,b,bpressure);
-  fprintf(stderr,"read_stress_fac: stress matrix: ((%10.3e,%10.3e,%10.3e),\n",
-	  sm[INT_X][INT_X],sm[INT_X][INT_Y],sm[INT_X][INT_Z]);
-  fprintf(stderr,"read_stress_fac: stress matrix:  (%10.3e,%10.3e,%10.3e),\n",
-	  sm[INT_Y][INT_X],sm[INT_Y][INT_Y],sm[INT_Y][INT_Z]);	 
-  fprintf(stderr,"read_stress_fac: stress matrix:  (%10.3e,%10.3e,%10.3e))\n",
-	  sm[INT_Z][INT_X],sm[INT_Z][INT_Y],sm[INT_Z][INT_Z]);
+  HEADNODE{
+    fprintf(stderr,"read_stress_fac: stress matrix: ((%10.3e,%10.3e,%10.3e),\n",
+	    sm[INT_X][INT_X],sm[INT_X][INT_Y],sm[INT_X][INT_Z]);
+    fprintf(stderr,"read_stress_fac: stress matrix:  (%10.3e,%10.3e,%10.3e),\n",
+	    sm[INT_Y][INT_X],sm[INT_Y][INT_Y],sm[INT_Y][INT_Z]);	 
+    fprintf(stderr,"read_stress_fac: stress matrix:  (%10.3e,%10.3e,%10.3e))\n",
+	    sm[INT_Z][INT_X],sm[INT_Z][INT_Y],sm[INT_Z][INT_Z]);
+  }
   // deviatoric
   calc_deviatoric_stress(sm,dm,&loc_pressure,&s2);
-  fprintf(stderr,"read_stress_fac: dev. stress vec: (%10.3e, %10.3e, %10.3e, %10.3e, %10.3e, %10.3e) pressure: %10.3e sII: %10.3e\n",
-	  dm[INT_X][INT_X],dm[INT_X][INT_Y],dm[INT_X][INT_Z],
-	  dm[INT_Y][INT_Y],dm[INT_Y][INT_Z],dm[INT_Z][INT_Z],loc_pressure,s2);
-
+  HEADNODE
+    fprintf(stderr,"read_stress_fac: dev. stress vec: (%10.3e, %10.3e, %10.3e, %10.3e, %10.3e, %10.3e) pressure: %10.3e sII: %10.3e\n",
+	    dm[INT_X][INT_X],dm[INT_X][INT_Y],dm[INT_X][INT_Z],
+	    dm[INT_Y][INT_Y],dm[INT_Y][INT_Z],dm[INT_Z][INT_Z],loc_pressure,s2);
+  
   // stress at time t=1
   background_stress(sm,x,1.0,a,b,bpressure);
   calc_deviatoric_stress(sm,dm,&loc_pressure,&s2);
-  fprintf(stderr,"read_stress_fac: at x:(%10.3e, %10.3e, %10.3e) and time t: 1\n",x[INT_X],x[INT_Y],x[INT_Z]);
-  fprintf(stderr,"read_stress_fac: dev. stress vec: (%10.3e, %10.3e, %10.3e, %10.3e, %10.3e, %10.3e) pressure: %10.3e sII: %10.3e\n",
-	  dm[INT_X][INT_X],dm[INT_X][INT_Y],dm[INT_X][INT_Z],dm[INT_Y][INT_Y],dm[INT_Y][INT_Z],dm[INT_Z][INT_Z],
-	  loc_pressure,s2);
-
+  HEADNODE{
+    fprintf(stderr,"read_stress_fac: at x:(%10.3e, %10.3e, %10.3e) and time t: 1\n",x[INT_X],x[INT_Y],x[INT_Z]);
+    fprintf(stderr,"read_stress_fac: dev. stress vec: (%10.3e, %10.3e, %10.3e, %10.3e, %10.3e, %10.3e) pressure: %10.3e sII: %10.3e\n",
+	    dm[INT_X][INT_X],dm[INT_X][INT_Y],dm[INT_X][INT_Z],dm[INT_Y][INT_Y],dm[INT_Y][INT_Z],dm[INT_Z][INT_Z],
+	    loc_pressure,s2);
+  }
   if(fabs(loc_pressure) < EPS_COMP_PREC)
-    fprintf(stderr,"read_stress_fac: WARNING: total background pressure is zero\n");
+    HEADNODE
+      fprintf(stderr,"read_stress_fac: WARNING: total background pressure is zero\n");
 }
 
 

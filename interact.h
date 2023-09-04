@@ -42,6 +42,10 @@
 #ifdef USE_GEOPROJECT
 #include "gmt.h" 
 #endif
+
+#ifdef USE_PETSC
+#include <petscksp.h>
+#endif
 /* list of projections
 
 don't expect anything to work....
@@ -392,3 +396,5 @@ void assemble_ap_matrix_3(A_MATRIX_PREC *,int ,int ,my_boolean *,my_boolean *,in
 			  int *,int *,struct flt *,struct med *);
 void assemble_ap_matrix_4(A_MATRIX_PREC *,int ,int ,my_boolean *,my_boolean *,int ,int ,
 			  int *,int *,struct flt *,struct med *);
+
+int par_assemble_a_matrix(int ,my_boolean *,int ,int *,struct flt *,struct med *);

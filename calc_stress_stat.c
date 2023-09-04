@@ -20,7 +20,7 @@ int main(int argc, char **argv)
   my_boolean check_stress,check_mu;
   struct flt *fault;
   struct med *medium;
-
+  medium=(struct med *)calloc(1,sizeof(struct med));
   // defaults
   mode = 0;
   nr_spc_bins=40;

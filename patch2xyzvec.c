@@ -15,6 +15,7 @@ int main(int argc, char **argv)
   COMP_PRECISION *dummy;
   int i;
   int opmode=XYZ_AND_VEC_MODE;
+  medium=(struct med *)calloc(1,sizeof(struct med));
   if(argc != 1){
     fprintf(stderr,"%s \n\t reads in patch format from stdin and writes corners and vectors to stdout\n",
 	    argv[0]);

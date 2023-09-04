@@ -14,6 +14,7 @@ int main(int argc,char **argv)
   struct flt *fault;
   int evil_pair[2];
   my_boolean bailout=TRUE;
+  medium=(struct med *)calloc(1,sizeof(struct med));
   switch(argc){
   case 2:{
     break;

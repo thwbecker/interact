@@ -21,6 +21,8 @@ int main(int argc, char **argv)
   my_boolean shrink_patches=FALSE,read_slip=FALSE;
   COMP_PRECISION fixed_range=0.025;
   char filename[2000];
+  medium=(struct med *)calloc(1,sizeof(struct med)); 
+  
   if(argc >= 2){
     sscanf(argv[1],"%i",&i);
     shrink_patches = (my_boolean)i;

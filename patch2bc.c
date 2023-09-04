@@ -13,6 +13,7 @@ int main(int argc, char **argv)
   int i;
   int opmode=BC_OUT_MODE;
   COMP_PRECISION *dummy;
+  medium=(struct med *)calloc(1,sizeof(struct med));
   if(argc!=1){
     fprintf(stderr,"%s: reads in patch format from stdin and writes bc.in modes to stdout\n",
 	    argv[0]);

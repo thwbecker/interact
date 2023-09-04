@@ -56,12 +56,11 @@ void assemble_ap_matrix_4(A_MATRIX_PREC *a,int naflt,int naflt_con,
   /*
     see routine below for the logic of the stress assignments
   */
-  int i,j,k,l,eqc1,eqc2,m,namef1tmp,namef2tmp,allflt,ip1,ip2,
-    eqc2m;
+  long int i,j,k,l,eqc1,eqc2,m,namef1tmp,namef2tmp,allflt,ip1,ip2,eqc2m;
   A_MATRIX_PREC cf;
   my_boolean sma1tmp,sma2tmp;
 #ifdef DEBUG
-  int n;
+  long int n;
 #endif
 #ifndef COMP_MODE_1
   A_MATRIX_PREC itmp;
@@ -71,7 +70,7 @@ void assemble_ap_matrix_4(A_MATRIX_PREC *a,int naflt,int naflt_con,
   fprintf(stderr,"assemble_ap_matrix_3: assembling matrix and calculating interaction coefficients\n");
 #endif
   // dimensions of A matrix (without b column)
-  m=nreq+nreq_con;
+  m = nreq + nreq_con;
 #ifdef DEBUG
   n=m;
 #endif
@@ -88,7 +87,7 @@ void assemble_ap_matrix_4(A_MATRIX_PREC *a,int naflt,int naflt_con,
 #ifdef DEBUG
 	if(eqc1 >= m){
 	  fprintf(stderr,"assemble_ap_matrix: i (slow) index out of bounds %i, vs. m: %i\n",
-		  eqc1,m);
+		  (int)eqc1,(int)m);
 	  exit(-1);
 	}
 #endif
@@ -115,7 +114,7 @@ void assemble_ap_matrix_4(A_MATRIX_PREC *a,int naflt,int naflt_con,
 #ifdef DEBUG
 	      if(eqc2 >= n){
 		fprintf(stderr,"assemble_ap_matrix: j (fast) index out of bounds %i, vs. n: %i\n",
-			eqc2,n);
+			(int)eqc2,(int)n);
 		exit(-1);
 	      }
 #endif
@@ -141,7 +140,7 @@ void assemble_ap_matrix_4(A_MATRIX_PREC *a,int naflt,int naflt_con,
 							    NORMAL,fault,&iret);
 		if(iret){
 		  fprintf(stderr,"assemble_ap_matrix_3: WARNING: encountered iret: i/j/k/l: %i/%i/%i/%i\n",
-			  namef1tmp,namef2tmp,l,j);
+			  (int)namef1tmp,(int)namef2tmp,(int)l,(int)j);
 		  itmp=0.0;
 		}
 		*(a+eqc2m+eqc1) +=  (A_MATRIX_PREC) itmp * cf;
@@ -166,7 +165,7 @@ void assemble_ap_matrix_4(A_MATRIX_PREC *a,int naflt,int naflt_con,
 		  *(a+eqc2m+eqc1) = 0.0;
 #ifdef SUPER_DEBUG
 	      fprintf(stderr,"assemble_ap_matrix: i:%3i j:%i(%i) %e\n",
-		      eqc2,eqc1,m,*(a+eqc2m+eqc1));
+		      (int)eqc2,(int)eqc1,(int)m,*(a+eqc2m+eqc1));
 #endif
 	      eqc2++;
 	      eqc2m += m;
@@ -204,15 +203,16 @@ void assemble_a_matrix_4(A_MATRIX_PREC *a,int naflt,
 			 struct flt *fault,struct med *medium)
 #endif
 {
-  long int i,j,k,l,eqc1,eqc2,eqc2nreq,ip1,ip2,istep;
+  long int i,j,k,l,eqc1,eqc2,eqc2nreq,ip1,ip2;
   A_MATRIX_PREC cf;
 #ifndef COMP_MODE_1
   A_MATRIX_PREC itmp;
 #endif
 #ifdef COMP_MODE_3
-  int iret;
-#endif
+  int iret,istep;
   istep = naflt/10+1;
+#endif
+
   /*
     COMMENT: the flipped sign for constrained
     faults was determined in interact.c
@@ -261,7 +261,7 @@ void assemble_a_matrix_4(A_MATRIX_PREC *a,int naflt,
 		 itmp=(A_MATRIX_PREC)interaction_coefficient(nameaf[i],nameaf[k],l,NORMAL,fault,&iret);
 		 if(iret){
 		   fprintf(stderr,"assemble_a_matrix_3: WARNING: encountered iret: i/j/k/l: %i/%i/%i/%i\n",
-			   nameaf[i],nameaf[k],l,j);
+			   nameaf[i],nameaf[k],(int)l,(int)j);
 		   itmp=0.0;
 		 }
 		 *(a+eqc2nreq+eqc1) +=  (A_MATRIX_PREC) itmp * cf;
@@ -269,7 +269,7 @@ void assemble_a_matrix_4(A_MATRIX_PREC *a,int naflt,
 	       if(medium->debug)
 		 if((i < 15)&&(j<15))
 		   fprintf(stderr,"assemble_a_matrix_3: f1 %3i f2 %3i i1 %i i2 %i %12.3e\n",
-			   i,k,j,l,*(a+eqc2nreq+eqc1));
+			   (int)i,(int)k,(int)j,(int)l,*(a+eqc2nreq+eqc1));
 	       
 #else
 	      // have I matrix in numerical recipes 

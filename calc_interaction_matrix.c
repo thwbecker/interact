@@ -15,6 +15,8 @@ int main(int argc, char **argv)
   struct med *medium;
   struct flt *fault;
   int mode=0,i;
+  medium=(struct med *)calloc(1,sizeof(struct med));
+
   if(argc<2)
     print_help_local(argv[0]);
   for(i=2;i<argc;i++){

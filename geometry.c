@@ -803,7 +803,7 @@ void calculate_position_of_patch(struct med *medium, struct flt *fault)
   COMP_PRECISION pmin[2]={FLT_MAX,FLT_MAX},pmax[2]={-FLT_MAX,-FLT_MAX};
 #endif
   if(!(grp=(struct geog *)calloc(medium->nrgrp,sizeof(struct geog))))
-    MEMERROR("calculate_position_of_patch");
+    PMEMERROR("calculate_position_of_patch");
   //
   // determine average geometrical quantities of the groups
   // and calculate the patches pos[STRIKE] and pos[DIP] relative
@@ -849,8 +849,9 @@ void calculate_position_of_patch(struct med *medium, struct flt *fault)
   }
 #ifdef DEBUG
   for(i=0;i<2;i++)
-    fprintf(stderr,"calculate_position_of_patch: dir: %i pmin: %g pmax: %g\n",
-	    i,pmin[i],pmax[i]);
+    HEADNODE
+      fprintf(stderr,"calculate_position_of_patch: dir: %i pmin: %g pmax: %g\n",
+	      i,pmin[i],pmax[i]);
 #endif
 #ifdef USE_PGPLOT
   //

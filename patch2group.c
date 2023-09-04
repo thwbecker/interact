@@ -12,6 +12,7 @@ int main(int argc,char **argv)
   struct flt *fault;
   struct geog *grp;
   int i;
+  medium=(struct med *)calloc(1,sizeof(struct med)); 
   switch(argc){
   case 2:{
     break;

@@ -12,6 +12,8 @@ int main(int argc, char **argv)
   int i,j,k;
   my_boolean shrink_patches=FALSE,read_slip=FALSE,verbose=FALSE;
   COMP_PRECISION leeway,corner[4][3],alpha,sin_dip,cos_dip,u[3];
+  medium=(struct med *)calloc(1,sizeof(struct med));
+  
   if(argc > 1)
     read_slip = TRUE;
   if(argc > 2){

@@ -25,9 +25,9 @@ void print_patch_geometry_and_bc(int flt_offset,struct flt *fault,
   int k,l;
   static my_boolean bc_init=FALSE,g_init=FALSE;
   static int nrf,bc_code;
-  COMP_PRECISION corner[4][3],alpha,sin_dip,cos_dip,x[3],lfac,leeway;
+  COMP_PRECISION corner[4][3],alpha,sin_dip,cos_dip,x[3],leeway;
 #ifdef ALLOW_NON_3DQUAD_GEOM
-  COMP_PRECISION tmpdbl;
+  COMP_PRECISION tmpdbl,lfac;
 #endif
   //
   // shrink patches for easier viewing

@@ -20,6 +20,7 @@ int main(int argc, char **argv)
     aspect,y[2],z[2],*group_moment_m,*group_moment_time,gmmin,gmmax,gmtick;
   my_boolean plot=TRUE,init=FALSE;
   char tmpchar;
+  medium=(struct med *)calloc(1,sizeof(struct med));
   if(argc!=1){
     fprintf(stderr,"%s\nreads single patch activations from binary file %s and patch geometry from %s\n",
 	    argv[0],EVENT_FILE_BINARY,GEOMETRY_FILE);

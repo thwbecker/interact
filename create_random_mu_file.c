@@ -15,6 +15,7 @@ int main(int argc, char **argv)
   long seed;
   COMP_PRECISION mu0[2]={STATIC_MU,(STATIC_MU-DELTA_MU)},
     std[2]={0.0,0.0},*mu,stat[4],fac[2],mutmp[2];
+  medium=(struct med *)calloc(1,sizeof(struct med));
   switch(argc){
   case 1:{
     ;

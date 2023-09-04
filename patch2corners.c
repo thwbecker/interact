@@ -13,6 +13,7 @@ int main(int argc, char **argv)
   struct med *medium;
   COMP_PRECISION *dummy;
   int opmode=CORNEROUT_MODE,i;
+  medium=(struct med *)calloc(1,sizeof(struct med));
   if(argc!=1){
     fprintf(stderr,"%s: reads in patch format from stdin and writes x,y,z tripels\n\tfor each corners to stdout\n",
 	    argv[0]);

@@ -12,7 +12,7 @@ int main(int argc,char **argv)
   struct flt *fault;
   int i;
   COMP_PRECISION maxdist,*dummy;
-  
+  medium=(struct med *)calloc(1,sizeof(struct med));
   read_geometry(GEOMETRY_FILE,&medium,&fault,FALSE,FALSE,FALSE,FALSE);
   maxdist=max_dist(fault,medium);
 
