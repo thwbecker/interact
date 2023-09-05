@@ -14,6 +14,19 @@
 */
 #include "interact.h"
 
+void assemble_a_matrix_1(A_MATRIX_PREC *a,int naflt,
+       my_boolean *sma,int nreq,int *nameaf,
+                         struct flt *fault,struct med *medium);
+
+void assemble_a_matrix_2(A_MATRIX_PREC *a,int naflt,
+       my_boolean *sma,int nreq,int *nameaf,
+                         struct flt *fault,struct med *medium);
+     
+void assemble_a_matrix_3(A_MATRIX_PREC *a,int naflt,
+       my_boolean *sma,int nreq,int *nameaf,
+                         struct flt *fault,struct med *medium);
+
+
 int solve(struct med *medium,struct flt *fault)
 {
   A_MATRIX_PREC *a,wmax,*sv=NULL,*dummyp=NULL,wcutoff;
@@ -28,14 +41,12 @@ int solve(struct med *medium,struct flt *fault)
   FILE *out1,*out2;
 #endif
 #ifdef USE_PETSC
-#define PETSC_HELPER_STR_LEN 256  
-  char mattype[PETSC_HELPER_STR_LEN];
-  PetscBool pset = PETSC_FALSE;
   Vec         px, pr,pxout;
   KSP         pksp;
   PC          ppc;
   PetscInt    i, j, m, n;
   PetscScalar *values=NULL;
+  //PetscInt    *col_idx=NULL;
   PetscReal   norm;
   PetscInt lm, ln, dn, on;
   VecScatter ctx;
@@ -244,12 +255,12 @@ int solve(struct med *medium,struct flt *fault)
       dn = ln;on = n - ln;
       PetscCall(MatSeqAIJSetPreallocation(medium->pA, n, NULL));
       PetscCall(MatMPIAIJSetPreallocation(medium->pA, dn, NULL, on, NULL));
-      /* 
-	 parallel assembly 
-      */
+      /* parallel assembly */
       PetscCall(MatGetOwnershipRange(medium->pA, &medium->rs, &medium->re));
-      medium->rn = medium->re  - medium->rs; /* number of local elements */
-        
+      medium->rn = medium->re  - medium->rs;
+      PetscCall(PetscCalloc(medium->rn*sizeof(PetscInt), &medium->indices));
+      for(j=0,i=medium->rs;i<medium->re;i++,j++)
+	medium->indices[j] = i;
       /* assemble A */
       par_assemble_a_matrix(medium->naflt,medium->sma,medium->nreq,medium->nameaf,
 			    fault,medium);
@@ -261,9 +272,13 @@ int solve(struct med *medium,struct flt *fault)
       PetscCall(MatAssemblyEnd(medium->pA, MAT_FINAL_ASSEMBLY));
       
       /* <DAM> Convert MATDENSE to another format required by solver package */
-      PetscCall(PetscOptionsGetString(NULL, NULL, "-mat_type", mattype, PETSC_HELPER_STR_LEN, &pset));
-      if (pset) { /* Convert MATDENSE to desired format */
-	PetscCall(MatConvert(medium->pA, mattype, MAT_INPLACE_MATRIX, &medium->pA));
+      {
+        char mattype[256];
+        PetscBool set = PETSC_FALSE;
+        PetscCall(PetscOptionsGetString(NULL, NULL, "-mat_type", mattype, 256, &set));
+        if (set) { /* Convert MATDENSE to desired format */
+          PetscCall(MatConvert(A, mattype, MAT_INPLACE_MATRIX, &A));
+        }
       }
 
       if(medium->comm_rank == 0)
@@ -271,16 +286,12 @@ int solve(struct med *medium,struct flt *fault)
       //MatView(pA,PETSC_VIEWER_STDOUT_WORLD);
   
       PetscCall(MatCreateVecs(medium->pA, &medium->pb, &px)); /* For A x = b: x -> left, b -> right */
-      /* 
-	 insert right hand side 
-      */
-      for (i = medium->rs; i < medium->re; i++) {
-	PetscCall(VecSetValue(medium->pb, i, medium->b[i], INSERT_VALUES));
-      }
+      
+      /* assign right hand side */
+      PetscCall(VecSetValues(medium->pb,medium->rn,
+			     medium->indices,medium->b,INSERT_VALUES));
       PetscCall(VecAssemblyBegin(medium->pb));
       PetscCall(VecAssemblyEnd(medium->pb));
-
-      //PetscCall(VecView(medium->pb,PETSC_VIEWER_STDOUT_WORLD)); 
       /* 
 	 solver
       */
@@ -311,6 +322,7 @@ int solve(struct med *medium,struct flt *fault)
 	PetscCall(VecGetArray(pxout,&values));
 	memcpy(medium->xsol,values,m*sizeof(PetscScalar));
 	PetscCall(VecRestoreArray(pxout,&values));
+	/*PetscCall(PetscFree(values));*/ /* <DAM> Freeing raw array will result in an illegal read/write error */
       }
       if(medium->debug){
 	PetscCall(VecDuplicate(px, &pr));
@@ -321,6 +333,7 @@ int solve(struct med *medium,struct flt *fault)
 	PetscCall(PetscPrintf(PETSC_COMM_WORLD, "Norm of residual %1.10e\n", (double)norm));
 	PetscCall(VecDestroy(&pr));
       }
+      PetscCall(PetscFree(medium->indices));      
       PetscCall(VecDestroy(&pxout));
       PetscCall(VecDestroy(&px));
       PetscCall(VecDestroy(&medium->pb));

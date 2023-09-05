@@ -485,9 +485,21 @@ void init_parameters(char **argv, int argc, my_boolean *read_fault_properties,
       sscanf(argv[i],ONE_CP_FORMAT,wcutoff);
 #ifdef USE_PETSC
       /* petsc options for pass through */
-    }else if(strcmp(argv[i],"-pc_factor_mat_solver_type")){
+    }else if(strcmp(argv[i],"-pc_factor_mat_solver_type")==0){
       advance_argument(&i,argc,argv);
-    }else if(strcmp(argv[i],"-mat_type")){
+    }else if(strcmp(argv[i],"-ksp_monitor_true_residual")==0){
+      ;
+    }else if(strcmp(argv[i],"-ksp_converged_reason")==0){
+      ;
+    }else if(strcmp(argv[i],"-mat_type")==0){
+      advance_argument(&i,argc,argv);
+    }else if(strcmp(argv[i],"-ksp_type")==0){
+      advance_argument(&i,argc,argv);
+    }else if(strcmp(argv[i],"-pc_type")==0){
+      advance_argument(&i,argc,argv);
+    }else if(strcmp(argv[i],"-ksp_max_it")==0){
+      advance_argument(&i,argc,argv);
+    }else if(strcmp(argv[i],"-ksp_rtol")==0){
       advance_argument(&i,argc,argv);
 #endif
     }else{

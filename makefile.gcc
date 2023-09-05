@@ -50,14 +50,14 @@ GCCWOPT = -Wall
 # fast execution options, comment out if debug output is wanted
 #SCARGS = -Ofast $(GCCWOPT)
 
-SCARGS = $(SFARGS) $(GCCWOPT)
+#SCARGS = $(SFARGS) $(GCCWOPT)
 
 DEBUG_LIBS = 
 #
 # debugging options, comment in for debugging
 # -DSUPER_DUPER_DEBUG -DDDMALLOC 
 # gcc 
-#SCARGS = -g  $(GCCWOPT) -DDEBUG 
+SCARGS = -g  $(GCCWOPT) -DDEBUG 
 #-DMEM_ALLOC_DEBUG \
 #	-DDEBUG -DSUPER_DEBUG  
 #DEBUG_LIBS = -lccmalloc -ldl

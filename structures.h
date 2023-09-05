@@ -232,7 +232,6 @@ struct med{
   PetscInt    rs, re, rn;
   Mat         pA;
   Vec         pb;
-  PetscInt    *indices;
 #else
   unsigned int comm_size,comm_rank;
 #endif

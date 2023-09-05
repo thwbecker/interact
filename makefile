@@ -76,6 +76,11 @@
 # 			     possible LU solvers are
 # 				-pc_factor_mat_solver_type scalapack -mat_type scalapack
 #  				-pc_factor_mat_solver_type elemental -mat_type elemental
+# 		             iterative solver
+# 		 	         -ksp_type fgmres -pc_type none -ksp_max_it 10000 -ksp_rtol 1.0e-10
+# 		 	         -ksp_type fgmres -pc_type jacobi -ksp_max_it 10000 -ksp_rtol 1.0e-10 
+#                            for this to work, you will have to have  $(PETSC_DIR) and $(PETSC_ARCH) defined
+#
 #  Example settings:
 #
 #  example with latency:
