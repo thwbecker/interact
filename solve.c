@@ -2,14 +2,14 @@
 
   interact: model fault interactions using dislocations in a 
             halfspace
-  (C) Thorsten Becker, becker@eps.harvard.edu
+  (C) Thorsten Becker, becker@post.harvard.edu
 
 
-  all routines in here deal with the solution of interact 
-  program specific routines
+  all routines in here deal with the solution of interact program
+  specific routines
 
 
-  $Id: solve.c,v 2.37 2011/01/09 02:02:43 becker Exp $
+  parallel Petsc implementation based on an example by Dave May (UCSD)
 
 */
 #include "interact.h"
