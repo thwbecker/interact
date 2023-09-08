@@ -366,6 +366,7 @@ void init_parameters(char **argv, int argc, my_boolean *read_fault_properties,
 		     int rank)
 {
   int i;
+  my_boolean warned = FALSE;
   /* 
      assign default values 
   */
@@ -483,30 +484,11 @@ void init_parameters(char **argv, int argc, my_boolean *read_fault_properties,
     }else if(strcmp(argv[i],"-wc")==0){// SVD wmax
       advance_argument(&i,argc,argv);
       sscanf(argv[i],ONE_CP_FORMAT,wcutoff);
-#ifdef USE_PETSC
-      /* petsc options for pass through */
-    }else if(strcmp(argv[i],"-pc_factor_mat_solver_type")==0){
-      advance_argument(&i,argc,argv);
-    }else if(strcmp(argv[i],"-ksp_monitor_true_residual")==0){
-      ;
-    }else if(strcmp(argv[i],"-ksp_converged_reason")==0){
-      ;
-    }else if(strcmp(argv[i],"-mat_type")==0){
-      advance_argument(&i,argc,argv);
-    }else if(strcmp(argv[i],"-ksp_type")==0){
-      advance_argument(&i,argc,argv);
-    }else if(strcmp(argv[i],"-pc_type")==0){
-      advance_argument(&i,argc,argv);
-    }else if(strcmp(argv[i],"-ksp_max_it")==0){
-      advance_argument(&i,argc,argv);
-    }else if(strcmp(argv[i],"-ksp_rtol")==0){
-      advance_argument(&i,argc,argv);
-#endif
     }else{
-      if(rank == 0)
-	fprintf(stderr,"init_parameters can not use parameter %s, use -h for help page\n",
-		argv[i]);
-      exit(-1);
+      if((rank == 0)&&(!warned)){
+	fprintf(stderr,"init_parameters encountered at least one parameter which cannot be interpreted by interact\n");
+	warned = TRUE;
+      }
     }
   }
 }

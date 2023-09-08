@@ -64,7 +64,7 @@ void divide_fault_in_patches(int flt,struct flt *fault,
   int i,j,mi,mj,irad,old_nrpatches,
     added_patches,pcnt;
   COMP_PRECISION dx[3],dy[3],alpha,sin_dip,cos_dip,
-    corner[4][3],l2,w2,newl,neww,tmpd1,tmpd2,newarea,
+    corner[4][3],newl,neww,tmpd1,tmpd2,newarea,
     l,w;
   my_boolean randomize;
   randomize = ((srand>0)||(drand>0))?(TRUE):(FALSE);
@@ -105,12 +105,10 @@ void divide_fault_in_patches(int flt,struct flt *fault,
   // new patch geometry
   newl = l / (COMP_PRECISION)seg[0];
   neww = w / (COMP_PRECISION)seg[1];
-  l2 = newl * 2.0;
-  w2 = neww * 2.0;
-  newarea = l2 * w2;
+  newarea = newl * neww;
   for(i=0;i<3;i++){
-    dx[i] = fault[flt].t_strike[i]*l2;
-    dy[i] = fault[flt].t_dip[i]*w2;
+    dx[i] = fault[flt].t_strike[i]*newl;
+    dy[i] = fault[flt].t_dip[i]*neww;
   }
   // assign common specs by copying them over from the 
   // fault to the patches
@@ -127,8 +125,8 @@ void divide_fault_in_patches(int flt,struct flt *fault,
 		     (*patch+i)->sin_alpha,(*patch+i)->cos_alpha,sin_dip,cos_dip);
     }
     (*patch+i)->area = newarea;
-    (*patch+i)->w = neww;
-    (*patch+i)->l = newl;
+    (*patch+i)->w = neww/2.;
+    (*patch+i)->l = newl/2.;
   }
   if(!circular){/* divide fault patch in rectangular patches */
     /* 
