@@ -1,42 +1,39 @@
-################################################################################
-#                                                                              #
-#  interact: model fault interactions using dislocations in an elastic         #
-#            medium                                                            #
-#  Copyright (C) Thorsten W. Becker 2000 - 2023                                #
-#                                                                              #
-#  Interact uses dc3d.f as provided by Y. Okada as in Okada (BSSA, 1992) and   #
-#  linear algebra routines from SLATEC, LAPACK, and EISPACK.                   #
-#                                                                              #
-#  Petsc interface built with much help from Dave May (UCSD)                   #
-#                                                                              #
-#  Might contain material copyrighted by others (e.g. Numerical                #
-#  Recipes etc)                                                                #
-#                                                                              #
-#                                                                              #
-#  See README.md, help.txt, and the makefile for documentation and             #
-#  COPYRIGHT and COPYING for the license and warranty disclaimers.             #
-#                                                                              #
-#  If you use interact in real work, a citation to use would be:               #
-#                                                                              #
-#  @Article{becker02c,                                                         #
-#    author = 	 {Becker, T. W. and Schott, B.},                               #
-#    title = 	 {On boundary-element models of elastic fault interaction      #
-#                  (abstract)},                                                # 
-#    journal = 	 {EOS Trans. AGU},                                             #
-#    year = 	 2002,                                                         #
-#    volume =	 83,                                                           #
-#    number =	 47,                                                           #
-#    pages =	 {NG62A-0925}                                                  #
-#  }                                                                           #
-#                                                                              #
-#  thwbecker@post.harvard.edu                                                  #
-#                                                                              #
-################################################################################
+#  interact: model fault interactions using dislocations in an elastic  medium
+Copyright (C) Thorsten W. Becker 2000 - 2023                                
 
+Interact uses dc3d.f as provided by Y. Okada as in Okada (BSSA, 1992)
+and might come with linear algebra routines from SLATEC, LAPACK, and
+EISPACK included. 
+                                                                              
+Petsc parallel solver interface built with much help from Dave May
+(UCSD).
+                                                                              
+Might contain material copyrighted by others (e.g. Numerical Recipes
+  etc).
+                                                                              
+                                                                              
+See this readme, help.txt, and the makefile for documentation and
+COPYRIGHT and COPYING for the license and warranty disclaimers.
+
+If you use interact in real work, a citation to use would be:               
+
+  @Article{becker02c,                                                         
+    author = 	 {Becker, T. W. and Schott, B.},                               
+    title = 	 {On boundary-element models of elastic fault interaction      
+                  (abstract)},                                                 
+    journal = 	 {EOS Trans. AGU},                                             
+    year = 	 2002,                                                         
+    volume =	 83,                                                           
+    number =	 47,                                                           
+    pages =	 {NG62A-0925}                                                  
+  }                                                                           
+                                                                              
+thwbecker@post.harvard.edu                                                  
+                                                                              
 
 This directory contains source codes needed to compile the elastic 2-D
 and half-space dislocation program "interact" as well as several tools
-that go with it. 
+that go with it.
 
 To compile, edit the makefile as described in the INSTALLATION
 document and type 'make'. By default, we use the GNU compilers, with
