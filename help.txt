@@ -1,7 +1,14 @@
+This file contains the help page that can be extracted
+from the interact program by typing "interact -h".
+This man-page type document describes the main features,
+usage, and input as well as output formats of interact.
+
+For further assistance, refer README.md, the makefile, and
+INSTALLATION (outdated).
+
 main: binary: interact
-main: compiled for double precision on Apr  9 2023 at 19:29:33, initializing
-init: version: $Id: init.c,v 2.51 2011/01/09 02:02:43 becker Exp $
-init: compiled on Apr  9 2023 19:29:28
+main: compiled for double precision, initializing
+init: interact compiled on Sep  9 2023 10:34:21, running in serial
 
 Interact: calculate fault stresses and displacements in a half space or in 2-D
           using a boundary element approach.
@@ -16,7 +23,10 @@ When stresses (stress tensor components) or pressure are referred to, positive v
 extensional and compressional regimes, respectively (physics convention).
 
 Output is written to files and in real-time to X11 if PGPLOT support was compiled in.
-(PGPlot support was compiled in.)
+PGPlot support was compiled in. 
+
+PetSc support was compiled in, providing limited access to parallel solves for one-step problems.
+      Check the makefile for possible options for solvers and MPI settings.
 
 (1) The fault geometry is input via the file "geom.in",
     a list of fault patches.
@@ -142,9 +152,6 @@ Output is written to files and in real-time to X11 if PGPLOT support was compile
     20	dip direction, either way
     21	dip direction, thrust       (stress drop bc usually < 0 for activation)
     22	dip direction, normal       (stress drop bc usually > 0 for activation)
-    30	normal direction, either way
-    31	normal direction, explosive (stress drop bc usually < 0 for activation)
-    32	normal direction, implosive (stress drop bc usually > 0 for activation)
 
     If any of the strike or dip modes (10, 11, 12 or 20, 21, or 22) are given as 
     (110, 111, 112 or 120, 121, or 122) instead (add 100) this means
@@ -226,9 +233,6 @@ Output is written to files and in real-time to X11 if PGPLOT support was compile
      121	dip direction, Coulomb correction, thrust
      22		dip direction, normal
      122	dip direction, Coulomb correction, normal
-     30		normal direction, either way (not implemented yet)
-     31		normal direction, explosive  (not implemented yet)
-     32		normal direction, implosive  (not implemented yet)
      40		maximum stress direction in strike/dip plane
      140	maximum stress direction in strike/dip plane, Coulomb correction
 
@@ -239,8 +243,9 @@ Output is written to files and in real-time to X11 if PGPLOT support was compile
 
 
  NOTICE:
- Program maintains normal (opening) modes. If this is not needed, recompile
- with the NO_OPENING_MODES switch set to save memory.
+ Program was compiled with the NO_OPENING_MODES switch set, therefore all
+ normal (opening) modes of slip are suppressed to save memory
+
 
 
 PARAMETERS:
@@ -462,7 +467,7 @@ OPTIONS:
 
  -h  prints out this help message and exits to the operating system
 
-(C) Thorsten Becker, thwbecker@post.harvard.edu, 1999 - 2021
+(C) Thorsten Becker, thwbecker@post.harvard.edu, 1999 - 2023)
     interact - boundary element code for elastic half-spaces
     Main 3-D dislocation code based on dc3d.f by Y. Okada, as of Okada, BSSA, 1992
     2-D segment slip solution from Crouch and Starfield (1973)

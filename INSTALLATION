@@ -3,7 +3,7 @@
 #  interact: model fault interactions using dislocations in an elastic         #
 #            medium                                                            #
 #	                                                                       #
-#  Copyright (C) Thorsten W. Becker 2000 - 2002                                #
+#  Copyright (C) Thorsten W. Becker 2000 - 2023                                #
 #                                                                              #
 #  Interact uses dc3d.f as provided by Y. Okada as in Okada (BSSA, 1992) and   #
 #  linear algebra routines from SLATEC, LAPACK, and EISPACK.                   #
@@ -26,12 +26,30 @@
 #  }                                                                           #
 #                                                                              #
 #                                                                              #
-#  $Id: INSTALLATION,v 1.9 2003/01/14 18:42:33 becker Exp $                   #
 #                                                                              #
 #  thwbecker@post.harvard.edu                                                  #
 #                                                                              #
 ################################################################################
 
+
+The most recent source of interact are on GitHub at
+https://github.com/thwbecker/interact.
+
+The instructions below are outdated, but basically, to compile, edit
+the makefile first and type 'make'. By default, we use the GNU
+compilers, with options set in makefile.gcc
+
+There are a number of optional additions
+such as petsc, pgplot, GMT projection interfaces, and such. Those are
+not important for the general operation, so if there are issues with
+any of these, edit the makefile to comment out
+include makefile.pgplot
+include makefile.petsc
+include makefile.geoproject
+
+
+
+BELOW TO BE UPDATED:
 
 
 This document describes briefly how to compile the "interact" program

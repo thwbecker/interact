@@ -3,8 +3,6 @@
             halfspace
   (C) Thorsten Becker, becker@eps.harvard.edu
 
-  $Id: init.c,v 2.51 2011/01/09 02:02:43 becker Exp $
-
 
   main initialization routine, sets defaults and optional parameters 
   from the command line
@@ -32,11 +30,10 @@ void check_parameters_and_init(int argc, char **argv,
   COMP_PRECISION pressure,med_cohesion,min_stress_drop,wcutoff;
   I_MATRIX_PREC i_mat_cutoff;
   if((*medium)->comm_rank==0){
-    fprintf(stderr,"init: version: $Id: init.c,v 2.51 2011/01/09 02:02:43 becker Exp $\n");
     if((*medium)->comm_size==1)
-      fprintf(stderr,"init: compiled on %s %s, running in serial\n",__DATE__,__TIME__);
+      fprintf(stderr,"init: %s compiled on %s %s, running in serial\n",argv[0],__DATE__,__TIME__);
     else
-      fprintf(stderr,"init: compiled on %s %s, running on %i cores\n",__DATE__,__TIME__,(*medium)->comm_size);
+      fprintf(stderr,"init: %s compiled on %s %s, running on %i cores\n",argv[0],__DATE__,__TIME__,(*medium)->comm_size);
   }
   // initialization phase, get parameters from command
   // line options

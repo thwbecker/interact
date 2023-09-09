@@ -46,22 +46,25 @@ MATHLIB = -lm
 GCCWOPT = -Wall 
 #-Werror
 
-# this may be overridden 
+
 # fast execution options, comment out if debug output is wanted
+#PETSC_ARCH=arch-linux-c-opt
 #SCARGS = -Ofast $(GCCWOPT)
+#DEBUG_FLAGS=
 
-#SCARGS = $(SFARGS) $(GCCWOPT)
+SCARGS = -g  $(GCCWOPT) 
+#PETSC_ARCH=arch-linux-c-debug
+PETSC_ARCH=arch-linux-c-opt
+DEBUG_FLAGS=-DDEBUG
 
+# other debugging options, comment in for debugging
+# -DSUPER_DUPER_DEBUG -DDDMALLOC
 DEBUG_LIBS = 
-#
-# debugging options, comment in for debugging
-# -DSUPER_DUPER_DEBUG -DDDMALLOC 
-# gcc 
-SCARGS = -g  $(GCCWOPT) -DDEBUG 
 #-DMEM_ALLOC_DEBUG \
 #	-DDEBUG -DSUPER_DEBUG  
 #DEBUG_LIBS = -lccmalloc -ldl
 #DEBUG_LIBS = -ldmalloc 
+
 
 
 #
@@ -81,9 +84,7 @@ EISPACK_DIR = eispack/
 # file installed?
 EISPACK_LIB = -L$(EISPACK_DIR)/ -lmyeis
 
-#
-# Petsc
-#PETSC_DIR = $(HOME)/progs/src/petsc/arch-linux-c-opt/
+
 
 
 # name of interact binary depending on compiler flags

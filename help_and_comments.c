@@ -683,7 +683,7 @@ void phelp(void)
   PE("");
   PE(" -h  prints out this help message and exits to the operating system");
   PE("");
-  PE("(C) Thorsten Becker, thwbecker@post.harvard.edu, 1999 - 2021");
+  PE("(C) Thorsten Becker, thwbecker@post.harvard.edu, 1999 - 2023");
   PE("    interact - boundary element code for elastic half-spaces");
   PE("    Main 3-D dislocation code based on dc3d.f by Y. Okada, as of Okada, BSSA, 1992");
   PE("    2-D segment slip solution from Crouch and Starfield (1973)");

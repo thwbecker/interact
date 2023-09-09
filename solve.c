@@ -86,12 +86,12 @@ int solve(struct med *medium,struct flt *fault)
 
     */
     if(medium->comm_size>1){
-      if(medium->comm_rank==0)
+      HEADNODE
 	fprintf(stderr,"solve: SLATEC MIX NNLS only serial, %i cores requested\n",medium->comm_size);
       exit(-1);
     }
 #ifndef USE_SLATEC_NNLS
-    if(medium->comm_rank==0){
+    HEADNODE{
       fprintf(stderr,"solve: for mixed contrained/uncontrained solution, have to use SLATEC\n");
       fprintf(stderr,"solve: library functions. Read the makefile, and compile with -lslatec_???.\n");
     }
@@ -123,7 +123,7 @@ int solve(struct med *medium,struct flt *fault)
       assemble A part of the A' matrix 
     */
     if(medium->use_old_amat){
-      if(medium->comm_rank==0)
+      HEADNODE
 	fprintf(stderr,"solve: slatec_nnls: WARNING: using old A matrix!\n");
       read_a_matrix_from_file(a,m,n,A_MATRIX_FILE,"mixed A");
     }else
@@ -211,20 +211,20 @@ int solve(struct med *medium,struct flt *fault)
     */
     if(medium->comm_size>1){
       /* parallel solve using PETSC */
-      if(medium->comm_rank==0)
+      HEADNODE
 	fprintf(stderr,"solve: attempting parallel LU solve, %i cores requested\n",medium->comm_size);
       if(medium->use_old_amat || medium->save_amat){
-	if(medium->comm_rank==0)
+	HEADNODE
 	  fprintf(stderr,"solve: matrix I/O not implemented yet\n");
 	exit(-1);
       }
       if(medium->solver_mode != LU_SOLVER){
-	if(medium->comm_rank==0)
+	HEADNODE
 	  fprintf(stderr,"solve: only LU solve availabled\n");
 	exit(-1);
       }
 #ifndef USE_PETSC
-      if(medium->comm_rank==0)
+      HEADNODE
 	fprintf(stderr,"solve: parallel solve required Petsc compile\n");
       exit(-1);
 #else
@@ -234,6 +234,7 @@ int solve(struct med *medium,struct flt *fault)
 	 
       */
       m = n = medium->nreq;
+      /* set up A matrix */
       PetscCall(MatCreate(PETSC_COMM_WORLD, &(medium->pA)));
       PetscCall(MatSetSizes(medium->pA, PETSC_DECIDE, PETSC_DECIDE, m, n));
       PetscCall(MatSetType(medium->pA, MATDENSE));
@@ -304,14 +305,16 @@ int solve(struct med *medium,struct flt *fault)
       // scatter as many times as you need
       PetscCall(VecScatterBegin(ctx,px,pxout,INSERT_VALUES,SCATTER_FORWARD));
       PetscCall(VecScatterEnd(ctx,px,pxout,INSERT_VALUES,SCATTER_FORWARD));
-      // destroy scatter context and local vector when no longer needed
-      PetscCall(VecScatterDestroy(&ctx));
       /* assign to x solution vector */
       if(medium->comm_rank == 0){
 	PetscCall(VecGetArray(pxout,&values));
 	memcpy(medium->xsol,values,m*sizeof(PetscScalar));
 	PetscCall(VecRestoreArray(pxout,&values));
       }
+      // destroy scatter context and local vector when no longer needed
+      PetscCall(VecScatterDestroy(&ctx));
+      PetscCall(VecDestroy(&pxout));
+ 
       if(medium->debug){
 	PetscCall(VecDuplicate(px, &pr));
 	/* check residual */
@@ -321,7 +324,7 @@ int solve(struct med *medium,struct flt *fault)
 	PetscCall(PetscPrintf(PETSC_COMM_WORLD, "Norm of residual %1.10e\n", (double)norm));
 	PetscCall(VecDestroy(&pr));
       }
-      PetscCall(VecDestroy(&pxout));
+      
       PetscCall(VecDestroy(&px));
       PetscCall(VecDestroy(&medium->pb));
       PetscCall(MatDestroy(&medium->pA));
@@ -486,7 +489,7 @@ int solve(struct med *medium,struct flt *fault)
     } /* end serial direct solve part */
   }else if(medium->nreq_con){
     if(medium->comm_size>1){
-      if(medium->comm_rank==0)
+      HEADNODE
 	fprintf(stderr,"solve: NNLS only serial, %i cores requested\n",medium->comm_size);
       exit(-1);
     }
@@ -680,9 +683,10 @@ int par_assemble_a_matrix(int naflt,my_boolean *sma,int nreq,int *nameaf,
   /*
     see routine below for the logic of the stress assignments
   */
-  PetscInt i,j,k,l,eqc1,eqc2,eqc2nreq,ip1,ip2;
-  PetscScalar cf,*avalues=NULL,itmp;
-  PetscInt *col_idx;
+  PetscInt i,j,k,l,eqc1,eqc2,ip1,ip2;
+  PetscScalar cf,*avalues=NULL,fac_itmp;
+  PetscInt *col_idx=NULL;
+  my_boolean in_range;
   int iret;
   fprintf(stderr,"par_assemble_a_matrix: core %03i/%03i: assigning row %5i to %i\n",
 	  medium->comm_rank,medium->comm_size,medium->rs,medium->re);
@@ -706,17 +710,23 @@ int par_assemble_a_matrix(int naflt,my_boolean *sma,int nreq,int *nameaf,
     l: slip mode on slipping fault
     
   */
-  for(eqc1=ip1=i=0;i < naflt;i++,ip1+=3){
-    for(j=0;j < 3;j++){
+  for(eqc1=ip1=i=0;i < naflt;i++,ip1+=3){ /* slow fault loop */
+    for(j=0;j < 3;j++){			  /* direction */
       if(sma[ip1+j]){
-	// normal correction for Coulomb?
-	cf = (j==NORMAL)?(0.0):fault[nameaf[i]].cf[j];
-	
-	for(eqc2=eqc2nreq=ip2=k=0;k < naflt;k++,ip2+=3){ /* fast loop */
-	  
-	  for(l=0;l < 3;l++){
-	    if(sma[ip2+l]){// flip around matrix ordering
-	      if((eqc1 >= medium->rs)&&(eqc1 < medium->re)){
+	/* 
+	   do we have work on this processor? 
+	*/
+	in_range = ((eqc1 >= medium->rs)&&(eqc1 < medium->re))?(TRUE):(FALSE);
+	if(in_range){
+	  /* 
+	     actually compute
+	  */
+	  // normal correction for Coulomb?
+	  cf = (j==NORMAL)?(0.0):fault[nameaf[i]].cf[j];
+
+	  for(eqc2=ip2=k=0;k < naflt;k++,ip2+=3){ /* fast fault loop */
+	    for(l=0;l < 3;l++){			  /* direction */
+	      if(sma[ip2+l]){// flip around matrix ordering
 		/* 
 		   actually compute
 		*/
@@ -724,6 +734,15 @@ int par_assemble_a_matrix(int naflt,my_boolean *sma,int nreq,int *nameaf,
 		if(cf != 0.0)
 		  fprintf(stderr,"par_assemble_a_matrix: i: %i j: %i k: %i l: %i cf: %g\n",
 			  (int)nameaf[i],(int)nameaf[k],(int)l,(int)j,cf);
+#endif
+#ifdef DEBUG
+		if(eqc2>=nreq){
+		  fprintf(stderr,"par_assemble_a_matrix: core %i: eqc2 %i out of bounds, nreq %i\n",
+			  medium->comm_rank,eqc2,nreq);
+		  fprintf(stderr,"par_assemble_a_matrix: i: %i j: %i k: %i l: %i naflt: %i\n",
+			  (int)nameaf[i],(int)nameaf[k],(int)l,(int)j,naflt);
+		  exit(-1);
+		}
 #endif
 		if(medium->no_interactions && (fault[i].group != fault[k].group)){
 		  avalues[eqc2] = 0;
@@ -734,25 +753,27 @@ int par_assemble_a_matrix(int naflt,my_boolean *sma,int nreq,int *nameaf,
 		  avalues[eqc2] = (PetscScalar)
 		    interaction_coefficient(nameaf[i],nameaf[k],l,j,fault,&iret);
 		  if(cf != 0.0){	/* coulomb addition */
-		    itmp=(PetscScalar)
+		    fac_itmp=(PetscScalar)
 		      interaction_coefficient(nameaf[i],nameaf[k],l,NORMAL,fault,&iret);
 		    if(iret){
 		      fprintf(stderr,"assemble_a_matrix_3: WARNING: encountered iret: i/j/k/l: %i/%i/%i/%i\n",
 			      (int)nameaf[i],(int)nameaf[k],(int)l,(int)j);
-		      itmp=0.0;
+		      fac_itmp = 0.0;
 		    }
-		    avalues[eqc2] +=  itmp * cf;
+		    avalues[eqc2] +=  fac_itmp * cf;
 		  }
 		}
 	   	//PetscCall(MatSetValue(medium->pA, eqc1, eqc2, avalues[eqc2], ADD_VALUES));
+	      	/* end value work part */
+		eqc2++;
 	      }
-	      eqc2++;
-	      eqc2nreq += nreq;
 	    }
 	  }
+	  PetscCall(MatSetValues(medium->pA, 1, &eqc1, nreq, col_idx,
+				 avalues, INSERT_VALUES)); /* <DAM> No problem
+							      to use INSERT_VALUES
+							      if we know A is MATDENSE */
 	}
-	if((eqc1 >= medium->rs)&&(eqc1 < medium->re))
-	  PetscCall(MatSetValues(medium->pA, 1, &eqc1, nreq, col_idx, avalues, INSERT_VALUES)); /* <DAM> No problem to use INSERT_VALUES if we know A is MATDENSE */
 	eqc1++; 
       }
     }

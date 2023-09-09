@@ -65,20 +65,22 @@
 #                            If this is not set, you will have to specify the flags
 #                            for the inclusion of LAPACK in the makefile.gcc files.
 #
-#  -DUSE_GEOPROJECT          use geoproject and produce code that allows for I/O
+#  -DUSE_GEOPROJECT          use geoproject and produce code that allows for I/O - Flag should be set in makefile.geoproject
 #                            using geographic coordinates and projections. for this to
 #                            work, you will have to have GMT (www.gmt.soest.hawaii.edu)
 #                            installed - THIS USES GMT < VERSION 5 - this is set in makefile.geoproject
 # 			     which is commented out by default
+# 		             
+#
 #
 #  -DUSE_PETSC               use the Petsc libraries and run the code in parallel, where only matrix inversions are parallelized right now
-#                            comments out makefile.petsc if no petsc support required
+#                            comments out makefile.petsc if no petsc support required. Flag should be set in makefile.petsc
 # 			     possible LU solvers are
 # 				-pc_factor_mat_solver_type scalapack -mat_type scalapack
 #  				-pc_factor_mat_solver_type elemental -mat_type elemental
 # 		             iterative solver
-# 		 	         -ksp_type fgmres -pc_type none -ksp_max_it 10000 -ksp_rtol 1.0e-10
-# 		 	         -ksp_type fgmres -pc_type jacobi -ksp_max_it 10000 -ksp_rtol 1.0e-10 
+# 		 	         -ksp_type fgmres -pc_type none -ksp_max_it 10000 -ksp_rtol 1.0e-8
+# 		 	         -ksp_type fgmres -pc_type jacobi -ksp_max_it 10000 -ksp_rtol 1.0e-8
 #                            for this to work, you will have to have  $(PETSC_DIR) and $(PETSC_ARCH) defined
 #
 #  Example settings:
@@ -154,8 +156,8 @@ FLAGS = $(DEFINE_FLAGS) $(PGPLOT_INCLUDES) $(SLATEC_INCLUDES) \
 
 
 # other flags
-CFLAGS = $(FLAGS) $(SCARGS) $(MACHINE_DEFINES)
-FFLAGS = $(FLAGS) $(SFARGS) $(MACHINE_DEFINES) 
+CFLAGS = $(FLAGS) $(SCARGS) $(DEBUG_FLAGS) $(MACHINE_DEFINES)
+FFLAGS = $(FLAGS) $(SFARGS) $(DEBUG_FLAGS) $(MACHINE_DEFINES)
 
 
 
