@@ -1,4 +1,4 @@
-# interact` models fault interactions using dislocations in an elastic medium.
+# interact - models static fault interactions using dislocations in an elastic medium
 
 `interact` uses `dc3d.f` as provided by Y. Okada as in Okada (BSSA,
 1992) and  linear algebra routines from SLATEC, LAPACK, and
@@ -238,7 +238,6 @@ check_feedback:
 ________________________________________________________________________________
 
 Output from interact -h follows (run code for updated versions!)
-
 ________________________________________________________________________________
 main: binary: interact
 main: compiled for double precision on Apr  9 2023 at 19:29:33, initializing
@@ -505,23 +504,23 @@ PARAMETERS:
 
  The following parameters can be set to non-default values on the command line:
 
- -c  value      sets the cohesion term of the friction law to value, by default: 5
+* -c  value      sets the cohesion term of the friction law to value, by default: 5
                 If the cohesion=0 at all times, recompile with NO_COHESION set
                 to improve speed. (Stress drop is set to 1, which is 0.0001 times mu).
 
- -pr value      set the background pressure to value `value`.
+* -pr value      set the background pressure to value `value`.
                 The background pressure amplitude is 10 by default, both for one-step and loading
                 simulations. The pressure is constant with depth (see properties.h).
 
- -ms value      set minimum stress drop to value `value`. (Characteristic stress drops are
+* -ms value      set minimum stress drop to value `value`. (Characteristic stress drops are
                 set to 1.) The minimum stress drop is zero by default, ie.
                 allowing stress drops of all sizes (loading simulation).
 
- -ei value      set matrix cutoff value for sparse storage of I or A in absolute values
+* -ei value      set matrix cutoff value for sparse storage of I or A in absolute values
                              (5.000000e-05 by default.)
                 (only used if I matrix is stored as sparse, see -nd option, or for sparse Ax=b solver.)
 
- -wc value      will use value as the maximum fraction of singular value for an SVD solution (default: 7.00e-15)
+* -wc value      will use value as the maximum fraction of singular value for an SVD solution (default: 7.00e-15)
 
 
 
@@ -532,7 +531,7 @@ OPTIONS:
  Please read carefully which switches are ON by default. If those
  active switches are selected, they will be switched OFF instead.
 
- -s  read in initial stress values for each fault from file `fsi.in`, format:
+* -s  read in initial stress values for each fault from file `fsi.in`, format:
 
      s_strike^0 s_dip^0 s_normal^0
      s_strike^1 s_dip^1 s_normal^1
@@ -542,13 +541,13 @@ OPTIONS:
      tensor resolved on the fault slip directions. All values are ADDED to the
      homogeneous background stress as set in the program, ie. use all zeros for normal
      initial stress state. (loading simulation)
- --> WARNING: This option will only work for the loading simulation mode, for one-step calculations
+  --> WARNING: This option will only work for the loading simulation mode, for one-step calculations
      specify fault stresses as individual boundary conditions, or use -l to get a resolved background
      stress.
 
      ON by default, if switch is set will be OFF.
 
- -f  read in fault properties from file `fp.in`, so far only parameters for the friction law
+* -f  read in fault properties from file `fp.in`, so far only parameters for the friction law
      are supported. Format:
 
      mu_static^0 mu_dynamic^0
@@ -559,33 +558,33 @@ OPTIONS:
      Coulomb.
      ON by default, if switch is set will be OFF.
 
- -i  suppress all interactions between fault patches except the self-effect of slip on any
+* -i  suppress all interactions between fault patches except the self-effect of slip on any
      patches within the group that the patch belongs to and the effect of slip
      on the number 0 master group (this should be the main fault).
      (Meant as a experimental feature for LOADING SIMULATIONS ONLY!)
      OFF by default, if switch is set will be ON. See -ni for suppressed interactions in one step.
 
- -ni suppress all interactions between faults except the interactions of fault patches
+* -ni suppress all interactions between faults except the interactions of fault patches
 
- -ct use constant time steps for the loading simulation
+* -ct use constant time steps for the loading simulation
      OFF by default, if switch is set will be ON.
 
- -b  suppress output of all fault stress and slip data. Normally,
+* -b  suppress output of all fault stress and slip data. Normally,
      individual output files for each
      group of faults are generated when the number of groups is smaller than 50.
      If -b is set, this maximum number will be set to zero.
 
- -p  prints information about the cumulative slip of every patch in a group to the
+* -p  prints information about the cumulative slip of every patch in a group to the
      slipline.*.dat files if the fault files are used (see -b). (loading simulation)
      OFF by default, if switch is set will be ON.
 
- -w  whole fault activation mode (loading simulation)
+* -w  whole fault activation mode (loading simulation)
      If set, one patch will activate all patches in the group for sliding.
      Also, if one patch is switched off because of low normal stress, all
      patches in the group will be switched off as well (*unless* -v is set).
      OFF by default, if switch is set will be ON.
 
- -k  keep slipping mode (loading simulation)
+* -k  keep slipping mode (loading simulation)
      If set, the first critical patches can trigger slip on other patches.
      If so, the initial patches will keep slipping, and the solution is obtained
      at each iteration until no more triggering takes place. If not set, slip
@@ -595,14 +594,14 @@ OPTIONS:
      If keep slipping, critical stress is -7.000000e-15, else -7.000000e-15.
      ON by default, if switch is set will be OFF.
 
- -v  whole fault deactivation mode (loading simulation)
+* -v  whole fault deactivation mode (loading simulation)
      If set (and -w is *not* set), the deactivation (low compressive normal stress) of a patch
      will lead to a deactivation of the whole fault group.
      If -w is on (whole fault activation mode), this is the default. If you use -v in this
      case, the whole fault de-activations will be suppressed.
      OFF by default, if switch is set will be ON.
 
- -l  reads a/b factors for the linear background loading stress relationship.
+* -l  reads a/b factors for the linear background loading stress relationship.
      If set, the file `smlin.in` is read, it should hold 6 pairs of a_i b_i factors
      where the *non-hydrostatic* background stress at time t is given by s_i=a_i+b_i*t
      s_i = {s_xx, s_xy, s_xz, s_yy, s_yz, s_zz}, so that the format is
@@ -624,7 +623,7 @@ OPTIONS:
 
      ON by default, if switch is set will be OFF.
 
- -nd switches to sparse matrix I storage, no matter what the I matrix size is.
+* -nd switches to sparse matrix I storage, no matter what the I matrix size is.
      By default, the program goes from dense to sparse only if the
      matrix is bigger than 8000 MB.
      The sparse matrix storage implies that matrix elements whose absolute
@@ -636,26 +635,26 @@ OPTIONS:
      note that sparse here refers to only the storage mode of the I matrix,
      not the solution method of A.x=b. (see -ss).
 
- -ci checks the interaction matrix for positive Coulomb stress feedback loops, once calculated
+* -ci checks the interaction matrix for positive Coulomb stress feedback loops, once calculated
      This may be useful for loading simulations.
      OFF by default, if switch is set will be ON.
 
- -si saves the interaction (I) matrix during a loading simulation,
+* -si saves the interaction (I) matrix during a loading simulation,
      if I is written to a file during runtime and not held in memory.
      Else, `/tmp/i` and `/tmp/i.hdr` will be deleted.
      OFF by default, if switch is set will be ON.
 
- -oi reads old interaction (I) matrix from files `/tmp/i.dat` and `/tmp/i.hdr`.
+* -oi reads old interaction (I) matrix from files `/tmp/i.dat` and `/tmp/i.hdr`.
      Saves time when the geometry
      does not change between subsequent model runs (this is not automatically checked!)
      (Make sure to use -si if you want to keep the matrix.)
      OFF by default, if switch is set will be ON.
 
- -sa saves the A x = b A matrix to `a.dat` and `a.dat.hdr` during a one-step calculation.
+* -sa saves the A x = b A matrix to `a.dat` and `a.dat.hdr` during a one-step calculation.
      Binary format, with dimensions (n x m) and precision (p, in bytes) in the header file as n p m
      OFF by default, if switch is set will be ON.
 
- -oa reads A matrix from files `a.dat` and `a.dat.hdr` during a one-step calculation.
+* -oa reads A matrix from files `a.dat` and `a.dat.hdr` during a one-step calculation.
      Saves time when A
      does not change between subsequent model runs (this is not automatically checked!)
      (Make sure to use -sa if you want to keep the matrix.)
@@ -665,7 +664,7 @@ OPTIONS:
      by the boundary conditions, and not only b as one might think!
      OFF by default, if switch is set will be ON.
 
- -r  attempts to restart a loading simulation model run based on previous results
+* -r  attempts to restart a loading simulation model run based on previous results
      WARNING: all result files will be overwritten NOT appended, so save before.
      For this to work, `geom.in` and `bc.in` (and possibly `fsi.in` and `fp.in`
      should not be substantially changed.
@@ -673,37 +672,37 @@ OPTIONS:
      Slip events from the previous run in the format as in the output file `events.bin` will be read in
      from the restart event file `restart.events.bin`
 
- -gv will output files with slip on faults in the Geometry center's geomview COFF format,
+* -gv will output files with slip on faults in the Geometry center's geomview COFF format,
      with a CQUAD file for each fault group. Slip values are scaled to the global maxima.
      Note that the fltdat2cquad script can produce CQAUD files from geom.in and flt.dat files.
      OFF by default, if switch is set will be ON.
 
- -sn will print NaN values in displacement and stress outputs of the one-step calculation.
+* -sn will print NaN values in displacement and stress outputs of the one-step calculation.
      Normally, those locations (end patch/segments) yielding one or more inf values in the
      stress matrix or the displacement vector will be omitted during output.
      OFF by default, if switch is set will be ON.
 
- -pc will print the global coordinates if fault-local planes are chosen for bulk stress
+* -pc will print the global coordinates if fault-local planes are chosen for bulk stress
      and displacement output (-1 or -2 for o in zmin zmax o), writes xyz to `plane.xyz`
      ON by default, if switch is set will be OFF.
 
- -sv uses SVD solver for the unconstrained A x = b system.
+* -sv uses SVD solver for the unconstrained A x = b system.
      This approach should reliably find the least-squares minimum norm solution
      if the A matrix is singular.
      Note that LU can be orders of magnitude faster than SVD but use caution.
      If non-negative solutions are sought (as for specified slip directions),
      the program will automatically default back to the NNLS solver.
 
- -sl uses LU solver for the unconstrained A x = b system (default).
+* -sl uses LU solver for the unconstrained A x = b system (default).
      LU can be orders of magnitude faster than SVD, but use caution.
      If non-negative solutions are sought (as for specified slip directions),
      the program will automatically default back to the NNLS solver.
 
- -d  run in debug mode
+* -d  run in debug mode
      OFF by default, if switch is set will be ON.
 
 
- -h  prints out this help message and exits to the operating system
+* -h  prints out this help message and exits to the operating system
 
 (C) Thorsten Becker, thwbecker@post.harvard.edu, 1999 - 2023
     interact - boundary element code for elastic half-spaces
