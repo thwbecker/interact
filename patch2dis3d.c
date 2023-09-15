@@ -61,7 +61,7 @@ int main(int argc, char **argv)
 	     PRINT_SLIPLINE_DEF,TRUE,EPS_COMP_PREC,FALSE,EPS_COMP_PREC,
 	     FALSE,FALSE,FALSE,FALSE,FALSE,TRUE,FALSE,SVD_SOLVER,
 	     FALSE,FALSE,PRESSURE_DEF,FALSE,FALSE,FALSE,TRUE,FALSE,FALSE,
-	     SVD_THRESHOLD,FALSE);
+	     SVD_THRESHOLD,FALSE,FALSE);
   /* check output options for conformity */
   if((medium->n[INT_X] <= 1) || medium->n[INT_Y] <= 1){
     fprintf(stderr,"%s: error nx and ny have to be > 1 \n",

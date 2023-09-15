@@ -47,14 +47,15 @@ int solve(struct med *medium,struct flt *fault)
   char command_str[STRLEN];
   wcutoff = (A_MATRIX_PREC)medium->wcutoff;
 
-  if(medium->debug&&(medium->comm_rank==0)){
-    print_equations(medium->naflt,medium->sma,medium->nameaf,
-		    medium->b,medium->nreq,"ucstr.",
-		    fault);
-    print_equations(medium->naflt_con,medium->sma_con,
-		    medium->nameaf_con,medium->b_con,
-		    medium->nreq_con," cstr.",fault);
-  }
+  HEADNODE
+    if(medium->debug){
+      print_equations(medium->naflt,medium->sma,medium->nameaf,
+		      medium->b,medium->nreq,"ucstr.",
+		      fault);
+      print_equations(medium->naflt_con,medium->sma_con,
+		      medium->nameaf_con,medium->b_con,
+		      medium->nreq_con," cstr.",fault);
+    }
   /* 
      now target_stress_drop has the dropped stress values, 
      and sma indicates which mode should slide for every patch 
@@ -209,10 +210,11 @@ int solve(struct med *medium,struct flt *fault)
       using LU, SVD or other methods
 
     */
-    if(medium->comm_size>1){
+    if(medium->force_petsc || (medium->comm_size>1)){
       /* parallel solve using PETSC */
       HEADNODE
-	fprintf(stderr,"solve: attempting parallel LU solve, %i cores requested\n",medium->comm_size);
+	fprintf(stderr,"solve: attempting Petsc LU solve, %i core(s) requested\n",
+		medium->comm_size);
       if(medium->use_old_amat || medium->save_amat){
 	HEADNODE
 	  fprintf(stderr,"solve: matrix I/O not implemented yet\n");
@@ -225,7 +227,7 @@ int solve(struct med *medium,struct flt *fault)
       }
 #ifndef USE_PETSC
       HEADNODE
-	fprintf(stderr,"solve: parallel solve required Petsc compile\n");
+	fprintf(stderr,"solve: parallel solve requires Petsc compile\n");
       exit(-1);
 #else
       /* 
@@ -238,11 +240,12 @@ int solve(struct med *medium,struct flt *fault)
       PetscCall(MatCreate(PETSC_COMM_WORLD, &(medium->pA)));
       PetscCall(MatSetSizes(medium->pA, PETSC_DECIDE, PETSC_DECIDE, m, n));
       PetscCall(MatSetType(medium->pA, MATDENSE));
-      /*PetscCall(MatSetFromOptions(medium->pA));*//* <DAM> Always assemble into MATDENSE format */
+      /*PetscCall(MatSetFromOptions(medium->pA));*//* Always assemble into MATDENSE format */
       PetscCall(MatSetUp(medium->pA));
       /* preallocate */
       PetscCall(MatGetLocalSize(medium->pA, &lm, &ln));
       dn = ln;on = n - ln;
+
       PetscCall(MatSeqAIJSetPreallocation(medium->pA, n, NULL));
       PetscCall(MatMPIAIJSetPreallocation(medium->pA, dn, NULL, on, NULL));
       /* 
@@ -250,7 +253,11 @@ int solve(struct med *medium,struct flt *fault)
       */
       PetscCall(MatGetOwnershipRange(medium->pA, &medium->rs, &medium->re));
       medium->rn = medium->re  - medium->rs; /* number of local elements */
-        
+      
+#ifdef DEBUG
+      fprintf(stderr,"solve: core %i: dn %i on %i n %i rs %i re %i \n",medium->comm_rank,dn,on,n,medium->rs,medium->re);
+#endif
+      
       /* assemble A */
       par_assemble_a_matrix(medium->naflt,medium->sma,medium->nreq,medium->nameaf,
 			    fault,medium);
@@ -260,15 +267,15 @@ int solve(struct med *medium,struct flt *fault)
       */
       PetscCall(MatAssemblyBegin(medium->pA, MAT_FINAL_ASSEMBLY));
       PetscCall(MatAssemblyEnd(medium->pA, MAT_FINAL_ASSEMBLY));
-      
-      /* <DAM> Convert MATDENSE to another format required by solver package */
+      HEADNODE
+	fprintf(stderr,"solve: parallel assembly done\n");
+     
+      /* Convert MATDENSE to another format required by solver package */
       PetscCall(PetscOptionsGetString(NULL, NULL, "-mat_type", mattype, PETSC_HELPER_STR_LEN, &pset));
       if (pset) { /* Convert MATDENSE to desired format */
 	PetscCall(MatConvert(medium->pA, mattype, MAT_INPLACE_MATRIX, &medium->pA));
       }
 
-      if(medium->comm_rank == 0)
-	fprintf(stderr,"solve: parallel assembly done\n");
       //MatView(pA,PETSC_VIEWER_STDOUT_WORLD);
   
       PetscCall(MatCreateVecs(medium->pA, &medium->pb, &px)); /* For A x = b: x -> left, b -> right */
@@ -688,15 +695,21 @@ int par_assemble_a_matrix(int naflt,my_boolean *sma,int nreq,int *nameaf,
   PetscInt *col_idx=NULL;
   my_boolean in_range;
   int iret;
+#ifdef DEBUG
+  my_boolean *assigned;
+  PetscScalar amin,amax;
+#endif
   fprintf(stderr,"par_assemble_a_matrix: core %03i/%03i: assigning row %5i to %i\n",
 	  medium->comm_rank,medium->comm_size,medium->rs,medium->re);
 
   PetscCall(PetscCalloc(nreq*sizeof(PetscScalar), &avalues));
   PetscCall(PetscCalloc(nreq*sizeof(PetscInt), &col_idx));
-  for (j=0; j < nreq; j++) {
+#ifdef DEBUG
+  assigned = (my_boolean *)malloc(sizeof(my_boolean)*nreq);
+#endif
+  for (j=0; j < nreq; j++) 
     col_idx[j] = j;
-  }
-
+  
   
   // dimensions of A matrix (without b column)
   // m = n = nreq;
@@ -718,6 +731,11 @@ int par_assemble_a_matrix(int naflt,my_boolean *sma,int nreq,int *nameaf,
 	*/
 	in_range = ((eqc1 >= medium->rs)&&(eqc1 < medium->re))?(TRUE):(FALSE);
 	if(in_range){
+#ifdef DEBUG
+	  for(eqc2=0;eqc2<nreq;eqc2++)
+	    assigned[eqc2] = FALSE;
+#endif
+
 	  /* 
 	     actually compute
 	  */
@@ -736,7 +754,7 @@ int par_assemble_a_matrix(int naflt,my_boolean *sma,int nreq,int *nameaf,
 			  (int)nameaf[i],(int)nameaf[k],(int)l,(int)j,cf);
 #endif
 #ifdef DEBUG
-		if(eqc2>=nreq){
+		if(eqc2 >= nreq){
 		  fprintf(stderr,"par_assemble_a_matrix: core %i: eqc2 %i out of bounds, nreq %i\n",
 			  medium->comm_rank,eqc2,nreq);
 		  fprintf(stderr,"par_assemble_a_matrix: i: %i j: %i k: %i l: %i naflt: %i\n",
@@ -756,23 +774,38 @@ int par_assemble_a_matrix(int naflt,my_boolean *sma,int nreq,int *nameaf,
 		    fac_itmp=(PetscScalar)
 		      interaction_coefficient(nameaf[i],nameaf[k],l,NORMAL,fault,&iret);
 		    if(iret){
-		      fprintf(stderr,"assemble_a_matrix_3: WARNING: encountered iret: i/j/k/l: %i/%i/%i/%i\n",
+		      fprintf(stderr,"par_assemble_a_matrix: WARNING: encountered iret: i/j/k/l: %i/%i/%i/%i\n",
 			      (int)nameaf[i],(int)nameaf[k],(int)l,(int)j);
 		      fac_itmp = 0.0;
 		    }
 		    avalues[eqc2] +=  fac_itmp * cf;
 		  }
 		}
+#ifdef DEBUG
+		assigned[eqc2] = TRUE;
+#endif
 	   	//PetscCall(MatSetValue(medium->pA, eqc1, eqc2, avalues[eqc2], ADD_VALUES));
 	      	/* end value work part */
 		eqc2++;
 	      }
 	    }
 	  }
-	  PetscCall(MatSetValues(medium->pA, 1, &eqc1, nreq, col_idx,
-				 avalues, INSERT_VALUES)); /* <DAM> No problem
-							      to use INSERT_VALUES
-							      if we know A is MATDENSE */
+#ifdef DEBUG
+	  amin = 1e20;amax=-1e20;
+	  for(eqc2=0;eqc2 < nreq;eqc2++){
+	    if(avalues[eqc2]< amin)
+	      amin = avalues[eqc2];
+	    if(avalues[eqc2]> amax)
+	      amax = avalues[eqc2];
+	    if(!assigned[eqc2])
+	      fprintf(stderr,"%06i out of %06i unassigned?!\n",eqc2,nreq);
+	    if(!finite(avalues[eqc2]))
+	      fprintf(stderr,"%06i out of %06i not finite\n",eqc2,nreq);
+	  }
+	  fprintf(stderr,"row eqc1 %6i eqc2 %6i nreq %6i amin %12g amax %12g\n",eqc1,eqc2,nreq,amin,amax);
+	  
+#endif 
+	  PetscCall(MatSetValues(medium->pA, 1, &eqc1, nreq, col_idx,avalues, INSERT_VALUES));
 	}
 	eqc1++; 
       }
@@ -780,6 +813,9 @@ int par_assemble_a_matrix(int naflt,my_boolean *sma,int nreq,int *nameaf,
   }
   PetscCall(PetscFree(col_idx));
   PetscCall(PetscFree(avalues));
+#ifdef DEBUG
+  free(assigned);
+#endif
   return(0);
 }
 

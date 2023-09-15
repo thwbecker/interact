@@ -28,9 +28,16 @@ void phelp(void)
   PE("");
   PE("Output is written to files and in real-time to X11 if PGPLOT support was compiled in.");
 #ifdef USE_PGPLOT
-  PE("(PGPlot support was compiled in.)");
+  PE("PGPlot support was compiled in. ");
 #else
   PE("(No PGPlot support, X11 output unavailable. Compile with USE_PGPLOT flag set, if wanted.)");
+#endif
+#ifdef USE_PETSC
+  PE("");
+  PE("PetSc support was compiled in, providing limited access to parallel solves for one-step problems.");
+  PE("      Check the makefile for possible options for solvers and MPI settings.");
+#else
+  PE("(Petsc support compiled in, if parallel support is desired, check makefile.)");
 #endif
   PE("");
   fprintf(stderr,"(1) The fault geometry is input via the file \"%s\",\n    a list of fault patches.\n",
@@ -655,7 +662,7 @@ void phelp(void)
   PE("     If non-negative solutions are sought (as for specified slip directions),");
   PE("     the program will automatically default back to the NNLS solver.");
   PE("");
-  PE(" -d  run in debug mode")
+  PE(" -d  debug output, if you want extra checks, compile with -DDEBUG")
   fprintf(stderr,"     %s by default, if switch is set will be %s.\n",
 	  name_boolean(DEBUG_DEF),
 	  name_boolean(TOGV(DEBUG_DEF)));
@@ -664,8 +671,12 @@ void phelp(void)
   PE(" -ss uses LU solver and sparse storage/solution method for unconstrained A x = b system");
   PE("     WARNING:");
   PE("     This is meant for the one-step calculation only, and involves cutting off");
-  PE("     small interaction matrix values as specified by -ei.");
+  PE("     small interaction matrix values as specified by -ei (bad idea?!)");
   PE("");
+#endif
+#ifdef USE_PETSC
+  PE(" -fpetsc    force Petsc solvers even for serial runs (else LAPACK for LU)");
+  PE("")
 #endif
 #ifdef ALLOW_NON_3DQUAD_GEOM
   fprintf(stderr," -ps Change the default 2-D elastic approximation for segments from plane-%s to plane-%s.\n",
@@ -683,7 +694,7 @@ void phelp(void)
   PE("");
   PE(" -h  prints out this help message and exits to the operating system");
   PE("");
-  PE("(C) Thorsten Becker, thwbecker@post.harvard.edu, 1999 - 2023");
+  PE("(C) Thorsten Becker, thwbecker@post.harvard.edu, 1999 - 2023)");
   PE("    interact - boundary element code for elastic half-spaces");
   PE("    Main 3-D dislocation code based on dc3d.f by Y. Okada, as of Okada, BSSA, 1992");
   PE("    2-D segment slip solution from Crouch and Starfield (1973)");

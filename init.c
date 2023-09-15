@@ -25,15 +25,15 @@ void check_parameters_and_init(int argc, char **argv,
     use_sparse_storage,use_old_imat,use_old_amat,save_imat,save_amat,
     check_for_interaction_feedback,keep_slipping,attempt_restart,suppress_nan_output,
     geomview_output,twod_approx_is_plane_stress,print_plane_coord,half_plane,
-    variable_time_step,debug,no_interactions;
+    variable_time_step,debug,no_interactions,force_petsc;
   short int solver_mode;
   COMP_PRECISION pressure,med_cohesion,min_stress_drop,wcutoff;
   I_MATRIX_PREC i_mat_cutoff;
   if((*medium)->comm_rank==0){
     if((*medium)->comm_size==1)
-      fprintf(stderr,"init: %s compiled on %s %s, running in serial\n",argv[0],__DATE__,__TIME__);
+      fprintf(stderr,"init: compiled on %s %s, running in serial\n",__DATE__,__TIME__);
     else
-      fprintf(stderr,"init: %s compiled on %s %s, running on %i cores\n",argv[0],__DATE__,__TIME__,(*medium)->comm_size);
+      fprintf(stderr,"init: compiled on %s %s, running on %i cores\n",__DATE__,__TIME__,(*medium)->comm_size);
   }
   // initialization phase, get parameters from command
   // line options
@@ -50,7 +50,7 @@ void check_parameters_and_init(int argc, char **argv,
 		  &suppress_nan_output,&geomview_output,&pressure,
 		  &twod_approx_is_plane_stress,&print_plane_coord,
 		  &half_plane,&variable_time_step,&debug,&wcutoff,
-		  &no_interactions,(*medium)->comm_rank);
+		  &no_interactions,&force_petsc,(*medium)->comm_rank);
   // load files, etc
   initialize(medium,fault,read_fault_properties,max_nr_flt_files,
 	     suppress_interactions,whole_fault_mode,med_cohesion,a,b,
@@ -60,7 +60,7 @@ void check_parameters_and_init(int argc, char **argv,
 	     keep_slipping,attempt_restart,solver_mode,suppress_nan_output,
 	     geomview_output,pressure,twod_approx_is_plane_stress,
 	     print_plane_coord,half_plane,variable_time_step,debug,TRUE,wcutoff,
-	     no_interactions);
+	     no_interactions,force_petsc);
 }
 /*
 
@@ -92,7 +92,7 @@ void initialize(struct med **medium, struct flt **fault,
 		my_boolean print_plane_coord,my_boolean half_plane,
 		my_boolean variable_time_step,my_boolean debug,
 		my_boolean init_system,COMP_PRECISION wcutoff,
-		my_boolean no_interactions)
+		my_boolean no_interactions,my_boolean force_petsc)
 {
   int serr;
   char tmpstring[STRLEN];
@@ -117,13 +117,10 @@ void initialize(struct med **medium, struct flt **fault,
   if(!(*medium)->variable_time_step)
     fprintf(stderr,"initialize: WARNING: using constant time steps\n");
 
-  if(((*medium)->debug=debug)){
+  if(((*medium)->debug = debug)){
     fprintf(stderr,"initialize: running in debugging mode, output in directory %s\n",INT_TMP_DIR);
     snprintf(tmpstring,STRLEN,"mkdir -p %s",INT_TMP_DIR);
-    serr = 0;
     serr = system(tmpstring);
-    snprintf(tmpstring,STRLEN,"/bin/rm %s/*",INT_TMP_DIR);
-    serr+= system(tmpstring);
     if(serr){
       fprintf(stderr,"initialize: could not make temporary output dir %s\n",INT_TMP_DIR);
       exit(-1);
@@ -230,6 +227,15 @@ void initialize(struct med **medium, struct flt **fault,
   (*medium)->suppress_nan_output = suppress_nan_output;
   // Geomview COFF file output?
   (*medium)->geomview_output = geomview_output;
+  if(force_petsc){
+#ifdef USE_PETSC
+    (*medium)->force_petsc = force_petsc;
+#else
+    HEADNODE
+      fprintf(stderr,"initialize: force_petsc is true, but no Petsc support compiled in\n");
+    
+#endif
+  }
   /*
      initialize files, possibly plotting windows,
      and interaction matrix 
@@ -360,6 +366,7 @@ void init_parameters(char **argv, int argc, my_boolean *read_fault_properties,
 		     my_boolean *debug,
 		     COMP_PRECISION *wcutoff,
 		     my_boolean *no_interactions,
+		     my_boolean *force_petsc,
 		     int rank)
 {
   int i;
@@ -397,6 +404,7 @@ void init_parameters(char **argv, int argc, my_boolean *read_fault_properties,
   *debug = DEBUG_DEF;
   *wcutoff = SVD_THRESHOLD;
   *no_interactions = FALSE;
+  *force_petsc = FALSE;
   /* 
      check for input options 
   */
@@ -481,6 +489,8 @@ void init_parameters(char **argv, int argc, my_boolean *read_fault_properties,
     }else if(strcmp(argv[i],"-wc")==0){// SVD wmax
       advance_argument(&i,argc,argv);
       sscanf(argv[i],ONE_CP_FORMAT,wcutoff);
+    }else if(strcmp(argv[i],"-fpetsc")==0){// 
+      toggle(force_petsc);
     }else{
       if((rank == 0)&&(!warned)){
 	fprintf(stderr,"init_parameters encountered at least one parameter which cannot be interpreted by interact\n");
