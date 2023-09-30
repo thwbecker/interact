@@ -70,7 +70,7 @@ SFARGS = $(SCARGS) -ffixed-line-length-132  -fmax-errors=0 -x f77-cpp-input
 SFARGSSAVE = $(SFARGS)
 #
 # BLAS
-BLASLIB =  $(MATHLIBS)
+BLASLIB =  -llapack -lblas -lm
 
 COMPUTATIONAL_LIBS = $(BLASLIB)
 #
