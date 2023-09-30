@@ -227,6 +227,7 @@ struct med{
 #endif
   COMP_PRECISION nan;		/* remember to initialize  */
   /*  */
+  my_boolean force_petsc;
 #ifdef USE_PETSC
   PetscMPIInt comm_size, comm_rank;
   PetscInt    rs, re, rn;
