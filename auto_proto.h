@@ -210,10 +210,10 @@ char *comment_on_code(short int);
 char *comment_on_code_bc(short int, double);
 /* init.c */
 void check_parameters_and_init(int, char **, struct med **, struct flt **, unsigned short *, double *, double *);
-void initialize(struct med **, struct flt **, unsigned short, int, unsigned short, unsigned short, double, double *, double *, unsigned short, unsigned short, unsigned short, double, unsigned short, double, unsigned short, unsigned short, unsigned short, unsigned short, unsigned short, unsigned short, unsigned short, short int, unsigned short, unsigned short, double, unsigned short, unsigned short, unsigned short, unsigned short, unsigned short, unsigned short, double, unsigned short);
+void initialize(struct med **, struct flt **, unsigned short, int, unsigned short, unsigned short, double, double *, double *, unsigned short, unsigned short, unsigned short, double, unsigned short, double, unsigned short, unsigned short, unsigned short, unsigned short, unsigned short, unsigned short, unsigned short, short int, unsigned short, unsigned short, double, unsigned short, unsigned short, unsigned short, unsigned short, unsigned short, unsigned short, double, unsigned short,unsigned short);
 void init_files(struct med **, struct flt **);
 void terminate(struct med *, struct flt *);
-void init_parameters(char **, int, unsigned short *, unsigned short *, unsigned short *, unsigned short *, double *, int *, unsigned short *, unsigned short *, unsigned short *, double *, unsigned short *, double *, unsigned short *, unsigned short *, unsigned short *, unsigned short *, unsigned short *, unsigned short *, unsigned short *, short int *, unsigned short *, unsigned short *, double *, unsigned short *, unsigned short *, unsigned short *, unsigned short *, unsigned short *, double *, unsigned short *, int);
+void init_parameters(char **, int, unsigned short *, unsigned short *, unsigned short *, unsigned short *, double *, int *, unsigned short *, unsigned short *, unsigned short *, double *, unsigned short *, double *, unsigned short *, unsigned short *, unsigned short *, unsigned short *, unsigned short *, unsigned short *, unsigned short *, short int *, unsigned short *, unsigned short *, double *, unsigned short *, unsigned short *, unsigned short *, unsigned short *, unsigned short *, double *, unsigned short *,unsigned short *, int);
 void advance_argument(int *, int, char **);
 char *name_boolean(unsigned short);
 unsigned short toggle(unsigned short *);
