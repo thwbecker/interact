@@ -83,14 +83,12 @@
 # 		 	         -ksp_type fgmres -pc_type jacobi -ksp_max_it 10000 -ksp_rtol 1.0e-8
 #                            for this to work, you will have to have  $(PETSC_DIR) and $(PETSC_ARCH) defined
 #
+# to debug:
+# mpirun -np 1 valgrind --tool=memcheck -q --num-callers=20 --log-file=pmia.%p.log interact -fpetsc -malloc=off
+#
+#
 #  Example settings:
 #
-#  example with latency:
-#              MAIN_DEFINES =   \
-#                      -DBINARY_PATCH_EVENT_FILE -DUSE_DOUBLE_PRECISION  -DLATENCY=0.5  
-#  example without:
-#              DEFINE_FLAGS =  \
-#                      -DBINARY_PATCH_EVENT_FILE -DUSE_DOUBLE_PRECISION 
 #
 
 MY_PRECISION = -DUSE_DOUBLE_PRECISION

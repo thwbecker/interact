@@ -31,8 +31,11 @@ and half-space dislocation program `interact` as well as several tools
 that go with it. 
 
 To compile, edit the `makefile` as described in the INSTALLATION
-document and type `make all`. (The normal make might give you
-problems, the GNU gmake is therefore to be preferred.)
+document and type `make`. The default might have some extra packages
+included, and sources a number of other files. For the simplest
+compile, try `make -f makefile.simple`, which should work out of the
+box, without any extra packages besides EISPACK (that should get
+compiled automatically, as provided). 
 
 General settings as to the operation of interact are set in
 `makefile`, material properties such as the shear modulus are set in
@@ -259,6 +262,13 @@ RESPECTIVELY (PHYSICS CONVENTION).
 
 Output is written to files and in real-time to X11 if PGPLOT support was compiled in.
 (PGPlot support was compiled in.)
+
+PetSc support was compiled in, providing limited access to parallel solves for one-step problems.
+      For LU solve, use    "-pc_factor_mat_solver_type scalapack -mat_type scalapack" or
+                           "-pc_factor_mat_solver_type elemental -mat_type elemental".
+      For iterative solve "-ksp_type fgmres -pc_type none   -ksp_max_it 10000 -ksp_rtol 1.0e-8" or
+                          "-ksp_type fgmres -pc_type jacobi -ksp_max_it 10000 -ksp_rtol 1.0e-8".
+      Check the makefile for other solver options and MPI settings.
 
 (1) The fault geometry is input via the file `geom.in`,
     a list of fault patches.

@@ -231,7 +231,7 @@ void initialize(struct med **medium, struct flt **fault,
 #ifdef USE_PETSC
     (*medium)->force_petsc = force_petsc;
 #else
-    HEADNODE
+    if((*medium)->comm_rank==0)
       fprintf(stderr,"initialize: force_petsc is true, but no Petsc support compiled in\n");
     
 #endif

@@ -45,6 +45,12 @@ int solve(struct med *medium,struct flt *fault)
 
   
   char command_str[STRLEN];
+  /* test valgrind */
+  /* int test_a; */
+  /* if (test_a==1) printf("random value is 1\n"); */
+
+
+  
   wcutoff = (A_MATRIX_PREC)medium->wcutoff;
 
   HEADNODE

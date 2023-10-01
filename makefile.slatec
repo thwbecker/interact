@@ -2,7 +2,7 @@
 #
 # use SLATEC at all? if not, only parts of code will not work
 # 
-#SLATEC_DEFINES = -DUSE_SLATEC_NNLS 
+SLATEC_DEFINES = -DUSE_SLATEC_NNLS 
 #
 #
 # where did we put the SLATEC distribution form slatec_nnls.tar?
@@ -18,7 +18,7 @@ SLATEC_INCLUDES = -I$(SLATEC_DIR)/
 # the type of $(BLASLIB) will be decided in makefile.$(ARCH) to allow 
 # for ATLAS type of blas/linpack
 #
-SLATEC_LIBS = -L$(SLATEC_DIR)/$(ARCH)/ \
+SLATEC_LIBS = -L$(SLATEC_DIR)/ \
 	-lslatec_sgl -lslatec_dbl  $(BLASLIB) 
 	
 
