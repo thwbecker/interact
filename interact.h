@@ -384,9 +384,6 @@ extern void GMT_end(int, char **);
 #endif
 
 
-#ifdef DMALLOC
-#include "dmalloc.h"
-#endif
 
 void assemble_ap_matrix_1(A_MATRIX_PREC *,int ,int ,my_boolean *,my_boolean *,int ,int ,
 			  int *,int *,struct flt *,struct med *);

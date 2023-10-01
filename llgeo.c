@@ -13,8 +13,6 @@
   
 */
 #include "interact.h"
-#include <math.h>
-#include <malloc.h>
 
 /*
 
