@@ -35,9 +35,13 @@ void phelp(void)
 #ifdef USE_PETSC
   PE("");
   PE("PetSc support was compiled in, providing limited access to parallel solves for one-step problems.");
-  PE("      Check the makefile for possible options for solvers and MPI settings.");
+  PE("      For LU solve, use    \"-pc_factor_mat_solver_type scalapack -mat_type scalapack\" or");
+  PE("                           \"-pc_factor_mat_solver_type elemental -mat_type elemental\".");
+  PE("      For iterative solve \"-ksp_type fgmres -pc_type none   -ksp_max_it 10000 -ksp_rtol 1.0e-8\" or");
+  PE("                          \"-ksp_type fgmres -pc_type jacobi -ksp_max_it 10000 -ksp_rtol 1.0e-8\".");
+  PE("      Check the makefile for other solver options and MPI settings.");
 #else
-  PE("(Petsc support compiled in, if parallel support is desired, check makefile.)");
+  PE("(Petsc support not compiled in, if parallel support is desired, check makefile.)");
 #endif
   PE("");
   fprintf(stderr,"(1) The fault geometry is input via the file \"%s\",\n    a list of fault patches.\n",

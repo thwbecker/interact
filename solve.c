@@ -21,7 +21,7 @@ int solve(struct med *medium,struct flt *fault)
   size_t full_size,sparse_size;
   static int izero=0;
   FILE *aio;
-  long int isize;
+  long int isize,index_numbers;
 #ifdef USE_SLATEC_NNLS
   A_MATRIX_PREC *x,prgopt[1]={1.0},rnorm,*work,dummy;
   int *iwork,mode,l,nm;
@@ -236,6 +236,22 @@ int solve(struct med *medium,struct flt *fault)
 	 
       */
       m = n = medium->nreq;
+      HEADNODE{
+	index_numbers = (long int)m*(long int)m;
+	if(index_numbers/medium->comm_size > INT_MAX){
+	  /* PetSc is not compiled with 64 bit indexing by default,
+	     this can cause a core dump 
+	     
+	     --with-64-bit-indices=yes
+	     
+	     can change that
+	     
+	  */
+	  fprintf(stderr,"solve: WARNING: %.3f G ints on %i cores, above 32b-int limit by %.1f%%\n",
+		  (double)index_numbers/1e9,medium->comm_size,
+		  ((double)index_numbers/(double)medium->comm_size)/(double)INT_MAX*100);
+	}
+      }
       /* set up A matrix */
       PetscCall(MatCreate(PETSC_COMM_WORLD, &(medium->pA)));
       PetscCall(MatSetSizes(medium->pA, PETSC_DECIDE, PETSC_DECIDE, m, n));
@@ -342,7 +358,7 @@ int solve(struct med *medium,struct flt *fault)
 #endif
     }else{			/* serial assembly */
       isize  = ((long int)sizeof(A_MATRIX_PREC)) * ((long int)medium->nreq*(long int)medium->nreq);
-      fprintf(stderr,"solve: attempting to allocate %g MB for A matrix\n",(double)isize/ONE_MEGABYTE);
+      fprintf(stderr,"solve: attempting to allocate %g GB for A matrix\n",(double)isize/ONE_MEGABYTE/1024.);
       if((a=(A_MATRIX_PREC *)malloc((size_t)isize)) == NULL){ /* do some testing for memory error */
 	fprintf(stderr,"solve: memory error for unconstrained A: (%p) n: %i by %i dsz: %i tsize: %g MB\n",
 		a,medium->nreq,medium->nreq,(int)sizeof(A_MATRIX_PREC),((double)isize)/ONE_MEGABYTE);
@@ -698,9 +714,11 @@ int par_assemble_a_matrix(int naflt,my_boolean *sma,int nreq,int *nameaf,
 #ifdef DEBUG
   my_boolean *assigned;
   PetscScalar amin,amax;
-#endif
+  
   fprintf(stderr,"par_assemble_a_matrix: core %03i/%03i: assigning row %5i to %i\n",
 	  medium->comm_rank,medium->comm_size,medium->rs,medium->re);
+
+#endif
 
   PetscCall(PetscCalloc(nreq*sizeof(PetscScalar), &avalues));
   PetscCall(PetscCalloc(nreq*sizeof(PetscInt), &col_idx));
