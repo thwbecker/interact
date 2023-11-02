@@ -172,10 +172,11 @@ void print_fault_data(char *filename,struct med *medium,struct flt *fault)
 		fault[i].area);
 	fprintf(out,"%10.3e %10.3e ",val[0],val[1]);
 	//
-	// remove tiny numbers from output
+	// remove tiny numbers from output?
 	//
 	for(j=2;j<NR_VAL;j++){
-	  val[j] = reformat_small(val[j]);
+	  // nah, leave those in 
+	  //val[j] = reformat_small(val[j]);
 	  fprintf(out,"%13.6e ",val[j]);
 	}
 	fprintf(out,"%5i %5i",i,grp);

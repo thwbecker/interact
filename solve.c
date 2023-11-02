@@ -364,7 +364,8 @@ int solve(struct med *medium,struct flt *fault)
 #endif
     }else{			/* serial assembly */
       isize  = ((long int)sizeof(A_MATRIX_PREC)) * ((long int)medium->nreq*(long int)medium->nreq);
-      fprintf(stderr,"solve: attempting to allocate %g GB for A matrix\n",(double)isize/ONE_MEGABYTE/1024.);
+      if(medium->debug)
+	fprintf(stderr,"solve: attempting to allocate %g GB for A matrix\n",(double)isize/ONE_MEGABYTE/1024.);
       if((a=(A_MATRIX_PREC *)malloc((size_t)isize)) == NULL){ /* do some testing for memory error */
 	fprintf(stderr,"solve: memory error for unconstrained A: (%p) n: %i by %i dsz: %i tsize: %g MB\n",
 		a,medium->nreq,medium->nreq,(int)sizeof(A_MATRIX_PREC),((double)isize)/ONE_MEGABYTE);
