@@ -400,7 +400,7 @@ void print_stress(struct med *medium,struct flt *fault)
 	  if(l == 6){
 	    if(!use_fault_plane || medium->ok[i*medium->n[INT_Y]+j]){
 	      for(m=0;m<3;m++){
-		x[m]=reformat_small(x[m]);
+		//x[m]=reformat_small(x[m]);
 		fprintf(out,"%14.7e ",x[m]);
 	      }
 	      /* if stresses are in a 6 component vector, then
@@ -448,7 +448,7 @@ void print_stress(struct med *medium,struct flt *fault)
       }
       if(l==6){
 	for(m=0;m<3;m++){
-	  medium->xoloc[k+m] = reformat_small(medium->xoloc[k+m]);
+	  //medium->xoloc[k+m] = reformat_small(medium->xoloc[k+m]);
 	  fprintf(out,"%14.7e ",medium->xoloc[k+m]);
 	}
 	for(l=0;l<6;l++)
@@ -488,9 +488,9 @@ void print_stress_on_fault(struct med *medium,struct flt *fault,int nrf)
 	  calc_three_stress_components(sm,fault[nrf].normal,fault[nrf].t_strike,
 				       fault[nrf].normal,fault[nrf].t_dip,
 				       &st,&sn,&sd);
-	  st=reformat_small(st);;
-	  sd=reformat_small(sd);
-	  sn=reformat_small(sn);
+	  //st=reformat_small(st);;
+	  //sd=reformat_small(sd);
+	  //sn=reformat_small(sn);
 	  fprintf(out,"%14.7e %14.7e %14.7e",st,sd,sn);
 	  fprintf(out,"\n");
 	}
@@ -537,7 +537,7 @@ void print_displacement(struct med *medium,struct flt *fault)
 	  if(l==3){
 	    if(!use_fault_plane || medium->ok[i*medium->n[INT_Y]+j]){
 	      for(m=0;m<3;m++){
-		x[m]=reformat_small(x[m]);
+		//x[m]=reformat_small(x[m]);
 		fprintf(out,"%14.7e ",x[m]);
 	      }
 	      for(l=0;l<3;l++)
@@ -572,7 +572,7 @@ void print_displacement(struct med *medium,struct flt *fault)
       }
       if(l == 3){
 	for(m=0;m<3;m++){
-	  medium->xoloc[m+j] = reformat_small(medium->xoloc[m+j]);
+	  //medium->xoloc[m+j] = reformat_small(medium->xoloc[m+j]);
 	  fprintf(out,"%14.7e ",medium->xoloc[m+j]);
 	}
 	for(l=0;l<3;l++)
