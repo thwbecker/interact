@@ -448,31 +448,6 @@ void read_geometry(char *patch_filename,struct med **medium,
   // determine the position of each patch in a group local coordinate system
   // and initialize the group structure
   calculate_position_of_patch(*medium,*fault);
-#ifdef USE_PETSC
-  if((*medium)->comm_size == 1){
-    (*medium)->myfault0 = 0;    (*medium)->myfaultn = (*medium)->nrflt;
-  }else{			/* distribute fault ranges to cores */
-    j = (int)((float)(*medium)->nrflt / (float)(*medium)->comm_size + 0.5);
-    if(j<2){
-      fprintf(stderr,"read_geometry: too many cores (%i) for the number of faults (%i)\n",
-	      (*medium)->comm_size,(*medium)->nrflt);
-       exit(-1);
-    }
-    (*medium)->myfault0 = (*medium)->comm_rank*j;
-    (*medium)->myfaultn = ((*medium)->comm_rank + 1) * j;
-    if((*medium)->comm_rank == (*medium)->comm_size-1){
-      if((*medium)->myfaultn  != (*medium)->nrflt)
-	(*medium)->myfaultn = (*medium)->nrflt;
-    }
-#ifdef DEBUG
-    fprintf(stderr,"core %03i/%03i: flt %05i to %05i\n",
-	    (*medium)->comm_rank,(*medium)->comm_size,
-	    (*medium)->myfault0,(*medium)->myfaultn);
-#endif
-  }
-#else
-  (*medium)->myfault0 = 0;    (*medium)->myfaultn = (*medium)->nrflt;
-#endif
   
   (*medium)->geometry_init = TRUE;
   init = TRUE;

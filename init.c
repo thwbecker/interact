@@ -94,7 +94,7 @@ void initialize(struct med **medium, struct flt **fault,
 		my_boolean init_system,COMP_PRECISION wcutoff,
 		my_boolean no_interactions,my_boolean force_petsc)
 {
-  int serr;
+  int serr,fchunk;
   char tmpstring[STRLEN];
   //
   // read in the main model description files
@@ -108,6 +108,35 @@ void initialize(struct med **medium, struct flt **fault,
   if((*medium)->comm_rank==0)
     fprintf(stderr,"initialize: all stress values are based on a shear modulus of %g\n",
 	    SHEAR_MODULUS);
+  /* assign faults to processors */
+#ifdef USE_PETSC
+  if((*medium)->comm_size == 1){
+    (*medium)->myfault0 = 0;
+    (*medium)->myfaultn = (*medium)->nrflt;
+  }else{			/* distribute fault ranges to cores */
+    fchunk = (int)((float)(*medium)->nrflt / (float)(*medium)->comm_size + 0.5);
+    if(fchunk < 2){
+      fprintf(stderr,"read_geometry: too many cores (%i) for the number of faults (%i), chunk %i\n",
+	      (*medium)->comm_size,(*medium)->nrflt,fchunk);
+       exit(-1);
+    }
+    (*medium)->myfault0 = (*medium)->comm_rank       * fchunk;
+    (*medium)->myfaultn = ((*medium)->comm_rank + 1) * fchunk;
+    if((*medium)->comm_rank == (*medium)->comm_size-1){
+      if((*medium)->myfaultn  != (*medium)->nrflt)
+	(*medium)->myfaultn = (*medium)->nrflt;
+    }
+#ifdef DEBUG
+    fprintf(stderr,"core %03i/%03i: flt %05i to %05i\n",
+	    (*medium)->comm_rank,(*medium)->comm_size,
+	    (*medium)->myfault0,(*medium)->myfaultn);
+#endif
+  }
+#else
+  (*medium)->myfault0 = 0;    (*medium)->myfaultn = (*medium)->nrflt;
+#endif
+
+
   // assign the background pressure 
   (*medium)->pressure = pressure;
   // read in the background stressing factors, 

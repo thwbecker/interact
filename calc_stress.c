@@ -376,11 +376,7 @@ void calc_fields(struct med *medium,struct flt *fault,
 		PLANE_COORD_FILE);
       }
 
-    if(medium->comm_size > 1)
-      fprintf(stderr,"calc_stress: core %03i/%03i computing grid for %05i to %05i\n",
-	      medium->comm_rank,medium->comm_size,
-	      medium->myfault0,medium->myfaultn);
-    
+     
     for(k=0,x[INT_Z]=medium->pxmin[INT_Z];k<nz;x[INT_Z]+=dx[INT_Z],k++)
       for(i=0,x[INT_X]=medium->pxmin[INT_X];i<medium->n[INT_X];x[INT_X]+=dx[INT_X],i++)
 	for(j=0,x[INT_Y]=medium->pxmin[INT_Y];j<medium->n[INT_Y];x[INT_Y]+=dx[INT_Y],j++){
@@ -445,10 +441,6 @@ void calc_fields(struct med *medium,struct flt *fault,
       if(medium->print_plane_coord)
 	fclose(out);
   }else  if(medium->read_oloc_from_file){
-    if(medium->comm_size > 1)
-      fprintf(stderr,"calc_stress: core %03i/%03i computing spotted for %05i to %05i\n",
-	      medium->comm_rank,medium->comm_size,
-	      medium->myfault0,medium->myfaultn);
     //
     // output given on spotted locations
     //
@@ -500,11 +492,12 @@ void calc_fields(struct med *medium,struct flt *fault,
     }
   }
   if(singular_count)
-    fprintf(stderr,"calc_fields: core %03i WARNING: there were %i singular entries in the field\n",
-	    medium->comm_rank,singular_count);
+    fprintf(stderr,"calc_fields: core %03i/%03i fault %05i to %05i: WARNING: %i singular\n",
+	    medium->comm_rank,medium->comm_size,medium->myfault0,medium->myfaultn,
+	    singular_count);
   else
-    fprintf(stderr,"calc_fields: core %03i done, no singular entries in the field\n",
-	    medium->comm_rank);
+    fprintf(stderr,"calc_fields: core %03i/%03i fault %05i to %05i: no singular entries\n",
+	    medium->comm_rank,medium->comm_size,medium->myfault0,medium->myfaultn);
   //for(i=0;i<10;i++)fprintf(stderr,"%10g ",local_u[i]);fprintf(stderr,"\n");
 #ifdef USE_PETSC
   if(medium->comm_size > 1){
