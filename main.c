@@ -183,16 +183,6 @@ int main(int argc, char **argv)
     }
     HEADNODE{
       print_fault_data(ONE_STEP_FAULT_DATA_FILE,medium,fault);
-      if(medium->geomview_output)
-	// output for geomview
-	for(i=0;i<medium->nrgrp;i++){
-	  sprintf(filename,"flt.%i.abs.off",i);
-	  print_group_data_geom(filename,medium,fault,i,0,0.0);
-	  sprintf(filename,"flt.%i.strike.off",i);
-	  print_group_data_geom(filename,medium,fault,i,1,0.0);
-	  sprintf(filename,"flt.%i.dip.off",i);
-	  print_group_data_geom(filename,medium,fault,i,2,0.0);
-	}
     }
     break;
   }}

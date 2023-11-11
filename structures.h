@@ -175,7 +175,7 @@ struct med{
   my_boolean flt_stress_init,events_init,save_amat,slip_line_init,
     print_bulk_fields,use_slip_files,use_sparse_storage,
     use_old_imat,use_old_amat,save_imat,check_for_interaction_feedback,
-    read_oloc_from_file,suppress_nan_output,geomview_output,
+    read_oloc_from_file,suppress_nan_output,
     twod_approx_is_plane_stress,print_plane_coord,
     variable_time_step,debug,no_interactions;
   /* calculation mode and state switches */

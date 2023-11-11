@@ -125,7 +125,7 @@ void phelp(void)
   PE("");
   PE("    Please note that there are various programs to convert to and from the above patch format,");
   PE("    e.g. patch2xyz to go to GMT style xyz coordinates for the edges of each patch,");
-  PE("    patch2geom to go from patch format to the Geometry center's geomview OFF format, or");
+  PE("    patch2vtk to go from patch format to (paraview) VTK format, or");
   PE("    points2patch to convert a set of four points in FE ordering to the above patch format.");
   PE("");
   PE("");
@@ -632,13 +632,6 @@ void phelp(void)
 	  RESTART_EVENT_FILE_ASCII);
 #endif
   PE(""); 
-  PE(" -gv will output files with slip on faults in the Geometry center's geomview COFF format,");
-  PE("     with a CQUAD file for each fault group. Slip values are scaled to the global maxima.");
-  fprintf(stderr,"     Note that the fltdat2cquad script can produce CQAUD files from %s and %s files.\n",
-	  GEOMETRY_FILE,ONE_STEP_FAULT_DATA_FILE);
-  fprintf(stderr,"     %s by default, if switch is set will be %s.\n",
-	  name_boolean(GEOMVIEW_OUTPUT_DEF),name_boolean(TOGV(GEOMVIEW_OUTPUT_DEF)));
-  PE("");
 
   PE(" -sn will print NaN values in displacement and stress outputs of the one-step calculation.");
   PE("     Normally, those locations (end patch/segments) yielding one or more inf values in the");

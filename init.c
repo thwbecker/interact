@@ -24,7 +24,7 @@ void check_parameters_and_init(int argc, char **argv,
     read_stress_relation_factors,use_slip_files,whole_fault_deactivations,
     use_sparse_storage,use_old_imat,use_old_amat,save_imat,save_amat,
     check_for_interaction_feedback,keep_slipping,attempt_restart,suppress_nan_output,
-    geomview_output,twod_approx_is_plane_stress,print_plane_coord,half_plane,
+    twod_approx_is_plane_stress,print_plane_coord,half_plane,
     variable_time_step,debug,no_interactions,force_petsc;
   short int solver_mode;
   COMP_PRECISION pressure,med_cohesion,min_stress_drop,wcutoff;
@@ -47,7 +47,7 @@ void check_parameters_and_init(int argc, char **argv,
 		  &i_mat_cutoff,&use_old_imat,&use_old_amat,
 		  &save_imat,&save_amat,&check_for_interaction_feedback,
 		  &keep_slipping,&attempt_restart,&solver_mode,
-		  &suppress_nan_output,&geomview_output,&pressure,
+		  &suppress_nan_output,&pressure,
 		  &twod_approx_is_plane_stress,&print_plane_coord,
 		  &half_plane,&variable_time_step,&debug,&wcutoff,
 		  &no_interactions,&force_petsc,(*medium)->comm_rank);
@@ -58,7 +58,7 @@ void check_parameters_and_init(int argc, char **argv,
 	     min_stress_drop,use_sparse_storage,i_mat_cutoff,use_old_imat,
 	     use_old_amat,save_imat,save_amat,check_for_interaction_feedback,
 	     keep_slipping,attempt_restart,solver_mode,suppress_nan_output,
-	     geomview_output,pressure,twod_approx_is_plane_stress,
+	     pressure,twod_approx_is_plane_stress,
 	     print_plane_coord,half_plane,variable_time_step,debug,TRUE,wcutoff,
 	     no_interactions,force_petsc);
 }
@@ -87,7 +87,7 @@ void initialize(struct med **medium, struct flt **fault,
 		my_boolean save_imat,my_boolean save_amat,
 		my_boolean check_for_interaction_feedback,my_boolean keep_slipping,
 		my_boolean attempt_restart,short int solver_mode,
-		my_boolean suppress_nan_output,my_boolean geomview_output,
+		my_boolean suppress_nan_output,
 		COMP_PRECISION pressure,my_boolean twod_approx_is_plane_stress,
 		my_boolean print_plane_coord,my_boolean half_plane,
 		my_boolean variable_time_step,my_boolean debug,
@@ -254,8 +254,6 @@ void initialize(struct med **medium, struct flt **fault,
   (*medium)->attempt_restart = attempt_restart;
   // output of NaNs in stress or displacement?
   (*medium)->suppress_nan_output = suppress_nan_output;
-  // Geomview COFF file output?
-  (*medium)->geomview_output = geomview_output;
   if(force_petsc){
 #ifdef USE_PETSC
     (*medium)->force_petsc = force_petsc;
@@ -386,7 +384,7 @@ void init_parameters(char **argv, int argc, my_boolean *read_fault_properties,
 		     my_boolean *check_for_interaction_feedback,
 		     my_boolean *keep_slipping,
 		     my_boolean *attempt_restart,short int *solver_mode,
-		     my_boolean *suppress_nan_output,my_boolean *geomview_output,
+		     my_boolean *suppress_nan_output,
 		     COMP_PRECISION *pressure,
 		     my_boolean *twod_approx_is_plane_stress,
 		     my_boolean *print_plane_coord,
@@ -424,7 +422,6 @@ void init_parameters(char **argv, int argc, my_boolean *read_fault_properties,
   *attempt_restart = FALSE;
   *solver_mode = LU_SOLVER;// default solver
   *suppress_nan_output = SUPPRESS_NAN_OUTPUT_DEF;
-  *geomview_output = GEOMVIEW_OUTPUT_DEF;
   *pressure = PRESSURE_DEF;
   *twod_approx_is_plane_stress = TWO_DIM_APPROX_IS_PLANE_STRESS_DEF;
   *print_plane_coord = PRINT_PLANE_COORD_DEF;
@@ -480,8 +477,6 @@ void init_parameters(char **argv, int argc, my_boolean *read_fault_properties,
       toggle(use_slip_files);
     }else if(strcmp(argv[i],"-pc")==0){// print plane coordinates
       toggle(print_plane_coord);
-    }else if(strcmp(argv[i],"-gv")==0){// Geomview output
-      toggle(geomview_output);
     }else if(strcmp(argv[i],"-ct")==0){// time step
       toggle(variable_time_step);
     }else if(strcmp(argv[i],"-sv")==0){// use SVD solver for Ax=b
