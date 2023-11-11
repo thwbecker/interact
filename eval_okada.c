@@ -54,9 +54,10 @@ void eval_rectangle(COMP_PRECISION *x,struct flt *fault,
 		    COMP_PRECISION *u_global, 
 		    COMP_PRECISION sm_global[3][3],int *iret)
 {
-  int i;
+
   COMP_PRECISION iso,dx[3],sm_local[3][3];
 #ifndef USE_DOUBLE_PRECISION
+  int i;
   double x_local_d[3],u_d[12],disp_d[3];
 #endif
   COMP_PRECISION x_local[3],u[12];

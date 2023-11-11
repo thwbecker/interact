@@ -70,6 +70,6 @@ void terminate(struct med *medium, struct flt *fault)
   }
 #ifdef USE_PETSC
   PetscCall(PetscFinalize());
-#endif USE_PETSC
+#endif
   exit(medium->op_state);
 }

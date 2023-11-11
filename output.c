@@ -538,10 +538,10 @@ void print_displacement(struct med *medium,struct flt *fault)
 	    if(!use_fault_plane || medium->ok[i*medium->n[INT_Y]+j]){
 	      for(m=0;m<3;m++){
 		//x[m]=reformat_small(x[m]);
-		fprintf(out,"%14.7e ",x[m]);
+		fprintf(out,"%13.6e ",x[m]);
 	      }
 	      for(l=0;l<3;l++)
-		fprintf(out,"%14.7e ",medium->u[POSU(i, j, k, l)]);
+		fprintf(out,"%13.6e ",medium->u[POSU(i, j, k, l)]);
 	      fprintf(out,"\n");
 	    }
 	  }
@@ -573,10 +573,10 @@ void print_displacement(struct med *medium,struct flt *fault)
       if(l == 3){
 	for(m=0;m<3;m++){
 	  //medium->xoloc[m+j] = reformat_small(medium->xoloc[m+j]);
-	  fprintf(out,"%14.7e ",medium->xoloc[m+j]);
+	  fprintf(out,"%13.6e ",medium->xoloc[m+j]);
 	}
 	for(l=0;l<3;l++)
-	  fprintf(out,"%14.7e ",medium->u[j+l]);
+	  fprintf(out,"%13.6e ",medium->u[j+l]);
 	fprintf(out,"\n");
       }
     }

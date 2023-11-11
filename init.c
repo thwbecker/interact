@@ -115,8 +115,8 @@ void initialize(struct med **medium, struct flt **fault,
     (*medium)->myfaultn = (*medium)->nrflt;
   }else{			/* distribute fault ranges to cores */
     fchunk = (int)((float)(*medium)->nrflt / (float)(*medium)->comm_size + 0.5);
-    if(fchunk < 2){
-      fprintf(stderr,"read_geometry: too many cores (%i) for the number of faults (%i), chunk %i\n",
+    if(fchunk < 1){
+      fprintf(stderr,"initialize: too many cores (%i) for the number of faults (%i), chunk %i\n",
 	      (*medium)->comm_size,(*medium)->nrflt,fchunk);
        exit(-1);
     }

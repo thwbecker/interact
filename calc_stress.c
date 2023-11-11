@@ -36,25 +36,29 @@ void initialize_stress_state(struct flt *fault,struct med *medium,
 #endif
     }
     if((medium->cohesion != 0.0) || (medium->cohesion!=COHESION_DEF))
-      HEADNODE
+      HEADNODE{
 	fprintf(stderr,"initialize_stress_state: WARNING: the cohesion was set to %g\n",
 		medium->cohesion);
+      }
     if(read_initial_fault_stress){
       in=fopen(FAULT_STRESS_INIT_FILE,"r");
       if(in){
-	HEADNODE
+	HEADNODE{
 	  fprintf(stderr,"initialize_stress_state: WARNING: reading initial non-hydrostatic stresses for faults from \"%s\"\n",
 		  FAULT_STRESS_INIT_FILE);
+	}
       }else{
-	HEADNODE
+	HEADNODE{
 	  fprintf(stderr,"initialize_stress_state: could not find initial stress file \"%s\", using homogeneous values\n",
 		  FAULT_STRESS_INIT_FILE);
+	}
 	read_initial_fault_stress=FALSE;
       }
     }
 #ifdef DEBUG
-    HEADNODE
+    HEADNODE{
       fprintf(stderr,"initialize_stress_state: initial stresses (including hydrostatic part):\n");
+    }
 #endif
     if(medium->variable_time_step)
       if(medium->dt0 != 1.0){
@@ -195,10 +199,10 @@ void calc_fields(struct med *medium,struct flt *fault,
 		 my_boolean include_background_displacement,
 		 COMP_PRECISION *a,COMP_PRECISION *b)
 {
-  int i,j,k,o,o1,iret,p1,p2,singular_count,not_ok;
+  int i,j,k,iflt,o1,iret,p1,p2,singular_count,not_ok;
   long int nxy,nxyz;
   int nz;
-  my_boolean use_fault_plane;
+  my_boolean use_fault_plane = FALSE;
   COMP_PRECISION dx[3],x[3],xl[3],u[3],sm[3][3],vec_1[3],vec_2[3],
     flt_mean_x[3],s1,s2,d1,d2;
   SUM_ARR_PREC *local_u,*local_s;
@@ -211,7 +215,8 @@ void calc_fields(struct med *medium,struct flt *fault,
     // check if we want a projection plane or 3d field
     fiddle_with_limits_for_plot(medium,&nz,&use_fault_plane,dx,FALSE);
     HEADNODE {
-      fprintf(stderr,"calc_fields: calculating bulk stress and displacement fields...\n");
+      fprintf(stderr,"calc_fields: calculating bulk stress and displacement fields, ufp %i\n",
+	      use_fault_plane);
       fprintf(stderr,"calc_fields: field dimensions: %i %i %i %i\n",
 	      nz,medium->n[INT_Y],medium->n[INT_X],6);
     }
@@ -283,9 +288,9 @@ void calc_fields(struct med *medium,struct flt *fault,
 	    x[INT_Y] += dx[INT_Y],j++){
 	  get_local_x_on_plane(xl,x,flt_mean_x,vec_1,vec_2);
 	  if(xl[INT_Z] <= 0){
-	    medium->ok[o1+j]=TRUE;
+	    medium->ok[o1+j] = TRUE;
 	  }else{
-	    medium->ok[o1+j]=FALSE;
+	    medium->ok[o1+j] = FALSE;
 	    not_ok++;
 	  }
 	}
@@ -366,7 +371,7 @@ void calc_fields(struct med *medium,struct flt *fault,
 
   */
   if(medium->print_bulk_fields){
-    HEADNODE
+    HEADNODE{
       if(medium->print_plane_coord){
 	out=myopen(PLANE_COORD_FILE,"w");
 	fprintf(out,"# format:\n#\txg[X] xg[Y] xg[Z] xl[X] xl[Y]\n#\twith v_s: (%g,%g,%g) v_%s: (%g,%g,%g)\n#\n",
@@ -375,12 +380,13 @@ void calc_fields(struct med *medium,struct flt *fault,
 	fprintf(stderr,"calc_fields: writing fault plane coordinates to \"%s\"\n",
 		PLANE_COORD_FILE);
       }
+    }
 
-     
-    for(k=0,x[INT_Z]=medium->pxmin[INT_Z];k<nz;x[INT_Z]+=dx[INT_Z],k++)
-      for(i=0,x[INT_X]=medium->pxmin[INT_X];i<medium->n[INT_X];x[INT_X]+=dx[INT_X],i++)
-	for(j=0,x[INT_Y]=medium->pxmin[INT_Y];j<medium->n[INT_Y];x[INT_Y]+=dx[INT_Y],j++){
-	  //fprintf(stderr,"calc_fields: working on %04i/%04i/%04i\r",k,i,j);
+    //fprintf(stderr,"\ncalc_fields: core %i from %i to %i, %i %i %i\n\n",medium->comm_rank,medium->myfault0,medium->myfaultn,nz,medium->n[INT_X],medium->n[INT_Y]);
+    for(k=0,x[INT_Z]=medium->pxmin[INT_Z];k < nz;x[INT_Z]+=dx[INT_Z],k++)
+      for(i=0,x[INT_X]=medium->pxmin[INT_X];i < medium->n[INT_X];x[INT_X]+=dx[INT_X],i++)
+	for(j=0,x[INT_Y]=medium->pxmin[INT_Y];j < medium->n[INT_Y];x[INT_Y]+=dx[INT_Y],j++){
+
 	  if(!use_fault_plane || medium->ok[i*medium->n[INT_Y]+j]){
 	    if(use_fault_plane){
 	      // determine position along the fault plane
@@ -388,9 +394,10 @@ void calc_fields(struct med *medium,struct flt *fault,
 	    }else{
 	      xl[INT_X]=x[INT_X];xl[INT_Y]=x[INT_Y];xl[INT_Z]=x[INT_Z];
 	    }
-	    HEADNODE
+	    HEADNODE{
 	      if(medium->print_plane_coord)
 		fprintf(out,"%g %g %g %g %g\n",xl[INT_X],xl[INT_Y],xl[INT_Z],x[INT_X],x[INT_Y]);
+	    }
 	    if(xl[INT_Z] > 0.0){
 	      if(xl[INT_Z] > 1e-10){
 		fprintf(stderr,"calc_fields: positive depth in loop, kij: %i %i %i x: (%g, %g, %g)\n",
@@ -402,16 +409,19 @@ void calc_fields(struct med *medium,struct flt *fault,
 	    }
 	    p1 = POSU(i,j,k,INT_X);
 	    p2 = POSS(i,j,k,0);
+	    
 
 	    /* possibly executed only for each core */
-	    for(o = medium->myfault0;o < medium->myfaultn;o++){
-	      
-	      if(norm_3d(fault[o].u) >= EPS_COMP_PREC){
+	    for(iflt = medium->myfault0;iflt < medium->myfaultn;iflt++){
+	      //fprintf(stderr,"calc_fields: %04i/%04i/%04i core %i f %i s %g\n",k,i,j,medium->comm_rank,iflt,norm_3d(fault[iflt].u));	      
+	      if(norm_3d(fault[iflt].u) > 0){
 		//
 		// actual fault contribution is accounted for HERE
 		//
-		eval_green(xl,(fault+o),fault[o].u,u,sm,&iret);
+		eval_green(xl,(fault+iflt),fault[iflt].u,u,sm,&iret);
+		//fprintf(stderr,"core %i k %3i i %3i j %3i flt %3i %11g\n",medium->comm_rank,k,i,j,iflt,u[INT_X]);
 		if(!iret){
+
 		  local_u[p1]   += (SUM_ARR_PREC)u[INT_X];
 		  local_u[p1+1] += (SUM_ARR_PREC)u[INT_Y];
 		  local_u[p1+2] += (SUM_ARR_PREC)u[INT_Z];
@@ -437,9 +447,10 @@ void calc_fields(struct med *medium,struct flt *fault,
 	    }
 	  }
 	}
-    HEADNODE
+    HEADNODE{
       if(medium->print_plane_coord)
 	fclose(out);
+    }
   }else  if(medium->read_oloc_from_file){
     //
     // output given on spotted locations
@@ -458,13 +469,13 @@ void calc_fields(struct med *medium,struct flt *fault,
       }
       p1 = j;
       p2 = i * 6;
-      for(o=medium->myfault0;o < medium->myfaultn;o++){
+      for(iflt=medium->myfault0;iflt < medium->myfaultn;iflt++){
 	
-	if(norm_3d(fault[o].u) >= EPS_COMP_PREC){
+	if(norm_3d(fault[iflt].u) > 0){
 	  //
 	  // actual fault contribution is accounted for HERE
 	  //
-	  eval_green(xl,(fault+o),fault[o].u,u,sm,&iret);
+	  eval_green(xl,(fault+iflt),fault[iflt].u,u,sm,&iret);
 	  if(!iret){
 	    local_u[p1]   += (SUM_ARR_PREC)u[INT_X];
 	    local_u[p1+1] += (SUM_ARR_PREC)u[INT_Y];
@@ -493,18 +504,21 @@ void calc_fields(struct med *medium,struct flt *fault,
   }
   if(singular_count)
     fprintf(stderr,"calc_fields: core %03i/%03i fault %05i to %05i: WARNING: %i singular\n",
-	    medium->comm_rank,medium->comm_size,medium->myfault0,medium->myfaultn,
+	    medium->comm_rank+1,medium->comm_size,medium->myfault0,medium->myfaultn,
 	    singular_count);
   else
-    fprintf(stderr,"calc_fields: core %03i/%03i fault %05i to %05i: no singular entries\n",
-	    medium->comm_rank,medium->comm_size,medium->myfault0,medium->myfaultn);
+    fprintf(stderr,"calc_fields: core %3i/%3i fault %5i < %5i: no singular entries\n",
+	    medium->comm_rank+1,medium->comm_size,medium->myfault0,medium->myfaultn);
   //for(i=0;i<10;i++)fprintf(stderr,"%10g ",local_u[i]);fprintf(stderr,"\n");
 #ifdef USE_PETSC
   if(medium->comm_size > 1){
-
+#if (SUM_ARR_PREC == float)
     MPI_Reduce(local_u, medium->u, (int)nxyz*3, MPI_FLOAT, MPI_SUM, 0, MPI_COMM_WORLD);
     MPI_Reduce(local_s, medium->s, (int)nxyz*6, MPI_FLOAT, MPI_SUM, 0, MPI_COMM_WORLD);
-
+#else
+    MPI_Reduce(local_u, medium->u, (int)nxyz*3, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
+    MPI_Reduce(local_s, medium->s, (int)nxyz*6, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
+#endif
     free(local_u);free(local_s);
   }
 #endif

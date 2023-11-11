@@ -30,7 +30,7 @@ void read_boundary_conditions(struct med *medium,
     HEADNODE
       fprintf(stderr,"read_boundary_conditions: reading boundary conditions from \"%s\"\n",
 	      BC_FILE);
-    fscanf(in,"%i",&medium->op_mode);
+    i = fscanf(in,"%i",&medium->op_mode);
     switch(medium->op_mode){
     case ONE_STEP_CALCULATION:{
       /*
@@ -56,7 +56,7 @@ void read_boundary_conditions(struct med *medium,
       HEADNODE
 	fprintf(stderr,"read_boundary_conditions: simulating loading\n");
       /* timing issues */
-      fscanf(in,THREE_CP_FORMAT,&medium->dt0,&medium->print_interval,
+      i = fscanf(in,THREE_CP_FORMAT,&medium->dt0,&medium->print_interval,
 	     &medium->stop_time);
       if(!medium->variable_time_step){
 	HEADNODE
@@ -86,7 +86,7 @@ void read_boundary_conditions(struct med *medium,
       if(medium->op_mode == SIMULATE_LOADING_AND_PLOT){
 #ifdef USE_PGPLOT
 	/* plotting interval */
-	fscanf(in,TWO_CP_FORMAT,
+	i = fscanf(in,TWO_CP_FORMAT,
 	       &medium->x_plot_interval,
 	       &medium->x_scroll_interval);
 	HEADNODE
@@ -994,8 +994,10 @@ void read_one_step_bc(FILE *in,struct med *medium,struct flt *fault,
 	  */
 	  if(sma[i3+j]){
 	    medium->sma[medium->naflt*3+j] = sma[i3+j];
+	    //
 	    // the x vector is in here just so that it gets resized at the same time
 	    // as b
+	    //
 	    add_to_right_hand_side(rhs[i3+j],&medium->b,&medium->xsol,
 				   &medium->nreq);
 	    added_to_uncon=TRUE;/* have to increment fault contraint counter */

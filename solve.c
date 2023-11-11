@@ -40,7 +40,7 @@ int solve(struct med *medium,struct flt *fault)
   PetscInt lm, ln, dn, on;
   VecScatter ctx;
 #else
-  unsigned int i,j,m,n;
+  unsigned int i,m,n;
 #endif
 
   
@@ -92,7 +92,7 @@ int solve(struct med *medium,struct flt *fault)
       mixed NNLS and least squares from NNLS package
 
     */
-    if(medium->comm_size>1){
+    if(medium->comm_size > 1){
       HEADNODE
 	fprintf(stderr,"solve: SLATEC MIX NNLS only serial, %i cores requested\n",medium->comm_size);
       exit(-1);
@@ -337,9 +337,16 @@ int solve(struct med *medium,struct flt *fault)
       /* assign to x solution vector */
       if(medium->comm_rank == 0){
 	PetscCall(VecGetArray(pxout,&values));
-	memcpy(medium->xsol,values,m*sizeof(PetscScalar));
+	for(i=0;i<m;i++)
+	  medium->xsol[i] = (A_MATRIX_PREC)values[i];
 	PetscCall(VecRestoreArray(pxout,&values));
       }
+      /* broadcast solution */
+#if (A_MATRIX_PREC == double)
+      MPI_Bcast(medium->xsol,m,MPI_DOUBLE,0, MPI_COMM_WORLD);
+#else
+      MPI_Bcast(medium->xsol,m,MPI_FLOAT,0, MPI_COMM_WORLD);
+#endif
       // destroy scatter context and local vector when no longer needed
       PetscCall(VecScatterDestroy(&ctx));
       PetscCall(VecDestroy(&pxout));

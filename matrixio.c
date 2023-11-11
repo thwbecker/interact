@@ -134,7 +134,12 @@ void read_a_matrix_from_file(A_MATRIX_PREC *a,int m, int n,
   fprintf(stderr,"read_a_matrix_from_file: reading %s from \"%s\" and \"%s\"\n",
 	  matrixname,tmpstr,filename);
   in=myopen(tmpstr,"r");
-  fscanf(in,"%i %i %i\n",&mr,&size,&nr);
+  size=fscanf(in,"%i %i %i\n",&mr,&size,&nr);
+  if(size!=3){
+    fprintf(stderr,"could not read header\n");
+    exit(-1);
+	   
+  }
   if((n!=nr)||(m!=mr)){
     fprintf(stderr,"read_a_matrix_from_file: header file indicates m: %i by n: %i system with %i byte precision\n",
 	    mr,nr,size);

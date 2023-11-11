@@ -54,8 +54,6 @@ int main(int argc, char **argv)
   // values for background stress
   my_boolean read_initial_fault_stress,faults_have_slipped;
   COMP_PRECISION a[6],b[6];
-  int i;
-  char filename[200];
   medium=(struct med *)calloc(1,sizeof(struct med)); /* init as zeros */
 
 #ifdef USE_PETSC
