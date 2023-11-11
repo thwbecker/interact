@@ -90,9 +90,6 @@ int main(int argc, char **argv)
     }else if(strcmp(argv[i],"-stime")==0){
       sscanf(argv[i+1],ONE_CP_FORMAT,&stop_time);
       i+=2;
-    }else if(strcmp(argv[i],"-geom")==0){
-      opmode= GEOMVIEW_MODE;
-      i++; 
     }else if(strcmp(argv[i],"-xyz")==0){
       opmode= PSXYZ_MODE;
       i++; 
@@ -141,7 +138,6 @@ int main(int argc, char **argv)
       fprintf(stderr,"\tuse -seed   value for random seed in case srand or drand != 0 (%i)\n\n",(int)seed);
       fprintf(stderr,"\tuse -stime  value for stop time in bc file (%g)\n",stop_time);
       fprintf(stderr,"\tuse -circ         for circular patch\n");
-      fprintf(stderr,"\n\tuse -geom    for geomview 3D output\n");
       fprintf(stderr,"\tuse -xyz     for psxyz output\n");
       fprintf(stderr,"\tuse -bc      for bc.in output\n");
 #ifdef ALLOW_NON_3DQUAD_GEOM

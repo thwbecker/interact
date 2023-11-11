@@ -187,7 +187,6 @@ singular value will be set to zero
 #define SAVE_AMAT_DEF FALSE
 #define CHECK_FOR_INTERACTION_FEEDBACK_DEF FALSE 
 #define SUPPRESS_NAN_OUTPUT_DEF TRUE // suppress NaNs in output
-#define GEOMVIEW_OUTPUT_DEF FALSE // output of files in geomview's OFF format
 #define TWO_DIM_APPROX_IS_PLANE_STRESS_DEF FALSE
 #define PRINT_PLANE_COORD_DEF FALSE
 #define HALF_PLANE_DEF FALSE

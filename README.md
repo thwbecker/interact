@@ -269,6 +269,9 @@ PetSc support was compiled in, providing limited access to parallel solves for o
       For iterative solve "-ksp_type fgmres -pc_type none   -ksp_max_it 10000 -ksp_rtol 1.0e-8" or
                           "-ksp_type fgmres -pc_type jacobi -ksp_max_it 10000 -ksp_rtol 1.0e-8".
       Check the makefile for other solver options and MPI settings.
+	  When running a one-step computation, will also compute stress fields in parallel.
+
+
 
 (1) The fault geometry is input via the file `geom.in`,
     a list of fault patches.
@@ -309,7 +312,7 @@ PetSc support was compiled in, providing limited access to parallel solves for o
 
     Please note that there are various programs to convert to and from the above patch format,
     e.g. patch2xyz to go to GMT style xyz coordinates for the edges of each patch,
-    patch2geom to go from patch format to the Geometry center's geomview OFF format, or
+    patch2vtk to go from patch format to (paraview) VTK format, or
     points2patch to convert a set of four points in FE ordering to the above patch format.
 
 
@@ -681,11 +684,6 @@ OPTIONS:
 
      Slip events from the previous run in the format as in the output file `events.bin` will be read in
      from the restart event file `restart.events.bin`
-
-* -gv will output files with slip on faults in the Geometry center's geomview COFF format,
-     with a CQUAD file for each fault group. Slip values are scaled to the global maxima.
-     Note that the fltdat2cquad script can produce CQAUD files from geom.in and flt.dat files.
-     OFF by default, if switch is set will be ON.
 
 * -sn will print NaN values in displacement and stress outputs of the one-step calculation.
      Normally, those locations (end patch/segments) yielding one or more inf values in the

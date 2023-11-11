@@ -116,57 +116,6 @@ void print_patch_geometry_and_bc(int flt_offset,struct flt *fault,
 #endif
     break;
   }
-  case GEOMVIEW_MODE:{
-    /*
-
-      output in GEOMVIEW format for 3-D viewing
-
-     */
-    if(!g_init){
-      fprintf(out,"QUAD\n");
-      g_init=TRUE;
-    }
-#ifdef ALLOW_NON_3DQUAD_GEOM
-    switch(fault[flt_offset].type){
-    case POINT_SOURCE:
-    case TWO_DIM_SEGMENT_PLANE_STRAIN:
-    case TWO_DIM_SEGMENT_PLANE_STRESS:
-    case RECTANGULAR_PATCH:{
-      calculate_bloated_corners(corner,(fault+flt_offset),leeway);
-      for(k=0;k<4;k++){
-	for(l=0;l<3;l++)
-	  if(fabs(corner[k][l]/CHAR_FAULT_DIM)>EPS_COMP_PREC)
-	    fprintf(out,"%g ",corner[k][l]/CHAR_FAULT_DIM);
-	  else
-	    fprintf(out,"0.0 ");
-	fprintf(out,"\n");
-      }
-      break;
-    }
-    case TRIANGULAR:{
-      for(k=0;k<3;k++)
-	for(l=0;l<3;l++)
-	  fprintf(out,"%g ",fault[flt_offset].xt[k*3+l]);
-      for(k=l=0;l<3;l++)
-	fprintf(out,"%g ",fault[flt_offset].xt[k*3+l]);
-      fprintf(out,"\n");
-      break;
-    }}
-#else
-    // only rectangular faults
-    calculate_bloated_corners(corner,(fault+flt_offset),leeway);
-    for(k=0;k<4;k++){
-      for(l=0;l<3;l++)
-	if(fabs(corner[k][l]/CHAR_FAULT_DIM)>
-	   EPS_COMP_PREC)
-	  fprintf(out,"%g ",corner[k][l]/CHAR_FAULT_DIM);
-	else
-	  fprintf(out,"0.0 ");
-      fprintf(out,"\n");
-    }
-#endif
-    break;
-  }
   /*
 
     output in XYZ format for plotting with pxxyz from

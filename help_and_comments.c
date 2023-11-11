@@ -40,6 +40,8 @@ void phelp(void)
   PE("      For iterative solve \"-ksp_type fgmres -pc_type none   -ksp_max_it 10000 -ksp_rtol 1.0e-8\" or");
   PE("                          \"-ksp_type fgmres -pc_type jacobi -ksp_max_it 10000 -ksp_rtol 1.0e-8\".");
   PE("      Check the makefile for other solver options and MPI settings.");
+  PE("      When running a one-step computation, will also compute stress fields in parallel.");
+
 #else
   PE("(Petsc support not compiled in, if parallel support is desired, check makefile.)");
 #endif
