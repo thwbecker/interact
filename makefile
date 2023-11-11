@@ -204,7 +204,6 @@ PATCH_IO_OBJS_SGL = $(PATCH_IO_OBJS:.o=.sgl.o)
 # will go to libinput.a
 #
 INPUT_OBJS = $(ODIR)/read_boundary_conditions.o $(ODIR)/read_fltdat.o \
-	$(ODIR)/calc_stress.o		\
 	$(ODIR)/read_geometry.o $(ODIR)/init.o $(ODIR)/help_and_comments.o	\
 	$(ODIR)/output.o $(ODIR)/input.o $(ODIR)/matrixio.o			\
 	$(ODIR)/calc_spatial_correlation.o	$(ODIR)/stress_aux.o		\
@@ -213,9 +212,11 @@ INPUT_OBJS = $(ODIR)/read_boundary_conditions.o $(ODIR)/read_fltdat.o \
 INPUT_OBJS_SGL = $(INPUT_OBJS:.o=.sgl.o)
 #
 # list of objects for the main program, interact
-INTERACT_OBJS = $(ODIR)/rupture.o $(ODIR)/adjust_time_step.o  $(ODIR)/terminate.o $(MATRIX_SOLVER_OBJS)
+INTERACT_OBJS = $(ODIR)/rupture.o $(ODIR)/adjust_time_step.o  $(ODIR)/terminate.o \
+	$(ODIR)/calc_stress.o $(MATRIX_SOLVER_OBJS) 
 # this is a random noise added version
-INTERACT_NOISE_OBJS = $(ODIR)/rupture.o	$(ODIR)/adjust_time_step.o $(MATRIX_SOLVER_OBJS)	\
+INTERACT_NOISE_OBJS = $(ODIR)/rupture.o	$(ODIR)/calc_stress.o \
+	$(ODIR)/adjust_time_step.o $(MATRIX_SOLVER_OBJS)	\
 	$(ODIR)/coulomb_noise_stress.$(NOISELEVEL).o $(ODIR)/terminate.o
 #
 # objects for randomflt

@@ -143,7 +143,8 @@ struct med{
      in stress and displacement field output matrices */
   int n[3];
   /* stress and displacement field output matrices */
-  float *s,*u;
+  SUM_ARR_PREC *s,*u;
+
   // stress and displacement input locations and nr of input locations
   float *xoloc;int olocnr;
   /* 
@@ -228,7 +229,9 @@ struct med{
   COMP_PRECISION nan;		/* remember to initialize  */
   /*  */
   my_boolean force_petsc;
+  unsigned int myfault0,myfaultn;
 #ifdef USE_PETSC
+
   PetscMPIInt comm_size, comm_rank;
   PetscInt    rs, re, rn;
   Mat         pA;

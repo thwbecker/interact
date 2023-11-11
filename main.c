@@ -66,7 +66,7 @@ int main(int argc, char **argv)
 #else
   medium->comm_size = 1;
 #endif
-  if(medium->comm_rank==0)
+  HEADNODE
     fprintf(stderr,"main: binary: %s\nmain: compiled for %s precision, initializing\n",
 	    argv[0],(sizeof(COMP_PRECISION)==sizeof(double))?("double"):("single"));
   check_parameters_and_init(argc,argv,&medium,&fault,&read_initial_fault_stress,a,b);
@@ -83,7 +83,8 @@ int main(int argc, char **argv)
        loading simulation is only serial 
     */
     if(medium->comm_size > 1){
-      fprintf(stderr,"main: loading simulation only set up for serial, CPU %i",medium->comm_rank);
+      fprintf(stderr,"main: loading simulation only set up for serial, but CPU %i/%i",
+	      medium->comm_rank,medium->comm_size);
       terminate(medium,fault);
     }
     if(medium->nr_flt_mode != 1){
@@ -166,15 +167,15 @@ int main(int argc, char **argv)
 		     medium,fault,FALSE,TRUE,1.0);
     }
     if(medium->print_bulk_fields || medium->read_oloc_from_file){
-      HEADNODE
-	calc_fields(medium,fault,FALSE,FALSE,a,b);
-#ifdef DEBUG
+      calc_fields(medium,fault,FALSE,FALSE,a,b); /* all nodes compute,
+						    but only head node
+						    will have all
+						    entries */
       HEADNODE{
+#ifdef DEBUG
 	fprintf(stderr,"main: field calculation ok\n");
 	fprintf(stderr,"main: output of solution\n");
-      }
 #endif
-      HEADNODE{
 	print_stress(medium,fault);
 	print_displacement(medium,fault);
 	/*  print_stress_on_fault(medium,fault,0);  */

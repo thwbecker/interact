@@ -6,7 +6,8 @@
   $Id: geometry.c,v 2.44 2003/12/20 21:53:59 becker Exp $
 */
 #include "interact.h"
-#include <math.h>
+#include "properties.h"
+
 
 /*
 
@@ -890,4 +891,167 @@ void compute_cartesian_slip(COMP_PRECISION *ux,
     ux[i] += flt->t_dip[i]    * us[DIP];
     ux[i] += flt->normal[i]   * us[NORMAL];
   }
+}
+
+/*
+
+  calculate the background stress (sm[3][3] matrix) at location x[3]
+  and time "time" given the constant stress matrix factors a[6] and the 
+  loading rates b[6] as well as the pressure "pressure"
+
+  
+
+*/
+
+void background_stress(COMP_PRECISION sm[3][3], COMP_PRECISION *x, 
+		       COMP_PRECISION time,COMP_PRECISION *a,
+		       COMP_PRECISION *b,COMP_PRECISION pressure)
+{
+  COMP_PRECISION locp;
+#ifdef HYDROSTATIC_PRESSURE
+  locp = -(x[INT_Z]/HYDROSTATIC_PRESSURE) * pressure; 
+#else
+  locp = pressure; 
+#endif
+  /* isotropic elements, compression negative */
+  sm[INT_X][INT_X] = a[0] + time * b[0] - locp;
+  sm[INT_Y][INT_Y] = a[3] + time * b[3] - locp;
+  sm[INT_Z][INT_Z] = a[5] + time * b[5] - locp;
+  /* off diagonal elements  */  
+  sm[INT_X][INT_Y]=sm[INT_Y][INT_X] = a[1] + time * b[1];
+  sm[INT_X][INT_Z]=sm[INT_Z][INT_X] = a[2] + time * b[2];
+  sm[INT_Y][INT_Z]=sm[INT_Z][INT_Y] = a[4] + time * b[4];
+}
+void background_disp(COMP_PRECISION *u, COMP_PRECISION *x, 
+		     struct med *medium,COMP_PRECISION *a,
+		     COMP_PRECISION *b)
+{
+  /* the characteristic strain rate for simple shear 
+     is given by 
+
+     characteristic stressing rate
+     --------------------------
+     2 mu
+
+     integration gives the characteristic strain
+
+     characteristic stressing rate
+     ----------------------------- y_location
+     mu
+     
+  */
+  int i;
+  my_boolean hit=FALSE;
+  for(i=0;i<6;i++)
+    if(a[i]!=0.0||((i!=1)&&(b[i]!=0.0))){hit=TRUE;break;}
+  if(hit){
+    fprintf(stderr,"background_disp: EXITING: background displacement is inaccurate since no simple shear stressing\n");
+    exit(-1);
+  }
+  u[INT_X]=medium->time * (b[1]/SHEAR_MODULUS)*u[INT_Y];
+  u[INT_Y]=u[INT_Z]=0.0;
+}
+/*
+
+  obtain the local coordinates given the base vectors vec_1 and vec_2
+
+
+*/
+void get_local_x_on_plane(COMP_PRECISION *xl,COMP_PRECISION *x,
+			  COMP_PRECISION *flt_mean_x,COMP_PRECISION *vec_1,
+			  COMP_PRECISION *vec_2)
+{
+  int i;
+  for(i=0;i<3;i++){
+    xl[i]  = flt_mean_x[i];
+    xl[i] += vec_1[i] * x[INT_X];
+    xl[i] += vec_2[i] * x[INT_Y];
+  }
+}
+/*
+
+
+  obtain average faulkt plane vectors and location
+  on return flt_mean_x will hold the mean location and vec_1 and vec_2
+  the mean strike and dip or the mean strike and normal vectors, depending
+  on the n[INT_Z] flag, -1 or -2 
+
+
+ */
+void get_fault_plane_basevec(COMP_PRECISION *flt_mean_x,
+			     COMP_PRECISION *vec_1,COMP_PRECISION *vec_2,
+			     struct flt *fault,struct med *medium)
+{
+  int n,i,j;
+  // get average fault plane vectors
+  // and mean location of patches
+  for(i=0;i<3;i++)
+    vec_1[i]=vec_2[i]=flt_mean_x[i]=0.0;
+  if(medium->n[INT_Z] == -1){
+    fprintf(stderr,"get_fault_plane_basevec: base vectors are average strike and dip of fault group 0\n");
+    for(n=i=0;i<medium->nrflt;i++)
+      if(fault[i].group == 0){
+	n++;
+	for(j=0;j<3;j++){
+	  flt_mean_x[j]   += fault[i].x[j];
+	  vec_1[j]        += fault[i].t_strike[j];
+	  vec_2[j]        += fault[i].t_dip[j];
+	}
+      }
+  }else if(medium->n[INT_Z] == -2){
+    fprintf(stderr,"get_fault_plane_basevec: base vectors are average strike and normal of fault group 0\n");
+    for(n=i=0;i<medium->nrflt;i++)
+      if(fault[i].group == 0){
+	n++;
+	for(j=0;j<3;j++){
+	  flt_mean_x[j]   += fault[i].x[j];
+	  vec_1[j]        += fault[i].t_strike[j];
+	  vec_2[j]        += fault[i].normal[j];
+	}
+      }
+  }else{
+    fprintf(stderr,"get_fault_plane_basevec: medium->n[Z] has to be -1 or -2 but is %i\n",
+	    medium->n[INT_Z]);
+    exit(-1);
+  }
+  if(n)
+    for(i=0;i<3;i++){
+      flt_mean_x[i]  /=(COMP_PRECISION)n;
+      if(fabs(flt_mean_x[i])<EPS_COMP_PREC)
+	flt_mean_x[i]=0.0;
+      vec_1[i]  /=(COMP_PRECISION)n;
+      if(fabs(vec_1[i])<EPS_COMP_PREC)
+	vec_1[i]=0.0;
+      vec_2[i]     /=(COMP_PRECISION)n;
+      if(fabs(vec_2[i])<EPS_COMP_PREC)
+	vec_2[i]=0.0;
+    }
+  normalize_3d(vec_1);normalize_3d(vec_2);
+}
+/*
+
+  calculate the deviator stress and pressure
+  given a stress matrix sm
+  
+  output is dm and pressure (of original tensor), and second invariant
+  of deviatoric tensor
+
+*/
+
+void calc_deviatoric_stress(COMP_PRECISION sm[3][3],COMP_PRECISION dm[3][3],
+			    COMP_PRECISION *pressure, COMP_PRECISION *s2)
+{
+  int i,j;
+  *pressure= -(sm[INT_X][INT_X] + sm[INT_Y][INT_Y] + sm[INT_Z][INT_Z])/3.0;
+ 
+  for(i=0;i<3;i++)
+    for(j=0;j<3;j++)
+      dm[i][j] = sm[i][j] + ((i==j)?(*pressure):(0.0));
+  /* second invariant of deviatoric tensor */
+  *s2 = sqrt(0.5* (dm[INT_X][INT_X] * dm[INT_X][INT_X] + 
+		   dm[INT_X][INT_Y] * dm[INT_X][INT_Y] * 2.0 + 
+		   dm[INT_Y][INT_Y] * dm[INT_Y][INT_Y] + 
+		   dm[INT_Y][INT_Z] * dm[INT_Y][INT_Z] * 2.0 + 
+		   dm[INT_Z][INT_Z] * dm[INT_Z][INT_Z] + 
+		   dm[INT_X][INT_Z] * dm[INT_X][INT_Z] * 2.0));
 }

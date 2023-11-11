@@ -8,6 +8,8 @@
 #define AM_PREC real*4
 
 
+#define SUM_ARR_PREC float
+
 #define EPS_COMP_PREC 7.0e-7
 #define EPS_AMAT_PREC 7.0e-7
 

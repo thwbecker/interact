@@ -1,6 +1,8 @@
 #define COMP_PRECISION double 
 #define C_PREC real*8
 
+#define SUM_ARR_PREC float
+
 #define I_MATRIX_PREC double
 #define A_MATRIX_PREC double
 #define AM_PREC real*8
