@@ -743,3 +743,15 @@ void fiddle_with_limits_for_plot(struct med *medium,int *nz,
       ((COMP_PRECISION)(*nz-1));
 }
 
+void time_report(char *sub,char *out_string,struct med *medium)
+{
+  struct timespec current_time;
+  double tisec,tsec;
+  clock_gettime(CLOCK_REALTIME,&current_time);
+
+  tisec = (double)medium->init_time.tv_sec  + (double)medium->init_time.tv_nsec/1e9;
+  tsec =  (double)current_time.tv_sec  +      (double)current_time.tv_nsec/1e9;
+  
+  fprintf(stderr,"%s: %s, %.3f s since init\n",sub,out_string,tsec-tisec);
+
+}

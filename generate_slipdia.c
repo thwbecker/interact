@@ -20,6 +20,7 @@
 int main(int argc, char **argv)
 {
   struct flt *fault;
+  int i;
   COMP_PRECISION strike,dip,ddip,dstrike,sm[3][3],xhemi[3],stress[3],
     tstress[3],alpha,sin_dip,cos_dip,sin_alpha,cos_alpha;
 
@@ -48,9 +49,14 @@ int main(int argc, char **argv)
   }}
   // read in stress state
   fprintf(stderr,"%s: reading s_ij (6 components)\n",argv[0]);
-  fscanf(stdin,SIX_CP_FORMAT,
-	 &sm[INT_X][INT_X],&sm[INT_X][INT_Y],&sm[INT_X][INT_Z],
-	 &sm[INT_Y][INT_Y],&sm[INT_Y][INT_Z],&sm[INT_Z][INT_Z]);
+  i=fscanf(stdin,SIX_CP_FORMAT,
+	   &sm[INT_X][INT_X],&sm[INT_X][INT_Y],&sm[INT_X][INT_Z],
+	   &sm[INT_Y][INT_Y],&sm[INT_Y][INT_Z],&sm[INT_Z][INT_Z]);
+  if(i!=6){
+    fprintf(stderr,"read error\n");
+    exit(-1);
+	    
+  }
   sm[INT_Y][INT_X] = sm[INT_X][INT_Y];
   sm[INT_Z][INT_X] = sm[INT_X][INT_Z];
   sm[INT_Z][INT_Y] = sm[INT_Y][INT_Z];

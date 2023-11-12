@@ -128,6 +128,7 @@ struct med{
      how to compute group local locations: 0: old 1: new
   */
   int group_geom_mode;
+  struct timespec init_time;
   /* 
      geometrical boundaries for fault geometry 
   */

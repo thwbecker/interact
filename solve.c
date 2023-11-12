@@ -16,7 +16,10 @@
 
 int solve(struct med *medium,struct flt *fault)
 {
-  A_MATRIX_PREC *a,wmax,*sv=NULL,*dummyp=NULL,wcutoff;
+  A_MATRIX_PREC *a,wmax,*sv=NULL,wcutoff;
+#ifdef USE_NUMREC_SVD
+  A_MATRIX_PREC *dummyp=NULL;
+#endif
   char solver_name[STRLEN];
   size_t full_size,sparse_size;
   static int izero=0;
@@ -29,12 +32,12 @@ int solve(struct med *medium,struct flt *fault)
 #endif
 #ifdef USE_PETSC
 #define PETSC_HELPER_STR_LEN 256  
-  char mattype[PETSC_HELPER_STR_LEN];
+  char mattype[PETSC_HELPER_STR_LEN],out_string[300];
   PetscBool pset = PETSC_FALSE;
   Vec         px, pr,pxout;
   KSP         pksp;
   PC          ppc;
-  PetscInt    i, j, m, n;
+  PetscInt    i, m, n;
   PetscScalar *values=NULL;
   PetscReal   norm;
   PetscInt lm, ln, dn, on;
@@ -207,9 +210,11 @@ int solve(struct med *medium,struct flt *fault)
     */
     if(medium->force_petsc || (medium->comm_size>1)){
       /* parallel solve using PETSC */
-      HEADNODE
-	fprintf(stderr,"solve: attempting Petsc LU solve, %i core(s) requested\n",
-		medium->comm_size);
+      HEADNODE{
+	sprintf(out_string,"attempting Petsc LU solve, %i core(s) requested",
+	       medium->comm_size);
+	time_report("solve",out_string,medium);
+      }
       if(medium->use_old_amat || medium->save_amat){
 	HEADNODE
 	  fprintf(stderr,"solve: matrix I/O not implemented yet\n");
@@ -280,7 +285,7 @@ int solve(struct med *medium,struct flt *fault)
       PetscCall(MatAssemblyBegin(medium->pA, MAT_FINAL_ASSEMBLY));
       PetscCall(MatAssemblyEnd(medium->pA, MAT_FINAL_ASSEMBLY));
       HEADNODE
-	fprintf(stderr,"solve: parallel assembly done\n");
+	time_report("solve","parallel assembly done",medium);
      
       /* Convert MATDENSE to another format required by solver package */
       PetscCall(PetscOptionsGetString(NULL, NULL, "-mat_type", mattype, PETSC_HELPER_STR_LEN, &pset));
@@ -331,6 +336,8 @@ int solve(struct med *medium,struct flt *fault)
 	  medium->xsol[i] = (A_MATRIX_PREC)values[i];
 	PetscCall(VecRestoreArray(pxout,&values));
       }
+      HEADNODE
+	time_report("solve","parallel solve done, broadcasting",medium);
       /* broadcast solution */
 #ifdef A_MATRIX_PREC_IN_DOUBLE
       MPI_Bcast(medium->xsol,m,MPI_DOUBLE,0, MPI_COMM_WORLD);
@@ -358,6 +365,9 @@ int solve(struct med *medium,struct flt *fault)
       /* 
 	 petsc done 
       */
+      HEADNODE
+	time_report("solve","parallel solve completed",medium);
+
 #endif
     }else{			/* serial assembly */
       isize  = ((long int)sizeof(A_MATRIX_PREC)) * ((long int)medium->nreq*(long int)medium->nreq);

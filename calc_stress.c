@@ -207,6 +207,7 @@ void calc_fields(struct med *medium,struct flt *fault,
     flt_mean_x[3],s1,s2,d1,d2;
   SUM_ARR_PREC *local_u,*local_s;
   FILE *out=NULL;
+  char out_string[300];
   singular_count = 0;
   if(medium->print_bulk_fields){
     //
@@ -215,18 +216,22 @@ void calc_fields(struct med *medium,struct flt *fault,
     // check if we want a projection plane or 3d field
     fiddle_with_limits_for_plot(medium,&nz,&use_fault_plane,dx,FALSE);
     HEADNODE {
-      fprintf(stderr,"calc_fields: calculating bulk stress and displacement fields, ufp %i\n",
+      sprintf(out_string,"calculating bulk stress and displacement field, ufp %i",
 	      use_fault_plane);
+      time_report("calc_fields",out_string,medium);
+#ifdef DEBUG
       fprintf(stderr,"calc_fields: field dimensions: %i %i %i %i\n",
 	      nz,medium->n[INT_Y],medium->n[INT_X],6);
+#endif
     }
   }else if(medium->read_oloc_from_file){
     // output on xyz tripels as read from file
     medium->n[INT_X] = medium->n[INT_Y] = 1;
     medium->n[INT_Z] = nz = medium->olocnr;
-    HEADNODE
-      fprintf(stderr,"calc_fields: calculating fields for %i spotted observations\n",
-	      medium->n[INT_Z]);
+    HEADNODE{
+      sprintf(out_string,"calculating fields for %i spotted observations",medium->n[INT_Z]);
+      time_report("calc_fields",out_string,medium);
+    }
   }
   nxy = (long int)medium->n[INT_X] * (long int) medium->n[INT_Y];
   nxyz = (long int)nz * nxy;
@@ -503,24 +508,27 @@ void calc_fields(struct med *medium,struct flt *fault,
     }
   }
   if(singular_count)
-    fprintf(stderr,"calc_fields: core %03i/%03i fault %05i to %05i: WARNING: %i singular\n",
+    sprintf(out_string,"core %03i/%03i fault %05i to %05i: WARNING: %i singular",
 	    medium->comm_rank+1,medium->comm_size,medium->myfault0,medium->myfaultn,
 	    singular_count);
   else
-    fprintf(stderr,"calc_fields: core %3i/%3i fault %5i < %5i: no singular entries\n",
+    sprintf(out_string,"core %3i/%3i fault %5i < %5i: no singular entries",
 	    medium->comm_rank+1,medium->comm_size,medium->myfault0,medium->myfaultn);
-  //for(i=0;i<10;i++)fprintf(stderr,"%10g ",local_u[i]);fprintf(stderr,"\n");
+  time_report("calc_fields",out_string,medium);
+
 #ifdef USE_PETSC
   if(medium->comm_size > 1){
 #ifdef SUM_ARR_PREC_IN_DOUBLE
-    fprintf(stderr,"calc_fields: communicating summation for doubles\n");
+    //fprintf(stderr,"calc_fields: communicating summation for doubles\n");
     MPI_Reduce(local_u, medium->u, (int)nxyz*3, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
     MPI_Reduce(local_s, medium->s, (int)nxyz*6, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
 #else
-    fprintf(stderr,"calc_fields: communicating summation for floats\n");
+    //fprintf(stderr,"calc_fields: communicating summation for floats\n");
     MPI_Reduce(local_u, medium->u, (int)nxyz*3, MPI_FLOAT, MPI_SUM, 0, MPI_COMM_WORLD);
     MPI_Reduce(local_s, medium->s, (int)nxyz*6, MPI_FLOAT, MPI_SUM, 0, MPI_COMM_WORLD);
 #endif
+    HEADNODE
+      time_report("calc_fields","reduce calls completed",medium);
     free(local_u);free(local_s);
   }
 #endif

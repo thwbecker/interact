@@ -29,12 +29,15 @@ void check_parameters_and_init(int argc, char **argv,
   short int solver_mode;
   COMP_PRECISION pressure,med_cohesion,min_stress_drop,wcutoff;
   I_MATRIX_PREC i_mat_cutoff;
+
   if((*medium)->comm_rank==0){
     if((*medium)->comm_size==1)
       fprintf(stderr,"init: compiled on %s %s, running in serial\n",__DATE__,__TIME__);
     else
       fprintf(stderr,"init: compiled on %s %s, running on %i cores\n",__DATE__,__TIME__,(*medium)->comm_size);
   }
+
+  
   // initialization phase, get parameters from command
   // line options
   init_parameters(argv,argc, &read_fault_properties,

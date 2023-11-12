@@ -354,6 +354,7 @@ void print_equations(int, unsigned short *, int *, float *, int, char *, struct 
 void print_solutions(int, int *, struct flt *, struct med *, char *);
 void flush_moment_stack(struct med *);
 void fiddle_with_limits_for_plot(struct med *, int *, unsigned short *, float *, unsigned short);
+void time_report(char *, char *, struct med *);
 /* patch2bc.c */
 /* patch2corners.c */
 /* patch2dis3d.c */

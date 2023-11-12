@@ -38,6 +38,7 @@
 #include <limits.h>
 #include <sys/types.h>
 #include <unistd.h>
+#include <time.h>
 
 #ifdef USE_GEOPROJECT
 #include "gmt.h" 
@@ -46,34 +47,7 @@
 #ifdef USE_PETSC
 #include <petscksp.h>
 #endif
-/* list of projections
 
-don't expect anything to work....
-*/
-
-#define PROJECT_AZI 0		/* 
-				   simple projection given 
-				   clon/clat and azimuth
-				   
-				 */
-#define OMERC_AZI 1		/* oblique Mercator lon/lat/azi */
-#define OMERC_POLE 2		/* oblique Mercator lon/lat plon/plat */
-#define LCONFORM 3		/* Lambert conic conformal 
-				 lon/lat/latp1/latp2 */
-
-/* 
-
-   other headers 
-
-*/
-// first floating types
-// these are sometimes undefined in <limits.h>
-#ifndef FLT_MAX
- #define FLT_MAX 3.40282347E+38F
-#endif
-#ifndef FLT_MIN
- #define FLT_MIN 1.17549435E-38F
-#endif
 
 /* major precision control here */
 #ifdef USE_DOUBLE_PRECISION
@@ -106,6 +80,38 @@ don't expect anything to work....
 // convenience
 #define my_boolean  unsigned short
 #define MODE_TYPE unsigned short int  
+
+
+/* list of projections
+
+don't expect anything to work....
+*/
+
+#define PROJECT_AZI 0		/* 
+				   simple projection given 
+				   clon/clat and azimuth
+				   
+				 */
+#define OMERC_AZI 1		/* oblique Mercator lon/lat/azi */
+#define OMERC_POLE 2		/* oblique Mercator lon/lat plon/plat */
+#define LCONFORM 3		/* Lambert conic conformal 
+				 lon/lat/latp1/latp2 */
+
+/* 
+
+   other headers 
+
+*/
+// first floating types
+// these are sometimes undefined in <limits.h>
+#ifndef FLT_MAX
+ #define FLT_MAX 3.40282347E+38F
+#endif
+#ifndef FLT_MIN
+ #define FLT_MIN 1.17549435E-38F
+#endif
+
+
 //
 #ifdef USE_PGPLOT
 // 

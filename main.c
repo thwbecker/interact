@@ -54,8 +54,12 @@ int main(int argc, char **argv)
   // values for background stress
   my_boolean read_initial_fault_stress,faults_have_slipped;
   COMP_PRECISION a[6],b[6];
+  char time_out_string[20];
   medium=(struct med *)calloc(1,sizeof(struct med)); /* init as zeros */
-
+  /* time at start */
+  clock_gettime(CLOCK_REALTIME, &(medium->init_time));
+  strftime(time_out_string, 20, "%Y-%m-%d %H:%M:%S",
+	   localtime(&medium->init_time.tv_sec));
 #ifdef USE_PETSC
   PetscFunctionBegin;
   PetscCall(PetscInitialize(&argc, &argv, (char *)0, NULL));
@@ -65,8 +69,10 @@ int main(int argc, char **argv)
   medium->comm_size = 1;
 #endif
   HEADNODE
-    fprintf(stderr,"main: binary: %s\nmain: compiled for %s precision, initializing\n",
-	    argv[0],(sizeof(COMP_PRECISION)==sizeof(double))?("double"):("single"));
+    fprintf(stderr,"main: binary: %s\nmain: internal %s prec, A matrix %s prec\nmain: initializing on %s\n",
+	    argv[0],(sizeof(COMP_PRECISION)==sizeof(double))?("double"):("single"),
+	    (sizeof(A_MATRIX_PREC)==sizeof(double))?("double"):("single"),
+	    time_out_string );
   check_parameters_and_init(argc,argv,&medium,&fault,&read_initial_fault_stress,a,b);
   // decide which mode we are in and execute main loops
   switch(medium->op_mode){
