@@ -61,10 +61,10 @@ $Id: geoproject.c,v 1.2 2003/02/13 22:45:12 becker Exp $
 					 /* we cannot include gmt.h because of defined X there.... */
 
 
-void geoproject(double *in, double *out, int projection,
-		double lon, double lat, double azi,
-		double plon, double plat, double lat1,
-		double lat2, int inverse)
+void geoproject(COMP_PRECISION *in, COMP_PRECISION *out, int projection,
+		COMP_PRECISION lon, COMP_PRECISION lat, COMP_PRECISION azi,
+		COMP_PRECISION plon, COMP_PRECISION plat, COMP_PRECISION lat1,
+		COMP_PRECISION lat2, int inverse)
 {
   static my_boolean init=FALSE;
   static int oldprojection,unit;

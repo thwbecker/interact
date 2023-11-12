@@ -45,14 +45,15 @@ original comments follow
 #ifdef USE_GEOPROJECT
 #include "gmt.h"
 #include "myprojectsimple.h"
+void my_sincos(COMP_PRECISION *,COMP_PRECISION *,COMP_PRECISION );
 
 
 
-void myprojectsimple(double *xin, double *xout,double clon,
-		     double clat, double azimuth, int init)
+void myprojectsimple(COMP_PRECISION *xin, COMP_PRECISION *xout,COMP_PRECISION clon,
+		     COMP_PRECISION clat, COMP_PRECISION azimuth, int init)
 {	
-  static double	a[3], b[3], xt[3], pole[3], center[3],x_b, y_b;
-  static double d_to_km;
+  static COMP_PRECISION	a[3], b[3], xt[3], pole[3], center[3],x_b, y_b;
+  static COMP_PRECISION d_to_km;
 
   //GMT_geographic_in = GMT_geographic_out = TRUE;
   GMT_io.in_col_type[GMT_X] = GMT_io.out_col_type[GMT_X] = GMT_IS_LON;
@@ -72,7 +73,9 @@ void myprojectsimple(double *xin, double *xout,double clon,
   xout[2] = xin[2];
 }
 
-double oblique_setup (double plat, double plon, double *p, double clat, double clon, double *c, GMT_LONG c_given)
+COMP_PRECISION oblique_setup (COMP_PRECISION plat, COMP_PRECISION plon,
+			      COMP_PRECISION *p, COMP_PRECISION clat,
+			      COMP_PRECISION clon, COMP_PRECISION *c, GMT_LONG c_given)
 {
 	/* routine sets up a unit 3-vector p, the pole of an 
 	   oblique projection, given plat, plon, the position 
@@ -87,20 +90,26 @@ double oblique_setup (double plat, double plon, double *p, double clat, double c
 	   meridian, pointing in the positive normal (east) sense.
 	   Latitudes and longitudes are in degrees. */
 
-	double	s[3];  /* s points to the south pole  */
-	double cp, sin_lat_to_pole;
-
-	s[0] = s[1] = 0.0;
-	s[2] = -1.0;
-
-	GMT_geo_to_cart(plat, plon, p, TRUE);
+	COMP_PRECISION cp, sin_lat_to_pole;
+	double pd[3],platd,plond,cd[3],sd[3];
+	int i;
+	platd = (double)plat;
+	plond = (double)plon;
+	for(i=0;i<3;i++){
+	  pd[i] = p[i];
+	  cd[i] = c[i];
+	}
+	sd[0] = sd[1] = 0.0;
+	sd[2] = -1.0;
+	
+	GMT_geo_to_cart(platd, plond, pd, TRUE);
 
 	if (c_given) {	/* s points to user's clat, clon  */
-		GMT_geo_to_cart(clat, clon, s, TRUE);
+	  GMT_geo_to_cart(clat, clon, sd, TRUE);
 	}
-	GMT_cross3v(p, s, c);
-	GMT_normalize3v(c);
-	cp = GMT_dot3v (p, s);
+	GMT_cross3v(pd, sd, cd);
+	GMT_normalize3v(cd);
+	cp = GMT_dot3v (pd, sd);
 	sin_lat_to_pole = d_sqrt (1.0 - cp * cp);
 	return (sin_lat_to_pole);
 }
@@ -113,9 +122,9 @@ void make_euler_matrix (double *p, double *e, double theta)
 	   Latitudes and longitudes are in degrees. */
 
 	double	cos_theta, sin_theta, one_minus_cos_theta;
-	double	pxsin, pysin, pzsin, temp;
+	double pxsin, pysin, pzsin, temp;
 
-	sincosd (theta, &sin_theta, &cos_theta);
+	sincosd(theta,&sin_theta,&cos_theta);
 	one_minus_cos_theta = 1.0 - cos_theta;
 
 	pxsin = p[0] * sin_theta;
@@ -163,8 +172,11 @@ void	matrix_2v(double *a, double *x, double *b)
 }
 
 
-void sphere_project_setup (double alat, double alon, double *a, double blat, double blon, double *b, double azim, double *p, 
-			   double *c, GMT_LONG two_pts)
+void sphere_project_setup (COMP_PRECISION alat, COMP_PRECISION alon,
+			   COMP_PRECISION *a, COMP_PRECISION blat,
+			   COMP_PRECISION blon, COMP_PRECISION *b,
+			   COMP_PRECISION azim, COMP_PRECISION *p, 
+			   COMP_PRECISION *c, GMT_LONG two_pts)
 {
 	/* routine to initialize a pole vector, p, and a central meridian 
 	   normal vector, c, for use in projecting points onto a great circle.
@@ -190,33 +202,48 @@ void sphere_project_setup (double alat, double alon, double *a, double blat, dou
 	   Latitudes and longitudes are in degrees.
 	*/
 
-	double	e[9];	/* Euler rotation matrix, if needed  */
-
+        double 	e[9];	/* Euler rotation matrix, if needed  */
+	double ad[3],bd[3],pd[3],cd[3],alatd,alond,blatd,blond;
+	int i;
+	for(i=0;i<3;i++){
+	  ad[i] = (double)a[i];
+	  bd[i] = (double)b[i];
+	  pd[i] = (double)p[i];
+	}
+	alond = (double)alon;
+	alatd = (double)alat;
+	
+	blond = (double)blon;
+	blatd = (double)blat;
 	/* First find p vector  */
 
 	if (two_pts) {
-		GMT_geo_to_cart(alat, alon, a, TRUE);
-		GMT_geo_to_cart(blat, blon, b, TRUE);
-		GMT_cross3v(a, b, p);
-		GMT_normalize3v(p);
+	  GMT_geo_to_cart(alatd, alond, ad, TRUE);
+	  GMT_geo_to_cart(blatd, blond, bd, TRUE);
+	  GMT_cross3v(ad, bd, pd);
+	  GMT_normalize3v(pd);
 	}
 	else {
-		GMT_geo_to_cart(alat, alon, a, TRUE);
-		b[0] = b[1] = 0.0;	/* set b to north pole  */
-		b[2] = 1.0;
-		GMT_cross3v(a, b, c);	/* use c for p_temp  */
-		GMT_normalize3v(c);
-		make_euler_matrix(a, e, -azim);
-		matrix_3v(e, c, p);	/* c (p_temp) rotates to p  */
+	  GMT_geo_to_cart(alatd, alond, ad, TRUE);
+	  bd[0] = bd[1] = 0.0;	/* set b to north pole  */
+	  bd[2] = 1.0;
+	  GMT_cross3v(ad, bd, cd);	/* use c for p_temp  */
+	  GMT_normalize3v(cd);
+	  make_euler_matrix(ad, e, -azim);
+	  matrix_3v(e, cd, pd);	/* c (p_temp) rotates to p  */
 	}
 
 	/* Now set c vector  */
 
-	GMT_cross3v(p, a, c);
-	GMT_normalize3v(c);
+	GMT_cross3v(pd, ad, cd);
+	GMT_normalize3v(cd);
+	for(i=0;i<3;i++)
+	  c[i] = cd[i];
 }
 
-void oblique_transform (double xlat, double xlon, double *x_t_lat, double *x_t_lon, double *p, double *c)
+void oblique_transform (COMP_PRECISION xlat, COMP_PRECISION xlon,
+			COMP_PRECISION *x_t_lat, COMP_PRECISION *x_t_lon,
+			COMP_PRECISION *p, COMP_PRECISION *c)
 {
 	/* routine takes the point x at conventional (xlat, xlon) and
 	   computes the transformed coordinates (x_t_lat, x_t_lon) in
@@ -226,19 +253,26 @@ void oblique_transform (double xlat, double xlon, double *x_t_lat, double *x_t_l
 	   the routine oblique_setup().
 	   Latitudes and longitudes are in degrees. */
 
-	double	x[3], p_cross_x[3], temp1, temp2;
+	COMP_PRECISION	 temp1, temp2;
+	double xlatd,xlond,xd[3],pd[3],p_cross_xd[3],cd[3];
+	int i;
+	xlatd = xlat;
+	xlond = xlon;
+	for(i=0;i<3;i++){
+	  pd[i] = p[i];
+	  cd[i] = c[i];
+	}
+	GMT_geo_to_cart(xlatd, xlond, xd, TRUE);
 
-	GMT_geo_to_cart(xlat, xlon, x, TRUE);
+	temp1 = GMT_dot3v(xd,pd);
+	*x_t_lat = (COMP_PRECISION)d_asind(temp1);
 
-	temp1 = GMT_dot3v(x,p);
-	*x_t_lat = d_asind(temp1);
+	GMT_cross3v(pd,xd,p_cross_xd);
+	GMT_normalize3v(p_cross_xd);
 
-	GMT_cross3v(p,x,p_cross_x);
-	GMT_normalize3v(p_cross_x);
-
-	temp1 = GMT_dot3v(p_cross_x, c);
-	temp2 = GMT_dot3v(x, c);
-	*x_t_lon = copysign(d_acosd(temp1), temp2);
+	temp1 = GMT_dot3v(p_cross_xd, cd);
+	temp2 = GMT_dot3v(xd, cd);
+	*x_t_lon = (COMP_PRECISION) copysign(d_acosd(temp1), temp2);
 }
 
 #endif

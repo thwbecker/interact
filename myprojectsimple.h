@@ -1,13 +1,24 @@
-void myprojectsimple(double *, double *,double ,
-		     double , double , int );
+#ifdef USE_DOUBLE_PRECISION
+#include "precision_double.h"
+#elif defined USE_MIXED_PRECISION /* no good */
+#include "precision_mixed.h"
+#else
+#include "precision_single.h"
+#endif
+
+
+void myprojectsimple(COMP_PRECISION *, COMP_PRECISION *,COMP_PRECISION ,
+		     COMP_PRECISION , COMP_PRECISION , int );
 
 int	solve_right_spherical_triangle();
 int	sphere_azim_dist();
-void	oblique_transform (double , double , double *, double *, double *, double *);
+void	oblique_transform (COMP_PRECISION , COMP_PRECISION , COMP_PRECISION *, COMP_PRECISION *, COMP_PRECISION *, COMP_PRECISION *);
 
 void make_euler_matrix (double *, double *, double); /*  */
-void	matrix_3v(double *a, double *x, double *b);
-void	matrix_2v(double *a, double *x, double *b);
-void sphere_project_setup (double, double , double *, double , double , double *, double , double *, double *, GMT_LONG);
+void	matrix_3v(double *, double *, double *);
+void	matrix_2v(double *, double *, double *);
+void sphere_project_setup (COMP_PRECISION, COMP_PRECISION , COMP_PRECISION *,
+			   COMP_PRECISION , COMP_PRECISION , COMP_PRECISION *,
+			   COMP_PRECISION , COMP_PRECISION *, COMP_PRECISION *, GMT_LONG); 
 
 

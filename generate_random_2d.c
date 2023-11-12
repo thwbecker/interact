@@ -20,7 +20,7 @@ int main(int argc, char **argv)
 {
   int nx,ny,i,j,k,n,random_mode,err;
   long int seed=-1;
-  COMP_PRECISION x[3],xmin,xrange,xmax,ymin,yrange,ymax,alpha,dx,dy;
+  COMP_PRECISION x[3],xmin,xrange,ymin,yrange,alpha,dx,dy;
   COMP_PRECISION fxmin,fxrange,fxmean,lmin,lrange,lmean,tmpdbl,s[3][3],sl[3][3],ul[3];
   struct flt *fault;
   /* 
@@ -40,9 +40,8 @@ int main(int argc, char **argv)
   nx = ny = 101;		/* number of samples in x and y direction */
   
   xmin = -10;xrange=20;/* geographic bounds */
-  xmax=xmin+xrange;		
   yrange=xrange;
-  ymin=xmin;ymax=xmax;
+  ymin=xmin;
   /* derived spacings */
   dx = xrange/(nx-1);
   dy = yrange/(ny-1);

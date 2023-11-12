@@ -81,7 +81,7 @@ void rotate_mat_z(COMP_PRECISION xin[3][3],
 		  COMP_PRECISION cos_alpha, 
 		  COMP_PRECISION sin_alpha)
 {
-  COMP_PRECISION cos_square,sin_square,sin_cos;
+  double cos_square,sin_square,sin_cos;
   cos_square=cos_alpha*cos_alpha;
   sin_square=sin_alpha*sin_alpha;
   sin_cos=cos_alpha*sin_alpha;
@@ -116,7 +116,8 @@ COMP_PRECISION distance_3d(COMP_PRECISION *x,COMP_PRECISION *y)
 {
   COMP_PRECISION tmp;
   tmp = distance_squared_3d(x,y);
-  if(tmp <= 0.0)return 0.0;else return(sqrt(tmp));
+  //  if(tmp <= 0.0)return 0.0;else
+  return(sqrt(tmp));
 }
 /*
 
@@ -130,7 +131,8 @@ COMP_PRECISION distance(COMP_PRECISION *x,
 {
   COMP_PRECISION tmp;
   tmp = distance_squared(x,y,n);
-  if(tmp <= 0.0)return 0.0;else return(sqrt(tmp));
+  //if(tmp <= 0.0)return 0.0;else
+  return(sqrt(tmp));
 }
 /*
 
@@ -142,7 +144,8 @@ float distance_float(float *x,float *y, int n)
 {
   float tmp;
   tmp = distance_squared_float(x,y,n);
-  if(tmp <= 0.0)return 0.0;else return(sqrt(tmp));
+  //if(tmp <= 0.0)return 0.0;else
+  return(sqrt(tmp));
 }
 
 void assign_to_vector(float *x,float val, int n)
@@ -199,7 +202,8 @@ COMP_PRECISION norm(COMP_PRECISION *x,int n)
 {
   COMP_PRECISION tmp;
   tmp = dotp(x,x,n);
-  if(tmp <= 0.0)return 0.0;else return(sqrt(tmp));
+  //if(tmp <= 0.0)return 0.0;else
+  return(sqrt(tmp));
 }
 /* 
    norm in 3 dimensions 
@@ -208,26 +212,27 @@ COMP_PRECISION norm_3d(COMP_PRECISION *x)
 {
  COMP_PRECISION tmp;
  tmp = dotp_3d(x,x);
- if(tmp <= 0.0)return 0.0;else return(sqrt(tmp));
+ //if(tmp <= 0.0)return 0.0;else
+ return(sqrt(tmp));
 }
 
 // dot products
 COMP_PRECISION dotp(COMP_PRECISION *x,COMP_PRECISION *y,
 		    int n)
 {
-  COMP_PRECISION tmp;
+  double tmp;
   int i;
   for(tmp = 0.0,i=0;i<n;i++)
-    tmp += x[i]*y[i];
-  return(tmp);
+    tmp += (double)x[i]*(double)y[i];
+  return((COMP_PRECISION)tmp);
 }
 COMP_PRECISION dotp_3d(COMP_PRECISION *x,COMP_PRECISION *y)
 {
-  COMP_PRECISION tmp;
-  tmp  = x[INT_X]*y[INT_X];
-  tmp += x[INT_Y]*y[INT_Y];
-  tmp += x[INT_Z]*y[INT_Z];
-  return(tmp);
+  double tmp;
+  tmp  = (double)x[INT_X]*(double)y[INT_X];
+  tmp += (double)x[INT_Y]*(double)y[INT_Y];
+  tmp += (double)x[INT_Z]*(double)y[INT_Z];
+  return((COMP_PRECISION)tmp);
 }
 /*
   calculate y = A . x where
@@ -512,10 +517,10 @@ COMP_PRECISION rms(COMP_PRECISION *x, int n)
 {
   COMP_PRECISION dp;
   dp = dotp(x,x,n);
-  if(dp <= 0.0)
-    return dp;
-  else
-    return sqrt(dp/(COMP_PRECISION)n);
+  //if(dp <= 0.0)
+  //return dp;
+  //else
+  return sqrt(dp/(COMP_PRECISION)n);
 }
 
 
@@ -670,14 +675,14 @@ STD = sqrt(sigma)
 */
 COMP_PRECISION stddev(COMP_PRECISION sum, COMP_PRECISION sum_sqrd, int n)
 {
-  COMP_PRECISION xn,sigma;
-  xn = (COMP_PRECISION)n;
-  sigma =  (xn * sum_sqrd - sum * sum) /(xn * (xn - 1.0));
+  double xn,sigma;
+  xn = (double)n;
+  sigma =  (xn * (double)sum_sqrd - (double)sum * (double)sum) /(xn * (xn - 1.0));
 
-  if(sigma <= 0.0)
-    return 0.0;
-  else
-    return sqrt(sigma);
+  //if(sigma <= 0.0)
+  //  return 0.0;
+  //else
+  return sqrt(sigma);
 }
 
 /* count the number of zero entries in a vector */
@@ -685,7 +690,7 @@ int countzero_vec(COMP_PRECISION *x,int n)
 {
   int i,nz=0;
   for(i=0;i<n;i++)
-    if(fabs(x[i])<EPS_COMP_PREC)
+    if(fabs(x[i]) < EPS_COMP_PREC)
       nz ++;
   return nz;
 

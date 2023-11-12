@@ -1,16 +1,15 @@
 /*
   interact: model fault interactions using dislocations in a 
             halfspace
-  (C) Thorsten Becker, becker@eps.harvard.edu
+  (C) Thorsten Becker, thwbecker@post.harvard.edu
 
-  $Id: eval_okada.c,v 1.8 2003/03/23 06:21:50 becker Exp $
 
   wraps C calls to the Okada (1992) halfspace routines for Greens
   functions given constant slip on a rectangle or for a point source
 
 
-WaRNING: FOR ALL CHANGES: REMEMBER TO ALSO CHANGE THE BASIC
-VERSION BELOW!
+WARNING: FOR ALL CHANGES: REMEMBER TO ALSO CHANGE THE BASIC VERSION
+BELOW!
 
 
 */
