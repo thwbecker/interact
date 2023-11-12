@@ -512,12 +512,14 @@ void calc_fields(struct med *medium,struct flt *fault,
   //for(i=0;i<10;i++)fprintf(stderr,"%10g ",local_u[i]);fprintf(stderr,"\n");
 #ifdef USE_PETSC
   if(medium->comm_size > 1){
-#if (SUM_ARR_PREC == float)
-    MPI_Reduce(local_u, medium->u, (int)nxyz*3, MPI_FLOAT, MPI_SUM, 0, MPI_COMM_WORLD);
-    MPI_Reduce(local_s, medium->s, (int)nxyz*6, MPI_FLOAT, MPI_SUM, 0, MPI_COMM_WORLD);
-#else
+#ifdef SUM_ARR_PREC_IN_DOUBLE
+    fprintf(stderr,"calc_fields: communicating summation for doubles\n");
     MPI_Reduce(local_u, medium->u, (int)nxyz*3, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
     MPI_Reduce(local_s, medium->s, (int)nxyz*6, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
+#else
+    fprintf(stderr,"calc_fields: communicating summation for floats\n");
+    MPI_Reduce(local_u, medium->u, (int)nxyz*3, MPI_FLOAT, MPI_SUM, 0, MPI_COMM_WORLD);
+    MPI_Reduce(local_s, medium->s, (int)nxyz*6, MPI_FLOAT, MPI_SUM, 0, MPI_COMM_WORLD);
 #endif
     free(local_u);free(local_s);
   }

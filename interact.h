@@ -74,6 +74,8 @@ don't expect anything to work....
 #ifndef FLT_MIN
  #define FLT_MIN 1.17549435E-38F
 #endif
+
+/* major precision control here */
 #ifdef USE_DOUBLE_PRECISION
 #include "precision_double.h"
 #elif defined USE_MIXED_PRECISION /* no good */
@@ -81,6 +83,25 @@ don't expect anything to work....
 #else
 #include "precision_single.h"
 #endif
+
+
+
+#ifdef A_MATRIX_PREC_IN_DOUBLE
+ #define A_MATRIX_PREC double
+ #define AM_PREC real*8
+#else
+ #define A_MATRIX_PREC float
+ #define AM_PREC real*4
+#endif
+
+#ifdef SUM_ARR_PREC_IN_DOUBLE
+ #define SUM_ARR_PREC double
+#else
+ #define SUM_ARR_PREC float
+#endif
+
+
+
 // integer types, we use defines instead of typedef for 
 // convenience
 #define my_boolean  unsigned short

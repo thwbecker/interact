@@ -90,9 +90,9 @@
 #  Example settings:
 #
 #
-
+# if this is set, will compile the main code to run in double precision, see precision_double.h and precisions_single.h
+#
 MY_PRECISION = -DUSE_DOUBLE_PRECISION
-#MY_PRECISION = -DUSE_MIXED_PRECISION
 #MY_PRECISION = 			#single
 
 COMMON_DEFINES =  -DBINARY_PATCH_EVENT_FILE -DCHECK_CI_ONE_WAY -DNO_OPENING_MODES

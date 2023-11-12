@@ -142,9 +142,6 @@ void eval_point_short(float *, float *, float, float, float, float, float *, flo
 void set_stress_and_disp_nan(float [3][3], float *);
 /* eval_triangle.c */
 void get_gauss_points(float *, float *, float *, int);
-/* ex_dense.c */
-/* ex_dense_v2.c */
-/* ex_dense_v3.c */
 /* far_enough.c */
 unsigned short far_enough(struct flt *, struct flt *, float);
 /* fit_mean_stress.c */
@@ -279,6 +276,7 @@ void c_eq_a_minus_b(float *, float *, float *, int);
 void cross_product(float *, float *, float *);
 float find_max_vec(float *, int);
 float find_max_abs_vec(float *, int);
+float find_max_abs_vec_float(float *, int);
 int find_lde_max(float *, int, int, float);
 float square(float);
 float tracemat9(float *);
@@ -442,10 +440,6 @@ int AreaSign(tPointi, tPointi, tPointi);
 unsigned short crosses(double *, double *);
 /* simul_gr.c */
 /* solve.c */
-int solve(struct med *, struct flt *);
-void add_solution(int, unsigned short *, float *, int *, struct med *, struct flt *, unsigned short, unsigned short, float);
-void assemble_a_matrix(float *, int, unsigned short *, int, int *, struct flt *, struct med *);
-/* solve_dave.c */
 int solve(struct med *, struct flt *);
 void add_solution(int, unsigned short *, float *, int *, struct med *, struct flt *, unsigned short, unsigned short, float);
 void assemble_a_matrix(float *, int, unsigned short *, int, int *, struct flt *, struct med *);

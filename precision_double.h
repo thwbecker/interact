@@ -1,11 +1,14 @@
 #define COMP_PRECISION double 
 #define C_PREC real*8
 
-#define SUM_ARR_PREC float
+/* for the stress and displacement summation */
+#define SUM_ARR_PREC_IN_DOUBLE
+/* for the A matrix */
+#define A_MATRIX_PREC_IN_DOUBLE
 
 #define I_MATRIX_PREC double
-#define A_MATRIX_PREC double
-#define AM_PREC real*8
+
+
 
 #define EPS_COMP_PREC 7.0e-15
 #define EPS_AMAT_PREC 7.0e-15

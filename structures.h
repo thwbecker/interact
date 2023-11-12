@@ -10,6 +10,7 @@
   has about groups of fault patches
   
 */
+
 struct fgrp{
   my_boolean active; /* if set, at least one of the patches of this group
 		   is slipping */
@@ -142,6 +143,11 @@ struct med{
   /* number of columns and rows and slices 
      in stress and displacement field output matrices */
   int n[3];
+#ifdef SUM_ARR_PREC_IN_DOUBLE
+ #define SUM_ARR_PREC double
+#else
+ #define SUM_ARR_PREC float
+#endif
   /* stress and displacement field output matrices */
   SUM_ARR_PREC *s,*u;
 

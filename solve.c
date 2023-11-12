@@ -157,22 +157,11 @@ int solve(struct med *medium,struct flt *fault)
       print_a_matrix(a,m,n,out1,&dummy,FALSE);
       print_b_vector((a+nm),m,out2,&dummy,FALSE);
       fclose(out1);fclose(out2);
-#ifndef A_MATRIX_SINGLE_PREC
-      if(sizeof(A_MATRIX_PREC)==4){
-	fprintf(stderr,"solve: slatec_nnls: error, have to recompile with A_MATRIX_SINGLE_PREC set\n");
-	exit(-1);
-      }
-#else
-      if(sizeof(A_MATRIX_PREC)==8){
-	fprintf(stderr,"solve: slatec_nnls: error, have to recompile without A_MATRIX_SINGLE_PREC set\n");
-	exit(-1);
-      }
-#endif
     }
     //
     // solve using SLATEC routines
     //
-#ifdef A_MATRIX_SINGLE_PREC
+#ifndef A_MATRIX_PREC_IN_DOUBLE
     // single prec version
     wnnls_( a, &m, &izero, &m, &n, &l, prgopt, x, &rnorm, 
 	    &mode,iwork, work);
@@ -277,7 +266,8 @@ int solve(struct med *medium,struct flt *fault)
       medium->rn = medium->re  - medium->rs; /* number of local elements */
       
 #ifdef DEBUG
-      fprintf(stderr,"solve: core %i: dn %i on %i n %i rs %i re %i \n",medium->comm_rank,dn,on,n,medium->rs,medium->re);
+      fprintf(stderr,"solve: core %i: dn %i on %i n %i rs %i re %i \n",
+	      medium->comm_rank,dn,on,n,medium->rs,medium->re);
 #endif
       
       /* assemble A */
@@ -305,7 +295,7 @@ int solve(struct med *medium,struct flt *fault)
 	 insert right hand side 
       */
       for (i = medium->rs; i < medium->re; i++) {
-	PetscCall(VecSetValue(medium->pb, i, medium->b[i], INSERT_VALUES));
+	PetscCall(VecSetValue(medium->pb, (PetscInt)i, (PetscScalar)(medium->b[i]), INSERT_VALUES));
       }
       PetscCall(VecAssemblyBegin(medium->pb));
       PetscCall(VecAssemblyEnd(medium->pb));
@@ -342,7 +332,7 @@ int solve(struct med *medium,struct flt *fault)
 	PetscCall(VecRestoreArray(pxout,&values));
       }
       /* broadcast solution */
-#if (A_MATRIX_PREC == double)
+#ifdef A_MATRIX_PREC_IN_DOUBLE
       MPI_Bcast(medium->xsol,m,MPI_DOUBLE,0, MPI_COMM_WORLD);
 #else
       MPI_Bcast(medium->xsol,m,MPI_FLOAT,0, MPI_COMM_WORLD);

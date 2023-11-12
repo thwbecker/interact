@@ -90,7 +90,7 @@ void add_to_active_fault_list(int aflt,int **al,int *naf,my_boolean **sma)
 
 */
 void add_to_right_hand_side(COMP_PRECISION bval,A_MATRIX_PREC **b,
-			    COMP_PRECISION **xsol, int *nreq)
+			    A_MATRIX_PREC **xsol, int *nreq)
 {
   size_t i;
   (*b)[*nreq]=(A_MATRIX_PREC)bval;

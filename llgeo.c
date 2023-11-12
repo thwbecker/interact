@@ -420,6 +420,19 @@ COMP_PRECISION find_max_abs_vec(COMP_PRECISION *x,int n)
   }
   return max;
 }
+float find_max_abs_vec_float(float *x,int n)
+{
+  float max = 0.0,tmp;
+  int i;
+  for(i=0;i<n;i++){
+    tmp = fabs(x[i]);
+    if(tmp > max)
+      max = tmp;
+  }
+  return max;
+}
+
+
 /*
   
   find the largest offset from the diagonal of a mxn matrix a

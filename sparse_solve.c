@@ -6,8 +6,6 @@
   $Id: sparse_solve.c,v 1.4 2002/11/05 17:40:59 tbecker Exp $
 
 */
-#include <math.h>
-#include <stdio.h>
 
 #ifdef USE_SUPERLU
 // SuperLU includes
@@ -49,7 +47,7 @@ void sparse_driver(unsigned int *si1,unsigned int *si2,
      Create matrix A in the format expected by SuperLU. 
   */
   slu_a.Stype = NC;// column-wise, no supernode, NC (CCS)
-#ifdef A_MATRIX_SINGLE_PREC
+#ifndef A_MATRIX_PREC_IN_DOUBLE
   slu_a.Dtype = _S;// double precision
 #else
   slu_a.Dtype = _D;// single precision
@@ -66,7 +64,7 @@ void sparse_driver(unsigned int *si1,unsigned int *si2,
      Create right-hand side matrix B
   */
   slu_b.Stype = DN;// fortran column format dense
-#ifdef A_MATRIX_SINGLE_PREC
+#ifndef A_MATRIX_PREC_IN_DOUBLE
   slu_b.Dtype = _S;// single precision
 #else
   slu_b.Dtype = _D;// double precision
@@ -92,7 +90,7 @@ void sparse_driver(unsigned int *si1,unsigned int *si2,
   //
   //solve system
   //
-#ifdef A_MATRIX_SINGLE_PREC
+#ifndef A_MATRIX_PREC_IN_DOUBLE
   sgssv(&slu_a, perm_c, perm_r, &slu_l, &slu_u, &slu_b, &info);
 #else
   dgssv(&slu_a, perm_c, perm_r, &slu_l, &slu_u, &slu_b, &info);

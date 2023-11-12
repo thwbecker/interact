@@ -3,16 +3,11 @@
 
 #define I_MATRIX_PREC float
 
-#define A_MATRIX_SINGLE_PREC
-#define A_MATRIX_PREC float
-#define AM_PREC real*4
-
-
-#define SUM_ARR_PREC float
+/* those emit the definitions SUM_ARR_PREC_IN_DOUBLE and
+   A_MATRIX_PREC_IN_DOUBLE and hence make both single precision */
 
 #define EPS_COMP_PREC 7.0e-7
 #define EPS_AMAT_PREC 7.0e-7
-
 
 #define ONE_CP_FORMAT "%f"
 #define ONE_IP_FORMAT "%f"

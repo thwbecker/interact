@@ -2,8 +2,6 @@
 #define C_PREC real*8
 
 #define I_MATRIX_PREC float
-#define A_MATRIX_PREC float
-#define AM_PREC real*4
 
 #define EPS_COMP_PREC 7.0e-15
 #define EPS_AMAT_PREC 7.0e-7

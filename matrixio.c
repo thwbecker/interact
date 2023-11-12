@@ -22,7 +22,6 @@
   $Id: matrixio.c,v 1.9 2011/01/07 07:19:58 becker Exp $ 
 
 */
-#include <stdio.h>
 #include "interact.h"
 
 
@@ -32,7 +31,7 @@
   out using FORTRAN convention
 
 */
-void print_matrix_ftrn(COMP_PRECISION *a,int m, int n, FILE *out,
+void print_matrix_ftrn(A_MATRIX_PREC *a,int m, int n, FILE *out,
 		       my_boolean binary)
 {
   int i,j,k;
@@ -53,7 +52,7 @@ void print_matrix_ftrn(COMP_PRECISION *a,int m, int n, FILE *out,
   }
 }
 /* same for C style */
-void print_matrix_C(COMP_PRECISION *a,int m, int n, FILE *out,
+void print_matrix_C(A_MATRIX_PREC *a,int m, int n, FILE *out,
 		    my_boolean binary)
 {
   int i,j,k;
@@ -74,13 +73,14 @@ void print_matrix_C(COMP_PRECISION *a,int m, int n, FILE *out,
   }
 }
 /* scaled version */
-void print_matrix_scaled_ftrn(COMP_PRECISION *a,int m, int n, FILE *out,
+void print_matrix_scaled_ftrn(A_MATRIX_PREC *a,int m, int n, FILE *out,
 			      my_boolean binary,COMP_PRECISION scale)
 {
   int i,nm;
-  COMP_PRECISION *aloc;
+  A_MATRIX_PREC *aloc;
   nm = n * m;
-  my_vecalloc(&aloc,nm,"print_matrix_scaled_ftrn");
+  aloc = (A_MATRIX_PREC *)malloc(sizeof(A_MATRIX_PREC)*nm);
+  if(!aloc)MEMERROR("print_matrix_scaled_ftrn");
   for(i=0;i<nm;i++)
     aloc[i] = a[i] * scale;
   print_matrix_ftrn(aloc,m, n, out,binary);
@@ -91,7 +91,7 @@ void print_matrix_scaled_ftrn(COMP_PRECISION *a,int m, int n, FILE *out,
 print FORTRAN style matrix to a file
 
  */
-void print_matrix_ftrn_file(COMP_PRECISION *a, int m, int n, 
+void print_matrix_ftrn_file(A_MATRIX_PREC *a, int m, int n, 
 			    char *name, 
 			    my_boolean binary)
 {
@@ -112,7 +112,11 @@ void print_a_matrix(A_MATRIX_PREC *a,int m, int n, FILE *out,
 		    A_MATRIX_PREC *amax, my_boolean binary)
 {
   print_matrix_ftrn(a,m,n,out,binary);
+#ifdef A_MATRIX_PREC_IN_DOUBLE
   *amax = find_max_abs_vec(a,n*m);
+#else
+  *amax = find_max_abs_vec_float(a,n*m);
+#endif
 }
 /*
 

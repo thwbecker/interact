@@ -27,7 +27,7 @@
 void lu_driver(A_MATRIX_PREC *a,A_MATRIX_PREC *xsol,
 	       A_MATRIX_PREC *b,int m,int n,struct med *medium)
 {
-  int *ipiv,info,*desca,*descb;
+  int *ipiv,info;
   static int iunity = 1;
   A_MATRIX_PREC dummy,*bcopy;
   static int print_count=0;
@@ -65,7 +65,7 @@ void lu_driver(A_MATRIX_PREC *a,A_MATRIX_PREC *xsol,
   //
   // solve by LU decomposition 
   //
-#ifdef A_MATRIX_SINGLE_PREC
+#ifndef A_MATRIX_PREC_IN_DOUBLE
   /* single prec solver call */
   sgesv_(&n,&iunity,a,&n,ipiv,b,&n,&info);
   if(info != 0){// error in xGESV routine

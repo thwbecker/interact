@@ -10,8 +10,6 @@
   $Id: svd.c,v 2.37 2003/12/23 04:04:59 becker Exp $
 
 */
-#include <math.h>
-#include <stdio.h>
 #include "interact.h"
 #include "numrec_svd_routines.h"
 /* 
@@ -129,7 +127,7 @@ void svd_driver_lapack(A_MATRIX_PREC *a,A_MATRIX_PREC *xsol,
     if(query_svd){
       /* query SVD routine */
       nwork=-1;liwork=1;
-#ifdef A_MATRIX_SINGLE_PREC
+#ifndef A_MATRIX_PREC_IN_DOUBLE
       sgelsd_(&m,&solve_n,&nrhs,a,&m,bloc,&m,*sval,wlim,&rank,vwork,&nwork,iwork,&info);
 #else
       dgelsd_(&m,&solve_n,&nrhs,a,&m,bloc,&m,*sval,wlim,&rank,vwork,&nwork,iwork,&info);
@@ -167,14 +165,13 @@ void svd_driver_lapack(A_MATRIX_PREC *a,A_MATRIX_PREC *xsol,
 
   */
 #ifdef USE_LAPACK_DAC		/* divide and conquor algorithm */
-#ifdef A_MATRIX_SINGLE_PREC
-  //DGELSD( M, N, NRHS, A, LDA, B, LDB, S, RCOND, RANK, WORK, LWORK, IWORK, INFO)
+#ifndef A_MATRIX_PREC_IN_DOUBLE
   sgelsd_(&m,&solve_n,&nrhs,a,&m,bloc,&m,*sval,wlim,&rank,vwork,&nwork,iwork,&info);
 #else
   dgelsd_(&m,&solve_n,&nrhs,a,&m,bloc,&m,*sval,wlim,&rank,vwork,&nwork,iwork,&info);
 #endif
 #else
-#ifdef A_MATRIX_SINGLE_PREC	/* old SVD algorithm */
+#ifndef A_MATRIX_PREC_IN_DOUBLE	/* old SVD algorithm */
   sgelss_(&m,&solve_n,&nrhs,a,&m,bloc,&m,*sval,wlim,&rank,vwork,&nwork,&info);
 #else
   dgelss_(&m,&solve_n,&nrhs,a,&m,bloc,&m,*sval,wlim,&rank,vwork,&nwork,&info);
