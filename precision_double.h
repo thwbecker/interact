@@ -1,8 +1,11 @@
 #define COMP_PRECISION double 
 #define C_PREC real*8
 
-/* for the stress and displacement summation */
-#define SUM_ARR_PREC_IN_DOUBLE
+/* for the stress and displacement summation, adding up fault
+   contributions? */
+/* #define SUM_ARR_PREC_IN_DOUBLE */
+
+
 /* for the A matrix */
 #define A_MATRIX_PREC_IN_DOUBLE
 

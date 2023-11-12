@@ -336,8 +336,8 @@ int solve(struct med *medium,struct flt *fault)
 	  medium->xsol[i] = (A_MATRIX_PREC)values[i];
 	PetscCall(VecRestoreArray(pxout,&values));
       }
-      HEADNODE
-	time_report("solve","parallel solve done, broadcasting",medium);
+      //HEADNODE
+      //time_report("solve","parallel solve done, broadcasting",medium);
       /* broadcast solution */
 #ifdef A_MATRIX_PREC_IN_DOUBLE
       MPI_Bcast(medium->xsol,m,MPI_DOUBLE,0, MPI_COMM_WORLD);
@@ -527,7 +527,7 @@ int solve(struct med *medium,struct flt *fault)
   }else if(medium->nreq_con){
     if(medium->comm_size>1){
       HEADNODE
-	fprintf(stderr,"solve: NNLS only serial, %i cores requested\n",medium->comm_size);
+	fprintf(stderr,"solve: NNLS only serial, yet %i cores requested\n",medium->comm_size);
       exit(-1);
     }
     /*

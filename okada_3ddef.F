@@ -1,8 +1,3 @@
-#ifdef USE_DOUBLE_PRECISION
-#include "precision_double.h"
-#else
-#include "precision_single.h"
-#endif
       SUBROUTINE  DCD3(ALPHA,X,Y,Z,DEPTH,DIP,
      & AL1,AL2,AW1,AW2,
      & UX1,UX2,UX3,UY1,UY2,UY3,UZ1,UZ2,UZ3,

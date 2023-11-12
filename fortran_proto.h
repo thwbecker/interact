@@ -62,31 +62,13 @@ extern void law_nnls(A_MATRIX_PREC *,int *,int *, int *,
 
  */
 
-extern void dc3d(double*,double*,
-		 double*,double*,
-		 double*,double*,
-		 double*,double*,
-		 double*,double*,
-		 double*,double*,
-		 double*,double*,
-		 double*,double*,
-		 double*,double*,
-		 double*,double*,
-		 double*,double*,
-		 double*,double*,
+extern void dc3d(double*,double*,double*,double*,double*,double*,double*,double*,
+		 double*,double*,double*,double*,double*,double*,double*,double*,
+		 double*,double*,double*,double*,double*,double*,double*,double*,
 		 double*,int*);
-extern void dc3d0(double*,double*,
-		  double*,double*,
-		  double*,double*,
-		  double*,double*,
-		  double*,double*,
-		  double*,double*,
-		  double*,double*,
-		  double*,double*,
-		  double*,double*,
-		  double*,double*,
-		  double*,double*,
-		  int*);
+extern void dc3d0(double*,double*,double*,double*,double*,double*,double*,double*,
+		  double*,double*,double*,double*,double*,double*,double*,double*,
+		  double*,double*,double*,double*,double*,double*,int*);
 
 extern void palett(int *, float *, float *);
 

@@ -28,6 +28,14 @@ BELOW!
 #define OKUXZ 9
 #define OKUYZ 10
 #define OKUZZ 11
+extern void dc3d(double*,double*,double*,double*,double*,double*,double*,double*,
+		 double*,double*,double*,double*,double*,double*,double*,double*,
+		 double*,double*,double*,double*,double*,double*,double*,double*,
+		 double*,int*);
+extern void dc3d0(double*,double*,double*,double*,double*,double*,double*,double*,
+		  double*,double*,double*,double*,double*,double*,double*,double*,
+		  double*,double*,double*,double*,double*,double*,int*);
+
 /*
   
   evaluate stresses and displacements due to slip on a 

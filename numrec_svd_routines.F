@@ -15,6 +15,10 @@ c
 #else
 #include "precision_single.h"
 #endif
+#include "fortran_prec.h"
+
+
+      
 #define NUMREC_SVD_N_MAX_PARAMETER 3000
       FUNCTION pythag(a,b)
       AM_PREC a,b,pythag

@@ -112,6 +112,7 @@ BDIR = bin/
 #
 # choice of Okada routine, comment out if modified routine is used
 OKROUTINE = $(ODIR)/dc3d.o
+
 # 
 # include the machine dependent flags
 # 

@@ -411,7 +411,7 @@ void read_geometry(char *patch_filename,struct med **medium,
 		(*fault+i)->x[INT_Z],(*fault+i)->strike,(*fault+i)->dip,(*fault+i)->l,
 		(*fault+i)->l/(*fault+i)->w);
   if(verbose){
-    fprintf(stderr,"read_geometry: read in %i fault patch(es)\nread_geometry: half length: min/mean/max: %g/%g/%g\nread_geometry: half width:  min/mean/max: %g/%g/%g\n",
+    fprintf(stderr,"read_geometry: read in %i fault patch(es)\nread_geometry: half length: min/mean/max: %8.3e/%8.3e/%8.3e\nread_geometry: half width:  min/mean/max: %8.3e/%8.3e/%8.3e\n",
 	    (*medium)->nrflt,lmin,(*medium)->lmean,lmax,wmin,(*medium)->wmean,wmax);
     fprintf(stderr,"read_geometry: average values for friction coefficients: mu_s/mu_d: %g/%g\n",
 	    mus_avg,mud_avg);

@@ -3,6 +3,7 @@
 #else
 #include "precision_single.h"
 #endif
+#include "fortran_prec.h"
 C     SUBROUTINE LAW_NNLS  (A,MDA,M,N,B,X,RNORM,W,ZZ,INDEX,MODE)
 C   
 C  Algorithm NNLS: NONNEGATIVE LEAST SQUARES

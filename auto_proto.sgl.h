@@ -321,6 +321,13 @@ void find_range(int *, int *, float, float, float, float, float *, float *, floa
 /* myopen.c */
 FILE *myopen(char *, char *);
 /* myprojectsimple.c */
+void myprojectsimple(float *, float *, float, float, float, int);
+float oblique_setup(float, float, float *, float, float, float *, GMT_LONG);
+void make_euler_matrix(double *, double *, double);
+void matrix_3v(double *, double *, double *);
+void matrix_2v(double *, double *, double *);
+void sphere_project_setup(float, float, float *, float, float, float *, float, float *, float *, GMT_LONG);
+void oblique_transform(float, float, float *, float *, float *, float *);
 /* mysincos.c */
 void my_sincos_deg(float *, float *, float);
 void my_sincos_deg_ftn(double *, double *, double *);
