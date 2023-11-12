@@ -1,1 +1,85 @@
-../../batch/modifybb
+#!/bin/bash
+#
+# change the bounding box of an EPS postscript file
+#
+# usage:
+#
+# modifybb ps_file [ llx lly urx ury ]
+# 
+# where llx, lly are the lower left, and urx, ury
+# the upper right corner x and y coordinates
+#
+# if no l1x ... are given, will try to determine the BB from eps2eps
+#
+#
+# $Id: modifybb,v 1.4 2016/01/27 06:05:00 becker Exp becker $
+#
+#
+pname=`basename $0`
+if [ $# -lt 1 ];then
+    echo $pname: usage > "/dev/stderr"
+    echo $pname "ps_file [ llx lly urx ury ]" > "/dev/stderr"
+    echo  > "/dev/stderr"
+    exit
+fi
+file=$1				# eps file
+make_pdf=${2-0}
+
+if [ ! -s $1 ];then
+    echo $pname: can not find EPS file $file > "/dev/stderr"
+    exit
+fi
+tmpn=`mktemp`
+trap "rm -f $tmpn.* ; exit" 0 1 2  15
+#eps2eps $1 $tmpn.ps;mv $tmpn.ps $1
+
+use_gmt=1
+
+if [ $# -ne 5 ];then		# eps2eps mode
+    cp $file $tmpn.ps
+    if [ $use_gmt -eq 1 ];then
+	if [ $make_pdf -eq 0 ];then
+	    psconvert $tmpn.ps -Te -A+m0.1
+	    mv $tmpn.eps $file
+	else
+	    psconvert $file -Tf -A+m0.1
+	    rm $file
+
+	fi
+    else
+	
+	epstool --gs $HOME/progs/src/ghostscript-9.52-linux-x86_64/gs-952-linux-x86_64 \
+		--copy --bbox $file $tmpn.ps 2> /dev/null > /dev/null
+	#$HOME/progs/src/epstool-3.09/bin/epstool --gs /usr/bin/gs --copy  --bbox $file $tmpn.ps  2> /dev/null > /dev/null
+	mv $tmpn.ps $file
+    fi
+    #ps2eps $tmpn.ps 2> /dev/null; mv $tmpn.eps $file
+    echo $pname: done with $file > "/dev/stderr"
+else
+#
+# bring bounding box to front
+#
+    #bbtofront $file
+
+    bb=`grep %%BoundingBox $file | \
+	gawk '{if($2!="(atend)" && !p){p=1;print($pname)}}'`
+    if [ `echo $bb | gawk '{print(length($pname))}'` -eq 0 ];then
+	echo $pname: error, no bounding box found in $file. PS format\?
+	exit
+    fi
+    bbn="%%BoundingBox: $2 $3 $4 $5"
+    
+    string=s/$bb/$bbn/g
+    if [ -s $file ];then
+	sed "$string" $file > $tmpn
+	mv $tmpn $file 
+    else
+	echo $pname: error > "/dev/stderr"
+	exit
+    fi
+
+    echo $pname: changed BoundingBox of $file > "/dev/stderr"
+    echo $pname: from $bb > "/dev/stderr"
+    echo $pname: to $bbn > "/dev/stderr"
+fi
+
