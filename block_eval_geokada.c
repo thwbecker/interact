@@ -79,7 +79,7 @@ void block_eval_geookada(COMP_PRECISION *xl,
       }
     }else{
       // rotate displacements pu back into the observational frame
-      rotate_vec(pu,u,fca,-fsa);
+      rotate_vec(pu,u,(double)fca,(double)-fsa);
     }
   }else{			/* don't return displacements */
     for(i=0;i<3;i++)

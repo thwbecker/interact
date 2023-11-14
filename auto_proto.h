@@ -332,6 +332,8 @@ void oblique_transform(double, double, double *, double *, double *, double *);
 void my_sincos_deg(double *, double *, double);
 void my_sincos_deg_ftn(double *, double *, double *);
 void my_sincos(double *, double *, double);
+void my_sincosd(double *, double *, double);
+void my_sincos_degd(double *, double *, double);
 /* nnls.c */
 void nnls_driver_i(double *, double *, double *, int, int);
 /* optimize.c */

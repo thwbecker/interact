@@ -63,9 +63,10 @@ void divide_fault_in_patches(int flt,struct flt *fault,
 {
   int i,j,mi,mj,irad,old_nrpatches,
     added_patches,pcnt;
-  COMP_PRECISION dx[3],dy[3],alpha,sin_dip,cos_dip,
+  COMP_PRECISION dx[3],dy[3],sin_dip,cos_dip,
     corner[4][3],newl,neww,tmpd1,tmpd2,newarea,
     l,w;
+  double alpha;
   my_boolean randomize;
   randomize = ((srand>0)||(drand>0))?(TRUE):(FALSE);
   
@@ -94,8 +95,8 @@ void divide_fault_in_patches(int flt,struct flt *fault,
   }
   // if base vecs not yet initialized, do now
   if(calculate_base_vecs){
-    alpha = 90.0 - (COMP_PRECISION)fault[flt].strike;
-    my_sincos_deg(&fault[flt].sin_alpha,&fault[flt].cos_alpha,alpha);
+    alpha = 90.0 - (double)fault[flt].strike;
+    my_sincos_degd(&fault[flt].sin_alpha,&fault[flt].cos_alpha,alpha);
     my_sincos_deg(&sin_dip,&cos_dip,(COMP_PRECISION)fault[flt].dip);
     calc_base_vecs(fault[flt].t_strike,fault[flt].normal,fault[flt].t_dip,
 		   fault[flt].sin_alpha,fault[flt].cos_alpha,sin_dip,cos_dip);
@@ -118,8 +119,8 @@ void divide_fault_in_patches(int flt,struct flt *fault,
     if(randomize){		/* randomize this patch? */
       randomize_strike_dip(srand,drand,(*patch+i),seed);
       /* need to recompute basis vectors */
-      alpha = 90.0 - (COMP_PRECISION)(*patch+i)->strike;
-      my_sincos_deg(&((*patch+i)->sin_alpha),&((*patch+i)->cos_alpha),alpha);
+      alpha = 90.0 - (double)(*patch+i)->strike;
+      my_sincos_degd(&((*patch+i)->sin_alpha),&((*patch+i)->cos_alpha),alpha);
       my_sincos_deg(&sin_dip,&cos_dip,(COMP_PRECISION)(*patch+i)->dip);
       calc_base_vecs((*patch+i)->t_strike,(*patch+i)->normal,(*patch+i)->t_dip,
 		     (*patch+i)->sin_alpha,(*patch+i)->cos_alpha,sin_dip,cos_dip);
@@ -193,12 +194,13 @@ void randomize_strike_dip(COMP_PRECISION srand,
 			  COMP_PRECISION drand,struct flt *fault,
 			  long *seed)
 {
-  COMP_PRECISION strike,dip;
+  COMP_PRECISION dip;
+  double strike;
   /* compute Gaussian deviation with srand drand std */
   strike = fault->strike + mygauss_randnr(srand,seed); 
   dip    = fault->dip    + mygauss_randnr(drand,seed); 
   check_angles(&dip,&strike);
-  fault->strike = strike;
+  fault->strike = (COMP_PRECISION)strike;
   fault->dip = dip;
 }
    

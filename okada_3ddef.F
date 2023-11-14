@@ -6,7 +6,8 @@
 
       REAL*8 ALPHA,DEPTH,DIP,
      &    UX1,UX2,UX3,UY1,UY2,UY3,UZ1,UZ2,UZ3
-	 
+
+      
       DIMENSION UXX(3),UYX(3),UZX(3),UXY(3),UYY(3),UZY(3)
       DIMENSION UXZ(3),UYZ(3),UZZ(3)
 

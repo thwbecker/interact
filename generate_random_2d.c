@@ -20,7 +20,8 @@ int main(int argc, char **argv)
 {
   int nx,ny,i,j,k,n,random_mode,err;
   long int seed=-1;
-  COMP_PRECISION x[3],xmin,xrange,ymin,yrange,alpha,dx,dy;
+  double alpha;
+  COMP_PRECISION x[3],xmin,xrange,ymin,yrange,dx,dy;
   COMP_PRECISION fxmin,fxrange,fxmean,lmin,lrange,lmean,tmpdbl,s[3][3],sl[3][3],ul[3];
   struct flt *fault;
   /* 
@@ -74,8 +75,8 @@ int main(int argc, char **argv)
     fault[0].l = 2;
     fault[0].w = 0;
     fault[0].strike = 0;
-    alpha=90.0-(COMP_PRECISION)fault[0].strike;
-    my_sincos_deg(&fault[0].sin_alpha,&fault[0].cos_alpha,(COMP_PRECISION)alpha);
+    alpha=90.0-(double)fault[0].strike;
+    my_sincos_degd(&fault[0].sin_alpha,&fault[0].cos_alpha,alpha);
     fault[0].u[STRIKE] = 2e-4 * fault[0].l;
     fault[0].u[NORMAL] = fault[0].u[DIP] =0.0;
   }else{
@@ -102,7 +103,7 @@ int main(int argc, char **argv)
       /* derived quantities, need them for base vectors */
       alpha=90.0-(COMP_PRECISION)fault[i].strike;
       // get angle cosines
-      my_sincos_deg(&fault[i].sin_alpha,&fault[i].cos_alpha,(COMP_PRECISION)alpha);
+      my_sincos_degd(&fault[i].sin_alpha,&fault[i].cos_alpha,alpha);
       /* 
 	 displacement
       */

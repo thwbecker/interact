@@ -58,4 +58,26 @@ void my_sincos(COMP_PRECISION *sin_val,
   
 #endif
 }
+void my_sincosd(double *sin_val,
+		double *cos_val,
+	        double arad)
+{
+#if !defined(SUN_TRIG_FUNCTIONS) 
+  *sin_val = sin(arad);
+  *cos_val = cos(arad);
+#else
+  sincos(arad,sin_val,cos_val);
+#endif
+}
+
+
+void my_sincos_degd(double *sin_val,
+		    double *cos_val,
+		    double adeg)
+{
+  double arad;
+  arad = adeg * DEG2RAD;
+  my_sincosd(sin_val,cos_val,arad);
+}
+
 

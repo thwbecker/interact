@@ -51,8 +51,8 @@ c
 c
 	implicit C_PREC(a-h,o-z)
 	implicit integer(i-n)
-
-        	
+	real*8 cosb,sinb
+	
 	cos2b = cosb * cosb - sinb * sinb
 	sin2b = 2.0d0 * sinb * cosb
 	cosb2 = cosb * cosb

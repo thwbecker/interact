@@ -43,9 +43,10 @@ int main(int argc, char **argv)
     dstrike=10.0,
     srand = 0,			/* inter-patch variability */
     drand = 0,
-    alpha,sin_dip,cos_dip,td[2]={-1,-1},asp,nval;
+    sin_dip,cos_dip,td[2]={-1,-1},asp,nval;
   COMP_PRECISION w1,dip1,stop_time=10.0,tmpdbl,
     aspect1,z1,x1,y1,strike1,bvalue,leeway=1.0;
+  double alpha;
   my_boolean circular=FALSE,
     check_for_interactions=TRUE, /* interaction test */
     gr_random= FALSE,gra_random = FALSE,
@@ -213,10 +214,9 @@ int main(int argc, char **argv)
 	// check for illegal values
 	check_fault_angles((fault+i));
 	/* derived quantities, need them for base vectors */
-	alpha=90.0-(COMP_PRECISION)fault[i].strike;
+	alpha=90.0-(double)fault[i].strike;
 	// get angles
-	my_sincos_deg(&fault[i].sin_alpha,&fault[i].cos_alpha,
-		      (COMP_PRECISION)alpha);
+	my_sincos_degd(&fault[i].sin_alpha,&fault[i].cos_alpha,alpha);
 	my_sincos_deg(&sin_dip,&cos_dip,(COMP_PRECISION)fault[i].dip);
 	calc_base_vecs(fault[i].t_strike,fault[i].normal,fault[i].t_dip,
 		       fault[i].sin_alpha,fault[i].cos_alpha,sin_dip,cos_dip);

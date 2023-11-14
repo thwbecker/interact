@@ -304,7 +304,7 @@ struct flt{
 			   means vertical 
 
 			*/
-  COMP_PRECISION cos_alpha,/* cos and sin alpha, which is
+  double cos_alpha,/* cos and sin alpha, which is
 			      angle counterclockwise from East,
 			      ie. 90 - strike */
     sin_alpha;

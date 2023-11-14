@@ -26,9 +26,10 @@ void read_geometry(char *patch_filename,struct med **medium,
 {
   int i,j,k,tmpint,jlim,ic;
   FILE *in,*in2=NULL;
-  COMP_PRECISION sin_dip,cos_dip,alpha,mus_avg,mud_avg,d_mu,corner[4][3],
+  COMP_PRECISION sin_dip,cos_dip,mus_avg,mud_avg,d_mu,corner[4][3],
     lloc,wloc,eps_for_z = EPS_COMP_PREC * 100.0;
   float wmin,wmax,lmin,lmax;
+  double alpha;
   static my_boolean init=FALSE;
 #ifdef ALLOW_NON_3DQUAD_GEOM
   int nr_pt_src=0,nr_triangle=0,nr_2d=0;
@@ -145,7 +146,8 @@ void read_geometry(char *patch_filename,struct med **medium,
       // determine local reference frame by means of the angles
       // w, l, and area will be the triangle area
       get_alpha_dip_tri_gh((*fault+i)->xt,&(*fault+i)->sin_alpha,
-			   &(*fault+i)->cos_alpha,&tmpdbl,&(*fault+i)->area);
+			   &(*fault+i)->cos_alpha,
+			   &tmpdbl,&(*fault+i)->area);
       (*fault+i)->dip=(float)RAD2DEGF(tmpdbl);
       (*fault+i)->l = (*fault+i)->w = (*fault+i)->area;
       alpha = RAD2DEGF(asin((*fault+i)->sin_alpha));
@@ -234,8 +236,8 @@ void read_geometry(char *patch_filename,struct med **medium,
       // calculation if it's a triangular patch since we 
       // have already calculates sin and cos (alpha) above
       alpha= 90.0 - (*fault+i)->strike;
-      my_sincos_deg(&(*fault+i)->sin_alpha,&(*fault+i)->cos_alpha,
-		    (COMP_PRECISION)alpha);
+      my_sincos_degd(&(*fault+i)->sin_alpha,&(*fault+i)->cos_alpha,
+		     alpha);
       /* if(fabs((*fault+i)->sin_alpha)< EPS_COMP_PREC) */
       /* 	(*fault+i)->sin_alpha=0.0; */
       /* if(fabs((*fault+i)->cos_alpha)< EPS_COMP_PREC) */

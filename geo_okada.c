@@ -78,8 +78,8 @@ int main(int argc, char **argv)
       frame
       
     */
-    rotate_vec(pu, u,  cmazi, smazi);
-    rotate_mat_z(ps,s, cmazi, smazi);
+    rotate_vec(pu, u,(double)  cmazi, (double)smazi);
+    rotate_mat_z(ps,s, (double) cmazi, (double) smazi);
     if(dxfout){
       //
       // geographic output of displacements in lon lat azi length format

@@ -468,11 +468,12 @@ my_boolean check_planar(COMP_PRECISION *x)
   g and h vectors, also determines area
   
 */
-void get_alpha_dip_tri_gh(COMP_PRECISION *xt,COMP_PRECISION *sin_alpha,
-			  COMP_PRECISION *cos_alpha,COMP_PRECISION *dip,
+void get_alpha_dip_tri_gh(COMP_PRECISION *xt,double *sin_alpha,
+			  double *cos_alpha,COMP_PRECISION *dip,
 			  COMP_PRECISION *area)
 {
-  COMP_PRECISION normal[3],nl,alpha,gvec[3],hvec[3];
+  COMP_PRECISION normal[3],nl,gvec[3],hvec[3];
+  double alpha;
   int i;
   get_gh_tri_vec(xt,gvec,hvec);
   //fprintf(stderr,"g: %g %g %g\n",gvec[INT_X],gvec[INT_Y],gvec[INT_Z]);
@@ -491,11 +492,11 @@ void get_alpha_dip_tri_gh(COMP_PRECISION *xt,COMP_PRECISION *sin_alpha,
   //normal[INT_X]/=nl; not needed
   normal[INT_Y]/=nl;
   normal[INT_Z]/=nl;
-  *dip= acos(normal[INT_Z]);
-  alpha=acos(normal[INT_Y]);
+  *dip= (COMP_PRECISION)acos((double)normal[INT_Z]);
+  alpha=(double)acos((double)normal[INT_Y]);
   // might have to check for bounds
   check_angles(dip,&alpha);
-  my_sincos(sin_alpha,cos_alpha,(COMP_PRECISION)alpha);
+  my_sincosd(sin_alpha,cos_alpha,alpha);
 }
 
 
@@ -635,9 +636,11 @@ void calc_group_geometry(struct med *medium,struct flt *fault,
 void vec_to_angles(COMP_PRECISION *x,COMP_PRECISION *dip, 
 		   COMP_PRECISION *strike)
 {
+  double alpha;
   *dip =    vec_to_dip(x); 
-  *strike = vec_to_strike(x);
-  check_angles(dip,strike);
+  alpha = vec_to_strike(x);
+  check_angles(dip,&alpha);
+  *strike = (COMP_PRECISION)alpha;
 }
 /*
   go the other way, from dip and strike angles (in deg) to a normalized vector
@@ -671,15 +674,16 @@ COMP_PRECISION vec_to_dip(COMP_PRECISION *x)
 */
 void check_fault_angles(struct flt *fault)
 {
-  COMP_PRECISION dip,strike;
+  COMP_PRECISION dip;
+  double strike;
   dip=(COMP_PRECISION)fault->dip;strike=(COMP_PRECISION)fault->strike;
   check_angles(&dip,&strike);
-  fault->dip = (float)dip; fault->strike = (float)strike;
+  fault->dip = (float)dip; fault->strike = (COMP_PRECISION)strike;
 }
 /*
   make sure angles are in the right range
 */
-void check_angles(COMP_PRECISION *dip,COMP_PRECISION *strike)
+void check_angles(COMP_PRECISION *dip,double *strike)
 {
   if(*dip > 90.0){
     *dip = 180.0 - *dip;
@@ -692,7 +696,7 @@ void check_angles(COMP_PRECISION *dip,COMP_PRECISION *strike)
   fix_azimuth(strike);
 }
 // same for azimuth, should be between 0 and 360 degrees
-void fix_azimuth(COMP_PRECISION *azi)
+void fix_azimuth(double *azi)
 {
   if(*azi >= 360.0)
     *azi -= 360.0;

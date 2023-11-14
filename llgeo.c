@@ -13,6 +13,7 @@
   
 */
 #include "interact.h"
+COMP_PRECISION tensor3d_norm(COMP_PRECISION [3][3]);
 
 /*
 
@@ -28,7 +29,7 @@
 
 */
 void rotate_vec(COMP_PRECISION *xin, COMP_PRECISION *xout,
-		COMP_PRECISION cos_alpha, COMP_PRECISION sin_alpha)
+		double cos_alpha, double sin_alpha)
 {
   xout[INT_X]= ( cos_alpha * xin[INT_X]) + (sin_alpha * xin[INT_Y]);
   xout[INT_Y]= (-sin_alpha * xin[INT_X]) + (cos_alpha * xin[INT_Y]);
@@ -37,7 +38,7 @@ void rotate_vec(COMP_PRECISION *xin, COMP_PRECISION *xout,
 // similar for 2-D in X-Y plane
 //   WARNING: this routine doesn't take azimuth but direction!
 void rotate_vec2d(COMP_PRECISION *xin, COMP_PRECISION *xout,
-		  COMP_PRECISION cos_alpha, COMP_PRECISION sin_alpha)
+		  double cos_alpha, double sin_alpha)
 {
   xout[INT_X]= ( cos_alpha * xin[INT_X]) + (sin_alpha * xin[INT_Y]);
   xout[INT_Y]= (-sin_alpha * xin[INT_X]) + (cos_alpha * xin[INT_Y]);
@@ -78,28 +79,49 @@ void rotate_mat(COMP_PRECISION xin[3][3],COMP_PRECISION xout[3][3],
 */
 void rotate_mat_z(COMP_PRECISION xin[3][3],
 		  COMP_PRECISION xout[3][3],
-		  COMP_PRECISION cos_alpha, 
-		  COMP_PRECISION sin_alpha)
+		  double cos_alpha, 
+		  double sin_alpha)
 {
   double cos_square,sin_square,sin_cos;
+  /* COMP_PRECISION r[3][3]; */
+  /* r[0][0]=1;r[0][1]=0;r[0][2]=0; */
+  /* r[1][0]=0;r[1][1]=cos_alpha;r[1][2]=-sin_alpha; */
+  /* r[2][0]=0;r[2][1]=sin_alpha;r[2][2]= cos_alpha; */
+  /* rotate_mat(xin,xout,r); */
+  /* return; */
+  //fprintf(stderr,"%20.7e %20.7e\n",cos_alpha,sin_alpha);
   cos_square=cos_alpha*cos_alpha;
   sin_square=sin_alpha*sin_alpha;
   sin_cos=cos_alpha*sin_alpha;
+
   /* has to be optimized */
-  xout[INT_X][INT_X]=(xin[INT_X][INT_X]*cos_square + xin[INT_Y][INT_Y]*sin_square + 
-	      (xin[INT_X][INT_Y]*2.0*sin_alpha*cos_alpha));
-  xout[INT_X][INT_Y]=xout[INT_Y][INT_X]=(xin[INT_X][INT_Y]*(cos_square-sin_square) + 
-			 (-xin[INT_X][INT_X] + xin[INT_Y][INT_Y])*sin_cos);
-  xout[INT_X][INT_Z]=xout[INT_Z][INT_X]=(xin[INT_X][INT_Z]*cos_alpha + 
-			 xin[INT_Y][INT_Z]*sin_alpha);
-  xout[INT_Y][INT_Y]=(xin[INT_Y][INT_Y]*cos_square - (2.0*xin[INT_X][INT_Y]*sin_cos) + 
-	      xin[INT_X][INT_X]*sin_square);
-  xout[INT_Y][INT_Z]=xout[INT_Z][INT_Y]=(xin[INT_Y][INT_Z]*cos_alpha - 
-			 xin[INT_X][INT_Z]*sin_alpha);
+  xout[INT_X][INT_X]=(COMP_PRECISION)
+    ((double)xin[INT_X][INT_X]*cos_square + (double)xin[INT_Y][INT_Y]*sin_square + 
+     ((double)xin[INT_X][INT_Y]*2.0*sin_alpha*cos_alpha));
+  xout[INT_X][INT_Y]=xout[INT_Y][INT_X]=(COMP_PRECISION)
+    ((double)xin[INT_X][INT_Y]*(cos_square-sin_square) + (-(double)xin[INT_X][INT_X] + (double)xin[INT_Y][INT_Y])*sin_cos);
+  xout[INT_X][INT_Z]=xout[INT_Z][INT_X]=(COMP_PRECISION)
+    ((double)xin[INT_X][INT_Z]*cos_alpha + (double)xin[INT_Y][INT_Z]*sin_alpha);
+  xout[INT_Y][INT_Y]=(COMP_PRECISION)
+    ((double)xin[INT_Y][INT_Y]*cos_square -
+     (2.0*(double)xin[INT_X][INT_Y]*sin_cos) + 
+     (double)xin[INT_X][INT_X]*sin_square);
+  xout[INT_Y][INT_Z]=xout[INT_Z][INT_Y]=(COMP_PRECISION)
+    ((double)xin[INT_Y][INT_Z]*cos_alpha - (double)xin[INT_X][INT_Z]*sin_alpha);
   xout[INT_Z][INT_Z]=xin[INT_Z][INT_Z];
+  //fprintf(stderr,"%20.15e\n",tensor3d_norm(xin)-tensor3d_norm(xout));
 }
 
-
+COMP_PRECISION tensor3d_norm(COMP_PRECISION x[3][3])
+{
+  int i,j;
+  double sum = 0;
+  for(i=0;i<3;i++)
+    for(j=0;j<3;j++)
+      sum += x[i][j]*x[i][j];
+  return((COMP_PRECISION)sqrt(sum));
+    
+}
 /* 
    project a vector by doing the dot product 
 */

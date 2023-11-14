@@ -1,8 +1,8 @@
 c
-c this routine always double precision
-c
-#define C_PREC real*8
-#define EPS_DC3D_PREC 7.0D-15
+c     this routine uses double precision for all computations
+c      
+c however, this cannot be too greedy for the nodal line checks
+#define EPS_DC3D_PREC 1.0D-8
 c
 c
 c     This routine is based on the original source code as 
@@ -14,7 +14,7 @@ c     small modifications, mostly to improve speed by Thorsten Becker,
 c     becker@eps.harvard.edu
 c
 c     - floating point precision is set in include files, C-style
-c       all references to real*4 are replaced with C_PREC
+c       all references to real*4 are replaced with real*8
 c
 c     - introduced tmpd[1-5] variables to speed up computations
 c
@@ -31,8 +31,9 @@ c
 c
       SUBROUTINE  DC3D0(ALPHA,X,Y,Z,DEPTH,DIP,POT1,POT2,POT3,POT4,      
      *               UX,UY,UZ,UXX,UYX,UZX,UXY,UYY,UZY,UXZ,UYZ,UZZ,IRET) 
-      IMPLICIT C_PREC (A-H,O-Z)                                         
-      C_PREC   ALPHA,X,Y,Z,DEPTH,DIP,POT1,POT2,POT3,POT4,               
+      IMPLICIT real*8 (A-H,O-Z)
+
+      real*8   ALPHA,X,Y,Z,DEPTH,DIP,POT1,POT2,POT3,POT4,               
      *         UX,UY,UZ,UXX,UYX,UZX,UXY,UYY,UZY,UXZ,UYZ,UZZ             
 C                                                                       
 C********************************************************************   
@@ -147,9 +148,9 @@ C=======================================
       RETURN                                                            
       END                                                               
       SUBROUTINE  UA0(X,Y,D,POT1,POT2,POT3,POT4,U)                      
-      IMPLICIT C_PREC (A-H,O-Z)      
+      IMPLICIT real*8 (A-H,O-Z)      
 c     added this, th
-      C_PREC tmpd1,tmpd2,tmpd3,tmpd4,tmpd5
+      real*8 tmpd1,tmpd2,tmpd3,tmpd4,tmpd5
 
       DIMENSION U(12),DU(12)                                            
 C                                                                       
@@ -275,8 +276,8 @@ C=========================================
 
                                            
       SUBROUTINE  UB0(X,Y,D,Z,POT1,POT2,POT3,POT4,U)                    
-      IMPLICIT C_PREC (A-H,O-Z)                                         
-      C_PREC tmpd1,tmpd2,tmpd3,tmpd4,tmpd5
+      IMPLICIT real*8 (A-H,O-Z)                                         
+      real*8 tmpd1,tmpd2,tmpd3,tmpd4,tmpd5
       DIMENSION U(12),DU(12)                                            
 C                                                                       
 C********************************************************************   
@@ -416,9 +417,9 @@ C=========================================
 
                                           
       SUBROUTINE  UC0(X,Y,D,Z,POT1,POT2,POT3,POT4,U)                    
-      IMPLICIT C_PREC (A-H,O-Z)                                         
+      IMPLICIT real*8 (A-H,O-Z)                                         
 c
-      C_PREC tmpd1,tmpd2,tmpd3,tmpd4
+      real*8 tmpd1,tmpd2,tmpd3,tmpd4
       DIMENSION U(12),DU(12)                                            
 C                                                                       
 C********************************************************************   
@@ -562,11 +563,11 @@ C=========================================
       SUBROUTINE  DC3D(ALPHA,X,Y,Z,DEPTH,DIP,                           
      *     AL1,AL2,AW1,AW2,DISL1,DISL2,DISL3,                  
      *     UX,UY,UZ,UXX,UYX,UZX,UXY,UYY,UZY,UXZ,UYZ,UZZ,IRET)  
-      IMPLICIT C_PREC (A-H,O-Z)                                         
-      C_PREC   ALPHA,X,Y,Z,DEPTH,DIP,AL1,AL2,AW1,AW2,DISL1,DISL2,DISL3, 
+      IMPLICIT real*8 (A-H,O-Z)                                         
+      real*8   ALPHA,X,Y,Z,DEPTH,DIP,AL1,AL2,AW1,AW2,DISL1,DISL2,DISL3, 
      *         UX,UY,UZ,UXX,UYX,UZX,UXY,UYY,UZY,UXZ,UYZ,UZZ        
 c     my addtions, th
-      C_PREC tmpd1,tmpd2,tmpd3,tmpd4
+      real*8 tmpd1,tmpd2,tmpd3,tmpd4
 c     
 C                                                                       
 C********************************************************************   
@@ -792,8 +793,8 @@ C===========================================
       END                                     
                           
       SUBROUTINE  UA(XI,ET,Q,DISL1,DISL2,DISL3,U)                       
-      IMPLICIT C_PREC (A-H,O-Z)                                         
-      C_PREC tmpd1,tmpd2,tmpd5
+      IMPLICIT real*8 (A-H,O-Z)                                         
+      real*8 tmpd1,tmpd2,tmpd5
       DIMENSION U(12),DU(12)                                            
 C                                                                       
 C********************************************************************   
@@ -887,7 +888,7 @@ C========================================
       END                   
                                             
       SUBROUTINE  UB(XI,ET,Q,DISL1,DISL2,DISL3,U)                       
-      IMPLICIT C_PREC (A-H,O-Z)                                         
+      IMPLICIT real*8 (A-H,O-Z)                                         
       DIMENSION U(12),DU(12)                                            
 C                                                                       
 C********************************************************************   
@@ -905,7 +906,7 @@ C
       COMMON /C2/XI2,ET2,Q2,R,R2,R3,R5,Y,D,TT,ALX,ALE,X11,Y11,X32,Y32,  
      *           EY,EZ,FY,FZ,GY,GZ,HY,HZ                                
       DATA  F0,F1,F2,PI2/0.D0,1.D0,2.D0,6.283185307179586D0/            
-      C_PREC tmpd1,tmpd2
+      real*8 tmpd1,tmpd2
 C-----                                                                  
       RD=R+D                                                            
       D11=F1/(R*RD)                                                     
@@ -1014,8 +1015,8 @@ C========================================
 
                                           
       SUBROUTINE  UC(XI,ET,Q,Z,DISL1,DISL2,DISL3,U)                     
-      IMPLICIT C_PREC (A-H,O-Z)                                         
-      C_PREC tmpd1,tmpd2,tmpd5
+      IMPLICIT real*8 (A-H,O-Z)                                         
+      real*8 tmpd1,tmpd2,tmpd5
       DIMENSION U(12),DU(12)                                            
 C                                                                       
 C********************************************************************   
@@ -1131,7 +1132,7 @@ C========================================
       END                  
                                              
       SUBROUTINE  DCCON0(ALPHA,DIP)                                     
-      IMPLICIT C_PREC (A-H,O-Z)  
+      IMPLICIT real*8 (A-H,O-Z)  
 C                                                                       
 C*******************************************************************    
 C*****   CALCULATE MEDIUM CONSTANTS AND FAULT-DIP CONSTANTS    *****    
@@ -1168,8 +1169,8 @@ c     obtain sin and cos of dip, given in degrees
       END        
                                                        
       SUBROUTINE  DCCON1(X,Y,D)                                         
-      IMPLICIT C_PREC (A-H,O-Z)                                         
-      C_PREC tmpd1
+      IMPLICIT real*8 (A-H,O-Z)                                         
+      real*8 tmpd1
 C                                                                       
 C********************************************************************** 
 C*****   CALCULATE STATION GEOMETRY CONSTANTS FOR POINT SOURCE    ***** 
@@ -1221,8 +1222,8 @@ C-----
       END                                                               
 
       SUBROUTINE  DCCON2(XI,ET,Q,SD,CD,KXI,KET)                         
-      IMPLICIT C_PREC (A-H,O-Z)                                         
-      C_PREC tmpd1
+      IMPLICIT real*8 (A-H,O-Z)                                         
+      real*8 tmpd1
 C                                                                       
 C********************************************************************** 
 C*****   CALCULATE STATION GEOMETRY CONSTANTS FOR FINITE SOURCE   ***** 
