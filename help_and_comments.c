@@ -80,15 +80,15 @@ void phelp(void)
   PE("      of a rectangular fault patch. In this case, width should be set to the `fault' area");
   PE("      and half-length is equivalent to -aspect_ratio, where aspect_ratio is some equivalent L/W.");
   PE("");
-  PE("      WARNING: Not properly tested  yet.");
+  PE("      WARNING: Not properly tested yet.");
   PE("");
   PE("    - triangular in half-space:");
   PE("      If BOTH fault half-width and length are negative, then the patch is a triangular element.");
   PE("      In this case, x, y, z, dip, strike, length, and width have no meaning but will be reassigned.");
-  PE("      The next nine numbers in the input line will be the coordinates of the three nodes of the");
+  PE("      The next nine numbers in the input geometry line will be the coordinates of the three nodes of the");
   PE("      triangle, however. FE-style counterclockwise numbering, input is then in the format:\n");
   PE("      999 999 999 999 999 -1 -1 group_0 x_x^1 x_y^1 x_z^1 x_x^2 x_y^2 x_z^2 x_x^3 x_y^3 x_z^3\n");
-  PE("      where exponents indicate the local number of the node, and 999 means field will not be used.");
+  PE("      where exponents indicate the local number of the node, and 999 are place holder values, not used.");
   PE("");
   PE("      WARNING: This is not properly implemented yet.");
   PE("");

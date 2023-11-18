@@ -318,7 +318,10 @@ void calc_interaction_matrix(struct med *medium,struct flt *fault,
   if(medium->read_int_mat_from_file){
     // reopen in read mode
     if(!medium->use_old_imat){
-      freopen(medium->mfname,"r",medium->i_mat_in);
+      if(!freopen(medium->mfname,"r",medium->i_mat_in)){
+	fprintf(stderr,"calc_interaction_matrix: issue with %s, could not reopen\n",medium->mfname);
+	exit(-1);
+      }
       fprintf(stderr,"calc_interaction_matrix: written to %s\n",
 	      medium->mfname);
     }

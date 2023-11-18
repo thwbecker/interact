@@ -217,9 +217,9 @@ void block_output(struct bmd *mod,my_boolean rigid,
     */
     fprintf(stderr,"%s: block %c (%2i): w: %12g (%12g) v_0: %12g (%12g) %12g (%12g) %s\n",
 	    argv[0],bname(i),i+1,
-	    mod->xsol[i*BLOCK_NBASE],  (i<nrbf)?(mod->sigma[i*BLOCK_NBASE]):(NaN),
-	    mod->xsol[i*BLOCK_NBASE+1],(i<nrbf)?(mod->sigma[i*BLOCK_NBASE+1]):(NaN),
-	    mod->xsol[i*BLOCK_NBASE+2],(i<nrbf)?(mod->sigma[i*BLOCK_NBASE+2]):(NaN),
+	    mod->xsol[i*BLOCK_NBASE],  (i<nrbf)?(mod->sigma[i*BLOCK_NBASE]):(NAN),
+	    mod->xsol[i*BLOCK_NBASE+1],(i<nrbf)?(mod->sigma[i*BLOCK_NBASE+1]):(NAN),
+	    mod->xsol[i*BLOCK_NBASE+2],(i<nrbf)?(mod->sigma[i*BLOCK_NBASE+2]):(NAN),
 	    (mod->changed_reference_frame)?("again in orig RF"):("in orig RF"));
 #else
     /* 
@@ -230,9 +230,9 @@ void block_output(struct bmd *mod,my_boolean rigid,
     if(verbose)
       fprintf(stderr,"%s: block %c (%2i): wx: %12g (%12g) wy: %12g (%12g) wz: %12g (%12g) (deg/Myr) %s\n",
 	      argv[0],bname(i),i+1,
-	      mod->xsol[i*BLOCK_NBASE+INT_X]/BLOCK_GFAC,(i<nrbf)?(mod->sigma[i*BLOCK_NBASE+INT_X]/BLOCK_GFAC):(NaN),
-	      mod->xsol[i*BLOCK_NBASE+INT_Y]/BLOCK_GFAC,(i<nrbf)?(mod->sigma[i*BLOCK_NBASE+INT_Y]/BLOCK_GFAC):(NaN),
-	      mod->xsol[i*BLOCK_NBASE+INT_Z]/BLOCK_GFAC,(i<nrbf)?(mod->sigma[i*BLOCK_NBASE+INT_Z]/BLOCK_GFAC):(NaN),
+	      mod->xsol[i*BLOCK_NBASE+INT_X]/BLOCK_GFAC,(i<nrbf)?(mod->sigma[i*BLOCK_NBASE+INT_X]/BLOCK_GFAC):(NAN),
+	      mod->xsol[i*BLOCK_NBASE+INT_Y]/BLOCK_GFAC,(i<nrbf)?(mod->sigma[i*BLOCK_NBASE+INT_Y]/BLOCK_GFAC):(NAN),
+	      mod->xsol[i*BLOCK_NBASE+INT_Z]/BLOCK_GFAC,(i<nrbf)?(mod->sigma[i*BLOCK_NBASE+INT_Z]/BLOCK_GFAC):(NAN),
 	      (mod->changed_reference_frame)?("again in orig RF"):("in orig RF"));
     /* 
 

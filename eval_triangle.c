@@ -48,17 +48,17 @@ void eval_triangle(COMP_PRECISION *x,struct flt *fault,
     sum up several point sources to obtain the effect
     of a triangle
   */
-  u_global[X]=u_global[Y]=u_global[Z]=0.0;
-  sm_global[X][X]=sm_global[X][Y]=sm_global[X][Z]=
-    sm_global[Y][Y]=sm_global[Y][Z]=sm_global[Z][Z]=0.0;
+  u_global[INT_X]=u_global[INT_Y]=u_global[INT_Z]=0.0;
+  sm_global[INT_X][INT_X]=sm_global[INT_X][INT_Y]=sm_global[INT_X][INT_Z]=
+    sm_global[INT_Y][INT_Y]=sm_global[INT_Y][INT_Z]=sm_global[INT_Z][INT_Z]=0.0;
   *giret=0;
   for(i=0;i<GAUSS_POINTS;i++){
     // assign the coordinate in element
     globalx(fault->xt,g[i],h[i],xf);
     /*
       fprintf(stderr,"eval_triangle: gp %2i: x: %g/%g/%g, g/h/w: %g/%g/%g, cen: %g/%g/%g\n",
-      i,xf[X],xf[Y],xf[Z],g[i],h[i],w[i],
-      fault->x[X],fault->x[Y],fault->x[Z]);
+      i,xf[INT_X],xf[INT_Y],xf[INT_Z],g[i],h[i],w[i],
+      fault->x[INT_X],fault->x[INT_Y],fault->x[INT_Z]);
     */
     // add contribution of point source, are weighted by w[i]
     // at Gauss integration point location
@@ -69,28 +69,28 @@ void eval_triangle(COMP_PRECISION *x,struct flt *fault,
 		     (COMP_PRECISION)fault->dip,
 		     disp,u,sm,&iret);
     if(!iret){// sum up contribution
-      u_global[X] += u[X];
-      u_global[Y] += u[Y];
-      u_global[Z] += u[Z];
-      sm_global[X][X] += sm[X][X];
-      sm_global[X][Y] += sm[X][Y];
-      sm_global[X][Z] += sm[X][Z];
-      sm_global[Y][Y] += sm[Y][Y];
-      sm_global[Y][Z] += sm[Y][Z];
-      sm_global[Z][Z] += sm[Z][Z];
+      u_global[INT_X] += u[INT_X];
+      u_global[INT_Y] += u[INT_Y];
+      u_global[INT_Z] += u[INT_Z];
+      sm_global[INT_X][INT_X] += sm[INT_X][INT_X];
+      sm_global[INT_X][INT_Y] += sm[INT_X][INT_Y];
+      sm_global[INT_X][INT_Z] += sm[INT_X][INT_Z];
+      sm_global[INT_Y][INT_Y] += sm[INT_Y][INT_Y];
+      sm_global[INT_Y][INT_Z] += sm[INT_Y][INT_Z];
+      sm_global[INT_Z][INT_Z] += sm[INT_Z][INT_Z];
     }else{
       fprintf(stderr,"eval_triangle: gauss point %i is undefined: x: (%g, %g, %g) xg: (%g, %g, %g)\n",
-	      i,x[X],x[Y],x[Z],xf[X],xf[Y],xf[Z]);
+	      i,x[INT_X],x[INT_Y],x[INT_Z],xf[INT_X],xf[INT_Y],xf[INT_Z]);
       fprintf(stderr,"eval_triangle: xt: (%g, %g, %g) (%g, %g, %g) (%g, %g, %g)\n",
-	      fault->xt[X  ],fault->xt[Y  ],fault->xt[Z  ],
-	      fault->xt[3+X],fault->xt[3+Y],fault->xt[3+Z],
-	      fault->xt[6+X],fault->xt[6+Y],fault->xt[6+Z]);
+	      fault->xt[INT_X  ],fault->xt[INT_Y  ],fault->xt[INT_Z  ],
+	      fault->xt[3+INT_X],fault->xt[3+INT_Y],fault->xt[3+INT_Z],
+	      fault->xt[6+INT_X],fault->xt[6+INT_Y],fault->xt[6+INT_Z]);
       *giret = iret;
     }
   }
-  sm_global[Y][X]=sm_global[X][Y];
-  sm_global[Z][X]=sm_global[X][Z];
-  sm_global[Z][Y]=sm_global[Y][Z];
+  sm_global[INT_Y][INT_X]=sm_global[INT_X][INT_Y];
+  sm_global[INT_Z][INT_X]=sm_global[INT_X][INT_Z];
+  sm_global[INT_Z][INT_Y]=sm_global[INT_Y][INT_Z];
 }
 #endif
 /*

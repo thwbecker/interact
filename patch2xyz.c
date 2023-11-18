@@ -13,8 +13,8 @@ int main(int argc, char **argv)
   int i,comp=0;
   int opmode=PSXYZ_MODE;
   COMP_PRECISION *scalar=NULL,min,max;
-  my_boolean shrink_patches=FALSE,
-    read_slip = FALSE,verbose = FALSE,use_scalar = FALSE;
+  my_boolean shrink_patches=FALSE,read_slip,
+    attempt_read_slip = FALSE,verbose = FALSE,use_scalar = FALSE;
   FILE *in;
   medium=(struct med *)calloc(1,sizeof(struct med)); 
   if(argc > 5){
@@ -32,7 +32,7 @@ int main(int argc, char **argv)
 
   if(argc > 1){
     opmode = PSXYZ_SCALAR_MODE;
-    read_slip = TRUE;
+    attempt_read_slip = TRUE;
   }
   if(argc > 2){
     sscanf(argv[2],"%i",&comp);
@@ -48,8 +48,15 @@ int main(int argc, char **argv)
   fprintf(stderr,"%s: reading patch format from stdin, writing xyz to stdout. shrink: %i\n",
 	  argv[0],shrink_patches);
   read_geometry("stdin",&medium,&fault,FALSE,FALSE,FALSE,verbose);
-  
+
+  if(attempt_read_slip)
+    read_slip = read_fltdat(argv[1],fault,medium,verbose);
+  else
+    read_slip = FALSE;
   if(read_slip){
+    fprintf(stderr,"%s: reading flt slip from %s, printing component %i\n",
+	    argv[0],argv[1],comp);
+    
     if(use_scalar){
       fprintf(stderr,"%s: reading scalar values from %s\n",
 	      argv[0],argv[1]);
@@ -65,9 +72,7 @@ int main(int argc, char **argv)
 	if(scalar[i]>max)max=scalar[i];
       }
     }else{
-      fprintf(stderr,"%s: reading flt slip from %s, printing component %i\n",
-	      argv[0],argv[1],comp);
-      read_fltdat(argv[1],fault,medium,verbose);
+     
       scalar = (COMP_PRECISION *)calloc(medium->nrflt,sizeof(COMP_PRECISION));
       min = 1e20; max = -1e20;
       for(i=0;i < medium->nrflt;i++){

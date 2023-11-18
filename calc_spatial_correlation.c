@@ -213,6 +213,6 @@ COMP_PRECISION correlation_coefficient(COMP_PRECISION *x,
     //
     // not enough entries
     //
-    return NaN;
+    return NAN;
   }
 }

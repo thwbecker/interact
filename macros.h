@@ -38,15 +38,9 @@
 #define ONEEIGHTYOVERPI  RAD2DEG
 
 //
-// the medium structure has a NaN field which will be 
-// initialized as sqrt(-1). the nan macro is only used if 
-// medium is not passed to subroutines
-//
-// WARNING: THIS (WHICH SHOULD BE BETTER)
-// DID NOT WORK ON IRIX WITH 
-// -Ofast: #define NaN (1./0.-1./0.)
-//
-#define NaN (1.0/0.0)
+#ifndef NAN 
+#define NAN (1.0/0.0)
+#endif
 
 
 #define ONE_MEGABYTE 1048576.0

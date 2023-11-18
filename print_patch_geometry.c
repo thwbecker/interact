@@ -25,9 +25,10 @@ void print_patch_geometry_and_bc(int flt_offset,struct flt *fault,
   int k,l;
   static my_boolean bc_init=FALSE;
   static int nrf,bc_code;
-  COMP_PRECISION corner[4][3],alpha,sin_dip,cos_dip,leeway;
+  COMP_PRECISION corner[4][3],sin_dip,cos_dip,leeway;
+  double alpha;
 #ifdef ALLOW_NON_3DQUAD_GEOM
-  COMP_PRECISION tmpdbl,lfac;
+  COMP_PRECISION tmp_real,lfac,x[3];
 #endif
   //
   // shrink patches for easier viewing
@@ -41,18 +42,18 @@ void print_patch_geometry_and_bc(int flt_offset,struct flt *fault,
 #ifdef ALLOW_NON_3DQUAD_GEOM
     if(fault[flt_offset].type != TRIANGULAR){
       // normal (rectangular, 2-D, or point source)
-      alpha=90.0-(COMP_PRECISION)fault[flt_offset].strike;
-      my_sincos_deg(&fault[flt_offset].sin_alpha,&fault[flt_offset].cos_alpha,(COMP_PRECISION)alpha);
+      alpha=90.0-(double)fault[flt_offset].strike;
+      my_sincos_degd(&fault[flt_offset].sin_alpha,&fault[flt_offset].cos_alpha,alpha);
       my_sincos_deg(&sin_dip,&cos_dip,(COMP_PRECISION)fault[flt_offset].dip);
       calc_base_vecs(fault[flt_offset].t_strike,fault[flt_offset].normal,fault[flt_offset].t_dip,
 		     fault[flt_offset].sin_alpha,fault[flt_offset].cos_alpha,sin_dip,cos_dip);
     }else{// triangular element
       get_alpha_dip_tri_gh((fault+flt_offset)->xt,&(fault+flt_offset)->sin_alpha,
-			   &(fault+flt_offset)->cos_alpha,&tmpdbl,&(fault+flt_offset)->w);
-      (fault+flt_offset)->dip=(float)tmpdbl;
+			   &(fault+flt_offset)->cos_alpha,&tmp_real,&(fault+flt_offset)->w);
+      (fault+flt_offset)->dip=(float)tmp_real;
       (fault+flt_offset)->area = (fault+flt_offset)->w;
-      alpha=RAD2DEGF(asin((fault+flt_offset)->sin_alpha));
-      (fault+flt_offset)->strike= 90.0 - alpha;
+      alpha = RAD2DEGF(asin((fault+flt_offset)->sin_alpha));
+      (fault+flt_offset)->strike= (COMP_PRECISION)(90.0 - alpha);
     }
 #else
     //

@@ -20,7 +20,7 @@ int solve(struct med *medium,struct flt *fault)
 #ifdef USE_NUMREC_SVD
   A_MATRIX_PREC *dummyp=NULL;
 #endif
-  char solver_name[STRLEN];
+  char solver_name[STRLEN],out_string[300];
   size_t full_size,sparse_size;
   static int izero=0;
   FILE *aio;
@@ -32,7 +32,7 @@ int solve(struct med *medium,struct flt *fault)
 #endif
 #ifdef USE_PETSC
 #define PETSC_HELPER_STR_LEN 256  
-  char mattype[PETSC_HELPER_STR_LEN],out_string[300];
+  char mattype[PETSC_HELPER_STR_LEN];
   PetscBool pset = PETSC_FALSE;
   Vec         px, pr,pxout;
   KSP         pksp;
@@ -578,6 +578,7 @@ int solve(struct med *medium,struct flt *fault)
   */
   if(medium->debug)
     fprintf(stderr,"solve: solvers done\n");
+  return 0;
 }
 
 /* 

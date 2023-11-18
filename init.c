@@ -97,7 +97,10 @@ void initialize(struct med **medium, struct flt **fault,
 		my_boolean init_system,COMP_PRECISION wcutoff,
 		my_boolean no_interactions,my_boolean force_petsc)
 {
-  int serr,fchunk;
+  int serr;
+#ifdef USE_PETSC
+  int fchunk;
+#endif
   char tmpstring[STRLEN];
   //
   // read in the main model description files

@@ -449,8 +449,7 @@ void read_one_step_bc(FILE *in,struct med *medium,struct flt *fault,
 #ifdef ALLOW_NON_3DQUAD_GEOM
       // check if we have triangular elements and prescribed slip
       if(slip_type_bc(bc_code)){
-	for(rotate_to_local=FALSE,
-	      i=start_patch;i <= stop_patch;i++)
+	for(rotate_to_local=FALSE,i=start_patch;i <= stop_patch;i++){
 	  if((i > medium->nrflt - 1)||(i<0)){
 	    HEADNODE
 	      fprintf(stderr,"read_boundary_conditions: error, trying to address patch %i out of %i total\n",
@@ -461,6 +460,7 @@ void read_one_step_bc(FILE *in,struct med *medium,struct flt *fault,
 	    rotate_to_local = TRUE;
 	    break;
 	  }
+	}
       }else{
 	rotate_to_local=FALSE;
       }

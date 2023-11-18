@@ -7,7 +7,7 @@
 */
 #include "properties.h"
 #include "interact.h"
-#include <string.h>
+
 
 /* 
 
@@ -49,13 +49,22 @@ void read_geometry(char *patch_filename,struct med **medium,
 
   */ 
   if(strcmp(patch_filename,"stdin")!=0){
-    if(verbose)
-      fprintf(stderr,"read_geometry: reading geometry from file \"%s\"\n",
-	      patch_filename);
+    if(verbose){
+#ifdef ALLOW_NON_3DQUAD_GEOM
+      fprintf(stderr,"read_geometry: reading geometry from file \"%s\", non quads allowed\n",patch_filename);
+#else
+      fprintf(stderr,"read_geometry: reading geometry from file \"%s\", non quads not allowed\n",patch_filename);
+#endif
+    }
     in = myopen(patch_filename,"r");
   }else{
-    if(verbose)
-      fprintf(stderr,"read_geometry: reading geometry from stdin\n");
+    if(verbose){
+#ifdef ALLOW_NON_3DQUAD_GEOM
+      fprintf(stderr,"read_geometry: reading geometry from stdin, non quads allowed\n");
+#else
+      fprintf(stderr,"read_geometry: reading geometry from stdin, non quads not allowed\n");
+#endif
+    }
     in = stdin;
   }
   if(read_fault_properties){
@@ -74,7 +83,9 @@ void read_geometry(char *patch_filename,struct med **medium,
 
  
 #ifdef ALLOW_NON_3DQUAD_GEOM
+  //
   // kind of elastic approximation for 2D segments
+  //
   (*medium)->twod_approx_is_plane_stress = twod_approx_is_plane_stress;
   if(((*medium)->twod_approx_is_plane_stress)&&(half_plane)){
     if((*medium)->comm_rank == 0)
@@ -88,7 +99,7 @@ void read_geometry(char *patch_filename,struct med **medium,
     (*medium)->xmax[i]=FLT_MIN;
     (*medium)->xmin[i]=FLT_MAX;
   } 
-  (*medium)->nan = sqrt(-1.0);
+  (*medium)->nan = NAN;
   (*medium)->wmean= (*medium)->lmean=0.0;
   lmin = wmin =  FLT_MAX;
   lmax = wmax = -FLT_MAX;// L and W are positive quantities
@@ -432,12 +443,12 @@ void read_geometry(char *patch_filename,struct med **medium,
 #ifdef ALLOW_NON_3DQUAD_GEOM
   if(nr_pt_src + nr_triangle + nr_2d == 0){
     if(verbose){
-      fprintf(stderr,"read_geometry: no special geometry patches were read in, recompiling without ALLOW_NON_3DQUAD_GEOM flag\n");
-      fprintf(stderr,"read_geometry: would improve speed and size requirements of interact\n");
+      fprintf(stderr,"read_geometry: no non-quad patches were read in, recompiling without ALLOW_NON_3DQUAD_GEOM flag\n");
+      fprintf(stderr,"read_geometry: might possibly improve speed and size requirements of interact\n");
     }
   }else{
     if((*medium)->comm_rank == 0){
-      fprintf(stderr,"read_geometry: WARNING: read in %i 2D elements, %i points, %i triangles, and %i rectangles\n",
+      fprintf(stderr,"read_geometry: read in %i 2D elements, %i points, %i triangles, and %i quads\n",
 	      nr_2d,nr_pt_src,nr_triangle,(*medium)->nrflt - nr_triangle - nr_pt_src - nr_2d);
       if(nr_2d)
 	fprintf(stderr,"read_geometry: two dimensional approximation: plane %s %s\n",

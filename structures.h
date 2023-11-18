@@ -262,8 +262,8 @@ struct med{
 */
 
 struct flt{
-  COMP_PRECISION u[3];/* displacements on fault in strike, 
-			 dip, and tensile direction */
+  COMP_PRECISION u[3];/* slup on fault in strike, dip, and tensile
+			 direction */
   COMP_PRECISION s[3];/* strike, normal and 
 			 dip stress */
   COMP_PRECISION sinc[3]; /* assuming that the background

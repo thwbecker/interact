@@ -354,14 +354,8 @@ void eval_point_short(COMP_PRECISION *x,COMP_PRECISION *xf,COMP_PRECISION area,
 
 void set_stress_and_disp_nan(COMP_PRECISION s[3][3],COMP_PRECISION *u)
 {
-  static COMP_PRECISION nan;
-  static my_boolean init=FALSE;
-  if(!init){
-    nan = sqrt(-1.0);
-    init=TRUE;
-  }
-  u[INT_X]=u[INT_Y]=u[INT_Z]=nan;
-  s[INT_X][INT_X]=s[INT_X][INT_Y]=s[INT_X][INT_Z]=nan;
-  s[INT_Y][INT_X]=s[INT_Y][INT_Y]=s[INT_Y][INT_Z]=nan;
-  s[INT_Z][INT_X]=s[INT_Z][INT_Y]=s[INT_Z][INT_Z]=nan;
+  u[INT_X]=u[INT_Y]=u[INT_Z]=NAN;
+  s[INT_X][INT_X]=s[INT_X][INT_Y]=s[INT_X][INT_Z]=NAN;
+  s[INT_Y][INT_X]=s[INT_Y][INT_Y]=s[INT_Y][INT_Z]=NAN;
+  s[INT_Z][INT_X]=s[INT_Z][INT_Y]=s[INT_Z][INT_Z]=NAN;
 }

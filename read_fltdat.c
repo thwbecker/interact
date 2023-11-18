@@ -17,10 +17,11 @@
    this reads in the version with the two header lines, unless told
    otherwise
 
+   return 1 if file found, zero else
 */
 
-void read_fltdat(char *filename,struct flt *fault,struct med *medium, 
-		 my_boolean verbose)
+int read_fltdat(char *filename,struct flt *fault,struct med *medium, 
+		my_boolean verbose)
 {
   int i,grp,igrp,ipatch,iread;
   size_t size_dummy;
@@ -36,7 +37,11 @@ void read_fltdat(char *filename,struct flt *fault,struct med *medium,
     if(verbose)
       fprintf(stderr,"read_fltdat: reading flt slip data file \"%s\"\n",
 	      filename);
-    in=myopen(filename,"r");
+    in = fopen(filename,"r");
+    if(!in){
+      fprintf(stderr,"read_fltdat: could not open %s, will not have slip information\n",filename);
+      return 0;
+    }
   }else{
     fprintf(stderr,"read_fltdat: stdin\n");
     in=stdin;
@@ -77,5 +82,6 @@ void read_fltdat(char *filename,struct flt *fault,struct med *medium,
   fclose(in);
   if(verbose)			/* should really check, but oh well */
     fprintf(stderr,"read_fltdat: read %i patches OK\n",medium->nrflt);
+  return 1;
 
 }

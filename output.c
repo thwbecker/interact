@@ -364,7 +364,7 @@ COMP_PRECISION select_val_for_print(struct flt *fault,int mode)
     exit(-1);
     break;
   }
-  return NaN;
+  return NAN;
 }
 /* 
 

@@ -1,7 +1,7 @@
 #include "interact.h"
 #include "properties.h"
 //
-// reads in sets of three points in 3-D and converts to patch format
+// reads in sets of three points in 3-D and converts to triangle patch format
 //
 
 
@@ -38,9 +38,9 @@ int main(int argc, char **argv)
   fault[0].xt=(COMP_PRECISION *)malloc(sizeof(COMP_PRECISION)*9);
   n=0;
   while(fscanf(stdin,NINE_CP_FORMAT,
-	       &fault[n].xt[  X],&fault[n].xt[  Y],&fault[n].xt[  Z],
-	       &fault[n].xt[3+X],&fault[n].xt[3+Y],&fault[n].xt[3+Z],
-	       &fault[n].xt[6+X],&fault[n].xt[6+Y],&fault[n].xt[6+Z])==9){
+	       &fault[n].xt[  INT_X],&fault[n].xt[  INT_Y],&fault[n].xt[  INT_Z],
+	       &fault[n].xt[3+INT_X],&fault[n].xt[3+INT_Y],&fault[n].xt[3+INT_Z],
+	       &fault[n].xt[6+INT_X],&fault[n].xt[6+INT_Y],&fault[n].xt[6+INT_Z])==9){
     for(j=1,i=2;i<9;i+= 3,j++)
       if(fault[n].xt[i] > 0.0){
 	fprintf(stderr,"%s: rectangle %i: point %i: z coordinate (%g) should be <= 0\n",

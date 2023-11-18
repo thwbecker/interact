@@ -9,13 +9,16 @@ int main(int argc, char **argv)
   
   struct flt *fault;
   struct med *medium;
-  int i,j,k;
-  my_boolean shrink_patches=FALSE,read_slip=FALSE,verbose=FALSE;
-  COMP_PRECISION leeway,corner[4][3],alpha,sin_dip,cos_dip,u[3];
+  int i,j,k,ncon,tncon;
+  my_boolean shrink_patches=FALSE,
+    verbose=FALSE,
+    attempt_read_slip=FALSE,
+    read_slip;
+  COMP_PRECISION leeway,corner[4][3],u[3];
   medium=(struct med *)calloc(1,sizeof(struct med));
   
   if(argc > 1)
-    read_slip = TRUE;
+    attempt_read_slip = TRUE;
   if(argc > 2){
     sscanf(argv[2],"%i",&i);
     shrink_patches = (my_boolean)i;
@@ -31,48 +34,29 @@ int main(int argc, char **argv)
 	  argv[0],shrink_patches);
   
   read_geometry("stdin",&medium,&fault,FALSE,FALSE,FALSE,verbose);
-  if(read_slip)
-    read_fltdat(argv[1],fault,medium,verbose);
-  if(shrink_patches)
+  if(attempt_read_slip)
+    read_slip = read_fltdat(argv[1],fault,medium,verbose);
+  else
+    read_slip = FALSE;
+  if(shrink_patches)		/* to make things easier to see */
     leeway = 0.9;
   else
     leeway = 1.0;
-
+  /* count all nodes  */
+  for(tncon=i=0;i < medium->nrflt;i++)
+    tncon += ncon_of_patch((fault+i)) ; 
   printf("# vtk DataFile Version 2.0\n");
   printf("from patch2vtk\n");
   printf("ASCII\n");
   printf("DATASET UNSTRUCTURED_GRID\n");
-  printf("POINTS %i float\n",medium->nrflt*4);
+  
+  printf("POINTS %i float\n",tncon);
   for(i=0;i < medium->nrflt;i++){
-#ifdef ALLOW_NON_3DQUAD_GEOM
-    if(fault[i].type != TRIANGULAR){
-      // normal (rectangular, 2-D, or point source)
-      alpha=90.0-(COMP_PRECISION)fault[i].strike;
-      my_sincos_deg(&fault[i].sin_alpha,&fault[i].cos_alpha,(COMP_PRECISION)alpha);
-      my_sincos_deg(&sin_dip,&cos_dip,(COMP_PRECISION)fault[i].dip);
-      calc_base_vecs(fault[i].t_strike,fault[i].normal,fault[i].t_dip,
-		     fault[i].sin_alpha,fault[i].cos_alpha,sin_dip,cos_dip);
-    }else{// triangular element
-      get_alpha_dip_tri_gh((fault+i)->xt,&(fault+i)->sin_alpha,
-			   &(fault+i)->cos_alpha,&tmpdbl,&(fault+i)->w);
-      (fault+i)->dip=(float)tmpdbl;
-      (fault+i)->area = (fault+i)->w;
-      alpha=RAD2DEGF(asin((fault+i)->sin_alpha));
-      (fault+i)->strike= 90.0 - alpha;
-    }
-#else
-    alpha=90.0-(COMP_PRECISION)fault[i].strike;
-    my_sincos_deg(&fault[i].sin_alpha,&fault[i].cos_alpha,(COMP_PRECISION)alpha);
-    my_sincos_deg(&sin_dip,&cos_dip,(COMP_PRECISION)fault[i].dip);
-    calc_base_vecs(fault[i].t_strike,fault[i].normal,fault[i].t_dip,
-		   fault[i].sin_alpha,fault[i].cos_alpha,sin_dip,cos_dip);
-    
-
-#endif
     calculate_bloated_corners(corner,(fault+i),leeway);
-    for(j=0;j < 4;j++){
+    ncon = ncon_of_patch((fault+i));
+    for(j=0;j < ncon;j++){
       for(k=0;k < 3;k++)
-	if(fabs(corner[j][k]/CHAR_FAULT_DIM)>EPS_COMP_PREC)
+	if(fabs(corner[j][k]/CHAR_FAULT_DIM) > EPS_COMP_PREC)
 	  printf("%g ",corner[j][k]/CHAR_FAULT_DIM);
 	else
 	  printf("0.0 ");
@@ -81,33 +65,43 @@ int main(int argc, char **argv)
     printf("\n");
   }
   
-  printf("CELLS %i %i\n",medium->nrflt,medium->nrflt*5);
-  for(i=0;i<medium->nrflt;i++)
-    printf("4 %i %i %i %i\n",i*4,i*4+1,i*4+2,i*4+3);
+  printf("CELLS %i %i\n",medium->nrflt,tncon+medium->nrflt);
+  for(i=k=0;i<medium->nrflt;i++){
+    ncon = ncon_of_patch((fault+i));
+    printf("%i ",ncon);
+    for(j=0;j < ncon;j++,k++)
+      printf("%i ",k);
+    printf("\n");
+  }
   printf("CELL_TYPES %i\n",medium->nrflt);
-  for(i=0;i<medium->nrflt;i++)
-    printf("9\n");
+  for(i=0;i<medium->nrflt;i++){
+    printf("%i\n",vtk_type_of_patch((fault+i)));
+  }
   if(read_slip){
-    /* use slip for coloring */
+    /* 
+       use slip for coloring 
+    */
     printf("CELL_DATA %i\n",medium->nrflt);
     
     printf("SCALARS sqrt(s^2+d^2) float 1\n");
     printf("LOOKUP_TABLE default\n");
-    for(i=0;i<medium->nrflt;i++)
+    for(i=0;i < medium->nrflt;i++)
       printf("%g\n",sqrt(fault[i].u[STRIKE]*fault[i].u[STRIKE] 
 			 + fault[i].u[DIP]*fault[i].u[DIP]));
 
     printf("SCALARS strike_slip float 1\n");
     printf("LOOKUP_TABLE default\n");
-    for(i=0;i<medium->nrflt;i++)
+    for(i=0;i < medium->nrflt;i++)
       printf("%g\n",fault[i].u[STRIKE]);
  
     printf("SCALARS dip_slip float 1\n");
     printf("LOOKUP_TABLE default\n");
-    for(i=0;i<medium->nrflt;i++)
+    for(i=0;i < medium->nrflt;i++)
       printf("%g\n",fault[i].u[DIP]);
 
-    /* vectors */
+    /* 
+       vectors for displacement 
+    */
     printf("VECTORS slip float\n");
     for(i=0;i < medium->nrflt;i++){
       for(j=0;j<3;j++){
@@ -119,7 +113,7 @@ int main(int argc, char **argv)
     }
 
   }
-
+  fprintf(stderr,"%s: written VTK to stdout\n",argv[0]);
   exit(0);
 }
 

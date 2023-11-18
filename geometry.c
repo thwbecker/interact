@@ -177,18 +177,19 @@ void calculate_corners(COMP_PRECISION corner[4][3],
 		       struct flt *fault,
 		       COMP_PRECISION *l, COMP_PRECISION *w)
 {
- 
 #ifdef ALLOW_NON_3DQUAD_GEOM
-  if(patch_is_2d(fault->type)){
+  if(patch_is_2d(fault->type)){	/* 2D */
     calculate_seg_corners(corner,fault,1.0);
     *l = fault->l;*w = fault->w;
-  }else if(fault->type == RECTANGULAR_PATCH){
+  }else if(fault->type == RECTANGULAR_PATCH){ /* quad */
     calculate_quad_corners(corner,fault,1.0);
     *l = fault->l;*w = fault->w;
-  }else if(fault->type == POINT_SOURCE)
+  }else if(fault->type == POINT_SOURCE){ /* point source */
     calculate_point_source_corners(corner,fault,1.0,l,w);
-  else{
-    fprintf(stderr,"calculate_corners: error, type %i is not implemented\n",
+  }else if(fault->type == TRIANGULAR){
+    calculate_tri_corners(corner,fault,1.0);
+  }else{
+    fprintf(stderr,"calculate_corners: error, element type %i is not implemented\n",
 	    fault->type);
     exit(-1);
   }
@@ -213,6 +214,8 @@ void calculate_bloated_corners(COMP_PRECISION corner[4][3],
     calculate_seg_corners(corner,fault,leeway);
   else if(fault->type == RECTANGULAR_PATCH)
     calculate_quad_corners(corner,fault,leeway);
+  else if(fault->type == TRIANGULAR)
+    calculate_tri_corners(corner,fault,leeway);
   else if(fault->type == POINT_SOURCE)
     calculate_point_source_corners(corner,fault,leeway,&lloc,
 				   &wloc);
@@ -225,10 +228,54 @@ void calculate_bloated_corners(COMP_PRECISION corner[4][3],
   calculate_quad_corners(corner,fault,leeway);
 #endif
 }
-
+/* determine the number of vertices in each patch */
+int ncon_of_patch(struct flt *fault)
+{
+#ifdef ALLOW_NON_3DQUAD_GEOM
+  if(patch_is_2d(fault->type))
+    return 2;
+  else if(fault->type == RECTANGULAR_PATCH)
+    return 4;
+  else if(fault->type == TRIANGULAR)
+    return 3;
+  else if(fault->type == POINT_SOURCE)
+    return 1;
+  else{
+    fprintf(stderr,"ncon_of_patch: mode %i undefined\n",fault->type);
+    exit(-1);
+  }
+#else
+  return 4;
+#endif
+}
+/* determine the VTK code of the patch type */
+int vtk_type_of_patch(struct flt *fault)
+{
+#ifdef ALLOW_NON_3DQUAD_GEOM
+  if(patch_is_2d(fault->type))
+    return 3;			/* vtk line */
+  else if(fault->type == RECTANGULAR_PATCH)
+    return 9;			     /* vtk quad */
+  else if(fault->type == TRIANGULAR) /*  */
+    return 5;			     /* vtk tri */
+  else if(fault->type == POINT_SOURCE)
+    return 1;			/* vertex */
+  else{
+    fprintf(stderr,"ncon_of_patch: mode %i undefined\n",fault->type);
+    exit(-1);
+  }
+#else
+  return 9;
+#endif
+}
 /*
   
-  calculate the corners of a rectangular patch
+  calculate the corners of a rectangular patch, sorted FE CCW style
+  from lower left
+
+  3 --- 2
+  |     |
+  0 --- 1 
 
  */
 void calculate_quad_corners(COMP_PRECISION corner[4][3],struct flt *fault,
@@ -248,6 +295,32 @@ void calculate_quad_corners(COMP_PRECISION corner[4][3],struct flt *fault,
     // upper left
     corner[3][i]=fault->x[i]-sx+dx;
   }
+}
+
+void calculate_tri_corners(COMP_PRECISION corner[4][3],struct flt *fault,
+			   COMP_PRECISION leeway)
+{
+  static my_boolean init = FALSE;
+  COMP_PRECISION vec[3];
+  int i,j;
+  if(leeway == 1.0){
+    for(i=0;i<3;i++)
+      for(j=0;j<3;j++)
+	corner[i][j] = fault->xt[i*3+j];
+   
+  }else{
+    if(!init)
+      fprintf(stderr,"calculate_tri_corners: WARNING: leeway != 1 only approximate\n");
+    for(i=0;i<3;i++){
+      for(j=0;j<3;j++){
+	vec[j] = fault->xt[i*3+j] - fault->x[j]; /* diff from centroid */
+	corner[i][j] = fault->x[j] + leeway * vec[j];
+      }
+    }
+  }
+  for(j=0;j<3;j++)
+    corner[3][j] = NAN;
+  init = TRUE;
 }
 /*
   
@@ -293,7 +366,7 @@ void calculate_point_source_corners(COMP_PRECISION corner[4][3],
 void calculate_seg_corners(COMP_PRECISION corner[4][3],struct flt *fault,
 			   COMP_PRECISION leeway)
 {
-  int i;
+  int i,j;
   COMP_PRECISION sx;
   for(i=0;i<2;i++){
     sx = fault->t_strike[i] * (COMP_PRECISION)fault->l * leeway;
@@ -303,6 +376,9 @@ void calculate_seg_corners(COMP_PRECISION corner[4][3],struct flt *fault,
     corner[1][i]=fault->x[i]+sx;
   }
   corner[0][INT_Z] = corner[1][INT_Z] = 0.0;
+  for(i=3;i<4;i++)
+    for(j=0;j<3;j++)
+      corner[i][j] = NAN;
 }
 
 /*
@@ -503,9 +579,8 @@ void get_alpha_dip_tri_gh(COMP_PRECISION *xt,double *sin_alpha,
 
 /*
   
-  determine several geometrical quantities of 
-  a fault group that consists of several patches
-  (assumes planar faults)
+  determine several geometrical quantities of a fault group that
+  consists of several patches (assumes planar faults)
   
 */
 
@@ -588,20 +663,11 @@ void calc_group_geometry(struct med *medium,struct flt *fault,
 #endif
     // determine actual extent of corners of patch
     calculate_corners(corner,(fault+i),&l,&w);
-#ifdef ALLOW_NON_3DQUAD_GEOM
-    if(patch_is_2d(fault->type))
-      clim = 2;
-    else if((fault->type == RECTANGULAR_PATCH)||
-	    (fault->type == POINT_SOURCE))
+    clim = ncon_of_patch((fault+i));
+    /* here, we treate point source as having quasi corners (?!) */
+    if(clim == 1)
       clim = 4;
-    else{
-      fprintf(stderr,"calc_group_geometry: geometries other than 2-D, point source, and quad not implemented yet\n");
-      exit(-1);
-    }
-#else
-    clim=4;
-#endif
-    for(j=0;j<clim;j++){
+    for(j=0;j < clim;j++){
       for(k=0;k<3;k++)
 	dx[k]=corner[j][k] - grp[fault[i].group].center[k];
       pos[STRIKE] = project_vector(dx,grp[fault[i].group].strike_vec);

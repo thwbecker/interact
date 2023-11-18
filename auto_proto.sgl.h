@@ -8,7 +8,6 @@ void block_save_solution_and_faults(float *, int, int, struct bflt *, float *, s
 void block_load_solution_and_faults(float **, int *, int *, struct bflt **, float **, struct prj **, FILE *, unsigned short *, unsigned short *);
 void block_eval_blockvec(float *, float, int, float *, struct prj *, float *);
 /* block_evaluate_solution.c */
-/* blockinvert.c */
 /* block_levmarq.c */
 void run_lm(struct bmd *, long int *, struct prj, float *, unsigned short, unsigned short, float, float *, unsigned short, unsigned short, float, unsigned short, unsigned short, unsigned short, int, int, char **);
 /* block_matrix.c */
@@ -77,6 +76,7 @@ void calc_dir_diff_vec(float *, float *, float *, int, unsigned short);
 float calc_dir_diff(float, float, unsigned short);
 void cart_mat_from_horsym(float, float, float, float *);
 void rescale_observed_stresses(float *, float *, float *, float, float *, unsigned short, struct bmd *, unsigned short, unsigned short);
+/* blockinvert.c */
 /* calc_cart_from_eigen_stress.c */
 unsigned short read_vecs(int, float *, float *, float *, float *, float *);
 void ccfes_help(char **);
@@ -141,6 +141,7 @@ void eval_point(float *, struct flt *, float *, float *, float [3][3], int *);
 void eval_point_short(float *, float *, float, float, float, float, float *, float *, float [3][3], int *);
 void set_stress_and_disp_nan(float [3][3], float *);
 /* eval_triangle.c */
+void eval_triangle(float *, struct flt *, float *, float *, float [3][3], int *);
 void get_gauss_points(float *, float *, float *, int);
 /* far_enough.c */
 unsigned short far_enough(struct flt *, struct flt *, float);
@@ -164,6 +165,7 @@ int calc_absolute_shear_stress(float *, int, struct flt *);
 /* fstress2hor.c */
 /* generate_random_2d.c */
 /* generate_slipdia.c */
+/* geo_okada.c */
 /* geometry.c */
 void calc_lhemi_proj(float, float, float *);
 void resolve_force(float *, float [3][3], float *);
@@ -172,7 +174,10 @@ void get_maxsdir_stress_drops2(float *, float, float *);
 void get_maxsdir_stress_drops(float *, float, float *, float, float *, float *);
 void calculate_corners(float [4][3], struct flt *, float *, float *);
 void calculate_bloated_corners(float [4][3], struct flt *, float);
+int ncon_of_patch(struct flt *);
+int vtk_type_of_patch(struct flt *);
 void calculate_quad_corners(float [4][3], struct flt *, float);
+void calculate_tri_corners(float [4][3], struct flt *, float);
 void calculate_point_source_corners(float [4][3], struct flt *, float, float *, float *);
 void calculate_seg_corners(float [4][3], struct flt *, float);
 float quad_area(float *);
@@ -194,6 +199,7 @@ void globalx(float *, float, float, float *);
 void calc_centroid_tri(float *, float *);
 void calc_mean_quad_coord(float *, float *);
 void calc_centroid_quad(float *, float *);
+unsigned short patch_is_2d(unsigned short int);
 void calculate_position_of_patch(struct med *, struct flt *);
 void compute_cartesian_slip(float *, float *, struct flt *);
 void background_stress(float [3][3], float *, float, float *, float *, float);
@@ -201,7 +207,6 @@ void background_disp(float *, float *, struct med *, float *, float *);
 void get_local_x_on_plane(float *, float *, float *, float *, float *);
 void get_fault_plane_basevec(float *, float *, float *, struct flt *, struct med *);
 void calc_deviatoric_stress(float [3][3], float [3][3], float *, float *);
-/* geo_okada.c */
 /* get_projected_fault_parameters.c */
 void get_projected_fault_parameters(float [2][2], float, float *, float *, float *, float *, float *, float *);
 /* help_and_comments.c */
@@ -243,6 +248,7 @@ void rotate_vec(float *, float *, double, double);
 void rotate_vec2d(float *, float *, double, double);
 void rotate_mat(float [3][3], float [3][3], float [3][3]);
 void rotate_mat_z(float [3][3], float [3][3], double, double);
+float tensor3d_norm(float [3][3]);
 float project_vector(float *, float *);
 float distance_3d(float *, float *);
 float distance(float *, float *, int);
@@ -367,6 +373,7 @@ void get_dis3d_parameters(float, float, float, float, float, float, float *, flo
 /* patch2vtk.c */
 /* patch2xyz.c */
 /* patch2xyzvec.c */
+/* patchquad2patchtri.c */
 /* period.c */
 void period(float *, float *, int, float, float, float *, float *, int, int *, int *, float *);
 void avevar(float *, int, float *, float *);
@@ -418,7 +425,7 @@ void read_boundary_conditions(struct med *, struct flt *, float *, float *, unsi
 void read_one_step_bc(FILE *, struct med *, struct flt *, float *, float *, unsigned short);
 unsigned short slip_type_bc(int);
 /* read_fltdat.c */
-void read_fltdat(char *, struct flt *, struct med *, unsigned short);
+int read_fltdat(char *, struct flt *, struct med *, unsigned short);
 /* read_geometry.c */
 void read_geometry(char *, struct med **, struct flt **, unsigned short, unsigned short, unsigned short, unsigned short);
 /* read_stress_observations.c */
