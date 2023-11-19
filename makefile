@@ -134,7 +134,7 @@ include makefile.pgplot
 #
 # petsc, will override some of the flags
 # comment out if not needed
-#include makefile.petsc
+include makefile.petsc
 ifndef MPILD
 MPILD = $(LD)
 endif

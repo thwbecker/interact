@@ -62,7 +62,9 @@ int main(int argc, char **argv)
     if(eltype == TRIANGULAR){
       // simply write triangular element type to stdout
       fault[n].type=TRIANGULAR;
-
+      /* in case */
+      get_tdcs_base_vectors(&((fault+n)->xt[0]),&((fault+n)->xt[3]),&((fault+n)->xt[6]),
+			    (fault+n)->t_strike,(fault+n)->t_dip,(fault+n)->normal);
     }else{// convert to rectangular
       // L=W=sqrt(A/4)
       fault[n].l=sqrt(fault[n].w/4.0);
@@ -70,15 +72,15 @@ int main(int argc, char **argv)
       alpha=RAD2DEGF(asin(fault[n].sin_alpha));
       fault[n].strike= 90.0 - alpha;
       my_sincos_deg(&sin_dip,&cos_dip,(COMP_PRECISION)fault[n].dip);
-      calc_base_vecs(fault[n].t_strike,fault[n].normal,fault[n].t_dip,
-		     fault[n].sin_alpha,fault[n].cos_alpha,sin_dip,cos_dip);
+      calc_quad_base_vecs(fault[n].t_strike,fault[n].normal,fault[n].t_dip,
+			  fault[n].sin_alpha,fault[n].cos_alpha,sin_dip,cos_dip);
       fault[n].type=RECTANGULAR_PATCH;
     }
     n++;
   }
   medium->nrflt=n;
   fault=realloc(fault,sizeof(struct flt)*medium->nrflt);
-  for(i=0;i<medium->nrflt;i++)// output
+  for(i=0;i < medium->nrflt;i++)// output
     print_patch_geometry_and_bc(0,(fault+i),opmode,0.0,FALSE,stdout,FALSE,dummy);
   exit(0);
 #endif

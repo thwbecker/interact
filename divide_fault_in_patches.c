@@ -48,10 +48,10 @@ void determine_segments(int *seg,int *segn, struct flt *fault,
 /* 
 
 
-subdivide a rectangular surface into sub-fault patches
+   subdivide a rectangular surface into sub-fault patches
 
 
- */
+*/
 
 void divide_fault_in_patches(int flt,struct flt *fault,
 			     struct flt **patch,
@@ -98,8 +98,8 @@ void divide_fault_in_patches(int flt,struct flt *fault,
     alpha = 90.0 - (double)fault[flt].strike;
     my_sincos_degd(&fault[flt].sin_alpha,&fault[flt].cos_alpha,alpha);
     my_sincos_deg(&sin_dip,&cos_dip,(COMP_PRECISION)fault[flt].dip);
-    calc_base_vecs(fault[flt].t_strike,fault[flt].normal,fault[flt].t_dip,
-		   fault[flt].sin_alpha,fault[flt].cos_alpha,sin_dip,cos_dip);
+    calc_quad_base_vecs(fault[flt].t_strike,fault[flt].normal,fault[flt].t_dip,
+			fault[flt].sin_alpha,fault[flt].cos_alpha,sin_dip,cos_dip);
   }
   // obtain corner points of original patch
   calculate_corners(corner,(fault+flt),&l,&w);
@@ -122,8 +122,8 @@ void divide_fault_in_patches(int flt,struct flt *fault,
       alpha = 90.0 - (double)(*patch+i)->strike;
       my_sincos_degd(&((*patch+i)->sin_alpha),&((*patch+i)->cos_alpha),alpha);
       my_sincos_deg(&sin_dip,&cos_dip,(COMP_PRECISION)(*patch+i)->dip);
-      calc_base_vecs((*patch+i)->t_strike,(*patch+i)->normal,(*patch+i)->t_dip,
-		     (*patch+i)->sin_alpha,(*patch+i)->cos_alpha,sin_dip,cos_dip);
+      calc_quad_base_vecs((*patch+i)->t_strike,(*patch+i)->normal,(*patch+i)->t_dip,
+			  (*patch+i)->sin_alpha,(*patch+i)->cos_alpha,sin_dip,cos_dip);
     }
     (*patch+i)->area = newarea;
     (*patch+i)->w = neww/2.;

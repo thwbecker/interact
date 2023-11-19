@@ -8,6 +8,7 @@ void block_save_solution_and_faults(float *, int, int, struct bflt *, float *, s
 void block_load_solution_and_faults(float **, int *, int *, struct bflt **, float **, struct prj **, FILE *, unsigned short *, unsigned short *);
 void block_eval_blockvec(float *, float, int, float *, struct prj *, float *);
 /* block_evaluate_solution.c */
+/* blockinvert.c */
 /* block_levmarq.c */
 void run_lm(struct bmd *, long int *, struct prj, float *, unsigned short, unsigned short, float, float *, unsigned short, unsigned short, float, unsigned short, unsigned short, unsigned short, int, int, char **);
 /* block_matrix.c */
@@ -76,7 +77,6 @@ void calc_dir_diff_vec(float *, float *, float *, int, unsigned short);
 float calc_dir_diff(float, float, unsigned short);
 void cart_mat_from_horsym(float, float, float, float *);
 void rescale_observed_stresses(float *, float *, float *, float, float *, unsigned short, struct bmd *, unsigned short, unsigned short);
-/* blockinvert.c */
 /* calc_cart_from_eigen_stress.c */
 unsigned short read_vecs(int, float *, float *, float *, float *, float *);
 void ccfes_help(char **);
@@ -142,6 +142,8 @@ void eval_point_short(float *, float *, float, float, float, float, float *, flo
 void set_stress_and_disp_nan(float [3][3], float *);
 /* eval_triangle.c */
 void eval_triangle(float *, struct flt *, float *, float *, float [3][3], int *);
+/* eval_triangle_gauss.c */
+void eval_triangle_gauss(float *, struct flt *, float *, float *, float [3][3], int *);
 void get_gauss_points(float *, float *, float *, int);
 /* far_enough.c */
 unsigned short far_enough(struct flt *, struct flt *, float);
@@ -165,11 +167,10 @@ int calc_absolute_shear_stress(float *, int, struct flt *);
 /* fstress2hor.c */
 /* generate_random_2d.c */
 /* generate_slipdia.c */
-/* geo_okada.c */
 /* geometry.c */
 void calc_lhemi_proj(float, float, float *);
 void resolve_force(float *, float [3][3], float *);
-void calc_base_vecs(float *, float *, float *, float, float, float, float);
+void calc_quad_base_vecs(float *, float *, float *, float, float, float, float);
 void get_maxsdir_stress_drops2(float *, float, float *);
 void get_maxsdir_stress_drops(float *, float, float *, float, float *, float *);
 void calculate_corners(float [4][3], struct flt *, float *, float *);
@@ -207,6 +208,7 @@ void background_disp(float *, float *, struct med *, float *, float *);
 void get_local_x_on_plane(float *, float *, float *, float *, float *);
 void get_fault_plane_basevec(float *, float *, float *, struct flt *, struct med *);
 void calc_deviatoric_stress(float [3][3], float [3][3], float *, float *);
+/* geo_okada.c */
 /* get_projected_fault_parameters.c */
 void get_projected_fault_parameters(float [2][2], float, float *, float *, float *, float *, float *, float *);
 /* help_and_comments.c */

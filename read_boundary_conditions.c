@@ -481,9 +481,9 @@ void read_one_step_bc(FILE *in,struct med *medium,struct flt *fault,
 	 a local cooridnate system */
       if(slip_type_bc(bc_code) && 
 	 (fault[patch_nr].type==TRIANGULAR))
-	rotate_to_local=TRUE;
+	rotate_to_local = TRUE;
       else
-	rotate_to_local=FALSE;	
+	rotate_to_local = FALSE;	
 #endif      
     }
     // message for mixed BCs
@@ -493,6 +493,11 @@ void read_one_step_bc(FILE *in,struct med *medium,struct flt *fault,
 		bc_value);
     }
     if(rotate_to_local){
+      /* 
+	 
+	 read a global strike and dip and rotate to local 
+
+      */
       if(fscanf(in,TWO_CP_FORMAT,&global_strike,&global_dip) != 2){
 	HEADNODE{
 	  fprintf(stderr,"read_boundary_conditions: expected additional strike and dip specification for slip of triangular patch(es)\n");
@@ -512,9 +517,11 @@ void read_one_step_bc(FILE *in,struct med *medium,struct flt *fault,
       my_sincos(&sin_global_alpha_rad,&cos_global_alpha_rad,global_alpha_rad);
       my_sincos(&sin_global_dip_rad,&cos_global_dip_rad,global_dip_rad);
       //
-      calc_base_vecs(gstrike, gnormal, gdip,
-		     sin_global_alpha_rad, cos_global_alpha_rad,
-		     sin_global_dip_rad,   cos_global_dip_rad);
+      // we treat those global strike and dip as if they were to apply to a Okada patch
+      //
+      calc_quad_base_vecs(gstrike, gnormal, gdip,
+			  sin_global_alpha_rad, cos_global_alpha_rad,
+			  sin_global_dip_rad,   cos_global_dip_rad);
 #ifdef SUPER_DEBUG
       HEADNODE
 	fprintf(stderr," vec: s: (%10.3e,%10.3e,%10.3e) d: (%10.3e,%10.3e,%10.3e) n: (%10.3e,%10.3e,%10.3e)\n",
@@ -605,8 +612,10 @@ void read_one_step_bc(FILE *in,struct med *medium,struct flt *fault,
 		      n,start_patch,stop_patch,bc_code,bc_value,
 		      comment_on_code_bc(bc_code,bc_value));
 	}else{
+	  //
 	  // have to project to local coordinate system, this is the
 	  // case for triangular elements
+	  //
 	  if(bc_code == STRIKE){// global strike component
 	    slip[STRIKE] = 
 	      project_vector(fault[patch_nr].t_strike,gstrike)*bc_value;
@@ -836,7 +845,9 @@ void read_one_step_bc(FILE *in,struct med *medium,struct flt *fault,
 	*/
 	// time is 0
 	background_stress(sm,fault[patch_nr].x,0.0,a,b,medium->pressure);
+	//
 	// determine stress on patch
+	//
 	calc_three_stress_components(sm, fault[patch_nr].normal,
 				     fault[patch_nr].t_strike,
 				     fault[patch_nr].t_dip,fault[patch_nr].normal,

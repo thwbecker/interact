@@ -1,4 +1,10 @@
-  ! TDdispHS 
+#ifdef USE_DOUBLE_PRECISION
+#include "precision_double.h"
+#else
+#include "precision_single.h"
+#endif
+
+! TDdispHS 
 ! calculates displacements associated with a triangular dislocation in an 
 ! elastic half-space.
 !
@@ -104,12 +110,12 @@
 ! u is displacement vector, East, North, Vertical 
 subroutine  tddisphs(loc,P1,P2,P3,Ss,Ds,Ts,nu,u)
   implicit none
-  REAL*8, PARAMETER :: pi = 3.14159265358979D0
-  real*8,intent(in) :: ss,ds,ts,nu
-  real*8,intent(in),dimension(3) :: p1,p2,p3,loc
-  real*8,intent(out),dimension(3) :: u
-  real*8 :: ueMS,unMS,uvMS,ueFSC,unFSC,uvFSC,ueIS,unIS,uvIS
-  real*8,dimension(3) :: p1n,p2n,p3n
+  C_PREC, PARAMETER :: pi = 3.14159265358979D0
+  C_PREC,intent(in) :: ss,ds,ts,nu
+  C_PREC,intent(in),dimension(3) :: p1,p2,p3,loc
+  C_PREC,intent(out),dimension(3) :: u
+  C_PREC :: ueMS,unMS,uvMS,ueFSC,unFSC,uvFSC,ueIS,unIS,uvIS
+  C_PREC,dimension(3) :: p1n,p2n,p3n
   if ((loc(3) .gt.0.d0).or.(P1(3)>0.d0).or.(P2(3)>0.d0).or.(P3(3)>0))then
      print *,'Half-space solution: Z coordinates must be negative!'
      stop
@@ -141,15 +147,15 @@ end subroutine  TDdispHS
 subroutine TDdispFS(X,Y,Z,P1,P2,P3,Ss,Ds,Ts,nu,ue,un,uv)
   USE, INTRINSIC :: IEEE_ARITHMETIC
   implicit none
-  real*8,intent(in) :: x,y,z,ss,ds,ts,nu
-  real*8,intent(in),dimension(3) :: p1,p2,p3
-  real*8,intent(out) :: ue,un,uv
-  REAL*8, PARAMETER :: pi = 3.14159265358979D0
+  C_PREC,intent(in) :: x,y,z,ss,ds,ts,nu
+  C_PREC,intent(in),dimension(3) :: p1,p2,p3
+  C_PREC,intent(out) :: ue,un,uv
+  C_PREC, PARAMETER :: pi = 3.14159265358979D0
   
-  real*8,dimension(3) :: p1_,p2_,p3_,e12,e13,e23,a,b,c
-  real*8 :: bx,by,bz,x_,y_,z_,fin,fid,fi,aA,aB,aC,na,nb,nc,u,v,w,&
+  C_PREC,dimension(3) :: p1_,p2_,p3_,e12,e13,e23,a,b,c
+  C_PREC :: bx,by,bz,x_,y_,z_,fin,fid,fi,aA,aB,aC,na,nb,nc,u,v,w,&
        u1,u2,u3,v1,v2,v3,w1,w2,w3
-  real*8,dimension(3,3) :: Ar
+  C_PREC,dimension(3,3) :: Ar
   logical :: casepLog,casenlog,casezlog
   integer trimode
   ! TDdispFS 
@@ -236,19 +242,20 @@ subroutine TDdisp_HarFunc(X,Y,Z,P1,P2,P3,Ss,Ds,Ts,nu,ue,un,uv)
   ! image dislocations.
   USE, INTRINSIC :: IEEE_ARITHMETIC
   implicit none
-  real*8,intent(in) :: x,y,z,ss,ds,ts,nu
-  real*8,intent(in),dimension(3) :: p1,p2,p3
-  real*8,intent(out) :: ue,un,uv
-  real*8,dimension(3,3) :: Ar
-  real*8,dimension(3) :: vnorm,vdip,vstrike
+  C_PREC,intent(in) :: x,y,z,ss,ds,ts,nu
+  C_PREC,intent(in),dimension(3) :: p1,p2,p3
+  C_PREC,intent(out) :: ue,un,uv
+  C_PREC,dimension(3,3) :: Ar
+  C_PREC,dimension(3) :: vnorm,vdip,vstrike
        
-  real*8 bx,by,bz,b_x,b_y,b_z,u3,v3,w3,u1,v1,w1,u2,v2,w2
+  C_PREC bx,by,bz,b_x,b_y,b_z,u3,v3,w3,u1,v1,w1,u2,v2,w2
   
   bx = Ts; ! Tensile-slip
   by = Ss; ! Strike-slip
   bz = Ds; ! Dip-slip
-  
-  call get_base_vectors(p1,p2,p3,vstrike,vdip,vnorm)
+
+  !
+  call get_tdcs_base_vectors(p1,p2,p3,vstrike,vdip,vnorm)
 
   ! Transform slip vector components from TDCS into EFCS
   call matrix_from_3vec(vnorm,vstrike,vdip,Ar)
@@ -268,9 +275,9 @@ end subroutine TDdisp_HarFunc
 
 subroutine CoordTrans(x1,x2,x3,A,X_1,X_2,X_3)
   implicit none
-  real*8,dimension(3,3) :: A
-  real*8,intent(in) :: x1,x2,x3
-  real*8,intent(out) :: x_1,x_2,x_3
+  C_PREC,dimension(3,3) :: A
+  C_PREC,intent(in) :: x1,x2,x3
+  C_PREC,intent(out) :: x_1,x_2,x_3
   ! CoordTrans transforms the coordinates of the vectors, from
   ! x1x2x3 coordinate system to X1X2X3 coordinate system. "A" is the
   ! transformation matrix, whose columns e1,e2 and e3 are the unit base 
@@ -285,9 +292,9 @@ end  subroutine CoordTrans
 
 subroutine trimodefinder(x,y,z,p1,p2,p3,trimode)
   integer,intent(out) :: trimode
-  real*8,intent(in) :: x,y,z
-  real*8,intent(in),dimension(2) :: p1,p2,p3
-  real*8 :: a,b,c
+  C_PREC,intent(in) :: x,y,z
+  C_PREC,intent(in),dimension(2) :: p1,p2,p3
+  C_PREC :: a,b,c
   ! trimodefinder calculates the normalized barycentric coordinates of 
   ! the points with respect to the TD vertices and specifies the appropriate
   ! artefact-free configuration of the angular dislocations for the 
@@ -322,12 +329,12 @@ subroutine TDSetupD(x,y,z,alpha,bx,by,bz,nu,TriVertex,SideVec,u,v,w)
   ! slip vector components from ADCS into TDCS. It then calculates the 
   ! displacements in ADCS and transforms them into TDCS.
   implicit none
-  real*8,intent(in) :: x,y,z,alpha,bx,by,bz,nu
-  real*8,intent(out) :: u,v,w
-  real*8,intent(in),dimension(3) :: sidevec,trivertex
-  REAL*8 :: by1, bz1, v0, w0,y1,z1
-  REAL*8, DIMENSION(2, 2) :: A
-  REAL*8, PARAMETER :: pi = 3.14159265358979D0
+  C_PREC,intent(in) :: x,y,z,alpha,bx,by,bz,nu
+  C_PREC,intent(out) :: u,v,w
+  C_PREC,intent(in),dimension(3) :: sidevec,trivertex
+  C_PREC :: by1, bz1, v0, w0,y1,z1
+  C_PREC, DIMENSION(2, 2) :: A
+  C_PREC, PARAMETER :: pi = 3.14159265358979D0
 
   call get_tdcd_adcs(sidevec,trivertex,y,z,by,bz,A,y1,z1,by1,bz1)
 
@@ -349,15 +356,15 @@ subroutine AngSetupFSC(X,Y,Z,bX,bY,bZ,PA,PB,nu,ue,un,uv)
   ! AngSetupFSC calculates the Free Surface Correction to displacements 
   ! associated with angular dislocation pair on each TD side.
   IMPLICIT NONE
-  REAL*8, INTENT(IN) :: bX, bY, bZ, nu, X, Y, Z
-  REAL*8, DIMENSION(3), INTENT(IN) :: PA, PB
-  REAL*8, INTENT(OUT) :: ue, un, uv
-  REAL*8, PARAMETER :: pi = 3.14159265358979D0
-  REAL*8 :: b1, b2, b3, beta, v1, v1A, v1B, v2, v2A, v2B, &
+  C_PREC, INTENT(IN) :: bX, bY, bZ, nu, X, Y, Z
+  C_PREC, DIMENSION(3), INTENT(IN) :: PA, PB
+  C_PREC, INTENT(OUT) :: ue, un, uv
+  C_PREC, PARAMETER :: pi = 3.14159265358979D0
+  C_PREC :: b1, b2, b3, beta, v1, v1A, v1B, v2, v2A, v2B, &
        v3, v3A, v3B, y1A, y1AB, y1B, y2A, y2AB, y2B, y3A, y3AB, y3B
-  REAL*8, DIMENSION(3) :: ey1, ey2, ey3, eZ, SideVec
-  REAL*8, DIMENSION(3, 3) :: A, At
-  REAL*8, PARAMETER :: eps = 1.0D-15 ! a crude approximation of the MatLab "eps" constant.
+  C_PREC, DIMENSION(3) :: ey1, ey2, ey3, eZ, SideVec
+  C_PREC, DIMENSION(3, 3) :: A, At
+  C_PREC, PARAMETER :: eps = EPS_FOR_FORTRAN ! a crude approximation of the MatLab "eps" constant.
   LOGICAL :: I
   
   ! Calculate TD side vector and the angle of the angular dislocation pair
@@ -365,12 +372,12 @@ subroutine AngSetupFSC(X,Y,Z,bX,bY,bZ,PA,PB,nu,ue,un,uv)
   eZ = (/0.d0, 0.d0, 1.0d0/);
   beta = acos(dot_product(-SideVec,eZ)/norm2(SideVec));
 
-  if ((abs(beta)<eps).or.(abs(pi-beta)<eps))then 
+  if ((abs(beta).lt.eps).or.(abs(pi-beta).lt.eps))then 
      ue = 0.0d0
      un = 0.d0
      uv = 0.d0
   else
-     ey1 = (/ SideVec(1),Sidevec(2),0.d0/);
+     ey1 = (/ SideVec(1),Sidevec(2),FORTRAN_ZERO /);
      call normalize_vec(ey1,ey1)
      ey3 = -eZ;
      call dcross(ey3,ey1,ey2);
@@ -421,11 +428,11 @@ subroutine AngDisDisp(x,y,z,alpha,bx,by,bz,nu,u,v,w)
   ! Burgers' function contribution) associated with an angular dislocation in
   ! an elastic full-space.
   implicit none
-  real*8,intent(in) :: x,y,z,alpha,bx,by,bz,nu
-  real*8,intent(out) :: u,v,w
-  real*8 :: cosA,sinA,eta,zeta,r,zz,ux,uy,uz,vx,vy,vz,wx,wy,wz;
+  C_PREC,intent(in) :: x,y,z,alpha,bx,by,bz,nu
+  C_PREC,intent(out) :: u,v,w
+  C_PREC :: cosA,sinA,eta,zeta,r,zz,ux,uy,uz,vx,vy,vz,wx,wy,wz;
 
-  REAL*8, PARAMETER :: pi = 3.14159265358979D0
+  C_PREC, PARAMETER :: pi = 3.14159265358979D0
   
   cosA = cos(alpha);
   sinA = sin(alpha);
@@ -467,10 +474,10 @@ subroutine AngDisDispFSC(y1,y2,y3,beta,b1,b2,b3,nu,a,v1,v2,v3)
   ! displacements associated with an angular dislocation in an elastic 
   ! half-space.
   implicit none 
-  real*8,intent(in) :: y1,y2,y3,beta,b1,b2,b3,nu,a
-  real*8,intent(out) ::v1,v2,v3
-  REAL*8, PARAMETER :: pi = 3.14159265358979D0
-  REAL*8 :: cosB, cotB, Fib, r2b, rb, sinB, &
+  C_PREC,intent(in) :: y1,y2,y3,beta,b1,b2,b3,nu,a
+  C_PREC,intent(out) ::v1,v2,v3
+  C_PREC, PARAMETER :: pi = 3.14159265358979D0
+  C_PREC :: cosB, cotB, Fib, r2b, rb, sinB, &
        & v1cb1, v1cb2, v1cb3, v2cb1, v2cb2, v2cb3, v3cb1, v3cb2, v3cb3, &
        & y3b, z1b, z3b
 
@@ -551,16 +558,16 @@ subroutine AngDisDispFSC(y1,y2,y3,beta,b1,b2,b3,nu,a,v1,v2,v3)
 end  subroutine AngDisDispFSC
 subroutine matrix_from_3vec(x,y,z,A)
   implicit none
-  real*8,intent(in),dimension(3):: x,y,z
-  real*8,intent(out),dimension(3,3) :: A
+  C_PREC,intent(in),dimension(3):: x,y,z
+  C_PREC,intent(out),dimension(3,3) :: A
   a(:,1) = x(:)
   a(:,2) = y(:)
   a(:,3) = z(:)
 end  subroutine matrix_from_3vec
 subroutine dcross(x,y,out)
   implicit none
-  real*8, dimension(3), intent(in) :: x, y
-  real*8, dimension(3), intent(out) :: out
+  C_PREC, dimension(3), intent(in) :: x, y
+  C_PREC, dimension(3), intent(out) :: out
   
   out(1) = x(2)*y(3) - x(3)*y(2)
   out(2) = x(3)*y(1) - x(1)*y(3)
@@ -569,9 +576,9 @@ end subroutine dcross
 
 subroutine normalize_vec(x,y)
   implicit none
-  real*8,intent(in),dimension(3) :: x
-  real*8,intent(out),dimension(3) :: y
-  real*8 :: vec_len
+  C_PREC,intent(in),dimension(3) :: x
+  C_PREC,intent(out),dimension(3) :: y
+  C_PREC :: vec_len
   vec_len = norm2(x)
   y = x/vec_len
 end subroutine normalize_vec
@@ -579,20 +586,20 @@ end subroutine normalize_vec
 subroutine setup_geometry(x,y,z,Ts,Ss,Ds,p1,p2,p3,bx,by,bz,&
      x_,y_,z_,p1_,p2_,p3_,e12,e13,e23,aA,aB,aC,Ar,trimode)
   implicit none
-  real*8,intent(in) :: x,y,z,Ts,Ss,Ds
-  real*8,intent(in),dimension(3) :: p1,p2,p3
+  C_PREC,intent(in) :: x,y,z,Ts,Ss,Ds
+  C_PREC,intent(in),dimension(3) :: p1,p2,p3
   integer,intent(out) :: trimode
-  real*8,intent(out) :: bx,by,bz,x_,y_,z_,aA,aB,aC
-  real*8,intent(out),dimension(3,3) :: Ar
-  real*8,intent(out),dimension(3) :: p1_,p2_,p3_,e12,e13,e23
-  real*8,dimension(3,3) :: At
-  real*8,dimension(3) :: vnorm,vstrike,vdip
+  C_PREC,intent(out) :: bx,by,bz,x_,y_,z_,aA,aB,aC
+  C_PREC,intent(out),dimension(3,3) :: Ar
+  C_PREC,intent(out),dimension(3) :: p1_,p2_,p3_,e12,e13,e23
+  C_PREC,dimension(3,3) :: At
+  C_PREC,dimension(3) :: vnorm,vstrike,vdip
   ! burgers vector
   bx = Ts; ! Tensile-slip
   by = Ss; ! Strike-slip
   bz = Ds; ! Dip-slip
   !print *,bx,by,bz
-  call get_base_vectors(p1,p2,p3,vstrike,vdip,vnorm)
+  call get_tdcs_base_vectors(p1,p2,p3,vstrike,vdip,vnorm)
   
   ! Transform coordinates and slip vector components from EFCS into TDCS
 
@@ -622,42 +629,43 @@ subroutine setup_geometry(x,y,z,Ts,Ss,Ds,p1,p2,p3,bx,by,bz,&
   
 end subroutine setup_geometry
 
-subroutine get_base_vectors(p1,p2,p3,vstrike,vdip,vnorm)
+subroutine get_tdcs_base_vectors(p1,p2,p3,vstrike,vdip,vnorm)
   implicit none 
   ! Calculate unit strike, dip and normal to TD vectors: For a horizontal TD 
   ! as an exception, if the normal vector points upward, the strike and dip 
   ! vectors point Northward and Westward, whereas if the normal vector points
   ! downward, the strike and dip vectors point Southward and Westward, 
   ! respectively.
-  real*8,intent(in),dimension(3) :: p1,p2,p3
-  real*8,intent(out),dimension(3) :: vstrike,vdip,vnorm
-  real*8,dimension(3) :: ey,ez
+  C_PREC,intent(in),dimension(3) :: p1,p2,p3
+  C_PREC,intent(out),dimension(3) :: vstrike,vdip,vnorm
+  C_PREC,dimension(3) :: ey,ez
   
   call dcross(P2-P1,P3-P1,vnorm);
   call normalize_vec(vnorm,vnorm)
   
-  eZ = (/0.d0, 0.0d0, 1.0d0/);
+  eZ = (/ FORTRAN_ZERO , FORTRAN_ZERO, FORTRAN_UNITY /);
   call dcross(eZ,Vnorm,vstrike);
-  if(norm2(Vstrike)==0.d0)then
-     eY = (/0.d0, 1.0d0, 0.0d0/);
+  if(norm2(Vstrike) == FORTRAN_ZERO )then
+     eY = (/ FORTRAN_ZERO, FORTRAN_UNITY, FORTRAN_ZERO /);
      vstrike = ey*vnorm(3);
      ! For horizontal elements in case of half-space calculation!!!
      ! Correct the strike vector of image dislocation only
-     if(p1(3) .gt. 0.0d0)then 
+     if(p1(3) .gt. FORTRAN_ZERO)then 
         vstrike = -vstrike;
      end if
   end if
   call normalize_vec(vstrike,vstrike)
   call dcross(vnorm,vstrike,vdip);
-end subroutine get_base_vectors
+end subroutine get_tdcs_base_vectors
+
 
 subroutine get_tdcd_adcs(sidevec,trivertex,y,z,by,bz,A,y1,z1,by1,bz1)
   implicit none
-  real*8,intent(in),dimension(3) :: sidevec,trivertex
-  real*8,intent(in) :: y,z,by,bz
-  real*8,intent(out) :: by1,bz1
-  real*8,intent(out),dimension(2,2) :: A
-  real*8,intent(out) :: y1,z1
+  C_PREC,intent(in),dimension(3) :: sidevec,trivertex
+  C_PREC,intent(in) :: y,z,by,bz
+  C_PREC,intent(out) :: by1,bz1
+  C_PREC,intent(out),dimension(2,2) :: A
+  C_PREC,intent(out) :: y1,z1
 
   ! Transformation matrix
   !A = [[SideVec(3);-SideVec(2)] SideVec(2:3)];

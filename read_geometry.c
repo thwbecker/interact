@@ -152,8 +152,17 @@ void read_geometry(char *patch_filename,struct med **medium,
 		&(*fault+i)->xt[6+INT_X],&(*fault+i)->xt[6+INT_Y],
 		&(*fault+i)->xt[6+INT_Z])!=9)
 	READ_ERROR("read_geometry");
+      /* check */
+      for(j=0;j<3;j++){
+	if((*fault+i)->xt[j*3+INT_Z] > 0){
+	  fprintf(stderr,"read_geometry: triangular patch %i node %i above ground, error\n",
+		  i+1,j+1);
+	  exit(-1);
+	}
+      }
       // x will be the centroid, to be calculated
       calc_centroid_tri((*fault+i)->xt,(*fault+i)->x);
+      //
       // determine local reference frame by means of the angles
       // w, l, and area will be the triangle area
       get_alpha_dip_tri_gh((*fault+i)->xt,&(*fault+i)->sin_alpha,
@@ -163,6 +172,11 @@ void read_geometry(char *patch_filename,struct med **medium,
       (*fault+i)->l = (*fault+i)->w = (*fault+i)->area;
       alpha = RAD2DEGF(asin((*fault+i)->sin_alpha));
       (*fault+i)->strike= 90.0 - alpha;
+      /* 
+	 get basis vectors in TDCS system of NW15 
+      */
+      get_tdcs_base_vectors(&((*fault+i)->xt[0]),&((*fault+i)->xt[3]),&((*fault+i)->xt[6]),
+			    (*fault+i)->t_strike,(*fault+i)->t_dip,(*fault+i)->normal);
 #ifdef DEBUG
       if((*medium)->comm_rank == 0)
 	fprintf(stderr,"read_geometry: fault %i is triangular, x1: (%g, %g, %g) x2: (%g, %g, %g) x3: (%g, %g, %g), area: %g\n",
@@ -175,7 +189,7 @@ void read_geometry(char *patch_filename,struct med **medium,
     }else if((*fault+i)->l < 0){
       /*
 
-	point source
+	POINT SOURCE
 	
       */
       if((*medium)->comm_rank == 0)
@@ -261,10 +275,10 @@ void read_geometry(char *patch_filename,struct med **medium,
     // calculate the unity vectors in strike, dip, and normal
     // direction
     //
-    calc_base_vecs((*fault+i)->t_strike,
-		   (*fault+i)->normal,(*fault+i)->t_dip,
-		   (*fault+i)->sin_alpha,
-		   (*fault+i)->cos_alpha,sin_dip,cos_dip);
+    calc_quad_base_vecs((*fault+i)->t_strike,
+			(*fault+i)->normal,(*fault+i)->t_dip,
+			(*fault+i)->sin_alpha,
+			(*fault+i)->cos_alpha,sin_dip,cos_dip);
 #ifdef SUPER_DEBUG
     if((*medium)->comm_rank == 0){
       fprintf(stderr,"fault %5i: strike: %g dip: %g sc_alpha:  %10.3e/%10.3e sc_dip: %10.3e/%10.3e\n",

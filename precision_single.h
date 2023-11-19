@@ -9,6 +9,10 @@
 #define EPS_COMP_PREC 7.0e-7
 #define EPS_AMAT_PREC 7.0e-7
 
+#define EPS_FOR_FORTRAN 1.0e-7
+#define FORTRAN_ZERO 0.0
+#define FORTRAN_UNITY 1.0
+
 #define ONE_CP_FORMAT "%f"
 #define ONE_IP_FORMAT "%f"
 #define TWO_CP_FORMAT "%f %f"

@@ -378,8 +378,8 @@ int main(int argc, char **argv)
       alpha=90.0-(COMP_PRECISION)fault[i].strike;
       // get angles
       my_sincos_deg(&fault[i].sin_alpha,&fault[i].cos_alpha,(COMP_PRECISION)alpha);
-      calc_base_vecs(fault[i].t_strike,fault[i].normal,fault[i].t_dip,
-		     fault[i].sin_alpha,fault[i].cos_alpha,sin_dip,cos_dip);
+      calc_quad_base_vecs(fault[i].t_strike,fault[i].normal,fault[i].t_dip,
+			  fault[i].sin_alpha,fault[i].cos_alpha,sin_dip,cos_dip);
       // move depth around to allow for more patches to be inserted
       if(depth_adjust){
 	tmpw=fault[i].w*sin_dip;

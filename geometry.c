@@ -42,10 +42,9 @@ void resolve_force(COMP_PRECISION *norm,COMP_PRECISION sm[3][3],
       trac[i] += norm[j] * sm[i][j];
 }
 /* 
-   given a fault patch with specified 
-   angles strike and dip (resp. their cosines and sines),
-   calculate the normal, dip, and strike vectors of that
-   patch
+   given a quad fault patch with specified angles strike and dip
+   (resp. their cosines and sines), calculate the normal, dip, and
+   strike vectors of that patch
    
    INPUT:
    
@@ -60,12 +59,12 @@ void resolve_force(COMP_PRECISION *norm,COMP_PRECISION sm[3][3],
    
 */
 
-void calc_base_vecs(COMP_PRECISION *strike,COMP_PRECISION *normal,
-		    COMP_PRECISION *dip,
-		    COMP_PRECISION sin_alpha,
-		    COMP_PRECISION cos_alpha,
-		    COMP_PRECISION sin_dip, 
-		    COMP_PRECISION cos_dip)
+void calc_quad_base_vecs(COMP_PRECISION *strike,COMP_PRECISION *normal,
+			 COMP_PRECISION *dip,
+			 COMP_PRECISION sin_alpha,
+			 COMP_PRECISION cos_alpha,
+			 COMP_PRECISION sin_dip, 
+			 COMP_PRECISION cos_dip)
 {
   /* tangential vector in strike direction, by definition 
      this vector is in the x-y plane */
@@ -543,6 +542,8 @@ my_boolean check_planar(COMP_PRECISION *x)
   determine alpha and dip vectors given non-normalized
   g and h vectors, also determines area
   
+  this does not give us sitrke, dip rake angles, but leave this in
+  here
 */
 void get_alpha_dip_tri_gh(COMP_PRECISION *xt,double *sin_alpha,
 			  double *cos_alpha,COMP_PRECISION *dip,
@@ -593,6 +594,9 @@ void calc_group_geometry(struct med *medium,struct flt *fault,
   /* 
      determine center of mass and average strike 
      and dip vectors for each patch group 
+
+     makes little/no sense for triangular elements
+     
   */
   for(i=0;i<medium->nrflt;i++){
     igrp = fault[i].group;
@@ -1041,11 +1045,12 @@ void get_local_x_on_plane(COMP_PRECISION *xl,COMP_PRECISION *x,
 /*
 
 
-  obtain average faulkt plane vectors and location
+  obtain average faulk plane vectors and location
   on return flt_mean_x will hold the mean location and vec_1 and vec_2
   the mean strike and dip or the mean strike and normal vectors, depending
   on the n[INT_Z] flag, -1 or -2 
-
+  
+  doesn't make sense for triangular
 
  */
 void get_fault_plane_basevec(COMP_PRECISION *flt_mean_x,

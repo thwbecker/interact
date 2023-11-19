@@ -157,8 +157,8 @@ void fit_plane(int n,
       }
     }
   }
-  calc_base_vecs(t_strike,normal,t_dip,
-		 *sin_alpha,*cos_alpha,sin_dip,cos_dip);
+  calc_quad_base_vecs(t_strike,normal,t_dip,
+		      *sin_alpha,*cos_alpha,sin_dip,cos_dip);
   if(verbose)
     fprintf(stderr,"fit_plane: S1: %10.3e S2: %10.3e S3: %10.3e g: %6.3f %6.3f %6.3f h: %6.3f %6.3f %6.3f n: %6.3f %6.3f %6.3f\n",
 	    s[0],s[1],s[2],p[0],p[1],p[2],p[3],p[4],p[5],p[6],p[7],p[8]);

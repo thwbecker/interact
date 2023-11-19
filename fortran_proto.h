@@ -96,5 +96,12 @@ extern void tdd_coeff(COMP_PRECISION *,COMP_PRECISION *,
 		      int *);
 /*  Nikkhoo, M., Walter, T. R. (2015) half space triangular converted
     to F90 */
-extern void tddisphs(double *,double *,double *,double *,double *,double *,double *,double *,double *);
-extern void tdstresshs(double *,double *,double *,double *,double *,double *,double *,double *,double *,double *,double *);
+extern void tddisphs(COMP_PRECISION *,COMP_PRECISION *,COMP_PRECISION *,COMP_PRECISION *,
+		     COMP_PRECISION *,COMP_PRECISION *,
+		     COMP_PRECISION *,COMP_PRECISION *,COMP_PRECISION *);
+extern void tdstresshs(COMP_PRECISION *,COMP_PRECISION *,COMP_PRECISION *,COMP_PRECISION *,
+		       COMP_PRECISION *,COMP_PRECISION *,
+		       COMP_PRECISION *,COMP_PRECISION *,COMP_PRECISION *,COMP_PRECISION *,
+		       COMP_PRECISION *);
+extern void get_tdcs_base_vectors(COMP_PRECISION *,COMP_PRECISION *,COMP_PRECISION *,
+				  COMP_PRECISION *,COMP_PRECISION *,COMP_PRECISION *);

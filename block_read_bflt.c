@@ -450,11 +450,11 @@ void generate_new_fault(struct bflt **fault,int *lblock, int *n,
     
   */
 
-  calc_base_vecs(&(*fault+(*n))->evec[STRIKE*3], 
-		 &(*fault+(*n))->evec[NORMAL*3], 
-		 &(*fault+(*n))->evec[DIP*3], 
-		 (*fault+(*n))->sa,(*fault+(*n))->ca,
-		 (*fault+(*n))->sd,(*fault+(*n))->cd);
+  calc_quad_base_vecs(&(*fault+(*n))->evec[STRIKE*3], 
+		      &(*fault+(*n))->evec[NORMAL*3], 
+		      &(*fault+(*n))->evec[DIP*3], 
+		      (*fault+(*n))->sa,(*fault+(*n))->ca,
+		      (*fault+(*n))->sd,(*fault+(*n))->cd);
 #ifdef BLOCK_SPHERICAL
   /* 
      

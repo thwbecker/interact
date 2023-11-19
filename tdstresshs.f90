@@ -1,3 +1,9 @@
+#ifdef USE_DOUBLE_PRECISION
+#include "precision_double.h"
+#else
+#include "precision_single.h"
+#endif
+
 #define ANG_STRAIN_ROUTINE AngDisStrainFSC
 #define ANG_DISS_ROUTINE AngDisStrain
 
@@ -107,11 +113,11 @@ subroutine tdstresshs(loc,P1,P2,P3,Ss,Ds,Ts,mu,lambda,stress,strain)
   ! displacement conversion
   !
   implicit none 
-  real*8, intent(in) :: mu,lambda,Ss,Ds,Ts
-  real*8, intent(out),dimension(6) :: stress,strain
-  real*8, dimension(3), intent(in) :: p1, p2, p3,loc
-  real*8, dimension(3) :: p1n, p2n, p3n
-  real*8, dimension(6) :: StsMS,StrMS,StsFSC,StrFSC,StsIS,StrIS
+  C_PREC, intent(in) :: mu,lambda,Ss,Ds,Ts
+  C_PREC, intent(out),dimension(6) :: stress,strain
+  C_PREC, dimension(3), intent(in) :: p1, p2, p3,loc
+  C_PREC, dimension(3) :: p1n, p2n, p3n
+  C_PREC, dimension(6) :: StsMS,StrMS,StsFSC,StrFSC,StsIS,StrIS
 
   if ((loc(3) .gt. 0.d0).or. (P1(3) > 0.d0).or.( P2(3) > 0d0) .or.( P3(3)>0d0))then 
      write(*,*)'Half-space solution: Z coordinates must be negative!'
@@ -148,20 +154,20 @@ subroutine TDstressFS(X,Y,Z,P1,P2,P3,Ss,Ds,Ts,mu,lambda,Stress,Strain)
   ! Calculates stresses and strains associated with a triangular dislocation 
   ! in an elastic full-space.
   implicit none
-  real*8,intent(in) :: x,y,z,Ss,Ds,Ts,mu,lambda
-  real*8,dimension(3) :: p1,p2,p3
-  real*8,intent(out),dimension(6) :: stress,strain
+  C_PREC,intent(in) :: x,y,z,Ss,Ds,Ts,mu,lambda
+  C_PREC,dimension(3) :: p1,p2,p3
+  C_PREC,intent(out),dimension(6) :: stress,strain
 
-  real*8 nu,bx,by,bz,x_,y_,z_,aA,aB,aC,&
+  C_PREC nu,bx,by,bz,x_,y_,z_,aA,aB,aC,&
        Exx,Eyy,Ezz,Exy,Exz,Eyz,&
        Exxr,Eyyr,Ezzr,Exyr,Exzr,Eyzr,&
        Sxx,Syy,Szz,Sxy,Sxz,Syz,two_mu
-  real*8 Exx1,Eyy1,Ezz1,Exy1,Exz1,Eyz1,&
+  C_PREC Exx1,Eyy1,Ezz1,Exy1,Exz1,Eyz1,&
        Exx2,Eyy2,Ezz2,Exy2,Exz2,Eyz2,&
        Exx3,Eyy3,Ezz3,Exy3,Exz3,Eyz3,&
        etracel
-  real*8,dimension(3) :: e12,e13,e23,p1_,p2_,p3_
-  real*8,dimension(3,3) :: Ar
+  C_PREC,dimension(3) :: e12,e13,e23,p1_,p2_,p3_
+  C_PREC,dimension(3,3) :: Ar
   INTEGER :: trimode
   logical :: caseplog,casenlog,casezlog
 
@@ -246,13 +252,13 @@ end subroutine TDstressFS
 
 subroutine TDstress_HarFunc(X,Y,Z,P1,P2,P3,Ss,Ds,Ts,mu,lambda,stress,strain)
   implicit none
-  real*8,intent(in) :: x,y,z,ss,ds,ts,mu,lambda
-  real*8,intent(in),dimension(3) :: p1,p2,p3
-  real*8,intent(out),dimension(6) :: stress,strain
-  real*8,dimension(6) :: stress1,strain1,stress2,strain2,stress3,strain3
-  real*8,dimension(3) :: vstrike,vnorm,vdip
-  real*8,dimension(3,3) :: A
-  real*8 bx,by,bz,bx_,by_,bz_
+  C_PREC,intent(in) :: x,y,z,ss,ds,ts,mu,lambda
+  C_PREC,intent(in),dimension(3) :: p1,p2,p3
+  C_PREC,intent(out),dimension(6) :: stress,strain
+  C_PREC,dimension(6) :: stress1,strain1,stress2,strain2,stress3,strain3
+  C_PREC,dimension(3) :: vstrike,vnorm,vdip
+  C_PREC,dimension(3,3) :: A
+  C_PREC bx,by,bz,bx_,by_,bz_
   ! TDstress_HarFunc calculates the harmonic function contribution to the
   ! strains and stresses associated with a triangular dislocation in a 
   ! half-space. The function cancels the surface normal tractions induced by 
@@ -262,7 +268,7 @@ subroutine TDstress_HarFunc(X,Y,Z,P1,P2,P3,Ss,Ds,Ts,mu,lambda,stress,strain)
   by = Ss; ! Strike-slip
   bz = Ds; ! Dip-slip
 
-  call get_base_vectors(p1,p2,p3,vstrike,vdip,vnorm)
+  call get_tdcs_base_vectors(p1,p2,p3,vstrike,vdip,vnorm)
 
   ! Transform slip vector components from TDCS into EFCS
   call matrix_from_3vec(Vnorm, Vstrike, Vdip,A)
@@ -286,10 +292,10 @@ end subroutine TDstress_HarFunc
 
 subroutine TensTrans(Txx1,Tyy1,Tzz1,Txy1,Txz1,Tyz1,Am,Txx2,Tyy2,Tzz2,Txy2,Txz2,Tyz2)
   implicit none
-  real*8,intent(in) :: Txx1,Tyy1,Tzz1,Txy1,Txz1,Tyz1
-  real*8,intent(in),dimension(3,3) :: Am
-  real*8,intent(out) :: Txx2,Tyy2,Tzz2,Txy2,Txz2,Tyz2
-  real*8, dimension(9) :: a
+  C_PREC,intent(in) :: Txx1,Tyy1,Tzz1,Txy1,Txz1,Tyz1
+  C_PREC,intent(in),dimension(3,3) :: Am
+  C_PREC,intent(out) :: Txx2,Tyy2,Tzz2,Txy2,Txz2,Tyz2
+  C_PREC, dimension(9) :: a
   A(1:3) = Am(:,1);A(4:6) = Am(:,2);A(7:9) = Am(:,3)
 
   ! TensTrans Transforms the coordinates of tensors,from x1y1z1 coordinate
@@ -321,14 +327,14 @@ subroutine TDSetupS(x,y,z,alpha,bx,by,bz,nu,TriVertex,SideVec,exxt,eyyt,ezzt,exy
   ! slip vector components from ADCS into TDCS. It then calculates the 
   ! strains in ADCS and transforms them into TDCS.
   IMPLICIT NONE
-  REAL*8, INTENT(IN) :: alpha, bx, by, bz, nu, x, y, z
-  REAL*8, DIMENSION(3), INTENT(IN) :: SideVec, TriVertex
-  REAL*8, INTENT(OUT) :: exxt,eyyt,ezzt,exyt,exzt,eyzt
-  REAL*8 :: exx,eyy,ezz,exy,exz,eyz
-  REAL*8, PARAMETER :: pi = 3.14159265358979D0
-  REAL*8, DIMENSION(2, 2) :: A
-  REAL*8, DIMENSION(3, 3) :: B
-  real*8 by1,bz1,y1,z1
+  C_PREC, INTENT(IN) :: alpha, bx, by, bz, nu, x, y, z
+  C_PREC, DIMENSION(3), INTENT(IN) :: SideVec, TriVertex
+  C_PREC, INTENT(OUT) :: exxt,eyyt,ezzt,exyt,exzt,eyzt
+  C_PREC :: exx,eyy,ezz,exy,exz,eyz
+  C_PREC, PARAMETER :: pi = 3.14159265358979D0
+  C_PREC, DIMENSION(2, 2) :: A
+  C_PREC, DIMENSION(3, 3) :: B
+  C_PREC by1,bz1,y1,z1
 
 
   call get_tdcd_adcs(sidevec,trivertex,y,z,by,bz,A,y1,z1,by1,bz1)
@@ -354,36 +360,36 @@ end subroutine TDSetupS
 
 subroutine AngSetupFSC_S(X,Y,Z,bX,bY,bZ,PA,PB,mu,lambda,Stress,Strain)
   IMPLICIT NONE
-  real*8, intent(in) :: X,Y,Z,bX,bY,bZ,mu,lambda
-  real*8, dimension(6), intent(out) :: stress,strain
-  REAL*8, DIMENSION(3), INTENT(IN) :: PA, PB
-  REAL*8, PARAMETER :: pi = 3.14159265358979D0
-  REAL*8 :: beta,two_mu,ltrace_E,nu,Exx,Eyy,Ezz,Exy,Exz,Eyz,&
+  C_PREC, intent(in) :: X,Y,Z,bX,bY,bZ,mu,lambda
+  C_PREC, dimension(6), intent(out) :: stress,strain
+  C_PREC, DIMENSION(3), INTENT(IN) :: PA, PB
+  C_PREC, PARAMETER :: pi = 3.14159265358979D0
+  C_PREC :: beta,two_mu,ltrace_E,nu,Exx,Eyy,Ezz,Exy,Exz,Eyz,&
        Sxx,Syy,Szz,Sxy,Sxz,Syz,&
        v11,v22,v33,v12,v23,v13,v11A,v22A,v33A,v12A,v23A,v13A,&
        v11B,v22B,v33B,v12B,v23B,v13B
-  real*8, dimension(3) :: SideVec,eZ,ey1,ey2,ey3
-  real*8 y1A,y2A,y3A,y1B,y2B,y3B,y1AB,y2AB,y3AB,b1,b2,b3
-  real*8, dimension(3,3) :: A,At
+  C_PREC, dimension(3) :: SideVec,eZ,ey1,ey2,ey3
+  C_PREC y1A,y2A,y3A,y1B,y2B,y3B,y1AB,y2AB,y3AB,b1,b2,b3
+  C_PREC, dimension(3,3) :: A,At
 
-  REAL*8, PARAMETER :: eps = 1.0D-15 ! a crude approximation of the MatLab "eps" constant.
+  C_PREC, PARAMETER :: eps = EPS_FOR_FORTRAN ! a crude approximation of the MatLab "eps" constant.
   LOGICAL :: I
   ! AngSetupFSC_S calculates the Free Surface Correction to strains and 
   ! stresses associated with angular dislocation pair on each TD side.
-
+  
   nu = lambda/(lambda+mu)/2.0d0; ! Poisson's ratio
   two_mu = 2.0d0 * mu
 
   ! Calculate TD side vector and the angle of the angular dislocation pair
   SideVec = PB - PA;
-  eZ = (/ 0.d0, 0.d0, 1.d0 /)
+  eZ = (/ FORTRAN_ZERO, FORTRAN_ZERO, FORTRAN_UNITY /)
   beta = acos(-dot_product(SideVec,eZ)/norm2(SideVec));
   !print *,beta
   if ((abs(beta).lt.eps).or.(abs(pi-beta).lt.eps))then
      Stress = 0.d0
      Strain = 0.d0
   else
-     ey1 = (/ SideVec(1), SideVec(2), 0.d0 /)
+     ey1 = (/ SideVec(1), SideVec(2), FORTRAN_ZERO  /)
      call normalize_vec(ey1,ey1)
      ey3 = -eZ;
      call Dcross(ey3,ey1,ey2);
@@ -462,12 +468,12 @@ subroutine AngDisStrain(x,y,z,alpha,bx,by,bz,nu,Exx,Eyy,Ezz,Exy,Exz,Eyz)
   IMPLICIT NONE
   ! AngDisStrain calculates the strains associated with an angular 
   ! dislocation in an elastic full-space.
-  real*8,intent(in) :: x,y,z,alpha,bx,by,bz,nu
-  real*8,intent(out) :: exx,eyy,ezz,exy,exz,eyz
+  C_PREC,intent(in) :: x,y,z,alpha,bx,by,bz,nu
+  C_PREC,intent(out) :: exx,eyy,ezz,exy,exz,eyz
 
-  real*8 sinA,cosA,eta,zeta,x2,y2,z2,r2,r,r3,rz,r3z,W,W2,Wr,W2r,Wr3,W2r2, C,S
-  real*8 rFi_rx,rFi_ry,rFi_rz,r2z2
-  REAL*8, PARAMETER :: pi = 3.14159265358979D0
+  C_PREC sinA,cosA,eta,zeta,x2,y2,z2,r2,r,r3,rz,r3z,W,W2,Wr,W2r,Wr3,W2r2, C,S
+  C_PREC rFi_rx,rFi_ry,rFi_rz,r2z2
+  C_PREC, PARAMETER :: pi = 3.14159265358979D0
 
   sinA = sin(alpha);
   cosA = cos(alpha);
@@ -548,12 +554,12 @@ subroutine AngDisStrainFSC(y1,y2,y3,beta,b1,b2,b3,nu,a,v11,v22,v33,v12,v13,v23)
   ! AngDisStrainFSC calculates the harmonic function contribution to the 
   ! strains associated with an angular dislocation in an elastic half-space.
   IMPLICIT NONE
-  real*8, intent(in) :: y1,y2,y3,beta,b1,b2,b3,nu,a
-  real*8, intent (out) :: v11,v22,v33,v12,v13,v23
-  real*8 y3b,z1b,z3b,rb2,rb,W1,W2,W3,W4,W5,W6,W7,W8,W9,y2s,rb2s,rbc,W6s,W7s
-  real*8 rFib_ry2,rFib_ry1,rFib_ry3,cosB,sinB,cotB,N1,N2,N3,N4,two_nu,&
+  C_PREC, intent(in) :: y1,y2,y3,beta,b1,b2,b3,nu,a
+  C_PREC, intent (out) :: v11,v22,v33,v12,v13,v23
+  C_PREC y3b,z1b,z3b,rb2,rb,W1,W2,W3,W4,W5,W6,W7,W8,W9,y2s,rb2s,rbc,W6s,W7s
+  C_PREC rFib_ry2,rFib_ry1,rFib_ry3,cosB,sinB,cotB,N1,N2,N3,N4,two_nu,&
        one_over_rb,one_over_rb2,one_over_rb_p3,one_over_W6,one_over_W6_p2,w1_over_w7,w1_over_w7s,one_over_w7
-  REAL*8, PARAMETER :: pi = 3.14159265358979D0, one_quarter = 1.0d0/4.0d0, one_half = 1.0d0/2.0d0
+  C_PREC, PARAMETER :: pi = 3.14159265358979D0, one_quarter = 1.0d0/4.0d0, one_half = 1.0d0/2.0d0
 
   two_nu = 2.0d0*nu
   

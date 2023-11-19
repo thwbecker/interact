@@ -43,6 +43,7 @@
 /*  */
 #define tddisphs tddisphs_
 #define tdstresshs tdstresshs_
+#define get_tdcs_base_vectors get_tdcs_base_vectors_
 //other
 #define my_sincos_deg_ftn my_sincos_deg_ftn_
 // weird fix for calling convention

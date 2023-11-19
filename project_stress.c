@@ -64,8 +64,8 @@ int main(int argc, char **argv)
   */
   my_sincos(&sin_dip,&cos_dip,dip);
   my_sincos(&sin_alpha,&cos_alpha,alpha);
-  calc_base_vecs(fault->t_strike,fault->normal,fault->t_dip,
-		 sin_alpha,cos_alpha,sin_dip,cos_dip);
+  calc_quad_base_vecs(fault->t_strike,fault->normal,fault->t_dip,
+		      sin_alpha,cos_alpha,sin_dip,cos_dip);
   if(!use_rake){
     /* 
        output of three components,

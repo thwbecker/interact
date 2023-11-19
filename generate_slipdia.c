@@ -77,8 +77,8 @@ int main(int argc, char **argv)
       */
       my_sincos_deg(&sin_dip,&cos_dip,dip);
       my_sincos_deg(&sin_alpha,&cos_alpha,alpha);
-      calc_base_vecs(fault->t_strike,fault->normal,fault->t_dip,
-		     sin_alpha,cos_alpha,sin_dip,cos_dip);
+      calc_quad_base_vecs(fault->t_strike,fault->normal,fault->t_dip,
+			  sin_alpha,cos_alpha,sin_dip,cos_dip);
       calc_three_stress_components(sm,fault->normal,fault->t_strike,
 				   fault->normal,fault->t_dip,
 				   (stress+STRIKE),(stress+NORMAL),

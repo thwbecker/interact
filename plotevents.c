@@ -45,7 +45,7 @@ int main(void)
     alpha= 90.0 - fault[n].strike;
     my_sincos_deg(&fault[n].sin_alpha,&fault[n].cos_alpha,(COMP_PRECISION)alpha);
     my_sincos_deg(&sin_dip,&cos_dip,(COMP_PRECISION)fault[n].dip);
-    calc_base_vecs(fault[n].t_strike,fault[n].normal,fault[n].t_dip,
+    calc_quad_base_vecs(fault[n].t_strike,fault[n].normal,fault[n].t_dip,
 		   fault[n].sin_alpha,fault[n].cos_alpha,sin_dip,cos_dip);
     fault[n].area = fault[n].l * fault[n].w * 4.0;
     calculate_corners(corner,(fault+n),&dummy,&dummy);
