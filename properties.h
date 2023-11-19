@@ -48,6 +48,8 @@
    E = 2\mu(1+\nu), which is 2.5 for \nu=.25 and \mu=1
 */
 #define POISSON_NU 0.25
+
+/* change those */
 #define LAMBDA SHEAR_MODULUS
 #define ALPHA 0.666666666666666666666666666666666667
 /* 

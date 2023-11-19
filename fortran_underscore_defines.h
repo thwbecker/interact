@@ -40,6 +40,9 @@
 #define sgemv sgemv_
 
 #define law_nnls law_nnls_
+/*  */
+#define tddisphs tddisphs_
+#define tdstresshs tdstresshs_
 //other
 #define my_sincos_deg_ftn my_sincos_deg_ftn_
 // weird fix for calling convention

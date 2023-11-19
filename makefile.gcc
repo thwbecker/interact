@@ -21,6 +21,7 @@ MACHINE_DEFINES = -DIMAT_SPARSE_LIM=8000.0 -DIMAT_SIZE_LIM=4000.1  \
 CC = gcc
 MPICC = mpicc
 F77 = /usr/bin/gfortran
+F90 = /usr/bin/gfortran
 LD = $(F77)
 MPILD = mpif77
 AR = ar
@@ -67,6 +68,7 @@ DEBUG_LIBS =
 # fortran flags
 #
 SFARGS = $(SCARGS) -ffixed-line-length-132  -fmax-errors=0 -x f77-cpp-input
+SF90ARGS = $(SCARGS)   -fmax-errors=0 -cpp
 #
 SFARGSSAVE = $(SFARGS)
 #

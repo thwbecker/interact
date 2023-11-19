@@ -54,7 +54,7 @@
 #                            patches. if this switch is set, will also remove the patch
 #                            when condition is only met one way
 #
-#  -DALLOW_NON_3DQUAD_GEOM      allows for different fault element types, so far rectangular and 
+#  -DALLOW_NON_3DQUAD_GEOM   allows for different fault element types, so far rectangular and 
 #                            point source are implemented. if all faults are rectangular, leave
 #		  	     away for improved speed 
 #
@@ -79,10 +79,12 @@
 # 				-pc_factor_mat_solver_type scalapack -mat_type scalapack
 #  				-pc_factor_mat_solver_type elemental -mat_type elemental
 # 		             iterative solver
-# 		 	         -ksp_type fgmres -pc_type none -ksp_max_it 10000 -ksp_rtol 1.0e-8
+# 		 	         -ksp_type fgmres -pc_type none -ksp_max_it 10000 -ksp_rtol 1.0e-8 
 # 		 	         -ksp_type fgmres -pc_type jacobi -ksp_max_it 10000 -ksp_rtol 1.0e-8
 #                            for this to work, you will have to have  $(PETSC_DIR) and $(PETSC_ARCH) defined
 #
+# to run in parallel for example
+#  mpirun -np 8 interact -pc_factor_mat_solver_type scalapack -mat_type scalapack
 # to debug:
 # mpirun -np 1 valgrind --tool=memcheck -q --num-callers=20 --log-file=pmia.%p.log interact -fpetsc -malloc=off
 #
@@ -95,7 +97,8 @@
 MY_PRECISION = -DUSE_DOUBLE_PRECISION
 #MY_PRECISION = 			#single
 
-COMMON_DEFINES =  -DBINARY_PATCH_EVENT_FILE -DCHECK_CI_ONE_WAY -DNO_OPENING_MODES
+#COMMON_DEFINES =  -DBINARY_PATCH_EVENT_FILE -DCHECK_CI_ONE_WAY -DNO_OPENING_MODES
+COMMON_DEFINES =  -DBINARY_PATCH_EVENT_FILE -DCHECK_CI_ONE_WAY  -DALLOW_NON_3DQUAD_GEOM  
 #
 # noise level for random interact version. this version 
 # doesn't get compiled automatically.
@@ -110,8 +113,9 @@ ODIR = objects/
 # directory for binaries
 BDIR = bin/
 #
-# choice of Okada routine, comment out if modified routine is used
-OKROUTINE = $(ODIR)/dc3d.o
+# choice of Okada routine
+OKROUTINE = $(ODIR)/dc3d.o	# my modified version
+#OKROUTINE = $(ODIR)/dc3d_original_double.o	# original, changed to double
 
 # 
 # include the machine dependent flags
@@ -130,7 +134,7 @@ include makefile.pgplot
 #
 # petsc, will override some of the flags
 # comment out if not needed
-include makefile.petsc
+#include makefile.petsc
 ifndef MPILD
 MPILD = $(LD)
 endif
@@ -155,8 +159,9 @@ FLAGS = $(DEFINE_FLAGS) $(PGPLOT_INCLUDES) $(SLATEC_INCLUDES) \
 
 
 # other flags
-CFLAGS = $(FLAGS) $(SCARGS) $(DEBUG_FLAGS) $(MACHINE_DEFINES)
-FFLAGS = $(FLAGS) $(SFARGS) $(DEBUG_FLAGS) $(MACHINE_DEFINES)
+CFLAGS =   $(FLAGS) $(SCARGS)   $(DEBUG_FLAGS) $(MACHINE_DEFINES)
+FFLAGS =   $(FLAGS) $(SFARGS)   $(DEBUG_FLAGS) $(MACHINE_DEFINES)
+F90FLAGS = $(FLAGS) $(SF90ARGS) $(DEBUG_FLAGS) $(MACHINE_DEFINES)
 
 
 
@@ -177,7 +182,13 @@ MATRIX_SOLVER_OBJS = $(ODIR)/numrec_svd_routines.o $(ODIR)/nnls_lawson.o	\
 	$(ODIR)/nnls.o $(ODIR)/svd.o $(ODIR)/solve.o		\
 	$(ODIR)/lusolve.o $(ODIR)/sparse_solve.o \
 	$(ODIR)/ilaenv_wrapper.o
+
 #
+# triangular dislocation routines
+#
+
+TRI_GREEN_OBJS = $(ODIR)/tdstresshs.o  $(ODIR)/tddisphs.o 
+
 # list of objects for patch i/o. these also include
 # all object files that deal with interaction coefficients
 # since we might want to check for fatal interaction 
@@ -190,7 +201,7 @@ PATCH_IO_OBJS = $(ODIR)/divide_fault_in_patches.o $(ODIR)/sparse.o	\
 	$(ODIR)/check_interaction.o $(ODIR)/eval_2dsegment.o		\
 	$(ODIR)/eval_okada.o $(ODIR)/tdd_coeff.o $(ODIR)/rhs.o		\
 	$(ODIR)/eval_green.o $(ODIR)/eval_triangle.o			\
-	$(ODIR)/interact.o	$(ODIR)/mysincos.o 			\
+	$(ODIR)/interact.o   $(ODIR)/mysincos.o $(TRI_GREEN_OBJS)	\
 	$(OKROUTINE) $(ODIR)/fracture_criterion.o			\
 	$(ODIR)/myopen.o  $(ODIR)/randgen.o \
 	$(ODIR)/string_compare.o 
@@ -328,12 +339,13 @@ geographic_tools: $(BDIR)/blockinvert_sph $(BDIR)/geo_okada  \
 	$(BDIR)/fit_mean_stress
 
 analysis: $(BDIR)/mspectral
+#$(BDIR)/patch2geom : geomview, outdated
 
-converters: $(BDIR)/patch2xyz $(BDIR)/patch2geom  $(BDIR)/patch2vtk $(BDIR)/patch2bc \
+converters: $(BDIR)/patch2xyz   $(BDIR)/patch2vtk $(BDIR)/patch2bc \
 	$(BDIR)/patch2corners $(BDIR)/patch2group \
 	$(BDIR)/patch2xyzvec $(BDIR)/patch2poly3d $(BDIR)/patch2dis3d
 
-geom_converters: $(BDIR)/points2patch $(BDIR)/tri2patch
+geom_converters: $(BDIR)/points2patch $(BDIR)/tri2patch  $(BDIR)/patchquad2patchtri 
 
 test:    $(ODIR)/test_stuff 
 
@@ -398,6 +410,12 @@ $(BDIR)/generate_random_2d: $(GENERATE_RANDOM_2D_OBJS)  $(GEN_P_INC)  $(LIBLIST)
 	$(LD) $(LDFLAGS) $(GENERATE_RANDOM_2D_OBJS) \
 	-o $(BDIR)/generate_random_2d $(LIBS)
 
+
+$(BDIR)/patchquad2patchtri: $(ODIR)/patchquad2patchtri.o $(GEN_P_INC) $(ODIR)/read_geometry.o \
+	 $(LIBLIST) 
+	$(LD) $(LDFLAGS)  $(ODIR)/read_geometry.o \
+		$(ODIR)/libpatchio.a $(ODIR)/patchquad2patchtri.o \
+		-o $(BDIR)/patchquad2patchtri  $(LIBS) $(SUPERLU_LIBS) $(SLATEC_LIBS) $(PGLIBS)
 
 $(BDIR)/patch2xyz: $(ODIR)/patch2xyz.o $(GEN_P_INC) $(ODIR)/read_geometry.o \
 	 $(LIBLIST) 
@@ -829,6 +847,9 @@ $(ODIR)/%.o:	%.f $(GEN_P_INC)
 $(ODIR)/%.o:	%.F $(GEN_P_INC)
 	$(F77) $(FFLAGS) $(MY_PRECISION) -c $<  -o $(ODIR)/$*.o
 
+$(ODIR)/%.o:	%.f90 $(GEN_P_INC)
+	$(F90) $(F90FLAGS) $(MY_PRECISION) -c $<  -o $(ODIR)/$*.o
+
 # single prec versions
 $(ODIR)/%.sgl.o:	%.c $(GEN_P_INC)
 	$(CC) $(CFLAGS) -c $< -o $(ODIR)/$*.sgl.o
@@ -838,3 +859,6 @@ $(ODIR)/%.sgl.o:	%.f $(GEN_P_INC)
 
 $(ODIR)/%.sgl.o:	%.F $(GEN_P_INC)
 	$(F77) $(FFLAGS) -c $<  -o $(ODIR)/$*.sgl.o
+
+$(ODIR)/%.sgl.o:	%.f90 $(GEN_P_INC)
+	$(F90) $(F90FLAGS) -c $<  -o $(ODIR)/$*.sgl.o

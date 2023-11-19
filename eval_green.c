@@ -15,8 +15,8 @@
 
 /* 
 
-   evaluate the displacements and stresses based on various half-space
-   and 2-D Greens functions
+   evaluate the displacements and stresses based on various
+   half-space, triangular, and 2-D Greens functions
 
    will call point, rectangle or triangle routines from here
 

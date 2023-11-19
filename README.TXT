@@ -7,6 +7,7 @@
 #                                                                              #
 #  Interact uses dc3d.f as provided by Y. Okada as in Okada (BSSA, 1992) and   #
 #  linear algebra routines from SLATEC, LAPACK, and EISPACK.                   #
+#  Contains f90 converted routines from Nikkhoo and Walter (GJI, 2015)         #
 #  Might contain material copyrighted by others (e.g. Numerical Recipes etc)   #
 #                                                                              #
 #  See INSTALLATION, README.TXT, and help.txt for documentation and            #
@@ -94,14 +95,17 @@ points2patch:
 	convert four points defining a rectangle in 3-D to a best
 	fitting, Okada type fault patch
 
-patch2geom:
-	converts a patch file (with fault segments) into a file that
-	holds the patch geometry as a geomview GEOM file
 
 patch2xyz:
 	converts a patch file (with fault segments) into a file that
 	holds the geometry in a xyz file to be read with GMT (<5)
 
+patch2vtk:
+	converts a patch file (with fault segments) into a VTK file
+
+patchquad2patchtri:
+	convert a quad geometry file to a triangular geometry file
+	
 create_random_stress_file:
 	create fsi.in input file for interact which holds randomly
 	distributed initial values for the strike, dip and normal

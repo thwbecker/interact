@@ -1,0 +1,45 @@
+################################################################################
+#                                                                              #
+#  interact: model fault interactions using dislocations in an elastic         #
+#            medium                                                            #
+#	                                                                       #
+#    Copyright (C) Thorsten W. Becker 2000 - 2002                              #
+#                                                                              #
+#    Unteract uses dc3d.f as provided by Y. Okada as in Okada (BSSA, 1992) and #
+#    linear algebra routines from SLATEC, LAPACK, and EISPACK.                 #
+#    Contains f90 converted routines from Nikkhoo and Walter (GJI, 2015)       #
+#    Might contain material copyrighted by others (e.g. Numerical Recipes etc) #
+#                                                                              #
+#  If you use interact in real work, a citation to use would be:               #
+#                                                                              #
+#  @Article{becker02c,                                                         #
+#    author = 	 {Becker, T. W. and Schott, B.},                               #
+#    title = 	 {On boundary-element models of elastic fault interaction      #
+#                  (abstract)},                                                # 
+#    journal = 	 {EOS Trans. AGU},                                             #
+#    year = 	 2002,                                                         #
+#    volume =	 83,                                                           #
+#    number =	 47,                                                           #
+#    pages =	 {NG62A-0925}                                                  #
+#  }                                                                           #
+#                                                                              #
+#                                                                              #
+#    This program is free software; you can redistribute it and/or modify      #
+#    it under the terms of the GNU General Public License as published by      #
+#    the Free Software Foundation; either version 2 of the License, or         #
+#    (at your option) any later version.                                       #
+#                                                                              #
+#    This program is distributed in the hope that it will be useful,           #
+#    but WITHOUT ANY WARRANTY; without even the implied warranty of            #
+#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the             #
+#    GNU General Public License for more details.                              #
+#                                                                              #
+#    In addition, we strongly suggest that iGMT users comply with the goals    #
+#    as expressed in the Student Pugwash Pledge (www.spusa.org/pugwash/).      #
+#                                                                              #
+#    You should have received a copy of the GNU General Public License         #
+#    along with this program; see the file COPYING.  If not, write to          #
+#    the Free Software Foundation, Inc., 59 Temple Place - Suite 330,          #
+#    Boston, MA 02111-1307, USA.                                               #
+#                                                                              #
+################################################################################
