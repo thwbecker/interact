@@ -171,6 +171,8 @@ void get_maxsdir_stress_drops(COMP_PRECISION *stress,
    if fault is a segment, only calculate the first two corners, 
    which will be the left and right endpoint of the segment 
 
+   this will also return total (not half) fault length and width
+
 */
 void calculate_corners(COMP_PRECISION corner[4][3],
 		       struct flt *fault,
@@ -179,14 +181,16 @@ void calculate_corners(COMP_PRECISION corner[4][3],
 #ifdef ALLOW_NON_3DQUAD_GEOM
   if(patch_is_2d(fault->type)){	/* 2D */
     calculate_seg_corners(corner,fault,1.0);
-    *l = fault->l;*w = fault->w;
+    *l = fault->l*2;*w = NAN;
   }else if(fault->type == RECTANGULAR_PATCH){ /* quad */
     calculate_quad_corners(corner,fault,1.0);
-    *l = fault->l;*w = fault->w;
+    *l = fault->l*2;*w = fault->w*2;
   }else if(fault->type == POINT_SOURCE){ /* point source */
     calculate_point_source_corners(corner,fault,1.0,l,w);
+    *l = *w = NAN;
   }else if(fault->type == TRIANGULAR){
     calculate_tri_corners(corner,fault,1.0);
+    *l = *w = NAN;
   }else{
     fprintf(stderr,"calculate_corners: error, element type %i is not implemented\n",
 	    fault->type);
@@ -194,7 +198,7 @@ void calculate_corners(COMP_PRECISION corner[4][3],
   }
 #else
   calculate_quad_corners(corner,fault,1.0);
-  *l = fault->l;*w = fault->w;
+  *l = fault->l*2;*w = fault->w*2;
 #endif
 }
 /*
@@ -282,7 +286,7 @@ void calculate_quad_corners(COMP_PRECISION corner[4][3],struct flt *fault,
 {
   int i;
   COMP_PRECISION sx,dx;
-  for(i=0;i<3;i++){
+  for(i=0;i < 3;i++){
     sx = fault->t_strike[i] * (COMP_PRECISION)fault->l * leeway;
     dx = fault->t_dip[i]    * (COMP_PRECISION)fault->w * leeway;
     // lower left

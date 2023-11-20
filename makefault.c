@@ -200,8 +200,9 @@ int main(int argc, char **argv)
   // check for illegal values
   //
   check_fault_angles(fault);
+  /* subdivide this pathc */
   divide_fault_in_patches(0,fault,&patch,&nrpatches,seg,circular,TRUE,
-			  srand,drand,&seed);
+			  srand,drand,&seed,FALSE);
 #ifdef ALLOW_NON_3DQUAD_GEOM
   fprintf(stderr,"makefault: x: (%g, %g, %g) l: %g w: %g s: %g d: %g grp: %i n: %5i m: %5i patches: %5i scaling: %11e %s\n",
 	  fault[0].x[INT_X],fault[0].x[INT_Y],fault[0].x[INT_Z],
@@ -210,8 +211,6 @@ int main(int argc, char **argv)
 	  (twod)?("2-D"):((point_source)?("point source"):("")));
   if(circular)
     fprintf(stderr,"circular patches\n");
-  else
-    fprintf(stderr,"\n");
 #else
   fprintf(stderr,"makefault: x: (%g, %g, %g) l: %g w: %g s: %g d: %g grp: %i n: %5i m: %5i patches: %5i scaling: %11e\n",
 	  fault[0].x[INT_X],fault[0].x[INT_Y],fault[0].x[INT_Z],

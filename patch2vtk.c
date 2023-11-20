@@ -74,9 +74,15 @@ int main(int argc, char **argv)
     printf("\n");
   }
   printf("CELL_TYPES %i\n",medium->nrflt);
-  for(i=0;i<medium->nrflt;i++){
-    printf("%i\n",vtk_type_of_patch((fault+i)));
+  for(i=j=0;i<medium->nrflt;i++,j++){
+    printf("%i ",vtk_type_of_patch((fault+i)));
+    if(j>40){
+      printf("\n");
+      j=0;
+    }
   }
+  if(j)
+    printf("\n");
   if(read_slip){
     /* 
        use slip for coloring 

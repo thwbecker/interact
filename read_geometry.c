@@ -293,8 +293,10 @@ void read_geometry(char *patch_filename,struct med **medium,
 #ifdef ALLOW_NON_3DQUAD_GEOM
     if((*fault+i)->type != TRIANGULAR){
 #endif
+      //
       // determine geometrical boundaries for plotting
-      calculate_corners(corner,(*fault+i),&lloc,&wloc);
+      //
+      calculate_corners(corner,(*fault+i),&lloc,&wloc); /* lloc and wloc will be full l and w, not half */
 #ifdef ALLOW_NON_3DQUAD_GEOM// select the number of corners
       jlim = (patch_is_2d((*fault+i)->type))?(2):(4);
 #else

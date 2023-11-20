@@ -17,9 +17,9 @@ void phelp(void)
   PE("Interact: calculate fault stresses and displacements in a half space or in 2-D");
   PE("          using a boundary element approach.");
   PE("");
-  PE("Program reads in fault patch geometries (usually rectangular) and either solves");
+  PE("Program reads in patch dividing a fault geometry and either solves");
   PE("for stresses and/or displacements in a one-step problem for various boundary");
-  PE("conditions (sign-constrained or unconstrained), or for a simulated loading");
+  PE("conditions (sign (i.e. direction) constrained or unconstrained), or for a simulated loading");
   PE("cycle where each patch follows a frictional constitutive law (e.g. Navier-Coulomb)");
   PE("and repetitive rupture is allowed during continuous \"plate-tectonic\" loading.");
   PE("");
@@ -35,7 +35,7 @@ void phelp(void)
 #ifdef USE_PETSC
   PE("");
   PE("PetSc support was compiled in, providing limited access to parallel solves for one-step problems.");
-  PE("      For LU solve, use    \"-pc_factor_mat_solver_type scalapack -mat_type scalapack\" or");
+  PE("      For direct solve, use    \"-pc_factor_mat_solver_type scalapack -mat_type scalapack\" or");
   PE("                           \"-pc_factor_mat_solver_type elemental -mat_type elemental\".");
   PE("      For iterative solve \"-ksp_type fgmres -pc_type none   -ksp_max_it 10000 -ksp_rtol 1.0e-8\" or");
   PE("                          \"-ksp_type fgmres -pc_type jacobi -ksp_max_it 10000 -ksp_rtol 1.0e-8\".");
@@ -90,7 +90,7 @@ void phelp(void)
   PE("      999 999 999 999 999 -1 -1 group_0 x_x^1 x_y^1 x_z^1 x_x^2 x_y^2 x_z^2 x_x^3 x_y^3 x_z^3\n");
   PE("      where exponents indicate the local number of the node, and 999 are place holder values, not used.");
   PE("");
-  PE("      WARNING: This is not properly implemented yet.");
+  PE("      WARNING: This is experimental and not fully tested.");
   PE("");
   PE("    - segments in two dimensions in the x-y plane");
   PE("      If fault half-width is zero, then dip should be 90, z=0, and program will run in 2-D mode.");
@@ -102,7 +102,7 @@ void phelp(void)
   fprintf(stderr,"      Calculations are performed in a %s plane by default, can be changed with the -hp option.\n",
 	  (HALF_PLANE_DEF)?("half"):("full"));
   PE("");
-  PE("    If all your patches are rectangular in 3-D, you could recompile\n    without the ALLOW_NON_3DQUAD_GEOM set to save space.");
+  PE("    If all your patches are rectangular in 3-D, you could recompile\n    without the ALLOW_NON_3DQUAD_GEOM set to save memory and enhance speed.");
 #else
   PE("    If you would like to use the 2-D mode, point sources or triangles, recompile with ALLOW_NON_3DQUAD_GEOM flag set.");
 #endif  
@@ -695,8 +695,12 @@ void phelp(void)
   PE("");
   PE("(C) Thorsten Becker, thwbecker@post.harvard.edu, 1999 - 2023)");
   PE("    interact - boundary element code for elastic half-spaces");
-  PE("    Main 3-D dislocation code based on dc3d.f by Y. Okada, as of Okada, BSSA, 1992");
-  PE("    2-D segment slip solution from Crouch and Starfield (1973)");
+  PE("    3-D quad dislocationS based on Okada (BSSA, 1992).");
+#ifdef ALLOW_NON_3DQUAD_GEOM
+  PE("    3-D triangular dislocations based on Nikkhoo and Walter (GJI, 2015).");
+  PE("    2-D segment slip solution from Crouch and Starfield (1973).");
+#endif
+
   PE("    May include routines based on copyrighted software of others.");
   PE("    Distributed under the GNU public license, see \"COPYING\".");
   PE("");

@@ -1,0 +1,3 @@
+#!/bin/bash
+
+for prop in 0 1 2

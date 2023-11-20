@@ -85,8 +85,7 @@ void print_patch_geometry_and_bc(int flt_offset,struct flt *fault,
       break;
     }
     case TWO_DIM_SEGMENT_PLANE_STRAIN:
-    case TWO_DIM_SEGMENT_PLANE_STRESS:
-    case RECTANGULAR_PATCH:{// normal rectangular fault, this is the default
+    case TWO_DIM_SEGMENT_PLANE_STRESS:{// normal rectangular fault, this is the default
       fprintf(out,"%19.12e %19.12e %19.12e %10.6f %10.6f %19.12e %19.12e %6i\n",
 	      fault[flt_offset].x[INT_X], fault[flt_offset].x[INT_Y], 
 	      fault[flt_offset].x[INT_Z],fault[flt_offset].strike,
@@ -101,6 +100,12 @@ void print_patch_geometry_and_bc(int flt_offset,struct flt *fault,
 	      fault[flt_offset].xt[INT_X],fault[flt_offset].xt[INT_Y],fault[flt_offset].xt[INT_Z],
 	      fault[flt_offset].xt[3+INT_X],fault[flt_offset].xt[3+INT_Y],fault[flt_offset].xt[3+INT_Z],
       	      fault[flt_offset].xt[6+INT_X],fault[flt_offset].xt[6+INT_Y],fault[flt_offset].xt[6+INT_Z]);
+      break;
+    }
+    case RECTANGULAR_PATCH:{
+      fprintf(out,"%15.8e %15.8e %15.8e %10.6f %10.6f %15.8e %15.8e %6i\n",
+	      fault[flt_offset].x[INT_X], fault[flt_offset].x[INT_Y], fault[flt_offset].x[INT_Z],fault[flt_offset].strike,
+	      fault[flt_offset].dip,fault[flt_offset].l,fault[flt_offset].w,fault[flt_offset].group);
       break;
     }
     default:

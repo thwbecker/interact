@@ -19,7 +19,7 @@ void create_patches(int flt, struct flt *fault,struct flt **patch,
   int segn[2];
   determine_segments(seg,segn,(fault+flt),circular,td);
   divide_fault_in_patches(flt,fault,patch,nrpatches,segn,circular,
-			  calculate_base_vecs,srand,drand,seed);
+			  calculate_base_vecs,srand,drand,seed,FALSE);
 }
 /*
 
@@ -59,7 +59,7 @@ void divide_fault_in_patches(int flt,struct flt *fault,
 			     my_boolean circular,
 			     my_boolean calculate_base_vecs,
 			     COMP_PRECISION srand, COMP_PRECISION drand,
-			     long *seed)
+			     long *seed,my_boolean verbose)
 {
   int i,j,mi,mj,irad,old_nrpatches,
     added_patches,pcnt;
@@ -68,6 +68,13 @@ void divide_fault_in_patches(int flt,struct flt *fault,
     l,w;
   double alpha;
   my_boolean randomize;
+#ifdef  ALLOW_NON_3DQUAD_GEOM
+  if(fault[flt].type != RECTANGULAR_PATCH){
+    fprintf(stderr,"divide_fault_in_patches: error, only set up for quads, type: %i\n",
+	    fault[flt].type);
+    exit(-1);
+  }
+#endif
   randomize = ((srand>0)||(drand>0))?(TRUE):(FALSE);
   
   added_patches=seg[0]*seg[1];
@@ -99,20 +106,48 @@ void divide_fault_in_patches(int flt,struct flt *fault,
     my_sincos_degd(&fault[flt].sin_alpha,&fault[flt].cos_alpha,alpha);
     my_sincos_deg(&sin_dip,&cos_dip,(COMP_PRECISION)fault[flt].dip);
     calc_quad_base_vecs(fault[flt].t_strike,fault[flt].normal,fault[flt].t_dip,
-			fault[flt].sin_alpha,fault[flt].cos_alpha,sin_dip,cos_dip);
+			fault[flt].sin_alpha,fault[flt].cos_alpha,sin_dip,
+			cos_dip);
+    if(verbose){
+      fprintf(stderr,"divide_fault_in_patches: e_strike: %11g %11g %11g\n",
+	      reformat_small(fault[flt].t_strike[INT_X]),
+	      reformat_small(fault[flt].t_strike[INT_Y]),
+	      reformat_small(fault[flt].t_strike[INT_Z]));
+      fprintf(stderr,"divide_fault_in_patches: e_dip:    %11g %11g %11g\n",
+	      reformat_small(fault[flt].t_dip[INT_X]),
+	      reformat_small(fault[flt].t_dip[INT_Y]),
+	      reformat_small(fault[flt].t_dip[INT_Z]));
+      fprintf(stderr,"divide_fault_in_patches: e_normal: %11g %11g %11g\n",
+	      reformat_small(fault[flt].normal[INT_X]),
+	      reformat_small(fault[flt].normal[INT_Y]),
+	      reformat_small(fault[flt].normal[INT_Z]));
+
+    }
   }
   // obtain corner points of original patch
   calculate_corners(corner,(fault+flt),&l,&w);
+  if(verbose){
+    for(i=0;i < ncon_of_patch((fault+flt));i++)
+      fprintf(stderr,"divide_fault_in_patches: vertex %i: %11g %11g %11g\n",
+	      i+1,reformat_small(corner[i][INT_X]),
+	      reformat_small(corner[i][INT_Y]),reformat_small(corner[i][INT_Z]));
+  }
   // new patch geometry
   newl = l / (COMP_PRECISION)seg[0];
   neww = w / (COMP_PRECISION)seg[1];
-  newarea = newl * neww;
-  for(i=0;i<3;i++){
-    dx[i] = fault[flt].t_strike[i]*newl;
-    dy[i] = fault[flt].t_dip[i]*neww;
+  if(verbose){
+    fprintf(stderr,"divide_fault_in_patches: converting from original l/w %g/%g to %g/%g\n",
+	    l,w,newl,neww);
   }
+  newarea = newl * neww;
+  for(i=0;i < 3;i++){
+    dx[i] = fault[flt].t_strike[i] * newl;
+    dy[i] = fault[flt].t_dip[i]    * neww;
+  }
+  //
   // assign common specs by copying them over from the 
   // fault to the patches
+  //
   for(i=old_nrpatches;i< *nrpatches;i++){
     fltcp((fault+flt),(*patch+i));
 
@@ -135,12 +170,12 @@ void divide_fault_in_patches(int flt,struct flt *fault,
     go left right, then top down
 
     */
-
     pcnt = old_nrpatches;
     for(j=seg[1]-1;j >= 0;j--){
-      for(i=0;i<seg[0];i++){
+      for(i=0;i < seg[0];i++){
+	//fprintf(stderr,"%i %i\n",i,j);
 	/* calculate position of patch in fault */
-	get_flt_location((*patch + pcnt),dx,dy,&corner[0][0],i,j);
+	get_flt_location((*patch + pcnt),dx,dy,&(corner[0][0]),i,j);
 	pcnt++;
       }
     }
@@ -168,7 +203,7 @@ void divide_fault_in_patches(int flt,struct flt *fault,
     }
   }
   // resize patch array if we did not need all the new patches
-  if(pcnt<added_patches){
+  if(pcnt < added_patches){
     *nrpatches = old_nrpatches + pcnt;
     *patch = (struct flt *)realloc(*patch,*nrpatches * sizeof(struct flt));
   }
@@ -185,7 +220,8 @@ void get_flt_location(struct flt *fault,COMP_PRECISION *dx,COMP_PRECISION *dy,
 {
   int k;
   for(k=0;k<3;k++){
-    fault->x[k]  = corner[k]+(0.5+(COMP_PRECISION)i)*dx[k];
+    fault->x[k]  = corner[k];
+    fault->x[k] += (0.5+(COMP_PRECISION)i)*dx[k];
     fault->x[k] += (0.5+(COMP_PRECISION)j)*dy[k];
   }
 }  

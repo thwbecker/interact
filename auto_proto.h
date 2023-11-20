@@ -113,7 +113,7 @@ void get_random_stress(double *, double *, double *, int, long *, int);
 /* divide_fault_in_patches.c */
 void create_patches(int, struct flt *, struct flt **, int *, int *, unsigned short, unsigned short, double *, double, double, long *);
 void determine_segments(int *, int *, struct flt *, unsigned short, double *);
-void divide_fault_in_patches(int, struct flt *, struct flt **, int *, int *, unsigned short, unsigned short, double, double, long *);
+void divide_fault_in_patches(int, struct flt *, struct flt **, int *, int *, unsigned short, unsigned short, double, double, long *,unsigned short);
 void get_flt_location(struct flt *, double *, double *, double *, int, int);
 void randomize_strike_dip(double, double, struct flt *, long *);
 /* eigensystem.c */

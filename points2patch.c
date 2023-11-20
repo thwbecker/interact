@@ -105,7 +105,7 @@ int main(int argc, char **argv)
     seg[1] = 1 + fault[0].w/dx;
     /* subdivide */
     divide_fault_in_patches(0,fault,&patch,&nrpatches,
-			    seg,FALSE,TRUE,0,0,&seed);
+			    seg,FALSE,TRUE,0,0,&seed,FALSE);
     medium->nrflt++;
   }
   for(i=0;i<nrpatches;i++){
