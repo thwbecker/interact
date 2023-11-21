@@ -319,6 +319,12 @@ void read_geometry(char *patch_filename,struct med **medium,
       lloc = sqrt((*fault+i)->area)/2;
       (*medium)->wmean += lloc;
       (*medium)->lmean += lloc;
+         
+      if(lloc > lmax)lmax=lloc;
+      if(lloc < lmin)lmin=lloc;
+      if(lloc > wmax)wmax=lloc;
+      if(lloc < wmin)wmin=lloc;
+  
     }
 #endif
     if(read_fault_properties){

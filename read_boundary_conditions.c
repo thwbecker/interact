@@ -699,7 +699,7 @@ void read_one_step_bc(FILE *in,struct med *medium,struct flt *fault,
 	  /* rotate prescribed global strike stress into local dip and
 	     strike */
 	  bc_value_s = project_vector(fault[patch_nr].t_strike,gstrike) * bc_value;
-	  bc_value_d = project_vector(fault[patch_nr].t_dip,gstrike)    * bc_value;
+	  bc_value_d = project_vector(fault[patch_nr].t_dip,   gstrike) * bc_value;
 	  rhs[patch_nr3+STRIKE] = bc_value_s - fault[patch_nr].s[STRIKE];
 	  rhs[patch_nr3+DIP]    = bc_value_d - fault[patch_nr].s[DIP];
 	  sma[patch_nr3+STRIKE] = ACTIVATED;
@@ -711,12 +711,12 @@ void read_one_step_bc(FILE *in,struct med *medium,struct flt *fault,
 #endif
 	}
 	//
-	
+	// assign strike mode
 	fault[patch_nr].mode[STRIKE]=(MODE_TYPE)bc_code;
 	if(rotate_to_local){
 	  /* for rotate to local, a global strike mode will activate
 	     local strike and dip modes */
-	  if(bc_is_directionally_unconstrained(fault[patch_nr].mode[STRIKE])){
+	  if(!bc_is_directionally_unconstrained(fault[patch_nr].mode[STRIKE])){
 	    /* 
 	       prescibed direction, decide on the local strike and dip modes that can accommodate this motion
 	    */
@@ -747,6 +747,8 @@ void read_one_step_bc(FILE *in,struct med *medium,struct flt *fault,
 	    else		/* only shear, switch on dip also */
 	      fault[patch_nr].mode[DIP] = DIP_SLIP;
 	  }
+	  //fprintf(stderr,"rtl: code %i unconstrained %i strike %i dip %i\n",bc_code,bc_is_directionally_unconstrained(bc_code),
+	  //fault[patch_nr].mode[STRIKE],fault[patch_nr].mode[DIP]);
 	}
 	if(bc_code > OS_C_OFFSET){// need to correct for normal stress changes
 	  if(fault[patch_nr].mu_s == 0.0){
@@ -802,8 +804,9 @@ void read_one_step_bc(FILE *in,struct med *medium,struct flt *fault,
 		    patch_nr,bc_value,fault[patch_nr].s[DIP],rhs[patch_nr3+DIP]);
 #endif
 	}else{
+	  /* rotate dip slip into local */
 	  bc_value_s = project_vector(fault[patch_nr].t_strike,gdip) * bc_value;
-	  bc_value_d = project_vector(fault[patch_nr].t_dip,gdip)    * bc_value;
+	  bc_value_d = project_vector(fault[patch_nr].t_dip,   gdip) * bc_value;
 	  rhs[patch_nr3+STRIKE] = bc_value_s - fault[patch_nr].s[STRIKE];
 	  rhs[patch_nr3+DIP] =    bc_value_d - fault[patch_nr].s[DIP];
 	  sma[patch_nr3+STRIKE] = ACTIVATED;
@@ -818,7 +821,7 @@ void read_one_step_bc(FILE *in,struct med *medium,struct flt *fault,
 	if(rotate_to_local){
 	  /* for rotate to local, a global dip mode will activate
 	     local strike and dip modes */
-	  if(bc_is_directionally_unconstrained(fault[patch_nr].mode[DIP])){
+	  if(!bc_is_directionally_unconstrained(fault[patch_nr].mode[DIP])){
 	    /* 
 	       prescibed direction, decide on the local strike and dip modes that can accommodate this motion
 	    */
@@ -1114,8 +1117,7 @@ void read_one_step_bc(FILE *in,struct med *medium,struct flt *fault,
       for(j=0;j<3;j++){// loop through possible modes
 	if(bc_is_directionally_unconstrained(fault[i].mode[j])){
 	  /* 
-	     first the unconstrained modes, 
-	     slip can go either way
+	     first the unconstrained modes, slip can go either way
 	  */
 	  
 	  /* 

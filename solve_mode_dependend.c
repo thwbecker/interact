@@ -309,7 +309,7 @@ void assemble_a_matrix_4(A_MATRIX_PREC *a,int naflt,
 
 /*
 
-  add the stress change due to slip at certain fault
+  add the stress change due to slip at certain fault r_flt
   to medium stresses
 
 */
@@ -337,50 +337,108 @@ void add_quake_stress_4(my_boolean *sma,COMP_PRECISION *slip,
   int i,j,k;
 #ifdef COMP_MODE_3
   int iret;
-  I_MATRIX_PREC iadbl;
+  I_MATRIX_PREC iadbl,u[3],sm[3][3],disp[3],trac[3];
 #endif
   for(i=0;i<medium->nrflt;i++){/* loop through all flts */
+   
+	
+#ifdef COMP_MODE_1
+    /* 
+       we have the interactions precomputed
+    */
     for(j=0;j<3;j++){/* loop through all 
 			possible slip dirs. */
-      if(sma[j])
+      if(sma[j]){
 	for(k=0;k<3;k++){/* calculate all 
 			    affected components */
-#ifdef COMP_MODE_1
+	  
 	  fault[i].s[k] += 
 	    ((COMP_PRECISION)ICIM(medium->i,i,r_flt,j,k)) * slip[j];
 	  //	  fprintf(stderr,"rupnr: %5i recnr: %5i smode: %i stype: %i ic: %12g slip: %12g\n",
 	  //	  r_flt,i,j,k,ICIM(medium->i,i,r_flt,j,k),slip[j]);
+	}
+      }
+    }
 #elif defined COMP_MODE_2
-	  fault[i].s[k] += 
-	    ((COMP_PRECISION)ic_from_file(i,r_flt,j,k,medium)) *
-	    slip[j];
+    /* 
+
+       from file, really?!? 
+
+    */
+    for(j=0;j<3;j++){/* loop through all 
+			possible slip dirs. */
+      if(sma[j]){
+	for(k=0;k<3;k++){
+	  fault[i].s[k] += ((COMP_PRECISION)ic_from_file(i,r_flt,j,k,medium)) * slip[j];
+	}
+      }
+    }
 #elif defined COMP_MODE_3
-	  // calculate now
-	  iadbl = interaction_coefficient(i,r_flt,j,k,fault,&iret);
-	  // check if we are in a one-step calculation and below
-	  // the threshold for sparse matrix storage
-	  if(medium->solver_mode == SPARSE_SOLVER){
+    /* 
+       
+       calculate the effect of slip in terms of fault stress right now
+
+    */
+    if(medium->solver_mode == SPARSE_SOLVER){
+      /* 
+
+	 this does the one by one loop for some internal consistency I cannot remember
+
+      */
+      for(j=0;j<3;j++){/* loop through all 
+			  possible slip dirs. */
+	if(sma[j]){
+	  for(k=0;k<3;k++){
+	    iadbl = interaction_coefficient(i,r_flt,j,k,fault,&iret);
 	    // if so, make sure that cutoff values are consistent
 	    if(fabs(iadbl) < medium->i_mat_cutoff){
 	      iadbl = 0.0;
 	      iret = 1;// don't add small entries
 	    }
+	    if(!iret)
+	      fault[i].s[k] += iadbl * slip[j];
+	    fprintf(stderr,"sparse mode: rupnr: 1x1 %5i recnr: %5i smode: %i stype: %i ic: %12g slip: %12g iret: %i\n",r_flt,i,j,k,iadbl,slip[j],iret);
 	  }
-	  if(!iret)
-	    fault[i].s[k] += iadbl * slip[j];
-	  //	  fprintf(stderr,"rupnr: %5i recnr: %5i smode: %i stype: %i ic: %12g slip: %12g\n",
-	  //  r_flt,i,j,k,iadbl,slip[j]);
-
-#else 
+	}
+      }
+    }else{
+      /* 
+	 
+	 compute stress change to due slip for all three components
+	 
+      */
+#ifdef DEBUG
+      for(j=0;j<3;j++)	/* check */
+	if((fabs(slip[j])!=0)&&(!sma[j])){
+	  fprintf(stderr,"add_quake_stress_3: patch %i slip %g %g %g but sma %i %i %i\n",
+		    i,slip[0],slip[1],slip[2],sma[0],sma[1],sma[2]);
+	  exit(-1);
+	}
+#endif
+      /* compute effect of full slip vector */
+      eval_green(fault[i].x,(fault+r_flt),slip,u,sm,&iret);
+      if(!iret){
+	resolve_force(fault[i].normal,sm,trac);
+	fault[i].s[STRIKE]  += project_vector(trac,fault[i].t_strike);
+	fault[i].s[DIP]     += project_vector(trac,fault[i].t_dip);
+	fault[i].s[NORMAL]  += project_vector(trac,fault[i].normal);
+      }
+    }
+#else
+    for(j=0;j < 3;j++){/* loop through all 
+			possible slip dirs. */
+      if(sma[j]){
+	
+	for(k=0;k<3;k++){
 	  // numerical recipes sparse matrix scheme
 	  fault[i].s[k] += 
 	    ((COMP_PRECISION)get_nrs_sparse_el(POSII(r_flt,j),POSIJ(i,k),
-					       medium->is1,medium->val))*
-	    slip[j];
-#endif
+					       medium->is1,medium->val))*slip[j];
 	}
+      }
     }
-  }
+#endif
+  } /* number of receiving fault loops */
 }
 
 /*

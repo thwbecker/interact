@@ -167,7 +167,10 @@ void print_fault_data(char *filename,struct med *medium,struct flt *fault)
 	val[1] = ((COMP_PRECISION)fault[i].mu_d)*fault[i].s[NORMAL];
 #ifdef ALLOW_NON_3DQUAD_GEOM
 	if(fault[i].type==TRIANGULAR){
+	  /* triangular element will have local stress and slip
+	     rotated into global system */
 	  if((fault[i].strike != old_rstrike)||(fault[i].dip != old_rdip)){
+	    /* need to compute new global basis vectors */
 	    fprintf(stderr,"patch %03i triangular, rotating to global strike %g dip %g (not repeating for same angles)\n",
 		    i,fault[i].strike,fault[i].dip);
 	    /* compute appropriate projection vectors */
@@ -181,16 +184,16 @@ void print_fault_data(char *filename,struct med *medium,struct flt *fault)
 	    old_rstrike = fault[i].strike;
 	  }
 	 
-	  for(j=0;j<3;j++){
-	    slip[j] = fault[i].t_strike[j]*fault[i].u[STRIKE]+fault[i].t_dip[j]*fault[i].u[DIP]+fault[i].normal[j]*fault[i].u[NORMAL];
-	    trac[j] = fault[i].t_strike[j]*fault[i].s[STRIKE]+fault[i].t_dip[j]*fault[i].s[DIP]+fault[i].normal[j]*fault[i].s[NORMAL];
+	  for(j=0;j<3;j++){	/* shear components only */
+	    slip[j] = fault[i].t_strike[j]*fault[i].u[STRIKE]+fault[i].t_dip[j]*fault[i].u[DIP];
+	    trac[j] = fault[i].t_strike[j]*fault[i].s[STRIKE]+fault[i].t_dip[j]*fault[i].s[DIP];
 	  }
 	  val[2] = project_vector(slip,gstrike);
-	  val[3] = project_vector(slip,gnormal);
+	  val[3] = fault[i].u[NORMAL];//project_vector(slip,gnormal);
 	  val[4] = project_vector(slip,gdip);
 
 	  val[5] = project_vector(trac,gstrike);
-	  val[6] = project_vector(trac,gnormal);
+	  val[6] = fault[i].s[NORMAL];	  //val[6] = project_vector(trac,gnormal);
 	  val[7] = project_vector(trac,gdip);
 	  
 	}else{
