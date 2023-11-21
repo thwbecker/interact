@@ -8,6 +8,7 @@ void block_save_solution_and_faults(double *, int, int, struct bflt *, double *,
 void block_load_solution_and_faults(double **, int *, int *, struct bflt **, double **, struct prj **, FILE *, unsigned char *, unsigned char *);
 void block_eval_blockvec(double *, double, int, double *, struct prj *, double *);
 /* block_evaluate_solution.c */
+/* blockinvert.c */
 /* block_levmarq.c */
 void run_lm(struct bmd *, long int *, struct prj, double *, unsigned char, unsigned char, double, double *, unsigned char, unsigned char, double, unsigned char, unsigned char, unsigned char, int, int, char **);
 /* block_matrix.c */
@@ -76,7 +77,6 @@ void calc_dir_diff_vec(double *, double *, double *, int, unsigned char);
 double calc_dir_diff(double, double, unsigned char);
 void cart_mat_from_horsym(double, double, double, double *);
 void rescale_observed_stresses(double *, double *, double *, double, double *, unsigned char, struct bmd *, unsigned char, unsigned char);
-/* blockinvert.c */
 /* calc_cart_from_eigen_stress.c */
 unsigned char read_vecs(int, double *, double *, double *, double *, double *);
 void ccfes_help(char **);
@@ -167,7 +167,6 @@ int calc_absolute_shear_stress(double *, int, struct flt *);
 /* fstress2hor.c */
 /* generate_random_2d.c */
 /* generate_slipdia.c */
-/* geo_okada.c */
 /* geometry.c */
 void calc_lhemi_proj(double, double, double *);
 void resolve_force(double *, double [3][3], double *);
@@ -209,6 +208,9 @@ void background_disp(double *, double *, struct med *, double *, double *);
 void get_local_x_on_plane(double *, double *, double *, double *, double *);
 void get_fault_plane_basevec(double *, double *, double *, struct flt *, struct med *);
 void calc_deviatoric_stress(double [3][3], double [3][3], double *, double *);
+void calc_global_strike_dip_from_local(struct flt *, double *, double *, double *);
+void calc_global_slip_and_traction_from_local(struct flt *, double *, double *, double *, double *, double *, double *, double *);
+/* geo_okada.c */
 /* get_projected_fault_parameters.c */
 void get_projected_fault_parameters(double [2][2], double, double *, double *, double *, double *, double *, double *);
 /* help_and_comments.c */

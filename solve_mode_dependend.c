@@ -337,9 +337,15 @@ void add_quake_stress_4(my_boolean *sma,COMP_PRECISION *slip,
   int i,j,k;
 #ifdef COMP_MODE_3
   int iret;
-  I_MATRIX_PREC iadbl,u[3],sm[3][3],disp[3],trac[3];
+  I_MATRIX_PREC iadbl,u[3],sm[3][3],trac[3];
+#ifdef ALLOW_NON_3DQUAD_GEOM
+#ifdef SUPER_DUPER_DEBUG
+  
+  COMP_PRECISION gstrike[3],gdip[3],gnormal[3],uglobal[3],tglobal[3];
 #endif
-  for(i=0;i<medium->nrflt;i++){/* loop through all flts */
+#endif
+#endif
+  for(i=0;i < medium->nrflt;i++){/* loop through all flts */
    
 	
 #ifdef COMP_MODE_1
@@ -415,13 +421,38 @@ void add_quake_stress_4(my_boolean *sma,COMP_PRECISION *slip,
 	  exit(-1);
 	}
 #endif
-      /* compute effect of full slip vector */
+
+#ifdef SUPER_DUPER_DEBUG
+#ifdef ALLOW_NON_3DQUAD_GEOM
+      if(fault[i].type == TRIANGULAR){
+	fprintf(stderr,"add_quake_stress_3: rec %03i rup %03i slip %10.3e, %10.3e, %10.3e s/d %.2f %.2f",
+		i,r_flt,slip[STRIKE],slip[DIP],slip[NORMAL],fault[i].strike,fault[i].dip);
+	calc_global_strike_dip_from_local((fault+i),gstrike,gnormal,gdip);
+	calc_global_slip_and_traction_from_local((fault+i),slip,slip,gstrike, gnormal,gdip,uglobal,tglobal);
+	fprintf(stderr," gslip %10.3e, %10.3e, %10.3e\n",uglobal[0],uglobal[2],uglobal[1]);
+      }else{
+	fprintf(stderr,"add_quake_stress_3: rec %03i rup %03i slip %10.3e, %10.3e, %10.3e\n",i,r_flt,slip[STRIKE],slip[DIP],slip[NORMAL]);
+      }
+#endif
+#endif
+      /* evaluate the greens function for slipping fault r_flt at
+	 receiver location centroids of fault i */
       eval_green(fault[i].x,(fault+r_flt),slip,u,sm,&iret);
       if(!iret){
-	resolve_force(fault[i].normal,sm,trac);
+	/* project the stresses */
+	resolve_force(fault[i].normal,sm,trac); /* convert to local
+						   traction vector */
 	fault[i].s[STRIKE]  += project_vector(trac,fault[i].t_strike);
 	fault[i].s[DIP]     += project_vector(trac,fault[i].t_dip);
 	fault[i].s[NORMAL]  += project_vector(trac,fault[i].normal);
+#ifdef SUPER_DUPER_DEBUG
+	fprintf(stderr,"add_quake_stress_3: rec %03i rup %03i t %10.3e %10.3e %10.3e with sv (%9.2e,%9.2e,%9.2e) %9.2e (t:%9.2e) dv (%9.2e,%9.2e,%9.2e) %9.2e (t:%9.2e) nv (%9.2e,%9.2e,%9.2e) %9.2e (t:%9.2e)\n",i,r_flt,
+		trac[0],trac[1],trac[2],
+		fault[i].t_strike[0],fault[i].t_strike[1],fault[i].t_strike[2], project_vector(trac,fault[i].t_strike),fault[i].s[STRIKE],
+		fault[i].t_dip[0],fault[i].t_dip[1],fault[i].t_dip[2], project_vector(trac,fault[i].t_dip),fault[i].s[DIP],
+		fault[i].normal[0],fault[i].normal[1],fault[i].normal[2],project_vector(trac,fault[i].normal),fault[i].s[NORMAL]);
+#endif
+
       }
     }
 #else

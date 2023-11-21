@@ -94,16 +94,16 @@ void print_patch_geometry_and_bc(int flt_offset,struct flt *fault,
       break;
     }
     case TRIANGULAR:{// xt has to be assigned and allocated before
-      fprintf(out,"%15.8e %15.8e %15.8e %10.6f %10.6f %15.8e %15.8e %6i ",
+      fprintf(out,"%19.12e %19.12e %19.12e %10.6f %10.6f %19.12e %19.12e %6i ",
 	      999.,999.,999.,999.,999.,-1.,-1.,fault[flt_offset].group);
-      fprintf(out,"%15.8e %15.8e %15.8e %15.8e %15.8e %15.8e %15.8e %15.8e %15.8e\n",
+      fprintf(out,"%19.12e %19.12e %19.12e %19.12e %19.12e %19.12e %19.12e %19.12e %19.12e\n",
 	      fault[flt_offset].xt[INT_X],fault[flt_offset].xt[INT_Y],fault[flt_offset].xt[INT_Z],
 	      fault[flt_offset].xt[3+INT_X],fault[flt_offset].xt[3+INT_Y],fault[flt_offset].xt[3+INT_Z],
       	      fault[flt_offset].xt[6+INT_X],fault[flt_offset].xt[6+INT_Y],fault[flt_offset].xt[6+INT_Z]);
       break;
     }
     case RECTANGULAR_PATCH:{
-      fprintf(out,"%15.8e %15.8e %15.8e %10.6f %10.6f %15.8e %15.8e %6i\n",
+      fprintf(out,"%19.12e %19.12e %19.12e %10.6f %10.6f %19.12e %19.12e %6i\n",
 	      fault[flt_offset].x[INT_X], fault[flt_offset].x[INT_Y], fault[flt_offset].x[INT_Z],fault[flt_offset].strike,
 	      fault[flt_offset].dip,fault[flt_offset].l,fault[flt_offset].w,fault[flt_offset].group);
       break;
@@ -116,7 +116,7 @@ void print_patch_geometry_and_bc(int flt_offset,struct flt *fault,
     }
 #else
     // only rectangular
-    fprintf(out,"%15.8e %15.8e %15.8e %10.6f %10.6f %15.8e %15.8e %6i\n",
+    fprintf(out,"%19.12e %19.12e %19.12e %10.6f %10.6f %19.12e %19.12e %6i\n",
 	    fault[flt_offset].x[INT_X], fault[flt_offset].x[INT_Y], fault[flt_offset].x[INT_Z],fault[flt_offset].strike,
 	    fault[flt_offset].dip,fault[flt_offset].l,fault[flt_offset].w,fault[flt_offset].group);
 #endif

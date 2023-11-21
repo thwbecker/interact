@@ -29,17 +29,19 @@ void calc_lhemi_proj(COMP_PRECISION dip, COMP_PRECISION strike,
 }
 
 /* 
-   obtain a traction vector given matrix sm and
-   normal vector on the plane 
+   obtain a traction vector given matrix sm and normal vector on the
+   plane, left multiply
 */
 
 void resolve_force(COMP_PRECISION *norm,COMP_PRECISION sm[3][3],
 		   COMP_PRECISION *trac)
 {
   int i,j;
-  for(i=0;i<3;i++)
-    for(trac[i]=0.0,j=0;j<3;j++)
+  for(i=0;i<3;i++){
+    trac[i] = 0.0;
+    for(j=0;j < 3;j++)
       trac[i] += norm[j] * sm[i][j];
+  }
 }
 /* 
    given a quad fault patch with specified angles strike and dip
@@ -1165,3 +1167,57 @@ void calc_deviatoric_stress(COMP_PRECISION sm[3][3],COMP_PRECISION dm[3][3],
 		   dm[INT_Z][INT_Z] * dm[INT_Z][INT_Z] + 
 		   dm[INT_X][INT_Z] * dm[INT_X][INT_Z] * 2.0));
 }
+
+
+#ifdef ALLOW_NON_3DQUAD_GEOM
+
+/* compute the global basis vectors for a triangular patch */
+void calc_global_strike_dip_from_local(struct flt *fault,COMP_PRECISION *gstrike, COMP_PRECISION *gnormal, COMP_PRECISION *gdip)
+{
+  COMP_PRECISION global_dip_rad,sin_global_dip_rad,cos_global_dip_rad;
+#ifdef DEBUG
+  if(fault->type != TRIANGULAR){
+    fprintf(stderr,"calc_global_strike_dip_from_local: called for a non triangular patch?!\n");
+    exit(-1);
+  }
+#endif
+  /* compute appropriate projection vectors */
+  global_dip_rad   = DEG2RADF((COMP_PRECISION)fault->dip);
+  my_sincos(&sin_global_dip_rad,&cos_global_dip_rad,global_dip_rad);
+  calc_quad_base_vecs(gstrike, gnormal, gdip,
+		      fault->sin_alpha, fault->cos_alpha,
+		      sin_global_dip_rad,   cos_global_dip_rad);
+}
+/* 
+   compute the projection of fault local properties to global assuming
+   projection vectors already computed
+   input slip and tractions are fault local
+
+   vectors are sorted STRIKE, NORMAL, DIP
+*/
+void calc_global_slip_and_traction_from_local(struct flt *fault,COMP_PRECISION *slip,COMP_PRECISION *trac,
+					      COMP_PRECISION *gstrike, COMP_PRECISION *gnormal, COMP_PRECISION *gdip,
+					      COMP_PRECISION *gslip,COMP_PRECISION *gtrac)
+{
+  int j;
+  COMP_PRECISION lslip[3],ltrac[3];
+#ifdef DEBUG
+  if(fault->type != TRIANGULAR){
+    fprintf(stderr,"calc_global_strike_dip_from_local: called for a non triangular patch?!\n");
+    exit(-1);
+  }
+#endif
+  for(j=0;j<3;j++){		/* global slip and strike vectors */
+    lslip[j] = fault->t_strike[j] * slip[STRIKE] + fault->t_dip[j] * slip[DIP] + fault->normal[j] * slip[NORMAL];
+    ltrac[j] = fault->t_strike[j] * trac[STRIKE] + fault->t_dip[j] * trac[DIP] + fault->normal[j] * trac[NORMAL];
+  }
+  /* project into global coordinate system */
+  gslip[0] = project_vector(lslip,gstrike);
+  gslip[1] = project_vector(lslip,gnormal);
+  gslip[2] = project_vector(lslip,gdip);
+  
+  gtrac[0] = project_vector(ltrac,gstrike);
+  gtrac[1] = project_vector(ltrac,gnormal);
+  gtrac[2] = project_vector(ltrac,gdip);
+}
+#endif

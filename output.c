@@ -141,8 +141,7 @@ void print_fault_data(char *filename,struct med *medium,struct flt *fault)
   FILE *out;
   COMP_PRECISION val[NR_VAL],abs_tau;
 #ifdef ALLOW_NON_3DQUAD_GEOM
-  COMP_PRECISION global_dip_rad,sin_global_dip_rad,cos_global_dip_rad;
-  COMP_PRECISION gstrike[3],gdip[3],gnormal[3],slip[3],trac[3],old_rdip = FLT_MAX,old_rstrike = FLT_MAX;
+  COMP_PRECISION gstrike[3],gdip[3],gnormal[3],old_rdip = FLT_MAX,old_rstrike = FLT_MAX;
 #endif
   out=myopen(filename,"w");
   fprintf(stderr,
@@ -150,7 +149,7 @@ void print_fault_data(char *filename,struct med *medium,struct flt *fault)
   fprintf(stderr,
 	  "print_fault_data: format: pos_1 pos_2 area s_c m_d*s_n u_s u_n u_d s_s s_n s_d patch_nr group_nr\n");
   fprintf(out,"# fault state: note that stresses are only those due to slip and do not include background stress\n");
-  fprintf(out,"%10s %10s %10s %10s %10s %13s %13s %13s %13s %13s %13s %5s %5s\n",
+  fprintf(out,"%10s %10s %10s %10s %10s %18s %18s %18s %18s %18s %18s %5s %5s\n",
 	  "#    pos_1/W","pos_2/W","area","s_c", "m_d*s_n", "u_s", "u_n", "u_d", 
 	  "s_s", "s_n", "s_d","pach#","grp#");
 
@@ -170,32 +169,19 @@ void print_fault_data(char *filename,struct med *medium,struct flt *fault)
 	  /* triangular element will have local stress and slip
 	     rotated into global system */
 	  if((fault[i].strike != old_rstrike)||(fault[i].dip != old_rdip)){
-	    /* need to compute new global basis vectors */
+	    /* 
+	       need to compute new global basis vectors 
+	    */
 	    fprintf(stderr,"patch %03i triangular, rotating to global strike %g dip %g (not repeating for same angles)\n",
 		    i,fault[i].strike,fault[i].dip);
-	    /* compute appropriate projection vectors */
-	    global_dip_rad   = DEG2RADF((COMP_PRECISION)fault[i].dip);
-	    my_sincos(&sin_global_dip_rad,&cos_global_dip_rad,global_dip_rad);
-	    calc_quad_base_vecs(gstrike, gnormal, gdip,
-				fault[i].sin_alpha, fault[i].cos_alpha,
-				sin_global_dip_rad,   cos_global_dip_rad);
-	    
+	    calc_global_strike_dip_from_local((fault+i),gstrike, gnormal, gdip);
 	    old_rdip = fault[i].dip;
 	    old_rstrike = fault[i].strike;
 	  }
-	 
-	  for(j=0;j<3;j++){	/* shear components only */
-	    slip[j] = fault[i].t_strike[j]*fault[i].u[STRIKE]+fault[i].t_dip[j]*fault[i].u[DIP];
-	    trac[j] = fault[i].t_strike[j]*fault[i].s[STRIKE]+fault[i].t_dip[j]*fault[i].s[DIP];
-	  }
-	  val[2] = project_vector(slip,gstrike);
-	  val[3] = fault[i].u[NORMAL];//project_vector(slip,gnormal);
-	  val[4] = project_vector(slip,gdip);
-
-	  val[5] = project_vector(trac,gstrike);
-	  val[6] = fault[i].s[NORMAL];	  //val[6] = project_vector(trac,gnormal);
-	  val[7] = project_vector(trac,gdip);
-	  
+	  /* 
+	     project to global for output 
+	  */
+	  calc_global_slip_and_traction_from_local((fault+i),fault[i].u,fault[i].s,gstrike, gnormal, gdip,(val+2),(val+5));
 	}else{
 	  val[2] = fault[i].u[STRIKE];// slip values
 	  val[3] = fault[i].u[NORMAL];
@@ -222,7 +208,7 @@ void print_fault_data(char *filename,struct med *medium,struct flt *fault)
 	for(j=2;j<NR_VAL;j++){
 	  // nah, leave those in 
 	  //val[j] = reformat_small(val[j]);
-	  fprintf(out,"%13.6e ",val[j]);
+	  fprintf(out,"%20.12e ",val[j]);
 	}
 	fprintf(out,"%5i %5i",i,grp);
 	fprintf(out,"\n");

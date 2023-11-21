@@ -8,6 +8,7 @@ void block_save_solution_and_faults(float *, int, int, struct bflt *, float *, s
 void block_load_solution_and_faults(float **, int *, int *, struct bflt **, float **, struct prj **, FILE *, unsigned char *, unsigned char *);
 void block_eval_blockvec(float *, float, int, float *, struct prj *, float *);
 /* block_evaluate_solution.c */
+/* blockinvert.c */
 /* block_levmarq.c */
 void run_lm(struct bmd *, long int *, struct prj, float *, unsigned char, unsigned char, float, float *, unsigned char, unsigned char, float, unsigned char, unsigned char, unsigned char, int, int, char **);
 /* block_matrix.c */
@@ -76,7 +77,6 @@ void calc_dir_diff_vec(float *, float *, float *, int, unsigned char);
 float calc_dir_diff(float, float, unsigned char);
 void cart_mat_from_horsym(float, float, float, float *);
 void rescale_observed_stresses(float *, float *, float *, float, float *, unsigned char, struct bmd *, unsigned char, unsigned char);
-/* blockinvert.c */
 /* calc_cart_from_eigen_stress.c */
 unsigned char read_vecs(int, float *, float *, float *, float *, float *);
 void ccfes_help(char **);
@@ -167,7 +167,6 @@ int calc_absolute_shear_stress(float *, int, struct flt *);
 /* fstress2hor.c */
 /* generate_random_2d.c */
 /* generate_slipdia.c */
-/* geo_okada.c */
 /* geometry.c */
 void calc_lhemi_proj(float, float, float *);
 void resolve_force(float *, float [3][3], float *);
@@ -209,6 +208,9 @@ void background_disp(float *, float *, struct med *, float *, float *);
 void get_local_x_on_plane(float *, float *, float *, float *, float *);
 void get_fault_plane_basevec(float *, float *, float *, struct flt *, struct med *);
 void calc_deviatoric_stress(float [3][3], float [3][3], float *, float *);
+void calc_global_strike_dip_from_local(struct flt *, float *, float *, float *);
+void calc_global_slip_and_traction_from_local(struct flt *, float *, float *, float *, float *, float *, float *, float *);
+/* geo_okada.c */
 /* get_projected_fault_parameters.c */
 void get_projected_fault_parameters(float [2][2], float, float *, float *, float *, float *, float *, float *);
 /* help_and_comments.c */

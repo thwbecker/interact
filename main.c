@@ -170,6 +170,9 @@ int main(int argc, char **argv)
 		     medium->xsol_con,medium->nameaf_con,
 		     medium,fault,FALSE,TRUE,1.0);
     }
+    HEADNODE{
+      print_fault_data(ONE_STEP_FAULT_DATA_FILE,medium,fault);
+    }
     if(medium->print_bulk_fields || medium->read_oloc_from_file){
       calc_fields(medium,fault,FALSE,FALSE,a,b); /* all nodes compute,
 						    but only head node
@@ -185,9 +188,7 @@ int main(int argc, char **argv)
 	/*  print_stress_on_fault(medium,fault,0);  */
       }
     }
-    HEADNODE{
-      print_fault_data(ONE_STEP_FAULT_DATA_FILE,medium,fault);
-    }
+   
     break;
   }}
   terminate(medium,fault);

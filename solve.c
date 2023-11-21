@@ -589,9 +589,7 @@ int solve(struct med *medium,struct flt *fault)
    like
  
    if add_quake_stress is not set, will not calculate the stress
-   change (since
-   
-   it was done before) and not add to the fault slip counter
+   change (since it was done before) and not add to the fault slip counter
 
 */
 void add_solution(int naflt,my_boolean *sma,A_MATRIX_PREC *xsol,int *nameaf,
@@ -601,39 +599,75 @@ void add_solution(int naflt,my_boolean *sma,A_MATRIX_PREC *xsol,int *nameaf,
 {
   int i,j,eqc,ip;
   COMP_PRECISION slip[3];
-  for(eqc=i=ip=0;i<naflt;i++,ip += 3){
-    // create a slip vector  by looping through all components
-    for(j=0;j<3;j++){
-      slip[j]=0.0;
-      // if we use all modes, change with direction j
-      // else, use only mode[0]
-      switch(fault[nameaf[i]].mode[(medium->nr_flt_mode==3)?(j):(0)]){
-	/* give a list of constrained equations that have
-	   to be taken negative */
-      case COULOMB_STRIKE_SLIP_RIGHTLATERAL:
-      case COULOMB_DIP_SLIP_DOWNWARD:
-      case STRIKE_SLIP_RIGHTLATERAL:
-      case DIP_SLIP_DOWNWARD:
-      case NORMAL_SLIP_INWARD:{
-	/* for these, we will have to subtract the solution
-	   as non-negative should actually go in the other
-	   direction */
-	if(sma[ip + j]){
-	  slip[j]= -((COMP_PRECISION)xsol[eqc] * sfac);
-	  eqc++;
+  if(medium->nr_flt_mode == 3){
+    for(eqc=i=ip=0;i < naflt;i++,ip += 3){
+      // create a slip vector  by looping through all components
+      for(j=0;j < 3;j++){
+	slip[j] = 0.0;
+	// if we use all modes, change with direction j
+	// else, use only mode[0]
+	switch(fault[nameaf[i]].mode[j]){
+	  /* give a list of constrained equations that have
+	     to be taken negative */
+	case COULOMB_STRIKE_SLIP_RIGHTLATERAL:
+	case COULOMB_DIP_SLIP_DOWNWARD:
+	case STRIKE_SLIP_RIGHTLATERAL:
+	case DIP_SLIP_DOWNWARD:
+	case NORMAL_SLIP_INWARD:{
+	  /* for these, we will have to subtract the solution
+	     as non-negative should actually go in the other
+	     direction */
+	  if(sma[ip + j]){
+	    slip[j]= -((COMP_PRECISION)xsol[eqc] * sfac);
+	    eqc++;
+	  }
+	  break;
 	}
-	break;
+	default:{
+	  if(sma[ip + j]){
+	    slip[j]=   ((COMP_PRECISION)xsol[eqc] * sfac);
+	    eqc++;
+	  }
+	  break;
+	}}
       }
-      default:{
-	if(sma[ip + j]){
-	  slip[j]=   ((COMP_PRECISION)xsol[eqc] * sfac);
-	  eqc++;
-	}
-	break;
-      }}
+      quake((sma+ip),slip,nameaf[i],fault,medium,add_quake_stress,mark_quake);
     }
-    /* assign slip and stress increments to all faults */
-    quake((sma+ip),slip,nameaf[i],fault,medium,add_quake_stress,mark_quake);
+  }else{
+    for(eqc=i=ip=0;i < naflt;i++,ip += 3){
+      // create a slip vector  by looping through all components
+      for(j=0;j < 3;j++){
+	slip[j] = 0.0;
+	// if we use all modes, change with direction j
+	// else, use only mode[0]
+	switch(fault[nameaf[i]].mode[0]){
+	  /* give a list of constrained equations that have
+	     to be taken negative */
+	case COULOMB_STRIKE_SLIP_RIGHTLATERAL:
+	case COULOMB_DIP_SLIP_DOWNWARD:
+	case STRIKE_SLIP_RIGHTLATERAL:
+	case DIP_SLIP_DOWNWARD:
+	case NORMAL_SLIP_INWARD:{
+	  /* for these, we will have to subtract the solution
+	     as non-negative should actually go in the other
+	     direction */
+	  if(sma[ip + j]){
+	    slip[j]= -((COMP_PRECISION)xsol[eqc] * sfac);
+	    eqc++;
+	  }
+	  break;
+	}
+	default:{
+	  if(sma[ip + j]){
+	    slip[j]=   ((COMP_PRECISION)xsol[eqc] * sfac);
+	    eqc++;
+	  }
+	  break;
+	}}
+      }
+      /* assign slip and stress increments to all faults */
+      quake((sma+ip),slip,nameaf[i],fault,medium,add_quake_stress,mark_quake);
+    }
   }
 }
 
