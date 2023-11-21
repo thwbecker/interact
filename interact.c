@@ -431,12 +431,15 @@ COMP_PRECISION interaction_coefficient(int i, int j, int k, int l,
      (old_indices[2] != k)){
     // obtain appropriate slip vector for slip mode k
     get_right_slip(disp,k,1.0);
-    /* obtain the stress vector at fault i when fault j
+    /* obtain the stress vector at fault i (centroid) when fault j
        slips with disp[] */
     eval_green(fault[i].x,(fault+j),disp,u,sm,iret);
-    if(! *iret)// if not singular,
+    if(! *iret){// if not singular,
       // obtain the traction vector for i,j,k 
       resolve_force(fault[i].normal,sm,trac);
+    }else{
+      fprintf(stderr,"interaction_coefficient: NAN returned\n");
+    }
     old_indices[0]=i;old_indices[1]=j;old_indices[2]=k;
     // use fourth index for singular code
     old_indices[3]= *iret;

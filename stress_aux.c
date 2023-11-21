@@ -1,9 +1,7 @@
 /*
   interact: model fault interactions using dislocations in a 
             halfspace
-  (C) Thorsten Becker, becker@eps.harvard.edu
-
-  $Id: stress_aux.c,v 1.2 2004/01/26 01:16:23 becker Exp $
+  (C) Thorsten Becker, becker@post.harvard.edu
 
   auxiliary functions for stress computations
 

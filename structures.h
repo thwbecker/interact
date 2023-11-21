@@ -305,8 +305,8 @@ struct flt{
 
 			*/
   double cos_alpha,/* cos and sin alpha, which is
-			      angle counterclockwise from East,
-			      ie. 90 - strike */
+		      angle counterclockwise from East,
+		      ie. 90 - strike */
     sin_alpha;
   COMP_PRECISION normal[3],
     t_strike[3],t_dip[3]; /* normal and tangential 

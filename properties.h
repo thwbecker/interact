@@ -72,7 +72,7 @@
    should be on the order of the fault's width if things
    are to work out reasonably
 */
-#define CHAR_FAULT_DIM 1.0
+#define CHAR_FAULT_DIM 1.0	/* best to leave that at unity */
 /* 
    the pressure scale is given via the characteristic
    stress drop such that in reality

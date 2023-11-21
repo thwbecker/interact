@@ -56,12 +56,6 @@ int read_fltdat(char *filename,struct flt *fault,struct med *medium,
   for(grp=0;grp<medium->nrgrp;grp++)
     for(i=0;i<medium->nrflt;i++){
       if(fault[i].group == grp){
-#ifdef ALLOW_NON_3DQUAD_GEOM
-	if(fault[i].type == TRIANGULAR){
-	  fprintf(stderr,"read_fltdat: non quad not implemented\n");
-	  exit(-1);
-	}
-#endif
 	if((iread=fscanf(in,FLTDAT_FORMAT,&fault[i].pos[0],&fault[i].pos[1],&fault[i].area,&coulomb,
 		  &mud_normal,&fault[i].u[STRIKE],&fault[i].u[NORMAL],&fault[i].u[DIP],
 			 &fault[i].s[STRIKE],&fault[i].s[NORMAL],&fault[i].s[DIP],&ipatch,&igrp))!=13){

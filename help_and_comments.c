@@ -192,12 +192,11 @@ void phelp(void)
   PE("     if the strike and dip movement modes are to be activated the same time).");
 #ifdef ALLOW_NON_3DQUAD_GEOM
   PE("");
-  fprintf(stderr,"     If the slip was specified (codes %i, %i, or %i) and one or more fault patches are\n",
-	  STRIKE,DIP,NORMAL);
-  PE("     triangular, then two more fields have to be given in the end (indicated by dots),");
-  PE("     the strike and dip dip angle of the global reference frame to which the prescribed slip values");
-  PE("     refer. The slip boundary conditions will then be converted to the local reference");
-  PE("     frame of the triangular element.");
+  fprintf(stderr,"     If the patches for which boundary conditions are specified are triangular,\n");
+  PE("     then two more fields have to be given after the boundary values (dots above),");
+  PE("     the strike and dip dip angle of a global reference frame to which the prescribed slip ");
+  PE("     or stress values refer. The slip boundary conditions will then be converted to the triangle local");
+  PE("     reference frame internally, and converted back to the global frame on output for fault properties.");
 #endif
   PE("");
   PE("");
@@ -218,6 +217,9 @@ void phelp(void)
   PE("    \tthis corresponds to a resulting drop resp. increase in the dip component of stress.");
   PE("    For normal: positive values of slip mean explosive source, negative implosive;");
   PE("    \tthis corresponds to a resulting drop resp. increase in the normal component of stress.\n");
+#ifdef ALLOW_NON_3DQUAD_GEOM
+  PE("    For triangles, these are all referring to the global frame specified.");
+#endif
   PE("");
   fprintf(stderr,"   (B) %i, %i, %i or %i, %i, %i or %i, %i, %i: stresses are specified\n",
 	  STRIKE_SLIP,STRIKE_SLIP_LEFTLATERAL,STRIKE_SLIP_RIGHTLATERAL,

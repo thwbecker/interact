@@ -24,7 +24,7 @@ void read_geometry(char *patch_filename,struct med **medium,
 		   my_boolean half_plane,
 		   my_boolean verbose)
 {
-  int i,j,k,tmpint,jlim,ic;
+  int i,j,k,tmpint,ic;
   FILE *in,*in2=NULL;
   COMP_PRECISION sin_dip,cos_dip,mus_avg,mud_avg,d_mu,corner[4][3],
     lloc,wloc,eps_for_z = EPS_COMP_PREC * 100.0;
@@ -33,7 +33,6 @@ void read_geometry(char *patch_filename,struct med **medium,
   static my_boolean init=FALSE;
 #ifdef ALLOW_NON_3DQUAD_GEOM
   int nr_pt_src=0,nr_triangle=0,nr_2d=0;
-  COMP_PRECISION tmpdbl;  
 #endif
   if(init){
     if((*medium)->comm_rank == 0)
@@ -51,9 +50,9 @@ void read_geometry(char *patch_filename,struct med **medium,
   if(strcmp(patch_filename,"stdin")!=0){
     if(verbose){
 #ifdef ALLOW_NON_3DQUAD_GEOM
-      fprintf(stderr,"read_geometry: reading geometry from file \"%s\", non quads allowed\n",patch_filename);
+      fprintf(stderr,"read_geometry: reading geometry from \"%s\", non quads allowed\n",patch_filename);
 #else
-      fprintf(stderr,"read_geometry: reading geometry from file \"%s\", non quads not allowed\n",patch_filename);
+      fprintf(stderr,"read_geometry: reading geometry from \"%s\", non quads not allowed\n",patch_filename);
 #endif
     }
     in = myopen(patch_filename,"r");
@@ -71,11 +70,11 @@ void read_geometry(char *patch_filename,struct med **medium,
     in2=fopen(FAULT_PROP_FILE,"r");
     if(in2){
       if((*medium)->comm_rank == 0)
-	fprintf(stderr,"read_geometry: WARNING: reading fault properties from from \"%s\"\n",
+	fprintf(stderr,"read_geometry: WARNING: reading fault properties from \"%s\"\n",
 		FAULT_PROP_FILE);
     }else{
       if((*medium)->comm_rank == 0)
-	fprintf(stderr,"read_geometry: could not open \"%s\" for fault properties, using default values\n",
+	fprintf(stderr,"read_geometry: could not open \"%s\" for fault properties, using defaults\n",
 		FAULT_PROP_FILE);
       read_fault_properties=FALSE;
     }
@@ -93,11 +92,10 @@ void read_geometry(char *patch_filename,struct med **medium,
     exit(-1);
   }
 #endif
-  if((*fault=(struct flt *)calloc(1,sizeof(struct flt)))==
-     NULL)MEMERROR("read_geometry: 2:");
+  if((*fault=(struct flt *)calloc(1,sizeof(struct flt)))==NULL)MEMERROR("read_geometry: 2:");
   for(i=0;i<3;i++){// intialize medium boundaries for plotting
-    (*medium)->xmax[i]=FLT_MIN;
-    (*medium)->xmin[i]=FLT_MAX;
+    (*medium)->xmax[i] = FLT_MIN;
+    (*medium)->xmin[i] = FLT_MAX;
   } 
   (*medium)->nan = NAN;
   (*medium)->wmean= (*medium)->lmean=0.0;
@@ -156,22 +154,14 @@ void read_geometry(char *patch_filename,struct med **medium,
       for(j=0;j<3;j++){
 	if((*fault+i)->xt[j*3+INT_Z] > 0){
 	  fprintf(stderr,"read_geometry: triangular patch %i node %i above ground, error\n",
-		  i+1,j+1);
+		  i,j);
 	  exit(-1);
 	}
       }
       // x will be the centroid, to be calculated
       calc_centroid_tri((*fault+i)->xt,(*fault+i)->x);
-      //
-      // determine local reference frame by means of the angles
-      // w, l, and area will be the triangle area
-      get_alpha_dip_tri_gh((*fault+i)->xt,&(*fault+i)->sin_alpha,
-			   &(*fault+i)->cos_alpha,
-			   &tmpdbl,&(*fault+i)->area);
-      (*fault+i)->dip=(float)RAD2DEGF(tmpdbl);
-      (*fault+i)->l = (*fault+i)->w = (*fault+i)->area;
-      alpha = RAD2DEGF(asin((*fault+i)->sin_alpha));
-      (*fault+i)->strike= 90.0 - alpha;
+      (*fault+i)->area = triangle_area((*fault+i)->xt);
+      (*fault+i)->l = (*fault+i)->w = NAN;
       /* 
 	 get basis vectors in TDCS system of NW15 
       */
@@ -221,7 +211,7 @@ void read_geometry(char *patch_filename,struct med **medium,
 #endif
     if((*fault+i)->x[INT_Z] > 0){
       if((*medium)->comm_rank == 0)
-	fprintf(stderr,"read_geometry: patch %i: z has to be < 0, mid point z: %g\n",
+	fprintf(stderr,"read_geometry: patch %03i: z has to be < 0, mid point z: %g\n",
 		i,(*fault+i)->x[INT_Z]);
       exit(-1);
     }
@@ -233,30 +223,33 @@ void read_geometry(char *patch_filename,struct med **medium,
     }else{
       (*fault+i)->group=(unsigned int)tmpint;
     }
-    // check for illegal angles
-    check_fault_angles((*fault+i));
+    //
     // do some stats for length and position
+    //
     for(j=0;j<3;j++){
       if((*fault+i)->x[j]<(*medium)->xmin[j])
 	(*medium)->xmin[j] = (*fault+i)->x[j];
       if((*fault+i)->x[j]>(*medium)->xmax[j])
 	(*medium)->xmax[j] = (*fault+i)->x[j];
     }
-    if((*fault+i)->l > lmax)lmax=(*fault+i)->l;
-    if((*fault+i)->l < lmin)lmin=(*fault+i)->l;
-    if((*fault+i)->w > wmax)wmax=(*fault+i)->w;
-    if((*fault+i)->w < wmin)wmin=(*fault+i)->w;
-    (*medium)->wmean += (*fault+i)->w;
-    (*medium)->lmean += (*fault+i)->l;
-    (*fault+i)->area = (*fault+i)->l * (*fault+i)->w * 4.0;
-    /*
-      strike is defined as degrees clockwise from north (azimuth)
-      we need the angle alpha, which is 
-      counterclockwise from east and used for all rotations 
-    */
 #ifdef ALLOW_NON_3DQUAD_GEOM
     if((*fault+i)->type != TRIANGULAR){
 #endif
+      // check for illegal angles
+      check_fault_angles((*fault+i));
+      
+      if((*fault+i)->l > lmax)lmax=(*fault+i)->l;
+      if((*fault+i)->l < lmin)lmin=(*fault+i)->l;
+      if((*fault+i)->w > wmax)wmax=(*fault+i)->w;
+      if((*fault+i)->w < wmin)wmin=(*fault+i)->w;
+      (*medium)->wmean += (*fault+i)->w;
+      (*medium)->lmean += (*fault+i)->l;
+      (*fault+i)->area = (*fault+i)->l * (*fault+i)->w * 4.0;
+      /*
+	strike is defined as degrees clockwise from north (azimuth)
+	we need the angle alpha, which is 
+	counterclockwise from east and used for all rotations 
+      */
       // if we have different kinds of faults, don't do this
       // calculation if it's a triangular patch since we 
       // have already calculates sin and cos (alpha) above
@@ -267,42 +260,31 @@ void read_geometry(char *patch_filename,struct med **medium,
       /* 	(*fault+i)->sin_alpha=0.0; */
       /* if(fabs((*fault+i)->cos_alpha)< EPS_COMP_PREC) */
       /* 	(*fault+i)->cos_alpha=0.0; */
-#ifdef ALLOW_NON_3DQUAD_GEOM
-    }
-#endif
-    my_sincos_deg(&sin_dip,&cos_dip,(COMP_PRECISION)(*fault+i)->dip);
-    //
-    // calculate the unity vectors in strike, dip, and normal
-    // direction
-    //
-    calc_quad_base_vecs((*fault+i)->t_strike,
-			(*fault+i)->normal,(*fault+i)->t_dip,
-			(*fault+i)->sin_alpha,
-			(*fault+i)->cos_alpha,sin_dip,cos_dip);
+      my_sincos_deg(&sin_dip,&cos_dip,(COMP_PRECISION)(*fault+i)->dip);
+      //
+      // calculate the unity vectors in strike, dip, and normal
+      // direction
+      //
+      calc_quad_base_vecs((*fault+i)->t_strike,
+			  (*fault+i)->normal,(*fault+i)->t_dip,
+			  (*fault+i)->sin_alpha,
+			  (*fault+i)->cos_alpha,sin_dip,cos_dip);
 #ifdef SUPER_DEBUG
-    if((*medium)->comm_rank == 0){
-      fprintf(stderr,"fault %5i: strike: %g dip: %g sc_alpha:  %10.3e/%10.3e sc_dip: %10.3e/%10.3e\n",
-	      i,90.0-alpha,(*fault+i)->dip,(*fault+i)->sin_alpha,
-	      (*fault+i)->cos_alpha,sin_dip,cos_dip);
-      fprintf(stderr," vec: s: (%10.3e,%10.3e,%10.3e) d: (%10.3e,%10.3e,%10.3e) n: (%10.3e,%10.3e,%10.3e)\n",
-	      (*fault+i)->t_strike[INT_X],(*fault+i)->t_strike[INT_Y],(*fault+i)->t_strike[INT_Z],
-	      (*fault+i)->t_dip[INT_X],(*fault+i)->t_dip[INT_Y],(*fault+i)->t_dip[INT_Z],
-	      (*fault+i)->normal[INT_X],(*fault+i)->normal[INT_Y],(*fault+i)->normal[INT_Z]);
-    }
-#endif
-#ifdef ALLOW_NON_3DQUAD_GEOM
-    if((*fault+i)->type != TRIANGULAR){
+      if((*medium)->comm_rank == 0){
+	fprintf(stderr,"fault %5i: strike: %g dip: %g sc_alpha:  %10.3e/%10.3e sc_dip: %10.3e/%10.3e\n",
+		i,90.0-alpha,(*fault+i)->dip,(*fault+i)->sin_alpha,
+		(*fault+i)->cos_alpha,sin_dip,cos_dip);
+	fprintf(stderr," vec: s: (%10.3e,%10.3e,%10.3e) d: (%10.3e,%10.3e,%10.3e) n: (%10.3e,%10.3e,%10.3e)\n",
+		(*fault+i)->t_strike[INT_X],(*fault+i)->t_strike[INT_Y],(*fault+i)->t_strike[INT_Z],
+		(*fault+i)->t_dip[INT_X],(*fault+i)->t_dip[INT_Y],(*fault+i)->t_dip[INT_Z],
+		(*fault+i)->normal[INT_X],(*fault+i)->normal[INT_Y],(*fault+i)->normal[INT_Z]);
+      }
 #endif
       //
       // determine geometrical boundaries for plotting
       //
       calculate_corners(corner,(*fault+i),&lloc,&wloc); /* lloc and wloc will be full l and w, not half */
-#ifdef ALLOW_NON_3DQUAD_GEOM// select the number of corners
-      jlim = (patch_is_2d((*fault+i)->type))?(2):(4);
-#else
-      jlim = 4;
-#endif
-      for(j=0;j<jlim;j++){
+      for(j=0; j < ncon_of_patch((*fault+i));j++){
 	// check depth alignment
 	if(corner[j][INT_Z] > eps_for_z){
 	  if((*medium)->comm_rank == 0){
@@ -333,6 +315,10 @@ void read_geometry(char *patch_filename,struct med **medium,
 	}
       }
 #ifdef ALLOW_NON_3DQUAD_GEOM
+    }else{			/* triangular */
+      lloc = sqrt((*fault+i)->area)/2;
+      (*medium)->wmean += lloc;
+      (*medium)->lmean += lloc;
     }
 #endif
     if(read_fault_properties){
@@ -368,7 +354,9 @@ void read_geometry(char *patch_filename,struct med **medium,
     mus_avg += (COMP_PRECISION)(*fault+i)->mu_s;
     mud_avg += (COMP_PRECISION)(*fault+i)->mu_d;
     /* 
+       
        initialize some of the fault arrays with zeros 
+
     */
     // coulomb stress correction factors
     (*fault+i)->cf[0] = (*fault+i)->cf[1] = 0.0;

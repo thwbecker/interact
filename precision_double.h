@@ -14,7 +14,7 @@
 #define EPS_COMP_PREC 1.0e-15
 #define EPS_AMAT_PREC 1.0e-15
 
-#define EPS_FOR_FORTRAN 1.0d-15
+#define EPS_FOR_FORTRAN 5.0d-15
 #define FORTRAN_ZERO 0.0d0
 #define FORTRAN_UNITY 1.0d0
 

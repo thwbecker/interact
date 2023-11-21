@@ -299,7 +299,15 @@ void calculate_quad_corners(COMP_PRECISION corner[4][3],struct flt *fault,
     corner[3][i]=fault->x[i]-sx+dx;
   }
 }
+#ifdef ALLOW_NON_3DQUAD_GEOM
 
+/* 
+
+   calculate the three vertices for a triangle those are identical to
+   the ->xt array, but for visualization purposes, we also allow for
+   shrinking a patch, in which case they are computed by reduced
+   vectors from centroid
+*/
 void calculate_tri_corners(COMP_PRECISION corner[4][3],struct flt *fault,
 			   COMP_PRECISION leeway)
 {
@@ -325,6 +333,7 @@ void calculate_tri_corners(COMP_PRECISION corner[4][3],struct flt *fault,
     corner[3][j] = NAN;
   init = TRUE;
 }
+#endif
 /*
   
   calculate the "corners" of a point source patch
@@ -457,6 +466,7 @@ void get_gh_tri_vec(COMP_PRECISION *xt,// 3 points in FE ordering
   gvec[INT_X]=xt[3+INT_X]-xt[ +INT_X];
   gvec[INT_Y]=xt[3+INT_Y]-xt[ +INT_Y];
   gvec[INT_Z]=xt[3+INT_Z]-xt[ +INT_Z];
+  
   hvec[INT_X]=xt[6+INT_X]-xt[ +INT_X];
   hvec[INT_Y]=xt[6+INT_Y]-xt[ +INT_Y];
   hvec[INT_Z]=xt[6+INT_Z]-xt[ +INT_Z];
@@ -593,47 +603,68 @@ void calc_group_geometry(struct med *medium,struct flt *fault,
 			 struct geog *grp)
 {
   int i,j,k,clim,igrp;
-  COMP_PRECISION dx[3],corner[4][3],fac,pos[2],l,w,dist_max,dist;
+  COMP_PRECISION dx1[3],dx2[3],corner[4][3],fac,pos[2],l,w,dist_max,dist;
   static int group_geom_mode = 1;
-  /* 
+#ifdef ALLOW_NON_3DQUAD_GEOM
+  COMP_PRECISION global_dip_rad,sin_global_dip_rad,cos_global_dip_rad,
+    gnormal[3],gstrike[3],gdip[3];  
+#endif
+  /*
      determine center of mass and average strike 
      and dip vectors for each patch group 
-
-     makes little/no sense for triangular elements
      
   */
   for(i=0;i<medium->nrflt;i++){
     igrp = fault[i].group;
     grp[igrp].nrflt++;
+    
+    add_b_to_a_vector_3d(grp[igrp].center,fault[i].x);
+#ifdef ALLOW_NON_3DQUAD_GEOM
+    if(fault[i].type == TRIANGULAR){
+      /* 
+	 compute appropriate projection vectors 
+
+	 for triangle, global
+      */
+      global_dip_rad   = DEG2RADF((COMP_PRECISION)fault[i].dip);
+      my_sincos(&sin_global_dip_rad,&cos_global_dip_rad,global_dip_rad);
+      calc_quad_base_vecs(gstrike, gnormal, gdip,
+			  fault[i].sin_alpha, fault[i].cos_alpha,
+			  sin_global_dip_rad, cos_global_dip_rad);
+      calc_quad_base_vecs(gstrike, gnormal, gdip,
+			  fault[i].sin_alpha, fault[i].cos_alpha,
+			  sin_global_dip_rad,   cos_global_dip_rad);
+      a_equals_b_vector_3d(dx1,gstrike);
+      a_equals_b_vector_3d(dx2,gdip);
+    }else{
+      /* for quad, local */
+      a_equals_b_vector_3d(dx1,fault[i].t_strike);
+      a_equals_b_vector_3d(dx2,fault[i].t_dip);
+    }
+#else
+    a_equals_b_vector_3d(dx1,fault[i].t_strike);
+    a_equals_b_vector_3d(dx2,fault[i].t_dip);
+#endif
     if(group_geom_mode == 1){
       /* new mode, weighted by patch area */
-      add_b_to_a_vector_3d(grp[igrp].center,fault[i].x);
-      /*  */
-      a_equals_b_vector_3d(dx,fault[i].t_strike);
-      scale_vector_3d(dx,fault[i].area);
-      add_b_to_a_vector_3d(grp[igrp].strike_vec,dx);
-      /*  */
-      a_equals_b_vector_3d(dx,fault[i].t_dip);
-      scale_vector_3d(dx,fault[i].area);
-      add_b_to_a_vector_3d(grp[igrp].dip_vec,dx);
-    }else{
-      add_b_to_a_vector_3d(grp[igrp].center,fault[i].x);
-      add_b_to_a_vector_3d(grp[igrp].strike_vec,fault[i].t_strike);
-      add_b_to_a_vector_3d(grp[igrp].dip_vec,fault[i].t_dip);
+      scale_vector_3d(dx1,fault[i].area);
+      scale_vector_3d(dx2,fault[i].area);
     }
+    add_b_to_a_vector_3d(grp[igrp].strike_vec,dx1);
+    add_b_to_a_vector_3d(grp[igrp].dip_vec,dx2);
   }
-  for(i=0;i<medium->nrgrp;i++){
+  for(i=0;i < medium->nrgrp;i++){
     if(grp[i].nrflt){// get average
       fac=1.0/((COMP_PRECISION)grp[i].nrflt);
       scale_vector_3d(grp[i].center,fac);
-      /* don't need to normalize those by number, will be unity
+      /* don't need to normalize those by number or weight, will be unity
 	 normalized */
       normalize_3d(grp[i].strike_vec);
       normalize_3d(grp[i].dip_vec);
     }
     for(j=0;j<2;j++){
-      grp[i].pmin[j]= FLT_MAX;
-      grp[i].pmax[j]=-FLT_MAX;
+      grp[i].pmin[j] = FLT_MAX;
+      grp[i].pmax[j] =-FLT_MAX;
     }
   }
   /* 
@@ -643,20 +674,20 @@ void calc_group_geometry(struct med *medium,struct flt *fault,
 
   */
   dist_max = 0;
-  for(i=0;i<medium->nrflt;i++){
+  for(i=0;i < medium->nrflt;i++){
     // determine distance of center of patch from 
     // center of group of patches
-    c_eq_a_minus_b_3d(dx,fault[i].x,grp[fault[i].group].center);
-    dist = norm_3d(dx);
-    if(dist>dist_max)
+    c_eq_a_minus_b_3d(dx1,fault[i].x,grp[fault[i].group].center);
+    dist = norm_3d(dx1);
+    if(dist > dist_max)
       dist_max = dist;
     fault[i].pos[STRIKE]=(float)
-      project_vector(dx,grp[fault[i].group].strike_vec);
+      project_vector(dx1,grp[fault[i].group].strike_vec);
     fault[i].pos[DIP]=(float)
-      project_vector(dx,grp[fault[i].group].dip_vec);
+      project_vector(dx1,grp[fault[i].group].dip_vec);
   }
 
-  for(i=0;i<medium->nrflt;i++){
+  for(i=0;i < medium->nrflt;i++){
 #ifdef ATZ_NATZ_VOODOO_GNATZ
     fprintf(stderr,"mx: %g %g %g ms: %g %g %g md: %g %g %g P: %6.3f %6.3f\n",
 	    grp[fault[i].group].center[INT_X],grp[fault[i].group].center[INT_Y],
@@ -677,9 +708,9 @@ void calc_group_geometry(struct med *medium,struct flt *fault,
       clim = 4;
     for(j=0;j < clim;j++){
       for(k=0;k<3;k++)
-	dx[k]=corner[j][k] - grp[fault[i].group].center[k];
-      pos[STRIKE] = project_vector(dx,grp[fault[i].group].strike_vec);
-      pos[DIP] = project_vector(dx,grp[fault[i].group].dip_vec);
+	dx1[k] = corner[j][k] - grp[fault[i].group].center[k];
+      pos[STRIKE] = project_vector(dx1,grp[fault[i].group].strike_vec);
+      pos[DIP] = project_vector(dx1,grp[fault[i].group].dip_vec);
       // determine min/max
       for(k=0;k<2;k++){
 	if(grp[fault[i].group].pmin[k] > pos[k])

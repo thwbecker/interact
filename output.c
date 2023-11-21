@@ -140,6 +140,10 @@ void print_fault_data(char *filename,struct med *medium,struct flt *fault)
   int i,j,grp;
   FILE *out;
   COMP_PRECISION val[NR_VAL],abs_tau;
+#ifdef ALLOW_NON_3DQUAD_GEOM
+  COMP_PRECISION global_dip_rad,sin_global_dip_rad,cos_global_dip_rad;
+  COMP_PRECISION gstrike[3],gdip[3],gnormal[3],slip[3],trac[3],old_rdip = FLT_MAX,old_rstrike = FLT_MAX;
+#endif
   out=myopen(filename,"w");
   fprintf(stderr,
 	  "print_fault_data: writing to \"%s\"\n",filename);
@@ -161,12 +165,50 @@ void print_fault_data(char *filename,struct med *medium,struct flt *fault)
 	  coulomb_stress(abs_tau,(COMP_PRECISION)fault[i].mu_s,
 			 fault[i].s[NORMAL],medium->cohesion);
 	val[1] = ((COMP_PRECISION)fault[i].mu_d)*fault[i].s[NORMAL];
+#ifdef ALLOW_NON_3DQUAD_GEOM
+	if(fault[i].type==TRIANGULAR){
+	  if((fault[i].strike != old_rstrike)||(fault[i].dip != old_rdip)){
+	    fprintf(stderr,"patch %03i triangular, rotating to global strike %g dip %g (not repeating for same angles)\n",
+		    i,fault[i].strike,fault[i].dip);
+	    /* compute appropriate projection vectors */
+	    global_dip_rad   = DEG2RADF((COMP_PRECISION)fault[i].dip);
+	    my_sincos(&sin_global_dip_rad,&cos_global_dip_rad,global_dip_rad);
+	    calc_quad_base_vecs(gstrike, gnormal, gdip,
+				fault[i].sin_alpha, fault[i].cos_alpha,
+				sin_global_dip_rad,   cos_global_dip_rad);
+	    
+	    old_rdip = fault[i].dip;
+	    old_rstrike = fault[i].strike;
+	  }
+	 
+	  for(j=0;j<3;j++){
+	    slip[j] = fault[i].t_strike[j]*fault[i].u[STRIKE]+fault[i].t_dip[j]*fault[i].u[DIP]+fault[i].normal[j]*fault[i].u[NORMAL];
+	    trac[j] = fault[i].t_strike[j]*fault[i].s[STRIKE]+fault[i].t_dip[j]*fault[i].s[DIP]+fault[i].normal[j]*fault[i].s[NORMAL];
+	  }
+	  val[2] = project_vector(slip,gstrike);
+	  val[3] = project_vector(slip,gnormal);
+	  val[4] = project_vector(slip,gdip);
+
+	  val[5] = project_vector(trac,gstrike);
+	  val[6] = project_vector(trac,gnormal);
+	  val[7] = project_vector(trac,gdip);
+	  
+	}else{
+	  val[2] = fault[i].u[STRIKE];// slip values
+	  val[3] = fault[i].u[NORMAL];
+	  val[4] = fault[i].u[DIP];
+	  val[5] = fault[i].s[STRIKE];// resolved stress values
+	  val[6] = fault[i].s[NORMAL];
+	  val[7] = fault[i].s[DIP];
+	}
+#else
 	val[2] = fault[i].u[STRIKE];// slip values
 	val[3] = fault[i].u[NORMAL];
 	val[4] = fault[i].u[DIP];
 	val[5] = fault[i].s[STRIKE];// resolved stress values
 	val[6] = fault[i].s[NORMAL];
 	val[7] = fault[i].s[DIP];
+#endif
 	// local position of patch in fault group
 	fprintf(out,"%10.3e %10.3e %10.3e ",fault[i].pos[0],fault[i].pos[1],
 		fault[i].area);
@@ -180,11 +222,6 @@ void print_fault_data(char *filename,struct med *medium,struct flt *fault)
 	  fprintf(out,"%13.6e ",val[j]);
 	}
 	fprintf(out,"%5i %5i",i,grp);
-#ifdef ALLOW_NON_3DQUAD_GEOM
-	if(fault[i].type == TRIANGULAR)
-	  fprintf(out,"%10.3e %10.3e %10.3e ",
-		  fault[i].x[INT_X],fault[i].x[INT_Y],fault[i].x[INT_Z]);
-#endif
 	fprintf(out,"\n");
       }
     }

@@ -36,14 +36,42 @@ void eval_triangle(COMP_PRECISION *x,struct flt *fault,
   /* input is x y z, vertices, and slip as strike, dip, normal
      displacements are output as east, north, up
   */
-  tddisphs(x,  &(fault->xt[0]),&(fault->xt[3]),&(fault->xt[6]),(slip),(slip+1),(slip+2),&nu,u);
+  tddisphs(x,  &(fault->xt[0]),&(fault->xt[3]),&(fault->xt[6]),
+	   (slip),(slip+1),(slip+2),&nu,u);
+#ifdef CRAZY_DEBUG
+  fprintf(stderr,"eval_triangle: xt %g %g %g\t%g %g %g\t%g %g %g\tslip %g %g %g\tx %g %g %g\tu %g %g %g\n", 
+   	  fault->xt[0],fault->xt[1],fault->xt[2], 
+   	  fault->xt[3],fault->xt[4],fault->xt[5], 
+   	  fault->xt[6],fault->xt[7],fault->xt[8], 
+   	  slip[0],slip[1],slip[2],x[0],x[1],x[2],
+	  u[0],u[1],u[2]);
+  fprintf(stderr,"eval_triangle: u: %g %g %g\n",u[0],u[1],u[2]);
+#endif
+  if(!finite(u[0])||(!finite(u[1]))||(!finite(u[2]))){
+    sm[0][0]=sm[0][1]=sm[0][2]=NAN;
+    sm[1][0]=sm[1][1]=sm[1][2]=NAN;
+    sm[2][0]=sm[2][1]=sm[2][2]=NAN;
+    *giret = 1;
+    return;
+  }
   /* 
      stress and strain are given as: Sxx, Syy, Szz, Sxy, Sxz and Syz
   */
   tdstresshs(x,&(fault->xt[0]),&(fault->xt[3]),&(fault->xt[6]),
 	     (slip),(slip+1),(slip+2),&mu,&lambda,
 	     stress,strain);
-
+#ifdef CRAZY_DEBUG
+  fprintf(stderr,"eval_triangle: stress: %g %g %g %g %g %g\n",strain[0],strain[1],strain[2],strain[3],strain[4],strain[5]);
+#endif
+  if((!finite(stress[0]))||(!finite(stress[1]))||(!finite(stress[2]))||
+     (!finite(stress[3]))||(!finite(stress[4]))||(!finite(stress[5]))){
+    sm[0][0]=sm[0][1]=sm[0][2]=NAN;
+    sm[1][0]=sm[1][1]=sm[1][2]=NAN;
+    sm[2][0]=sm[2][1]=sm[2][2]=NAN;
+    *giret = 1;
+    return;
+  }
+ 
   sm[INT_X][INT_X] = stress[0];
   sm[INT_Y][INT_Y] = stress[1];
   sm[INT_Z][INT_Z] = stress[2];

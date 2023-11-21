@@ -3,38 +3,37 @@ void adjust_time_step(struct flt *, struct med *);
 /* block_checkflt.c */
 /* block_compute_vel_from_omega.c */
 /* block_eval_geokada.c */
-void block_eval_geookada(float *, float *, float *, float [3][3], float, float, float, float, float, float, float, float, float, float, float, int *, unsigned short, unsigned short);
-void block_save_solution_and_faults(float *, int, int, struct bflt *, float *, struct prj *, FILE *, unsigned short, unsigned short);
-void block_load_solution_and_faults(float **, int *, int *, struct bflt **, float **, struct prj **, FILE *, unsigned short *, unsigned short *);
+void block_eval_geookada(float *, float *, float *, float [3][3], float, float, float, float, float, float, float, float, float, float, float, int *, unsigned char, unsigned char);
+void block_save_solution_and_faults(float *, int, int, struct bflt *, float *, struct prj *, FILE *, unsigned char, unsigned char);
+void block_load_solution_and_faults(float **, int *, int *, struct bflt **, float **, struct prj **, FILE *, unsigned char *, unsigned char *);
 void block_eval_blockvec(float *, float, int, float *, struct prj *, float *);
 /* block_evaluate_solution.c */
-/* blockinvert.c */
 /* block_levmarq.c */
-void run_lm(struct bmd *, long int *, struct prj, float *, unsigned short, unsigned short, float, float *, unsigned short, unsigned short, float, unsigned short, unsigned short, unsigned short, int, int, char **);
+void run_lm(struct bmd *, long int *, struct prj, float *, unsigned char, unsigned char, float, float *, unsigned char, unsigned char, float, unsigned char, unsigned char, unsigned char, int, int, char **);
 /* block_matrix.c */
-void assemble_block_fltdep_matrices(float **, float **, float **, float **, float *, float *, float *, int, int, int, int, int, int, int, float *, struct bflt *, struct bck *, unsigned short, unsigned short);
+void assemble_block_fltdep_matrices(float **, float **, float **, float **, float *, float *, float *, int, int, int, int, int, int, int, float *, struct bflt *, struct bck *, unsigned char, unsigned char);
 void assemble_block_a(float **, float *, int *, int, int, struct bck *, int, struct bmd *);
 void assemble_block_d(float **, struct bflt *, int, int, int, struct bmd *);
 void assemble_block_i(float **, struct bflt *, int, int, int);
 void assemble_block_g(float **, struct bflt *, int, int);
-void assemble_block_f(float **, struct bflt *, int, int, struct bck *, float *, unsigned short);
-void assemble_block_k(float **, int, int, int, int, int, int, int, float *, float *, float *, unsigned short, unsigned short, float *, struct bflt *, int, int, int, int, float);
+void assemble_block_f(float **, struct bflt *, int, int, struct bck *, float *, unsigned char);
+void assemble_block_k(float **, int, int, int, int, int, int, int, float *, float *, float *, unsigned char, unsigned char, float *, struct bflt *, int, int, int, int, float);
 void assemble_stress_matrix(float *, int, struct bflt *, float *, int, int);
-void block_assemble_fit_vector(float **, int, int, int, int, int, int, int, int, int, float *, int, float *, float *, unsigned short, float *, float **, float *, float **, int, struct bck *, int, struct bflt **, unsigned short, float **, unsigned short, unsigned short, unsigned short, float *, float *, float *, struct prj, unsigned short, int, int, float, struct bmd *);
-void block_assemble_dyda_matrix(float **, float **, int, int, int, int, int, int, int, int, int, float *, float *, float **, float *, float **, float **, int, struct bck *, int, struct bflt **, unsigned short, unsigned short, unsigned short, float *, float *, float *, struct prj, unsigned short, int, int, float, struct bmd *);
+void block_assemble_fit_vector(float **, int, int, int, int, int, int, int, int, int, float *, int, float *, float *, unsigned char, float *, float **, float *, float **, int, struct bck *, int, struct bflt **, unsigned char, float **, unsigned char, unsigned char, unsigned char, float *, float *, float *, struct prj, unsigned char, int, int, float, struct bmd *);
+void block_assemble_dyda_matrix(float **, float **, int, int, int, int, int, int, int, int, int, float *, float *, float **, float *, float **, float **, int, struct bck *, int, struct bflt **, unsigned char, unsigned char, unsigned char, float *, float *, float *, struct prj, unsigned char, int, int, float, struct bmd *);
 float block_chi_square(float *, float *, float *, int, int, float, float *, float *);
 float block_data_norm(float *, float *, int, int, float, struct bmd *);
 int block_slip_direction(int, struct bflt *);
-void assign_additional_sol_values(float *, int, int, int, struct bflt *, unsigned short, unsigned short, long int *, int);
-void change_locking_depths(struct bflt **, int, int, int, int, float *, float *, float *, unsigned short, struct prj, float **, float **, float *, struct bmd *);
+void assign_additional_sol_values(float *, int, int, int, struct bflt *, unsigned char, unsigned char, long int *, int);
+void change_locking_depths(struct bflt **, int, int, int, int, float *, float *, float *, unsigned char, struct prj, float **, float **, float *, struct bmd *);
 void calc_fault_sn_rms(float *, int, int, float *, float *);
 void init_block_mods(struct bmd **);
 void init_blocks(struct bmd *, int);
 void convert_cart_sol(float *, float *, struct bmd *);
-void check_solution_vector(float *, int, int, unsigned short, unsigned short);
+void check_solution_vector(float *, int, int, unsigned char, unsigned char);
 void copy_block(struct bck *, struct bck *);
 /* block_output.c */
-void block_output(struct bmd *, unsigned short, char **, struct prj, unsigned short, unsigned short, float, unsigned short, unsigned short, unsigned short, unsigned short, unsigned short, unsigned short);
+void block_output(struct bmd *, unsigned char, char **, struct prj, unsigned char, unsigned char, float, unsigned char, unsigned char, unsigned char, unsigned char, unsigned char, unsigned char);
 void sort_eigen(int *, float *);
 void print_horizontal_stress(float *, FILE *);
 void print_projected_stress(float *, FILE *);
@@ -42,43 +41,44 @@ void calculate_slipsol_sigma(struct bmd *, float *, float *, int);
 void calc_geo_euler_pole(float *, float *, float *, float *);
 void print_simple_vel(float *, float *, float *, float *, int, char *);
 /* block_read_bflt.c */
-void read_bflt(struct bmd *, float, struct prj, unsigned short, float, unsigned short, unsigned short, unsigned short, unsigned short, unsigned short, unsigned short, unsigned short, unsigned short, unsigned short);
-void generate_new_fault(struct bflt **, int *, int *, float *, int, float *, int, float, struct prj, float *, unsigned short, float, unsigned short, unsigned short, float *, float, int, float *, unsigned short *, int *);
-void get_bflt_intcoeff(struct bflt **, int, float *, int, float *, int, float *, unsigned short);
+void read_bflt(struct bmd *, float, struct prj, unsigned char, float, unsigned char, unsigned char, unsigned char, unsigned char, unsigned char, unsigned char, unsigned char, unsigned char, unsigned char);
+void generate_new_fault(struct bflt **, int *, int *, float *, int, float *, int, float, struct prj, float *, unsigned char, float, unsigned char, unsigned char, float *, float, int, float *, unsigned char *, int *);
+void get_bflt_intcoeff(struct bflt **, int, float *, int, float *, int, float *, unsigned char);
 void free_bflt(struct bflt **, int, int);
 void assign_bflt_dip_mode(struct bflt *, float);
 void flip_block_code(struct bflt *, float *);
 void print_fault_geometry(struct bflt *, int, FILE *);
-void assign_fault_locking_depth_parameters(struct bflt *, float, struct prj, unsigned short, int);
+void assign_fault_locking_depth_parameters(struct bflt *, float, struct prj, unsigned char, int);
 int new_fault(struct bflt **, int);
 void init_bflt(struct bflt *);
 /* block_read_euler.c */
 void read_constrained_euler_poles(struct bmd *, char **, int);
 /* block_read_gps.c */
-void read_gps_velocities(struct bmd *, struct prj *, float *, char **, unsigned short, int *, int *);
+void read_gps_velocities(struct bmd *, struct prj *, float *, char **, unsigned char, int *, int *);
 void project_gps_coordinates(float *, float *, int, int, int *, struct bck *, int, struct prj *, char **);
 void block_read_centroids(float **, int *);
-void find_spherical_rotation(struct bmd *, int, float *, unsigned short, unsigned short, unsigned short, unsigned short, unsigned short, float *, int);
+void find_spherical_rotation(struct bmd *, int, float *, unsigned char, unsigned char, unsigned char, unsigned char, unsigned char, float *, int);
 void init_gps_pbase(struct bmd *);
-void init_cart_gps_velsig(struct bmd *, unsigned short);
+void init_cart_gps_velsig(struct bmd *, unsigned char);
 void calculate_c2p_gps(float *, float *, struct bmd *);
 void convert_sig_p2c(float *, float *, float *);
 void remove_cvel_from_vel(struct bmd *, float *, int);
 char bname(int);
-unsigned short node_in_geo_list(float *, int, float *);
+unsigned char node_in_geo_list(float *, int, float *);
 /* block_solve.c */
-void solve_block(float *, float *, float *, int, int, int, int, unsigned short, int, int, int, int, float *, float, float *, float **, float **, float *, float *, unsigned short, int, unsigned short, int, unsigned short);
+void solve_block(float *, float *, float *, int, int, int, int, unsigned char, int, int, int, int, float *, float, float *, float **, float **, float *, float *, unsigned char, int, unsigned char, int, unsigned char);
 void evaluate_block_solution(float *, int, int, float *, float *, float *, struct bmd *);
 /* block_stress.c */
-void block_scale_stresses(float *, float *, float *, int, int, int, float, float *, unsigned short);
+void block_scale_stresses(float *, float *, float *, int, int, int, float, float *, unsigned char);
 void calc_horizontal_stress_vec(float *, float *, int);
 void calc_horizontal_stress(float *, float *, float *, float *);
-void calc_dir_diff_vec(float *, float *, float *, int, unsigned short);
-float calc_dir_diff(float, float, unsigned short);
+void calc_dir_diff_vec(float *, float *, float *, int, unsigned char);
+float calc_dir_diff(float, float, unsigned char);
 void cart_mat_from_horsym(float, float, float, float *);
-void rescale_observed_stresses(float *, float *, float *, float, float *, unsigned short, struct bmd *, unsigned short, unsigned short);
+void rescale_observed_stresses(float *, float *, float *, float, float *, unsigned char, struct bmd *, unsigned char, unsigned char);
+/* blockinvert.c */
 /* calc_cart_from_eigen_stress.c */
-unsigned short read_vecs(int, float *, float *, float *, float *, float *);
+unsigned char read_vecs(int, float *, float *, float *, float *, float *);
 void ccfes_help(char **);
 /* calc_design_matrix.c */
 void print_help_local2(char *, int, int);
@@ -92,34 +92,34 @@ void print_help_local(char *);
 void calc_spatial_correlation(struct flt *, int, int, int, int, float **, float **, int **, float, float, float *, float **, float **, float **);
 float correlation_coefficient(float *, float *, int);
 /* calc_stress.c */
-void initialize_stress_state(struct flt *, struct med *, unsigned short, float *, float *);
+void initialize_stress_state(struct flt *, struct med *, unsigned char, float *, float *);
 void update_stress_state(struct flt *, struct med *);
-void calc_fields(struct med *, struct flt *, unsigned short, unsigned short, float *, float *);
+void calc_fields(struct med *, struct flt *, unsigned char, unsigned char, float *, float *);
 /* calc_stress_stat.c */
 /* check_feedback.c */
 /* check_interaction.c */
-unsigned short incrementally_check_interaction_coefficients(struct flt *, int, struct med *, unsigned short, int *, float);
-unsigned short check_coulomb_stress_feedback(int, int, struct flt *, struct med *, unsigned short, int, unsigned short, int *, float);
+unsigned char incrementally_check_interaction_coefficients(struct flt *, int, struct med *, unsigned char, int *, float);
+unsigned char check_coulomb_stress_feedback(int, int, struct flt *, struct med *, unsigned char, int, unsigned char, int *, float);
 /* compare_fault.c */
 int compare_fault_length(const void *, const void *);
 int compare_fault_width(const void *, const void *);
 /* coulomb_stress.c */
 float coulomb_stress(float, float, float, float);
 float cstress_drop(float, float, float, float);
-unsigned short in_coulomb_compress_regime(float);
+unsigned char in_coulomb_compress_regime(float);
 /* create_random_mu_file.c */
 /* create_random_stress_file.c */
 void get_random_stress(float *, float *, float *, int, long *, int);
 /* divide_fault_in_patches.c */
-void create_patches(int, struct flt *, struct flt **, int *, int *, unsigned short, unsigned short, float *, float, float, long *);
-void determine_segments(int *, int *, struct flt *, unsigned short, float *);
-void divide_fault_in_patches(int, struct flt *, struct flt **, int *, int *, unsigned short, unsigned short, float, float, long *,unsigned short);
+void create_patches(int, struct flt *, struct flt **, int *, int *, unsigned char, unsigned char, float *, float, float, long *);
+void determine_segments(int *, int *, struct flt *, unsigned char, float *);
+void divide_fault_in_patches(int, struct flt *, struct flt **, int *, int *, unsigned char, unsigned char, float, float, long *, unsigned char);
 void get_flt_location(struct flt *, float *, float *, float *, int, int);
 void randomize_strike_dip(float, float, struct flt *, long *);
 /* eigensystem.c */
 void eigensystem3d(float [3][3], float *, float *);
-void calc_eigensystem_sym3d(float *, float *, float *, unsigned short);
-void calc_eigensystem_sym2d(float *, float *, float *, unsigned short);
+void calc_eigensystem_sym3d(float *, float *, float *, unsigned char);
+void calc_eigensystem_sym2d(float *, float *, float *, unsigned char);
 void eispack_driver(float *, int, int, float *, float *, float *, float *, int);
 /* eval_2dsegment.c */
 void eval_2dsegment_plane_strain(float *, struct flt *, float *, float *, float [3][3], int *);
@@ -146,19 +146,19 @@ void eval_triangle(float *, struct flt *, float *, float *, float [3][3], int *)
 void eval_triangle_gauss(float *, struct flt *, float *, float *, float [3][3], int *);
 void get_gauss_points(float *, float *, float *, int);
 /* far_enough.c */
-unsigned short far_enough(struct flt *, struct flt *, float);
+unsigned char far_enough(struct flt *, struct flt *, float);
 /* fit_mean_stress.c */
 void eval_stress_correction(float *, float *, float *, float *, int, float *, float *, float *, float *, float *, float *);
 /* fit_plane.c */
-void fit_plane(int, float *, float *, float *, float *, float *, float *, float *, float *, float *, float *, float *, unsigned short, unsigned short);
-void points2patch(struct flt *, float *, unsigned short);
+void fit_plane(int, float *, float *, float *, float *, float *, float *, float *, float *, float *, float *, float *, unsigned char, unsigned char);
+void points2patch(struct flt *, float *, unsigned char);
 /* fit_simple_stress_from_cart.c */
 /* fltcopy.c */
 void fltswap(struct flt *, struct flt *);
 void fltcp(struct flt *, struct flt *);
 /* fracture_criterion.c */
-unsigned short fracture_criterion(int, struct flt *, float *, unsigned short *, struct med *);
-void two_dir_slip_check(unsigned short *, float *, unsigned short *, int, struct flt *, struct med *);
+unsigned char fracture_criterion(int, struct flt *, float *, unsigned char *, struct med *);
+void two_dir_slip_check(unsigned char *, float *, unsigned char *, int, struct flt *, struct med *);
 void deactivate_patch(int, struct flt *, struct med *);
 void deactivate_group(int, int, struct flt *, struct med *);
 int calc_absolute_shear_stress_and_inc(float *, float *, int, struct flt *);
@@ -167,6 +167,7 @@ int calc_absolute_shear_stress(float *, int, struct flt *);
 /* fstress2hor.c */
 /* generate_random_2d.c */
 /* generate_slipdia.c */
+/* geo_okada.c */
 /* geometry.c */
 void calc_lhemi_proj(float, float, float *);
 void resolve_force(float *, float [3][3], float *);
@@ -186,7 +187,7 @@ float triangle_area(float *);
 float triangle_area_gh(float *, float *);
 void get_gh_tri_vec(float *, float *, float *);
 void get_gh_quad_vec(float *, float *, float *, float *);
-unsigned short check_planar(float *);
+unsigned char check_planar(float *);
 void get_alpha_dip_tri_gh(float *, double *, double *, float *, float *);
 void calc_group_geometry(struct med *, struct flt *, struct geog *);
 void vec_to_angles(float *, float *, float *);
@@ -200,7 +201,7 @@ void globalx(float *, float, float, float *);
 void calc_centroid_tri(float *, float *);
 void calc_mean_quad_coord(float *, float *);
 void calc_centroid_quad(float *, float *);
-unsigned short patch_is_2d(unsigned short int);
+unsigned char patch_is_2d(unsigned char);
 void calculate_position_of_patch(struct med *, struct flt *);
 void compute_cartesian_slip(float *, float *, struct flt *);
 void background_stress(float [3][3], float *, float, float *, float *, float);
@@ -208,7 +209,6 @@ void background_disp(float *, float *, struct med *, float *, float *);
 void get_local_x_on_plane(float *, float *, float *, float *, float *);
 void get_fault_plane_basevec(float *, float *, float *, struct flt *, struct med *);
 void calc_deviatoric_stress(float [3][3], float [3][3], float *, float *);
-/* geo_okada.c */
 /* get_projected_fault_parameters.c */
 void get_projected_fault_parameters(float [2][2], float, float *, float *, float *, float *, float *, float *);
 /* help_and_comments.c */
@@ -216,20 +216,20 @@ void phelp(void);
 char *comment_on_code(short int);
 char *comment_on_code_bc(short int, float);
 /* init.c */
-void check_parameters_and_init(int, char **, struct med **, struct flt **, unsigned short *, float *, float *);
-void initialize(struct med **, struct flt **, unsigned short, int, unsigned short, unsigned short, float, float *, float *, unsigned short, unsigned short, unsigned short, float, unsigned short, float, unsigned short, unsigned short, unsigned short, unsigned short, unsigned short, unsigned short, unsigned short, short int, unsigned short, float, unsigned short, unsigned short, unsigned short, unsigned short, unsigned short, unsigned short, float, unsigned short, unsigned short);
+void check_parameters_and_init(int, char **, struct med **, struct flt **, unsigned char *, float *, float *);
+void initialize(struct med **, struct flt **, unsigned char, int, unsigned char, unsigned char, float, float *, float *, unsigned char, unsigned char, unsigned char, float, unsigned char, float, unsigned char, unsigned char, unsigned char, unsigned char, unsigned char, unsigned char, unsigned char, short int, unsigned char, float, unsigned char, unsigned char, unsigned char, unsigned char, unsigned char, unsigned char, float, unsigned char, unsigned char);
 void init_files(struct med **, struct flt **);
-void init_parameters(char **, int, unsigned short *, unsigned short *, unsigned short *, unsigned short *, float *, int *, unsigned short *, unsigned short *, unsigned short *, float *, unsigned short *, float *, unsigned short *, unsigned short *, unsigned short *, unsigned short *, unsigned short *, unsigned short *, unsigned short *, short int *, unsigned short *, float *, unsigned short *, unsigned short *, unsigned short *, unsigned short *, unsigned short *, float *, unsigned short *, unsigned short *, int);
+void init_parameters(char **, int, unsigned char *, unsigned char *, unsigned char *, unsigned char *, float *, int *, unsigned char *, unsigned char *, unsigned char *, float *, unsigned char *, float *, unsigned char *, unsigned char *, unsigned char *, unsigned char *, unsigned char *, unsigned char *, unsigned char *, short int *, unsigned char *, float *, unsigned char *, unsigned char *, unsigned char *, unsigned char *, unsigned char *, float *, unsigned char *, unsigned char *, int);
 void advance_argument(int *, int, char **);
-char *name_boolean(unsigned short);
-unsigned short toggle(unsigned short *);
-void read_stress_fac(unsigned short, float *, float *, float, struct med *);
+char *name_boolean(unsigned char);
+unsigned char toggle(unsigned char *);
+void read_stress_fac(unsigned char, float *, float *, float, struct med *);
 /* input.c */
-int read_moment_file(float **, float **, float *, float *, int *, unsigned short);
+int read_moment_file(float **, float **, float *, float *, int *, unsigned char);
 int read_patch_event_file(float *, int *, int *, float *, float *, FILE *, struct med *);
 int write_patch_event_file(float, int, int, float, float *, FILE *);
 /* interact.c */
-void calc_interaction_matrix(struct med *, struct flt *, unsigned short);
+void calc_interaction_matrix(struct med *, struct flt *, unsigned char);
 float interaction_coefficient(int, int, int, int, struct flt *, int *);
 void get_right_slip(float *, int, float);
 float ic_from_file(int, int, int, int, struct med *);
@@ -237,11 +237,11 @@ float aij_from_file(int, int, int, FILE *);
 int select_i_coeff_calc_mode(struct med *);
 size_t imatrix_size(struct med *);
 /* levmarq_numrec.c */
-void mrqmin(float *, float *, int, float *, int *, int, float **, float **, float *, float *, struct bmd *, unsigned short, float, unsigned short, unsigned short, unsigned short, unsigned short, float, float *, unsigned short, struct prj);
-void print_lm_progress(float, float, float, float, int, int, float *, float, int, char **, int, int, unsigned short, unsigned short);
+void mrqmin(float *, float *, int, float *, int *, int, float **, float **, float *, float *, struct bmd *, unsigned char, float, unsigned char, unsigned char, unsigned char, unsigned char, float, float *, unsigned char, struct prj);
+void print_lm_progress(float, float, float, float, int, int, float *, float, int, char **, int, int, unsigned char, unsigned char);
 void covsrt(float **, int, int *, int);
 void gaussj(float **, int, float **, int);
-void mrqcof(float *, float *, int, float *, int *, int, float **, float *, float *, struct bmd *, unsigned short, float, unsigned short, unsigned short, unsigned short, unsigned short, float, float *, unsigned short, struct prj);
+void mrqcof(float *, float *, int, float *, int *, int, float **, float *, float *, struct bmd *, unsigned char, float, unsigned char, unsigned char, unsigned char, unsigned char, float, float *, unsigned char, struct prj);
 void nrerror(char *);
 float **matrix(long, long, long, long);
 void free_matrix(float **, long, long, long, long);
@@ -308,11 +308,11 @@ void lu_driver(float *, float *, float *, int, int, struct med *);
 /* main.c */
 /* makefault.c */
 /* matrixio.c */
-void print_matrix_ftrn(float *, int, int, FILE *, unsigned short);
-void print_matrix_C(float *, int, int, FILE *, unsigned short);
-void print_matrix_scaled_ftrn(float *, int, int, FILE *, unsigned short, float);
-void print_matrix_ftrn_file(float *, int, int, char *, unsigned short);
-void print_a_matrix(float *, int, int, FILE *, float *, unsigned short);
+void print_matrix_ftrn(float *, int, int, FILE *, unsigned char);
+void print_matrix_C(float *, int, int, FILE *, unsigned char);
+void print_matrix_scaled_ftrn(float *, int, int, FILE *, unsigned char, float);
+void print_matrix_ftrn_file(float *, int, int, char *, unsigned char);
+void print_a_matrix(float *, int, int, FILE *, float *, unsigned char);
 void read_a_matrix_from_file(float *, int, int, char *, char *);
 void print_a_matrix_to_file(float *, int, int, char *, char *);
 void print_system(float *, float *, float *, int, int, FILE *);
@@ -322,7 +322,7 @@ void print_reduced_interaction_matrix(struct med *, struct flt *);
 void print_vector(float *, int, FILE *);
 void print_vector_file(float *, int, char *, char *);
 void print_vector_row(float *, int, FILE *);
-void print_b_vector(float *, int, FILE *, float *, unsigned short);
+void print_b_vector(float *, int, FILE *, float *, unsigned char);
 void print_3x3_matrix(float [3][3], FILE *);
 /* mspectral.c */
 void find_range(int *, int *, float, float, float, float, float *, float *, float *, int);
@@ -352,7 +352,7 @@ float penalty_dist(struct flt *, struct med *, float);
 /* output.c */
 void print_slip_line(struct med *, struct flt *);
 void flush_slipline(struct med *, struct flt *);
-void print_fault_stress_and_slip(struct med *, struct flt *, unsigned short);
+void print_fault_stress_and_slip(struct med *, struct flt *, unsigned char);
 void print_fault_data(char *, struct med *, struct flt *);
 void print_fault_stress_stat(FILE *, int, struct med *, struct flt *);
 void print_group_data_geom(char *, struct med *, struct flt *, int, int, float);
@@ -360,10 +360,10 @@ float select_val_for_print(struct flt *, int);
 void print_stress(struct med *, struct flt *);
 void print_stress_on_fault(struct med *, struct flt *, int);
 void print_displacement(struct med *, struct flt *);
-void print_equations(int, unsigned short *, int *, float *, int, char *, struct flt *);
+void print_equations(int, unsigned char *, int *, float *, int, char *, struct flt *);
 void print_solutions(int, int *, struct flt *, struct med *, char *);
 void flush_moment_stack(struct med *);
-void fiddle_with_limits_for_plot(struct med *, int *, unsigned short *, float *, unsigned short);
+void fiddle_with_limits_for_plot(struct med *, int *, unsigned char *, float *, unsigned char);
 void time_report(char *, char *, struct med *);
 /* patch2bc.c */
 /* patch2corners.c */
@@ -398,13 +398,13 @@ void plot_quake(int, struct med *, struct flt *);
 void plot_moment_array(struct med *, float *, int);
 void psticks(float *, float *, int);
 /* points2patch.c */
-unsigned short read_points_local(float *, int *, unsigned short, FILE *);
+unsigned char read_points_local(float *, int *, unsigned char, FILE *);
 /* print_patch_geometry.c */
-void print_patch_geometry_and_bc(int, struct flt *, int, float, unsigned short, FILE *, unsigned short, float *);
+void print_patch_geometry_and_bc(int, struct flt *, int, float, unsigned char, FILE *, unsigned char, float *);
 /* project_stress.c */
 /* quake.c */
-void quake(unsigned short *, float *, int, struct flt *, struct med *, unsigned short, unsigned short);
-void add_quake_stress(int, unsigned short *, float *, struct flt *, struct med *);
+void quake(unsigned char *, float *, int, struct flt *, struct med *, unsigned char, unsigned char);
+void add_quake_stress(int, unsigned char *, float *, struct flt *, struct med *);
 /* randgen.c */
 void assign_random(float *, float, float, float, long *, int);
 float myrand(long *);
@@ -416,49 +416,51 @@ double gasdev(long *);
 double ran1(long *);
 double ran2(long *);
 /* randomflt.c */
-void check_input_parameters(int, char **, int *, long *, int *, float *, unsigned short *, unsigned short *, float *, float *, float *, float *, float *, float *, float *, float *, float *, float *, float *, float *, float *, float *, float *, int *, unsigned short *, int *, float *, unsigned short *, float *, float *);
+void check_input_parameters(int, char **, int *, long *, int *, float *, unsigned char *, unsigned char *, float *, float *, float *, float *, float *, float *, float *, float *, float *, float *, float *, float *, float *, float *, float *, int *, unsigned char *, int *, float *, unsigned char *, float *, float *);
 /* randomize_list.c */
-void randomize_list(int **, int, unsigned short);
+void randomize_list(int **, int, unsigned char);
 int slist_sort(const void *, const void *);
 /* randomize_strike.c */
 /* read_bin_events.c */
 /* read_boundary_conditions.c */
-void read_boundary_conditions(struct med *, struct flt *, float *, float *, unsigned short);
-void read_one_step_bc(FILE *, struct med *, struct flt *, float *, float *, unsigned short);
-unsigned short slip_type_bc(int);
+void read_boundary_conditions(struct med *, struct flt *, float *, float *, unsigned char);
+void read_one_step_bc(FILE *, struct med *, struct flt *, float *, float *, unsigned char);
+unsigned char slip_type_bc(int);
+unsigned char bc_is_directionally_unconstrained(unsigned char);
+unsigned char bc_contains_dip_motion(unsigned char);
 /* read_fltdat.c */
-int read_fltdat(char *, struct flt *, struct med *, unsigned short);
+int read_fltdat(char *, struct flt *, struct med *, unsigned char);
 /* read_geometry.c */
-void read_geometry(char *, struct med **, struct flt **, unsigned short, unsigned short, unsigned short, unsigned short);
+void read_geometry(char *, struct med **, struct flt **, unsigned char, unsigned char, unsigned char, unsigned char);
 /* read_stress_observations.c */
-void read_stress_observations(struct bmd *, float *, float, unsigned short, float **, float, unsigned short);
+void read_stress_observations(struct bmd *, float *, float, unsigned char, float **, float, unsigned char);
 /* restart.c */
 void adjust_medium_for_restart(struct med *, struct flt *);
 /* rhs.c */
 void init_equation_system(struct med *, struct flt *);
-void add_to_active_fault_list(int, int **, int *, unsigned short **);
+void add_to_active_fault_list(int, int **, int *, unsigned char **);
 void add_to_right_hand_side(float, float **, float **, int *);
 /* rupture.c */
-unsigned short activate_faults(struct flt *, struct med *);
+unsigned char activate_faults(struct flt *, struct med *);
 void fault_criterion(int, struct flt *, struct med *);
 /* segseg.c */
 void intersect(float *, float *, float *, float *, float *, int *);
 char SegSegInt(tPointi, tPointi, tPointi, tPointi, tPointd);
 char ParallelInt(tPointi, tPointi, tPointi, tPointi, tPointd);
 void Assigndi(tPointd, tPointi);
-unsigned short Between(tPointi, tPointi, tPointi);
+unsigned char Between(tPointi, tPointi, tPointi);
 int Collinear(tPointi, tPointi, tPointi);
 int AreaSign(tPointi, tPointi, tPointi);
-unsigned short crosses(double *, double *);
+unsigned char crosses(double *, double *);
 /* simul_gr.c */
 /* solve.c */
 int solve(struct med *, struct flt *);
-void add_solution(int, unsigned short *, float *, int *, struct med *, struct flt *, unsigned short, unsigned short, float);
-void assemble_a_matrix(float *, int, unsigned short *, int, int *, struct flt *, struct med *);
+void add_solution(int, unsigned char *, float *, int *, struct med *, struct flt *, unsigned char, unsigned char, float);
+void assemble_a_matrix(float *, int, unsigned char *, int, int *, struct flt *, struct med *);
 /* solve_mode_dependend.c */
-void assemble_a_matrix_4(float *, int, unsigned short *, int, int *, struct flt *, struct med *);
-void add_quake_stress_4(unsigned short *, float *, int, struct flt *, struct med *);
-unsigned short check_coulomb_stress_feedback_4(int, int, struct flt *, struct med *, unsigned short, unsigned short, int *, float);
+void assemble_a_matrix_4(float *, int, unsigned char *, int, int *, struct flt *, struct med *);
+void add_quake_stress_4(unsigned char *, float *, int, struct flt *, struct med *);
+unsigned char check_coulomb_stress_feedback_4(int, int, struct flt *, struct med *, unsigned char, unsigned char, int *, float);
 /* sort_events.c */
 /* sparse.c */
 size_t create_crs_sparse_from_memory(int, float *, float, unsigned int **, unsigned int **, float **);
@@ -466,7 +468,7 @@ size_t create_crs_sparse_from_file(int, float, unsigned int **, unsigned int **,
 size_t create_ccs_sparse_from_memory(int, float *, float, unsigned int **, unsigned int **, float **);
 size_t create_ccs_sparse_from_file(int, float, unsigned int **, unsigned int **, float **, FILE *);
 /* sparse_nr.c */
-size_t create_nrs_sparse(struct med *, float, float *, unsigned short);
+size_t create_nrs_sparse(struct med *, float, float *, unsigned char);
 size_t create_nrs_sparse_from_memory(int, float *, float, unsigned int **, float **);
 size_t create_nrs_sparse_from_file(int, float, unsigned int **, float **, FILE *);
 float get_nrs_sparse_el(int, int, unsigned int *, float *);
@@ -480,10 +482,10 @@ void convert_6sym_to_9_matrix(float *, float [3][3]);
 float resolved_stress(float *, float [3][3], float *);
 void calc_three_stress_components(float [3][3], float *, float *, float *, float *, float *, float *, float *);
 /* string_compare.c */
-unsigned short strings_match(char *, char *);
+unsigned char strings_match(char *, char *);
 /* svd.c */
-void svd_driver_lapack(float *, float *, float *, int, int, float *, int, float *, float **, int, unsigned short, unsigned short);
-void svd_driver_numrec(float *, float *, float *, int, int, float *, int, float *, unsigned short, float **, float **, int, unsigned short, int, unsigned short, unsigned short, unsigned short);
+void svd_driver_lapack(float *, float *, float *, int, int, float *, int, float *, float **, int, unsigned char, unsigned char);
+void svd_driver_numrec(float *, float *, float *, int, int, float *, int, float *, unsigned char, float **, float **, int, unsigned char, int, unsigned char, unsigned char, unsigned char);
 void assemble_cov_svd(float *, int, float *, float *);
 void print_singular_values(float *, int, FILE *);
 void indexx(int, float *, int *);

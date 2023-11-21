@@ -421,7 +421,7 @@ int calc_absolute_shear_stress_and_inc(COMP_PRECISION *abs_tau,
     *abs_tau =sqrt(SQUARE(fault[flt].s[DIP])+SQUARE(fault[flt].s[STRIKE]));
     tmpd1=fault[flt].sinc[DIP]   +fault[flt].s[DIP];
     tmpd2=fault[flt].sinc[STRIKE]+fault[flt].s[STRIKE];
-    *abs_tau1=sqrt(SQUARE(tmpd1)+SQUARE(tmpd2));
+    *abs_tau1=sqrt(SQUARE(tmpd1) + SQUARE(tmpd2));
     return(MAXSDIR_SLIP);
   }
   default:{

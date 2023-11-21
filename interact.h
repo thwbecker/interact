@@ -78,9 +78,8 @@
 
 // integer types, we use defines instead of typedef for 
 // convenience
-#define my_boolean  unsigned short
-#define MODE_TYPE unsigned short int  
-
+#define my_boolean unsigned char
+#define MODE_TYPE unsigned char
 
 /* list of projections
 
@@ -297,7 +296,7 @@ singular value will be set to zero
    activation stress boundary condition 
    modes for the faults 
    make sure to not exceed the MODE_TYPE 
-   variable type (255?)
+   variable type (255)
 
 */
 #define INACTIVE 0
@@ -330,7 +329,7 @@ singular value will be set to zero
 #define COULOMB_DIP_SLIP_UPWARD (DIP_SLIP_UPWARD+OS_C_OFFSET) 
 #define COULOMB_DIP_SLIP_DOWNWARD (DIP_SLIP_DOWNWARD+OS_C_OFFSET) 
 #define COULOMB_MAXSDIR_SLIP  (MAXSDIR_SLIP+OS_C_OFFSET)
-
+/* make sure those are < 255 */
 
 #define ACTIVATED 1
 

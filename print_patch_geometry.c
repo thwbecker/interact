@@ -22,7 +22,7 @@ void print_patch_geometry_and_bc(int flt_offset,struct flt *fault,
 				 my_boolean shrink_patches,
 				 COMP_PRECISION *scalar)
 {
-  int k,l;
+  int k,l,ncon;
   static my_boolean bc_init=FALSE;
   static int nrf,bc_code;
   COMP_PRECISION corner[4][3],sin_dip,cos_dip,leeway;
@@ -132,11 +132,11 @@ void print_patch_geometry_and_bc(int flt_offset,struct flt *fault,
   case PSXYZ_MODE:{
     if(opmode == PSXYZ_SCALAR_MODE)
       fprintf(out,"> -Z%g\n",scalar[flt_offset]);
+    calculate_bloated_corners(corner,(fault+flt_offset),leeway);
 #ifdef ALLOW_NON_3DQUAD_GEOM
     switch(fault[flt_offset].type){
     case TWO_DIM_SEGMENT_PLANE_STRAIN:
     case TWO_DIM_SEGMENT_PLANE_STRESS:{
-      calculate_bloated_corners(corner,(fault+flt_offset),leeway);
       // draw segment with endbars
       lfac = fault[flt_offset].l * 0.2;
       for(l=0;l<3;l++)
@@ -160,12 +160,12 @@ void print_patch_geometry_and_bc(int flt_offset,struct flt *fault,
       break;
     }
     case POINT_SOURCE:
+    case TRIANGULAR:
     case RECTANGULAR_PATCH:{
-      calculate_bloated_corners(corner,(fault+flt_offset),leeway);
-      for(k=0;k<4;k++){
+      ncon = ncon_of_patch((fault+flt_offset));
+      for(k=0;k < ncon;k++){
 	for(l=0;l<3;l++){
-	  if(fabs(corner[k][l]/CHAR_FAULT_DIM)>
-	     EPS_COMP_PREC)
+	  if(fabs(corner[k][l]/CHAR_FAULT_DIM) > EPS_COMP_PREC)
 	    fprintf(out,"%g ",corner[k][l]/CHAR_FAULT_DIM);
 	  else
 	    fprintf(out,"0.0 ");
@@ -173,21 +173,8 @@ void print_patch_geometry_and_bc(int flt_offset,struct flt *fault,
 	fprintf(out,"\n");
       }
       break;
-    }
-    case TRIANGULAR:{
-      for(k=0;k<3;k++){
-	for(l=0;l<3;l++)
-	  fprintf(out,"%g ",fault[flt_offset].xt[k*3+l]);
-	fprintf(out,"\n");
-      }
-      for(k=l=0;l<3;l++)
-	fprintf(out,"%g ",fault[flt_offset].xt[k*3+l]);
-      fprintf(out,"\n");
-      break;
-    }
-    }
+    }}
 #else
-    calculate_bloated_corners(corner,(fault+flt_offset),leeway);
     for(k=0;k<4;k++){
       for(l=0;l<3;l++){
 	if(fabs(corner[k][l]/CHAR_FAULT_DIM)>

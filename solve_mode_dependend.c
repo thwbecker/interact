@@ -429,8 +429,8 @@ my_boolean check_coulomb_stress_feedback_4(int nrflt,
 #endif
 {
   int i,j,k;
-  unsigned short int mode;
-  static unsigned short int slip_mode_arr[2]={STRIKE,DIP};
+  MODE_TYPE mode;
+  static MODE_TYPE slip_mode_arr[2]={STRIKE,DIP};
   static my_boolean first_call=TRUE;
   static COMP_PRECISION dist_sqr;
 #ifdef COMP_MODE_3

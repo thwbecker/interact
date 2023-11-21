@@ -1,3 +1,68 @@
 #!/bin/bash
+ff=${1-flt}
+gf=${2-geom.in}
+reg=-R-10/10/-10/10/-4/0
+scale=.7
 
-for prop in 0 1 2
+if [ ! -s $ff.dat ];then
+    echo $0: slip solution $ff.dat not found
+    exit
+fi
+if [ ! -s $gf ];then
+    echo $0: patch geometry $gf not found
+    exit
+fi
+    
+echo $0: plotting results from $ff.dat and $gf
+
+proj="-Jx$scale/$scale -Jz$scale  -E130/30"
+ann=-Ba5f.5:"x":/a5f.5:"y":/a1f.2:"z":WESNZ+
+tmpn=`mktemp`
+trap "rm -f $tmpn*" EXIT
+
+for prop in 0 1 2 10 11 12;do
+    cat $gf | patch2xyz $ff.dat $prop > $tmpn.1.$prop &
+done
+wait
+for prop in 0 1 2 10 11 12;do
+    if [ $prop -gt 2 ];then
+	lls="@~t@~"
+	disp=0
+	((lc=prop-10))
+    else
+	lls="u"
+	lc=$prop
+	disp=1
+    fi
+    if [ $lc = 0 ];then
+	label="$lls@-strike@-"
+    elif [ $lc = 1 ];then
+	label="$lls@-dip@-"
+    elif [ $lc = 2 ];then
+	label="$lls@-normal@-"
+    else
+	echo $0: prop $prop error
+	exit
+    fi
+    if [ $disp -eq 1 ];then
+	makecpt -T-1/1/.1 -Cvik > $tmpn.cpt
+	lspc=.5
+    else
+	makecpt -T-500/500/50 -Croma > $tmpn.cpt
+	lspc=250
+    fi
+    
+    ofile=$ff.$prop.ps
+    psxyz $reg $proj $ann -P $tmpn.1.$prop -C$tmpn.cpt -m -L -K -W0.5 > $ofile
+    psscale -D2/0.5/4/.2h -E -C$tmpn.cpt -B$lspc:$label:  -O >> $ofile
+    modifybb $ofile &
+    #gv $ofile;exit
+    fs="$fs $ofile"
+done
+wait
+epsmerge -par -x 2 -y 3 --orientation Landscape -rmo 0 $fs > $ff.ps
+echo $0: output in $ff.ps
+#psconvert -Tf $ff.ps
+rm $fs # $ff.ps
+#echo $0: output in $ff.pdf
+
