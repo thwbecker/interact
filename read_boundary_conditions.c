@@ -683,7 +683,7 @@ void read_one_step_bc(FILE *in,struct med *medium,struct flt *fault,
 	  exit(-1);
 	} 
 	if(!rotate_to_local){
-	  // assign reight hand side and activate slipping mode
+	  // assign right hand side and activate slipping mode
 	  //fprintf(stderr,"%g %g\n", bc_value , fault[patch_nr].s[STRIKE]);
 	  /* unclear why the fault would be pre-stressed? */
 	  rhs[patch_nr3+STRIKE] = bc_value - fault[patch_nr].s[STRIKE];
@@ -700,7 +700,10 @@ void read_one_step_bc(FILE *in,struct med *medium,struct flt *fault,
 
 	  */
 	  HEADNODE
-	    if(!tri_warned[0]){
+	    if(!tri_warned[0]){	/* this could be fixed with some
+				 * matrix multiplication to the
+				 * interaction matrix, worry about
+				 * that later */
 	      fprintf(stderr,"WARNING: prescribing shear  for triangular dislocation means dip stress will be zero\n");
 	      tri_warned[0] = TRUE;
 	    }
@@ -811,8 +814,9 @@ void read_one_step_bc(FILE *in,struct med *medium,struct flt *fault,
 #endif
 	}else{
 	  HEADNODE
-	    if(!tri_warned[1]){
-	      fprintf(stderr,"WARNING: prescribing dip for triangular dislocation means shear stress will be zero\n");
+	    if(!tri_warned[1]){	/* could be fixed with matrix
+				 * multiplicationm */
+	      fprintf(stderr,"WARNING: prescribing dip for triangular dislocation means strike shear stress will be zero\n");
 	      tri_warned[1] = TRUE;
 	    }
 

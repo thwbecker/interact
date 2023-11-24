@@ -113,19 +113,20 @@
 !
 subroutine  tddisphs(loc,P1,P2,P3,Ss,Ds,Ts,nu,u)
   implicit none
-  C_PREC, PARAMETER :: pi = 3.14159265358979D0
+  C_PREC, PARAMETER :: pi = 3.14159265358979D0, zero = FORTRAN_ZERO
   C_PREC,intent(in) :: ss,ds,ts,nu
   C_PREC,intent(in),dimension(3) :: p1,p2,p3,loc
   C_PREC,intent(out),dimension(3) :: u
   C_PREC :: ueMS,unMS,uvMS,ueFSC,unFSC,uvFSC,ueIS,unIS,uvIS
   C_PREC,dimension(3) :: p1n,p2n,p3n
+  C_PREC,dimension(3,3) :: Ar1,Ar2
 
   ! vertices cannot be on the surface?
-  if ((loc(3).gt.0.d0).or.(P1(3).gt.0.d0).or.(P2(3).gt.0.d0).or.(P3(3).gt.0))then
+  if ((loc(3).gt.zero).or.(P1(3).gt.zero).or.(P2(3).gt.zero).or.(P3(3).gt.0))then
      print *,'Half-space solution: Z coordinates must be negative!'
      stop
-  else if((P1(3)==0.d0).and.(P2(3)==0.d0).and.(P3(3)==0.d0))then
-     u = 0.d0
+  else if((P1(3)==zero).and.(P2(3)==zero).and.(P3(3)==zero))then
+     u = zero
      return
   end  if
   !print *,p1,p2,p3
@@ -134,16 +135,20 @@ subroutine  tddisphs(loc,P1,P2,P3,Ss,Ds,Ts,nu,u)
 
 
   ! Calculate main dislocation contribution to displacements
-  call TDdispFS(loc(1),loc(2),loc(3),P1,P2,P3,Ss,Ds,Ts,nu,ueMS,unMS,uvMS);
+  call TDdispFS(loc(1),loc(2),loc(3),P1,P2,P3,Ss,Ds,Ts,nu,ueMS,unMS,uvMS,Ar1);
   !print *,ueMS,unMS,uvMS
   !stop
   ! Calculate harmonic function contribution to displacements
-  call TDdisp_HarFunc(loc(1),loc(2),loc(3),P1,P2,P3,Ss,Ds,Ts,nu,ueFSC,unFSC,uvFSC);
+  ! reuse the Ar1 matrix computed
+  call TDdisp_HarFunc(loc(1),loc(2),loc(3),P1,P2,P3,Ss,Ds,Ts,nu,&
+       ueFSC,unFSC,uvFSC,.false.,Ar1);
   !print *,ueFSC,unFSC,uvFSC
-  ! Calculate image dislocation contribution to displacements
+  !
+  ! Calculate image dislocation contribution to displacements, this will have a different
+  ! Ar matrix
   p1n(1:2) = p1(1:2);p2n(1:2)=p2(1:2);p3n(1:2) =  p3(1:2);
   p1n(3)  = -p1(3);  p2n(3)  = -p2(3);p3n(3)   = -p3(3);
-  call TDdispFS(loc(1),loc(2),loc(3),P1n,P2n,P3n,Ss,Ds,Ts,nu,ueIS,unIS,uvIS);
+  call TDdispFS(loc(1),loc(2),loc(3),P1n,P2n,P3n,Ss,Ds,Ts,nu,ueIS,unIS,uvIS,Ar2);
   !print *,ueIS,unIS,uvIS
   !stop
   ! Calculate the complete displacement vector components in EFCS
@@ -153,19 +158,24 @@ subroutine  tddisphs(loc,P1,P2,P3,Ss,Ds,Ts,nu,u)
 
 end subroutine  TDdispHS
 
-subroutine TDdispFS(X,Y,Z,P1,P2,P3,Ss,Ds,Ts,nu,ue,un,uv)
+!
+! now also returns Ar
+!
+subroutine TDdispFS(X,Y,Z,P1,P2,P3,Ss,Ds,Ts,nu,ue,un,uv,Ar)
   USE, INTRINSIC :: IEEE_ARITHMETIC
   implicit none
   C_PREC,intent(in) :: x,y,z,ss,ds,ts,nu
   C_PREC,intent(in),dimension(3) :: p1,p2,p3
   C_PREC,intent(out) :: ue,un,uv
+  C_PREC,intent(out), dimension(3,3) :: Ar
+  
   C_PREC, PARAMETER :: pi = 3.14159265358979D0,&
        one_over_four_pi = 1.0d0/(4.0d0*pi)
   
   C_PREC,dimension(3) :: p1_,p2_,p3_,e12,e13,e23,a,b,c
   C_PREC :: bx,by,bz,x_,y_,z_,fin,fid,fi,aA,aB,aC,na,nb,nc,u,v,w,&
        u1,u2,u3,v1,v2,v3,w1,w2,w3
-  C_PREC,dimension(3,3) :: Ar
+
   logical :: casepLog,casenlog,casezlog
   integer trimode
   ! TDdispFS 
@@ -249,7 +259,8 @@ subroutine TDdispFS(X,Y,Z,P1,P2,P3,Ss,Ds,Ts,nu,ue,un,uv)
  !print *,ue,un,uv
 end  subroutine TDdispFS
 
-subroutine TDdisp_HarFunc(X,Y,Z,P1,P2,P3,Ss,Ds,Ts,nu,ue,un,uv)
+subroutine TDdisp_HarFunc(X,Y,Z,P1,P2,P3,Ss,Ds,Ts,nu,ue,un,uv,&
+     compute_ar,ar)
   ! TDdisp_HarFunc calculates the harmonic function contribution to the
   ! displacements associated with a triangular dislocation in a half-space.
   ! The function cancels the surface normal tractions induced by the main and
@@ -259,7 +270,8 @@ subroutine TDdisp_HarFunc(X,Y,Z,P1,P2,P3,Ss,Ds,Ts,nu,ue,un,uv)
   C_PREC,intent(in) :: x,y,z,ss,ds,ts,nu
   C_PREC,intent(in),dimension(3) :: p1,p2,p3
   C_PREC,intent(out) :: ue,un,uv
-  C_PREC,dimension(3,3) :: Ar
+  C_PREC,intent(in),dimension(3,3) :: Ar
+  logical,intent(in) :: compute_ar
   C_PREC,dimension(3) :: vnorm,vdip,vstrike
        
   C_PREC bx,by,bz,b_x,b_y,b_z,u3,v3,w3,u1,v1,w1,u2,v2,w2
@@ -268,11 +280,15 @@ subroutine TDdisp_HarFunc(X,Y,Z,P1,P2,P3,Ss,Ds,Ts,nu,ue,un,uv)
   by = Ss; ! Strike-slip
   bz = Ds; ! Dip-slip
 
-  !
-  call get_tdcs_base_vectors(p1,p2,p3,vstrike,vdip,vnorm)
-
-  ! Transform slip vector components from TDCS into EFCS
-  call matrix_from_3vec(vnorm,vstrike,vdip,Ar)
+  
+  !print *,'Ar on input',Ar
+  if(compute_ar)then            !compute locally, or reuse?
+     call get_tdcs_base_vectors(p1,p2,p3,vstrike,vdip,vnorm)
+     
+     ! Transform slip vector components from TDCS into EFCS
+     call matrix_from_3vec(vnorm,vstrike,vdip,Ar)
+     !print *,'Ar computed',Ar
+  endif
 
   call CoordTrans(bx,by,bz,Ar,b_x,b_y,b_z);
   !print *,X,Y,Z,b_X,b_Y,b_Z,P1,P2,nu
@@ -312,6 +328,7 @@ subroutine trimodefinder(x,y,z,p1,p2,p3,trimode)
   C_PREC,intent(in) :: x,y,z
   C_PREC,intent(in),dimension(2) :: p1,p2,p3
   C_PREC :: a,b,c
+  C_PREC,parameter :: zero = FORTRAN_ZERO
   ! trimodefinder calculates the normalized barycentric coordinates of 
   ! the points with respect to the TD vertices and specifies the appropriate
   ! artefact-free configuration of the angular dislocations for the 
@@ -331,13 +348,13 @@ subroutine trimodefinder(x,y,z,p1,p2,p3,trimode)
   c = 1.d0-a-b;
 
   trimode = 1
-  IF ((a <= 0.0D0) .AND. (b > c) .AND. (c > a)) trimode = -1
-  IF ((b <= 0.0D0) .AND. (c > a) .AND. (a > b)) trimode = -1
-  IF ((c <= 0.0D0) .AND. (a > b) .AND. (b > c)) trimode = -1
-  IF ((a == 0.0D0) .AND. (b >= 0.0D0) .AND. (c >= 0.0D0)) trimode = 0
-  IF ((a >= 0.0D0) .AND. (b == 0.0D0) .AND. (c >= 0.0D0)) trimode = 0
-  IF ((a >= 0.0D0) .AND. (b >= 0.0D0) .AND. (c == 0.0D0)) trimode = 0
-  IF ((trimode == 0) .AND. (z /= 0.0D0)) trimode = 1
+  IF ((a <= zero) .AND. (b > c) .AND. (c > a)) trimode = -1
+  IF ((b <= zero) .AND. (c > a) .AND. (a > b)) trimode = -1
+  IF ((c <= zero) .AND. (a > b) .AND. (b > c)) trimode = -1
+  IF ((a == zero) .AND. (b >= zero) .AND. (c >= zero)) trimode = 0
+  IF ((a >= zero) .AND. (b == zero) .AND. (c >= zero)) trimode = 0
+  IF ((a >= zero) .AND. (b >= zero) .AND. (c == zero)) trimode = 0
+  IF ((trimode == 0) .AND. (z /= zero)) trimode = 1
 
 end  subroutine trimodefinder
 
@@ -379,19 +396,20 @@ subroutine AngSetupFSC(X,Y,Z,bX,bY,bZ,PA,PB,nu,ue,un,uv)
   C_PREC, PARAMETER :: pi = 3.14159265358979D0
   C_PREC :: b1, b2, b3, beta, v1, v1A, v1B, v2, v2A, v2B, &
        v3, v3A, v3B, y1A, y1AB, y1B, y2A, y2AB, y2B, y3A, y3AB, y3B
-  C_PREC, DIMENSION(3) :: ey1, ey2, ey3, eZ, SideVec
+  C_PREC, DIMENSION(3) :: ey1, ey2, ey3, SideVec
   C_PREC, DIMENSION(3, 3) :: A, At
   C_PREC, PARAMETER :: eps = EPS_FOR_FORTRAN ! a crude approximation of the MatLab "eps" constant.
+  C_PREC, PARAMETER,dimension(3) :: eZ =  (/ FORTRAN_ZERO , FORTRAN_ZERO, FORTRAN_UNITY /);
   LOGICAL :: I
   
   ! Calculate TD side vector and the angle of the angular dislocation pair
   SideVec = PB-PA;
-  eZ = (/0.d0, 0.d0, 1.0d0/);
+  
   beta = acos(dot_product(-SideVec,eZ)/norm2(SideVec));
   if ((abs(beta).lt.eps).or.(abs(pi-beta).lt.eps))then 
-     ue = 0.0d0
-     un = 0.d0
-     uv = 0.d0
+     ue = FORTRAN_ZERO
+     un = FORTRAN_ZERO
+     uv = FORTRAN_ZERO
   else
      ey1 = (/ SideVec(1),Sidevec(2),FORTRAN_ZERO /);
      call normalize_vec(ey1,ey1)
@@ -413,7 +431,7 @@ subroutine AngSetupFSC(X,Y,Z,bX,bY,bZ,PA,PB,nu,ue,un,uv)
     
     ! Determine the best artefact-free configuration for the calculation
     ! points near the free surface
-    I = ((beta*y1A)>=0);
+    I = ((beta*y1A)>=FORTRAN_ZERO);
     if(I)then 
        ! Configuration I
        call Angdisdispfsc(y1A,y2A,y3A,&
@@ -459,7 +477,8 @@ SUBROUTINE Angdisdisp(x, y, z, alpha, bx, by, bz, nu, & ! inputs
 
   C_PREC :: cosA, eta, r, sinA, ux, uy, uz, vx, vy, vz, wx, wy, wz, zz, zeta
 
-  C_PREC :: rmzeta,log_rmzeta,N1,N2,N3,rmzz,log_rmzz,xs,  one_over_r_rmzeta,ys
+  C_PREC :: rmzeta,log_rmzeta,N1,N2,N3,rmzz,log_rmzz,xs,  one_over_r_rmzeta,ys,&
+       nfac 
   
   !cosA = cos(alpha);
   !sinA = sin(alpha);
@@ -494,25 +513,26 @@ SUBROUTINE Angdisdisp(x, y, z, alpha, bx, by, bz, nu, & ! inputs
   log_rmzeta = log(rmzeta)
   N1 = 1.0d0-nu
   N2 = 1.0D0-2.0D0*nu
-  N3 = 2.0D0*(N1)
- 
-  ux = bx*one_over_eight_pi/(N1) * (x*y/r/(rmzz)-x*eta*one_over_r_rmzeta)
-  vx = bx*one_over_eight_pi/(N1) * (eta*sinA/(rmzeta)-y*eta*one_over_r_rmzeta + &
-       & ys/r/(rmzz) + (N2) * (cosA*log_rmzeta-log_rmzz))
-  wx = bx*one_over_eight_pi/(N1) * (eta*cosA/(rmzeta)-y/r-eta*zz*one_over_r_rmzeta- &
-       & (N2) * sinA * log_rmzeta);
+  N3 = 2.0D0*N1
+  nfac = one_over_eight_pi/N1
+  
+  ux = bx*nfac * (x*y/r/(rmzz)-x*eta*one_over_r_rmzeta)
+  vx = bx*nfac * (eta*sinA/(rmzeta)-y*eta*one_over_r_rmzeta + &
+       & ys/r/(rmzz) + N2 * (cosA*log_rmzeta-log_rmzz))
+  wx = bx*nfac * (eta*cosA/(rmzeta)-y/r-eta*zz*one_over_r_rmzeta- &
+       & N2 * sinA * log_rmzeta);
 
  
-  uy = by*one_over_eight_pi/(N1) * (xs*cosA*one_over_r_rmzeta - xs/r/(rmzz) - &
-       & (N2) * (cosA*log_rmzeta - log_rmzz))
-  vy = by*x*one_over_eight_pi/(N1) * (y*cosA*one_over_r_rmzeta - &
+  uy = by*nfac * (xs*cosA*one_over_r_rmzeta - xs/r/(rmzz) - &
+       & N2 * (cosA*log_rmzeta - log_rmzz))
+  vy = by*x*nfac * (y*cosA*one_over_r_rmzeta - &
        & sinA*cosA/(rmzeta) - y/r/(rmzz))
-  wy = by*x*one_over_eight_pi/(N1) * (zz*cosA*one_over_r_rmzeta - cosA**2/(rmzeta)+1.0D0/r)
+  wy = by*x*nfac * (zz*cosA*one_over_r_rmzeta - cosA**2/(rmzeta)+1.0D0/r)
 
   
-  uz = bz*sinA*one_over_eight_pi/(N1) * ((N2)*log_rmzeta-xs*one_over_r_rmzeta)
-  vz = bz*x*sinA*one_over_eight_pi/(N1) * (sinA/(rmzeta)-y*one_over_r_rmzeta)
-  wz = bz*x*sinA*one_over_eight_pi/(N1) *(cosA/(rmzeta)-zz*one_over_r_rmzeta)
+  uz = bz  *sinA*nfac * (N2*log_rmzeta-xs*one_over_r_rmzeta)
+  vz = bz*x*sinA*nfac * (sinA/(rmzeta)-y*one_over_r_rmzeta)
+  wz = bz*x*sinA*nfac * (cosA/(rmzeta)-zz*one_over_r_rmzeta)
 
 
   u = ux + uy + uz
@@ -580,7 +600,7 @@ SUBROUTINE Angdisdispfsc(y1, y2, y3, beta, b1, b2, b3, nu, a, & ! inputs
   
   N1 = unity-nu
   N4 = 2.0d0*nu
-  N2 = UNITY-N4
+  N2 = unity-N4
   N3 = 2.0D0*N1
 
   
@@ -588,71 +608,71 @@ SUBROUTINE Angdisdispfsc(y1, y2, y3, beta, b1, b2, b3, nu, a, & ! inputs
   Fib = 2.0D0 * ATAN(-y2 / (-(rb + y3b) / TAN(beta / 2.0D0) + y1)) ! The Burgers' function
 
  
-  v1cb1 = b1*one_over_four_pi/(N1)*(-N3*(N2)*Fib*cotBs+(N2)*y2/ &
-       & (rb+y3b)*((N2-a/rb)*cotB-y1/(rb+y3b)*(nu+a/rb))+(N2)*               &
+  v1cb1 = b1*one_over_four_pi/N1*(-N3*N2*Fib*cotBs+N2*y2/ &
+       & (rb+y3b)*((N2-a/rb)*cotB-y1/(rb+y3b)*(nu+a/rb))+N2*               &
        & y2*cosB*cotB/(rb+z3b)*(cosB+a/rb)+a*y2*(y3b-a)*cotB/rbc+y2*                               &
-       & (y3b-a)/(rb*(rb+y3b))*(-(N2)*cotB+y1/(rb+y3b)*(N4+a/rb)+                  &
+       & (y3b-a)/(rb*(rb+y3b))*(-N2*cotB+y1/(rb+y3b)*(N4+a/rb)+                  &
        & a*y1/r2b)+y2*(y3b-a)/(rb*(rb+z3b))*(cosB/(rb+z3b)*((rb*                                   &
-       & cosB+y3b)*((N2)*cosB-a/rb)*cotB+N3*(rb*sinB-y1)*cosB)-            &
+       & cosB+y3b)*(N2*cosB-a/rb)*cotB+N3*(rb*sinB-y1)*cosB)-            &
        & a*y3b*cosB*cotB/r2b));
 
   
-  v2cb1 = b1*one_over_four_pi/(N1)*((N2)*((N3*cotBs-nu)*log_rbpy3b-(2.0D0* &
-       & (N1)*cotBs+N2)*cosB*log_rbpz3b)-(N2)/(rb+y3b)*(y1*         &
-       & cotB*(N2-a/rb)+nu*y3b-a+y2s/(rb+y3b)*(nu+a/rb))-(UNITY-N4                 &
+  v2cb1 = b1*one_over_four_pi/N1*(N2*((N3*cotBs-nu)*log_rbpy3b-(2.0D0* &
+       & N1*cotBs+N2)*cosB*log_rbpz3b)-N2/(rb+y3b)*(y1*         &
+       & cotB*(N2-a/rb)+nu*y3b-a+y2s/(rb+y3b)*(nu+a/rb))-(unity-N4                 &
        & )*z1b*cotB/(rb+z3b)*(cosB+a/rb)-a*y1*(y3b-a)*cotB/rbc+                                  &
-       & (y3b-a)/(rb+y3b)*(-N4+one_over_rb*((N2)*y1*cotB-a)+y2s/(rb*                &
+       & (y3b-a)/(rb+y3b)*(-N4+one_over_rb*(N2*y1*cotB-a)+y2s/(rb*                &
        & (rb+y3b))*(N4+a/rb)+a*y2s/rbc)+(y3b-a)/(rb+z3b)*(cosBs-                         &
-       & one_over_rb*((N2)*z1b*cotB+a*cosB)+a*y3b*z1b*cotB/rbc-UNITY/(rb*                 &
+       & one_over_rb*(N2*z1b*cotB+a*cosB)+a*y3b*z1b*cotB/rbc-unity/(rb*                 &
        & (rb+z3b))*(y2s*cosBs-a*z1b*cotB/rb*(rb*cosB+y3b))))
 
  
-  v3cb1 = b1*one_over_four_pi/(N1)*(N3*(((N2)*Fib*cotB)+(y2/(rb+y3b)*(N4  &
+  v3cb1 = b1*one_over_four_pi/N1*(N3*((N2*Fib*cotB)+(y2/(rb+y3b)*(N4  &
        & +a/rb))-(y2*cosB/(rb+z3b)*(cosB+a/rb)))+y2*(y3b-a)/rb*(N4                             &
        & /(rb+y3b)+a/r2b)+y2*(y3b-a)*cosB/(rb*(rb+z3b))*(N2-                     &
        & (rb*cosB+y3b)/(rb+z3b)*(cosB+a/rb)-a*y3b/r2b))
 
   
-  v1cb2 = b2*one_over_four_pi/(N1)*((N2)*((N3*cotBs+nu)*log_rbpy3b-(2* &
-       & (N1)*cotBs+1)*cosB*log_rbpz3b)+(N2)/(rb+y3b)*(-(N2)*   &
-       & y1*cotB+nu*y3b-a+a*y1*cotB/rb+y1s/(rb+y3b)*(nu+a/rb))-(UNITY-N4                   &
+  v1cb2 = b2*one_over_four_pi/N1*(N2*((N3*cotBs+nu)*log_rbpy3b-(2* &
+       & N1*cotBs+1)*cosB*log_rbpz3b)+N2/(rb+y3b)*(-N2*   &
+       & y1*cotB+nu*y3b-a+a*y1*cotB/rb+y1s/(rb+y3b)*(nu+a/rb))-(unity-N4                   &
        & )*cotB/(rb+z3b)*(z1b*cosB-a*(rb*sinB-y1)/(rb*cosB))-a*y1*                             &
-       & (y3b-a)*cotB/rbc+(y3b-a)/(rb+y3b)*(N4+one_over_rb*((N2)*y1*            &
+       & (y3b-a)*cotB/rbc+(y3b-a)/(rb+y3b)*(N4+one_over_rb*(N2*y1*            &
        & cotB+a)-y1s/(rb*(rb+y3b))*(N4+a/rb)-a*y1s/rbc)+(y3b-a)*                     &
        & cotB/(rb+z3b)*(-cosB*sinB+a*y1*y3b/(rbc*cosB)+(rb*sinB-y1)/                           &
-       & rb*(N3*cosB-(rb*cosB+y3b)/(rb+z3b)*(UNITY+a/(rb*cosB)))))
+       & rb*(N3*cosB-(rb*cosB+y3b)/(rb+z3b)*(unity+a/(rb*cosB)))))
 
  
-  v2cb2 = b2*one_over_four_pi/(N1)*(N3*(N2)*Fib*cotBs+(N2)*y2/  &
-       & (rb+y3b)*(-(N2-a/rb)*cotB+y1/(rb+y3b)*(nu+a/rb))-(N2)*              &
-       & y2*cotB/(rb+z3b)*(UNITY+a/(rb*cosB))-a*y2*(y3b-a)*cotB/rbc+y2*                            &
-       & (y3b-a)/(rb*(rb+y3b))*((N2)*cotB-N4*y1/(rb+y3b)-a*y1/rb*                  &
-       & (one_over_rb+UNITY/(rb+y3b)))+y2*(y3b-a)*cotB/(rb*(rb+z3b))*(-N3*                &
-       & cosB+(rb*cosB+y3b)/(rb+z3b)*(UNITY+a/(rb*cosB))+a*y3b/(r2b*cosB)))
+  v2cb2 = b2*one_over_four_pi/N1*(N3*N2*Fib*cotBs+N2*y2/  &
+       & (rb+y3b)*(-(N2-a/rb)*cotB+y1/(rb+y3b)*(nu+a/rb))-N2*              &
+       & y2*cotB/(rb+z3b)*(unity+a/(rb*cosB))-a*y2*(y3b-a)*cotB/rbc+y2*                            &
+       & (y3b-a)/(rb*(rb+y3b))*(N2*cotB-N4*y1/(rb+y3b)-a*y1/rb*                  &
+       & (one_over_rb+unity/(rb+y3b)))+y2*(y3b-a)*cotB/(rb*(rb+z3b))*(-N3*                &
+       & cosB+(rb*cosB+y3b)/(rb+z3b)*(unity+a/(rb*cosB))+a*y3b/(r2b*cosB)))
 
   
-  v3cb2 = b2*one_over_four_pi/(N1)*(-N3*(N2)*cotB*(log_rbpy3b-cosB*  &
+  v3cb2 = b2*one_over_four_pi/N1*(-N3*N2*cotB*(log_rbpy3b-cosB*  &
        &  log_rbpz3b)-N3*y1/(rb+y3b)*(N4+a/rb)+N3*z1b/(rb+ &
-       &  z3b)*(cosB+a/rb)+(y3b-a)/rb*((N2)*cotB-N4*y1/(rb+y3b)-a*          &
+       &  z3b)*(cosB+a/rb)+(y3b-a)/rb*(N2*cotB-N4*y1/(rb+y3b)-a*          &
        &  y1/r2b)-(y3b-a)/(rb+z3b)*(cosB*sinB+(rb*cosB+y3b)*cotB/rb*                        &
        &  (N3*cosB-(rb*cosB+y3b)/(rb+z3b))+a/rb*(sinB-y3b*z1b/                  &
        &  r2b-z1b*(rb*cosB+y3b)/(rb*(rb+z3b)))))
 
   
-  v1cb3 = b3*one_over_four_pi/(N1)*((N2)*(y2/(rb+y3b)*(unity+a/rb)-y2*cosB/(rb+  &
-       & z3b)*(cosB+a/rb))-y2*(y3b-a)/rb*(a/r2b+UNITY/(rb+y3b))+y2*                 &
+  v1cb3 = b3*one_over_four_pi/N1*(N2*(y2/(rb+y3b)*(unity+a/rb)-y2*cosB/(rb+  &
+       & z3b)*(cosB+a/rb))-y2*(y3b-a)/rb*(a/r2b+unity/(rb+y3b))+y2*                 &
        & (y3b-a)*cosB/(rb*(rb+z3b))*((rb*cosB+y3b)/(rb+z3b)*(cosB+a/                  &
        & rb)+a*y3b/r2b))
 
 
-  v2cb3 = b3*one_over_four_pi/(N1)*((N2)*(-sinB*log_rbpz3b-y1/(rb+y3b)*(unity+a/  &
-       & rb)+z1b/(rb+z3b)*(cosB+a/rb))+y1*(y3b-a)/rb*(a/r2b+UNITY/(rb+                &
-       & y3b))-(y3b-a)/(rb+z3b)*(sinB*(cosB-a/rb)+z1b/rb*(UNITY+a*y3b/                  &
-       & r2b)-UNITY/(rb*(rb+z3b))*(y2s*cosB*sinB-a*z1b/rb*(rb*cosB+y3b))))
+  v2cb3 = b3*one_over_four_pi/N1*(N2*(-sinB*log_rbpz3b-y1/(rb+y3b)*(unity+a/  &
+       & rb)+z1b/(rb+z3b)*(cosB+a/rb))+y1*(y3b-a)/rb*(a/r2b+unity/(rb+                &
+       & y3b))-(y3b-a)/(rb+z3b)*(sinB*(cosB-a/rb)+z1b/rb*(unity+a*y3b/                  &
+       & r2b)-unity/(rb*(rb+z3b))*(y2s*cosB*sinB-a*z1b/rb*(rb*cosB+y3b))))
 
   
-  v3cb3 = b3*one_over_four_pi/(N1)*(N3*Fib+N3*(y2*sinB/(rb+z3b)*(cosB+  &
-       & a/rb))+y2*(y3b-a)*sinB/(rb*(rb+z3b))*(UNITY+(rb*cosB+y3b)/(rb+                          &
+  v3cb3 = b3*one_over_four_pi/N1*(N3*Fib+N3*(y2*sinB/(rb+z3b)*(cosB+  &
+       & a/rb))+y2*(y3b-a)*sinB/(rb*(rb+z3b))*(unity+(rb*cosB+y3b)/(rb+                          &
        & z3b)*(cosB+a/rb)+a*y3b/r2b))
 
  
@@ -689,6 +709,9 @@ subroutine normalize_vec(x,y)
   y = x/vec_len
 end subroutine normalize_vec
 
+!
+!
+!
 subroutine setup_geometry(x,y,z,Ts,Ss,Ds,p1,p2,p3,bx,by,bz,&
      x_,y_,z_,p1_,p2_,p3_,e12,e13,e23,aA,aB,aC,Ar,trimode)
   implicit none
@@ -744,15 +767,16 @@ subroutine get_tdcs_base_vectors(p1,p2,p3,vstrike,vdip,vnorm)
   ! respectively.
   C_PREC,intent(in),dimension(3) :: p1,p2,p3
   C_PREC,intent(out),dimension(3) :: vstrike,vdip,vnorm
-  C_PREC,dimension(3) :: ey,ez
+  C_PREC, PARAMETER,dimension(3) :: &
+       eY = (/ FORTRAN_ZERO, FORTRAN_UNITY, FORTRAN_ZERO /), &
+       eZ = (/ FORTRAN_ZERO, FORTRAN_ZERO,  FORTRAN_UNITY /);
   
   call dcross(P2-P1,P3-P1,vnorm);
   call normalize_vec(vnorm,vnorm)
   
-  eZ = (/ FORTRAN_ZERO , FORTRAN_ZERO, FORTRAN_UNITY /);
+
   call dcross(eZ,Vnorm,vstrike);
   if(norm2(Vstrike) == FORTRAN_ZERO )then
-     eY = (/ FORTRAN_ZERO, FORTRAN_UNITY, FORTRAN_ZERO /);
      vstrike = ey*vnorm(3);
      ! For horizontal elements in case of half-space calculation!!!
      ! Correct the strike vector of image dislocation only
