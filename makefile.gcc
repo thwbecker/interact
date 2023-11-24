@@ -51,8 +51,8 @@ SCARGS = -Ofast -march=native $(GCCWOPT)
 DEBUG_FLAGS=
 
 # these next three lines for debugging, comment if fast execution is desired
+
 #SCARGS =  $(GCCWOPT) 
-#PETSC_ARCH=arch-linux-c-debug
 #DEBUG_FLAGS=-DDEBUG -g -O0
 
 # other debugging options, comment in for debugging
