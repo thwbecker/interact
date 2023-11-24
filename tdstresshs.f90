@@ -470,23 +470,26 @@ subroutine AngDisStrain(x,y,z,alpha,bx,by,bz,nu,Exx,Eyy,Ezz,Exy,Exz,Eyz)
   C_PREC,intent(out) :: exx,eyy,ezz,exy,exz,eyz
 
   C_PREC sinA,cosA,eta,zeta,x2,y2,z2,r2,r,r3,rz,r3z,W,W2,Wr,W2r,Wr3,W2r2, C,S
-  C_PREC rFi_rx,rFi_ry,rFi_rz,r2z2,N0,N1,N2,P8
+  C_PREC rFi_rx,rFi_ry,rFi_rz,r2z2,N0,N1,N2,P8,P4,cfac,rmz
   C_PREC, PARAMETER :: pi = 3.14159265358979D0
 
   sinA = sin(alpha);
   cosA = cos(alpha);
   eta = y*cosA-z*sinA;
   zeta = y*sinA+z*cosA;
-  
+
   x2 = x**2;
   y2 = y**2;
   z2 = z**2;
   r2 = x2+y2+z2;
   r = sqrt(r2);
   r3 = r*r2;
-  rz = r*(r-z);
-  r2z2 = r2*(r-z)**2;
-  r3z = r3*(r-z);
+
+  rmz = r-z
+  
+  rz = r*(rmz);
+  r2z2 = r2*(rmz)**2;
+  r3z = r3*(rmz);
 
   W = zeta-r;
   W2 = W**2;
@@ -497,52 +500,62 @@ subroutine AngDisStrain(x,y,z,alpha,bx,by,bz,nu,Exx,Eyy,Ezz,Exy,Exz,Eyz)
   
   C = (r*cosA-z)/Wr;
   S = (r*sinA-y)/Wr;
+
+  P4 = 1.0d0/(4.0d0*pi)
+  P8 = P4/2.0d0
+
+  cfac = y*cosA+z*sinA
   
   ! Partial derivatives of the Burgers function
-  rFi_rx = (eta/r/(r-zeta)-y/r/(r-z))/4.0d0/pi;
-  rFi_ry = (x/r/(r-z)-cosA*x/r/(r-zeta))/4.0d0/pi;
-  rFi_rz = (sinA*x/r/(r-zeta))/4.0d0/pi;
+  rFi_rx = (eta/r/(-W)-y/r/(rmz))*P4;
+  rFi_ry = (x/r/(rmz)-cosA*x/r/(-W))*P4;
+  rFi_rz = (sinA*x/r/(-W))*P4;
+
+
+  N0 = 2.0d0*nu
+  N1 = N0+1.0d0
+  N2 = 1.0d0-nu
   
   Exx = bx*(rFi_rx)+&
-       bx/8.0d0/pi/(1.0d0-nu)*(eta/Wr+eta*x2/W2r2-eta*x2/Wr3+y/rz-&
+       bx*P8/(N2)*(eta/Wr+eta*x2/W2r2-eta*x2/Wr3+y/rz-&
        x2*y/r2z2-x2*y/r3z)-&
-       by*x/8.0d0/pi/(1.0d0-nu)*(((2.0d0*nu+1.0d0)/Wr+x2/W2r2-x2/Wr3)*cosA+&
-       (2.0d0*nu+1.0d0)/rz-x2/r2z2-x2/r3z)+&
-       bz*x*sinA/8.0d0/pi/(1.0d0-nu)*((2.0d0*nu+1.0d0)/Wr+x2/W2r2-x2/Wr3);
+       by*x*P8/(N2)*(((N1)/Wr+x2/W2r2-x2/Wr3)*cosA+&
+       (N1)/rz-x2/r2z2-x2/r3z)+&
+       bz*x*sinA*P8/(N2)*((N1)/Wr+x2/W2r2-x2/Wr3);
   
   Eyy = by*(rFi_ry)+&
-       bx/8.0d0/pi/(1.0d0-nu)*((1.0d0/Wr+S**2-y2/Wr3)*eta+(2.0d0*nu+1.0d0)*y/rz-y**3/r2z2-&
+       bx*P8/(N2)*((1.0d0/Wr+S**2-y2/Wr3)*eta+(N1)*y/rz-y**3/r2z2-&
        y**3/r3z-2.0d0*nu*cosA*S)-&
-       by*x/8.0d0/pi/(1.0d0-nu)*(1.0d0/rz-y2/r2z2-y2/r3z+&
+       by*x*P8/(N2)*(1.0d0/rz-y2/r2z2-y2/r3z+&
        (1.0d0/Wr+S**2-y2/Wr3)*cosA)+&
-       bz*x*sinA/8.0d0/pi/(1.0d0-nu)*(1.0d0/Wr+S**2-y2/Wr3);
+       bz*x*sinA*P8/(N2)*(1.0d0/Wr+S**2-y2/Wr3);
   
   Ezz = bz*(rFi_rz)+&
-       bx/8.0d0/pi/(1.0d0-nu)*(eta/W/r+eta*C**2-eta*z2/Wr3+y*z/r3+&
+       bx*P8/(N2)*(eta/W/r+eta*C**2-eta*z2/Wr3+y*z/r3+&
        2.0d0*nu*sinA*C)-&
-       by*x/8.0d0/pi/(1.0d0-nu)*((1.0d0/Wr+C**2-z2/Wr3)*cosA+z/r3)+&
-       bz*x*sinA/8.0d0/pi/(1.0d0-nu)*(1.0d0/Wr+C**2-z2/Wr3);
+       by*x*P8/(N2)*((1.0d0/Wr+C**2-z2/Wr3)*cosA+z/r3)+&
+       bz*x*sinA*P8/(N2)*(1.0d0/Wr+C**2-z2/Wr3);
   
   Exy = bx*(rFi_ry)/2.0d0+by*(rFi_rx)/2.0d0-&
-       bx/8.0d0/pi/(1.0d0-nu)*(x*y2/r2z2-nu*x/rz+x*y2/r3z-nu*x*cosA/Wr+&
+       bx*P8/(N2)*(x*y2/r2z2-nu*x/rz+x*y2/r3z-nu*x*cosA/Wr+&
        eta*x*S/Wr+eta*x*y/Wr3)+&
-       by/8.0d0/pi/(1.0d0-nu)*(x2*y/r2z2-nu*y/rz+x2*y/r3z+nu*cosA*S+&
+       by*P8/(N2)*(x2*y/r2z2-nu*y/rz+x2*y/r3z+nu*cosA*S+&
        x2*y*cosA/Wr3+x2*cosA*S/Wr)-&
-       bz*sinA/8.0d0/pi/(1.0d0-nu)*(nu*S+x2*S/Wr+x2*y/Wr3);
+       bz*sinA*P8/(N2)*(nu*S+x2*S/Wr+x2*y/Wr3);
   
   Exz = bx*(rFi_rz)/2.0d0+bz*(rFi_rx)/2.0d0-&
-       bx/8.0d0/pi/(1.0d0-nu)*(-x*y/r3+nu*x*sinA/Wr+eta*x*C/Wr+&
+       bx*P8/(N2)*(-x*y/r3+nu*x*sinA/Wr+eta*x*C/Wr+&
        eta*x*z/Wr3)+&
-       by/8.0d0/pi/(1.0d0-nu)*(-x2/r3+nu/r+nu*cosA*C+x2*z*cosA/Wr3+&
+       by*P8/(N2)*(-x2/r3+nu/r+nu*cosA*C+x2*z*cosA/Wr3+&
        x2*cosA*C/Wr)-&
-       bz*sinA/8.0d0/pi/(1.0d0-nu)*(nu*C+x2*C/Wr+x2*z/Wr3);
+       bz*sinA*P8/(N2)*(nu*C+x2*C/Wr+x2*z/Wr3);
   
   Eyz = by*(rFi_rz)/2.0d0+bz*(rFi_ry)/2.0d0+&
-       bx/8.0d0/pi/(1.0d0-nu)*(y2/r3-nu/r-nu*cosA*C+nu*sinA*S+eta*sinA*cosA/W2-&
-       eta*(y*cosA+z*sinA)/W2r+eta*y*z/W2r2-eta*y*z/Wr3)-&
-       by*x/8.0d0/pi/(1.0d0-nu)*(y/r3+sinA*cosA**2/W2-cosA*(y*cosA+z*sinA)/&
+       bx*P8/(N2)*(y2/r3-nu/r-nu*cosA*C+nu*sinA*S+eta*sinA*cosA/W2-&
+       eta*(cfac)/W2r+eta*y*z/W2r2-eta*y*z/Wr3)-&
+       by*x*P8/(N2)*(y/r3+sinA*cosA**2/W2-cosA*(cfac)/&
        W2r+y*z*cosA/W2r2-y*z*cosA/Wr3)-&
-       bz*x*sinA/8.0d0/pi/(1.0d0-nu)*(y*z/Wr3-sinA*cosA/W2+(y*cosA+z*sinA)/&
+       bz*x*sinA*P8/(N2)*(y*z/Wr3-sinA*cosA/W2+(cfac)/&
        W2r-y*z/W2r2);
   
   
@@ -557,8 +570,9 @@ subroutine AngDisStrainFSC(y1,y2,y3,beta,b1,b2,b3,nu,a,v11,v22,v33,v12,v13,v23)
   C_PREC, intent(in) :: y1,y2,y3,beta,b1,b2,b3,nu,a
   C_PREC, intent (out) :: v11,v22,v33,v12,v13,v23
   C_PREC y3b,z1b,z3b,rb2,rb,W1,W2,W3,W4,W5,W6,W7,W8,W9,y2s,rb2s,rbc,W6s,W7s
-  C_PREC rFib_ry2,rFib_ry1,rFib_ry3,cosB,sinB,cotB,N1,N2,N3,N4,two_nu,&
-       one_over_rb,one_over_rb2,one_over_rb_p3,one_over_W6,one_over_W6_p2,w1_over_w7,w1_over_w7s,one_over_w7
+  C_PREC rFib_ry2,rFib_ry1,rFib_ry3,cosB,sinB,cotB,N0,N1,N2,N3,&
+       one_over_rb,one_over_rb2,one_over_rb_p3,one_over_W6,&
+       one_over_W6_p2,w1_over_w7,w1_over_w7s,one_over_w7
   C_PREC, PARAMETER :: pi = 3.14159265358979D0, one_quarter = 1.0d0/4.0d0, one_half = 1.0d0/2.0d0
   
   sinB = sin(beta);
@@ -579,15 +593,18 @@ subroutine AngDisStrainFSC(y1,y2,y3,beta,b1,b2,b3,nu,a,v11,v22,v33,v12,v13,v23)
   W7 = rb+z3b;
   W8 = y3+a;
   W9 = 1.0d0+a/rb/cosB;
-  
-  N1 = 1.0d0-2.0d0*nu;
+
+  N0 =  2.0d0*nu
+  N1 =  1.0d0-N0;
+  N2 = -2.0d0+N0
+  N3 =  2.0d0-N0
   
   ! Partial derivatives of the Burgers function
   rFib_ry2 = z1b/rb/(rb+z3b)-y1/rb/(rb+y3b); ! y2 = x in ADCS
   rFib_ry1 = y2/rb/(rb+y3b)-cosB*y2/rb/(rb+z3b); ! y1 = y in ADCS
   rFib_ry3 = -sinB*y2/rb/(rb+z3b); ! y3 = z in ADCS
   
-  v11 = b1*(1.0d0/4.0d0*((-2.0d0+2.0d0*nu)*N1*rFib_ry1*cotB**2-N1*y2/W6**2*((1.0d0-W5)*cotB-&
+  v11 = b1*(1.0d0/4.0d0*((N2)*N1*rFib_ry1*cotB**2-N1*y2/W6**2*((1.0d0-W5)*cotB-&
        y1/W6*W4)/rb*y1+N1*y2/W6*(a/rb**3*y1*cotB-1.0d0/W6*W4+y1**2/&
        W6**2*W4/rb+y1**2/W6*a/rb**3)-N1*y2*cosB*cotB/W7**2*W2*(y1/&
        rb-sinB)-N1*y2*cosB*cotB/W7*a/rb**3*y1-3.0d0*a*y2*W8*cotB/rb**5*&
@@ -595,14 +612,14 @@ subroutine AngDisStrainFSC(y1,y2,y3,beta,b1,b2,b3,nu,a,v11,v22,v33,v12,v13,v23)
        rb2/W6**2*(-N1*cotB+y1/W6*W5+a*y1/rb2)*y1+y2*W8/rb/W6*&
        (1.0d0/W6*W5-y1**2/W6**2*W5/rb-y1**2/W6*a/rb**3+a/rb2-2.0d0*a*y1**&
        2/rb2**2)-y2*W8/rb**3/W7*(cosB/W7*(W1*(N1*cosB-a/rb)*cotB+&
-       (2.0d0-2.0d0*nu)*(rb*sinB-y1)*cosB)-a*y3b*cosB*cotB/rb2)*y1-y2*W8/rb/&
-       W7**2*(cosB/W7*(W1*(N1*cosB-a/rb)*cotB+(2.0d0-2.0d0*nu)*(rb*sinB-y1)*&
+       (N3)*(rb*sinB-y1)*cosB)-a*y3b*cosB*cotB/rb2)*y1-y2*W8/rb/&
+       W7**2*(cosB/W7*(W1*(N1*cosB-a/rb)*cotB+(N3)*(rb*sinB-y1)*&
        cosB)-a*y3b*cosB*cotB/rb2)*(y1/rb-sinB)+y2*W8/rb/W7*(-cosB/&
-       W7**2*(W1*(N1*cosB-a/rb)*cotB+(2.0d0-2.0d0*nu)*(rb*sinB-y1)*cosB)*(y1/&
+       W7**2*(W1*(N1*cosB-a/rb)*cotB+(N3)*(rb*sinB-y1)*cosB)*(y1/&
        rb-sinB)+cosB/W7*(1.0d0/rb*cosB*y1*(N1*cosB-a/rb)*cotB+W1*a/rb**&
-       3*y1*cotB+(2.0d0-2.0d0*nu)*(1.0d0/rb*sinB*y1-1.0d0)*cosB)+2*a*y3b*cosB*cotB/&
+       3*y1*cotB+(N3)*(1.0d0/rb*sinB*y1-1.0d0)*cosB)+2*a*y3b*cosB*cotB/&
        rb2**2*y1))/pi/(1.0d0-nu))+&
-       b2*(1.0d0/4.0d0*(N1*(((2.0d0-2.0d0*nu)*cotB**2+nu)/rb*y1/W6-((2.0d0-2.0d0*nu)*cotB**2+1.0d0)*&
+       b2*(1.0d0/4.0d0*(N1*(((N3)*cotB**2+nu)/rb*y1/W6-((N3)*cotB**2+1.0d0)*&
        cosB*(y1/rb-sinB)/W7)-N1/W6**2*(-N1*y1*cotB+nu*y3b-a+a*y1*&
        cotB/rb+y1**2/W6*W4)/rb*y1+N1/W6*(-N1*cotB+a*cotB/rb-a*&
        y1**2*cotB/rb**3+2*y1/W6*W4-y1**3/W6**2*W4/rb-y1**3/W6*a/&
@@ -614,9 +631,9 @@ subroutine AngDisStrainFSC(y1,y2,y3,beta,b1,b2,b3,nu,a,v11,v22,v33,v12,v13,v23)
        1.0d0/rb*N1*cotB-2.0d0*y1/rb/W6*W5+y1**3/rb**3/W6*W5+y1**3/rb2/&
        W6**2*W5+y1**3/rb2**2/W6*a-2.0d0*a/rb**3*y1+3*a*y1**3/rb**5)-W8*&
        cotB/W7**2*(-cosB*sinB+a*y1*y3b/rb**3/cosB+(rb*sinB-y1)/rb*&
-       ((2.0d0-2.0d0*nu)*cosB-W1/W7*W9))*(y1/rb-sinB)+W8*cotB/W7*(a*y3b/&
+       ((N3)*cosB-W1/W7*W9))*(y1/rb-sinB)+W8*cotB/W7*(a*y3b/&
        rb**3/cosB-3.0d0*a*y1**2*y3b/rb**5/cosB+(1.0d0/rb*sinB*y1-1.0d0)/rb*&
-       ((2.0d0-2.0d0*nu)*cosB-W1/W7*W9)-(rb*sinB-y1)/rb**3*((2.0d0-2.0d0*nu)*cosB-W1/&
+       ((N3)*cosB-W1/W7*W9)-(rb*sinB-y1)/rb**3*((N3)*cosB-W1/&
        W7*W9)*y1+(rb*sinB-y1)/rb*(-1.0d0/rb*cosB*y1/W7*W9+W1/W7**2*&
        W9*(y1/rb-sinB)+W1/W7*a/rb**3/cosB*y1)))/pi/(1.0d0-nu))+&
        b3*(1.0d0/4.0d0*(N1*(-y2/W6**2*(1.0d0+a/rb)/rb*y1-y2/W6*a/rb**3*y1+y2*&
@@ -627,7 +644,7 @@ subroutine AngDisStrainFSC(y1,y2,y3,beta,b1,b2,b3,nu,a,v11,v22,v33,v12,v13,v23)
        cosB/rb/W7*(1.0d0/rb*cosB*y1/W7*W2-W1/W7**2*W2*(y1/rb-sinB)-&
        W1/W7*a/rb**3*y1-2.0d0*a*y3b/rb2**2*y1))/pi/(1.0d0-nu));
 
-  v22 = b1*(1.0d0/4.0d0*(N1*(((2.0d0-2.0d0*nu)*cotB**2-nu)/rb*y2/W6-((2.0d0-2.0d0*nu)*cotB**2+1.0d0-&
+  v22 = b1*(1.0d0/4.0d0*(N1*(((N3)*cotB**2-nu)/rb*y2/W6-((N3)*cotB**2+1.0d0-&
        2.0d0*nu)*cosB/rb*y2/W7)+N1/W6**2*(y1*cotB*(1.0d0-W5)+nu*y3b-a+y2**&
        2/W6*W4)/rb*y2-N1/W6*(a*y1*cotB/rb**3*y2+2*y2/W6*W4-y2**&
        3/W6**2*W4/rb-y2**3/W6*a/rb**3)+N1*z1b*cotB/W7**2*W2/rb*&
@@ -642,7 +659,7 @@ subroutine AngDisStrainFSC(y1,y2,y3,beta,b1,b2,b3,nu,a,v11,v22,v33,v12,v13,v23)
        a*z1b*cotB/rb*W1)*y2+1.0d0/rb2/W7**2*(y2**2*cosB**2-a*z1b*cotB/&
        rb*W1)*y2-1.0d0/rb/W7*(2.0d0*y2*cosB**2+a*z1b*cotB/rb**3*W1*y2-a*&
        z1b*cotB/rb2*cosB*y2)))/pi/(1.0d0-nu))+&
-       b2*(1.0d0/4.0d0*((2.0d0-2.0d0*nu)*N1*rFib_ry2*cotB**2+N1/W6*((W5-1.0d0)*cotB+y1/W6*&
+       b2*(1.0d0/4.0d0*((N3)*N1*rFib_ry2*cotB**2+N1/W6*((W5-1.0d0)*cotB+y1/W6*&
        W4)-N1*y2**2/W6**2*((W5-1.0d0)*cotB+y1/W6*W4)/rb+N1*y2/W6*(-a/&
        rb**3*y2*cotB-y1/W6**2*W4/rb*y2-y2/W6*a/rb**3*y1)-N1*cotB/&
        W7*W9+N1*y2**2*cotB/W7**2*W9/rb+N1*y2**2*cotB/W7*a/rb**3/&
@@ -651,54 +668,54 @@ subroutine AngDisStrainFSC(y1,y2,y3,beta,b1,b2,b3,nu,a,v11,v22,v33,v12,v13,v23)
        (N1*cotB-2.0d0*nu*y1/W6-a*y1/rb*(1.0d0/rb+1.0d0/W6))-y2**2*W8/rb2/W6**&
        2*(N1*cotB-2.0d0*nu*y1/W6-a*y1/rb*(1.0d0/rb+1.0d0/W6))+y2*W8/rb/W6*&
        (2.0d0*nu*y1/W6**2/rb*y2+a*y1/rb**3*(1.0d0/rb+1.0d0/W6)*y2-a*y1/rb*&
-       (-1.0d0/rb**3*y2-1.0d0/W6**2/rb*y2))+W8*cotB/rb/W7*((-2.0d0+2.0d0*nu)*cosB+&
-       W1/W7*W9+a*y3b/rb2/cosB)-y2**2*W8*cotB/rb**3/W7*((-2.0d0+2.0d0*nu)*&
+       (-1.0d0/rb**3*y2-1.0d0/W6**2/rb*y2))+W8*cotB/rb/W7*((N2)*cosB+&
+       W1/W7*W9+a*y3b/rb2/cosB)-y2**2*W8*cotB/rb**3/W7*((N2)*&
        cosB+W1/W7*W9+a*y3b/rb2/cosB)-y2**2*W8*cotB/rb2/W7**2*((-2.0d0+&
        2.0d0*nu)*cosB+W1/W7*W9+a*y3b/rb2/cosB)+y2*W8*cotB/rb/W7*(1.0d0/&
        rb*cosB*y2/W7*W9-W1/W7**2*W9/rb*y2-W1/W7*a/rb**3/cosB*y2-&
-       2*a*y3b/rb2**2/cosB*y2))/pi/(1.0d0-nu))+&
+       2.0d0*a*y3b/rb2**2/cosB*y2))/pi/(1.0d0-nu))+&
        b3*(1.0d0/4.0d0*(N1*(-sinB/rb*y2/W7+y2/W6**2*(1.0d0+a/rb)/rb*y1+y2/W6*&
        a/rb**3*y1-z1b/W7**2*W2/rb*y2-z1b/W7*a/rb**3*y2)-y2*W8/&
        rb**3*(a/rb2+1.0d0/W6)*y1+y1*W8/rb*(-2.0d0*a/rb2**2*y2-1.0d0/W6**2/&
        rb*y2)+W8/W7**2*(sinB*(cosB-a/rb)+z1b/rb*(1.0d0+a*y3b/rb2)-1.0d0/&
        rb/W7*(y2**2*cosB*sinB-a*z1b/rb*W1))/rb*y2-W8/W7*(sinB*a/&
        rb**3*y2-z1b/rb**3*(1.0d0+a*y3b/rb2)*y2-2.0d0*z1b/rb**5*a*y3b*y2+&
-       1/rb**3/W7*(y2**2*cosB*sinB-a*z1b/rb*W1)*y2+1.0d0/rb2/W7**2*&
+       1.0d0/rb**3/W7*(y2**2*cosB*sinB-a*z1b/rb*W1)*y2+1.0d0/rb2/W7**2*&
        (y2**2*cosB*sinB-a*z1b/rb*W1)*y2-1.0d0/rb/W7*(2.0d0*y2*cosB*sinB+a*&
        z1b/rb**3*W1*y2-a*z1b/rb2*cosB*y2)))/pi/(1.0d0-nu));
 
-  v33 = b1*(1.0d0/4.0d0*((2.0d0-2.0d0*nu)*(N1*rFib_ry3*cotB-y2/W6**2*W5*(y3b/rb+1.0d0)-&
+  v33 = b1*(1.0d0/4.0d0*((N3)*(N1*rFib_ry3*cotB-y2/W6**2*W5*(y3b/rb+1.0d0)-&
        1.0d0/2.0d0*y2/W6*a/rb**3*2*y3b+y2*cosB/W7**2*W2*W3+1.0d0/2.0d0*y2*cosB/W7*&
        a/rb**3*2*y3b)+y2/rb*(2.0d0*nu/W6+a/rb2)-1.0d0/2.0d0*y2*W8/rb**3*(2.0d0*&
        nu/W6+a/rb2)*2*y3b+y2*W8/rb*(-2.0d0*nu/W6**2*(y3b/rb+1.0d0)-a/&
-       rb2**2*2*y3b)+y2*cosB/rb/W7*(1.0d0-2.0d0*nu-W1/W7*W2-a*y3b/rb2)-&
-       1.0d0/2.0d0*y2*W8*cosB/rb**3/W7*(1.0d0-2.0d0*nu-W1/W7*W2-a*y3b/rb2)*2*&
-       y3b-y2*W8*cosB/rb/W7**2*(1.0d0-2.0d0*nu-W1/W7*W2-a*y3b/rb2)*W3+y2*&
+       rb2**2*2*y3b)+y2*cosB/rb/W7*(N1-W1/W7*W2-a*y3b/rb2)-&
+       1.0d0/2.0d0*y2*W8*cosB/rb**3/W7*(N1-W1/W7*W2-a*y3b/rb2)*2*&
+       y3b-y2*W8*cosB/rb/W7**2*(N1-W1/W7*W2-a*y3b/rb2)*W3+y2*&
        W8*cosB/rb/W7*(-(cosB*y3b/rb+1.0d0)/W7*W2+W1/W7**2*W2*W3+1.0d0/2.0d0*&
        W1/W7*a/rb**3*2*y3b-a/rb2+a*y3b/rb2**2*2*y3b))/pi/(1.0d0-nu))+&
-       b2*(1.0d0/4.0d0*((-2.0d0+2.0d0*nu)*N1*cotB*((y3b/rb+1.0d0)/W6-cosB*W3/W7)+(2.0d0-2.0d0*nu)*&
-       y1/W6**2*W5*(y3b/rb+1.0d0)+1.0d0/2.0d0*(2.0d0-2.0d0*nu)*y1/W6*a/rb**3*2*y3b+(2.0d0-&
-       2.0d0*nu)*sinB/W7*W2-(2.0d0-2.0d0*nu)*z1b/W7**2*W2*W3-1.0d0/2.0d0*(2.0d0-2.0d0*nu)*z1b/&
+       b2*(1.0d0/4.0d0*((N2)*N1*cotB*((y3b/rb+1.0d0)/W6-cosB*W3/W7)+(N3)*&
+       y1/W6**2*W5*(y3b/rb+1.0d0)+1.0d0/2.0d0*(N3)*y1/W6*a/rb**3*2*y3b+(2.0d0-&
+       2.0d0*nu)*sinB/W7*W2-(N3)*z1b/W7**2*W2*W3-1.0d0/2.0d0*(N3)*z1b/&
        W7*a/rb**3*2*y3b+1.0d0/rb*(N1*cotB-2.0d0*nu*y1/W6-a*y1/rb2)-1.0d0/2.0d0*&
        W8/rb**3*(N1*cotB-2.0d0*nu*y1/W6-a*y1/rb2)*2*y3b+W8/rb*(2.0d0*nu*&
        y1/W6**2*(y3b/rb+1.0d0)+a*y1/rb2**2*2*y3b)-1.0d0/W7*(cosB*sinB+W1*&
-       cotB/rb*((2.0d0-2.0d0*nu)*cosB-W1/W7)+a/rb*(sinB-y3b*z1b/rb2-z1b*&
-       W1/rb/W7))+W8/W7**2*(cosB*sinB+W1*cotB/rb*((2.0d0-2.0d0*nu)*cosB-W1/&
+       cotB/rb*((N3)*cosB-W1/W7)+a/rb*(sinB-y3b*z1b/rb2-z1b*&
+       W1/rb/W7))+W8/W7**2*(cosB*sinB+W1*cotB/rb*((N3)*cosB-W1/&
        W7)+a/rb*(sinB-y3b*z1b/rb2-z1b*W1/rb/W7))*W3-W8/W7*((cosB*&
-       y3b/rb+1.0d0)*cotB/rb*((2.0d0-2.0d0*nu)*cosB-W1/W7)-1.0d0/2.0d0*W1*cotB/rb**3*&
-       ((2.0d0-2.0d0*nu)*cosB-W1/W7)*2*y3b+W1*cotB/rb*(-(cosB*y3b/rb+1.0d0)/W7+&
+       y3b/rb+1.0d0)*cotB/rb*((N3)*cosB-W1/W7)-1.0d0/2.0d0*W1*cotB/rb**3*&
+       ((N3)*cosB-W1/W7)*2*y3b+W1*cotB/rb*(-(cosB*y3b/rb+1.0d0)/W7+&
        W1/W7**2*W3)-1.0d0/2.0d0*a/rb**3*(sinB-y3b*z1b/rb2-z1b*W1/rb/W7)*&
        2.0d0*y3b+a/rb*(-z1b/rb2-y3b*sinB/rb2+y3b*z1b/rb2**2*2.0d0*y3b-&
        sinB*W1/rb/W7-z1b*(cosB*y3b/rb+1.0d0)/rb/W7+1.0d0/2.0d0*z1b*W1/rb**3/&
        W7*2.0d0*y3b+z1b*W1/rb/W7**2*W3)))/pi/(1.0d0-nu))+&
-       b3*(1.0d0/4.0d0*((2.0d0-2.0d0*nu)*rFib_ry3-(2.0d0-2.0d0*nu)*y2*sinB/W7**2*W2*W3-1.0d0/2.0d0*&
-       (2.0d0-2.0d0*nu)*y2*sinB/W7*a/rb**3*2.0d0*y3b+y2*sinB/rb/W7*(1.0d0+W1/W7*&
+       b3*(1.0d0/4.0d0*((N3)*rFib_ry3-(N3)*y2*sinB/W7**2*W2*W3-1.0d0/2.0d0*&
+       (N3)*y2*sinB/W7*a/rb**3*2.0d0*y3b+y2*sinB/rb/W7*(1.0d0+W1/W7*&
        W2+a*y3b/rb2)-1.0d0/2.0d0*y2*W8*sinB/rb**3/W7*(1.0d0+W1/W7*W2+a*y3b/&
        rb2)*2*y3b-y2*W8*sinB/rb/W7**2*(1.0d0+W1/W7*W2+a*y3b/rb2)*W3+&
        y2*W8*sinB/rb/W7*((cosB*y3b/rb+1.0d0)/W7*W2-W1/W7**2*W2*W3-&
        1.0d0/2.0d0*W1/W7*a/rb**3*2*y3b+a/rb2-a*y3b/rb2**2*2*y3b))/pi/(1.0d0-nu));
 
-  v12 = b1/2.0d0*(1.0d0/4.0d0*((-2.0d0+2.0d0*nu)*N1*rFib_ry2*cotB**2+N1/W6*((1.0d0-W5)*cotB-y1/&
+  v12 = b1/2.0d0*(1.0d0/4.0d0*((N2)*N1*rFib_ry2*cotB**2+N1/W6*((1.0d0-W5)*cotB-y1/&
        W6*W4)-N1*y2**2/W6**2*((1.0d0-W5)*cotB-y1/W6*W4)/rb+N1*y2/W6*&
        (a/rb**3*y2*cotB+y1/W6**2*W4/rb*y2+y2/W6*a/rb**3*y1)+N1*&
        cosB*cotB/W7*W2-N1*y2**2*cosB*cotB/W7**2*W2/rb-N1*y2**2*cosB*&
@@ -707,15 +724,15 @@ subroutine AngDisStrainFSC(y1,y2,y3,beta,b1,b2,b3,nu,a,v11,v22,v33,v12,v13,v23)
        cotB+y1/W6*W5+a*y1/rb2)-y2**2*W8/rb2/W6**2*(-N1*cotB+y1/&
        W6*W5+a*y1/rb2)+y2*W8/rb/W6*(-y1/W6**2*W5/rb*y2-y2/W6*&
        a/rb**3*y1-2.0d0*a*y1/rb2**2*y2)+W8/rb/W7*(cosB/W7*(W1*(N1*&
-       cosB-a/rb)*cotB+(2.0d0-2.0d0*nu)*(rb*sinB-y1)*cosB)-a*y3b*cosB*cotB/&
+       cosB-a/rb)*cotB+(N3)*(rb*sinB-y1)*cosB)-a*y3b*cosB*cotB/&
        rb2)-y2**2*W8/rb**3/W7*(cosB/W7*(W1*(N1*cosB-a/rb)*cotB+(2.0d0-&
        2.0d0*nu)*(rb*sinB-y1)*cosB)-a*y3b*cosB*cotB/rb2)-y2**2*W8/rb2/&
-       W7**2*(cosB/W7*(W1*(N1*cosB-a/rb)*cotB+(2.0d0-2.0d0*nu)*(rb*sinB-y1)*&
+       W7**2*(cosB/W7*(W1*(N1*cosB-a/rb)*cotB+(N3)*(rb*sinB-y1)*&
        cosB)-a*y3b*cosB*cotB/rb2)+y2*W8/rb/W7*(-cosB/W7**2*(W1*&
-       (N1*cosB-a/rb)*cotB+(2.0d0-2.0d0*nu)*(rb*sinB-y1)*cosB)/rb*y2+cosB/&
+       (N1*cosB-a/rb)*cotB+(N3)*(rb*sinB-y1)*cosB)/rb*y2+cosB/&
        W7*(1.0d0/rb*cosB*y2*(N1*cosB-a/rb)*cotB+W1*a/rb**3*y2*cotB+(2.0d0-2.0d0*&
        nu)/rb*sinB*y2*cosB)+2*a*y3b*cosB*cotB/rb2**2*y2))/pi/(1.0d0-nu))+&
-       b2/2.0d0*(1.0d0/4.0d0*(N1*(((2.0d0-2.0d0*nu)*cotB**2+nu)/rb*y2/W6-((2.0d0-2.0d0*nu)*cotB**2+1.0d0)*&
+       b2/2.0d0*(1.0d0/4.0d0*(N1*(((N3)*cotB**2+nu)/rb*y2/W6-((N3)*cotB**2+1.0d0)*&
        cosB/rb*y2/W7)-N1/W6**2*(-N1*y1*cotB+nu*y3b-a+a*y1*cotB/rb+&
        y1**2/W6*W4)/rb*y2+N1/W6*(-a*y1*cotB/rb**3*y2-y1**2/W6**&
        2*W4/rb*y2-y1**2/W6*a/rb**3*y2)+N1*cotB/W7**2*(z1b*cosB-a*&
@@ -725,9 +742,9 @@ subroutine AngDisStrainFSC(y1,y2,y3,beta,b1,b2,b3,nu,a,v11,v22,v33,v12,v13,v23)
        rb**3)/rb*y2+W8/W6*(-1.0d0/rb**3*(N1*y1*cotB+a)*y2+y1**2/rb**&
        3/W6*W5*y2+y1**2/rb2/W6**2*W5*y2+y1**2/rb2**2/W6*a*y2+3.0d0*&
        a*y1**2/rb**5*y2)-W8*cotB/W7**2*(-cosB*sinB+a*y1*y3b/rb**3/&
-       cosB+(rb*sinB-y1)/rb*((2.0d0-2.0d0*nu)*cosB-W1/W7*W9))/rb*y2+W8*cotB/&
-       W7*(-3.0d0*a*y1*y3b/rb**5/cosB*y2+1.0d0/rb2*sinB*y2*((2.0d0-2.0d0*nu)*cosB-&
-       W1/W7*W9)-(rb*sinB-y1)/rb**3*((2.0d0-2.0d0*nu)*cosB-W1/W7*W9)*y2+(rb*&
+       cosB+(rb*sinB-y1)/rb*((N3)*cosB-W1/W7*W9))/rb*y2+W8*cotB/&
+       W7*(-3.0d0*a*y1*y3b/rb**5/cosB*y2+1.0d0/rb2*sinB*y2*((N3)*cosB-&
+       W1/W7*W9)-(rb*sinB-y1)/rb**3*((N3)*cosB-W1/W7*W9)*y2+(rb*&
        sinB-y1)/rb*(-1.0d0/rb*cosB*y2/W7*W9+W1/W7**2*W9/rb*y2+W1/W7*&
        a/rb**3/cosB*y2)))/pi/(1.0d0-nu))+&
        b3/2.0d0*(1.0d0/4.0d0*(N1*(1.0d0/W6*(1.0d0+a/rb)-y2**2/W6**2*(1.0d0+a/rb)/rb-y2**2/&
@@ -738,7 +755,7 @@ subroutine AngDisStrainFSC(y1,y2,y3,beta,b1,b2,b3,nu,a,v11,v22,v33,v12,v13,v23)
        y3b/rb2)-y2**2*W8*cosB/rb2/W7**2*(W1/W7*W2+a*y3b/rb2)+y2*&
        W8*cosB/rb/W7*(1.0d0/rb*cosB*y2/W7*W2-W1/W7**2*W2/rb*y2-W1/&
        W7*a/rb**3*y2-2.0d0*a*y3b/rb2**2*y2))/pi/(1.0d0-nu))+&
-       b1/2.0d0*(1.0d0/4.0d0*(N1*(((2.0d0-2.0d0*nu)*cotB**2-nu)/rb*y1/W6-((2.0d0-2.0d0*nu)*cotB**2+1.0d0-&
+       b1/2.0d0*(1.0d0/4.0d0*(N1*(((N3)*cotB**2-nu)/rb*y1/W6-((N3)*cotB**2+1.0d0-&
        2.0d0*nu)*cosB*(y1/rb-sinB)/W7)+N1/W6**2*(y1*cotB*(1.0d0-W5)+nu*y3b-&
        a+y2**2/W6*W4)/rb*y1-N1/W6*((1.0d0-W5)*cotB+a*y1**2*cotB/rb**3-&
        y2**2/W6**2*W4/rb*y1-y2**2/W6*a/rb**3*y1)-N1*cosB*cotB/W7*&
@@ -747,7 +764,7 @@ subroutine AngDisStrainFSC(y1,y2,y3,beta,b1,b2,b3,nu,a,v11,v22,v33,v12,v13,v23)
        nu+1.0d0/rb*(N1*y1*cotB-a)+y2**2/rb/W6*W5+a*y2**2/rb**3)/rb*&
        y1+W8/W6*(-1.0d0/rb**3*(N1*y1*cotB-a)*y1+1.0d0/rb*N1*cotB-y2**2/&
        rb**3/W6*W5*y1-y2**2/rb2/W6**2*W5*y1-y2**2/rb2**2/W6*a*y1-&
-       3*a*y2**2/rb**5*y1)-W8/W7**2*(cosB**2-1.0d0/rb*(N1*z1b*cotB+a*&
+       3.0d0*a*y2**2/rb**5*y1)-W8/W7**2*(cosB**2-1.0d0/rb*(N1*z1b*cotB+a*&
        cosB)+a*y3b*z1b*cotB/rb**3-1.0d0/rb/W7*(y2**2*cosB**2-a*z1b*cotB/&
        rb*W1))*(y1/rb-sinB)+W8/W7*(1.0d0/rb**3*(N1*z1b*cotB+a*cosB)*&
        y1-1.0d0/rb*N1*cosB*cotB+a*y3b*cosB*cotB/rb**3-3.0d0*a*y3b*z1b*cotB/&
@@ -755,7 +772,7 @@ subroutine AngDisStrainFSC(y1,y2,y3,beta,b1,b2,b3,nu,a,v11,v22,v33,v12,v13,v23)
        rb/W7**2*(y2**2*cosB**2-a*z1b*cotB/rb*W1)*(y1/rb-sinB)-1.0d0/rb/&
        W7*(-a*cosB*cotB/rb*W1+a*z1b*cotB/rb**3*W1*y1-a*z1b*cotB/&
        rb2*cosB*y1)))/pi/(1.0d0-nu))+&
-       b2/2.0d0*(1.0d0/4.0d0*((2.0d0-2.0d0*nu)*N1*rFib_ry1*cotB**2-N1*y2/W6**2*((W5-1.0d0)*cotB+&
+       b2/2.0d0*(1.0d0/4.0d0*((N3)*N1*rFib_ry1*cotB**2-N1*y2/W6**2*((W5-1.0d0)*cotB+&
        y1/W6*W4)/rb*y1+N1*y2/W6*(-a/rb**3*y1*cotB+1.0d0/W6*W4-y1**&
        2/W6**2*W4/rb-y1**2/W6*a/rb**3)+N1*y2*cotB/W7**2*W9*(y1/&
        rb-sinB)+N1*y2*cotB/W7*a/rb**3/cosB*y1+3.0d0*a*y2*W8*cotB/rb**&
@@ -763,7 +780,7 @@ subroutine AngDisStrainFSC(y1,y2,y3,beta,b1,b2,b3,nu,a,v11,v22,v33,v12,v13,v23)
        W6))*y1-y2*W8/rb2/W6**2*(N1*cotB-2.0d0*nu*y1/W6-a*y1/rb*(1.0d0/&
        rb+1.0d0/W6))*y1+y2*W8/rb/W6*(-2.0d0*nu/W6+2.0d0*nu*y1**2/W6**2/rb-a/&
        rb*(1.0d0/rb+1.0d0/W6)+a*y1**2/rb**3*(1.0d0/rb+1.0d0/W6)-a*y1/rb*(-1.0d0/&
-       rb**3*y1-1.0d0/W6**2/rb*y1))-y2*W8*cotB/rb**3/W7*((-2.0d0+2.0d0*nu)*&
+       rb**3*y1-1.0d0/W6**2/rb*y1))-y2*W8*cotB/rb**3/W7*((N2)*&
        cosB+W1/W7*W9+a*y3b/rb2/cosB)*y1-y2*W8*cotB/rb/W7**2*((-2.0d0+&
        2.0d0*nu)*cosB+W1/W7*W9+a*y3b/rb2/cosB)*(y1/rb-sinB)+y2*W8*&
        cotB/rb/W7*(1.0d0/rb*cosB*y1/W7*W9-W1/W7**2*W9*(y1/rb-sinB)-&
@@ -780,7 +797,7 @@ subroutine AngDisStrainFSC(y1,y2,y3,beta,b1,b2,b3,nu,a,v11,v22,v33,v12,v13,v23)
        (y1/rb-sinB)-1.0d0/rb/W7*(-a*cosB/rb*W1+a*z1b/rb**3*W1*y1-a*&
        z1b/rb2*cosB*y1)))/pi/(1.0d0-nu));
 
-  v13 = b1/2.0d0*(1.0d0/4.0d0*((-2.0d0+2.0d0*nu)*N1*rFib_ry3*cotB**2-N1*y2/W6**2*((1.0d0-W5)*&
+  v13 = b1/2.0d0*(1.0d0/4.0d0*((N2)*N1*rFib_ry3*cotB**2-N1*y2/W6**2*((1.0d0-W5)*&
        cotB-y1/W6*W4)*(y3b/rb+1.0d0)+N1*y2/W6*(1.0d0/2.0d0*a/rb**3*2*y3b*cotB+&
        y1/W6**2*W4*(y3b/rb+1.0d0)+1.0d0/2.0d0*y1/W6*a/rb**3*2*y3b)-N1*y2*cosB*&
        cotB/W7**2*W2*W3-1.0d0/2.0d0*N1*y2*cosB*cotB/W7*a/rb**3*2*y3b+a/&
@@ -788,17 +805,17 @@ subroutine AngDisStrainFSC(y1,y2,y3,beta,b1,b2,b3,nu,a,v11,v22,v33,v12,v13,v23)
        cotB+y1/W6*W5+a*y1/rb2)-1.0d0/2.0d0*y2*W8/rb**3/W6*(-N1*cotB+y1/&
        W6*W5+a*y1/rb2)*2*y3b-y2*W8/rb/W6**2*(-N1*cotB+y1/W6*W5+&
        a*y1/rb2)*(y3b/rb+1.0d0)+y2*W8/rb/W6*(-y1/W6**2*W5*(y3b/rb+&
-       1)-1.0d0/2.0d0*y1/W6*a/rb**3*2*y3b-a*y1/rb2**2*2*y3b)+y2/rb/W7*&
-       (cosB/W7*(W1*(N1*cosB-a/rb)*cotB+(2.0d0-2.0d0*nu)*(rb*sinB-y1)*cosB)-&
+       1.0d0)-1.0d0/2.0d0*y1/W6*a/rb**3*2*y3b-a*y1/rb2**2*2*y3b)+y2/rb/W7*&
+       (cosB/W7*(W1*(N1*cosB-a/rb)*cotB+(N3)*(rb*sinB-y1)*cosB)-&
        a*y3b*cosB*cotB/rb2)-1.0d0/2.0d0*y2*W8/rb**3/W7*(cosB/W7*(W1*(N1*&
-       cosB-a/rb)*cotB+(2.0d0-2.0d0*nu)*(rb*sinB-y1)*cosB)-a*y3b*cosB*cotB/&
+       cosB-a/rb)*cotB+(N3)*(rb*sinB-y1)*cosB)-a*y3b*cosB*cotB/&
        rb2)*2*y3b-y2*W8/rb/W7**2*(cosB/W7*(W1*(N1*cosB-a/rb)*cotB+&
-       (2.0d0-2.0d0*nu)*(rb*sinB-y1)*cosB)-a*y3b*cosB*cotB/rb2)*W3+y2*W8/rb/&
-       W7*(-cosB/W7**2*(W1*(N1*cosB-a/rb)*cotB+(2.0d0-2.0d0*nu)*(rb*sinB-y1)*&
+       (N3)*(rb*sinB-y1)*cosB)-a*y3b*cosB*cotB/rb2)*W3+y2*W8/rb/&
+       W7*(-cosB/W7**2*(W1*(N1*cosB-a/rb)*cotB+(N3)*(rb*sinB-y1)*&
        cosB)*W3+cosB/W7*((cosB*y3b/rb+1.0d0)*(N1*cosB-a/rb)*cotB+1.0d0/2.0d0*W1*&
-       a/rb**3*2*y3b*cotB+1.0d0/2.0d0*(2.0d0-2.0d0*nu)/rb*sinB*2*y3b*cosB)-a*cosB*&
+       a/rb**3*2*y3b*cotB+1.0d0/2.0d0*(N3)/rb*sinB*2*y3b*cosB)-a*cosB*&
        cotB/rb2+a*y3b*cosB*cotB/rb2**2*2*y3b))/pi/(1.0d0-nu))+&
-       b2/2.0d0*(1.0d0/4.0d0*(N1*(((2.0d0-2.0d0*nu)*cotB**2+nu)*(y3b/rb+1.0d0)/W6-((2.0d0-2.0d0*nu)*cotB**&
+       b2/2.0d0*(1.0d0/4.0d0*(N1*(((N3)*cotB**2+nu)*(y3b/rb+1.0d0)/W6-((N3)*cotB**&
        2+1.0d0)*cosB*W3/W7)-N1/W6**2*(-N1*y1*cotB+nu*y3b-a+a*y1*cotB/&
        rb+y1**2/W6*W4)*(y3b/rb+1.0d0)+N1/W6*(nu-1.0d0/2.0d0*a*y1*cotB/rb**3*2.0d0*&
        y3b-y1**2/W6**2*W4*(y3b/rb+1.0d0)-1.0d0/2.0d0*y1**2/W6*a/rb**3*2*y3b)+&
@@ -809,54 +826,54 @@ subroutine AngDisStrainFSC(y1,y2,y3,beta,b1,b2,b3,nu,a,v11,v22,v33,v12,v13,v23)
        rb**3)-W8/W6**2*(2.0d0*nu+1.0d0/rb*(N1*y1*cotB+a)-y1**2/rb/W6*W5-a*&
        y1**2/rb**3)*(y3b/rb+1.0d0)+W8/W6*(-1.0d0/2.0d0/rb**3*(N1*y1*cotB+a)*2*&
        y3b+1.0d0/2.0d0*y1**2/rb**3/W6*W5*2*y3b+y1**2/rb/W6**2*W5*(y3b/rb+&
-       1)+1.0d0/2.0d0*y1**2/rb2**2/W6*a*2*y3b+3/2.0d0*a*y1**2/rb**5*2*y3b)+&
+       1.0d0)+1.0d0/2.0d0*y1**2/rb2**2/W6*a*2*y3b+3/2.0d0*a*y1**2/rb**5*2*y3b)+&
        cotB/W7*(-cosB*sinB+a*y1*y3b/rb**3/cosB+(rb*sinB-y1)/rb*((2.0d0-&
        2.0d0*nu)*cosB-W1/W7*W9))-W8*cotB/W7**2*(-cosB*sinB+a*y1*y3b/rb**&
-       3/cosB+(rb*sinB-y1)/rb*((2.0d0-2.0d0*nu)*cosB-W1/W7*W9))*W3+W8*cotB/&
+       3/cosB+(rb*sinB-y1)/rb*((N3)*cosB-W1/W7*W9))*W3+W8*cotB/&
        W7*(a/rb**3/cosB*y1-3.0d0/2.0d0*a*y1*y3b/rb**5/cosB*2*y3b+1.0d0/2.0d0/&
-       rb2*sinB*2*y3b*((2.0d0-2.0d0*nu)*cosB-W1/W7*W9)-1.0d0/2.0d0*(rb*sinB-y1)/rb**&
-       3*((2.0d0-2.0d0*nu)*cosB-W1/W7*W9)*2*y3b+(rb*sinB-y1)/rb*(-(cosB*y3b/&
+       rb2*sinB*2*y3b*((N3)*cosB-W1/W7*W9)-1.0d0/2.0d0*(rb*sinB-y1)/rb**&
+       3*((N3)*cosB-W1/W7*W9)*2*y3b+(rb*sinB-y1)/rb*(-(cosB*y3b/&
        rb+1.0d0)/W7*W9+W1/W7**2*W9*W3+1.0d0/2.0d0*W1/W7*a/rb**3/cosB*2*&
        y3b)))/pi/(1.0d0-nu))+&
        b3/2.0d0*(1.0d0/4.0d0*(N1*(-y2/W6**2*(1.0d0+a/rb)*(y3b/rb+1.0d0)-1.0d0/2.0d0*y2/W6*a/&
-       rb**3*2*y3b+y2*cosB/W7**2*W2*W3+1.0d0/2.0d0*y2*cosB/W7*a/rb**3*2*&
-       y3b)-y2/rb*(a/rb2+1.0d0/W6)+1.0d0/2.0d0*y2*W8/rb**3*(a/rb2+1.0d0/W6)*2*&
+       rb**3*2.0d0*y3b+y2*cosB/W7**2*W2*W3+1.0d0/2.0d0*y2*cosB/W7*a/rb**3*2.0d0*&
+       y3b)-y2/rb*(a/rb2+1.0d0/W6)+1.0d0/2.0d0*y2*W8/rb**3*(a/rb2+1.0d0/W6)*2.0d0*&
        y3b-y2*W8/rb*(-a/rb2**2*2*y3b-1.0d0/W6**2*(y3b/rb+1.0d0))+y2*cosB/&
        rb/W7*(W1/W7*W2+a*y3b/rb2)-1.0d0/2.0d0*y2*W8*cosB/rb**3/W7*(W1/&
        W7*W2+a*y3b/rb2)*2*y3b-y2*W8*cosB/rb/W7**2*(W1/W7*W2+a*&
        y3b/rb2)*W3+y2*W8*cosB/rb/W7*((cosB*y3b/rb+1.0d0)/W7*W2-W1/&
        W7**2*W2*W3-1.0d0/2.0d0*W1/W7*a/rb**3*2*y3b+a/rb2-a*y3b/rb2**2*2*&
        y3b))/pi/(1.0d0-nu))+&
-       b1/2.0d0*(1.0d0/4.0d0*((2.0d0-2.0d0*nu)*(N1*rFib_ry1*cotB-y1/W6**2*W5/rb*y2-y2/W6*&
+       b1/2.0d0*(1.0d0/4.0d0*((N3)*(N1*rFib_ry1*cotB-y1/W6**2*W5/rb*y2-y2/W6*&
        a/rb**3*y1+y2*cosB/W7**2*W2*(y1/rb-sinB)+y2*cosB/W7*a/rb**&
        3*y1)-y2*W8/rb**3*(2.0d0*nu/W6+a/rb2)*y1+y2*W8/rb*(-2.0d0*nu/W6**&
-       2/rb*y1-2.0d0*a/rb2**2*y1)-y2*W8*cosB/rb**3/W7*(1.0d0-2.0d0*nu-W1/W7*&
-       W2-a*y3b/rb2)*y1-y2*W8*cosB/rb/W7**2*(1.0d0-2.0d0*nu-W1/W7*W2-a*&
+       2/rb*y1-2.0d0*a/rb2**2*y1)-y2*W8*cosB/rb**3/W7*(N1-W1/W7*&
+       W2-a*y3b/rb2)*y1-y2*W8*cosB/rb/W7**2*(N1-W1/W7*W2-a*&
        y3b/rb2)*(y1/rb-sinB)+y2*W8*cosB/rb/W7*(-1.0d0/rb*cosB*y1/W7*&
        W2+W1/W7**2*W2*(y1/rb-sinB)+W1/W7*a/rb**3*y1+2*a*y3b/rb2**&
        2*y1))/pi/(1.0d0-nu))+&
-       b2/2.0d0*(1.0d0/4.0d0*((-2.0d0+2.0d0*nu)*N1*cotB*(1.0d0/rb*y1/W6-cosB*(y1/rb-sinB)/W7)-&
-       (2.0d0-2.0d0*nu)/W6*W5+(2.0d0-2.0d0*nu)*y1**2/W6**2*W5/rb+(2.0d0-2.0d0*nu)*y1**2/W6*&
-       a/rb**3+(2.0d0-2.0d0*nu)*cosB/W7*W2-(2.0d0-2.0d0*nu)*z1b/W7**2*W2*(y1/rb-&
-       sinB)-(2.0d0-2.0d0*nu)*z1b/W7*a/rb**3*y1-W8/rb**3*(N1*cotB-2.0d0*nu*y1/&
+       b2/2.0d0*(1.0d0/4.0d0*((N2)*N1*cotB*(1.0d0/rb*y1/W6-cosB*(y1/rb-sinB)/W7)-&
+       (N3)/W6*W5+(N3)*y1**2/W6**2*W5/rb+(N3)*y1**2/W6*&
+       a/rb**3+(N3)*cosB/W7*W2-(N3)*z1b/W7**2*W2*(y1/rb-&
+       sinB)-(N3)*z1b/W7*a/rb**3*y1-W8/rb**3*(N1*cotB-2.0d0*nu*y1/&
        W6-a*y1/rb2)*y1+W8/rb*(-2.0d0*nu/W6+2.0d0*nu*y1**2/W6**2/rb-a/rb2+&
-       2.0d0*a*y1**2/rb2**2)+W8/W7**2*(cosB*sinB+W1*cotB/rb*((2.0d0-2.0d0*nu)*&
+       2.0d0*a*y1**2/rb2**2)+W8/W7**2*(cosB*sinB+W1*cotB/rb*((N3)*&
        cosB-W1/W7)+a/rb*(sinB-y3b*z1b/rb2-z1b*W1/rb/W7))*(y1/rb-&
-       sinB)-W8/W7*(1.0d0/rb2*cosB*y1*cotB*((2.0d0-2.0d0*nu)*cosB-W1/W7)-W1*&
-       cotB/rb**3*((2.0d0-2.0d0*nu)*cosB-W1/W7)*y1+W1*cotB/rb*(-1.0d0/rb*cosB*&
+       sinB)-W8/W7*(1.0d0/rb2*cosB*y1*cotB*((N3)*cosB-W1/W7)-W1*&
+       cotB/rb**3*((N3)*cosB-W1/W7)*y1+W1*cotB/rb*(-1.0d0/rb*cosB*&
        y1/W7+W1/W7**2*(y1/rb-sinB))-a/rb**3*(sinB-y3b*z1b/rb2-&
        z1b*W1/rb/W7)*y1+a/rb*(-y3b*cosB/rb2+2*y3b*z1b/rb2**2*y1-&
        cosB*W1/rb/W7-z1b/rb2*cosB*y1/W7+z1b*W1/rb**3/W7*y1+z1b*&
        W1/rb/W7**2*(y1/rb-sinB))))/pi/(1.0d0-nu))+&
-       b3/2.0d0*(1.0d0/4.0d0*((2.0d0-2.0d0*nu)*rFib_ry1-(2.0d0-2.0d0*nu)*y2*sinB/W7**2*W2*(y1/rb-&
-       sinB)-(2.0d0-2.0d0*nu)*y2*sinB/W7*a/rb**3*y1-y2*W8*sinB/rb**3/W7*(1.0d0+&
+       b3/2.0d0*(1.0d0/4.0d0*((N3)*rFib_ry1-(N3)*y2*sinB/W7**2*W2*(y1/rb-&
+       sinB)-(N3)*y2*sinB/W7*a/rb**3*y1-y2*W8*sinB/rb**3/W7*(1.0d0+&
        W1/W7*W2+a*y3b/rb2)*y1-y2*W8*sinB/rb/W7**2*(1.0d0+W1/W7*W2+&
        a*y3b/rb2)*(y1/rb-sinB)+y2*W8*sinB/rb/W7*(1.0d0/rb*cosB*y1/&
        W7*W2-W1/W7**2*W2*(y1/rb-sinB)-W1/W7*a/rb**3*y1-2.0d0*a*y3b/&
        rb2**2*y1))/pi/(1.0d0-nu));
 
-  v23 = b1/2.0d0*(1.0d0/4.0d0*(N1*(((2.0d0-2.0d0*nu)*cotB**2-nu)*(y3b/rb+1.0d0)/W6-((2.0d0-2.0d0*nu)*&
-       cotB**2+1.0d0-2.0d0*nu)*cosB*W3/W7)+N1/W6**2*(y1*cotB*(1.0d0-W5)+nu*y3b-a+&
+  v23 = b1/2.0d0*(1.0d0/4.0d0*(N1*(((N3)*cotB**2-nu)*(y3b/rb+1.0d0)/W6-((N3)*&
+       cotB**2+N1)*cosB*W3/W7)+N1/W6**2*(y1*cotB*(1.0d0-W5)+nu*y3b-a+&
        y2**2/W6*W4)*(y3b/rb+1.0d0)-N1/W6*(1.0d0/2.0d0*a*y1*cotB/rb**3*2*y3b+&
        nu-y2**2/W6**2*W4*(y3b/rb+1.0d0)-1.0d0/2.0d0*y2**2/W6*a/rb**3*2*y3b)-N1*&
        sinB*cotB/W7*W2+N1*z1b*cotB/W7**2*W2*W3+1.0d0/2.0d0*N1*z1b*cotB/W7*&
@@ -876,7 +893,7 @@ subroutine AngDisStrainFSC(y1,y2,y3,beta,b1,b2,b3,nu,a,v11,v22,v33,v12,v13,v23)
        2*cosB**2-a*z1b*cotB/rb*W1)*W3-1.0d0/rb/W7*(-a*sinB*cotB/rb*W1+&
        1.0d0/2.0d0*a*z1b*cotB/rb**3*W1*2*y3b-a*z1b*cotB/rb*(cosB*y3b/rb+&
        1.0d0))))/pi/(1.0d0-nu))+&
-       b2/2.0d0*(1.0d0/4.0d0*((2.0d0-2.0d0*nu)*N1*rFib_ry3*cotB**2-N1*y2/W6**2*((W5-1.0d0)*cotB+&
+       b2/2.0d0*(1.0d0/4.0d0*((N3)*N1*rFib_ry3*cotB**2-N1*y2/W6**2*((W5-1.0d0)*cotB+&
        y1/W6*W4)*(y3b/rb+1.0d0)+N1*y2/W6*(-1.0d0/2.0d0*a/rb**3*2*y3b*cotB-y1/&
        W6**2*W4*(y3b/rb+1.0d0)-1.0d0/2.0d0*y1/W6*a/rb**3*2*y3b)+N1*y2*cotB/&
        W7**2*W9*W3+1.0d0/2.0d0*N1*y2*cotB/W7*a/rb**3/cosB*2*y3b-a/rb**3*&
@@ -886,9 +903,9 @@ subroutine AngDisStrainFSC(y1,y2,y3,beta,b1,b2,b3,nu,a,v11,v22,v33,v12,v13,v23)
        2*(N1*cotB-2.0d0*nu*y1/W6-a*y1/rb*(1.0d0/rb+1.0d0/W6))*(y3b/rb+1.0d0)+y2*&
        W8/rb/W6*(2.0d0*nu*y1/W6**2*(y3b/rb+1.0d0)+1.0d0/2.0d0*a*y1/rb**3*(1.0d0/rb+&
        1.0d0/W6)*2*y3b-a*y1/rb*(-1.0d0/2.0d0/rb**3*2*y3b-1.0d0/W6**2*(y3b/rb+&
-       1.0d0)))+y2*cotB/rb/W7*((-2.0d0+2.0d0*nu)*cosB+W1/W7*W9+a*y3b/rb2/cosB)-&
-       1/2.0d0*y2*W8*cotB/rb**3/W7*((-2.0d0+2.0d0*nu)*cosB+W1/W7*W9+a*y3b/&
-       rb2/cosB)*2*y3b-y2*W8*cotB/rb/W7**2*((-2.0d0+2.0d0*nu)*cosB+W1/W7*&
+       1.0d0)))+y2*cotB/rb/W7*((N2)*cosB+W1/W7*W9+a*y3b/rb2/cosB)-&
+       1/2.0d0*y2*W8*cotB/rb**3/W7*((N2)*cosB+W1/W7*W9+a*y3b/&
+       rb2/cosB)*2*y3b-y2*W8*cotB/rb/W7**2*((N2)*cosB+W1/W7*&
        W9+a*y3b/rb2/cosB)*W3+y2*W8*cotB/rb/W7*((cosB*y3b/rb+1.0d0)/&
        W7*W9-W1/W7**2*W9*W3-1.0d0/2.0d0*W1/W7*a/rb**3/cosB*2*y3b+a/rb2/&
        cosB-a*y3b/rb2**2/cosB*2*y3b))/pi/(1.0d0-nu))+&
@@ -905,28 +922,28 @@ subroutine AngDisStrainFSC(y1,y2,y3,beta,b1,b2,b3,nu,a,v11,v22,v33,v12,v13,v23)
        W1)*2*y3b+1.0d0/rb/W7**2*(y2**2*cosB*sinB-a*z1b/rb*W1)*W3-1.0d0/&
        rb/W7*(-a*sinB/rb*W1+1.0d0/2.0d0*a*z1b/rb**3*W1*2*y3b-a*z1b/rb*&
        (cosB*y3b/rb+1.0d0))))/pi/(1.0d0-nu))+&
-       b1/2.0d0*(1.0d0/4.0d0*((2.0d0-2.0d0*nu)*(N1*rFib_ry2*cotB+1.0d0/W6*W5-y2**2/W6**2*W5/&
+       b1/2.0d0*(1.0d0/4.0d0*((N3)*(N1*rFib_ry2*cotB+1.0d0/W6*W5-y2**2/W6**2*W5/&
        rb-y2**2/W6*a/rb**3-cosB/W7*W2+y2**2*cosB/W7**2*W2/rb+y2**2*&
        cosB/W7*a/rb**3)+W8/rb*(2.0d0*nu/W6+a/rb2)-y2**2*W8/rb**3*(2.0d0*&
        nu/W6+a/rb2)+y2*W8/rb*(-2.0d0*nu/W6**2/rb*y2-2.0d0*a/rb2**2*y2)+&
-       W8*cosB/rb/W7*(1.0d0-2.0d0*nu-W1/W7*W2-a*y3b/rb2)-y2**2*W8*cosB/&
-       rb**3/W7*(1.0d0-2.0d0*nu-W1/W7*W2-a*y3b/rb2)-y2**2*W8*cosB/rb2/W7**&
-       2*(1.0d0-2.0d0*nu-W1/W7*W2-a*y3b/rb2)+y2*W8*cosB/rb/W7*(-1.0d0/rb*&
+       W8*cosB/rb/W7*(N1-W1/W7*W2-a*y3b/rb2)-y2**2*W8*cosB/&
+       rb**3/W7*(N1-W1/W7*W2-a*y3b/rb2)-y2**2*W8*cosB/rb2/W7**&
+       2*(N1-W1/W7*W2-a*y3b/rb2)+y2*W8*cosB/rb/W7*(-1.0d0/rb*&
        cosB*y2/W7*W2+W1/W7**2*W2/rb*y2+W1/W7*a/rb**3*y2+2*a*&
        y3b/rb2**2*y2))/pi/(1.0d0-nu))+&
-       b2/2.0d0*(1.0d0/4.0d0*((-2.0d0+2.0d0*nu)*N1*cotB*(1.0d0/rb*y2/W6-cosB/rb*y2/W7)+(2.0d0-&
-       2.0d0*nu)*y1/W6**2*W5/rb*y2+(2.0d0-2.0d0*nu)*y1/W6*a/rb**3*y2-(2.0d0-2.0d0*&
-       nu)*z1b/W7**2*W2/rb*y2-(2.0d0-2.0d0*nu)*z1b/W7*a/rb**3*y2-W8/rb**&
+       b2/2.0d0*(1.0d0/4.0d0*((N2)*N1*cotB*(1.0d0/rb*y2/W6-cosB/rb*y2/W7)+(2.0d0-&
+       2.0d0*nu)*y1/W6**2*W5/rb*y2+(N3)*y1/W6*a/rb**3*y2-(2.0d0-2.0d0*&
+       nu)*z1b/W7**2*W2/rb*y2-(N3)*z1b/W7*a/rb**3*y2-W8/rb**&
        3*(N1*cotB-2.0d0*nu*y1/W6-a*y1/rb2)*y2+W8/rb*(2.0d0*nu*y1/W6**2/&
        rb*y2+2*a*y1/rb2**2*y2)+W8/W7**2*(cosB*sinB+W1*cotB/rb*((2.0d0-&
        2.0d0*nu)*cosB-W1/W7)+a/rb*(sinB-y3b*z1b/rb2-z1b*W1/rb/W7))/&
-       rb*y2-W8/W7*(1.0d0/rb2*cosB*y2*cotB*((2.0d0-2.0d0*nu)*cosB-W1/W7)-W1*&
-       cotB/rb**3*((2.0d0-2.0d0*nu)*cosB-W1/W7)*y2+W1*cotB/rb*(-cosB/rb*&
+       rb*y2-W8/W7*(1.0d0/rb2*cosB*y2*cotB*((N3)*cosB-W1/W7)-W1*&
+       cotB/rb**3*((N3)*cosB-W1/W7)*y2+W1*cotB/rb*(-cosB/rb*&
        y2/W7+W1/W7**2/rb*y2)-a/rb**3*(sinB-y3b*z1b/rb2-z1b*W1/&
        rb/W7)*y2+a/rb*(2.0d0*y3b*z1b/rb2**2*y2-z1b/rb2*cosB*y2/W7+&
        z1b*W1/rb**3/W7*y2+z1b*W1/rb2/W7**2*y2)))/pi/(1.0d0-nu))+&
-       b3/2.0d0*(1.0d0/4.0d0*((2.0d0-2.0d0*nu)*rFib_ry2+(2.0d0-2.0d0*nu)*sinB/W7*W2-(2.0d0-2.0d0*nu)*y2**2*&
-       sinB/W7**2*W2/rb-(2.0d0-2.0d0*nu)*y2**2*sinB/W7*a/rb**3+W8*sinB/rb/&
+       b3/2.0d0*(1.0d0/4.0d0*((N3)*rFib_ry2+(N3)*sinB/W7*W2-(N3)*y2**2*&
+       sinB/W7**2*W2/rb-(N3)*y2**2*sinB/W7*a/rb**3+W8*sinB/rb/&
        W7*(1.0d0+W1/W7*W2+a*y3b/rb2)-y2**2*W8*sinB/rb**3/W7*(1.0d0+W1/&
        W7*W2+a*y3b/rb2)-y2**2*W8*sinB/rb2/W7**2*(1.0d0+W1/W7*W2+a*&
        y3b/rb2)+y2*W8*sinB/rb/W7*(1.0d0/rb*cosB*y2/W7*W2-W1/W7**2*&
