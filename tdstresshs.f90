@@ -569,11 +569,13 @@ subroutine AngDisStrainFSC(y1,y2,y3,beta,b1,b2,b3,nu,a,v11,v22,v33,v12,v13,v23)
   IMPLICIT NONE
   C_PREC, intent(in) :: y1,y2,y3,beta,b1,b2,b3,nu,a
   C_PREC, intent (out) :: v11,v22,v33,v12,v13,v23
-  C_PREC y3b,z1b,z3b,rb2,rb,W1,W2,W3,W4,W5,W6,W7,W8,W9,y2s,rb2s,rbc,W6s,W7s
-  C_PREC rFib_ry2,rFib_ry1,rFib_ry3,cosB,sinB,cotB,N0,N1,N2,N3,&
-       one_over_rb,one_over_rb2,one_over_rb_p3,one_over_W6,&
+  C_PREC y3b,z1b,z3b,rb2,rb,W1,W2,W3,W4,W5,W6,W7,W8,W9,y2s,rb2s,rbc, &
+       W6s,W7s
+  C_PREC rFib_ry2,rFib_ry1,rFib_ry3,cosB,sinB,cotB,N0,N1,N2,N3,N4,&
+       one_over_rb,one_over_rb2,one_over_rbp3,one_over_W6,&
        one_over_W6_p2,w1_over_w7,w1_over_w7s,one_over_w7
-  C_PREC, PARAMETER :: pi = 3.14159265358979D0, one_quarter = 1.0d0/4.0d0, one_half = 1.0d0/2.0d0
+  C_PREC, PARAMETER :: pi = 3.14159265358979D0, &
+       one_quarter = 1.0d0/4.0d0, one_half = 1.0d0/2.0d0
   
   sinB = sin(beta);
   cosB = cos(beta);
@@ -583,370 +585,384 @@ subroutine AngDisStrainFSC(y1,y2,y3,beta,b1,b2,b3,nu,a,v11,v22,v33,v12,v13,v23)
   z3b = -y1*sinB+y3b*cosB;
   rb2 =  y1**2+y2**2+y3b**2;
   rb = sqrt(rb2);
+  rbc = rb**3
+  
+  one_over_rb   = 1.0d0/rb
+  one_over_rb2  = 1.0d0/rb2
+  one_over_rbp3 = 1.0d0/rbc
+  
+  N0 =  2.0d0*nu
+  N1 =  1.0d0-N0
+  N2 = -2.0d0+N0
+  N3 =  -N2 !2.0d0-N0
+  N4 = 1.0d0-nu
   
   W1 = rb*cosB+y3b;
   W2 = cosB+a/rb;
   W3 = cosB+y3b/rb;
   W4 = nu+a/rb;
-  W5 = 2.0d0*nu+a/rb;
+  W5 = N0 + a/rb;
   W6 = rb+y3b;
+  W6s = W6**2
   W7 = rb+z3b;
+  W7s = W7**2
   W8 = y3+a;
   W9 = 1.0d0+a/rb/cosB;
 
-  N0 =  2.0d0*nu
-  N1 =  1.0d0-N0;
-  N2 = -2.0d0+N0
-  N3 =  2.0d0-N0
+  one_over_W6 = 1.0d0/W6
+  one_over_W6_p2 =  one_over_W6/W6 !1.0d0/W6**2
+  w1_over_w7 = W1/W7
+  w1_over_w7s = w1_over_w7/W7 !W1/W7**2
+  one_over_w7 = 1.0d0/W7
   
   ! Partial derivatives of the Burgers function
   rFib_ry2 = z1b/rb/(rb+z3b)-y1/rb/(rb+y3b); ! y2 = x in ADCS
   rFib_ry1 = y2/rb/(rb+y3b)-cosB*y2/rb/(rb+z3b); ! y1 = y in ADCS
   rFib_ry3 = -sinB*y2/rb/(rb+z3b); ! y3 = z in ADCS
   
-  v11 = b1*(1.0d0/4.0d0*((N2)*N1*rFib_ry1*cotB**2-N1*y2/W6**2*((1.0d0-W5)*cotB-&
-       y1/W6*W4)/rb*y1+N1*y2/W6*(a/rb**3*y1*cotB-1.0d0/W6*W4+y1**2/&
-       W6**2*W4/rb+y1**2/W6*a/rb**3)-N1*y2*cosB*cotB/W7**2*W2*(y1/&
-       rb-sinB)-N1*y2*cosB*cotB/W7*a/rb**3*y1-3.0d0*a*y2*W8*cotB/rb**5*&
-       y1-y2*W8/rb**3/W6*(-N1*cotB+y1/W6*W5+a*y1/rb2)*y1-y2*W8/&
-       rb2/W6**2*(-N1*cotB+y1/W6*W5+a*y1/rb2)*y1+y2*W8/rb/W6*&
-       (1.0d0/W6*W5-y1**2/W6**2*W5/rb-y1**2/W6*a/rb**3+a/rb2-2.0d0*a*y1**&
-       2/rb2**2)-y2*W8/rb**3/W7*(cosB/W7*(W1*(N1*cosB-a/rb)*cotB+&
+  v11 = b1*(one_quarter*((N2)*N1*rFib_ry1*cotB**2-N1*y2/W6s*((1.0d0-W5)*cotB-&
+       y1/W6*W4)/rb*y1+N1*y2/W6*(a/rbc*y1*cotB-one_over_w6*W4+y1**2/&
+       W6s*W4/rb+y1**2/W6*a/rbc)-N1*y2*cosB*cotB/W7s*W2*(y1/&
+       rb-sinB)-N1*y2*cosB*cotB/W7*a/rbc*y1-3.0d0*a*y2*W8*cotB/rb**5*&
+       y1-y2*W8/rbc/W6*(-N1*cotB+y1/W6*W5+a*y1/rb2)*y1-y2*W8/&
+       rb2/W6s*(-N1*cotB+y1/W6*W5+a*y1/rb2)*y1+y2*W8/rb/W6*&
+       (one_over_w6*W5-y1**2/W6s*W5/rb-y1**2/W6*a/rbc+a/rb2-2.0d0*a*y1**&
+       2/rb2**2)-y2*W8/rbc/W7*(cosB/W7*(W1*(N1*cosB-a/rb)*cotB+&
        (N3)*(rb*sinB-y1)*cosB)-a*y3b*cosB*cotB/rb2)*y1-y2*W8/rb/&
-       W7**2*(cosB/W7*(W1*(N1*cosB-a/rb)*cotB+(N3)*(rb*sinB-y1)*&
+       W7s*(cosB/W7*(W1*(N1*cosB-a/rb)*cotB+(N3)*(rb*sinB-y1)*&
        cosB)-a*y3b*cosB*cotB/rb2)*(y1/rb-sinB)+y2*W8/rb/W7*(-cosB/&
-       W7**2*(W1*(N1*cosB-a/rb)*cotB+(N3)*(rb*sinB-y1)*cosB)*(y1/&
+       W7s*(W1*(N1*cosB-a/rb)*cotB+(N3)*(rb*sinB-y1)*cosB)*(y1/&
        rb-sinB)+cosB/W7*(1.0d0/rb*cosB*y1*(N1*cosB-a/rb)*cotB+W1*a/rb**&
        3*y1*cotB+(N3)*(1.0d0/rb*sinB*y1-1.0d0)*cosB)+2*a*y3b*cosB*cotB/&
-       rb2**2*y1))/pi/(1.0d0-nu))+&
-       b2*(1.0d0/4.0d0*(N1*(((N3)*cotB**2+nu)/rb*y1/W6-((N3)*cotB**2+1.0d0)*&
-       cosB*(y1/rb-sinB)/W7)-N1/W6**2*(-N1*y1*cotB+nu*y3b-a+a*y1*&
+       rb2**2*y1))/pi/(N4))+&
+       b2*(one_quarter*(N1*(((N3)*cotB**2+nu)/rb*y1/W6-((N3)*cotB**2+1.0d0)*&
+       cosB*(y1/rb-sinB)/W7)-N1/W6s*(-N1*y1*cotB+nu*y3b-a+a*y1*&
        cotB/rb+y1**2/W6*W4)/rb*y1+N1/W6*(-N1*cotB+a*cotB/rb-a*&
-       y1**2*cotB/rb**3+2*y1/W6*W4-y1**3/W6**2*W4/rb-y1**3/W6*a/&
-       rb**3)+N1*cotB/W7**2*(z1b*cosB-a*(rb*sinB-y1)/rb/cosB)*(y1/&
+       y1**2*cotB/rbc+2*y1/W6*W4-y1**3/W6s*W4/rb-y1**3/W6*a/&
+       rbc)+N1*cotB/W7s*(z1b*cosB-a*(rb*sinB-y1)/rb/cosB)*(y1/&
        rb-sinB)-N1*cotB/W7*(cosB**2-a*(1.0d0/rb*sinB*y1-1.0d0)/rb/cosB+a*&
-       (rb*sinB-y1)/rb**3/cosB*y1)-a*W8*cotB/rb**3+3*a*y1**2*W8*&
-       cotB/rb**5-W8/W6**2*(2.0d0*nu+1.0d0/rb*(N1*y1*cotB+a)-y1**2/rb/W6*&
-       W5-a*y1**2/rb**3)/rb*y1+W8/W6*(-1.0d0/rb**3*(N1*y1*cotB+a)*y1+&
-       1.0d0/rb*N1*cotB-2.0d0*y1/rb/W6*W5+y1**3/rb**3/W6*W5+y1**3/rb2/&
-       W6**2*W5+y1**3/rb2**2/W6*a-2.0d0*a/rb**3*y1+3*a*y1**3/rb**5)-W8*&
-       cotB/W7**2*(-cosB*sinB+a*y1*y3b/rb**3/cosB+(rb*sinB-y1)/rb*&
+       (rb*sinB-y1)/rbc/cosB*y1)-a*W8*cotB/rbc+3*a*y1**2*W8*&
+       cotB/rb**5-W8/W6s*(N0+1.0d0/rb*(N1*y1*cotB+a)-y1**2/rb/W6*&
+       W5-a*y1**2/rbc)/rb*y1+W8/W6*(-one_over_rbp3*(N1*y1*cotB+a)*y1+&
+       1.0d0/rb*N1*cotB-2.0d0*y1/rb/W6*W5+y1**3/rbc/W6*W5+y1**3/rb2/&
+       W6s*W5+y1**3/rb2**2/W6*a-2.0d0*a/rbc*y1+3*a*y1**3/rb**5)-W8*&
+       cotB/W7s*(-cosB*sinB+a*y1*y3b/rbc/cosB+(rb*sinB-y1)/rb*&
        ((N3)*cosB-W1/W7*W9))*(y1/rb-sinB)+W8*cotB/W7*(a*y3b/&
-       rb**3/cosB-3.0d0*a*y1**2*y3b/rb**5/cosB+(1.0d0/rb*sinB*y1-1.0d0)/rb*&
-       ((N3)*cosB-W1/W7*W9)-(rb*sinB-y1)/rb**3*((N3)*cosB-W1/&
-       W7*W9)*y1+(rb*sinB-y1)/rb*(-1.0d0/rb*cosB*y1/W7*W9+W1/W7**2*&
-       W9*(y1/rb-sinB)+W1/W7*a/rb**3/cosB*y1)))/pi/(1.0d0-nu))+&
-       b3*(1.0d0/4.0d0*(N1*(-y2/W6**2*(1.0d0+a/rb)/rb*y1-y2/W6*a/rb**3*y1+y2*&
-       cosB/W7**2*W2*(y1/rb-sinB)+y2*cosB/W7*a/rb**3*y1)+y2*W8/&
-       rb**3*(a/rb2+1.0d0/W6)*y1-y2*W8/rb*(-2.0d0*a/rb2**2*y1-1.0d0/W6**2/&
-       rb*y1)-y2*W8*cosB/rb**3/W7*(W1/W7*W2+a*y3b/rb2)*y1-y2*W8*&
-       cosB/rb/W7**2*(W1/W7*W2+a*y3b/rb2)*(y1/rb-sinB)+y2*W8*&
-       cosB/rb/W7*(1.0d0/rb*cosB*y1/W7*W2-W1/W7**2*W2*(y1/rb-sinB)-&
-       W1/W7*a/rb**3*y1-2.0d0*a*y3b/rb2**2*y1))/pi/(1.0d0-nu));
+       rbc/cosB-3.0d0*a*y1**2*y3b/rb**5/cosB+(1.0d0/rb*sinB*y1-1.0d0)/rb*&
+       ((N3)*cosB-W1/W7*W9)-(rb*sinB-y1)/rbc*((N3)*cosB-W1/&
+       W7*W9)*y1+(rb*sinB-y1)/rb*(-1.0d0/rb*cosB*y1/W7*W9+w1_over_w7s*&
+       W9*(y1/rb-sinB)+W1/W7*a/rbc/cosB*y1)))/pi/(N4))+&
+       b3*(one_quarter*(N1*(-y2/W6s*(1.0d0+a/rb)/rb*y1-y2/W6*a/rbc*y1+y2*&
+       cosB/W7s*W2*(y1/rb-sinB)+y2*cosB/W7*a/rbc*y1)+y2*W8/&
+       rbc*(a/rb2+one_over_w6)*y1-y2*W8/rb*(-2.0d0*a/rb2**2*y1-one_over_W6_p2/&
+       rb*y1)-y2*W8*cosB/rbc/W7*(W1/W7*W2+a*y3b/rb2)*y1-y2*W8*&
+       cosB/rb/W7s*(W1/W7*W2+a*y3b/rb2)*(y1/rb-sinB)+y2*W8*&
+       cosB/rb/W7*(1.0d0/rb*cosB*y1/W7*W2-w1_over_w7s*W2*(y1/rb-sinB)-&
+       W1/W7*a/rbc*y1-2.0d0*a*y3b/rb2**2*y1))/pi/(N4));
 
-  v22 = b1*(1.0d0/4.0d0*(N1*(((N3)*cotB**2-nu)/rb*y2/W6-((N3)*cotB**2+1.0d0-&
-       2.0d0*nu)*cosB/rb*y2/W7)+N1/W6**2*(y1*cotB*(1.0d0-W5)+nu*y3b-a+y2**&
-       2/W6*W4)/rb*y2-N1/W6*(a*y1*cotB/rb**3*y2+2*y2/W6*W4-y2**&
-       3/W6**2*W4/rb-y2**3/W6*a/rb**3)+N1*z1b*cotB/W7**2*W2/rb*&
-       y2+N1*z1b*cotB/W7*a/rb**3*y2+3*a*y2*W8*cotB/rb**5*y1-W8/&
-       W6**2*(-2.0d0*nu+1.0d0/rb*(N1*y1*cotB-a)+y2**2/rb/W6*W5+a*y2**2/&
-       rb**3)/rb*y2+W8/W6*(-1.0d0/rb**3*(N1*y1*cotB-a)*y2+2*y2/rb/&
-       W6*W5-y2**3/rb**3/W6*W5-y2**3/rb2/W6**2*W5-y2**3/rb2**2/W6*&
-       a+2*a/rb**3*y2-3.0d0*a*y2**3/rb**5)-W8/W7**2*(cosB**2-1.0d0/rb*(N1*&
-       z1b*cotB+a*cosB)+a*y3b*z1b*cotB/rb**3-1.0d0/rb/W7*(y2**2*cosB**2-&
-       a*z1b*cotB/rb*W1))/rb*y2+W8/W7*(1.0d0/rb**3*(N1*z1b*cotB+a*&
-       cosB)*y2-3.0d0*a*y3b*z1b*cotB/rb**5*y2+1.0d0/rb**3/W7*(y2**2*cosB**2-&
-       a*z1b*cotB/rb*W1)*y2+1.0d0/rb2/W7**2*(y2**2*cosB**2-a*z1b*cotB/&
-       rb*W1)*y2-1.0d0/rb/W7*(2.0d0*y2*cosB**2+a*z1b*cotB/rb**3*W1*y2-a*&
-       z1b*cotB/rb2*cosB*y2)))/pi/(1.0d0-nu))+&
-       b2*(1.0d0/4.0d0*((N3)*N1*rFib_ry2*cotB**2+N1/W6*((W5-1.0d0)*cotB+y1/W6*&
-       W4)-N1*y2**2/W6**2*((W5-1.0d0)*cotB+y1/W6*W4)/rb+N1*y2/W6*(-a/&
-       rb**3*y2*cotB-y1/W6**2*W4/rb*y2-y2/W6*a/rb**3*y1)-N1*cotB/&
-       W7*W9+N1*y2**2*cotB/W7**2*W9/rb+N1*y2**2*cotB/W7*a/rb**3/&
-       cosB-a*W8*cotB/rb**3+3*a*y2**2*W8*cotB/rb**5+W8/rb/W6*(N1*&
-       cotB-2.0d0*nu*y1/W6-a*y1/rb*(1.0d0/rb+1.0d0/W6))-y2**2*W8/rb**3/W6*&
-       (N1*cotB-2.0d0*nu*y1/W6-a*y1/rb*(1.0d0/rb+1.0d0/W6))-y2**2*W8/rb2/W6**&
-       2*(N1*cotB-2.0d0*nu*y1/W6-a*y1/rb*(1.0d0/rb+1.0d0/W6))+y2*W8/rb/W6*&
-       (2.0d0*nu*y1/W6**2/rb*y2+a*y1/rb**3*(1.0d0/rb+1.0d0/W6)*y2-a*y1/rb*&
-       (-1.0d0/rb**3*y2-1.0d0/W6**2/rb*y2))+W8*cotB/rb/W7*((N2)*cosB+&
-       W1/W7*W9+a*y3b/rb2/cosB)-y2**2*W8*cotB/rb**3/W7*((N2)*&
-       cosB+W1/W7*W9+a*y3b/rb2/cosB)-y2**2*W8*cotB/rb2/W7**2*((-2.0d0+&
-       2.0d0*nu)*cosB+W1/W7*W9+a*y3b/rb2/cosB)+y2*W8*cotB/rb/W7*(1.0d0/&
-       rb*cosB*y2/W7*W9-W1/W7**2*W9/rb*y2-W1/W7*a/rb**3/cosB*y2-&
-       2.0d0*a*y3b/rb2**2/cosB*y2))/pi/(1.0d0-nu))+&
-       b3*(1.0d0/4.0d0*(N1*(-sinB/rb*y2/W7+y2/W6**2*(1.0d0+a/rb)/rb*y1+y2/W6*&
-       a/rb**3*y1-z1b/W7**2*W2/rb*y2-z1b/W7*a/rb**3*y2)-y2*W8/&
-       rb**3*(a/rb2+1.0d0/W6)*y1+y1*W8/rb*(-2.0d0*a/rb2**2*y2-1.0d0/W6**2/&
-       rb*y2)+W8/W7**2*(sinB*(cosB-a/rb)+z1b/rb*(1.0d0+a*y3b/rb2)-1.0d0/&
+  v22 = b1*(one_quarter*(N1*(((N3)*cotB**2-nu)/rb*y2/W6-((N3)*cotB**2+1.0d0-&
+       N0)*cosB/rb*y2/W7)+N1/W6s*(y1*cotB*(1.0d0-W5)+nu*y3b-a+y2**&
+       2/W6*W4)/rb*y2-N1/W6*(a*y1*cotB/rbc*y2+2*y2/W6*W4-y2**&
+       3/W6s*W4/rb-y2**3/W6*a/rbc)+N1*z1b*cotB/W7s*W2/rb*&
+       y2+N1*z1b*cotB/W7*a/rbc*y2+3*a*y2*W8*cotB/rb**5*y1-W8/&
+       W6s*(-N0+1.0d0/rb*(N1*y1*cotB-a)+y2**2/rb/W6*W5+a*y2**2/&
+       rbc)/rb*y2+W8/W6*(-one_over_rbp3*(N1*y1*cotB-a)*y2+2*y2/rb/&
+       W6*W5-y2**3/rbc/W6*W5-y2**3/rb2/W6s*W5-y2**3/rb2**2/W6*&
+       a+2*a/rbc*y2-3.0d0*a*y2**3/rb**5)-W8/W7s*(cosB**2-1.0d0/rb*(N1*&
+       z1b*cotB+a*cosB)+a*y3b*z1b*cotB/rbc-1.0d0/rb/W7*(y2**2*cosB**2-&
+       a*z1b*cotB/rb*W1))/rb*y2+W8/W7*(one_over_rbp3*(N1*z1b*cotB+a*&
+       cosB)*y2-3.0d0*a*y3b*z1b*cotB/rb**5*y2+one_over_rbp3/W7*(y2**2*cosB**2-&
+       a*z1b*cotB/rb*W1)*y2+one_over_rb2/W7s*(y2**2*cosB**2-a*z1b*cotB/&
+       rb*W1)*y2-1.0d0/rb/W7*(2.0d0*y2*cosB**2+a*z1b*cotB/rbc*W1*y2-a*&
+       z1b*cotB/rb2*cosB*y2)))/pi/(N4))+&
+       b2*(one_quarter*((N3)*N1*rFib_ry2*cotB**2+N1/W6*((W5-1.0d0)*cotB+y1/W6*&
+       W4)-N1*y2**2/W6s*((W5-1.0d0)*cotB+y1/W6*W4)/rb+N1*y2/W6*(-a/&
+       rbc*y2*cotB-y1/W6s*W4/rb*y2-y2/W6*a/rbc*y1)-N1*cotB/&
+       W7*W9+N1*y2**2*cotB/W7s*W9/rb+N1*y2**2*cotB/W7*a/rbc/&
+       cosB-a*W8*cotB/rbc+3*a*y2**2*W8*cotB/rb**5+W8/rb/W6*(N1*&
+       cotB-N0*y1/W6-a*y1/rb*(1.0d0/rb+one_over_w6))-y2**2*W8/rbc/W6*&
+       (N1*cotB-N0*y1/W6-a*y1/rb*(1.0d0/rb+one_over_w6))-y2**2*W8/rb2/W6**&
+       2*(N1*cotB-N0*y1/W6-a*y1/rb*(1.0d0/rb+one_over_w6))+y2*W8/rb/W6*&
+       (N0*y1/W6s/rb*y2+a*y1/rbc*(1.0d0/rb+one_over_w6)*y2-a*y1/rb*&
+       (-one_over_rbp3*y2-one_over_W6_p2/rb*y2))+W8*cotB/rb/W7*((N2)*cosB+&
+       W1/W7*W9+a*y3b/rb2/cosB)-y2**2*W8*cotB/rbc/W7*((N2)*&
+       cosB+W1/W7*W9+a*y3b/rb2/cosB)-y2**2*W8*cotB/rb2/W7s*((-2.0d0+&
+       N0)*cosB+W1/W7*W9+a*y3b/rb2/cosB)+y2*W8*cotB/rb/W7*(1.0d0/&
+       rb*cosB*y2/W7*W9-w1_over_w7s*W9/rb*y2-W1/W7*a/rbc/cosB*y2-&
+       2.0d0*a*y3b/rb2**2/cosB*y2))/pi/(N4))+&
+       b3*(one_quarter*(N1*(-sinB/rb*y2/W7+y2/W6s*(1.0d0+a/rb)/rb*y1+y2/W6*&
+       a/rbc*y1-z1b/W7s*W2/rb*y2-z1b/W7*a/rbc*y2)-y2*W8/&
+       rbc*(a/rb2+one_over_w6)*y1+y1*W8/rb*(-2.0d0*a/rb2**2*y2-one_over_W6_p2/&
+       rb*y2)+W8/W7s*(sinB*(cosB-a/rb)+z1b/rb*(1.0d0+a*y3b/rb2)-1.0d0/&
        rb/W7*(y2**2*cosB*sinB-a*z1b/rb*W1))/rb*y2-W8/W7*(sinB*a/&
-       rb**3*y2-z1b/rb**3*(1.0d0+a*y3b/rb2)*y2-2.0d0*z1b/rb**5*a*y3b*y2+&
-       1.0d0/rb**3/W7*(y2**2*cosB*sinB-a*z1b/rb*W1)*y2+1.0d0/rb2/W7**2*&
+       rbc*y2-z1b/rbc*(1.0d0+a*y3b/rb2)*y2-2.0d0*z1b/rb**5*a*y3b*y2+&
+       one_over_rbp3/W7*(y2**2*cosB*sinB-a*z1b/rb*W1)*y2+one_over_rb2/W7s*&
        (y2**2*cosB*sinB-a*z1b/rb*W1)*y2-1.0d0/rb/W7*(2.0d0*y2*cosB*sinB+a*&
-       z1b/rb**3*W1*y2-a*z1b/rb2*cosB*y2)))/pi/(1.0d0-nu));
+       z1b/rbc*W1*y2-a*z1b/rb2*cosB*y2)))/pi/(N4));
 
-  v33 = b1*(1.0d0/4.0d0*((N3)*(N1*rFib_ry3*cotB-y2/W6**2*W5*(y3b/rb+1.0d0)-&
-       1.0d0/2.0d0*y2/W6*a/rb**3*2*y3b+y2*cosB/W7**2*W2*W3+1.0d0/2.0d0*y2*cosB/W7*&
-       a/rb**3*2*y3b)+y2/rb*(2.0d0*nu/W6+a/rb2)-1.0d0/2.0d0*y2*W8/rb**3*(2.0d0*&
-       nu/W6+a/rb2)*2*y3b+y2*W8/rb*(-2.0d0*nu/W6**2*(y3b/rb+1.0d0)-a/&
+  v33 = b1*(one_quarter*((N3)*(N1*rFib_ry3*cotB-y2/W6s*W5*(y3b/rb+1.0d0)-&
+       one_half*y2/W6*a/rbc*2*y3b+y2*cosB/W7s*W2*W3+one_half*y2*cosB/W7*&
+       a/rbc*2*y3b)+y2/rb*(N0/W6+a/rb2)-one_half*y2*W8/rbc*(2.0d0*&
+       nu/W6+a/rb2)*2*y3b+y2*W8/rb*(-N0/W6s*(y3b/rb+1.0d0)-a/&
        rb2**2*2*y3b)+y2*cosB/rb/W7*(N1-W1/W7*W2-a*y3b/rb2)-&
-       1.0d0/2.0d0*y2*W8*cosB/rb**3/W7*(N1-W1/W7*W2-a*y3b/rb2)*2*&
-       y3b-y2*W8*cosB/rb/W7**2*(N1-W1/W7*W2-a*y3b/rb2)*W3+y2*&
-       W8*cosB/rb/W7*(-(cosB*y3b/rb+1.0d0)/W7*W2+W1/W7**2*W2*W3+1.0d0/2.0d0*&
-       W1/W7*a/rb**3*2*y3b-a/rb2+a*y3b/rb2**2*2*y3b))/pi/(1.0d0-nu))+&
-       b2*(1.0d0/4.0d0*((N2)*N1*cotB*((y3b/rb+1.0d0)/W6-cosB*W3/W7)+(N3)*&
-       y1/W6**2*W5*(y3b/rb+1.0d0)+1.0d0/2.0d0*(N3)*y1/W6*a/rb**3*2*y3b+(2.0d0-&
-       2.0d0*nu)*sinB/W7*W2-(N3)*z1b/W7**2*W2*W3-1.0d0/2.0d0*(N3)*z1b/&
-       W7*a/rb**3*2*y3b+1.0d0/rb*(N1*cotB-2.0d0*nu*y1/W6-a*y1/rb2)-1.0d0/2.0d0*&
-       W8/rb**3*(N1*cotB-2.0d0*nu*y1/W6-a*y1/rb2)*2*y3b+W8/rb*(2.0d0*nu*&
-       y1/W6**2*(y3b/rb+1.0d0)+a*y1/rb2**2*2*y3b)-1.0d0/W7*(cosB*sinB+W1*&
+       one_half*y2*W8*cosB/rbc/W7*(N1-W1/W7*W2-a*y3b/rb2)*2*&
+       y3b-y2*W8*cosB/rb/W7s*(N1-W1/W7*W2-a*y3b/rb2)*W3+y2*&
+       W8*cosB/rb/W7*(-(cosB*y3b/rb+1.0d0)/W7*W2+w1_over_w7s*W2*W3+one_half*&
+       W1/W7*a/rbc*2*y3b-a/rb2+a*y3b/rb2**2*2*y3b))/pi/(N4))+&
+       b2*(one_quarter*((N2)*N1*cotB*((y3b/rb+1.0d0)/W6-cosB*W3/W7)+(N3)*&
+       y1/W6s*W5*(y3b/rb+1.0d0)+one_half*(N3)*y1/W6*a/rbc*2*y3b+(2.0d0-&
+       N0)*sinB/W7*W2-(N3)*z1b/W7s*W2*W3-one_half*(N3)*z1b/&
+       W7*a/rbc*2*y3b+1.0d0/rb*(N1*cotB-N0*y1/W6-a*y1/rb2)-one_half*&
+       W8/rbc*(N1*cotB-N0*y1/W6-a*y1/rb2)*2*y3b+W8/rb*(N0*&
+       y1/W6s*(y3b/rb+1.0d0)+a*y1/rb2**2*2*y3b)-1.0d0/W7*(cosB*sinB+W1*&
        cotB/rb*((N3)*cosB-W1/W7)+a/rb*(sinB-y3b*z1b/rb2-z1b*&
-       W1/rb/W7))+W8/W7**2*(cosB*sinB+W1*cotB/rb*((N3)*cosB-W1/&
+       W1/rb/W7))+W8/W7s*(cosB*sinB+W1*cotB/rb*((N3)*cosB-W1/&
        W7)+a/rb*(sinB-y3b*z1b/rb2-z1b*W1/rb/W7))*W3-W8/W7*((cosB*&
-       y3b/rb+1.0d0)*cotB/rb*((N3)*cosB-W1/W7)-1.0d0/2.0d0*W1*cotB/rb**3*&
+       y3b/rb+1.0d0)*cotB/rb*((N3)*cosB-W1/W7)-one_half*W1*cotB/rbc*&
        ((N3)*cosB-W1/W7)*2*y3b+W1*cotB/rb*(-(cosB*y3b/rb+1.0d0)/W7+&
-       W1/W7**2*W3)-1.0d0/2.0d0*a/rb**3*(sinB-y3b*z1b/rb2-z1b*W1/rb/W7)*&
+       w1_over_w7s*W3)-one_half*a/rbc*(sinB-y3b*z1b/rb2-z1b*W1/rb/W7)*&
        2.0d0*y3b+a/rb*(-z1b/rb2-y3b*sinB/rb2+y3b*z1b/rb2**2*2.0d0*y3b-&
-       sinB*W1/rb/W7-z1b*(cosB*y3b/rb+1.0d0)/rb/W7+1.0d0/2.0d0*z1b*W1/rb**3/&
-       W7*2.0d0*y3b+z1b*W1/rb/W7**2*W3)))/pi/(1.0d0-nu))+&
-       b3*(1.0d0/4.0d0*((N3)*rFib_ry3-(N3)*y2*sinB/W7**2*W2*W3-1.0d0/2.0d0*&
-       (N3)*y2*sinB/W7*a/rb**3*2.0d0*y3b+y2*sinB/rb/W7*(1.0d0+W1/W7*&
-       W2+a*y3b/rb2)-1.0d0/2.0d0*y2*W8*sinB/rb**3/W7*(1.0d0+W1/W7*W2+a*y3b/&
-       rb2)*2*y3b-y2*W8*sinB/rb/W7**2*(1.0d0+W1/W7*W2+a*y3b/rb2)*W3+&
-       y2*W8*sinB/rb/W7*((cosB*y3b/rb+1.0d0)/W7*W2-W1/W7**2*W2*W3-&
-       1.0d0/2.0d0*W1/W7*a/rb**3*2*y3b+a/rb2-a*y3b/rb2**2*2*y3b))/pi/(1.0d0-nu));
+       sinB*W1/rb/W7-z1b*(cosB*y3b/rb+1.0d0)/rb/W7+one_half*z1b*W1/rbc/&
+       W7*2.0d0*y3b+z1b*W1/rb/W7s*W3)))/pi/(N4))+&
+       b3*(one_quarter*((N3)*rFib_ry3-(N3)*y2*sinB/W7s*W2*W3-one_half*&
+       (N3)*y2*sinB/W7*a/rbc*2.0d0*y3b+y2*sinB/rb/W7*(1.0d0+W1/W7*&
+       W2+a*y3b/rb2)-one_half*y2*W8*sinB/rbc/W7*(1.0d0+W1/W7*W2+a*y3b/&
+       rb2)*2*y3b-y2*W8*sinB/rb/W7s*(1.0d0+W1/W7*W2+a*y3b/rb2)*W3+&
+       y2*W8*sinB/rb/W7*((cosB*y3b/rb+1.0d0)/W7*W2-w1_over_w7s*W2*W3-&
+       one_half*W1/W7*a/rbc*2*y3b+a/rb2-a*y3b/rb2**2*2*y3b))/pi/(N4));
 
-  v12 = b1/2.0d0*(1.0d0/4.0d0*((N2)*N1*rFib_ry2*cotB**2+N1/W6*((1.0d0-W5)*cotB-y1/&
-       W6*W4)-N1*y2**2/W6**2*((1.0d0-W5)*cotB-y1/W6*W4)/rb+N1*y2/W6*&
-       (a/rb**3*y2*cotB+y1/W6**2*W4/rb*y2+y2/W6*a/rb**3*y1)+N1*&
-       cosB*cotB/W7*W2-N1*y2**2*cosB*cotB/W7**2*W2/rb-N1*y2**2*cosB*&
-       cotB/W7*a/rb**3+a*W8*cotB/rb**3-3.0d0*a*y2**2*W8*cotB/rb**5+W8/&
-       rb/W6*(-N1*cotB+y1/W6*W5+a*y1/rb2)-y2**2*W8/rb**3/W6*(-N1*&
-       cotB+y1/W6*W5+a*y1/rb2)-y2**2*W8/rb2/W6**2*(-N1*cotB+y1/&
-       W6*W5+a*y1/rb2)+y2*W8/rb/W6*(-y1/W6**2*W5/rb*y2-y2/W6*&
-       a/rb**3*y1-2.0d0*a*y1/rb2**2*y2)+W8/rb/W7*(cosB/W7*(W1*(N1*&
+  v12 = b1/2.0d0*(one_quarter*((N2)*N1*rFib_ry2*cotB**2+N1/W6*((1.0d0-W5)*cotB-y1/&
+       W6*W4)-N1*y2**2/W6s*((1.0d0-W5)*cotB-y1/W6*W4)/rb+N1*y2/W6*&
+       (a/rbc*y2*cotB+y1/W6s*W4/rb*y2+y2/W6*a/rbc*y1)+N1*&
+       cosB*cotB/W7*W2-N1*y2**2*cosB*cotB/W7s*W2/rb-N1*y2**2*cosB*&
+       cotB/W7*a/rbc+a*W8*cotB/rbc-3.0d0*a*y2**2*W8*cotB/rb**5+W8/&
+       rb/W6*(-N1*cotB+y1/W6*W5+a*y1/rb2)-y2**2*W8/rbc/W6*(-N1*&
+       cotB+y1/W6*W5+a*y1/rb2)-y2**2*W8/rb2/W6s*(-N1*cotB+y1/&
+       W6*W5+a*y1/rb2)+y2*W8/rb/W6*(-y1/W6s*W5/rb*y2-y2/W6*&
+       a/rbc*y1-2.0d0*a*y1/rb2**2*y2)+W8/rb/W7*(cosB/W7*(W1*(N1*&
        cosB-a/rb)*cotB+(N3)*(rb*sinB-y1)*cosB)-a*y3b*cosB*cotB/&
-       rb2)-y2**2*W8/rb**3/W7*(cosB/W7*(W1*(N1*cosB-a/rb)*cotB+(2.0d0-&
-       2.0d0*nu)*(rb*sinB-y1)*cosB)-a*y3b*cosB*cotB/rb2)-y2**2*W8/rb2/&
-       W7**2*(cosB/W7*(W1*(N1*cosB-a/rb)*cotB+(N3)*(rb*sinB-y1)*&
-       cosB)-a*y3b*cosB*cotB/rb2)+y2*W8/rb/W7*(-cosB/W7**2*(W1*&
+       rb2)-y2**2*W8/rbc/W7*(cosB/W7*(W1*(N1*cosB-a/rb)*cotB+(2.0d0-&
+       N0)*(rb*sinB-y1)*cosB)-a*y3b*cosB*cotB/rb2)-y2**2*W8/rb2/&
+       W7s*(cosB/W7*(W1*(N1*cosB-a/rb)*cotB+(N3)*(rb*sinB-y1)*&
+       cosB)-a*y3b*cosB*cotB/rb2)+y2*W8/rb/W7*(-cosB/W7s*(W1*&
        (N1*cosB-a/rb)*cotB+(N3)*(rb*sinB-y1)*cosB)/rb*y2+cosB/&
-       W7*(1.0d0/rb*cosB*y2*(N1*cosB-a/rb)*cotB+W1*a/rb**3*y2*cotB+(2.0d0-2.0d0*&
-       nu)/rb*sinB*y2*cosB)+2*a*y3b*cosB*cotB/rb2**2*y2))/pi/(1.0d0-nu))+&
-       b2/2.0d0*(1.0d0/4.0d0*(N1*(((N3)*cotB**2+nu)/rb*y2/W6-((N3)*cotB**2+1.0d0)*&
-       cosB/rb*y2/W7)-N1/W6**2*(-N1*y1*cotB+nu*y3b-a+a*y1*cotB/rb+&
-       y1**2/W6*W4)/rb*y2+N1/W6*(-a*y1*cotB/rb**3*y2-y1**2/W6**&
-       2*W4/rb*y2-y1**2/W6*a/rb**3*y2)+N1*cotB/W7**2*(z1b*cosB-a*&
+       W7*(1.0d0/rb*cosB*y2*(N1*cosB-a/rb)*cotB+W1*a/rbc*y2*cotB+(2.0d0-2.0d0*&
+       nu)/rb*sinB*y2*cosB)+2*a*y3b*cosB*cotB/rb2**2*y2))/pi/(N4))+&
+       b2/2.0d0*(one_quarter*(N1*(((N3)*cotB**2+nu)/rb*y2/W6-((N3)*cotB**2+1.0d0)*&
+       cosB/rb*y2/W7)-N1/W6s*(-N1*y1*cotB+nu*y3b-a+a*y1*cotB/rb+&
+       y1**2/W6*W4)/rb*y2+N1/W6*(-a*y1*cotB/rbc*y2-y1**2/W6**&
+       2*W4/rb*y2-y1**2/W6*a/rbc*y2)+N1*cotB/W7s*(z1b*cosB-a*&
        (rb*sinB-y1)/rb/cosB)/rb*y2-N1*cotB/W7*(-a/rb2*sinB*y2/&
-       cosB+a*(rb*sinB-y1)/rb**3/cosB*y2)+3.0d0*a*y2*W8*cotB/rb**5*y1-&
-       W8/W6**2*(2.0d0*nu+1.0d0/rb*(N1*y1*cotB+a)-y1**2/rb/W6*W5-a*y1**2/&
-       rb**3)/rb*y2+W8/W6*(-1.0d0/rb**3*(N1*y1*cotB+a)*y2+y1**2/rb**&
-       3/W6*W5*y2+y1**2/rb2/W6**2*W5*y2+y1**2/rb2**2/W6*a*y2+3.0d0*&
-       a*y1**2/rb**5*y2)-W8*cotB/W7**2*(-cosB*sinB+a*y1*y3b/rb**3/&
+       cosB+a*(rb*sinB-y1)/rbc/cosB*y2)+3.0d0*a*y2*W8*cotB/rb**5*y1-&
+       W8/W6s*(N0+1.0d0/rb*(N1*y1*cotB+a)-y1**2/rb/W6*W5-a*y1**2/&
+       rbc)/rb*y2+W8/W6*(-one_over_rbp3*(N1*y1*cotB+a)*y2+y1**2/rb**&
+       3/W6*W5*y2+y1**2/rb2/W6s*W5*y2+y1**2/rb2**2/W6*a*y2+3.0d0*&
+       a*y1**2/rb**5*y2)-W8*cotB/W7s*(-cosB*sinB+a*y1*y3b/rbc/&
        cosB+(rb*sinB-y1)/rb*((N3)*cosB-W1/W7*W9))/rb*y2+W8*cotB/&
-       W7*(-3.0d0*a*y1*y3b/rb**5/cosB*y2+1.0d0/rb2*sinB*y2*((N3)*cosB-&
-       W1/W7*W9)-(rb*sinB-y1)/rb**3*((N3)*cosB-W1/W7*W9)*y2+(rb*&
-       sinB-y1)/rb*(-1.0d0/rb*cosB*y2/W7*W9+W1/W7**2*W9/rb*y2+W1/W7*&
-       a/rb**3/cosB*y2)))/pi/(1.0d0-nu))+&
-       b3/2.0d0*(1.0d0/4.0d0*(N1*(1.0d0/W6*(1.0d0+a/rb)-y2**2/W6**2*(1.0d0+a/rb)/rb-y2**2/&
-       W6*a/rb**3-cosB/W7*W2+y2**2*cosB/W7**2*W2/rb+y2**2*cosB/W7*&
-       a/rb**3)-W8/rb*(a/rb2+1.0d0/W6)+y2**2*W8/rb**3*(a/rb2+1.0d0/W6)-&
-       y2*W8/rb*(-2.0d0*a/rb2**2*y2-1.0d0/W6**2/rb*y2)+W8*cosB/rb/W7*&
-       (W1/W7*W2+a*y3b/rb2)-y2**2*W8*cosB/rb**3/W7*(W1/W7*W2+a*&
-       y3b/rb2)-y2**2*W8*cosB/rb2/W7**2*(W1/W7*W2+a*y3b/rb2)+y2*&
-       W8*cosB/rb/W7*(1.0d0/rb*cosB*y2/W7*W2-W1/W7**2*W2/rb*y2-W1/&
-       W7*a/rb**3*y2-2.0d0*a*y3b/rb2**2*y2))/pi/(1.0d0-nu))+&
-       b1/2.0d0*(1.0d0/4.0d0*(N1*(((N3)*cotB**2-nu)/rb*y1/W6-((N3)*cotB**2+1.0d0-&
-       2.0d0*nu)*cosB*(y1/rb-sinB)/W7)+N1/W6**2*(y1*cotB*(1.0d0-W5)+nu*y3b-&
-       a+y2**2/W6*W4)/rb*y1-N1/W6*((1.0d0-W5)*cotB+a*y1**2*cotB/rb**3-&
-       y2**2/W6**2*W4/rb*y1-y2**2/W6*a/rb**3*y1)-N1*cosB*cotB/W7*&
-       W2+N1*z1b*cotB/W7**2*W2*(y1/rb-sinB)+N1*z1b*cotB/W7*a/rb**&
-       3*y1-a*W8*cotB/rb**3+3.0d0*a*y1**2*W8*cotB/rb**5-W8/W6**2*(-2.0d0*&
-       nu+1.0d0/rb*(N1*y1*cotB-a)+y2**2/rb/W6*W5+a*y2**2/rb**3)/rb*&
-       y1+W8/W6*(-1.0d0/rb**3*(N1*y1*cotB-a)*y1+1.0d0/rb*N1*cotB-y2**2/&
-       rb**3/W6*W5*y1-y2**2/rb2/W6**2*W5*y1-y2**2/rb2**2/W6*a*y1-&
-       3.0d0*a*y2**2/rb**5*y1)-W8/W7**2*(cosB**2-1.0d0/rb*(N1*z1b*cotB+a*&
-       cosB)+a*y3b*z1b*cotB/rb**3-1.0d0/rb/W7*(y2**2*cosB**2-a*z1b*cotB/&
-       rb*W1))*(y1/rb-sinB)+W8/W7*(1.0d0/rb**3*(N1*z1b*cotB+a*cosB)*&
-       y1-1.0d0/rb*N1*cosB*cotB+a*y3b*cosB*cotB/rb**3-3.0d0*a*y3b*z1b*cotB/&
-       rb**5*y1+1.0d0/rb**3/W7*(y2**2*cosB**2-a*z1b*cotB/rb*W1)*y1+1.0d0/&
-       rb/W7**2*(y2**2*cosB**2-a*z1b*cotB/rb*W1)*(y1/rb-sinB)-1.0d0/rb/&
-       W7*(-a*cosB*cotB/rb*W1+a*z1b*cotB/rb**3*W1*y1-a*z1b*cotB/&
-       rb2*cosB*y1)))/pi/(1.0d0-nu))+&
-       b2/2.0d0*(1.0d0/4.0d0*((N3)*N1*rFib_ry1*cotB**2-N1*y2/W6**2*((W5-1.0d0)*cotB+&
-       y1/W6*W4)/rb*y1+N1*y2/W6*(-a/rb**3*y1*cotB+1.0d0/W6*W4-y1**&
-       2/W6**2*W4/rb-y1**2/W6*a/rb**3)+N1*y2*cotB/W7**2*W9*(y1/&
-       rb-sinB)+N1*y2*cotB/W7*a/rb**3/cosB*y1+3.0d0*a*y2*W8*cotB/rb**&
-       5*y1-y2*W8/rb**3/W6*(N1*cotB-2.0d0*nu*y1/W6-a*y1/rb*(1.0d0/rb+1.0d0/&
-       W6))*y1-y2*W8/rb2/W6**2*(N1*cotB-2.0d0*nu*y1/W6-a*y1/rb*(1.0d0/&
-       rb+1.0d0/W6))*y1+y2*W8/rb/W6*(-2.0d0*nu/W6+2.0d0*nu*y1**2/W6**2/rb-a/&
-       rb*(1.0d0/rb+1.0d0/W6)+a*y1**2/rb**3*(1.0d0/rb+1.0d0/W6)-a*y1/rb*(-1.0d0/&
-       rb**3*y1-1.0d0/W6**2/rb*y1))-y2*W8*cotB/rb**3/W7*((N2)*&
-       cosB+W1/W7*W9+a*y3b/rb2/cosB)*y1-y2*W8*cotB/rb/W7**2*((-2.0d0+&
-       2.0d0*nu)*cosB+W1/W7*W9+a*y3b/rb2/cosB)*(y1/rb-sinB)+y2*W8*&
-       cotB/rb/W7*(1.0d0/rb*cosB*y1/W7*W9-W1/W7**2*W9*(y1/rb-sinB)-&
-       W1/W7*a/rb**3/cosB*y1-2.0d0*a*y3b/rb2**2/cosB*y1))/pi/(1.0d0-nu))+&
-       b3/2.0d0*(1.0d0/4.0d0*(N1*(-sinB*(y1/rb-sinB)/W7-1.0d0/W6*(1.0d0+a/rb)+y1**2/W6**&
-       2*(1.0d0+a/rb)/rb+y1**2/W6*a/rb**3+cosB/W7*W2-z1b/W7**2*W2*&
-       (y1/rb-sinB)-z1b/W7*a/rb**3*y1)+W8/rb*(a/rb2+1.0d0/W6)-y1**2*&
-       W8/rb**3*(a/rb2+1.0d0/W6)+y1*W8/rb*(-2.0d0*a/rb2**2*y1-1.0d0/W6**2/&
-       rb*y1)+W8/W7**2*(sinB*(cosB-a/rb)+z1b/rb*(1.0d0+a*y3b/rb2)-1.0d0/&
+       W7*(-3.0d0*a*y1*y3b/rb**5/cosB*y2+one_over_rb2*sinB*y2*((N3)*cosB-&
+       W1/W7*W9)-(rb*sinB-y1)/rbc*((N3)*cosB-W1/W7*W9)*y2+(rb*&
+       sinB-y1)/rb*(-1.0d0/rb*cosB*y2/W7*W9+w1_over_w7s*W9/rb*y2+W1/W7*&
+       a/rbc/cosB*y2)))/pi/(N4))+&
+       b3/2.0d0*(one_quarter*(N1*(one_over_w6*(1.0d0+a/rb)-y2**2/W6s*(1.0d0+a/rb)/rb-y2**2/&
+       W6*a/rbc-cosB/W7*W2+y2**2*cosB/W7s*W2/rb+y2**2*cosB/W7*&
+       a/rbc)-W8/rb*(a/rb2+one_over_w6)+y2**2*W8/rbc*(a/rb2+one_over_w6)-&
+       y2*W8/rb*(-2.0d0*a/rb2**2*y2-one_over_W6_p2/rb*y2)+W8*cosB/rb/W7*&
+       (W1/W7*W2+a*y3b/rb2)-y2**2*W8*cosB/rbc/W7*(W1/W7*W2+a*&
+       y3b/rb2)-y2**2*W8*cosB/rb2/W7s*(W1/W7*W2+a*y3b/rb2)+y2*&
+       W8*cosB/rb/W7*(1.0d0/rb*cosB*y2/W7*W2-w1_over_w7s*W2/rb*y2-W1/&
+       W7*a/rbc*y2-2.0d0*a*y3b/rb2**2*y2))/pi/(N4))+&
+       b1/2.0d0*(one_quarter*(N1*(((N3)*cotB**2-nu)/rb*y1/W6-((N3)*cotB**2+1.0d0-&
+       N0)*cosB*(y1/rb-sinB)/W7)+N1/W6s*(y1*cotB*(1.0d0-W5)+nu*y3b-&
+       a+y2**2/W6*W4)/rb*y1-N1/W6*((1.0d0-W5)*cotB+a*y1**2*cotB/rbc-&
+       y2**2/W6s*W4/rb*y1-y2**2/W6*a/rbc*y1)-N1*cosB*cotB/W7*&
+       W2+N1*z1b*cotB/W7s*W2*(y1/rb-sinB)+N1*z1b*cotB/W7*a/rb**&
+       3*y1-a*W8*cotB/rbc+3.0d0*a*y1**2*W8*cotB/rb**5-W8/W6s*(-2.0d0*&
+       nu+1.0d0/rb*(N1*y1*cotB-a)+y2**2/rb/W6*W5+a*y2**2/rbc)/rb*&
+       y1+W8/W6*(-one_over_rbp3*(N1*y1*cotB-a)*y1+1.0d0/rb*N1*cotB-y2**2/&
+       rbc/W6*W5*y1-y2**2/rb2/W6s*W5*y1-y2**2/rb2**2/W6*a*y1-&
+       3.0d0*a*y2**2/rb**5*y1)-W8/W7s*(cosB**2-1.0d0/rb*(N1*z1b*cotB+a*&
+       cosB)+a*y3b*z1b*cotB/rbc-1.0d0/rb/W7*(y2**2*cosB**2-a*z1b*cotB/&
+       rb*W1))*(y1/rb-sinB)+W8/W7*(one_over_rbp3*(N1*z1b*cotB+a*cosB)*&
+       y1-1.0d0/rb*N1*cosB*cotB+a*y3b*cosB*cotB/rbc-3.0d0*a*y3b*z1b*cotB/&
+       rb**5*y1+one_over_rbp3/W7*(y2**2*cosB**2-a*z1b*cotB/rb*W1)*y1+1.0d0/&
+       rb/W7s*(y2**2*cosB**2-a*z1b*cotB/rb*W1)*(y1/rb-sinB)-1.0d0/rb/&
+       W7*(-a*cosB*cotB/rb*W1+a*z1b*cotB/rbc*W1*y1-a*z1b*cotB/&
+       rb2*cosB*y1)))/pi/(N4))+&
+       b2/2.0d0*(one_quarter*((N3)*N1*rFib_ry1*cotB**2-N1*y2/W6s*((W5-1.0d0)*cotB+&
+       y1/W6*W4)/rb*y1+N1*y2/W6*(-a/rbc*y1*cotB+one_over_w6*W4-y1**&
+       2/W6s*W4/rb-y1**2/W6*a/rbc)+N1*y2*cotB/W7s*W9*(y1/&
+       rb-sinB)+N1*y2*cotB/W7*a/rbc/cosB*y1+3.0d0*a*y2*W8*cotB/rb**&
+       5*y1-y2*W8/rbc/W6*(N1*cotB-N0*y1/W6-a*y1/rb*(1.0d0/rb+1.0d0/&
+       W6))*y1-y2*W8/rb2/W6s*(N1*cotB-N0*y1/W6-a*y1/rb*(1.0d0/&
+       rb+one_over_w6))*y1+y2*W8/rb/W6*(-N0/W6+N0*y1**2/W6s/rb-a/&
+       rb*(1.0d0/rb+one_over_w6)+a*y1**2/rbc*(1.0d0/rb+one_over_w6)-a*y1/rb*(-1.0d0/&
+       rbc*y1-one_over_W6_p2/rb*y1))-y2*W8*cotB/rbc/W7*((N2)*&
+       cosB+W1/W7*W9+a*y3b/rb2/cosB)*y1-y2*W8*cotB/rb/W7s*((-2.0d0+&
+       N0)*cosB+W1/W7*W9+a*y3b/rb2/cosB)*(y1/rb-sinB)+y2*W8*&
+       cotB/rb/W7*(1.0d0/rb*cosB*y1/W7*W9-w1_over_w7s*W9*(y1/rb-sinB)-&
+       W1/W7*a/rbc/cosB*y1-2.0d0*a*y3b/rb2**2/cosB*y1))/pi/(N4))+&
+       b3/2.0d0*(one_quarter*(N1*(-sinB*(y1/rb-sinB)/W7-one_over_w6*(1.0d0+a/rb)+y1**2/W6**&
+       2*(1.0d0+a/rb)/rb+y1**2/W6*a/rbc+cosB/W7*W2-z1b/W7s*W2*&
+       (y1/rb-sinB)-z1b/W7*a/rbc*y1)+W8/rb*(a/rb2+one_over_w6)-y1**2*&
+       W8/rbc*(a/rb2+one_over_w6)+y1*W8/rb*(-2.0d0*a/rb2**2*y1-one_over_W6_p2/&
+       rb*y1)+W8/W7s*(sinB*(cosB-a/rb)+z1b/rb*(1.0d0+a*y3b/rb2)-1.0d0/&
        rb/W7*(y2**2*cosB*sinB-a*z1b/rb*W1))*(y1/rb-sinB)-W8/W7*&
-       (sinB*a/rb**3*y1+cosB/rb*(1.0d0+a*y3b/rb2)-z1b/rb**3*(1.0d0+a*y3b/&
-       rb2)*y1-2.0d0*z1b/rb**5*a*y3b*y1+1.0d0/rb**3/W7*(y2**2*cosB*sinB-a*&
-       z1b/rb*W1)*y1+1.0d0/rb/W7**2*(y2**2*cosB*sinB-a*z1b/rb*W1)*&
-       (y1/rb-sinB)-1.0d0/rb/W7*(-a*cosB/rb*W1+a*z1b/rb**3*W1*y1-a*&
-       z1b/rb2*cosB*y1)))/pi/(1.0d0-nu));
+       (sinB*a/rbc*y1+cosB/rb*(1.0d0+a*y3b/rb2)-z1b/rbc*(1.0d0+a*y3b/&
+       rb2)*y1-2.0d0*z1b/rb**5*a*y3b*y1+one_over_rbp3/W7*(y2**2*cosB*sinB-a*&
+       z1b/rb*W1)*y1+1.0d0/rb/W7s*(y2**2*cosB*sinB-a*z1b/rb*W1)*&
+       (y1/rb-sinB)-1.0d0/rb/W7*(-a*cosB/rb*W1+a*z1b/rbc*W1*y1-a*&
+       z1b/rb2*cosB*y1)))/pi/(N4));
 
-  v13 = b1/2.0d0*(1.0d0/4.0d0*((N2)*N1*rFib_ry3*cotB**2-N1*y2/W6**2*((1.0d0-W5)*&
-       cotB-y1/W6*W4)*(y3b/rb+1.0d0)+N1*y2/W6*(1.0d0/2.0d0*a/rb**3*2*y3b*cotB+&
-       y1/W6**2*W4*(y3b/rb+1.0d0)+1.0d0/2.0d0*y1/W6*a/rb**3*2*y3b)-N1*y2*cosB*&
-       cotB/W7**2*W2*W3-1.0d0/2.0d0*N1*y2*cosB*cotB/W7*a/rb**3*2*y3b+a/&
-       rb**3*y2*cotB-3.0d0/2.0d0*a*y2*W8*cotB/rb**5*2*y3b+y2/rb/W6*(-N1*&
-       cotB+y1/W6*W5+a*y1/rb2)-1.0d0/2.0d0*y2*W8/rb**3/W6*(-N1*cotB+y1/&
-       W6*W5+a*y1/rb2)*2*y3b-y2*W8/rb/W6**2*(-N1*cotB+y1/W6*W5+&
-       a*y1/rb2)*(y3b/rb+1.0d0)+y2*W8/rb/W6*(-y1/W6**2*W5*(y3b/rb+&
-       1.0d0)-1.0d0/2.0d0*y1/W6*a/rb**3*2*y3b-a*y1/rb2**2*2*y3b)+y2/rb/W7*&
+  v13 = b1/2.0d0*(one_quarter*((N2)*N1*rFib_ry3*cotB**2-N1*y2/W6s*((1.0d0-W5)*&
+       cotB-y1/W6*W4)*(y3b/rb+1.0d0)+N1*y2/W6*(one_half*a/rbc*2*y3b*cotB+&
+       y1/W6s*W4*(y3b/rb+1.0d0)+one_half*y1/W6*a/rbc*2*y3b)-N1*y2*cosB*&
+       cotB/W7s*W2*W3-one_half*N1*y2*cosB*cotB/W7*a/rbc*2*y3b+a/&
+       rbc*y2*cotB-3.0d0/2.0d0*a*y2*W8*cotB/rb**5*2*y3b+y2/rb/W6*(-N1*&
+       cotB+y1/W6*W5+a*y1/rb2)-one_half*y2*W8/rbc/W6*(-N1*cotB+y1/&
+       W6*W5+a*y1/rb2)*2*y3b-y2*W8/rb/W6s*(-N1*cotB+y1/W6*W5+&
+       a*y1/rb2)*(y3b/rb+1.0d0)+y2*W8/rb/W6*(-y1/W6s*W5*(y3b/rb+&
+       1.0d0)-one_half*y1/W6*a/rbc*2*y3b-a*y1/rb2**2*2*y3b)+y2/rb/W7*&
        (cosB/W7*(W1*(N1*cosB-a/rb)*cotB+(N3)*(rb*sinB-y1)*cosB)-&
-       a*y3b*cosB*cotB/rb2)-1.0d0/2.0d0*y2*W8/rb**3/W7*(cosB/W7*(W1*(N1*&
+       a*y3b*cosB*cotB/rb2)-one_half*y2*W8/rbc/W7*(cosB/W7*(W1*(N1*&
        cosB-a/rb)*cotB+(N3)*(rb*sinB-y1)*cosB)-a*y3b*cosB*cotB/&
-       rb2)*2*y3b-y2*W8/rb/W7**2*(cosB/W7*(W1*(N1*cosB-a/rb)*cotB+&
+       rb2)*2*y3b-y2*W8/rb/W7s*(cosB/W7*(W1*(N1*cosB-a/rb)*cotB+&
        (N3)*(rb*sinB-y1)*cosB)-a*y3b*cosB*cotB/rb2)*W3+y2*W8/rb/&
-       W7*(-cosB/W7**2*(W1*(N1*cosB-a/rb)*cotB+(N3)*(rb*sinB-y1)*&
-       cosB)*W3+cosB/W7*((cosB*y3b/rb+1.0d0)*(N1*cosB-a/rb)*cotB+1.0d0/2.0d0*W1*&
-       a/rb**3*2*y3b*cotB+1.0d0/2.0d0*(N3)/rb*sinB*2*y3b*cosB)-a*cosB*&
-       cotB/rb2+a*y3b*cosB*cotB/rb2**2*2*y3b))/pi/(1.0d0-nu))+&
-       b2/2.0d0*(1.0d0/4.0d0*(N1*(((N3)*cotB**2+nu)*(y3b/rb+1.0d0)/W6-((N3)*cotB**&
-       2+1.0d0)*cosB*W3/W7)-N1/W6**2*(-N1*y1*cotB+nu*y3b-a+a*y1*cotB/&
-       rb+y1**2/W6*W4)*(y3b/rb+1.0d0)+N1/W6*(nu-1.0d0/2.0d0*a*y1*cotB/rb**3*2.0d0*&
-       y3b-y1**2/W6**2*W4*(y3b/rb+1.0d0)-1.0d0/2.0d0*y1**2/W6*a/rb**3*2*y3b)+&
-       N1*cotB/W7**2*(z1b*cosB-a*(rb*sinB-y1)/rb/cosB)*W3-N1*cotB/&
-       W7*(cosB*sinB-1.0d0/2.0d0*a/rb2*sinB*2*y3b/cosB+1.0d0/2.0d0*a*(rb*sinB-y1)/&
-       rb**3/cosB*2*y3b)-a/rb**3*y1*cotB+3/2.0d0*a*y1*W8*cotB/rb**5*2*&
-       y3b+1.0d0/W6*(2.0d0*nu+1.0d0/rb*(N1*y1*cotB+a)-y1**2/rb/W6*W5-a*y1**2/&
-       rb**3)-W8/W6**2*(2.0d0*nu+1.0d0/rb*(N1*y1*cotB+a)-y1**2/rb/W6*W5-a*&
-       y1**2/rb**3)*(y3b/rb+1.0d0)+W8/W6*(-1.0d0/2.0d0/rb**3*(N1*y1*cotB+a)*2*&
-       y3b+1.0d0/2.0d0*y1**2/rb**3/W6*W5*2*y3b+y1**2/rb/W6**2*W5*(y3b/rb+&
-       1.0d0)+1.0d0/2.0d0*y1**2/rb2**2/W6*a*2*y3b+3/2.0d0*a*y1**2/rb**5*2*y3b)+&
-       cotB/W7*(-cosB*sinB+a*y1*y3b/rb**3/cosB+(rb*sinB-y1)/rb*((2.0d0-&
-       2.0d0*nu)*cosB-W1/W7*W9))-W8*cotB/W7**2*(-cosB*sinB+a*y1*y3b/rb**&
+       W7*(-cosB/W7s*(W1*(N1*cosB-a/rb)*cotB+(N3)*(rb*sinB-y1)*&
+       cosB)*W3+cosB/W7*((cosB*y3b/rb+1.0d0)*(N1*cosB-a/rb)*cotB+one_half*W1*&
+       a/rbc*2*y3b*cotB+one_half*(N3)/rb*sinB*2*y3b*cosB)-a*cosB*&
+       cotB/rb2+a*y3b*cosB*cotB/rb2**2*2*y3b))/pi/(N4))+&
+       b2/2.0d0*(one_quarter*(N1*(((N3)*cotB**2+nu)*(y3b/rb+1.0d0)/W6-((N3)*cotB**&
+       2+1.0d0)*cosB*W3/W7)-N1/W6s*(-N1*y1*cotB+nu*y3b-a+a*y1*cotB/&
+       rb+y1**2/W6*W4)*(y3b/rb+1.0d0)+N1/W6*(nu-one_half*a*y1*cotB/rbc*2.0d0*&
+       y3b-y1**2/W6s*W4*(y3b/rb+1.0d0)-one_half*y1**2/W6*a/rbc*2*y3b)+&
+       N1*cotB/W7s*(z1b*cosB-a*(rb*sinB-y1)/rb/cosB)*W3-N1*cotB/&
+       W7*(cosB*sinB-one_half*a/rb2*sinB*2*y3b/cosB+one_half*a*(rb*sinB-y1)/&
+       rbc/cosB*2*y3b)-a/rbc*y1*cotB+3/2.0d0*a*y1*W8*cotB/rb**5*2*&
+       y3b+one_over_w6*(N0+1.0d0/rb*(N1*y1*cotB+a)-y1**2/rb/W6*W5-a*y1**2/&
+       rbc)-W8/W6s*(N0+1.0d0/rb*(N1*y1*cotB+a)-y1**2/rb/W6*W5-a*&
+       y1**2/rbc)*(y3b/rb+1.0d0)+W8/W6*(-one_half/rbc*(N1*y1*cotB+a)*2*&
+       y3b+one_half*y1**2/rbc/W6*W5*2*y3b+y1**2/rb/W6s*W5*(y3b/rb+&
+       1.0d0)+one_half*y1**2/rb2**2/W6*a*2*y3b+3/2.0d0*a*y1**2/rb**5*2*y3b)+&
+       cotB/W7*(-cosB*sinB+a*y1*y3b/rbc/cosB+(rb*sinB-y1)/rb*((2.0d0-&
+       N0)*cosB-W1/W7*W9))-W8*cotB/W7s*(-cosB*sinB+a*y1*y3b/rb**&
        3/cosB+(rb*sinB-y1)/rb*((N3)*cosB-W1/W7*W9))*W3+W8*cotB/&
-       W7*(a/rb**3/cosB*y1-3.0d0/2.0d0*a*y1*y3b/rb**5/cosB*2*y3b+1.0d0/2.0d0/&
-       rb2*sinB*2*y3b*((N3)*cosB-W1/W7*W9)-1.0d0/2.0d0*(rb*sinB-y1)/rb**&
+       W7*(a/rbc/cosB*y1-3.0d0/2.0d0*a*y1*y3b/rb**5/cosB*2*y3b+one_half/&
+       rb2*sinB*2*y3b*((N3)*cosB-W1/W7*W9)-one_half*(rb*sinB-y1)/rb**&
        3*((N3)*cosB-W1/W7*W9)*2*y3b+(rb*sinB-y1)/rb*(-(cosB*y3b/&
-       rb+1.0d0)/W7*W9+W1/W7**2*W9*W3+1.0d0/2.0d0*W1/W7*a/rb**3/cosB*2*&
-       y3b)))/pi/(1.0d0-nu))+&
-       b3/2.0d0*(1.0d0/4.0d0*(N1*(-y2/W6**2*(1.0d0+a/rb)*(y3b/rb+1.0d0)-1.0d0/2.0d0*y2/W6*a/&
-       rb**3*2.0d0*y3b+y2*cosB/W7**2*W2*W3+1.0d0/2.0d0*y2*cosB/W7*a/rb**3*2.0d0*&
-       y3b)-y2/rb*(a/rb2+1.0d0/W6)+1.0d0/2.0d0*y2*W8/rb**3*(a/rb2+1.0d0/W6)*2.0d0*&
-       y3b-y2*W8/rb*(-a/rb2**2*2*y3b-1.0d0/W6**2*(y3b/rb+1.0d0))+y2*cosB/&
-       rb/W7*(W1/W7*W2+a*y3b/rb2)-1.0d0/2.0d0*y2*W8*cosB/rb**3/W7*(W1/&
-       W7*W2+a*y3b/rb2)*2*y3b-y2*W8*cosB/rb/W7**2*(W1/W7*W2+a*&
+       rb+1.0d0)/W7*W9+w1_over_w7s*W9*W3+one_half*W1/W7*a/rbc/cosB*2*&
+       y3b)))/pi/(N4))+&
+       b3/2.0d0*(one_quarter*(N1*(-y2/W6s*(1.0d0+a/rb)*(y3b/rb+1.0d0)-one_half*y2/W6*a/&
+       rbc*2.0d0*y3b+y2*cosB/W7s*W2*W3+one_half*y2*cosB/W7*a/rbc*2.0d0*&
+       y3b)-y2/rb*(a/rb2+one_over_w6)+one_half*y2*W8/rbc*(a/rb2+one_over_w6)*2.0d0*&
+       y3b-y2*W8/rb*(-a/rb2**2*2*y3b-one_over_W6_p2*(y3b/rb+1.0d0))+y2*cosB/&
+       rb/W7*(W1/W7*W2+a*y3b/rb2)-one_half*y2*W8*cosB/rbc/W7*(W1/&
+       W7*W2+a*y3b/rb2)*2*y3b-y2*W8*cosB/rb/W7s*(W1/W7*W2+a*&
        y3b/rb2)*W3+y2*W8*cosB/rb/W7*((cosB*y3b/rb+1.0d0)/W7*W2-W1/&
-       W7**2*W2*W3-1.0d0/2.0d0*W1/W7*a/rb**3*2*y3b+a/rb2-a*y3b/rb2**2*2*&
-       y3b))/pi/(1.0d0-nu))+&
-       b1/2.0d0*(1.0d0/4.0d0*((N3)*(N1*rFib_ry1*cotB-y1/W6**2*W5/rb*y2-y2/W6*&
-       a/rb**3*y1+y2*cosB/W7**2*W2*(y1/rb-sinB)+y2*cosB/W7*a/rb**&
-       3*y1)-y2*W8/rb**3*(2.0d0*nu/W6+a/rb2)*y1+y2*W8/rb*(-2.0d0*nu/W6**&
-       2/rb*y1-2.0d0*a/rb2**2*y1)-y2*W8*cosB/rb**3/W7*(N1-W1/W7*&
-       W2-a*y3b/rb2)*y1-y2*W8*cosB/rb/W7**2*(N1-W1/W7*W2-a*&
+       W7s*W2*W3-one_half*W1/W7*a/rbc*2*y3b+a/rb2-a*y3b/rb2**2*2*&
+       y3b))/pi/(N4))+&
+       b1/2.0d0*(one_quarter*((N3)*(N1*rFib_ry1*cotB-y1/W6s*W5/rb*y2-y2/W6*&
+       a/rbc*y1+y2*cosB/W7s*W2*(y1/rb-sinB)+y2*cosB/W7*a/rb**&
+       3*y1)-y2*W8/rbc*(N0/W6+a/rb2)*y1+y2*W8/rb*(-N0/W6**&
+       2/rb*y1-2.0d0*a/rb2**2*y1)-y2*W8*cosB/rbc/W7*(N1-W1/W7*&
+       W2-a*y3b/rb2)*y1-y2*W8*cosB/rb/W7s*(N1-W1/W7*W2-a*&
        y3b/rb2)*(y1/rb-sinB)+y2*W8*cosB/rb/W7*(-1.0d0/rb*cosB*y1/W7*&
-       W2+W1/W7**2*W2*(y1/rb-sinB)+W1/W7*a/rb**3*y1+2*a*y3b/rb2**&
-       2*y1))/pi/(1.0d0-nu))+&
-       b2/2.0d0*(1.0d0/4.0d0*((N2)*N1*cotB*(1.0d0/rb*y1/W6-cosB*(y1/rb-sinB)/W7)-&
-       (N3)/W6*W5+(N3)*y1**2/W6**2*W5/rb+(N3)*y1**2/W6*&
-       a/rb**3+(N3)*cosB/W7*W2-(N3)*z1b/W7**2*W2*(y1/rb-&
-       sinB)-(N3)*z1b/W7*a/rb**3*y1-W8/rb**3*(N1*cotB-2.0d0*nu*y1/&
-       W6-a*y1/rb2)*y1+W8/rb*(-2.0d0*nu/W6+2.0d0*nu*y1**2/W6**2/rb-a/rb2+&
-       2.0d0*a*y1**2/rb2**2)+W8/W7**2*(cosB*sinB+W1*cotB/rb*((N3)*&
+       W2+w1_over_w7s*W2*(y1/rb-sinB)+W1/W7*a/rbc*y1+2*a*y3b/rb2**&
+       2*y1))/pi/(N4))+&
+       b2/2.0d0*(one_quarter*((N2)*N1*cotB*(1.0d0/rb*y1/W6-cosB*(y1/rb-sinB)/W7)-&
+       (N3)/W6*W5+(N3)*y1**2/W6s*W5/rb+(N3)*y1**2/W6*&
+       a/rbc+(N3)*cosB/W7*W2-(N3)*z1b/W7s*W2*(y1/rb-&
+       sinB)-(N3)*z1b/W7*a/rbc*y1-W8/rbc*(N1*cotB-N0*y1/&
+       W6-a*y1/rb2)*y1+W8/rb*(-N0/W6+N0*y1**2/W6s/rb-a/rb2+&
+       2.0d0*a*y1**2/rb2**2)+W8/W7s*(cosB*sinB+W1*cotB/rb*((N3)*&
        cosB-W1/W7)+a/rb*(sinB-y3b*z1b/rb2-z1b*W1/rb/W7))*(y1/rb-&
-       sinB)-W8/W7*(1.0d0/rb2*cosB*y1*cotB*((N3)*cosB-W1/W7)-W1*&
-       cotB/rb**3*((N3)*cosB-W1/W7)*y1+W1*cotB/rb*(-1.0d0/rb*cosB*&
-       y1/W7+W1/W7**2*(y1/rb-sinB))-a/rb**3*(sinB-y3b*z1b/rb2-&
+       sinB)-W8/W7*(one_over_rb2*cosB*y1*cotB*((N3)*cosB-W1/W7)-W1*&
+       cotB/rbc*((N3)*cosB-W1/W7)*y1+W1*cotB/rb*(-1.0d0/rb*cosB*&
+       y1/W7+w1_over_w7s*(y1/rb-sinB))-a/rbc*(sinB-y3b*z1b/rb2-&
        z1b*W1/rb/W7)*y1+a/rb*(-y3b*cosB/rb2+2*y3b*z1b/rb2**2*y1-&
-       cosB*W1/rb/W7-z1b/rb2*cosB*y1/W7+z1b*W1/rb**3/W7*y1+z1b*&
-       W1/rb/W7**2*(y1/rb-sinB))))/pi/(1.0d0-nu))+&
-       b3/2.0d0*(1.0d0/4.0d0*((N3)*rFib_ry1-(N3)*y2*sinB/W7**2*W2*(y1/rb-&
-       sinB)-(N3)*y2*sinB/W7*a/rb**3*y1-y2*W8*sinB/rb**3/W7*(1.0d0+&
-       W1/W7*W2+a*y3b/rb2)*y1-y2*W8*sinB/rb/W7**2*(1.0d0+W1/W7*W2+&
+       cosB*W1/rb/W7-z1b/rb2*cosB*y1/W7+z1b*W1/rbc/W7*y1+z1b*&
+       W1/rb/W7s*(y1/rb-sinB))))/pi/(N4))+&
+       b3/2.0d0*(one_quarter*((N3)*rFib_ry1-(N3)*y2*sinB/W7s*W2*(y1/rb-&
+       sinB)-(N3)*y2*sinB/W7*a/rbc*y1-y2*W8*sinB/rbc/W7*(1.0d0+&
+       W1/W7*W2+a*y3b/rb2)*y1-y2*W8*sinB/rb/W7s*(1.0d0+W1/W7*W2+&
        a*y3b/rb2)*(y1/rb-sinB)+y2*W8*sinB/rb/W7*(1.0d0/rb*cosB*y1/&
-       W7*W2-W1/W7**2*W2*(y1/rb-sinB)-W1/W7*a/rb**3*y1-2.0d0*a*y3b/&
-       rb2**2*y1))/pi/(1.0d0-nu));
+       W7*W2-w1_over_w7s*W2*(y1/rb-sinB)-W1/W7*a/rbc*y1-2.0d0*a*y3b/&
+       rb2**2*y1))/pi/(N4));
 
-  v23 = b1/2.0d0*(1.0d0/4.0d0*(N1*(((N3)*cotB**2-nu)*(y3b/rb+1.0d0)/W6-((N3)*&
-       cotB**2+N1)*cosB*W3/W7)+N1/W6**2*(y1*cotB*(1.0d0-W5)+nu*y3b-a+&
-       y2**2/W6*W4)*(y3b/rb+1.0d0)-N1/W6*(1.0d0/2.0d0*a*y1*cotB/rb**3*2*y3b+&
-       nu-y2**2/W6**2*W4*(y3b/rb+1.0d0)-1.0d0/2.0d0*y2**2/W6*a/rb**3*2*y3b)-N1*&
-       sinB*cotB/W7*W2+N1*z1b*cotB/W7**2*W2*W3+1.0d0/2.0d0*N1*z1b*cotB/W7*&
-       a/rb**3*2*y3b-a/rb**3*y1*cotB+3/2.0d0*a*y1*W8*cotB/rb**5*2*y3b+&
-       1.0d0/W6*(-2.0d0*nu+1.0d0/rb*(N1*y1*cotB-a)+y2**2/rb/W6*W5+a*y2**2/&
-       rb**3)-W8/W6**2*(-2.0d0*nu+1.0d0/rb*(N1*y1*cotB-a)+y2**2/rb/W6*W5+&
-       a*y2**2/rb**3)*(y3b/rb+1.0d0)+W8/W6*(-1.0d0/2.0d0/rb**3*(N1*y1*cotB-a)*&
-       2*y3b-1.0d0/2.0d0*y2**2/rb**3/W6*W5*2*y3b-y2**2/rb/W6**2*W5*(y3b/&
-       rb+1.0d0)-1.0d0/2.0d0*y2**2/rb2**2/W6*a*2*y3b-3.0d0/2.0d0*a*y2**2/rb**5*2*y3b)+&
+  v23 = b1/2.0d0*(one_quarter*(N1*(((N3)*cotB**2-nu)*(y3b/rb+1.0d0)/W6-((N3)*&
+       cotB**2+N1)*cosB*W3/W7)+N1/W6s*(y1*cotB*(1.0d0-W5)+nu*y3b-a+&
+       y2**2/W6*W4)*(y3b/rb+1.0d0)-N1/W6*(one_half*a*y1*cotB/rbc*2*y3b+&
+       nu-y2**2/W6s*W4*(y3b/rb+1.0d0)-one_half*y2**2/W6*a/rbc*2*y3b)-N1*&
+       sinB*cotB/W7*W2+N1*z1b*cotB/W7s*W2*W3+one_half*N1*z1b*cotB/W7*&
+       a/rbc*2*y3b-a/rbc*y1*cotB+3/2.0d0*a*y1*W8*cotB/rb**5*2*y3b+&
+       one_over_w6*(-N0+1.0d0/rb*(N1*y1*cotB-a)+y2**2/rb/W6*W5+a*y2**2/&
+       rbc)-W8/W6s*(-N0+1.0d0/rb*(N1*y1*cotB-a)+y2**2/rb/W6*W5+&
+       a*y2**2/rbc)*(y3b/rb+1.0d0)+W8/W6*(-one_half/rbc*(N1*y1*cotB-a)*&
+       2*y3b-one_half*y2**2/rbc/W6*W5*2*y3b-y2**2/rb/W6s*W5*(y3b/&
+       rb+1.0d0)-one_half*y2**2/rb2**2/W6*a*2*y3b-3.0d0/2.0d0*a*y2**2/rb**5*2*y3b)+&
        1.0d0/W7*(cosB**2-1.0d0/rb*(N1*z1b*cotB+a*cosB)+a*y3b*z1b*cotB/rb**&
-       3-1.0d0/rb/W7*(y2**2*cosB**2-a*z1b*cotB/rb*W1))-W8/W7**2*(cosB**2-&
-       1.0d0/rb*(N1*z1b*cotB+a*cosB)+a*y3b*z1b*cotB/rb**3-1.0d0/rb/W7*&
-       (y2**2*cosB**2-a*z1b*cotB/rb*W1))*W3+W8/W7*(1.0d0/2.0d0/rb**3*(N1*&
-       z1b*cotB+a*cosB)*2*y3b-1.0d0/rb*N1*sinB*cotB+a*z1b*cotB/rb**3+a*&
-       y3b*sinB*cotB/rb**3-3.0d0/2.0d0*a*y3b*z1b*cotB/rb**5*2*y3b+1.0d0/2.0d0/rb**&
-       3/W7*(y2**2*cosB**2-a*z1b*cotB/rb*W1)*2*y3b+1.0d0/rb/W7**2*(y2**&
+       3-1.0d0/rb/W7*(y2**2*cosB**2-a*z1b*cotB/rb*W1))-W8/W7s*(cosB**2-&
+       1.0d0/rb*(N1*z1b*cotB+a*cosB)+a*y3b*z1b*cotB/rbc-1.0d0/rb/W7*&
+       (y2**2*cosB**2-a*z1b*cotB/rb*W1))*W3+W8/W7*(one_half/rbc*(N1*&
+       z1b*cotB+a*cosB)*2*y3b-1.0d0/rb*N1*sinB*cotB+a*z1b*cotB/rbc+a*&
+       y3b*sinB*cotB/rbc-3.0d0/2.0d0*a*y3b*z1b*cotB/rb**5*2*y3b+one_half/rb**&
+       3/W7*(y2**2*cosB**2-a*z1b*cotB/rb*W1)*2*y3b+1.0d0/rb/W7s*(y2**&
        2*cosB**2-a*z1b*cotB/rb*W1)*W3-1.0d0/rb/W7*(-a*sinB*cotB/rb*W1+&
-       1.0d0/2.0d0*a*z1b*cotB/rb**3*W1*2*y3b-a*z1b*cotB/rb*(cosB*y3b/rb+&
-       1.0d0))))/pi/(1.0d0-nu))+&
-       b2/2.0d0*(1.0d0/4.0d0*((N3)*N1*rFib_ry3*cotB**2-N1*y2/W6**2*((W5-1.0d0)*cotB+&
-       y1/W6*W4)*(y3b/rb+1.0d0)+N1*y2/W6*(-1.0d0/2.0d0*a/rb**3*2*y3b*cotB-y1/&
-       W6**2*W4*(y3b/rb+1.0d0)-1.0d0/2.0d0*y1/W6*a/rb**3*2*y3b)+N1*y2*cotB/&
-       W7**2*W9*W3+1.0d0/2.0d0*N1*y2*cotB/W7*a/rb**3/cosB*2*y3b-a/rb**3*&
+       one_half*a*z1b*cotB/rbc*W1*2*y3b-a*z1b*cotB/rb*(cosB*y3b/rb+&
+       1.0d0))))/pi/(N4))+&
+       b2/2.0d0*(one_quarter*((N3)*N1*rFib_ry3*cotB**2-N1*y2/W6s*((W5-1.0d0)*cotB+&
+       y1/W6*W4)*(y3b/rb+1.0d0)+N1*y2/W6*(-one_half*a/rbc*2*y3b*cotB-y1/&
+       W6s*W4*(y3b/rb+1.0d0)-one_half*y1/W6*a/rbc*2*y3b)+N1*y2*cotB/&
+       W7s*W9*W3+one_half*N1*y2*cotB/W7*a/rbc/cosB*2*y3b-a/rbc*&
        y2*cotB+3/2.0d0*a*y2*W8*cotB/rb**5*2*y3b+y2/rb/W6*(N1*cotB-2.0d0*&
-       nu*y1/W6-a*y1/rb*(1.0d0/rb+1.0d0/W6))-1.0d0/2.0d0*y2*W8/rb**3/W6*(N1*&
-       cotB-2.0d0*nu*y1/W6-a*y1/rb*(1.0d0/rb+1.0d0/W6))*2*y3b-y2*W8/rb/W6**&
-       2*(N1*cotB-2.0d0*nu*y1/W6-a*y1/rb*(1.0d0/rb+1.0d0/W6))*(y3b/rb+1.0d0)+y2*&
-       W8/rb/W6*(2.0d0*nu*y1/W6**2*(y3b/rb+1.0d0)+1.0d0/2.0d0*a*y1/rb**3*(1.0d0/rb+&
-       1.0d0/W6)*2*y3b-a*y1/rb*(-1.0d0/2.0d0/rb**3*2*y3b-1.0d0/W6**2*(y3b/rb+&
+       nu*y1/W6-a*y1/rb*(1.0d0/rb+one_over_w6))-one_half*y2*W8/rbc/W6*(N1*&
+       cotB-N0*y1/W6-a*y1/rb*(1.0d0/rb+one_over_w6))*2*y3b-y2*W8/rb/W6**&
+       2*(N1*cotB-N0*y1/W6-a*y1/rb*(1.0d0/rb+one_over_w6))*(y3b/rb+1.0d0)+y2*&
+       W8/rb/W6*(N0*y1/W6s*(y3b/rb+1.0d0)+one_half*a*y1/rbc*(1.0d0/rb+&
+       one_over_w6)*2*y3b-a*y1/rb*(-one_half/rbc*2*y3b-one_over_W6_p2*(y3b/rb+&
        1.0d0)))+y2*cotB/rb/W7*((N2)*cosB+W1/W7*W9+a*y3b/rb2/cosB)-&
-       1/2.0d0*y2*W8*cotB/rb**3/W7*((N2)*cosB+W1/W7*W9+a*y3b/&
-       rb2/cosB)*2*y3b-y2*W8*cotB/rb/W7**2*((N2)*cosB+W1/W7*&
+       1/2.0d0*y2*W8*cotB/rbc/W7*((N2)*cosB+W1/W7*W9+a*y3b/&
+       rb2/cosB)*2*y3b-y2*W8*cotB/rb/W7s*((N2)*cosB+W1/W7*&
        W9+a*y3b/rb2/cosB)*W3+y2*W8*cotB/rb/W7*((cosB*y3b/rb+1.0d0)/&
-       W7*W9-W1/W7**2*W9*W3-1.0d0/2.0d0*W1/W7*a/rb**3/cosB*2*y3b+a/rb2/&
-       cosB-a*y3b/rb2**2/cosB*2*y3b))/pi/(1.0d0-nu))+&
-       b3/2.0d0*(1.0d0/4.0d0*(N1*(-sinB*W3/W7+y1/W6**2*(1.0d0+a/rb)*(y3b/rb+1.0d0)+&
-       1.0d0/2.0d0*y1/W6*a/rb**3*2*y3b+sinB/W7*W2-z1b/W7**2*W2*W3-1.0d0/2.0d0*&
-       z1b/W7*a/rb**3*2*y3b)+y1/rb*(a/rb2+1.0d0/W6)-1.0d0/2.0d0*y1*W8/rb**&
-       3*(a/rb2+1.0d0/W6)*2*y3b+y1*W8/rb*(-a/rb2**2*2*y3b-1.0d0/W6**2*&
+       W7*W9-w1_over_w7s*W9*W3-one_half*W1/W7*a/rbc/cosB*2*y3b+a/rb2/&
+       cosB-a*y3b/rb2**2/cosB*2*y3b))/pi/(N4))+&
+       b3/2.0d0*(one_quarter*(N1*(-sinB*W3/W7+y1/W6s*(1.0d0+a/rb)*(y3b/rb+1.0d0)+&
+       one_half*y1/W6*a/rbc*2*y3b+sinB/W7*W2-z1b/W7s*W2*W3-one_half*&
+       z1b/W7*a/rbc*2*y3b)+y1/rb*(a/rb2+one_over_w6)-one_half*y1*W8/rb**&
+       3*(a/rb2+one_over_w6)*2*y3b+y1*W8/rb*(-a/rb2**2*2*y3b-one_over_W6_p2*&
        (y3b/rb+1.0d0))-1.0d0/W7*(sinB*(cosB-a/rb)+z1b/rb*(1.0d0+a*y3b/rb2)-1.0d0/&
-       rb/W7*(y2**2*cosB*sinB-a*z1b/rb*W1))+W8/W7**2*(sinB*(cosB-&
+       rb/W7*(y2**2*cosB*sinB-a*z1b/rb*W1))+W8/W7s*(sinB*(cosB-&
        a/rb)+z1b/rb*(1.0d0+a*y3b/rb2)-1.0d0/rb/W7*(y2**2*cosB*sinB-a*z1b/&
-       rb*W1))*W3-W8/W7*(1.0d0/2.0d0*sinB*a/rb**3*2*y3b+sinB/rb*(1.0d0+a*y3b/&
-       rb2)-1.0d0/2.0d0*z1b/rb**3*(1.0d0+a*y3b/rb2)*2*y3b+z1b/rb*(a/rb2-a*&
-       y3b/rb2**2*2*y3b)+1.0d0/2.0d0/rb**3/W7*(y2**2*cosB*sinB-a*z1b/rb*&
-       W1)*2*y3b+1.0d0/rb/W7**2*(y2**2*cosB*sinB-a*z1b/rb*W1)*W3-1.0d0/&
-       rb/W7*(-a*sinB/rb*W1+1.0d0/2.0d0*a*z1b/rb**3*W1*2*y3b-a*z1b/rb*&
-       (cosB*y3b/rb+1.0d0))))/pi/(1.0d0-nu))+&
-       b1/2.0d0*(1.0d0/4.0d0*((N3)*(N1*rFib_ry2*cotB+1.0d0/W6*W5-y2**2/W6**2*W5/&
-       rb-y2**2/W6*a/rb**3-cosB/W7*W2+y2**2*cosB/W7**2*W2/rb+y2**2*&
-       cosB/W7*a/rb**3)+W8/rb*(2.0d0*nu/W6+a/rb2)-y2**2*W8/rb**3*(2.0d0*&
-       nu/W6+a/rb2)+y2*W8/rb*(-2.0d0*nu/W6**2/rb*y2-2.0d0*a/rb2**2*y2)+&
+       rb*W1))*W3-W8/W7*(one_half*sinB*a/rbc*2*y3b+sinB/rb*(1.0d0+a*y3b/&
+       rb2)-one_half*z1b/rbc*(1.0d0+a*y3b/rb2)*2*y3b+z1b/rb*(a/rb2-a*&
+       y3b/rb2**2*2*y3b)+one_half/rbc/W7*(y2**2*cosB*sinB-a*z1b/rb*&
+       W1)*2*y3b+1.0d0/rb/W7s*(y2**2*cosB*sinB-a*z1b/rb*W1)*W3-1.0d0/&
+       rb/W7*(-a*sinB/rb*W1+one_half*a*z1b/rbc*W1*2*y3b-a*z1b/rb*&
+       (cosB*y3b/rb+1.0d0))))/pi/(N4))+&
+       b1/2.0d0*(one_quarter*((N3)*(N1*rFib_ry2*cotB+one_over_w6*W5-y2**2/W6s*W5/&
+       rb-y2**2/W6*a/rbc-cosB/W7*W2+y2**2*cosB/W7s*W2/rb+y2**2*&
+       cosB/W7*a/rbc)+W8/rb*(N0/W6+a/rb2)-y2**2*W8/rbc*(2.0d0*&
+       nu/W6+a/rb2)+y2*W8/rb*(-N0/W6s/rb*y2-2.0d0*a/rb2**2*y2)+&
        W8*cosB/rb/W7*(N1-W1/W7*W2-a*y3b/rb2)-y2**2*W8*cosB/&
-       rb**3/W7*(N1-W1/W7*W2-a*y3b/rb2)-y2**2*W8*cosB/rb2/W7**&
+       rbc/W7*(N1-W1/W7*W2-a*y3b/rb2)-y2**2*W8*cosB/rb2/W7**&
        2*(N1-W1/W7*W2-a*y3b/rb2)+y2*W8*cosB/rb/W7*(-1.0d0/rb*&
-       cosB*y2/W7*W2+W1/W7**2*W2/rb*y2+W1/W7*a/rb**3*y2+2*a*&
-       y3b/rb2**2*y2))/pi/(1.0d0-nu))+&
-       b2/2.0d0*(1.0d0/4.0d0*((N2)*N1*cotB*(1.0d0/rb*y2/W6-cosB/rb*y2/W7)+(2.0d0-&
-       2.0d0*nu)*y1/W6**2*W5/rb*y2+(N3)*y1/W6*a/rb**3*y2-(2.0d0-2.0d0*&
-       nu)*z1b/W7**2*W2/rb*y2-(N3)*z1b/W7*a/rb**3*y2-W8/rb**&
-       3*(N1*cotB-2.0d0*nu*y1/W6-a*y1/rb2)*y2+W8/rb*(2.0d0*nu*y1/W6**2/&
-       rb*y2+2*a*y1/rb2**2*y2)+W8/W7**2*(cosB*sinB+W1*cotB/rb*((2.0d0-&
-       2.0d0*nu)*cosB-W1/W7)+a/rb*(sinB-y3b*z1b/rb2-z1b*W1/rb/W7))/&
-       rb*y2-W8/W7*(1.0d0/rb2*cosB*y2*cotB*((N3)*cosB-W1/W7)-W1*&
-       cotB/rb**3*((N3)*cosB-W1/W7)*y2+W1*cotB/rb*(-cosB/rb*&
-       y2/W7+W1/W7**2/rb*y2)-a/rb**3*(sinB-y3b*z1b/rb2-z1b*W1/&
+       cosB*y2/W7*W2+w1_over_w7s*W2/rb*y2+W1/W7*a/rbc*y2+2*a*&
+       y3b/rb2**2*y2))/pi/(N4))+&
+       b2/2.0d0*(one_quarter*((N2)*N1*cotB*(1.0d0/rb*y2/W6-cosB/rb*y2/W7)+(2.0d0-&
+       N0)*y1/W6s*W5/rb*y2+(N3)*y1/W6*a/rbc*y2-(2.0d0-2.0d0*&
+       nu)*z1b/W7s*W2/rb*y2-(N3)*z1b/W7*a/rbc*y2-W8/rb**&
+       3*(N1*cotB-N0*y1/W6-a*y1/rb2)*y2+W8/rb*(N0*y1/W6s/&
+       rb*y2+2*a*y1/rb2**2*y2)+W8/W7s*(cosB*sinB+W1*cotB/rb*((2.0d0-&
+       N0)*cosB-W1/W7)+a/rb*(sinB-y3b*z1b/rb2-z1b*W1/rb/W7))/&
+       rb*y2-W8/W7*(one_over_rb2*cosB*y2*cotB*((N3)*cosB-W1/W7)-W1*&
+       cotB/rbc*((N3)*cosB-W1/W7)*y2+W1*cotB/rb*(-cosB/rb*&
+       y2/W7+w1_over_w7s/rb*y2)-a/rbc*(sinB-y3b*z1b/rb2-z1b*W1/&
        rb/W7)*y2+a/rb*(2.0d0*y3b*z1b/rb2**2*y2-z1b/rb2*cosB*y2/W7+&
-       z1b*W1/rb**3/W7*y2+z1b*W1/rb2/W7**2*y2)))/pi/(1.0d0-nu))+&
-       b3/2.0d0*(1.0d0/4.0d0*((N3)*rFib_ry2+(N3)*sinB/W7*W2-(N3)*y2**2*&
-       sinB/W7**2*W2/rb-(N3)*y2**2*sinB/W7*a/rb**3+W8*sinB/rb/&
-       W7*(1.0d0+W1/W7*W2+a*y3b/rb2)-y2**2*W8*sinB/rb**3/W7*(1.0d0+W1/&
-       W7*W2+a*y3b/rb2)-y2**2*W8*sinB/rb2/W7**2*(1.0d0+W1/W7*W2+a*&
-       y3b/rb2)+y2*W8*sinB/rb/W7*(1.0d0/rb*cosB*y2/W7*W2-W1/W7**2*&
-       W2/rb*y2-W1/W7*a/rb**3*y2-2.0d0*a*y3b/rb2**2*y2))/pi/(1.0d0-nu));
+       z1b*W1/rbc/W7*y2+z1b*W1/rb2/W7s*y2)))/pi/(N4))+&
+       b3/2.0d0*(one_quarter*((N3)*rFib_ry2+(N3)*sinB/W7*W2-(N3)*y2**2*&
+       sinB/W7s*W2/rb-(N3)*y2**2*sinB/W7*a/rbc+W8*sinB/rb/&
+       W7*(1.0d0+W1/W7*W2+a*y3b/rb2)-y2**2*W8*sinB/rbc/W7*(1.0d0+W1/&
+       W7*W2+a*y3b/rb2)-y2**2*W8*sinB/rb2/W7s*(1.0d0+W1/W7*W2+a*&
+       y3b/rb2)+y2*W8*sinB/rb/W7*(1.0d0/rb*cosB*y2/W7*W2-w1_over_w7s*&
+       W2/rb*y2-W1/W7*a/rbc*y2-2.0d0*a*y3b/rb2**2*y2))/pi/(N4));
 
 end subroutine AngDisStrainFSC
