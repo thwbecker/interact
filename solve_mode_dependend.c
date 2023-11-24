@@ -436,7 +436,7 @@ void add_quake_stress_4(my_boolean *sma,COMP_PRECISION *slip,
 #endif
 #endif
       /* compute the effect of slip of r_flt on fault[i] and add to it's stress fault[i].s */
-      eval_green_and_project_to_fault(fault,i,r_flt,slip,fault[i].s);
+      eval_green_and_project_stress_to_fault(fault,i,r_flt,slip,fault[i].s);
     }
 #else
     for(j=0;j < 3;j++){/* loop through all 

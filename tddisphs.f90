@@ -109,7 +109,8 @@
 ! displacement conversion
 !
 ! loc is location vector, X,Y,Z
-! u is displacement vector, East, North, Vertical 
+! u is displacement vector, East, North, Vertical
+!
 subroutine  tddisphs(loc,P1,P2,P3,Ss,Ds,Ts,nu,u)
   implicit none
   C_PREC, PARAMETER :: pi = 3.14159265358979D0
@@ -158,7 +159,8 @@ subroutine TDdispFS(X,Y,Z,P1,P2,P3,Ss,Ds,Ts,nu,ue,un,uv)
   C_PREC,intent(in) :: x,y,z,ss,ds,ts,nu
   C_PREC,intent(in),dimension(3) :: p1,p2,p3
   C_PREC,intent(out) :: ue,un,uv
-  C_PREC, PARAMETER :: pi = 3.14159265358979D0
+  C_PREC, PARAMETER :: pi = 3.14159265358979D0,&
+       one_over_four_pi = 1.0d0/(4.0d0*pi)
   
   C_PREC,dimension(3) :: p1_,p2_,p3_,e12,e13,e23,a,b,c
   C_PREC :: bx,by,bz,x_,y_,z_,fin,fid,fi,aA,aB,aC,na,nb,nc,u,v,w,&
@@ -234,7 +236,7 @@ subroutine TDdispFS(X,Y,Z,P1,P2,P3,Ss,Ds,Ts,nu,ue,un,uv)
  !print *,'fi',fin,fid
  !print *,'b',bx,by,bz
  !print *,'u',u,v,w
- Fi = -2.d0*atan2(FiN,FiD)/4.d0/pi;
+ Fi = -2.d0*atan2(FiN,FiD)*one_over_four_pi
 
  ! Calculate the complete displacement vector components in TDCS
  u = bx*Fi+u;
@@ -457,7 +459,7 @@ SUBROUTINE Angdisdisp(x, y, z, alpha, bx, by, bz, nu, & ! inputs
 
   C_PREC :: cosA, eta, r, sinA, ux, uy, uz, vx, vy, vz, wx, wy, wz, zz, zeta
 
-  C_PREC :: rmzeta,log_rmzeta,N1,N2,N3,rmzz,log_rmzz,xs,  one_over_r_rmzeta 
+  C_PREC :: rmzeta,log_rmzeta,N1,N2,N3,rmzz,log_rmzz,xs,  one_over_r_rmzeta,ys
   
   !cosA = cos(alpha);
   !sinA = sin(alpha);
@@ -469,8 +471,9 @@ SUBROUTINE Angdisdisp(x, y, z, alpha, bx, by, bz, nu, & ! inputs
   eta =  y * cosA - z * sinA
   zeta = y * sinA + z * cosA
   xs = x**2
-  
-  r = SQRT(xs + y**2 + z**2)
+  ys = y**2
+
+  r = SQRT(xs + ys + z**2)
 
   !% Avoid complex results for the logarithmic terms
   !zeta(zeta>r) = r(zeta>r);
@@ -495,7 +498,7 @@ SUBROUTINE Angdisdisp(x, y, z, alpha, bx, by, bz, nu, & ! inputs
  
   ux = bx*one_over_eight_pi/(N1) * (x*y/r/(rmzz)-x*eta*one_over_r_rmzeta)
   vx = bx*one_over_eight_pi/(N1) * (eta*sinA/(rmzeta)-y*eta*one_over_r_rmzeta + &
-       & y**2/r/(rmzz) + (N2) * (cosA*log_rmzeta-log_rmzz))
+       & ys/r/(rmzz) + (N2) * (cosA*log_rmzeta-log_rmzz))
   wx = bx*one_over_eight_pi/(N1) * (eta*cosA/(rmzeta)-y/r-eta*zz*one_over_r_rmzeta- &
        & (N2) * sinA * log_rmzeta);
 

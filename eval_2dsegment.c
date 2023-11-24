@@ -41,7 +41,7 @@ void eval_2dsegment_plane_strain(COMP_PRECISION *x,
 				 COMP_PRECISION *disp,
 				 COMP_PRECISION *u_global, 
 				 COMP_PRECISION sm_global[3][3],
-				 int *iret)
+				 int *iret, MODE_TYPE mode)
 {
   COMP_PRECISION u[3],x_local[3],dx[3],sm_local[3][3],f2,f3,f4,f5,f6,f7,
     c1,c12,c2,c22,c3,c32,c4,c42,y2;
@@ -85,7 +85,7 @@ void eval_2dsegment_plane_strain(COMP_PRECISION *x,
 	    x_local[INT_X],x_local[INT_Y],corners[0][INT_X],corners[0][INT_Y],
 	    corners[1][INT_X],corners[1][INT_Y]);
 #endif
-    set_stress_and_disp_nan(sm_global,u_global);
+    set_stress_and_disp_nan(sm_global,u_global,mode);
   }else{
     // get f factors
     get_2dseg_ffac(&f2,&f3,&f4,&f5,&f6,&f7,c1,c2,c12,c22,c3,c4,
@@ -107,12 +107,16 @@ void eval_2dsegment_plane_strain(COMP_PRECISION *x,
        takes the first three components of u, ie. u_x u_y u_z
 
     */
-    rotate_vec2d(u,u_global,fault->cos_alpha,-fault->sin_alpha);
-    u_global[INT_Z] = 0.0;
-    /* 
-       rotate stress matrix back into global field 
-    */
-    rotate_mat_z(sm_local,sm_global,fault->cos_alpha,-fault->sin_alpha);
+    if(mode != GC_STRESS_ONLY){
+      rotate_vec2d(u,u_global,fault->cos_alpha,-fault->sin_alpha);
+      u_global[INT_Z] = 0.0;
+    }
+    if(mode != GC_DISP_ONLY){
+      /* 
+	 rotate stress matrix back into global field 
+      */
+      rotate_mat_z(sm_local,sm_global,fault->cos_alpha,-fault->sin_alpha);
+    }
   }
 }
 //
@@ -122,7 +126,8 @@ void eval_2dsegment_plane_strain(COMP_PRECISION *x,
 void eval_2dsegment_plane_stress(COMP_PRECISION *x,struct flt *fault,
 				 COMP_PRECISION *disp,
 				 COMP_PRECISION *u_global, 
-				 COMP_PRECISION sm_global[3][3],int *iret)
+				 COMP_PRECISION sm_global[3][3],int *iret,
+				 MODE_TYPE mode)
 {  
   COMP_PRECISION u[3],x_local[3],dx[3],sm_local[3][3],f2,f3,f4,f5,f6,f7,
     c1,c12,c2,c22,c3,c32,c4,c42,y2;
@@ -153,20 +158,25 @@ void eval_2dsegment_plane_stress(COMP_PRECISION *x,struct flt *fault,
 	    x_local[INT_X],x_local[INT_Y],corners[0][INT_X],corners[0][INT_Y],
 	    corners[1][INT_X],corners[1][INT_Y]);
 #endif
-    set_stress_and_disp_nan(sm_global,u_global);
+    set_stress_and_disp_nan(sm_global,u_global,mode);
   }else{
     get_2dseg_ffac(&f2,&f3,&f4,&f5,&f6,&f7,c1,c2,c12,c22,
 		   c3,c4,c32,c42,pfac1,y2,x_local);
     get_2dseg_disp(u,disp,x_local,f2,f3,f4,f5,pfac2,pfac3);
     get_2dseg_stress(sm_local,disp,x_local,f4,f5,f6,f7);
     // no shear stresses with z 
-    sm_local[INT_X][INT_Z] = sm_local[INT_Z][INT_X] = sm_local[INT_Z][INT_Y] = sm_local[INT_Y][INT_Z] = 0.0;
+    sm_local[INT_X][INT_Z] = sm_local[INT_Z][INT_X] =
+      sm_local[INT_Z][INT_Y] = sm_local[INT_Y][INT_Z] = 0.0;
     sm_local[INT_Z][INT_Z] = 0.0;
-    rotate_vec2d(u,u_global,fault->cos_alpha,-fault->sin_alpha);
-    rotate_mat_z(sm_local,sm_global,fault->cos_alpha,-fault->sin_alpha);
-    // u_z is undefined without plate thickness, but we shall volunteer
-    // e_zz = - pfac5 (s_xx + s_yy) instead
-    u_global[INT_Z] = -pfac5 * (sm_global[INT_X][INT_X] + sm_global[INT_Y][INT_Y]);
+    if(mode != GC_STRESS_ONLY)
+      rotate_vec2d(u,u_global,fault->cos_alpha,-fault->sin_alpha);
+    if(mode != GC_DISP_ONLY){
+      rotate_mat_z(sm_local,sm_global,fault->cos_alpha,-fault->sin_alpha);
+      // u_z is undefined without plate thickness, but we shall volunteer
+      // e_zz = - pfac5 (s_xx + s_yy) instead
+      if(mode != GC_STRESS_ONLY)
+	u_global[INT_Z] = -pfac5 * (sm_global[INT_X][INT_X] + sm_global[INT_Y][INT_Y]);
+    }
   }
 
 }
@@ -215,7 +225,7 @@ void eval_2dsegment_plane_strain_basic(COMP_PRECISION *x,
 	    x[INT_X],x[INT_Y],corners[0][INT_X],corners[0][INT_Y],
 	    corners[1][INT_X],corners[1][INT_Y]);
 #endif
-    set_stress_and_disp_nan(sm_global,u_global);
+    set_stress_and_disp_nan(sm_global,u_global,GC_DISP_AND_STRESS);
   }else{
     get_2dseg_ffac(&f2,&f3,&f4,&f5,&f6,&f7,c1,c2,c12,c22,c3,c4,
 		   c32,c42,pfac1,y2,x);
@@ -266,7 +276,7 @@ void eval_2dsegment_plane_stress_basic(COMP_PRECISION *x,
 	    x[INT_X],x[INT_Y],corners[0][INT_X],corners[0][INT_Y],corners[1][INT_X],
 	    corners[1][INT_Y]);
 #endif
-   set_stress_and_disp_nan(sm_global,u_global);
+    set_stress_and_disp_nan(sm_global,u_global,GC_DISP_AND_STRESS);
   }else{
     get_2dseg_ffac(&f2,&f3,&f4,&f5,&f6,&f7,c1,c2,c12,c22,
 		   c3,c4,c32,c42,pfac1,y2,x);
@@ -408,7 +418,7 @@ void eval_2dsegment_plane_strain_tdd(COMP_PRECISION *x,
 				     COMP_PRECISION *disp,
 				     COMP_PRECISION *u_global, 
 				     COMP_PRECISION sm_global[3][3],
-				     int ihalf,int *iret)
+				     int ihalf,int *iret, MODE_TYPE mode)
 {
   static my_boolean init=FALSE;
   static COMP_PRECISION pr,pr1,pr2,con,cons,chi;
@@ -423,7 +433,7 @@ void eval_2dsegment_plane_strain_tdd(COMP_PRECISION *x,
     init = TRUE;
   }
   if((ihalf)&&(x[INT_Y] > 0)){	/* half-plane in air */
-    set_stress_and_disp_nan(sm_global,u_global);
+    set_stress_and_disp_nan(sm_global,u_global,mode);
   }else{
     tdd_coeff((x+INT_X),(x+INT_Y),&fault->x[INT_X],&fault->x[INT_Y],
 	      &fault->l,&fault->cos_alpha,&fault->sin_alpha,
@@ -432,25 +442,29 @@ void eval_2dsegment_plane_strain_tdd(COMP_PRECISION *x,
 	      (sxy+STRIKE),(sxy+NORMAL),(ux+STRIKE), (ux+NORMAL),
 	      (uy+STRIKE),(uy+NORMAL),iret);
     if(!(*iret)){
-      /* add up contribution from strike and normal motion */
-      u_global[INT_X] = ux[STRIKE] * disp[STRIKE] - 
-	ux[NORMAL] * disp[NORMAL];
-      u_global[INT_Y] = uy[STRIKE] * disp[STRIKE] -
-	uy[NORMAL] * disp[NORMAL];
-      u_global[INT_Z] = 0.0;
-      /* stresses */
-      sm_global[INT_X][INT_X] = sxx[STRIKE] * disp[STRIKE] -
-	sxx[NORMAL] * disp[NORMAL];
-      sm_global[INT_Y][INT_X] = sm_global[INT_X][INT_Y] = 
-	sxy[STRIKE] * disp[STRIKE] -
-	sxy[NORMAL] * disp[NORMAL];
-      sm_global[INT_Y][INT_Y] = syy[STRIKE] * disp[STRIKE] -
-	syy[NORMAL] * disp[NORMAL];
-      sm_global[INT_X][INT_Z] = sm_global[INT_Z][INT_X] = sm_global[INT_Z][INT_Y] = 
-	sm_global[INT_Y][INT_Z] = 0.0;
-      sm_global[INT_Z][INT_Z] = pr * (sm_global[INT_X][INT_X] + sm_global[INT_Y][INT_Y]);
+      if(mode != GC_STRESS_ONLY){
+	/* add up contribution from strike and normal motion */
+	u_global[INT_X] = ux[STRIKE] * disp[STRIKE] - 
+	  ux[NORMAL] * disp[NORMAL];
+	u_global[INT_Y] = uy[STRIKE] * disp[STRIKE] -
+	  uy[NORMAL] * disp[NORMAL];
+	u_global[INT_Z] = 0.0;
+      }
+      if(mode != GC_DISP_ONLY){
+	/* stresses */
+	sm_global[INT_X][INT_X] = sxx[STRIKE] * disp[STRIKE] -
+	  sxx[NORMAL] * disp[NORMAL];
+	sm_global[INT_Y][INT_X] = sm_global[INT_X][INT_Y] = 
+	  sxy[STRIKE] * disp[STRIKE] -
+	  sxy[NORMAL] * disp[NORMAL];
+	sm_global[INT_Y][INT_Y] = syy[STRIKE] * disp[STRIKE] -
+	  syy[NORMAL] * disp[NORMAL];
+	sm_global[INT_X][INT_Z] = sm_global[INT_Z][INT_X] = sm_global[INT_Z][INT_Y] = 
+	  sm_global[INT_Y][INT_Z] = 0.0;
+	sm_global[INT_Z][INT_Z] = pr * (sm_global[INT_X][INT_X] + sm_global[INT_Y][INT_Y]);
+      }
     }else{
-      set_stress_and_disp_nan(sm_global,u_global);
+      set_stress_and_disp_nan(sm_global,u_global,mode);
     }
   }
 }

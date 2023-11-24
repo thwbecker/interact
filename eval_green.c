@@ -21,13 +21,15 @@
    
 */
 
-void eval_green_and_project_to_fault(struct flt *fault, int ireceive, int islip, COMP_PRECISION *slip,COMP_PRECISION *s)
+void eval_green_and_project_stress_to_fault(struct flt *fault, int ireceive,
+					    int islip, COMP_PRECISION *slip,
+					    COMP_PRECISION *s)
 {
   int iret;
-  COMP_PRECISION trac[3],u[3],sm[3][3];
+  COMP_PRECISION trac[3],sm[3][3];
   /* evaluate the greens function for slipping fault islip at receiver
      location centroids of fault ireceive */
-  eval_green(fault[ireceive].x,(fault+islip),slip,u,sm,&iret);
+  eval_green(fault[ireceive].x,(fault+islip),slip,NULL,sm,&iret,GC_STRESS_ONLY);
   if(!iret){
     /* project the stresses */
     resolve_force(fault[ireceive].normal,sm,trac); /* convert to local
@@ -65,35 +67,34 @@ void eval_green_and_project_to_fault(struct flt *fault, int ireceive, int islip,
 
 void eval_green(COMP_PRECISION *x,struct flt *fault,
 		COMP_PRECISION *disp,COMP_PRECISION *u_global, 
-		COMP_PRECISION sm_global[3][3],int *iret)
+		COMP_PRECISION sm_global[3][3],int *iret,
+		MODE_TYPE mode)	/* mode type only for triangular */
 {
 #ifdef ALLOW_NON_3DQUAD_GEOM
   switch(fault->type){
   case POINT_SOURCE:{
-    eval_point(x,fault,disp,u_global,sm_global,iret);
+    eval_point(x,fault,disp,u_global,sm_global,iret,mode);
     break;
   }
   case TRIANGULAR:{
-    eval_triangle(x,fault,disp,u_global,sm_global,iret);
+    eval_triangle(x,fault,disp,u_global,sm_global,iret,mode);
     break;
   }
   case RECTANGULAR_PATCH:{
-    eval_rectangle(x,fault,disp,u_global,sm_global,iret);
+    eval_rectangle(x,fault,disp,u_global,sm_global,iret,mode);
     break;
   }
   case TWO_DIM_SEGMENT_PLANE_STRAIN:{
-    eval_2dsegment_plane_strain(x,fault,disp,u_global,sm_global,iret);
-    //eval_2dsegment_plane_strain_tdd(x,fault,disp,u_global,sm_global, 
-    //0,iret); 
+    eval_2dsegment_plane_strain(x,fault,disp,u_global,sm_global,iret,mode);
     break;
   }
   case TWO_DIM_SEGMENT_PLANE_STRESS:{
-    eval_2dsegment_plane_stress(x,fault,disp,u_global,sm_global,iret);
+    eval_2dsegment_plane_stress(x,fault,disp,u_global,sm_global,iret,mode);
     break;
   }
   case TWO_DIM_HALFPLANE_PLANE_STRAIN:{
-    eval_2dsegment_plane_strain_tdd(x,fault,disp,u_global,sm_global, 
-     				    1,iret); 
+    eval_2dsegment_plane_strain_tdd(x,fault,disp,u_global,sm_global, 1,iret,
+				    mode); 
     break;
   }
   default:{
@@ -102,12 +103,14 @@ void eval_green(COMP_PRECISION *x,struct flt *fault,
     exit(-1);
   }}
 #else
-  eval_rectangle(x,fault,disp,u_global,sm_global,iret);
+  eval_rectangle(x,fault,disp,u_global,sm_global,iret,mode);
 #endif
 }
 /* 
    same as above but assume that the faults coordinates
    are in the origin (x: 0, y: 0) and the strike is 0 
+
+   will compute both stress and diaplacement
 
 */
 void eval_green_basic(COMP_PRECISION *x,struct flt *fault,
@@ -115,6 +118,7 @@ void eval_green_basic(COMP_PRECISION *x,struct flt *fault,
 		      COMP_PRECISION *u_global, 
 		      COMP_PRECISION sm_global[3][3],int *iret)
 {
+  
 #ifdef DEBUG
   if((fault->strike != 90)||(norm(fault->x,2) > EPS_COMP_PREC)){
     fprintf(stderr,"eval_green_basic: fault should have strike=90 and be at origin\n");
@@ -150,6 +154,6 @@ void eval_green_basic(COMP_PRECISION *x,struct flt *fault,
     exit(-1);
   }}
 #else
-  eval_rectangle(x,fault,disp,u_global,sm_global,iret);
+  eval_rectangle(x,fault,disp,u_global,sm_global,iret,GC_DISP_AND_STRESS);
 #endif
 }

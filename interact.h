@@ -257,6 +257,11 @@ singular value will be set to zero
 #define INT_ZX 2
 #define INT_ZY 5
 
+/* for green's functions */
+#define GC_DISP_AND_STRESS 0 
+#define GC_DISP_ONLY 1 
+#define GC_STRESS_ONLY 2
+
 
 
 

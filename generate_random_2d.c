@@ -127,7 +127,7 @@ int main(int argc, char **argv)
 	   sum over faults 
 	*/
 	/* get contribution from fault k */
-	eval_2dsegment_plane_strain(x,(fault+k),fault[k].u,ul,sl,&err);
+	eval_2dsegment_plane_strain(x,(fault+k),fault[k].u,ul,sl,&err,GC_DISP_AND_STRESS);
 	if(!err){
 	  /* non-infinite, add only three components */
 	  s[INT_X][INT_X] += sl[INT_X][INT_X];

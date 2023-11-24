@@ -75,7 +75,7 @@ int main(int argc, char **argv)
 	      get_right_slip(disp,k,1.0);
 	    else
 	      get_right_slip(disp,DIP,1.0);
-	    eval_rectangle(x,(fault+j),disp,u,sm,&iret);
+	    eval_rectangle(x,(fault+j),disp,u,sm,&iret, GC_DISP_AND_STRESS);
 	    fprintf(stdout,"%g ",u[l]);
 	  }
 	}
@@ -125,7 +125,7 @@ void calc_design_matrix(struct med *medium,struct flt *fault,int disp_dim, int s
 	  get_right_slip(disp,k,1.0);
 	else
 	  get_right_slip(disp,DIP,1.0);
-	eval_rectangle(x,(fault+j),disp,u,sm,&iret);
+	eval_rectangle(x,(fault+j),disp,u,sm,&iret,GC_DISP_AND_STRESS);
 	for(l=0;l<disp_dim;l++){
 	  medium->val[((i*disp_dim)+l)*nmod + j*slip_modes +k] = u[l];
 	}

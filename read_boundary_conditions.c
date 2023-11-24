@@ -1157,7 +1157,7 @@ void read_one_step_bc(FILE *in,struct med *medium,struct flt *fault,
 	for(j=j3=0;j <  medium->nrflt;j++,j3+=3){ /* j = receiving,
 						    loop through
 						    all */
-	  eval_green_and_project_to_fault(fault,j,i, fault[i].u,(fstress+j3));
+	  eval_green_and_project_stress_to_fault(fault,j,i, fault[i].u,(fstress+j3));
 	}
       }
     }
@@ -1317,10 +1317,10 @@ void read_one_step_bc(FILE *in,struct med *medium,struct flt *fault,
     HEADNODE{
       if(medium->nreq_con + medium->nreq > 0){
 	fprintf(stderr,
-		"read_boundary_conditions: total of %i constrained and %i unconstrained equations\n",
+		"read_boundary_conditions: total of %5i constrained and %5i unconstrained equations\n",
 		medium->nreq_con,medium->nreq);
 	fprintf(stderr,
-		"read_boundary_conditions: with     %i constrained and %i unconstrained faults\n",
+		"read_boundary_conditions: with     %5i constrained and %5i unconstrained faults, done with BCs.\n",
 		medium->naflt_con,medium->naflt);
       }
     }

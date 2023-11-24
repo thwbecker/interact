@@ -122,26 +122,27 @@ void calc_eigensystem_sym3d(double *, double *, double *, unsigned char);
 void calc_eigensystem_sym2d(double *, double *, double *, unsigned char);
 void eispack_driver(double *, int, int, double *, double *, double *, double *, int);
 /* eval_2dsegment.c */
-void eval_2dsegment_plane_strain(double *, struct flt *, double *, double *, double [3][3], int *);
-void eval_2dsegment_plane_stress(double *, struct flt *, double *, double *, double [3][3], int *);
+void eval_2dsegment_plane_strain(double *, struct flt *, double *, double *, double [3][3], int *, unsigned char);
+void eval_2dsegment_plane_stress(double *, struct flt *, double *, double *, double [3][3], int *, unsigned char);
 void eval_2dsegment_plane_strain_basic(double *, struct flt *, double *, double *, double [3][3], int *);
 void eval_2dsegment_plane_stress_basic(double *, struct flt *, double *, double *, double [3][3], int *);
 void get_2dseg_geo(double *, double, double *, double *, double *, double *, double *, double *, double *, double *, double *, int *);
 void get_2dseg_ffac(double *, double *, double *, double *, double *, double *, double, double, double, double, double, double, double, double, double, double, double *);
 void get_2dseg_disp(double *, double *, double *, double, double, double, double, double, double);
 void get_2dseg_stress(double [3][3], double *, double *, double, double, double, double);
-void eval_2dsegment_plane_strain_tdd(double *, struct flt *, double *, double *, double [3][3], int, int *);
+void eval_2dsegment_plane_strain_tdd(double *, struct flt *, double *, double *, double [3][3], int, int *, unsigned char);
 /* eval_green.c */
-void eval_green(double *, struct flt *, double *, double *, double [3][3], int *);
+void eval_green_and_project_stress_to_fault(struct flt *, int, int, double *, double *);
+void eval_green(double *, struct flt *, double *, double *, double [3][3], int *, unsigned char);
 void eval_green_basic(double *, struct flt *, double *, double *, double [3][3], int *);
 /* eval_okada.c */
-void eval_rectangle(double *, struct flt *, double *, double *, double [3][3], int *);
+void eval_rectangle(double *, struct flt *, double *, double *, double [3][3], int *, unsigned char);
 void eval_rectangle_basic(double *, double, double, double, double, double *, double *, double [3][3], int *);
-void eval_point(double *, struct flt *, double *, double *, double [3][3], int *);
-void eval_point_short(double *, double *, double, double, double, double, double *, double *, double [3][3], int *);
-void set_stress_and_disp_nan(double [3][3], double *);
+void eval_point(double *, struct flt *, double *, double *, double [3][3], int *, unsigned char);
+void eval_point_short(double *, double *, double, double, double, double, double *, double *, double [3][3], int *, unsigned char);
+void set_stress_and_disp_nan(double [3][3], double *, unsigned char);
 /* eval_triangle.c */
-void eval_triangle(double *, struct flt *, double *, double *, double [3][3], int *);
+void eval_triangle(double *, struct flt *, double *, double *, double [3][3], int *, unsigned char);
 /* eval_triangle_gauss.c */
 void eval_triangle_gauss(double *, struct flt *, double *, double *, double [3][3], int *);
 void get_gauss_points(double *, double *, double *, int);
@@ -517,4 +518,3 @@ void calculate_polar_base(double, double, double *);
 /* tritri.c */
 int coplanar_tri_tri(float [3], float [3], float [3], float [3], float [3], float [3], float [3]);
 int tri_tri_intersect(float [3], float [3], float [3], float [3], float [3], float [3]);
-void eval_green_and_project_to_fault(struct flt *, int , int , double *,double *);

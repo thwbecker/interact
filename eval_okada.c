@@ -59,7 +59,8 @@ extern void dc3d0(double*,double*,double*,double*,double*,double*,double*,double
 void eval_rectangle(COMP_PRECISION *x,struct flt *fault,
 		    COMP_PRECISION *disp,
 		    COMP_PRECISION *u_global, 
-		    COMP_PRECISION sm_global[3][3],int *iret)
+		    COMP_PRECISION sm_global[3][3],int *iret,
+		    MODE_TYPE mode)
 {
 
   COMP_PRECISION iso,dx[3],sm_local[3][3];
@@ -135,36 +136,40 @@ void eval_rectangle(COMP_PRECISION *x,struct flt *fault,
 	    corners[2][INT_X],corners[2][INT_Y],corners[2][INT_Z],
 	    corners[3][INT_X],corners[3][INT_Y],corners[3][INT_Z]);
 #endif
-    set_stress_and_disp_nan(sm_global,u_global);
+    set_stress_and_disp_nan(sm_global,u_global,mode);
   }else{
-    /* 
-       rotate displacements back into global frame 
-       this subroutine takes the first three components 
-       of u, ie. u_x u_y u_z
-    */
-    rotate_vec(u,u_global,fault->cos_alpha,-fault->sin_alpha);
-    /* 
-       convert displacement derivatives into 
-       strains and stresses 
-    */
-    /* this is the isotropic component */
-    iso= LAMBDA*(u[OKUXX]+u[OKUYY]+u[OKUZZ]);
-    /* 
-       assign sxx,sxy,sxz,syy,syz,szz 
-       according to 
-       s_ij = \lambda \sum_i e_ii \delta_ij + 2 \mu e_ij
-    */
-    sm_local[INT_X][INT_X]=               iso + TWO_TIMES_SHEAR_MODULUS*u[OKUXX];
-    sm_local[INT_X][INT_Y]=sm_local[INT_Y][INT_X]=SHEAR_MODULUS*(u[OKUXY]+u[OKUYX]);
-    sm_local[INT_X][INT_Z]=sm_local[INT_Z][INT_X]=SHEAR_MODULUS*(u[OKUXZ]+u[OKUZX]);
-    sm_local[INT_Y][INT_Y]=               iso + TWO_TIMES_SHEAR_MODULUS*u[OKUYY];
-    sm_local[INT_Y][INT_Z]=sm_local[INT_Z][INT_Y]=SHEAR_MODULUS*(u[OKUYZ]+u[OKUZY]);
-    sm_local[INT_Z][INT_Z]=               iso+TWO_TIMES_SHEAR_MODULUS*u[OKUZZ];
-    /* 
-       rotate stress matrix back into global field 
-    */
-    rotate_mat_z(sm_local,sm_global,fault->cos_alpha,
-		 -fault->sin_alpha);
+    if(mode != GC_STRESS_ONLY){	/* may not be allocated */
+      /* 
+	 rotate displacements back into global frame 
+	 this subroutine takes the first three components 
+	 of u, ie. u_x u_y u_z
+      */
+      rotate_vec(u,u_global,fault->cos_alpha,-fault->sin_alpha);
+    }
+    if(mode != GC_DISP_ONLY){
+      /* 
+	 convert displacement derivatives into 
+	 strains and stresses 
+      */
+      /* this is the isotropic component */
+      iso= LAMBDA*(u[OKUXX]+u[OKUYY]+u[OKUZZ]);
+      /* 
+	 assign sxx,sxy,sxz,syy,syz,szz 
+	 according to 
+	 s_ij = \lambda \sum_i e_ii \delta_ij + 2 \mu e_ij
+      */
+      sm_local[INT_X][INT_X]=               iso + TWO_TIMES_SHEAR_MODULUS*u[OKUXX];
+      sm_local[INT_X][INT_Y]=sm_local[INT_Y][INT_X]=SHEAR_MODULUS*(u[OKUXY]+u[OKUYX]);
+      sm_local[INT_X][INT_Z]=sm_local[INT_Z][INT_X]=SHEAR_MODULUS*(u[OKUXZ]+u[OKUZX]);
+      sm_local[INT_Y][INT_Y]=               iso + TWO_TIMES_SHEAR_MODULUS*u[OKUYY];
+      sm_local[INT_Y][INT_Z]=sm_local[INT_Z][INT_Y]=SHEAR_MODULUS*(u[OKUYZ]+u[OKUZY]);
+      sm_local[INT_Z][INT_Z]=               iso+TWO_TIMES_SHEAR_MODULUS*u[OKUZZ];
+      /* 
+	 rotate stress matrix back into global field 
+      */
+      rotate_mat_z(sm_local,sm_global,fault->cos_alpha,
+		   -fault->sin_alpha);
+    }
   }
 }
 /*
@@ -173,6 +178,8 @@ this is the same as above, but for fault coordinates
 x: x,y = 0,0 and strike = 90
 
 input is L, W, dip, and depth (>0) as opposed to fault structure
+
+will compute both displacement and stress
 
 */
 void eval_rectangle_basic(COMP_PRECISION *x,
@@ -224,7 +231,7 @@ void eval_rectangle_basic(COMP_PRECISION *x,
     u[i] = (COMP_PRECISION)u_d[i];
 #endif
   if(*iret){
-    set_stress_and_disp_nan(sm_global,u_global);
+    set_stress_and_disp_nan(sm_global,u_global,GC_DISP_AND_STRESS);
   }else{
     iso= LAMBDA*(u[OKUXX]+u[OKUYY]+u[OKUZZ]);
     sm_global[INT_X][INT_X]=               iso + TWO_TIMES_SHEAR_MODULUS*u[OKUXX];
@@ -254,11 +261,12 @@ void eval_rectangle_basic(COMP_PRECISION *x,
 
 void eval_point(COMP_PRECISION *x,struct flt *fault,
 		COMP_PRECISION *disp,COMP_PRECISION *u_global, 
-		COMP_PRECISION sm_global[3][3],int *iret)
+		COMP_PRECISION sm_global[3][3],int *iret,
+		MODE_TYPE mode)
 {
   eval_point_short(x,fault->x,fault->area,fault->sin_alpha,
 		   fault->cos_alpha,(COMP_PRECISION)fault->dip,
-		   disp,u_global,sm_global,iret);
+		   disp,u_global,sm_global,iret,mode);
 }
 /*
 
@@ -272,7 +280,7 @@ void eval_point_short(COMP_PRECISION *x,COMP_PRECISION *xf,COMP_PRECISION area,
 		      COMP_PRECISION dip,COMP_PRECISION *disp,
 		      COMP_PRECISION *u_global, 
 		      COMP_PRECISION sm_global[3][3],
-		      int *iret)
+		      int *iret,MODE_TYPE mode)
 {
   static double medium_alpha=ALPHA;
   COMP_PRECISION u[12],
@@ -318,20 +326,24 @@ void eval_point_short(COMP_PRECISION *x,COMP_PRECISION *xf,COMP_PRECISION area,
     u[i] = (COMP_PRECISION)u_d[i];
 #endif
   if(*iret){
-    set_stress_and_disp_nan(sm_global,u_global);
+    set_stress_and_disp_nan(sm_global,u_global,mode);
   }else{
-    rotate_vec(u,u_global,cos_alpha,-sin_alpha);
-    iso= LAMBDA*(u[OKUXX]+u[OKUYY]+u[OKUZZ]);
-    sm_local[INT_X][INT_X]=iso+TWO_TIMES_SHEAR_MODULUS*u[OKUXX];
-    sm_local[INT_X][INT_Y]=sm_local[INT_Y][INT_X]=
-      SHEAR_MODULUS*(u[OKUXY]+u[OKUYX]);
-    sm_local[INT_X][INT_Z]=sm_local[INT_Z][INT_X]=
-    SHEAR_MODULUS*(u[OKUXZ]+u[OKUZX]);
-    sm_local[INT_Y][INT_Y]=iso+TWO_TIMES_SHEAR_MODULUS*u[OKUYY];
-    sm_local[INT_Y][INT_Z]=sm_local[INT_Z][INT_Y]=
-    SHEAR_MODULUS*(u[OKUYZ]+u[OKUZY]);
-    sm_local[INT_Z][INT_Z]=iso+TWO_TIMES_SHEAR_MODULUS*u[OKUZZ];
-    rotate_mat_z(sm_local,sm_global,cos_alpha,-sin_alpha);
+    if(mode !=  GC_STRESS_ONLY)
+      rotate_vec(u,u_global,cos_alpha,-sin_alpha);
+    if(mode != GC_DISP_ONLY){
+      iso= LAMBDA*(u[OKUXX]+u[OKUYY]+u[OKUZZ]);
+
+      sm_local[INT_X][INT_X]=iso+TWO_TIMES_SHEAR_MODULUS*u[OKUXX];
+      sm_local[INT_X][INT_Y]=sm_local[INT_Y][INT_X]=
+	SHEAR_MODULUS*(u[OKUXY]+u[OKUYX]);
+      sm_local[INT_X][INT_Z]=sm_local[INT_Z][INT_X]=
+	SHEAR_MODULUS*(u[OKUXZ]+u[OKUZX]);
+      sm_local[INT_Y][INT_Y]=iso+TWO_TIMES_SHEAR_MODULUS*u[OKUYY];
+      sm_local[INT_Y][INT_Z]=sm_local[INT_Z][INT_Y]=
+	SHEAR_MODULUS*(u[OKUYZ]+u[OKUZY]);
+      sm_local[INT_Z][INT_Z]=iso+TWO_TIMES_SHEAR_MODULUS*u[OKUZZ];
+      rotate_mat_z(sm_local,sm_global,cos_alpha,-sin_alpha);
+    }
   }
 }
 #undef OKUX 
@@ -352,10 +364,15 @@ void eval_point_short(COMP_PRECISION *x,COMP_PRECISION *xf,COMP_PRECISION area,
 
 
 
-void set_stress_and_disp_nan(COMP_PRECISION s[3][3],COMP_PRECISION *u)
+void set_stress_and_disp_nan(COMP_PRECISION s[3][3],COMP_PRECISION *u,
+			     MODE_TYPE mode)
 {
-  u[INT_X]=u[INT_Y]=u[INT_Z]=NAN;
-  s[INT_X][INT_X]=s[INT_X][INT_Y]=s[INT_X][INT_Z]=NAN;
-  s[INT_Y][INT_X]=s[INT_Y][INT_Y]=s[INT_Y][INT_Z]=NAN;
-  s[INT_Z][INT_X]=s[INT_Z][INT_Y]=s[INT_Z][INT_Z]=NAN;
+  if(mode != GC_STRESS_ONLY){
+    u[INT_X]=u[INT_Y]=u[INT_Z]=NAN;
+  }
+  if(mode != GC_DISP_ONLY){
+    s[INT_X][INT_X]=s[INT_X][INT_Y]=s[INT_X][INT_Z]=NAN;
+    s[INT_Y][INT_X]=s[INT_Y][INT_Y]=s[INT_Y][INT_Z]=NAN;
+    s[INT_Z][INT_X]=s[INT_Z][INT_Y]=s[INT_Z][INT_Z]=NAN;
+  }
 }

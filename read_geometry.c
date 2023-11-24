@@ -169,11 +169,11 @@ void read_geometry(char *patch_filename,struct med **medium,
 			    (*fault+i)->t_strike,(*fault+i)->t_dip,(*fault+i)->normal);
 #ifdef DEBUG
       if((*medium)->comm_rank == 0)
-	fprintf(stderr,"read_geometry: fault %i is triangular, x1: (%g, %g, %g) x2: (%g, %g, %g) x3: (%g, %g, %g), area: %g\n",
+	fprintf(stderr,"read_geometry: fault %5i is triangular, x1: (%10.3e, %10.3e, %10.3e) x2: (%10.3e, %10.3e, %10.3e) x3: (%10.3e, %10.3e, %10.3e), area: %10.3e\n",
 		i,(*fault+i)->xt[  INT_X],(*fault+i)->xt[  INT_Y],(*fault+i)->xt[  INT_Z],
 		(*fault+i)->xt[3+INT_X],(*fault+i)->xt[3+INT_Y],(*fault+i)->xt[3+INT_Z],
 		(*fault+i)->xt[6+INT_X],(*fault+i)->xt[6+INT_Y],(*fault+i)->xt[6+INT_Z],
-		(*fault+i)->w);
+		(*fault+i)->area);
 #endif
       nr_triangle++;
     }else if((*fault+i)->l < 0){
