@@ -31,13 +31,13 @@ void eval_triangle(COMP_PRECISION *x,struct flt *fault,
 {
  
   COMP_PRECISION stress[6],strain[6];
-  const COMP_PRECISION nu =  POISSON_NU, lambda = LAMBDA,mu = SHEAR_MODULUS;
+  const COMP_PRECISION nu =  POISSON_NU;
 
   /* input is x y z, vertices, and slip as strike, dip, normal
      displacements are output as east, north, up
   */
-  tddisphs(x,  &(fault->xt[0]),&(fault->xt[3]),&(fault->xt[6]),
-	   (slip),(slip+1),(slip+2),&nu,u);
+  tddisphs(x,  &(fault->xt[0]),&(fault->xt[3]),&(fault->xt[6]),(slip),(slip+1),(slip+2),&nu,u);
+  //tddisphs_bird((x+0),(x+1),(x+2),&(fault->xt[0]),&(fault->xt[3]),&(fault->xt[6]),(slip),(slip+1),(slip+2),&nu,(u+0),(u+1),(u+2));
 #ifdef CRAZY_DEBUG
   fprintf(stderr,"eval_triangle: xt %g %g %g\t%g %g %g\t%g %g %g\tslip %g %g %g\tx %g %g %g\tu %g %g %g\n", 
    	  fault->xt[0],fault->xt[1],fault->xt[2], 
@@ -58,8 +58,7 @@ void eval_triangle(COMP_PRECISION *x,struct flt *fault,
      stress and strain are given as: Sxx, Syy, Szz, Sxy, Sxz and Syz
   */
   tdstresshs(x,&(fault->xt[0]),&(fault->xt[3]),&(fault->xt[6]),
-	     (slip),(slip+1),(slip+2),&mu,&lambda,
-	     stress,strain);
+	     (slip),(slip+1),(slip+2),stress,strain);
 #ifdef CRAZY_DEBUG
   fprintf(stderr,"eval_triangle: stress: %g %g %g %g %g %g\n",strain[0],strain[1],strain[2],strain[3],strain[4],strain[5]);
 #endif

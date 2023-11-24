@@ -7,36 +7,33 @@
    REMEMBER TO RECOMPILE ALL FILES AFTER MAKING
    CHANGES
 
-   $Id: properties.h,v 2.27 2004/01/26 01:16:41 becker Exp becker $
-
 
    REMEMBER to check the whole file since changing, say, the 
    shear modulus once might not affect some of the quantities further 
    down
 
 */
-// STRESS_DROP_NORM flag:
-// if defined, will normalize stresses by stress drop
-// if not, shear modulus will be set to unity
+/* STRESS_DROP_NORM flag: if defined, will normalize stresses by
+ stress drop if not, shear modulus will be set to unity */
 #define STRESS_DROP_NORM
 
 
 #ifdef STRESS_DROP_NORM
-// set by stress drop
- #define SHEAR_MODULUS 1.0e4
- #define TWO_TIMES_SHEAR_MODULUS  2.0e4
+/* set by stress drop */
+#define SHEAR_MODULUS 1.0e4
+#define TWO_TIMES_SHEAR_MODULUS  2.0e4
 /* 
    define stress drop in consistent units
    for Earth, \Delta \sigma \sim 3e6 Pa, \mu= \sim 3e10 Pa,
    therefore, if we set the characteristic stress by the shear modulus 
    to unity, stress_drop should be 1e-4
 */
- #define STRESS_DROP 1.0
+#define STRESS_DROP 1.0
 #else
-//   characteristic stress set by shear modulus 
- #define SHEAR_MODULUS  1.0
- #define TWO_TIMES_SHEAR_MODULUS  2.0
- #define STRESS_DROP 1.0e-4
+/*   characteristic stress set by shear modulus  */
+#define SHEAR_MODULUS  1.0
+#define TWO_TIMES_SHEAR_MODULUS  2.0
+#define STRESS_DROP 1.0e-4
 #endif
 
 /* 
@@ -106,7 +103,6 @@
 
    suitable choice would be CHAR_FAULT_DIM
 */
-//#define HYDROSTATIC_PRESSURE  CHAR_FAULT_DIM
 
 
 /* 
@@ -125,11 +121,11 @@
 
 */
 #define COHESION_DEF (5.0*STRESS_DROP)
-//#define COHESION_DEF 0.0 
+/* #define COHESION_DEF 0.0 */
 
-// we consider a compressive stress of amplitude TENSILE_RANGE 
-// to be needed for strike-slip (give positive TENSILE_RANGE as compressive!)
-// faulting. if you want faulting up to 0 compressive stress, set to zero 
+/* we consider a compressive stress of amplitude TENSILE_RANGE 
+   to be needed for strike-slip (give positive TENSILE_RANGE as compressive!)
+   faulting. if you want faulting up to 0 compressive stress, set to zero  */
 #define TENSILE_RANGE EPS_COMP_PREC
 /* 
    stressing rate for calc_stress.c, routine 

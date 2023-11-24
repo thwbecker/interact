@@ -42,6 +42,7 @@
 #define law_nnls law_nnls_
 /*  */
 #define tddisphs tddisphs_
+#define tddisphs_bird tddisphs_bird_
 #define tdstresshs tdstresshs_
 #define get_tdcs_base_vectors get_tdcs_base_vectors_
 //other

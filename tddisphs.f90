@@ -3,6 +3,12 @@
 #else
 #include "precision_single.h"
 #endif
+#include "properties.h"
+
+!#define ANGDISDISP  Angdisdisp_Bird
+!#define ANGDISDISPFSC  Angdisdispfsc_Bird
+#define ANGDISDISP  Angdisdisp
+#define ANGDISDISPFSC  Angdisdispfsc
 
 ! TDdispHS 
 ! calculates displacements associated with a triangular dislocation in an 
@@ -116,13 +122,18 @@ subroutine  tddisphs(loc,P1,P2,P3,Ss,Ds,Ts,nu,u)
   C_PREC,intent(out),dimension(3) :: u
   C_PREC :: ueMS,unMS,uvMS,ueFSC,unFSC,uvFSC,ueIS,unIS,uvIS
   C_PREC,dimension(3) :: p1n,p2n,p3n
-  if ((loc(3) .gt.0.d0).or.(P1(3)>0.d0).or.(P2(3)>0.d0).or.(P3(3)>0))then
+
+  ! vertices cannot be on the surface?
+  if ((loc(3).gt.0.d0).or.(P1(3).gt.0.d0).or.(P2(3).gt.0.d0).or.(P3(3).gt.0))then
      print *,'Half-space solution: Z coordinates must be negative!'
      stop
   else if((P1(3)==0.d0).and.(P2(3)==0.d0).and.(P3(3)==0.d0))then
      u = 0.d0
      return
   end  if
+  !print *,p1,p2,p3
+  !print *,loc
+  !print *,Ss,Ds,Ts
 
 
   ! Calculate main dislocation contribution to displacements
@@ -137,6 +148,7 @@ subroutine  tddisphs(loc,P1,P2,P3,Ss,Ds,Ts,nu,u)
   p1n(3)  = -p1(3);  p2n(3)  = -p2(3);p3n(3)   = -p3(3);
   call TDdispFS(loc(1),loc(2),loc(3),P1n,P2n,P3n,Ss,Ds,Ts,nu,ueIS,unIS,uvIS);
   !print *,ueIS,unIS,uvIS
+  !stop
   ! Calculate the complete displacement vector components in EFCS
   u(1) = ueMS+ueIS+ueFSC;
   u(2) = unMS+unIS+unFSC;
@@ -163,10 +175,11 @@ subroutine TDdispFS(X,Y,Z,P1,P2,P3,Ss,Ds,Ts,nu,ue,un,uv)
   ! elastic full-space.
 
   
-  call setup_geometry(x,y,z,Ts,Ss,Ds,p1,p2,p3,bx,by,bz,x_,y_,z_,p1_,p2_,p3_,e12,e13,e23,aA,aB,aC,Ar,trimode)
-  casepLog  = (Trimode==1);
-  casenLog =  (Trimode==-1);
-  casezLog =  (Trimode==0);
+  call setup_geometry(x,y,z,Ts,Ss,Ds,p1,p2,p3,bx,by,bz,&
+       x_,y_,z_,p1_,p2_,p3_,e12,e13,e23,aA,aB,aC,Ar,trimode)
+  casepLog  = (Trimode ==  1);
+  casenLog =  (Trimode == -1);
+  casezLog =  (Trimode ==  0);
  
   !print *,trimode,caseplog,casenlog,casezlog
  
@@ -174,7 +187,9 @@ subroutine TDdispFS(X,Y,Z,P1,P2,P3,Ss,Ds,Ts,nu,ue,un,uv)
   ! Configuration I
   if(casepLog)then
      ! Calculate first angular dislocation contribution
+     !print *,x_,y_,z_,aA,bx,by,bz, nu,p1_
      call TDSetupD(x_,y_,z_,aA,bx,by,bz, nu,p1_,-e13,u1,v1,w1);
+     !print *,-e13,u1,v1,w1
      ! Calculate second angular dislocation contribution
      call TDSetupD(x_,y_,z_,aB,bx,by,bz, nu,p2_, e12,u2,v2,w2);
      ! Calculate third angular dislocation contribution
@@ -182,14 +197,14 @@ subroutine TDdispFS(X,Y,Z,P1,P2,P3,Ss,Ds,Ts,nu,ue,un,uv)
   end if
 
   ! Configuration II
- if(casenLog)then 
-    ! Calculate first angular dislocation contribution
+  if(casenLog)then 
+     ! Calculate first angular dislocation contribution
     call TDSetupD(x_,y_,z_,aA,bx,by,bz,nu,p1_, e13,u1,v1,w1);
     ! Calculate second angular dislocation contribution
     call TDSetupD(x_,y_,z_,aB,bx,by,bz,nu,p2_,-e12,u2,v2,w2);
     ! Calculate third angular dislocation contribution
     call TDSetupD(x_,y_,z_,aC,bx,by,bz,nu,p3_,-e23,u3,v3,w3);
-   
+    
  end  if
  if(caseplog.or.casenlog)then
     u = u1+u2+u3;
@@ -229,10 +244,11 @@ subroutine TDdispFS(X,Y,Z,P1,P2,P3,Ss,Ds,Ts,nu,ue,un,uv)
  u = bx*Fi+u;
  v = by*Fi+v;
  w = bz*Fi+w;
- !print *,'uvw',u,v,w
+ !print *,u,v,w
  ! Transform the complete displacement vector components from TDCS into EFCS
  !call matrix_from_3vec(vnorm,vstrike,vdip,Ar)
  call CoordTrans(u,v,w,Ar,ue,un,uv);
+ !print *,ue,un,uv
 end  subroutine TDdispFS
 
 subroutine TDdisp_HarFunc(X,Y,Z,P1,P2,P3,Ss,Ds,Ts,nu,ue,un,uv)
@@ -261,12 +277,15 @@ subroutine TDdisp_HarFunc(X,Y,Z,P1,P2,P3,Ss,Ds,Ts,nu,ue,un,uv)
   call matrix_from_3vec(vnorm,vstrike,vdip,Ar)
 
   call CoordTrans(bx,by,bz,Ar,b_x,b_y,b_z);
-
+  !print *,X,Y,Z,b_X,b_Y,b_Z,P1,P2,nu
 ! Calculate contribution of angular dislocation pair on each TD side 
   call AngSetupFSC(X,Y,Z,b_X,b_Y,b_Z,P1,P2,nu,u1,v1,w1); ! Side P1P2
+  !print *,'HF u1',u1,v1,w1
   call AngSetupFSC(X,Y,Z,b_X,b_Y,b_Z,P2,P3,nu,u2,v2,w2); ! Side P2P3
+  !print *,'HF u2',u2,v2,w2
+  !print *,X,Y,Z,b_X,b_Y,b_Z,P3,P1,nu
   call AngSetupFSC(X,Y,Z,b_X,b_Y,b_Z,P3,P1,nu,u3,v3,w3); ! Side P3P1
-
+  !print *,'HF u3',u3,v3,w3
   ! Calculate total harmonic function contribution to displacements
   ue = u1+u2+u3;
   un = v1+v2+v3;
@@ -338,10 +357,10 @@ subroutine TDSetupD(x,y,z,alpha,bx,by,bz,nu,TriVertex,SideVec,u,v,w)
 
   call get_tdcd_adcs(sidevec,trivertex,y,z,by,bz,A,y1,z1,by1,bz1)
 
-  !print *,x,y1,z1,-pi+alpha,bx,by1,bz1,nu
+  !print *,'in',x,y1,z1,-pi+alpha,bx,by1,bz1,nu
   ! Calculate displacements associated with an angular dislocation in ADCS
-  call AngDisDisp(x,y1,z1,-pi+alpha,bx,by1,bz1,nu,u,v0,w0);
-
+  call ANGDISDISP(x,y1,z1,-pi+alpha,bx,by1,bz1,nu,u,v0,w0);
+  !print *,'out',v0,w0
   ! Transform displacements from ADCS into TDCS
   !r3 = A'*[v0';w0'];
   !v = r3(1,:)';
@@ -371,7 +390,6 @@ subroutine AngSetupFSC(X,Y,Z,bX,bY,bZ,PA,PB,nu,ue,un,uv)
   SideVec = PB-PA;
   eZ = (/0.d0, 0.d0, 1.0d0/);
   beta = acos(dot_product(-SideVec,eZ)/norm2(SideVec));
-
   if ((abs(beta).lt.eps).or.(abs(pi-beta).lt.eps))then 
      ue = 0.0d0
      un = 0.d0
@@ -400,15 +418,15 @@ subroutine AngSetupFSC(X,Y,Z,bX,bY,bZ,PA,PB,nu,ue,un,uv)
     I = ((beta*y1A)>=0);
     if(I)then 
        ! Configuration I
-       call AngDisDispFSC(y1A,y2A,y3A,&
+       call ANGDISDISPFSC(y1A,y2A,y3A,&
             -pi+beta,b1,b2,b3,nu,-PA(3),v1A,v2A,v3A);
-       call AngDisDispFSC(y1B,y2B,y3B,&
+       call ANGDISDISPFSC(y1B,y2B,y3B,&
             -pi+beta,b1,b2,b3,nu,-PB(3),v1B,v2B,v3B);
     else
        ! Configuration II
-       call AngDisDispFSC(y1A,y2A,y3A,&
+       call ANGDISDISPFSC(y1A,y2A,y3A,&
             beta,b1,b2,b3,nu,-PA(3),v1A,v2A,v3A);
-       call AngDisDispFSC(y1B,y2B,y3B,&
+       call ANGDISDISPFSC(y1B,y2B,y3B,&
             beta,b1,b2,b3,nu,-PB(3),v1B,v2B,v3B);
     end if
     
@@ -423,139 +441,275 @@ subroutine AngSetupFSC(X,Y,Z,bX,bY,bZ,PA,PB,nu,ue,un,uv)
  end if
 end subroutine AngSetupFSC
 
-subroutine AngDisDisp(x,y,z,alpha,bx,by,bz,nu,u,v,w)
-  ! AngDisDisp calculates the "incomplete" displacements (without the 
-  ! Burgers' function contribution) associated with an angular dislocation in
-  ! an elastic full-space.
-  implicit none
-  C_PREC,intent(in) :: x,y,z,alpha,bx,by,bz,nu
-  C_PREC,intent(out) :: u,v,w
-  C_PREC :: cosA,sinA,eta,zeta,r,zz,ux,uy,uz,vx,vy,vz,wx,wy,wz;
+!function [u,v,w]=Angdisdisp_Bird(x,y,z,alpha,bx,by,bz,nu)
+SUBROUTINE Angdisdisp(x, y, z, alpha, bx, by, bz, nu, & ! inputs
+     & u, v, w) ! outputs
 
-  C_PREC, PARAMETER :: pi = 3.14159265358979D0
-  
-  cosA = cos(alpha);
-  sinA = sin(alpha);
-  eta =  y*cosA - z*sinA;
-  zeta = y*sinA + z*cosA;
-  r = sqrt(x**2 + y**2 + z**2);
-  
-  ! Avoid complex results for the logarithmic terms
-  if(zeta>r) zeta =  r
-  if(z>r)then
-     zz = r
-  else
-     zz = z
-  endif
-  ! NEED TO OPTIMIZE
-  ux = bx/8.0d0/pi/(1.0d0-nu)*(x*y/r/(r-zz)-x*eta/r/(r-zeta));
-  vx = bx/8.0d0/pi/(1.0d0-nu)*(eta*sinA/(r-zeta)-y*eta/r/(r-zeta)+&
-       y**2/r/(r-zz)+(1.0d0-2.d0*nu)*(cosA*log(r-zeta)-log(r-zz)));
-  wx = bx/8.0d0/pi/(1.0d0-nu)*(eta*cosA/(r-zeta)-y/r-eta*zz/r/(r-zeta)-&
-       (1.0d0-2.0d0*nu)*sinA*log(r-zeta));
-  
-  uy = by/8.0d0/pi/(1.0d0-nu)*(x**2*cosA/r/(r-zeta)-x**2/r/(r-zz)-&
-       (1.0d0-2.0d0*nu)*(cosA*log(r-zeta)-log(r-zz)));
-  vy = by*x/8.0d0/pi/(1.0d0-nu)*(y*cosA/r/(r-zeta)-&
-       sinA*cosA/(r-zeta)-y/r/(r-zz));
-  wy = by*x/8.0d0/pi/(1.0d0-nu)*(zz*cosA/r/(r-zeta)-cosA**2/(r-zeta)+1.0d0/r);
-  
-  uz = bz*sinA/8.0d0/pi/(1.0d0-nu)*((1.0d0-2.0d0*nu)*log(r-zeta)-x**2/r/(r-zeta));
-  vz = bz*x*sinA/8.0d0/pi/(1.0d0-nu)*(sinA/(r-zeta)-y/r/(r-zeta));
-  wz = bz*x*sinA/8.0d0/pi/(1.0d0-nu)*(cosA/(r-zeta)-zz/r/(r-zeta));
-  
-  u = ux+uy+uz;
-  v = vx+vy+vz;
-  w = wx+wy+wz;
-end  subroutine AngDisDisp
+  !% Angdisdisp_Bird calculates the "incomplete" displacements (without the 
+  !% Burgers' function contribution) associated with an angular dislocation in
+  !% an elastic full-space.
 
-subroutine AngDisDispFSC(y1,y2,y3,beta,b1,b2,b3,nu,a,v1,v2,v3)
-  ! AngDisDispFSC calculates the harmonic function contribution to the 
-  ! displacements associated with an angular dislocation in an elastic 
-  ! half-space.
-  implicit none 
-  C_PREC,intent(in) :: y1,y2,y3,beta,b1,b2,b3,nu,a
-  C_PREC,intent(out) ::v1,v2,v3
-  C_PREC, PARAMETER :: pi = 3.14159265358979D0
+  !Note that the orginal MatLab version allows x, y, and z to be arrays of test points
+  !(in 0-D, 1-D, 2-D, or 3-D); however, in this Fortran version there is only a single
+  !test point at (x, y, z), and each of these is a simple C_PREC scalar number.
+
+  IMPLICIT NONE
+  C_PREC, PARAMETER :: pi = 3.14159265358979D0,one_over_eight_pi = 1.0d0/(8.0d0*pi)
+
+  C_PREC, INTENT(IN) :: x, y, z, alpha, bx, by, bz, nu
+  C_PREC, INTENT(OUT) :: u, v, w
+
+  C_PREC :: cosA, eta, r, sinA, ux, uy, uz, vx, vy, vz, wx, wy, wz, zz, zeta
+
+  C_PREC :: rmzeta,log_rmzeta,N1,N2,N3,rmzz,log_rmzz,xs
+  
+  !cosA = cos(alpha);
+  !sinA = sin(alpha);
+  !eta = y*cosA-z*sinA;
+  !zeta = y*sinA+z*cosA;
+  !r = sqrt(x.^2+y.^2+z.^2);
+  cosA = COS(alpha)
+  sinA = SIN(alpha)
+  eta =  y * cosA - z * sinA
+  zeta = y * sinA + z * cosA
+  xs = x**2
+  
+  r = SQRT(xs + y**2 + z**2)
+
+  !% Avoid complex results for the logarithmic terms
+  !zeta(zeta>r) = r(zeta>r);
+  !z(z>r) = r(z>r);
+  IF (zeta > r) zeta = r
+  !In Fortran, we have to avoid changing an input argument of type INTENT(IN), so I substitute a copy: zz.
+  IF (z > r) THEN
+     zz = r ! apply the limit
+  ELSE
+     zz = z ! just copy the value, without any change
+  END IF
+  rmzz = r - zz
+  log_rmzz = log(rmzz)
+  
+  rmzeta = r - zeta
+  log_rmzeta = log(rmzeta)
+  N1 = 1.0d0-nu
+  N2 = 1.0D0-2.0D0*nu
+  N3 = 2.0D0*(N1)
+  !ux = bx/8/pi/(1-nu)*(x.*y./r./(r-z)-x.*eta./r./(r-zeta));
+  !vx = bx/8/pi/(1-nu)*(eta*sinA./(rmzeta)-y.*eta./r./(rmzeta)+...
+  !    y.^2./r./(r-z)+(1-2*nu)*(cosA*log_rmzeta-log(r-z)));
+  !wx = bx/8/pi/(1-nu)*(eta*cosA./(rmzeta)-y./r-eta.*z./r./(rmzeta)-...
+  !    (1-2*nu)*sinA*log_rmzeta);
+  ux = bx*one_over_eight_pi/(N1) * (x*y/r/(rmzz)-x*eta/r/(rmzeta))
+  vx = bx*one_over_eight_pi/(N1) * (eta*sinA/(rmzeta)-y*eta/r/(rmzeta) + &
+       & y**2/r/(rmzz) + (N2) * (cosA*log_rmzeta-log_rmzz))
+  wx = bx*one_over_eight_pi/(N1) * (eta*cosA/(rmzeta)-y/r-eta*zz/r/(rmzeta)- &
+       & (N2) * sinA * log_rmzeta);
+
+  !uy = by/8/pi/(1-nu)*(x.^2*cosA./r./(rmzeta)-x.^2./r./(r-z)-...
+  !    (1-2*nu)*(cosA*log_rmzeta-log(r-z)));
+  !vy = by*x/8/pi/(1-nu).*(y.*cosA./r./(rmzeta)-...
+  !    sinA*cosA./(rmzeta)-y./r./(r-z));
+  !wy = by*x/8/pi/(1-nu).*(z*cosA./r./(rmzeta)-cosA^2./(rmzeta)+1./r);
+  uy = by*one_over_eight_pi/(N1) * (xs*cosA/r/(rmzeta) - xs/r/(rmzz) - &
+       & (N2) * (cosA*log_rmzeta - log_rmzz))
+  vy = by*x*one_over_eight_pi/(N1) * (y*cosA/r/(rmzeta) - &
+       & sinA*cosA/(rmzeta) - y/r/(rmzz))
+  wy = by*x*one_over_eight_pi/(N1) * (zz*cosA/r/(rmzeta) - cosA**2/(rmzeta)+1.0D0/r)
+
+  !uz = bz*sinA/8/pi/(1-nu).*((1-2*nu)*log_rmzeta-x.^2./r./(rmzeta));
+  !vz = bz*x*sinA/8/pi/(1-nu).*(sinA./(rmzeta)-y./r./(rmzeta));
+  !wz = bz*x*sinA/8/pi/(1-nu).*(cosA./(rmzeta)-z./r./(rmzeta));
+  uz = bz*sinA*one_over_eight_pi/(N1) * ((N2)*log_rmzeta-xs/r/(rmzeta))
+  vz = bz*x*sinA*one_over_eight_pi/(N1) * (sinA/(rmzeta)-y/r/(rmzeta))
+  wz = bz*x*sinA*one_over_eight_pi/(N1)*(cosA/(rmzeta)-zz/r/(rmzeta))
+
+  !u = ux+uy+uz;
+  !v = vx+vy+vz;
+  !w = wx+wy+wz;
+  u = ux + uy + uz
+  v = vx + vy + vz
+  w = wx + wy + wz
+
+END SUBROUTINE Angdisdisp
+
+!----------------------------------------------------------------------------
+
+!function [v1 v2 v3] = Angdisdispfsc_Bird(y1,y2,y3,beta,b1,b2,b3,nu,a)
+SUBROUTINE Angdisdispfsc(y1, y2, y3, beta, b1, b2, b3, nu, a, & ! inputs
+     & v1, v2, v3)                            ! outputs
+
+  !% Angdisdispfsc_Bird calculates the harmonic function contribution to the 
+  !% displacements associated with an angular dislocation in an elastic 
+  !% half-space.
+
+  !Note that the orginal MatLab version allows y1, y2, and y3 to be arrays of test points
+  !(in 0-D, 1-D, 2-D, or 3-D); however, in this Fortran version there is only a single
+  !test point at (y1, y2, y3), and each of these is a simple C_PREC scalar number.
+
+  IMPLICIT NONE
+  C_PREC, PARAMETER :: pi = 3.14159265358979D0,one_over_four_pi = 1.0d0/(4.0d0*pi)
+  C_PREC, INTENT(IN) :: y1, y2, y3, beta, b1, b2, b3, nu, a
+  C_PREC, INTENT(OUT) :: v1, v2, v3
+
   C_PREC :: cosB, cotB, Fib, r2b, rb, sinB, &
        & v1cb1, v1cb2, v1cb3, v2cb1, v2cb2, v2cb3, v3cb1, v3cb2, v3cb3, &
        & y3b, z1b, z3b
 
- 
-  sinB = sin(beta);
-  cosB = cos(beta);
-  cotB = 1.00D0 / TAN(beta);
-  y3b = y3+2*a;
-  z1b = y1*cosB+y3b*sinB;
-  z3b = -y1*sinB+y3b*cosB;
-  r2b = y1**2+y2**2+y3b**2;
-  rb = sqrt(r2b);
-  ! replace with atan2?
-  Fib = 2.d0*atan(-y2/(-(rb+y3b)/tan(beta/2.d0)+y1)); ! The Burgers' function
+  C_PREC :: N1, N2, N3,one_over_rb,N4,log_rbpy3b,log_rbpz3b,rbc,y2s,cotBs
 
-  v1cb1 = b1/4.0d0/pi/(1.0d0-nu)*(-2.0d0*(1.0d0-nu)*(1.0d0-2.0d0*nu)*Fib*cotB**2+(1.0d0-2.0d0*nu)*y2/&
-       (rb+y3b)*((1.0d0-2.0d0*nu-a/rb)*cotB-y1/(rb+y3b)*(nu+a/rb))+(1.0d0-2.0d0*nu)*&
-       y2*cosB*cotB/(rb+z3b)*(cosB+a/rb)+a*y2*(y3b-a)*cotB/rb**3+y2*&
-       (y3b-a)/(rb*(rb+y3b))*(-(1.0d0-2.0d0*nu)*cotB+y1/(rb+y3b)*(2.0d0*nu+a/rb)+&
-       a*y1/rb**2)+y2*(y3b-a)/(rb*(rb+z3b))*(cosB/(rb+z3b)*((rb*&
-       cosB+y3b)*((1.0d0-2.0d0*nu)*cosB-a/rb)*cotB+2.0d0*(1.0d0-nu)*(rb*sinB-y1)*cosB)-&
-       a*y3b*cosB*cotB/rb**2));
+  !sinB = sin(beta);
+  !cosB = cos(beta);
+  !cotB = cot(beta);
+  !y3b = y3+2*a;
+  !z1b = y1*cosB+y3b*sinB;
+  !z3b = -y1*sinB+y3b*cosB;
+  !r2b = y1.^2+y2.^2+y3b.^2;
+  !rb = sqrt(r2b);
+  sinB = SIN(beta)
+  cosB = COS(beta)
+  cotB = 1.00D0 / TAN(beta)
+  cotBs = cotB**2
   
-  v2cb1 = b1/4.0d0/pi/(1.0d0-nu)*((1.0d0-2.0d0*nu)*((2.0d0*(1.0d0-nu)*cotB**2-nu)*log(rb+y3b)-(2.0d0*&
-       (1.0d0-nu)*cotB**2+1.0d0-2.0d0*nu)*cosB*log(rb+z3b))-(1.0d0-2.0d0*nu)/(rb+y3b)*(y1*&
-       cotB*(1.0d0-2.0d0*nu-a/rb)+nu*y3b-a+y2**2/(rb+y3b)*(nu+a/rb))-(1.0d0-2.0d0*&
-       nu)*z1b*cotB/(rb+z3b)*(cosB+a/rb)-a*y1*(y3b-a)*cotB/rb**3+&
-       (y3b-a)/(rb+y3b)*(-2*nu+1.0d0/rb*((1.0d0-2.0d0*nu)*y1*cotB-a)+y2**2/(rb*&
-       (rb+y3b))*(2.0d0*nu+a/rb)+a*y2**2/rb**3)+(y3b-a)/(rb+z3b)*(cosB**2-&
-       1.0d0/rb*((1.0d0-2.0d0*nu)*z1b*cotB+a*cosB)+a*y3b*z1b*cotB/rb**3-1/(rb*&
-       (rb+z3b))*(y2**2*cosB**2-a*z1b*cotB/rb*(rb*cosB+y3b))));
+  y3b = y3 + 2.0D0 * a
+  z1b = y1 * cosB + y3b * sinB
+  z3b = -y1 * sinB + y3b * cosB
+  y2s = y2**2
+  r2b = y1**2 + y2s + y3b**2
+  rb = SQRT(r2b)
+
+  rbc=rb**3
   
-  v3cb1 = b1/4.0d0/pi/(1.0d0-nu)*(2.0d0*(1.0d0-nu)*(((1.0d0-2.0d0*nu)*Fib*cotB)+(y2/(rb+y3b)*(2.0d0*&
-       nu+a/rb))-(y2*cosB/(rb+z3b)*(cosB+a/rb)))+y2*(y3b-a)/rb*(2.0d0*&
-       nu/(rb+y3b)+a/rb**2)+y2*(y3b-a)*cosB/(rb*(rb+z3b))*(1.0d0-2.0d0*nu-&
-       (rb*cosB+y3b)/(rb+z3b)*(cosB+a/rb)-a*y3b/rb**2));
+  log_rbpy3b = log(rb+y3b)
+  log_rbpz3b = log(rb+z3b)
+  one_over_rb = 1.0d0/rb
   
-  v1cb2 = b2/4.0d0/pi/(1.0d0-nu)*((1.0d0-2.0d0*nu)*((2.0d0*(1.0d0-nu)*cotB**2+nu)*log(rb+y3b)-(2.0d0*&
-       (1.0d0-nu)*cotB**2+1)*cosB*log(rb+z3b))+(1.0d0-2.0d0*nu)/(rb+y3b)*(-(1.0d0-2.0d0*nu)*&
-       y1*cotB+nu*y3b-a+a*y1*cotB/rb+y1**2/(rb+y3b)*(nu+a/rb))-(1-2*&
-       nu)*cotB/(rb+z3b)*(z1b*cosB-a*(rb*sinB-y1)/(rb*cosB))-a*y1*&
-       (y3b-a)*cotB/rb**3+(y3b-a)/(rb+y3b)*(2.0d0*nu+1.0d0/rb*((1.0d0-2.0d0*nu)*y1*&
-       cotB+a)-y1**2/(rb*(rb+y3b))*(2.0d0*nu+a/rb)-a*y1**2/rb**3)+(y3b-a)*&
-       cotB/(rb+z3b)*(-cosB*sinB+a*y1*y3b/(rb**3*cosB)+(rb*sinB-y1)/&
-       rb*(2.0d0*(1.0d0-nu)*cosB-(rb*cosB+y3b)/(rb+z3b)*(1.d0+a/(rb*cosB)))));
+  N1 = 1.0d0-nu
+  N4 = 2.0d0*nu
+  N2 = 1.0D0-N4
+  N3 = 2.0D0*(N1)
+
   
-  v2cb2 = b2/4.0d0/pi/(1.0d0-nu)*(2.0d0*(1.0d0-nu)*(1.0d0-2.0d0*nu)*Fib*cotB**2+(1.0d0-2.0d0*nu)*y2/&
-       (rb+y3b)*(-(1.0d0-2.0d0*nu-a/rb)*cotB+y1/(rb+y3b)*(nu+a/rb))-(1.0d0-2.0d0*nu)*&
-       y2*cotB/(rb+z3b)*(1.d0+a/(rb*cosB))-a*y2*(y3b-a)*cotB/rb**3+y2*&
-       (y3b-a)/(rb*(rb+y3b))*((1.0d0-2.0d0*nu)*cotB-2*nu*y1/(rb+y3b)-a*y1/rb*&
-       (1.0d0/rb+1.0d0/(rb+y3b)))+y2*(y3b-a)*cotB/(rb*(rb+z3b))*(-2.0d0*(1.0d0-nu)*&
-       cosB+(rb*cosB+y3b)/(rb+z3b)*(1.d0+a/(rb*cosB))+a*y3b/(rb**2*cosB)));
-  
-  v3cb2 = b2/4.0d0/pi/(1.0d0-nu)*(-2*(1.0d0-nu)*(1.0d0-2.0d0*nu)*cotB*(log(rb+y3b)-cosB*&
-       log(rb+z3b))-2.0d0*(1.0d0-nu)*y1/(rb+y3b)*(2.0d0*nu+a/rb)+2.0d0*(1.0d0-nu)*z1b/(rb+&
-       z3b)*(cosB+a/rb)+(y3b-a)/rb*((1.0d0-2.0d0*nu)*cotB-2*nu*y1/(rb+y3b)-a*&
-       y1/rb**2)-(y3b-a)/(rb+z3b)*(cosB*sinB+(rb*cosB+y3b)*cotB/rb*&
-       (2.0d0*(1.0d0-nu)*cosB-(rb*cosB+y3b)/(rb+z3b))+a/rb*(sinB-y3b*z1b/&
-       rb**2-z1b*(rb*cosB+y3b)/(rb*(rb+z3b)))));
-  
-  v1cb3 = b3/4.0d0/pi/(1.0d0-nu)*((1.0d0-2.0d0*nu)*(y2/(rb+y3b)*(1.d0+a/rb)-y2*cosB/(rb+&
-       z3b)*(cosB+a/rb))-y2*(y3b-a)/rb*(a/rb**2+1.0d0/(rb+y3b))+y2*&
-       (y3b-a)*cosB/(rb*(rb+z3b))*((rb*cosB+y3b)/(rb+z3b)*(cosB+a/&
-       rb)+a*y3b/rb**2));
-  
-  v2cb3 = b3/4.0d0/pi/(1.0d0-nu)*((1.0d0-2.0d0*nu)*(-sinB*log(rb+z3b)-y1/(rb+y3b)*(1.d0+a/&
-       rb)+z1b/(rb+z3b)*(cosB+a/rb))+y1*(y3b-a)/rb*(a/rb**2+1.0d0/(rb+&
-       y3b))-(y3b-a)/(rb+z3b)*(sinB*(cosB-a/rb)+z1b/rb*(1.d0+a*y3b/&
-       rb**2)-1/(rb*(rb+z3b))*(y2**2*cosB*sinB-a*z1b/rb*(rb*cosB+y3b))));
-  
-  v3cb3 = b3/4.0d0/pi/(1.0d0-nu)*(2.0d0*(1.0d0-nu)*Fib+2.0d0*(1.0d0-nu)*(y2*sinB/(rb+z3b)*(cosB+&
-       a/rb))+y2*(y3b-a)*sinB/(rb*(rb+z3b))*(1.d0+(rb*cosB+y3b)/(rb+&
-       z3b)*(cosB+a/rb)+a*y3b/rb**2));
-  
-  v1 = v1cb1+v1cb2+v1cb3;
-  v2 = v2cb1+v2cb2+v2cb3;
-  v3 = v3cb1+v3cb2+v3cb3;
-end  subroutine AngDisDispFSC
+  !Fib = 2*atan(-y2./(-(rb+y3b)*cot(beta/2)+y1)); % The Burgers' function
+  Fib = 2.0D0 * ATAN(-y2 / (-(rb + y3b) / TAN(beta / 2.0D0) + y1)) ! The Burgers' function
+
+  !v1cb1 = b1/4/pi/(1-nu)*(-2*(1-nu)*(1-2*nu)*Fib*cotB.^2+(1-2*nu)*y2./...
+  !    (rb+y3b).*((1-2*nu-a./rb)*cotB-y1./(rb+y3b).*(nu+a./rb))+(1-2*nu).*...
+  !    y2.*cosB*cotB./(rb+z3b).*(cosB+a./rb)+a*y2.*(y3b-a)*cotB./rb.^3+y2.*...
+  !    (y3b-a)./(rb.*(rb+y3b)).*(-(1-2*nu)*cotB+y1./(rb+y3b).*(2*nu+a./rb)+...
+  !    a*y1./rb.^2)+y2.*(y3b-a)./(rb.*(rb+z3b)).*(cosB./(rb+z3b).*((rb*...
+  !    cosB+y3b).*((1-2*nu)*cosB-a./rb).*cotB+2*(1-nu)*(rb*sinB-y1)*cosB)-...
+  !    a.*y3b*cosB*cotB./rb.^2));
+  v1cb1 = b1*one_over_four_pi/(N1)*(-N3*(N2)*Fib*cotBs+(N2)*y2/ &
+       & (rb+y3b)*((N2-a/rb)*cotB-y1/(rb+y3b)*(nu+a/rb))+(N2)*               &
+       & y2*cosB*cotB/(rb+z3b)*(cosB+a/rb)+a*y2*(y3b-a)*cotB/rbc+y2*                               &
+       & (y3b-a)/(rb*(rb+y3b))*(-(N2)*cotB+y1/(rb+y3b)*(N4+a/rb)+                  &
+       & a*y1/r2b)+y2*(y3b-a)/(rb*(rb+z3b))*(cosB/(rb+z3b)*((rb*                                   &
+       & cosB+y3b)*((N2)*cosB-a/rb)*cotB+N3*(rb*sinB-y1)*cosB)-            &
+       & a*y3b*cosB*cotB/r2b));
+
+  !v2cb1 = b1/4/pi/(1-nu)*((1-2*nu)*((2*(1-nu)*cotB^2-nu)*log_rbpy3b-(2*...
+  !    (1-nu)*cotB^2+1-2*nu)*cosB*log_rbpz3b)-(1-2*nu)./(rb+y3b).*(y1*...
+  !    cotB.*(1-2*nu-a./rb)+nu*y3b-a+y2.^2./(rb+y3b).*(nu+a./rb))-(1-2*...
+  !    nu).*z1b*cotB./(rb+z3b).*(cosB+a./rb)-a*y1.*(y3b-a)*cotB./rb.^3+...
+  !    (y3b-a)./(rb+y3b).*(-2*nu+1./rb.*((1-2*nu).*y1*cotB-a)+y2.^2./(rb.*...
+  !    (rb+y3b)).*(2*nu+a./rb)+a*y2.^2./rb.^3)+(y3b-a)./(rb+z3b).*(cosB^2-...
+  !    1./rb.*((1-2*nu).*z1b*cotB+a*cosB)+a*y3b.*z1b*cotB./rb.^3-1./(rb.*...
+  !    (rb+z3b)).*(y2.^2*cosB^2-a*z1b*cotB./rb.*(rb*cosB+y3b))));
+  v2cb1 = b1*one_over_four_pi/(N1)*((N2)*((N3*cotBs-nu)*log_rbpy3b-(2.0D0* &
+       & (N1)*cotBs+N2)*cosB*log_rbpz3b)-(N2)/(rb+y3b)*(y1*         &
+       & cotB*(N2-a/rb)+nu*y3b-a+y2s/(rb+y3b)*(nu+a/rb))-(1.0D0-2.0D0*                 &
+       & nu)*z1b*cotB/(rb+z3b)*(cosB+a/rb)-a*y1*(y3b-a)*cotB/rbc+                                  &
+       & (y3b-a)/(rb+y3b)*(-N4+one_over_rb*((N2)*y1*cotB-a)+y2s/(rb*                &
+       & (rb+y3b))*(N4+a/rb)+a*y2s/rbc)+(y3b-a)/(rb+z3b)*(cosB**2-                         &
+       & one_over_rb*((N2)*z1b*cotB+a*cosB)+a*y3b*z1b*cotB/rbc-1.0D0/(rb*                 &
+       & (rb+z3b))*(y2s*cosB**2-a*z1b*cotB/rb*(rb*cosB+y3b))))
+
+  !v3cb1 = b1/4/pi/(1-nu)*(2*(1-nu)*(((1-2*nu)*Fib*cotB)+(y2./(rb+y3b).*(2*...
+  !    nu+a./rb))-(y2*cosB./(rb+z3b).*(cosB+a./rb)))+y2.*(y3b-a)./rb.*(2*...
+  !    nu./(rb+y3b)+a./rb.^2)+y2.*(y3b-a)*cosB./(rb.*(rb+z3b)).*(1-2*nu-...
+  !    (rb*cosB+y3b)./(rb+z3b).*(cosB+a./rb)-a*y3b./rb.^2));
+  v3cb1 = b1*one_over_four_pi/(N1)*(N3*(((N2)*Fib*cotB)+(y2/(rb+y3b)*(2*  &
+       & nu+a/rb))-(y2*cosB/(rb+z3b)*(cosB+a/rb)))+y2*(y3b-a)/rb*(2*                             &
+       & nu/(rb+y3b)+a/r2b)+y2*(y3b-a)*cosB/(rb*(rb+z3b))*(N2-                     &
+       & (rb*cosB+y3b)/(rb+z3b)*(cosB+a/rb)-a*y3b/r2b))
+
+  !v1cb2 = b2/4/pi/(1-nu)*((1-2*nu)*((2*(1-nu)*cotB^2+nu)*log_rbpy3b-(2*...
+  !    (1-nu)*cotB^2+1)*cosB*log_rbpz3b)+(1-2*nu)./(rb+y3b).*(-(1-2*nu).*...
+  !    y1*cotB+nu*y3b-a+a*y1*cotB./rb+y1.^2./(rb+y3b).*(nu+a./rb))-(1-2*...
+  !    nu)*cotB./(rb+z3b).*(z1b*cosB-a*(rb*sinB-y1)./(rb*cosB))-a*y1.*...
+  !    (y3b-a)*cotB./rb.^3+(y3b-a)./(rb+y3b).*(2*nu+1./rb.*((1-2*nu).*y1*...
+  !    cotB+a)-y1.^2./(rb.*(rb+y3b)).*(2*nu+a./rb)-a*y1.^2./rb.^3)+(y3b-a)*...
+  !    cotB./(rb+z3b).*(-cosB*sinB+a*y1.*y3b./(rb.^3*cosB)+(rb*sinB-y1)./...
+  !    rb.*(2*(1-nu)*cosB-(rb*cosB+y3b)./(rb+z3b).*(1+a./(rb*cosB)))));
+  v1cb2 = b2*one_over_four_pi/(N1)*((N2)*((N3*cotBs+nu)*log_rbpy3b-(2* &
+       & (N1)*cotBs+1)*cosB*log_rbpz3b)+(N2)/(rb+y3b)*(-(N2)*   &
+       & y1*cotB+nu*y3b-a+a*y1*cotB/rb+y1**2/(rb+y3b)*(nu+a/rb))-(1.0D0-2.0D0*                   &
+       & nu)*cotB/(rb+z3b)*(z1b*cosB-a*(rb*sinB-y1)/(rb*cosB))-a*y1*                             &
+       & (y3b-a)*cotB/rbc+(y3b-a)/(rb+y3b)*(N4+one_over_rb*((N2)*y1*            &
+       & cotB+a)-y1**2/(rb*(rb+y3b))*(N4+a/rb)-a*y1**2/rbc)+(y3b-a)*                     &
+       & cotB/(rb+z3b)*(-cosB*sinB+a*y1*y3b/(rbc*cosB)+(rb*sinB-y1)/                           &
+       & rb*(N3*cosB-(rb*cosB+y3b)/(rb+z3b)*(1.0D0+a/(rb*cosB)))))
+
+  !v2cb2 = b2/4/pi/(1-nu)*(2*(1-nu)*(1-2*nu)*Fib*cotB.^2+(1-2*nu)*y2./...
+  !    (rb+y3b).*(-(1-2*nu-a./rb)*cotB+y1./(rb+y3b).*(nu+a./rb))-(1-2*nu)*...
+  !    y2*cotB./(rb+z3b).*(1+a./(rb*cosB))-a*y2.*(y3b-a)*cotB./rb.^3+y2.*...
+  !    (y3b-a)./(rb.*(rb+y3b)).*((1-2*nu)*cotB-2*nu*y1./(rb+y3b)-a*y1./rb.*...
+  !    (1./rb+1./(rb+y3b)))+y2.*(y3b-a)*cotB./(rb.*(rb+z3b)).*(-2*(1-nu)*...
+  !    cosB+(rb*cosB+y3b)./(rb+z3b).*(1+a./(rb*cosB))+a*y3b./(rb.^2*cosB)));
+  v2cb2 = b2*one_over_four_pi/(N1)*(N3*(N2)*Fib*cotBs+(N2)*y2/  &
+       & (rb+y3b)*(-(N2-a/rb)*cotB+y1/(rb+y3b)*(nu+a/rb))-(N2)*              &
+       & y2*cotB/(rb+z3b)*(1.0D0+a/(rb*cosB))-a*y2*(y3b-a)*cotB/rbc+y2*                            &
+       & (y3b-a)/(rb*(rb+y3b))*((N2)*cotB-N4*y1/(rb+y3b)-a*y1/rb*                  &
+       & (one_over_rb+1.0D0/(rb+y3b)))+y2*(y3b-a)*cotB/(rb*(rb+z3b))*(-N3*                &
+       & cosB+(rb*cosB+y3b)/(rb+z3b)*(1.0D0+a/(rb*cosB))+a*y3b/(r2b*cosB)))
+
+  !v3cb2 = b2/4/pi/(1-nu)*(-2*(1-nu)*(1-2*nu)*cotB*(log_rbpy3b-cosB*...
+  !    log_rbpz3b)-2*(1-nu)*y1./(rb+y3b).*(2*nu+a./rb)+2*(1-nu)*z1b./(rb+...
+  !    z3b).*(cosB+a./rb)+(y3b-a)./rb.*((1-2*nu)*cotB-2*nu*y1./(rb+y3b)-a*...
+  !    y1./rb.^2)-(y3b-a)./(rb+z3b).*(cosB*sinB+(rb*cosB+y3b)*cotB./rb.*...
+  !    (2*(1-nu)*cosB-(rb*cosB+y3b)./(rb+z3b))+a./rb.*(sinB-y3b.*z1b./...
+  !    rb.^2-z1b.*(rb*cosB+y3b)./(rb.*(rb+z3b)))));
+  v3cb2 = b2*one_over_four_pi/(N1)*(-N3*(N2)*cotB*(log_rbpy3b-cosB*  &
+       &  log_rbpz3b)-N3*y1/(rb+y3b)*(N4+a/rb)+N3*z1b/(rb+ &
+       &  z3b)*(cosB+a/rb)+(y3b-a)/rb*((N2)*cotB-N4*y1/(rb+y3b)-a*          &
+       &  y1/r2b)-(y3b-a)/(rb+z3b)*(cosB*sinB+(rb*cosB+y3b)*cotB/rb*                        &
+       &  (N3*cosB-(rb*cosB+y3b)/(rb+z3b))+a/rb*(sinB-y3b*z1b/                  &
+       &  r2b-z1b*(rb*cosB+y3b)/(rb*(rb+z3b)))))
+
+  !v1cb3 = b3/4/pi/(1-nu)*((1-2*nu)*(y2./(rb+y3b).*(1+a./rb)-y2*cosB./(rb+...
+  !    z3b).*(cosB+a./rb))-y2.*(y3b-a)./rb.*(a./rb.^2+1./(rb+y3b))+y2.*...
+  !    (y3b-a)*cosB./(rb.*(rb+z3b)).*((rb*cosB+y3b)./(rb+z3b).*(cosB+a./...
+  !    rb)+a.*y3b./rb.^2));
+  v1cb3 = b3*one_over_four_pi/(N1)*((N2)*(y2/(rb+y3b)*(1.0d0+a/rb)-y2*cosB/(rb+  &
+       & z3b)*(cosB+a/rb))-y2*(y3b-a)/rb*(a/r2b+1.0D0/(rb+y3b))+y2*                 &
+       & (y3b-a)*cosB/(rb*(rb+z3b))*((rb*cosB+y3b)/(rb+z3b)*(cosB+a/                  &
+       & rb)+a*y3b/r2b))
+
+  !v2cb3 = b3/4/pi/(1-nu)*((1-2*nu)*(-sinB*log_rbpz3b-y1./(rb+y3b).*(1+a./...
+  !    rb)+z1b./(rb+z3b).*(cosB+a./rb))+y1.*(y3b-a)./rb.*(a./rb.^2+1./(rb+...
+  !    y3b))-(y3b-a)./(rb+z3b).*(sinB*(cosB-a./rb)+z1b./rb.*(1+a.*y3b./...
+  !    rb.^2)-1./(rb.*(rb+z3b)).*(y2.^2*cosB*sinB-a*z1b./rb.*(rb*cosB+y3b))));
+  v2cb3 = b3*one_over_four_pi/(N1)*((N2)*(-sinB*log_rbpz3b-y1/(rb+y3b)*(1+a/  &
+       & rb)+z1b/(rb+z3b)*(cosB+a/rb))+y1*(y3b-a)/rb*(a/r2b+1.0D0/(rb+                &
+       & y3b))-(y3b-a)/(rb+z3b)*(sinB*(cosB-a/rb)+z1b/rb*(1.0D0+a*y3b/                  &
+       & r2b)-1.0D0/(rb*(rb+z3b))*(y2s*cosB*sinB-a*z1b/rb*(rb*cosB+y3b))))
+
+  !v3cb3 = b3/4/pi/(1-nu)*(2*(1-nu)*Fib+2*(1-nu)*(y2*sinB./(rb+z3b).*(cosB+...
+  !    a./rb))+y2.*(y3b-a)*sinB./(rb.*(rb+z3b)).*(1+(rb*cosB+y3b)./(rb+...
+  !    z3b).*(cosB+a./rb)+a.*y3b./rb.^2));
+  v3cb3 = b3*one_over_four_pi/(N1)*(N3*Fib+N3*(y2*sinB/(rb+z3b)*(cosB+  &
+       & a/rb))+y2*(y3b-a)*sinB/(rb*(rb+z3b))*(1.0D0+(rb*cosB+y3b)/(rb+                          &
+       & z3b)*(cosB+a/rb)+a*y3b/r2b))
+
+  !v1 = v1cb1+v1cb2+v1cb3;
+  !v2 = v2cb1+v2cb2+v2cb3;
+  !v3 = v3cb1+v3cb2+v3cb3;
+  v1 = v1cb1 + v1cb2 + v1cb3
+  v2 = v2cb1 + v2cb2 + v2cb3
+  v3 = v3cb1 + v3cb2 + v3cb3
+
+END SUBROUTINE Angdisdispfsc
+
 subroutine matrix_from_3vec(x,y,z,A)
   implicit none
   C_PREC,intent(in),dimension(3):: x,y,z
@@ -623,7 +777,7 @@ subroutine setup_geometry(x,y,z,Ts,Ss,Ds,p1,p2,p3,bx,by,bz,&
   aA = acos(dot_product( e12,e13));
   aB = acos(dot_product(-e12,e23));
   aC = acos(dot_product( e23,e13));
-
+  !print *,'abc',aA,aB,aC
   ! Determine the best arteact-free configuration for each calculation point
   call trimodefinder(y_,z_,x_,p1_(2:3),p2_(2:3),p3_(2:3),trimode);
   
@@ -689,3 +843,5 @@ subroutine get_tdcd_adcs(sidevec,trivertex,y,z,by,bz,A,y1,z1,by1,bz1)
   by1 = A(1, 1) * by + A(1, 2) * bz
   bz1 = A(2, 1) * by + A(2, 2) * bz
 end subroutine get_tdcd_adcs
+#undef ANGDISDISP
+#undef ANGDISDISP_FSC

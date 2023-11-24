@@ -99,8 +99,11 @@ extern void tdd_coeff(COMP_PRECISION *,COMP_PRECISION *,
 extern void tddisphs(COMP_PRECISION *,COMP_PRECISION *,COMP_PRECISION *,COMP_PRECISION *,
 		     COMP_PRECISION *,COMP_PRECISION *,
 		     COMP_PRECISION *,COMP_PRECISION *,COMP_PRECISION *);
+extern void tddisphs_bird(double *,double *,double *,double *,double *,
+			  double *,double *,double *,
+			  double *,double *,
+			  double *,double *,double *);
 extern void tdstresshs(COMP_PRECISION *,COMP_PRECISION *,COMP_PRECISION *,COMP_PRECISION *,
-		       COMP_PRECISION *,COMP_PRECISION *,
 		       COMP_PRECISION *,COMP_PRECISION *,COMP_PRECISION *,COMP_PRECISION *,
 		       COMP_PRECISION *);
 extern void get_tdcs_base_vectors(COMP_PRECISION *,COMP_PRECISION *,COMP_PRECISION *,
