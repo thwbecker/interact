@@ -108,7 +108,7 @@ void initialize(struct med **medium, struct flt **fault,
   // first, need the FAULT GEOMETRY, and calculate the position of patches
   // also, allocate space and initialize the medium structure
   //
-  
+  /* all nodes need to know geometry */
   read_geometry(GEOMETRY_FILE,medium,fault,read_fault_properties,
 		twod_approx_is_plane_stress,half_plane,TRUE);
   if((*medium)->comm_rank==0)
@@ -119,7 +119,10 @@ void initialize(struct med **medium, struct flt **fault,
   if((*medium)->comm_size == 1){
     (*medium)->myfault0 = 0;
     (*medium)->myfaultn = (*medium)->nrflt;
-  }else{			/* distribute fault ranges to cores */
+  }else{
+    /* 
+       distribute fault ranges to cores 
+    */
     fchunk = (int)((float)(*medium)->nrflt / (float)(*medium)->comm_size + 0.5);
     if(fchunk < 1){
       fprintf(stderr,"initialize: too many cores (%i) for the number of faults (%i), chunk %i\n",
@@ -165,6 +168,7 @@ void initialize(struct med **medium, struct flt **fault,
   // read in boundary conditions, e.g. what kind of simulations, if
   // one step, prescribed slip or stress etc.
   //
+  /* all nodes need to know boundary conditions */
   read_boundary_conditions(*medium,*fault,a,b,init_system);  
   //
   //

@@ -457,7 +457,7 @@ SUBROUTINE Angdisdisp(x, y, z, alpha, bx, by, bz, nu, & ! inputs
 
   C_PREC :: cosA, eta, r, sinA, ux, uy, uz, vx, vy, vz, wx, wy, wz, zz, zeta
 
-  C_PREC :: rmzeta,log_rmzeta,N1,N2,N3,rmzz,log_rmzz,xs
+  C_PREC :: rmzeta,log_rmzeta,N1,N2,N3,rmzz,log_rmzz,xs,  one_over_r_rmzeta 
   
   !cosA = cos(alpha);
   !sinA = sin(alpha);
@@ -486,42 +486,32 @@ SUBROUTINE Angdisdisp(x, y, z, alpha, bx, by, bz, nu, & ! inputs
   log_rmzz = log(rmzz)
   
   rmzeta = r - zeta
+  one_over_r_rmzeta = 1.0d0/(r*rmzeta)
+  
   log_rmzeta = log(rmzeta)
   N1 = 1.0d0-nu
   N2 = 1.0D0-2.0D0*nu
   N3 = 2.0D0*(N1)
-  !ux = bx/8/pi/(1-nu)*(x.*y./r./(r-z)-x.*eta./r./(r-zeta));
-  !vx = bx/8/pi/(1-nu)*(eta*sinA./(rmzeta)-y.*eta./r./(rmzeta)+...
-  !    y.^2./r./(r-z)+(1-2*nu)*(cosA*log_rmzeta-log(r-z)));
-  !wx = bx/8/pi/(1-nu)*(eta*cosA./(rmzeta)-y./r-eta.*z./r./(rmzeta)-...
-  !    (1-2*nu)*sinA*log_rmzeta);
-  ux = bx*one_over_eight_pi/(N1) * (x*y/r/(rmzz)-x*eta/r/(rmzeta))
-  vx = bx*one_over_eight_pi/(N1) * (eta*sinA/(rmzeta)-y*eta/r/(rmzeta) + &
+ 
+  ux = bx*one_over_eight_pi/(N1) * (x*y/r/(rmzz)-x*eta*one_over_r_rmzeta)
+  vx = bx*one_over_eight_pi/(N1) * (eta*sinA/(rmzeta)-y*eta*one_over_r_rmzeta + &
        & y**2/r/(rmzz) + (N2) * (cosA*log_rmzeta-log_rmzz))
-  wx = bx*one_over_eight_pi/(N1) * (eta*cosA/(rmzeta)-y/r-eta*zz/r/(rmzeta)- &
+  wx = bx*one_over_eight_pi/(N1) * (eta*cosA/(rmzeta)-y/r-eta*zz*one_over_r_rmzeta- &
        & (N2) * sinA * log_rmzeta);
 
-  !uy = by/8/pi/(1-nu)*(x.^2*cosA./r./(rmzeta)-x.^2./r./(r-z)-...
-  !    (1-2*nu)*(cosA*log_rmzeta-log(r-z)));
-  !vy = by*x/8/pi/(1-nu).*(y.*cosA./r./(rmzeta)-...
-  !    sinA*cosA./(rmzeta)-y./r./(r-z));
-  !wy = by*x/8/pi/(1-nu).*(z*cosA./r./(rmzeta)-cosA^2./(rmzeta)+1./r);
-  uy = by*one_over_eight_pi/(N1) * (xs*cosA/r/(rmzeta) - xs/r/(rmzz) - &
+ 
+  uy = by*one_over_eight_pi/(N1) * (xs*cosA*one_over_r_rmzeta - xs/r/(rmzz) - &
        & (N2) * (cosA*log_rmzeta - log_rmzz))
-  vy = by*x*one_over_eight_pi/(N1) * (y*cosA/r/(rmzeta) - &
+  vy = by*x*one_over_eight_pi/(N1) * (y*cosA*one_over_r_rmzeta - &
        & sinA*cosA/(rmzeta) - y/r/(rmzz))
-  wy = by*x*one_over_eight_pi/(N1) * (zz*cosA/r/(rmzeta) - cosA**2/(rmzeta)+1.0D0/r)
+  wy = by*x*one_over_eight_pi/(N1) * (zz*cosA*one_over_r_rmzeta - cosA**2/(rmzeta)+1.0D0/r)
 
-  !uz = bz*sinA/8/pi/(1-nu).*((1-2*nu)*log_rmzeta-x.^2./r./(rmzeta));
-  !vz = bz*x*sinA/8/pi/(1-nu).*(sinA./(rmzeta)-y./r./(rmzeta));
-  !wz = bz*x*sinA/8/pi/(1-nu).*(cosA./(rmzeta)-z./r./(rmzeta));
-  uz = bz*sinA*one_over_eight_pi/(N1) * ((N2)*log_rmzeta-xs/r/(rmzeta))
-  vz = bz*x*sinA*one_over_eight_pi/(N1) * (sinA/(rmzeta)-y/r/(rmzeta))
-  wz = bz*x*sinA*one_over_eight_pi/(N1)*(cosA/(rmzeta)-zz/r/(rmzeta))
+  
+  uz = bz*sinA*one_over_eight_pi/(N1) * ((N2)*log_rmzeta-xs*one_over_r_rmzeta)
+  vz = bz*x*sinA*one_over_eight_pi/(N1) * (sinA/(rmzeta)-y*one_over_r_rmzeta)
+  wz = bz*x*sinA*one_over_eight_pi/(N1) *(cosA/(rmzeta)-zz*one_over_r_rmzeta)
 
-  !u = ux+uy+uz;
-  !v = vx+vy+vz;
-  !w = wx+wy+wz;
+
   u = ux + uy + uz
   v = vx + vy + vz
   w = wx + wy + wz
@@ -543,7 +533,8 @@ SUBROUTINE Angdisdispfsc(y1, y2, y3, beta, b1, b2, b3, nu, a, & ! inputs
   !test point at (y1, y2, y3), and each of these is a simple C_PREC scalar number.
 
   IMPLICIT NONE
-  C_PREC, PARAMETER :: pi = 3.14159265358979D0,one_over_four_pi = 1.0d0/(4.0d0*pi)
+  C_PREC, PARAMETER :: pi = 3.14159265358979D0,&
+       unity = FORTRAN_UNITY, one_over_four_pi = unity/(4.0d0*pi)
   C_PREC, INTENT(IN) :: y1, y2, y3, beta, b1, b2, b3, nu, a
   C_PREC, INTENT(OUT) :: v1, v2, v3
 
@@ -565,7 +556,7 @@ SUBROUTINE Angdisdispfsc(y1, y2, y3, beta, b1, b2, b3, nu, a, & ! inputs
   cosB = COS(beta)
   cosBs = cosB**2
   
-  cotB = 1.00D0 / TAN(beta)
+  cotB = unity / TAN(beta)
   cotBs = cotB**2
   
   y3b = y3 + 2.0D0 * a
@@ -582,24 +573,18 @@ SUBROUTINE Angdisdispfsc(y1, y2, y3, beta, b1, b2, b3, nu, a, & ! inputs
   
   log_rbpy3b = log(rb+y3b)
   log_rbpz3b = log(rb+z3b)
-  one_over_rb = 1.0d0/rb
+  one_over_rb = unity/rb
   
-  N1 = 1.0d0-nu
+  N1 = unity-nu
   N4 = 2.0d0*nu
-  N2 = 1.0D0-N4
+  N2 = UNITY-N4
   N3 = 2.0D0*N1
 
   
   !Fib = 2*atan(-y2./(-(rb+y3b)*cot(beta/2)+y1)); % The Burgers' function
   Fib = 2.0D0 * ATAN(-y2 / (-(rb + y3b) / TAN(beta / 2.0D0) + y1)) ! The Burgers' function
 
-  !v1cb1 = b1/4/pi/(1-nu)*(-2*(1-nu)*(1-2*nu)*Fib*cotB.^2+(1-2*nu)*y2./...
-  !    (rb+y3b).*((1-2*nu-a./rb)*cotB-y1./(rb+y3b).*(nu+a./rb))+(1-2*nu).*...
-  !    y2.*cosB*cotB./(rb+z3b).*(cosB+a./rb)+a*y2.*(y3b-a)*cotB./rb.^3+y2.*...
-  !    (y3b-a)./(rb.*(rb+y3b)).*(-(1-2*nu)*cotB+y1./(rb+y3b).*(2*nu+a./rb)+...
-  !    a*y1./rb.^2)+y2.*(y3b-a)./(rb.*(rb+z3b)).*(cosB./(rb+z3b).*((rb*...
-  !    cosB+y3b).*((1-2*nu)*cosB-a./rb).*cotB+2*(1-nu)*(rb*sinB-y1)*cosB)-...
-  !    a.*y3b*cosB*cotB./rb.^2));
+ 
   v1cb1 = b1*one_over_four_pi/(N1)*(-N3*(N2)*Fib*cotBs+(N2)*y2/ &
        & (rb+y3b)*((N2-a/rb)*cotB-y1/(rb+y3b)*(nu+a/rb))+(N2)*               &
        & y2*cosB*cotB/(rb+z3b)*(cosB+a/rb)+a*y2*(y3b-a)*cotB/rbc+y2*                               &
@@ -608,68 +593,41 @@ SUBROUTINE Angdisdispfsc(y1, y2, y3, beta, b1, b2, b3, nu, a, & ! inputs
        & cosB+y3b)*((N2)*cosB-a/rb)*cotB+N3*(rb*sinB-y1)*cosB)-            &
        & a*y3b*cosB*cotB/r2b));
 
-  !v2cb1 = b1/4/pi/(1-nu)*((1-2*nu)*((2*(1-nu)*cotB^2-nu)*log_rbpy3b-(2*...
-  !    (1-nu)*cotB^2+1-2*nu)*cosB*log_rbpz3b)-(1-2*nu)./(rb+y3b).*(y1*...
-  !    cotB.*(1-2*nu-a./rb)+nu*y3b-a+y2.^2./(rb+y3b).*(nu+a./rb))-(1-2*...
-  !    nu).*z1b*cotB./(rb+z3b).*(cosB+a./rb)-a*y1.*(y3b-a)*cotB./rb.^3+...
-  !    (y3b-a)./(rb+y3b).*(-2*nu+1./rb.*((1-2*nu).*y1*cotB-a)+y2.^2./(rb.*...
-  !    (rb+y3b)).*(2*nu+a./rb)+a*y2.^2./rb.^3)+(y3b-a)./(rb+z3b).*(cosB^2-...
-  !    1./rb.*((1-2*nu).*z1b*cotB+a*cosB)+a*y3b.*z1b*cotB./rb.^3-1./(rb.*...
-  !    (rb+z3b)).*(y2.^2*cosB^2-a*z1b*cotB./rb.*(rb*cosB+y3b))));
+  
   v2cb1 = b1*one_over_four_pi/(N1)*((N2)*((N3*cotBs-nu)*log_rbpy3b-(2.0D0* &
        & (N1)*cotBs+N2)*cosB*log_rbpz3b)-(N2)/(rb+y3b)*(y1*         &
-       & cotB*(N2-a/rb)+nu*y3b-a+y2s/(rb+y3b)*(nu+a/rb))-(1.0D0-2.0D0*                 &
-       & nu)*z1b*cotB/(rb+z3b)*(cosB+a/rb)-a*y1*(y3b-a)*cotB/rbc+                                  &
+       & cotB*(N2-a/rb)+nu*y3b-a+y2s/(rb+y3b)*(nu+a/rb))-(UNITY-N4                 &
+       & )*z1b*cotB/(rb+z3b)*(cosB+a/rb)-a*y1*(y3b-a)*cotB/rbc+                                  &
        & (y3b-a)/(rb+y3b)*(-N4+one_over_rb*((N2)*y1*cotB-a)+y2s/(rb*                &
        & (rb+y3b))*(N4+a/rb)+a*y2s/rbc)+(y3b-a)/(rb+z3b)*(cosBs-                         &
-       & one_over_rb*((N2)*z1b*cotB+a*cosB)+a*y3b*z1b*cotB/rbc-1.0D0/(rb*                 &
+       & one_over_rb*((N2)*z1b*cotB+a*cosB)+a*y3b*z1b*cotB/rbc-UNITY/(rb*                 &
        & (rb+z3b))*(y2s*cosBs-a*z1b*cotB/rb*(rb*cosB+y3b))))
 
-  !v3cb1 = b1/4/pi/(1-nu)*(2*(1-nu)*(((1-2*nu)*Fib*cotB)+(y2./(rb+y3b).*(2*...
-  !    nu+a./rb))-(y2*cosB./(rb+z3b).*(cosB+a./rb)))+y2.*(y3b-a)./rb.*(2*...
-  !    nu./(rb+y3b)+a./rb.^2)+y2.*(y3b-a)*cosB./(rb.*(rb+z3b)).*(1-2*nu-...
-  !    (rb*cosB+y3b)./(rb+z3b).*(cosB+a./rb)-a*y3b./rb.^2));
-  v3cb1 = b1*one_over_four_pi/(N1)*(N3*(((N2)*Fib*cotB)+(y2/(rb+y3b)*(2*  &
-       & nu+a/rb))-(y2*cosB/(rb+z3b)*(cosB+a/rb)))+y2*(y3b-a)/rb*(2*                             &
-       & nu/(rb+y3b)+a/r2b)+y2*(y3b-a)*cosB/(rb*(rb+z3b))*(N2-                     &
+ 
+  v3cb1 = b1*one_over_four_pi/(N1)*(N3*(((N2)*Fib*cotB)+(y2/(rb+y3b)*(N4  &
+       & +a/rb))-(y2*cosB/(rb+z3b)*(cosB+a/rb)))+y2*(y3b-a)/rb*(N4                             &
+       & /(rb+y3b)+a/r2b)+y2*(y3b-a)*cosB/(rb*(rb+z3b))*(N2-                     &
        & (rb*cosB+y3b)/(rb+z3b)*(cosB+a/rb)-a*y3b/r2b))
 
-  !v1cb2 = b2/4/pi/(1-nu)*((1-2*nu)*((2*(1-nu)*cotB^2+nu)*log_rbpy3b-(2*...
-  !    (1-nu)*cotB^2+1)*cosB*log_rbpz3b)+(1-2*nu)./(rb+y3b).*(-(1-2*nu).*...
-  !    y1*cotB+nu*y3b-a+a*y1*cotB./rb+y1.^2./(rb+y3b).*(nu+a./rb))-(1-2*...
-  !    nu)*cotB./(rb+z3b).*(z1b*cosB-a*(rb*sinB-y1)./(rb*cosB))-a*y1.*...
-  !    (y3b-a)*cotB./rb.^3+(y3b-a)./(rb+y3b).*(2*nu+1./rb.*((1-2*nu).*y1*...
-  !    cotB+a)-y1.^2./(rb.*(rb+y3b)).*(2*nu+a./rb)-a*y1.^2./rb.^3)+(y3b-a)*...
-  !    cotB./(rb+z3b).*(-cosB*sinB+a*y1.*y3b./(rb.^3*cosB)+(rb*sinB-y1)./...
-  !    rb.*(2*(1-nu)*cosB-(rb*cosB+y3b)./(rb+z3b).*(1+a./(rb*cosB)))));
+  
   v1cb2 = b2*one_over_four_pi/(N1)*((N2)*((N3*cotBs+nu)*log_rbpy3b-(2* &
        & (N1)*cotBs+1)*cosB*log_rbpz3b)+(N2)/(rb+y3b)*(-(N2)*   &
-       & y1*cotB+nu*y3b-a+a*y1*cotB/rb+y1s/(rb+y3b)*(nu+a/rb))-(1.0D0-2.0D0*                   &
-       & nu)*cotB/(rb+z3b)*(z1b*cosB-a*(rb*sinB-y1)/(rb*cosB))-a*y1*                             &
+       & y1*cotB+nu*y3b-a+a*y1*cotB/rb+y1s/(rb+y3b)*(nu+a/rb))-(UNITY-N4                   &
+       & )*cotB/(rb+z3b)*(z1b*cosB-a*(rb*sinB-y1)/(rb*cosB))-a*y1*                             &
        & (y3b-a)*cotB/rbc+(y3b-a)/(rb+y3b)*(N4+one_over_rb*((N2)*y1*            &
        & cotB+a)-y1s/(rb*(rb+y3b))*(N4+a/rb)-a*y1s/rbc)+(y3b-a)*                     &
        & cotB/(rb+z3b)*(-cosB*sinB+a*y1*y3b/(rbc*cosB)+(rb*sinB-y1)/                           &
-       & rb*(N3*cosB-(rb*cosB+y3b)/(rb+z3b)*(1.0D0+a/(rb*cosB)))))
+       & rb*(N3*cosB-(rb*cosB+y3b)/(rb+z3b)*(UNITY+a/(rb*cosB)))))
 
-  !v2cb2 = b2/4/pi/(1-nu)*(2*(1-nu)*(1-2*nu)*Fib*cotB.^2+(1-2*nu)*y2./...
-  !    (rb+y3b).*(-(1-2*nu-a./rb)*cotB+y1./(rb+y3b).*(nu+a./rb))-(1-2*nu)*...
-  !    y2*cotB./(rb+z3b).*(1+a./(rb*cosB))-a*y2.*(y3b-a)*cotB./rb.^3+y2.*...
-  !    (y3b-a)./(rb.*(rb+y3b)).*((1-2*nu)*cotB-2*nu*y1./(rb+y3b)-a*y1./rb.*...
-  !    (1./rb+1./(rb+y3b)))+y2.*(y3b-a)*cotB./(rb.*(rb+z3b)).*(-2*(1-nu)*...
-  !    cosB+(rb*cosB+y3b)./(rb+z3b).*(1+a./(rb*cosB))+a*y3b./(rb.^2*cosB)));
+ 
   v2cb2 = b2*one_over_four_pi/(N1)*(N3*(N2)*Fib*cotBs+(N2)*y2/  &
        & (rb+y3b)*(-(N2-a/rb)*cotB+y1/(rb+y3b)*(nu+a/rb))-(N2)*              &
-       & y2*cotB/(rb+z3b)*(1.0D0+a/(rb*cosB))-a*y2*(y3b-a)*cotB/rbc+y2*                            &
+       & y2*cotB/(rb+z3b)*(UNITY+a/(rb*cosB))-a*y2*(y3b-a)*cotB/rbc+y2*                            &
        & (y3b-a)/(rb*(rb+y3b))*((N2)*cotB-N4*y1/(rb+y3b)-a*y1/rb*                  &
-       & (one_over_rb+1.0D0/(rb+y3b)))+y2*(y3b-a)*cotB/(rb*(rb+z3b))*(-N3*                &
-       & cosB+(rb*cosB+y3b)/(rb+z3b)*(1.0D0+a/(rb*cosB))+a*y3b/(r2b*cosB)))
+       & (one_over_rb+UNITY/(rb+y3b)))+y2*(y3b-a)*cotB/(rb*(rb+z3b))*(-N3*                &
+       & cosB+(rb*cosB+y3b)/(rb+z3b)*(UNITY+a/(rb*cosB))+a*y3b/(r2b*cosB)))
 
-  !v3cb2 = b2/4/pi/(1-nu)*(-2*(1-nu)*(1-2*nu)*cotB*(log_rbpy3b-cosB*...
-  !    log_rbpz3b)-2*(1-nu)*y1./(rb+y3b).*(2*nu+a./rb)+2*(1-nu)*z1b./(rb+...
-  !    z3b).*(cosB+a./rb)+(y3b-a)./rb.*((1-2*nu)*cotB-2*nu*y1./(rb+y3b)-a*...
-  !    y1./rb.^2)-(y3b-a)./(rb+z3b).*(cosB*sinB+(rb*cosB+y3b)*cotB./rb.*...
-  !    (2*(1-nu)*cosB-(rb*cosB+y3b)./(rb+z3b))+a./rb.*(sinB-y3b.*z1b./...
-  !    rb.^2-z1b.*(rb*cosB+y3b)./(rb.*(rb+z3b)))));
+  
   v3cb2 = b2*one_over_four_pi/(N1)*(-N3*(N2)*cotB*(log_rbpy3b-cosB*  &
        &  log_rbpz3b)-N3*y1/(rb+y3b)*(N4+a/rb)+N3*z1b/(rb+ &
        &  z3b)*(cosB+a/rb)+(y3b-a)/rb*((N2)*cotB-N4*y1/(rb+y3b)-a*          &
@@ -677,34 +635,24 @@ SUBROUTINE Angdisdispfsc(y1, y2, y3, beta, b1, b2, b3, nu, a, & ! inputs
        &  (N3*cosB-(rb*cosB+y3b)/(rb+z3b))+a/rb*(sinB-y3b*z1b/                  &
        &  r2b-z1b*(rb*cosB+y3b)/(rb*(rb+z3b)))))
 
-  !v1cb3 = b3/4/pi/(1-nu)*((1-2*nu)*(y2./(rb+y3b).*(1+a./rb)-y2*cosB./(rb+...
-  !    z3b).*(cosB+a./rb))-y2.*(y3b-a)./rb.*(a./rb.^2+1./(rb+y3b))+y2.*...
-  !    (y3b-a)*cosB./(rb.*(rb+z3b)).*((rb*cosB+y3b)./(rb+z3b).*(cosB+a./...
-  !    rb)+a.*y3b./rb.^2));
-  v1cb3 = b3*one_over_four_pi/(N1)*((N2)*(y2/(rb+y3b)*(1.0d0+a/rb)-y2*cosB/(rb+  &
-       & z3b)*(cosB+a/rb))-y2*(y3b-a)/rb*(a/r2b+1.0D0/(rb+y3b))+y2*                 &
+  
+  v1cb3 = b3*one_over_four_pi/(N1)*((N2)*(y2/(rb+y3b)*(unity+a/rb)-y2*cosB/(rb+  &
+       & z3b)*(cosB+a/rb))-y2*(y3b-a)/rb*(a/r2b+UNITY/(rb+y3b))+y2*                 &
        & (y3b-a)*cosB/(rb*(rb+z3b))*((rb*cosB+y3b)/(rb+z3b)*(cosB+a/                  &
        & rb)+a*y3b/r2b))
 
-  !v2cb3 = b3/4/pi/(1-nu)*((1-2*nu)*(-sinB*log_rbpz3b-y1./(rb+y3b).*(1+a./...
-  !    rb)+z1b./(rb+z3b).*(cosB+a./rb))+y1.*(y3b-a)./rb.*(a./rb.^2+1./(rb+...
-  !    y3b))-(y3b-a)./(rb+z3b).*(sinB*(cosB-a./rb)+z1b./rb.*(1+a.*y3b./...
-  !    rb.^2)-1./(rb.*(rb+z3b)).*(y2.^2*cosB*sinB-a*z1b./rb.*(rb*cosB+y3b))));
-  v2cb3 = b3*one_over_four_pi/(N1)*((N2)*(-sinB*log_rbpz3b-y1/(rb+y3b)*(1+a/  &
-       & rb)+z1b/(rb+z3b)*(cosB+a/rb))+y1*(y3b-a)/rb*(a/r2b+1.0D0/(rb+                &
-       & y3b))-(y3b-a)/(rb+z3b)*(sinB*(cosB-a/rb)+z1b/rb*(1.0D0+a*y3b/                  &
-       & r2b)-1.0D0/(rb*(rb+z3b))*(y2s*cosB*sinB-a*z1b/rb*(rb*cosB+y3b))))
 
-  !v3cb3 = b3/4/pi/(1-nu)*(2*(1-nu)*Fib+2*(1-nu)*(y2*sinB./(rb+z3b).*(cosB+...
-  !    a./rb))+y2.*(y3b-a)*sinB./(rb.*(rb+z3b)).*(1+(rb*cosB+y3b)./(rb+...
-  !    z3b).*(cosB+a./rb)+a.*y3b./rb.^2));
+  v2cb3 = b3*one_over_four_pi/(N1)*((N2)*(-sinB*log_rbpz3b-y1/(rb+y3b)*(unity+a/  &
+       & rb)+z1b/(rb+z3b)*(cosB+a/rb))+y1*(y3b-a)/rb*(a/r2b+UNITY/(rb+                &
+       & y3b))-(y3b-a)/(rb+z3b)*(sinB*(cosB-a/rb)+z1b/rb*(UNITY+a*y3b/                  &
+       & r2b)-UNITY/(rb*(rb+z3b))*(y2s*cosB*sinB-a*z1b/rb*(rb*cosB+y3b))))
+
+  
   v3cb3 = b3*one_over_four_pi/(N1)*(N3*Fib+N3*(y2*sinB/(rb+z3b)*(cosB+  &
-       & a/rb))+y2*(y3b-a)*sinB/(rb*(rb+z3b))*(1.0D0+(rb*cosB+y3b)/(rb+                          &
+       & a/rb))+y2*(y3b-a)*sinB/(rb*(rb+z3b))*(UNITY+(rb*cosB+y3b)/(rb+                          &
        & z3b)*(cosB+a/rb)+a*y3b/r2b))
 
-  !v1 = v1cb1+v1cb2+v1cb3;
-  !v2 = v2cb1+v2cb2+v2cb3;
-  !v3 = v3cb1+v3cb2+v3cb3;
+ 
   v1 = v1cb1 + v1cb2 + v1cb3
   v2 = v2cb1 + v2cb2 + v2cb3
   v3 = v3cb1 + v3cb2 + v3cb3

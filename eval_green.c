@@ -14,6 +14,46 @@
 #include "properties.h"
 
 /* 
+   evaluate the greens function and project to fault stress 
+   ireceive is the receiving fault
+   slip the slip on islip fault
+   s[] is normally fault[ireceive].s[]
+   
+*/
+
+void eval_green_and_project_to_fault(struct flt *fault, int ireceive, int islip, COMP_PRECISION *slip,COMP_PRECISION *s)
+{
+  int iret;
+  COMP_PRECISION trac[3],u[3],sm[3][3];
+  /* evaluate the greens function for slipping fault islip at receiver
+     location centroids of fault ireceive */
+  eval_green(fault[ireceive].x,(fault+islip),slip,u,sm,&iret);
+  if(!iret){
+    /* project the stresses */
+    resolve_force(fault[ireceive].normal,sm,trac); /* convert to local
+						      traction
+						      vector */
+    //fault[ireceive].s[STRIKE]  += project_vector(trac,fault[ireceive].t_strike);
+    //fault[ireceive].s[DIP]     += project_vector(trac,fault[ireceive].t_dip);
+    ///fault[ireceive].s[NORMAL]  += project_vector(trac,fault[ireceive].normal);
+
+    s[STRIKE]  += project_vector(trac,fault[ireceive].t_strike);
+    s[DIP]     += project_vector(trac,fault[ireceive].t_dip);
+    s[NORMAL]  += project_vector(trac,fault[ireceive].normal);
+#ifdef SUPER_DUPER_DEBUG
+    fprintf(stderr,"add_quake_stress_3: rec %03i rup %03i t %10.3e %10.3e %10.3e with sv (%9.2e,%9.2e,%9.2e) %9.2e (t:%9.2e) dv (%9.2e,%9.2e,%9.2e) %9.2e (t:%9.2e) nv (%9.2e,%9.2e,%9.2e) %9.2e (t:%9.2e)\n",ireceive,islip,
+	    trac[0],trac[1],trac[2],
+	    fault[ireceive].t_strike[0],fault[ireceive].t_strike[1],fault[ireceive].t_strike[2],
+	    project_vector(trac,fault[ireceive].t_strike),s[STRIKE],
+	    fault[ireceive].t_dip[0],fault[ireceive].t_dip[1],fault[ireceive].t_dip[2],
+	    project_vector(trac,fault[ireceive].t_dip),s[DIP],
+	    fault[ireceive].normal[0],fault[ireceive].normal[1],fault[ireceive].normal[2],
+	    project_vector(trac,fault[ireceive].normal),s[NORMAL]);
+#endif
+  }
+}
+
+/* 
 
    evaluate the displacements and stresses based on various
    half-space, triangular, and 2-D Greens functions

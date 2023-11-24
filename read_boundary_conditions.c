@@ -256,14 +256,13 @@ void read_one_step_bc(FILE *in,struct med *medium,struct flt *fault,
 								      input */
 		      my_boolean init_system)
 {
-  my_boolean *sma,printevery,added_to_con,added_to_uncon,
+  my_boolean *sma,sma_local[3],printevery,added_to_con,added_to_uncon,
     print_res_stress_screen=FALSE,tri_warned[3]={FALSE,FALSE,FALSE},
     rotate_to_local=FALSE,check_for_res_stress_output=FALSE,use_dip,
-    sma_local[3],slip_bc_assigned=FALSE,stress_bc_assigned=FALSE;
-  int patch_nr,bc_code,n,inc,start_patch,stop_patch,i,j,i3,nrflt3,
-    patch_nr3;
+    slip_bc_assigned=FALSE,stress_bc_assigned=FALSE;
+  int patch_nr,bc_code,n,inc,start_patch,stop_patch,i,j,i3,j3,nrflt3,patch_nr3;
   COMP_PRECISION bc_value,bc_value_s,bc_value_d,*rhs,global_strike,global_dip,slip[3],
-    global_dip_rad,global_alpha_rad,gstrike[3],gnormal[3],gdip[3],
+    global_dip_rad,global_alpha_rad,gstrike[3],gnormal[3],gdip[3],*fstress,*gfstress,
     sm[3][3],bstress[3],stress_drop,sin_global_alpha_rad;
   COMP_PRECISION cos_global_alpha_rad, sin_global_dip_rad, cos_global_dip_rad;
   FILE *tmp_in,*rsout=NULL;
@@ -562,9 +561,9 @@ void read_one_step_bc(FILE *in,struct med *medium,struct flt *fault,
       }
       switch(bc_code){
 	/* 
-
+	   
 	   SPECIFIED SLIP BOUNDARY CONDITIONS
-
+	   
 	*/
       case DIP:
 #ifdef ALLOW_NON_3DQUAD_GEOM
@@ -589,7 +588,7 @@ void read_one_step_bc(FILE *in,struct med *medium,struct flt *fault,
 	}
 	/* 
 	   and the slip contribution of this patch
-	 */
+	*/
 	if(!rotate_to_local){
 	  //
 	  // simply assign the boundary condition value and mark it as a
@@ -630,40 +629,43 @@ void read_one_step_bc(FILE *in,struct med *medium,struct flt *fault,
 		    fault[patch_nr].u[NORMAL]);
 #endif
 	} /* end rotate part */
-	/* 
-	   
-	   this is not parallelized and can be a bottle neck
-	   
-	*/
 	for(i=0;i < 3;i++){	/* check if modes are active */
-	  if(fabs(slip[i]) > EPS_COMP_PREC)
+	  if(fabs(slip[i]) > EPS_COMP_PREC) /* having local modes
+					     * allows adding stress
+					     * modes later, but only
+					     * in serial */
 	    sma_local[i] = TRUE;
 	  else
 	    sma_local[i] = FALSE;
 	}
-	if(init_system)	/* this should be TRUE */
+	if((medium->comm_size == 1)&&(init_system))	/* init system
+							 * should be
+							 * TRUE in
+							 * general */
+	  /* for serial computation, compute stress effect now */
 	  quake(sma_local,slip,patch_nr,fault,medium,TRUE,FALSE);
-	else			/* else, just add to slip array */
+	else{			/* else, just add to slip array (quake does that, too) */
+	  for(j=0;j<3;j++)
+	    sma[patch_nr3+j] = sma_local[j];
 	  add_b_to_a_vector(fault[patch_nr].u,slip,3);
+	}
 	if(printevery)
 	  HEADNODE
 	    fprintf(stderr,"read_boundary_conditions: const: %5i, flts %5i to %5i, bcode: %4i, value: %9.6f, %s\n",
 		    n,start_patch,stop_patch,bc_code,bc_value,
 		    comment_on_code_bc(bc_code,bc_value));
-	
-	
 	break;
-      }
-      /* 
-
-	 STRESS BOUNDARY CONDITIONS 
-
-
-	 will be assembled in a huge array first, then assigned to
-	 rhs. later so we can keep up with a general ordering scheme
-	 as in rupture.c
-	 
-	 we will also have to assign fault slip modes 
+      }	/* end displacement assignment */
+	/* 
+	   
+	   STRESS BOUNDARY CONDITIONS FOLLOW
+	   
+	   
+	   will be assembled in a huge array first, then assigned to
+	   rhs. later so we can keep up with a general ordering scheme
+	   as in rupture.c
+	   
+	   we will also have to assign fault slip modes 
 
       */
       case COULOMB_STRIKE_SLIP_LEFTLATERAL:
@@ -1112,6 +1114,82 @@ void read_one_step_bc(FILE *in,struct med *medium,struct flt *fault,
   if(check_for_res_stress_output)// close the resolved stress file
     fclose(rsout);
 
+  if(stress_bc_assigned){
+    if(medium->comm_size != 1)
+      if(slip_bc_assigned){
+	HEADNODE
+	  fprintf(stderr,"read_boundary_conditions: error: parallel with slip prescribed cannot have those stress be accounted for in subsequent stress BCS");
+	exit(-1);
+      }
+  }
+  if(slip_bc_assigned && (medium->comm_size != 1)){
+#ifdef USE_PETSC
+    /* still need to actually add the stress contributions */
+    if(!init_system){
+      HEADNODE
+	fprintf(stderr,"read_boundary_conditions: trying to sum up slip in parallel, but system is not init\n");
+      exit(-1);
+    }
+    HEADNODE
+      fprintf(stderr,"read_boundary_conditions: starting parallel slip effect summation on %i cores\n",
+	      medium->comm_size);
+    /* 
+       sum up effects
+    */
+    fstress = (COMP_PRECISION *)calloc(nrflt3,sizeof(COMP_PRECISION)); /* local */
+    if(!fstress)
+      MEMERROR("read_boundary_conditions: fstress");
+
+    HEADNODE{	/* global on head node */
+      gfstress = (COMP_PRECISION *)calloc(nrflt3,sizeof(COMP_PRECISION));
+      if(!gfstress)
+	MEMERROR("read_boundary_conditions: gfstress");
+    }else{
+      gfstress = NULL;
+    }
+    fprintf(stderr,"read_boundary_conditions: core %03i adding slip from fault %05i %05i\n",
+	    medium->comm_rank,medium->myfault0,medium->myfaultn);
+    for(i = medium->myfault0, i3=i*3;i < medium->myfaultn;i++, i3+=3){ /* i is slipping */
+      //fprintf(stderr,"read_boundary_conditions: core %03i %i %i %i %g %g %g\n",medium->comm_rank,sma[i3], sma[i3+1],sma[i3+2], fault[i].u[0],fault[i].u[1],fault[i].u[2]);
+      if(sma[i3] || sma[i3+1] || sma[i3+2]){	  /* this fault is
+						   * actually
+						   * slipping */
+	for(j=j3=0;j <  medium->nrflt;j++,j3+=3){ /* j = receiving,
+						    loop through
+						    all */
+	  eval_green_and_project_to_fault(fault,j,i, fault[i].u,(fstress+j3));
+	}
+      }
+    }
+    /* switch sma off for ALL FAULTS to avoid solving equations below
+       where there's notthing to solve (cannot mix stress and slip for
+       parallel */
+    for(i=0;i<nrflt3;i++)
+      sma[i]=FALSE;
+
+
+    HEADNODE
+      fprintf(stderr,"read_boundary_conditions: broadcasting effects\n");
+    /* add up the stress effect across all faults */    
+#ifdef USE_DOUBLE_PRECISION
+    MPI_Reduce(fstress,gfstress,nrflt3,MPI_DOUBLE,MPI_SUM,0,MPI_COMM_WORLD);
+#else
+    MPI_Reduce(fstress,gfstress,nrflt3,MPI_FLOAT, MPI_SUM,0,MPI_COMM_WORLD);
+#endif
+    free(fstress);
+
+    HEADNODE{
+      fprintf(stderr,"read_boundary_conditions: broadcast done, reassigning on head node\n");
+      for(i=i3=0;i < medium->nrflt;i++,i3+=3){
+	fault[i].s[0] = gfstress[i3];fault[i].s[1] = gfstress[i3+1];fault[i].s[2] = gfstress[i3+2];
+      }
+      free(gfstress);
+      fprintf(stderr,"read_boundary_conditions: parallel summation done\n");
+    }
+#else
+    fprintf(stderr,"read_boundary_conditions: parallel logic error\n");
+#endif
+  } /* end parallel summation of prescribed slip effect */
 
   /* 
 

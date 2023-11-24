@@ -517,3 +517,4 @@ void calculate_polar_base(double, double, double *);
 /* tritri.c */
 int coplanar_tri_tri(float [3], float [3], float [3], float [3], float [3], float [3], float [3]);
 int tri_tri_intersect(float [3], float [3], float [3], float [3], float [3], float [3]);
+void eval_green_and_project_to_fault(struct flt *, int , int , double *,double *);

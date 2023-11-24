@@ -1,7 +1,7 @@
 ################################################################################
 #
 #
-#  (C) Thorsten Becker, thwbecker@post.harvard.edu
+#  (C) Thorsten Becker, thwbecker@post.harvard.edu, 1999-2023
 #
 #  makefile for interact and related programs
 #
@@ -187,7 +187,7 @@ MATRIX_SOLVER_OBJS = $(ODIR)/numrec_svd_routines.o $(ODIR)/nnls_lawson.o	\
 # triangular dislocation routines
 #
 
-TRI_GREEN_OBJS = $(ODIR)/tdstresshs.o  $(ODIR)/tddisphs.o 
+TRI_GREEN_OBJS = $(ODIR)/tdstresshs.o  $(ODIR)/tddisphs.o  $(ODIR)/tddisphs_bird.o 
 
 # list of objects for patch i/o. these also include
 # all object files that deal with interaction coefficients
@@ -342,8 +342,8 @@ analysis: $(BDIR)/mspectral
 #$(BDIR)/patch2geom : geomview, outdated
 
 converters: $(BDIR)/patch2xyz   $(BDIR)/patch2vtk $(BDIR)/patch2bc \
-	$(BDIR)/patch2corners $(BDIR)/patch2group \
-	$(BDIR)/patch2xyzvec $(BDIR)/patch2poly3d $(BDIR)/patch2dis3d
+	$(BDIR)/patch2corners $(BDIR)/patch2group  \
+	$(BDIR)/patch2xyzvec # $(BDIR)/patch2poly3d $(BDIR)/patch2dis3d
 
 geom_converters: $(BDIR)/points2patch $(BDIR)/tri2patch  $(BDIR)/patchquad2patchtri 
 
@@ -430,19 +430,16 @@ $(BDIR)/patch2xyzvec: $(ODIR)/patch2xyzvec.o $(GEN_P_INC) \
 		-o $(BDIR)/patch2xyzvec  $(LIBS) \
 	$(SUPERLU_LIBS) $(SLATEC_LIBS) $(PGLIBS)
 
-$(BDIR)/patch2poly3d: $(ODIR)/patch2poly3d.o $(GEN_P_INC) \
-	$(ODIR)/read_geometry.o $(LIBLIST) 
-	$(LD) $(LDFLAGS)  $(ODIR)/read_geometry.o \
+$(BDIR)/patch2poly3d: $(ODIR)/patch2poly3d.o $(GEN_P_INC) $(ODIR)/read_geometry.o $(LIBLIST)
+	$(MPILD) $(LDFLAGS)  $(ODIR)/read_geometry.o \
 		$(ODIR)/libpatchio.a $(ODIR)/patch2poly3d.o \
-		-o $(BDIR)/patch2poly3d  $(LIBS) \
-	$(SUPERLU_LIBS) $(SLATEC_LIBS) $(PGLIBS)
+		-o $(BDIR)/patch2poly3d \
+		$(PETSC_LIBS) $(LIBS) $(PGLIBS)  $(SUPERLU_LIBS)  $(SLATEC_LIBS) 
 
 $(BDIR)/patch2dis3d: $(ODIR)/patch2dis3d.o $(GEN_P_INC) \
 	$(ODIR)/read_geometry.o $(LIBLIST) 
-	$(LD) $(LDFLAGS)  $(ODIR)/read_geometry.o \
-		$(ODIR)/libpatchio.a $(ODIR)/patch2dis3d.o \
-		-o $(BDIR)/patch2dis3d  $(LIBS) \
-	$(SUPERLU_LIBS) $(SLATEC_LIBS) $(PGLIBS)
+	$(MPILD) $(LDFLAGS)  $(ODIR)/read_geometry.o $(ODIR)/patch2dis3d.o \
+		-o $(BDIR)/patch2dis3d  $(LIBS) $(SUPERLU_LIBS) $(SLATEC_LIBS) $(PGLIBS)
 
 $(BDIR)/points2patch: $(ODIR)/points2patch.o  $(ODIR)/fit_plane.o $(ODIR)/libpatchio.a $(GEN_P_INC)  \
 	 $(LIBLIST) 

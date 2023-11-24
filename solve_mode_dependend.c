@@ -337,7 +337,7 @@ void add_quake_stress_4(my_boolean *sma,COMP_PRECISION *slip,
   int i,j,k;
 #ifdef COMP_MODE_3
   int iret;
-  I_MATRIX_PREC iadbl,u[3],sm[3][3],trac[3];
+  I_MATRIX_PREC iadbl;
 #ifdef ALLOW_NON_3DQUAD_GEOM
 #ifdef SUPER_DUPER_DEBUG
   
@@ -415,7 +415,7 @@ void add_quake_stress_4(my_boolean *sma,COMP_PRECISION *slip,
       */
 #ifdef DEBUG
       for(j=0;j<3;j++)	/* check */
-	if((fabs(slip[j])!=0)&&(!sma[j])){
+	if((fabs(slip[j]) > 0)&&(!sma[j])){
 	  fprintf(stderr,"add_quake_stress_3: patch %i slip %g %g %g but sma %i %i %i\n",
 		    i,slip[0],slip[1],slip[2],sma[0],sma[1],sma[2]);
 	  exit(-1);
@@ -435,25 +435,8 @@ void add_quake_stress_4(my_boolean *sma,COMP_PRECISION *slip,
       }
 #endif
 #endif
-      /* evaluate the greens function for slipping fault r_flt at
-	 receiver location centroids of fault i */
-      eval_green(fault[i].x,(fault+r_flt),slip,u,sm,&iret);
-      if(!iret){
-	/* project the stresses */
-	resolve_force(fault[i].normal,sm,trac); /* convert to local
-						   traction vector */
-	fault[i].s[STRIKE]  += project_vector(trac,fault[i].t_strike);
-	fault[i].s[DIP]     += project_vector(trac,fault[i].t_dip);
-	fault[i].s[NORMAL]  += project_vector(trac,fault[i].normal);
-#ifdef SUPER_DUPER_DEBUG
-	fprintf(stderr,"add_quake_stress_3: rec %03i rup %03i t %10.3e %10.3e %10.3e with sv (%9.2e,%9.2e,%9.2e) %9.2e (t:%9.2e) dv (%9.2e,%9.2e,%9.2e) %9.2e (t:%9.2e) nv (%9.2e,%9.2e,%9.2e) %9.2e (t:%9.2e)\n",i,r_flt,
-		trac[0],trac[1],trac[2],
-		fault[i].t_strike[0],fault[i].t_strike[1],fault[i].t_strike[2], project_vector(trac,fault[i].t_strike),fault[i].s[STRIKE],
-		fault[i].t_dip[0],fault[i].t_dip[1],fault[i].t_dip[2], project_vector(trac,fault[i].t_dip),fault[i].s[DIP],
-		fault[i].normal[0],fault[i].normal[1],fault[i].normal[2],project_vector(trac,fault[i].normal),fault[i].s[NORMAL]);
-#endif
-
-      }
+      /* compute the effect of slip of r_flt on fault[i] and add to it's stress fault[i].s */
+      eval_green_and_project_to_fault(fault,i,r_flt,slip,fault[i].s);
     }
 #else
     for(j=0;j < 3;j++){/* loop through all 
