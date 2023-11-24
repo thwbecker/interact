@@ -5,8 +5,6 @@
 #endif
 #include "properties.h"
 
-#define ANG_STRAIN_ROUTINE AngDisStrainFSC
-#define ANG_DISS_ROUTINE AngDisStrain
 
 subroutine tdstresshs(loc,P1,P2,P3,Ss,Ds,Ts,stress,strain)
   ! TDstressHS 
@@ -340,7 +338,7 @@ subroutine TDSetupS(x,y,z,alpha,bx,by,bz,nu,TriVertex,SideVec,exxt,eyyt,ezzt,exy
 
 
   ! Calculate strains associated with an angular dislocation in ADCS
-  call ANG_DISS_ROUTINE(x,y1,z1,-pi+alpha,bx,by1,bz1,nu,exx,eyy,ezz,exy,exz,eyz);
+  call AngDisStrain(x,y1,z1,-pi+alpha,bx,by1,bz1,nu,exx,eyy,ezz,exy,exz,eyz);
 
   ! Transform strains from ADCS into TDCS
   B(1,1) = 1.0d0;B(1,2:3)=0.0d0;
@@ -424,12 +422,12 @@ subroutine AngSetupFSC_S(X,Y,Z,bX,bY,bZ,PA,PB,Stress,Strain)
      v23B = FORTRAN_ZERO
      IF (I) THEN
         ! Configuration I
-        call ANG_STRAIN_ROUTINE(y1A,y2A,y3A,-pi+beta,b1,b2,b3,nu,-PA(3),v11A,v22A,v33A,v12A,v13A,v23A);
-        call ANG_STRAIN_ROUTINE(y1B,y2B,y3B,-pi+beta,b1,b2,b3,nu,-PB(3),v11B,v22B,v33B,v12B,v13B,v23B);
+        call AngDisStrainFSC(y1A,y2A,y3A,-pi+beta,b1,b2,b3,nu,-PA(3),v11A,v22A,v33A,v12A,v13A,v23A);
+        call AngDisStrainFSC(y1B,y2B,y3B,-pi+beta,b1,b2,b3,nu,-PB(3),v11B,v22B,v33B,v12B,v13B,v23B);
      else
         ! Configuration II
-        call ANG_STRAIN_ROUTINE(y1A,y2A,y3A,beta,b1,b2,b3,nu,    -PA(3),v11A,v22A,v33A,v12A,v13A,v23A);
-        call ANG_STRAIN_ROUTINE(y1B,y2B,y3B,beta,b1,b2,b3,nu,    -PB(3),v11B,v22B,v33B,v12B,v13B,v23B);
+        call AngDisStrainFSC(y1A,y2A,y3A,beta,b1,b2,b3,nu,    -PA(3),v11A,v22A,v33A,v12A,v13A,v23A);
+        call AngDisStrainFSC(y1B,y2B,y3B,beta,b1,b2,b3,nu,    -PB(3),v11B,v22B,v33B,v12B,v13B,v23B);
      endif
 
      !print *,v11A,v22A,v33A,v12A,v13A,v23A

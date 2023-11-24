@@ -5,10 +5,6 @@
 #endif
 #include "properties.h"
 
-!#define ANGDISDISP  Angdisdisp_Bird
-!#define ANGDISDISPFSC  Angdisdispfsc_Bird
-#define ANGDISDISP  Angdisdisp
-#define ANGDISDISPFSC  Angdisdispfsc
 
 ! TDdispHS 
 ! calculates displacements associated with a triangular dislocation in an 
@@ -359,7 +355,7 @@ subroutine TDSetupD(x,y,z,alpha,bx,by,bz,nu,TriVertex,SideVec,u,v,w)
 
   !print *,'in',x,y1,z1,-pi+alpha,bx,by1,bz1,nu
   ! Calculate displacements associated with an angular dislocation in ADCS
-  call ANGDISDISP(x,y1,z1,-pi+alpha,bx,by1,bz1,nu,u,v0,w0);
+  call Angdisdisp(x,y1,z1,-pi+alpha,bx,by1,bz1,nu,u,v0,w0);
   !print *,'out',v0,w0
   ! Transform displacements from ADCS into TDCS
   !r3 = A'*[v0';w0'];
@@ -418,15 +414,15 @@ subroutine AngSetupFSC(X,Y,Z,bX,bY,bZ,PA,PB,nu,ue,un,uv)
     I = ((beta*y1A)>=0);
     if(I)then 
        ! Configuration I
-       call ANGDISDISPFSC(y1A,y2A,y3A,&
+       call Angdisdispfsc(y1A,y2A,y3A,&
             -pi+beta,b1,b2,b3,nu,-PA(3),v1A,v2A,v3A);
-       call ANGDISDISPFSC(y1B,y2B,y3B,&
+       call Angdisdispfsc(y1B,y2B,y3B,&
             -pi+beta,b1,b2,b3,nu,-PB(3),v1B,v2B,v3B);
     else
        ! Configuration II
-       call ANGDISDISPFSC(y1A,y2A,y3A,&
+       call Angdisdispfsc(y1A,y2A,y3A,&
             beta,b1,b2,b3,nu,-PA(3),v1A,v2A,v3A);
-       call ANGDISDISPFSC(y1B,y2B,y3B,&
+       call Angdisdispfsc(y1B,y2B,y3B,&
             beta,b1,b2,b3,nu,-PB(3),v1B,v2B,v3B);
     end if
     
@@ -553,7 +549,7 @@ SUBROUTINE Angdisdispfsc(y1, y2, y3, beta, b1, b2, b3, nu, a, & ! inputs
 
   C_PREC :: cosB, cotB, Fib, r2b, rb, sinB, &
        & v1cb1, v1cb2, v1cb3, v2cb1, v2cb2, v2cb3, v3cb1, v3cb2, v3cb3, &
-       & y3b, z1b, z3b
+       & y3b, z1b, z3b,y1s,cosBs
 
   C_PREC :: N1, N2, N3,one_over_rb,N4,log_rbpy3b,log_rbpz3b,rbc,y2s,cotBs
 
@@ -567,14 +563,19 @@ SUBROUTINE Angdisdispfsc(y1, y2, y3, beta, b1, b2, b3, nu, a, & ! inputs
   !rb = sqrt(r2b);
   sinB = SIN(beta)
   cosB = COS(beta)
+  cosBs = cosB**2
+  
   cotB = 1.00D0 / TAN(beta)
   cotBs = cotB**2
   
   y3b = y3 + 2.0D0 * a
   z1b = y1 * cosB + y3b * sinB
   z3b = -y1 * sinB + y3b * cosB
+
+  y1s = y1**2
   y2s = y2**2
-  r2b = y1**2 + y2s + y3b**2
+
+  r2b = y1s + y2s + y3b**2
   rb = SQRT(r2b)
 
   rbc=rb**3
@@ -586,7 +587,7 @@ SUBROUTINE Angdisdispfsc(y1, y2, y3, beta, b1, b2, b3, nu, a, & ! inputs
   N1 = 1.0d0-nu
   N4 = 2.0d0*nu
   N2 = 1.0D0-N4
-  N3 = 2.0D0*(N1)
+  N3 = 2.0D0*N1
 
   
   !Fib = 2*atan(-y2./(-(rb+y3b)*cot(beta/2)+y1)); % The Burgers' function
@@ -620,9 +621,9 @@ SUBROUTINE Angdisdispfsc(y1, y2, y3, beta, b1, b2, b3, nu, a, & ! inputs
        & cotB*(N2-a/rb)+nu*y3b-a+y2s/(rb+y3b)*(nu+a/rb))-(1.0D0-2.0D0*                 &
        & nu)*z1b*cotB/(rb+z3b)*(cosB+a/rb)-a*y1*(y3b-a)*cotB/rbc+                                  &
        & (y3b-a)/(rb+y3b)*(-N4+one_over_rb*((N2)*y1*cotB-a)+y2s/(rb*                &
-       & (rb+y3b))*(N4+a/rb)+a*y2s/rbc)+(y3b-a)/(rb+z3b)*(cosB**2-                         &
+       & (rb+y3b))*(N4+a/rb)+a*y2s/rbc)+(y3b-a)/(rb+z3b)*(cosBs-                         &
        & one_over_rb*((N2)*z1b*cotB+a*cosB)+a*y3b*z1b*cotB/rbc-1.0D0/(rb*                 &
-       & (rb+z3b))*(y2s*cosB**2-a*z1b*cotB/rb*(rb*cosB+y3b))))
+       & (rb+z3b))*(y2s*cosBs-a*z1b*cotB/rb*(rb*cosB+y3b))))
 
   !v3cb1 = b1/4/pi/(1-nu)*(2*(1-nu)*(((1-2*nu)*Fib*cotB)+(y2./(rb+y3b).*(2*...
   !    nu+a./rb))-(y2*cosB./(rb+z3b).*(cosB+a./rb)))+y2.*(y3b-a)./rb.*(2*...
@@ -643,10 +644,10 @@ SUBROUTINE Angdisdispfsc(y1, y2, y3, beta, b1, b2, b3, nu, a, & ! inputs
   !    rb.*(2*(1-nu)*cosB-(rb*cosB+y3b)./(rb+z3b).*(1+a./(rb*cosB)))));
   v1cb2 = b2*one_over_four_pi/(N1)*((N2)*((N3*cotBs+nu)*log_rbpy3b-(2* &
        & (N1)*cotBs+1)*cosB*log_rbpz3b)+(N2)/(rb+y3b)*(-(N2)*   &
-       & y1*cotB+nu*y3b-a+a*y1*cotB/rb+y1**2/(rb+y3b)*(nu+a/rb))-(1.0D0-2.0D0*                   &
+       & y1*cotB+nu*y3b-a+a*y1*cotB/rb+y1s/(rb+y3b)*(nu+a/rb))-(1.0D0-2.0D0*                   &
        & nu)*cotB/(rb+z3b)*(z1b*cosB-a*(rb*sinB-y1)/(rb*cosB))-a*y1*                             &
        & (y3b-a)*cotB/rbc+(y3b-a)/(rb+y3b)*(N4+one_over_rb*((N2)*y1*            &
-       & cotB+a)-y1**2/(rb*(rb+y3b))*(N4+a/rb)-a*y1**2/rbc)+(y3b-a)*                     &
+       & cotB+a)-y1s/(rb*(rb+y3b))*(N4+a/rb)-a*y1s/rbc)+(y3b-a)*                     &
        & cotB/(rb+z3b)*(-cosB*sinB+a*y1*y3b/(rbc*cosB)+(rb*sinB-y1)/                           &
        & rb*(N3*cosB-(rb*cosB+y3b)/(rb+z3b)*(1.0D0+a/(rb*cosB)))))
 
@@ -843,5 +844,4 @@ subroutine get_tdcd_adcs(sidevec,trivertex,y,z,by,bz,A,y1,z1,by1,bz1)
   by1 = A(1, 1) * by + A(1, 2) * bz
   bz1 = A(2, 1) * by + A(2, 2) * bz
 end subroutine get_tdcd_adcs
-#undef ANGDISDISP
-#undef ANGDISDISP_FSC
+
