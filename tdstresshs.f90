@@ -115,6 +115,7 @@ subroutine tdstresshs(loc,P1,P2,P3,Ss,Ds,Ts,stress,strain)
   C_PREC, dimension(3), intent(in) :: p1, p2, p3,loc
   C_PREC, dimension(3) :: p1n, p2n, p3n
   C_PREC, dimension(6) :: StsMS,StrMS,StsFSC,StrFSC,StsIS,StrIS
+  C_PREC, dimension(3,3) :: Ar1,Ar2
 
   if ((loc(3) .gt. 0.d0).or. (P1(3) > 0.d0).or.( P2(3) > 0d0) .or.( P3(3)>0d0))then 
      write(*,*)'Half-space solution: Z coordinates must be negative!'
@@ -127,17 +128,18 @@ subroutine tdstresshs(loc,P1,P2,P3,Ss,Ds,Ts,stress,strain)
 
   !print *,Ts,Ss,Ds
   ! Calculate main dislocation contribution to strains and stresses
-  call TDstressFS(loc(1),loc(2),loc(3),P1,P2,P3,Ss,Ds,Ts,StsMS,StrMS)
+  call TDstressFS(loc(1),loc(2),loc(3),P1,P2,P3,Ss,Ds,Ts,StsMS,StrMS,Ar1)
   !print *,stsms
   !print *,strms
   ! Calculate harmonic function contribution to strains and stresses
-  call TDstress_HarFunc(loc(1),loc(2),loc(3),P1,P2,P3,Ss,Ds,Ts,StsFSC,StrFSC)
+  call TDstress_HarFunc(loc(1),loc(2),loc(3),P1,P2,P3,Ss,Ds,Ts,StsFSC,StrFSC,&
+       .false.,Ar1)
 
   ! Calculate image dislocation contribution to strains and stresses
   p1n(1:2) = p1(1:2);p2n(1:2)=p2(1:2);p3n(1:2) =  p3(1:2);
   p1n(3)  = -p1(3);  p2n(3)  = -p2(3);p3n(3)   = -p3(3);
 
-  call TDstressFS(loc(1),loc(2),loc(3),P1n,P2n,P3n,Ss,Ds,Ts,StsIS,StrIS)
+  call TDstressFS(loc(1),loc(2),loc(3),P1n,P2n,P3n,Ss,Ds,Ts,StsIS,StrIS,Ar2)
 
   ! Calculate the complete stress and strain tensor components in EFCS
   Stress = StsMS+StsIS+StsFSC
@@ -145,7 +147,7 @@ subroutine tdstresshs(loc,P1,P2,P3,Ss,Ds,Ts,stress,strain)
 
 end subroutine TDstressHS
 
-subroutine TDstressFS(X,Y,Z,P1,P2,P3,Ss,Ds,Ts,Stress,Strain)
+subroutine TDstressFS(X,Y,Z,P1,P2,P3,Ss,Ds,Ts,Stress,Strain,Ar)
   USE, INTRINSIC :: IEEE_ARITHMETIC
   ! TDstressFS 
   ! Calculates stresses and strains associated with a triangular dislocation 
@@ -154,7 +156,8 @@ subroutine TDstressFS(X,Y,Z,P1,P2,P3,Ss,Ds,Ts,Stress,Strain)
   C_PREC,intent(in) :: x,y,z,Ss,Ds,Ts
   C_PREC,dimension(3) :: p1,p2,p3
   C_PREC,intent(out),dimension(6) :: stress,strain
-
+  C_PREC,dimension(3,3),intent(out) :: Ar
+  
   C_PREC nu,bx,by,bz,x_,y_,z_,aA,aB,aC,&
        Exx,Eyy,Ezz,Exy,Exz,Eyz,&
        Exxr,Eyyr,Ezzr,Exyr,Exzr,Eyzr,&
@@ -164,7 +167,7 @@ subroutine TDstressFS(X,Y,Z,P1,P2,P3,Ss,Ds,Ts,Stress,Strain)
        Exx3,Eyy3,Ezz3,Exy3,Exz3,Eyz3,&
        etracel
   C_PREC,dimension(3) :: e12,e13,e23,p1_,p2_,p3_
-  C_PREC,dimension(3,3) :: Ar
+
   INTEGER :: trimode
   logical :: caseplog,casenlog,casezlog
 
@@ -247,14 +250,15 @@ subroutine TDstressFS(X,Y,Z,P1,P2,P3,Ss,Ds,Ts,Stress,Strain)
   Stress = (/Sxx,Syy,Szz,Sxy,Sxz,Syz/)
 end subroutine TDstressFS
 
-subroutine TDstress_HarFunc(X,Y,Z,P1,P2,P3,Ss,Ds,Ts,stress,strain)
+subroutine TDstress_HarFunc(X,Y,Z,P1,P2,P3,Ss,Ds,Ts,stress,strain,compute_ar,ar)
   implicit none
   C_PREC,intent(in) :: x,y,z,ss,ds,ts
   C_PREC,intent(in),dimension(3) :: p1,p2,p3
+  logical,intent(in) :: compute_ar
+  C_PREC,intent(in),dimension(3,3) :: Ar
   C_PREC,intent(out),dimension(6) :: stress,strain
   C_PREC,dimension(6) :: stress1,strain1,stress2,strain2,stress3,strain3
   C_PREC,dimension(3) :: vstrike,vnorm,vdip
-  C_PREC,dimension(3,3) :: A
   C_PREC bx,by,bz,bx_,by_,bz_
   ! TDstress_HarFunc calculates the harmonic function contribution to the
   ! strains and stresses associated with a triangular dislocation in a 
@@ -265,11 +269,13 @@ subroutine TDstress_HarFunc(X,Y,Z,P1,P2,P3,Ss,Ds,Ts,stress,strain)
   by = Ss; ! Strike-slip
   bz = Ds; ! Dip-slip
 
-  call get_tdcs_base_vectors(p1,p2,p3,vstrike,vdip,vnorm)
+  if(compute_ar)then            !compute locally, or reuse?
+     call get_tdcs_base_vectors(p1,p2,p3,vstrike,vdip,vnorm)
 
-  ! Transform slip vector components from TDCS into EFCS
-  call matrix_from_3vec(Vnorm, Vstrike, Vdip,A)
-  call CoordTrans(bx,by,bz,A,bx_,by_,bz_) 
+     ! Transform slip vector components from TDCS into EFCS
+     call matrix_from_3vec(Vnorm, Vstrike, Vdip,Ar)
+  endif
+  call CoordTrans(bx,by,bz,Ar,bx_,by_,bz_) 
   !print *,'b_',bx_,by_,bz_
   ! Calculate contribution of angular dislocation pair on each TD side
   !print *,X,Y,Z,bX_,bY_,bZ_,P1,P2,mu,lambda
@@ -615,14 +621,14 @@ subroutine AngDisStrainFSC(y1,y2,y3,beta,b1,b2,b3,nu,a,v11,v22,v33,v12,v13,v23)
   
   N0 =  2.0d0*nu
   N1 =  1.0d0-N0
-  N2 = -2.0d0+N0
-  N3 =  -N2 !2.0d0-N0
+  N2 = -2.0d0+N0 !     -2.0d0+2.0d0*nu
+  N3 =  -N2 !2.0d0-N0 = 2.0d0-2.0d0*nu
   N4 = 1.0d0-nu
   
   W1 = rb*cosB+y3b;
   W2 = cosB+a/rb;
   W3 = cosB+y3b/rb;
-  W4 = nu+a/rb;
+  W4 = nu + a/rb;
   W5 = N0 + a/rb;
   W6 = rb+y3b;
   W6s = W6**2
@@ -656,7 +662,7 @@ subroutine AngDisStrainFSC(y1,y2,y3,beta,b1,b2,b3,nu,a,v11,v22,v33,v12,v13,v23)
        W7s*(W1*(N1*cosB-a/rb)*cotB+N3*(rb*sinB-y1)*cosB)*(y1/&
        rb-sinB)+cosB/W7*(one_over_rb*cosB*y1*(N1*cosB-a/rb)*cotB+W1*a/rbc&
        *y1*cotB+N3*(one_over_rb*sinB*y1-1.0d0)*cosB)+2.0d0*a*y3b*cosBtcotB/&
-       rb2s*y1))/pi/(N4))+&
+       rb2s*y1))/pi/N4)+&
        b2*(one_quarter*(N1*((N3*cotBs+nu)/rb*y1/W6-(N3*cotBs+1.0d0)*&
        cosB*(y1/rb-sinB)/W7)-N1/W6s*(-N1*y1*cotB+nu*y3b-a+a*y1*&
        cotB/rb+y1s/W6*W4)/rb*y1+N1/W6*(-N1*cotB+a*cotB/rb-a*&
@@ -673,14 +679,14 @@ subroutine AngDisStrainFSC(y1,y2,y3,beta,b1,b2,b3,nu,a,v11,v22,v33,v12,v13,v23)
        rbc/cosB-3.0d0*a*y1s*y3b/rbp5/cosB+(one_over_rb*sinB*y1-1.0d0)/rb*&
        (N3*cosB-w1_over_w7*W9)-(rb*sinB-y1)/rbc*(N3*cosB-W1/&
        W7*W9)*y1+(rb*sinB-y1)/rb*(-one_over_rb*cosB*y1/W7*W9+w1_over_w7s*&
-       W9*(y1/rb-sinB)+w1_over_w7*a/rbc/cosB*y1)))/pi/(N4))+&
+       W9*(y1/rb-sinB)+w1_over_w7*a/rbc/cosB*y1)))/pi/N4)+&
        b3*(one_quarter*(N1*(-y2/W6s*(1.0d0+a/rb)/rb*y1-y2/W6*a/rbc*y1+y2*&
        cosB/W7s*W2*(y1/rb-sinB)+y2*cosB/W7*a/rbc*y1)+y2*W8/&
        rbc*(a/rb2+one_over_w6)*y1-y2*W8/rb*(-2.0d0*a/rb2s*y1-one_over_W6_p2/&
        rb*y1)-y2*W8*cosB/rbc/W7*(w1_over_w7*W2+a*y3b/rb2)*y1-y2*W8*&
        cosB/rb/W7s*(w1_over_w7*W2+a*y3b/rb2)*(y1/rb-sinB)+y2*W8*&
        cosB/rb/W7*(one_over_rb*cosB*y1/W7*W2-w1_over_w7s*W2*(y1/rb-sinB)-&
-       w1_over_w7*a/rbc*y1-2.0d0*a*y3b/rb2s*y1))/pi/(N4));
+       w1_over_w7*a/rbc*y1-2.0d0*a*y3b/rb2s*y1))/pi/N4);
 
   v22 = b1*(one_quarter*(N1*((N3*cotBs-nu)/rb*y2/W6-(N3*cotBs+1.0d0-&
        N0)*cosB/rb*y2/W7)+N1/W6s*(y1*cotB*(1.0d0-W5)+nu*y3b-a+y2s&
@@ -696,7 +702,7 @@ subroutine AngDisStrainFSC(y1,y2,y3,beta,b1,b2,b3,nu,a,v11,v22,v33,v12,v13,v23)
        cosB)*y2-3.0d0*a*y3b*z1b*cotB/rbp5*y2+one_over_rbp3/W7*(y2s*cosBs-&
        a*z1b*cotB/rb*W1)*y2+one_over_rb2/W7s*(y2s*cosBs-a*z1b*cotB/&
        rb*W1)*y2-one_over_rb/W7*(2.0d0*y2*cosBs+a*z1b*cotB/rbc*W1*y2-a*&
-       z1b*cotB/rb2*cosB*y2)))/pi/(N4))+&
+       z1b*cotB/rb2*cosB*y2)))/pi/N4)+&
        b2*(one_quarter*(N3*N1*rFib_ry2*cotBs+N1/W6*((W5-1.0d0)*cotB+y1/W6*&
        W4)-N1*y2s/W6s*((W5-1.0d0)*cotB+y1/W6*W4)/rb+N1*y2/W6*(-a/&
        rbc*y2*cotB-y1/W6s*W4/rb*y2-y2/W6*a/rbc*y1)-N1*cotB/&
@@ -711,7 +717,7 @@ subroutine AngDisStrainFSC(y1,y2,y3,beta,b1,b2,b3,nu,a,v11,v22,v33,v12,v13,v23)
        cosB+w1_over_w7*W9+a*y3b/rb2/cosB)-y2s*W8*cotB/rb2/W7s*((-2.0d0+&
        N0)*cosB+w1_over_w7*W9+a*y3b/rb2/cosB)+y2*W8*cotB/rb/W7*(1.0d0/&
        rb*cosB*y2/W7*W9-w1_over_w7s*W9/rb*y2-w1_over_w7*a/rbc/cosB*y2-&
-       2.0d0*a*y3b/rb2s/cosB*y2))/pi/(N4))+&
+       2.0d0*a*y3b/rb2s/cosB*y2))/pi/N4)+&
        b3*(one_quarter*(N1*(-sinB/rb*y2/W7+y2/W6s*(1.0d0+a/rb)/rb*y1+y2/W6*&
        a/rbc*y1-z1b/W7s*W2/rb*y2-z1b/W7*a/rbc*y2)-y2*W8/&
        rbc*(a/rb2+one_over_w6)*y1+y1*W8/rb*(-2.0d0*a/rb2s*y2-one_over_W6_p2/&
@@ -720,17 +726,17 @@ subroutine AngDisStrainFSC(y1,y2,y3,beta,b1,b2,b3,nu,a,v11,v22,v33,v12,v13,v23)
        rbc*y2-z1b/rbc*(1.0d0+a*y3b/rb2)*y2-2.0d0*z1b/rbp5*a*y3b*y2+&
        one_over_rbp3/W7*(y2s*cosB*sinB-a*z1b/rb*W1)*y2+one_over_rb2/W7s*&
        (y2s*cosB*sinB-a*z1b/rb*W1)*y2-one_over_rb/W7*(2.0d0*y2*cosB*sinB+a*&
-       z1b/rbc*W1*y2-a*z1b/rb2*cosB*y2)))/pi/(N4));
+       z1b/rbc*W1*y2-a*z1b/rb2*cosB*y2)))/pi/N4);
 
   v33 = b1*(one_quarter*(N3*(N1*rFib_ry3*cotB-y2/W6s*W5*(y3b/rb+1.0d0)-&
        one_half*y2/W6*a/rbc*two_y3b+y2*cosB/W7s*W2*W3+one_half*y2*cosB/W7*&
-       a/rbc*two_y3b)+y2/rb*(N0/W6+a/rb2)-one_half*y2*W8/rbc*(2.0d0*&
-       nu/W6+a/rb2)*two_y3b+y2*W8/rb*(-N0/W6s*(y3b/rb+1.0d0)-a/&
+       a/rbc*two_y3b)+y2/rb*(N0/W6+a/rb2)-one_half*y2*W8/rbc*(N0/&
+       W6+a/rb2)*two_y3b+y2*W8/rb*(-N0/W6s*(y3b/rb+1.0d0)-a/&
        rb2s*two_y3b)+y2*cosB/rb/W7*(N1-w1_over_w7*W2-a*y3b/rb2)-&
        one_half*y2*W8*cosB/rbc/W7*(N1-w1_over_w7*W2-a*y3b/rb2)*2.0d0*&
        y3b-y2*W8*cosB/rb/W7s*(N1-w1_over_w7*W2-a*y3b/rb2)*W3+y2*&
        W8*cosB/rb/W7*(-(cosB*y3b/rb+1.0d0)/W7*W2+w1_over_w7s*W2*W3+one_half*&
-       w1_over_w7*a/rbc*two_y3b-a/rb2+a*y3b/rb2s*two_y3b))/pi/(N4))+&
+       w1_over_w7*a/rbc*two_y3b-a/rb2+a*y3b/rb2s*two_y3b))/pi/N4)+&
        b2*(one_quarter*(N2*N1*cotB*((y3b/rb+1.0d0)/W6-cosB*W3/W7)+N3*&
        y1/W6s*W5*(y3b/rb+1.0d0)+one_half*N3*y1/W6*a/rbc*two_y3b+(2.0d0-&
        N0)*sinB/W7*W2-N3*z1b/W7s*W2*W3-one_half*N3*z1b/&
@@ -745,13 +751,13 @@ subroutine AngDisStrainFSC(y1,y2,y3,beta,b1,b2,b3,nu,a,v11,v22,v33,v12,v13,v23)
        w1_over_w7s*W3)-one_half*a/rbc*(sinB-y3b*z1b/rb2-z1b*W1/rb/W7)*&
        two_y3b+a/rb*(-z1b/rb2-y3b*sinB/rb2+y3b*z1b/rb2s*two_y3b-&
        sinB*W1/rb/W7-z1b*(cosB*y3b/rb+1.0d0)/rb/W7+one_half*z1b*W1/rbc/&
-       W7*two_y3b+z1b*W1/rb/W7s*W3)))/pi/(N4))+&
+       W7*two_y3b+z1b*W1/rb/W7s*W3)))/pi/N4)+&
        b3*(one_quarter*(N3*rFib_ry3-N3*y2*sinB/W7s*W2*W3-one_half*&
        N3*y2*sinB/W7*a/rbc*two_y3b+y2*sinB/rb/W7*(1.0d0+w1_over_w7*&
        W2+a*y3b/rb2)-one_half*y2*W8*sinB/rbc/W7*(1.0d0+w1_over_w7*W2+a*y3b/&
        rb2)*two_y3b-y2*W8*sinB/rb/W7s*(1.0d0+w1_over_w7*W2+a*y3b/rb2)*W3+&
        y2*W8*sinB/rb/W7*((cosB*y3b/rb+1.0d0)/W7*W2-w1_over_w7s*W2*W3-&
-       one_half*w1_over_w7*a/rbc*two_y3b+a/rb2-a*y3b/rb2s*two_y3b))/pi/(N4));
+       one_half*w1_over_w7*a/rbc*two_y3b+a/rb2-a*y3b/rb2s*two_y3b))/pi/N4);
 
   v12 = b1/2.0d0*(one_quarter*(N2*N1*rFib_ry2*cotBs+N1/W6*((1.0d0-W5)*cotB-y1/&
        W6*W4)-N1*y2s/W6s*((1.0d0-W5)*cotB-y1/W6*W4)/rb+N1*y2/W6*&
@@ -768,8 +774,8 @@ subroutine AngDisStrainFSC(y1,y2,y3,beta,b1,b2,b3,nu,a,v11,v22,v33,v12,v13,v23)
        W7s*(cosB/W7*(W1*(N1*cosB-a/rb)*cotB+N3*(rb*sinB-y1)*&
        cosB)-a*y3b*cosBtcotB/rb2)+y2*W8/rb/W7*(-cosB/W7s*(W1*&
        (N1*cosB-a/rb)*cotB+N3*(rb*sinB-y1)*cosB)/rb*y2+cosB/&
-       W7*(one_over_rb*cosB*y2*(N1*cosB-a/rb)*cotB+W1*a/rbc*y2*cotB+(2.0d0-2.0d0*&
-       nu)/rb*sinB*y2*cosB)+2.0d0*a*y3b*cosBtcotB/rb2s*y2))/pi/(N4))+&
+       W7*(one_over_rb*cosB*y2*(N1*cosB-a/rb)*cotB+W1*a/rbc*y2*cotB+N3/&
+       rb*sinB*y2*cosB)+2.0d0*a*y3b*cosBtcotB/rb2s*y2))/pi/N4)+&
        b2/2.0d0*(one_quarter*(N1*((N3*cotBs+nu)/rb*y2/W6-(N3*cotBs+1.0d0)*&
        cosB/rb*y2/W7)-N1/W6s*(-N1*y1*cotB+nu*y3b-a+a*y1*cotB/rb+&
        y1s/W6*W4)/rb*y2+N1/W6*(-a*y1*cotB/rbc*y2-y1s/W6s&
@@ -784,7 +790,7 @@ subroutine AngDisStrainFSC(y1,y2,y3,beta,b1,b2,b3,nu,a,v11,v22,v33,v12,v13,v23)
        W7*(-3.0d0*a*y1*y3b/rbp5/cosB*y2+one_over_rb2*sinB*y2*(N3*cosB-&
        w1_over_w7*W9)-(rb*sinB-y1)/rbc*(N3*cosB-w1_over_w7*W9)*y2+(rb*&
        sinB-y1)/rb*(-one_over_rb*cosB*y2/W7*W9+w1_over_w7s*W9/rb*y2+w1_over_w7*&
-       a/rbc/cosB*y2)))/pi/(N4))+&
+       a/rbc/cosB*y2)))/pi/N4)+&
        b3/2.0d0*(one_quarter*(N1*(one_over_w6*(1.0d0+a/rb)-y2s/W6s*(1.0d0+a/rb)/rb-y2s/&
        W6*a/rbc-cosB/W7*W2+y2s*cosB/W7s*W2/rb+y2s*cosB/W7*&
        a/rbc)-W8/rb*(a/rb2+one_over_w6)+y2s*W8/rbc*(a/rb2+one_over_w6)-&
@@ -792,14 +798,14 @@ subroutine AngDisStrainFSC(y1,y2,y3,beta,b1,b2,b3,nu,a,v11,v22,v33,v12,v13,v23)
        (w1_over_w7*W2+a*y3b/rb2)-y2s*W8*cosB/rbc/W7*(w1_over_w7*W2+a*&
        y3b/rb2)-y2s*W8*cosB/rb2/W7s*(w1_over_w7*W2+a*y3b/rb2)+y2*&
        W8*cosB/rb/W7*(one_over_rb*cosB*y2/W7*W2-w1_over_w7s*W2/rb*y2-W1/&
-       W7*a/rbc*y2-2.0d0*a*y3b/rb2s*y2))/pi/(N4))+&
+       W7*a/rbc*y2-2.0d0*a*y3b/rb2s*y2))/pi/N4)+&
        b1/2.0d0*(one_quarter*(N1*((N3*cotBs-nu)/rb*y1/W6-(N3*cotBs+1.0d0-&
        N0)*cosB*(y1/rb-sinB)/W7)+N1/W6s*(y1*cotB*(1.0d0-W5)+nu*y3b-&
        a+y2s/W6*W4)/rb*y1-N1/W6*((1.0d0-W5)*cotB+a*y1s*cotB/rbc-&
        y2s/W6s*W4/rb*y1-y2s/W6*a/rbc*y1)-N1*cosBtcotB/W7*&
        W2+N1*z1b*cotB/W7s*W2*(y1/rb-sinB)+N1*z1b*cotB/W7*a/rbc&
-       *y1-a*W8*cotB/rbc+3.0d0*a*y1s*W8*cotB/rbp5-W8/W6s*(-2.0d0*&
-       nu+one_over_rb*(N1*y1*cotB-a)+y2s/rb/W6*W5+a*y2s/rbc)/rb*&
+       *y1-a*W8*cotB/rbc+3.0d0*a*y1s*W8*cotB/rbp5-W8/W6s*(-N0+&
+       one_over_rb*(N1*y1*cotB-a)+y2s/rb/W6*W5+a*y2s/rbc)/rb*&
        y1+W8/W6*(-one_over_rbp3*(N1*y1*cotB-a)*y1+one_over_rb*N1*cotB-y2s/&
        rbc/W6*W5*y1-y2s/rb2/W6s*W5*y1-y2s/rb2s/W6*a*y1-&
        3.0d0*a*y2s/rbp5*y1)-W8/W7s*(cosBs-one_over_rb*(N1*z1b*cotB+a*&
@@ -809,7 +815,7 @@ subroutine AngDisStrainFSC(y1,y2,y3,beta,b1,b2,b3,nu,a,v11,v22,v33,v12,v13,v23)
        rbp5*y1+one_over_rbp3/W7*(y2s*cosBs-a*z1b*cotB/rb*W1)*y1+1.0d0/&
        rb/W7s*(y2s*cosBs-a*z1b*cotB/rb*W1)*(y1/rb-sinB)-one_over_rb/&
        W7*(-a*cosBtcotB/rb*W1+a*z1b*cotB/rbc*W1*y1-a*z1b*cotB/&
-       rb2*cosB*y1)))/pi/(N4))+&
+       rb2*cosB*y1)))/pi/N4)+&
        b2/2.0d0*(one_quarter*(N3*N1*rFib_ry1*cotBs-N1*y2/W6s*((W5-1.0d0)*cotB+&
        y1/W6*W4)/rb*y1+N1*y2/W6*(-a/rbc*y1*cotB+one_over_w6*W4-y1s&
        /W6s*W4/rb-y1s/W6*a/rbc)+N1*y2*cotB/W7s*W9*(y1/&
@@ -822,7 +828,7 @@ subroutine AngDisStrainFSC(y1,y2,y3,beta,b1,b2,b3,nu,a,v11,v22,v33,v12,v13,v23)
        cosB+w1_over_w7*W9+a*y3b/rb2/cosB)*y1-y2*W8*cotB/rb/W7s*((-2.0d0+&
        N0)*cosB+w1_over_w7*W9+a*y3b/rb2/cosB)*(y1/rb-sinB)+y2*W8*&
        cotB/rb/W7*(one_over_rb*cosB*y1/W7*W9-w1_over_w7s*W9*(y1/rb-sinB)-&
-       w1_over_w7*a/rbc/cosB*y1-2.0d0*a*y3b/rb2s/cosB*y1))/pi/(N4))+&
+       w1_over_w7*a/rbc/cosB*y1-2.0d0*a*y3b/rb2s/cosB*y1))/pi/N4)+&
        b3/2.0d0*(one_quarter*(N1*(-sinB*(y1/rb-sinB)/W7-one_over_w6*(1.0d0+a/rb)+y1s/W6s&
        *(1.0d0+a/rb)/rb+y1s/W6*a/rbc+cosB/W7*W2-z1b/W7s*W2*&
        (y1/rb-sinB)-z1b/W7*a/rbc*y1)+W8/rb*(a/rb2+one_over_w6)-y1s*&
@@ -833,7 +839,7 @@ subroutine AngDisStrainFSC(y1,y2,y3,beta,b1,b2,b3,nu,a,v11,v22,v33,v12,v13,v23)
        rb2)*y1-2.0d0*z1b/rbp5*a*y3b*y1+one_over_rbp3/W7*(y2s*cosB*sinB-a*&
        z1b/rb*W1)*y1+one_over_rb/W7s*(y2s*cosB*sinB-a*z1b/rb*W1)*&
        (y1/rb-sinB)-one_over_rb/W7*(-a*cosB/rb*W1+a*z1b/rbc*W1*y1-a*&
-       z1b/rb2*cosB*y1)))/pi/(N4));
+       z1b/rb2*cosB*y1)))/pi/N4);
 
   v13 = b1/2.0d0*(one_quarter*(N2*N1*rFib_ry3*cotBs-N1*y2/W6s*((1.0d0-W5)*&
        cotB-y1/W6*W4)*(y3b/rb+1.0d0)+N1*y2/W6*(one_half*a/rbc*two_y3b*cotB+&
@@ -852,7 +858,7 @@ subroutine AngDisStrainFSC(y1,y2,y3,beta,b1,b2,b3,nu,a,v11,v22,v33,v12,v13,v23)
        W7*(-cosB/W7s*(W1*(N1*cosB-a/rb)*cotB+N3*(rb*sinB-y1)*&
        cosB)*W3+cosB/W7*((cosB*y3b/rb+1.0d0)*(N1*cosB-a/rb)*cotB+one_half*W1*&
        a/rbc*two_y3b*cotB+one_half*N3/rb*sinB*two_y3b*cosB)-a*cosB*&
-       cotB/rb2+a*y3b*cosBtcotB/rb2s*two_y3b))/pi/(N4))+&
+       cotB/rb2+a*y3b*cosBtcotB/rb2s*two_y3b))/pi/N4)+&
        b2/2.0d0*(one_quarter*(N1*((N3*cotBs+nu)*(y3b/rb+1.0d0)/W6-(N3*cotBs&
        +1.0d0)*cosB*W3/W7)-N1/W6s*(-N1*y1*cotB+nu*y3b-a+a*y1*cotB/&
        rb+y1s/W6*W4)*(y3b/rb+1.0d0)+N1/W6*(nu-one_half*a*y1*cotB/rbc*2.0d0*&
@@ -872,7 +878,7 @@ subroutine AngDisStrainFSC(y1,y2,y3,beta,b1,b2,b3,nu,a,v11,v22,v33,v12,v13,v23)
        rb2*sinB*two_y3b*(N3*cosB-w1_over_w7*W9)-one_half*(rb*sinB-y1)/rbc&
        *(N3*cosB-w1_over_w7*W9)*two_y3b+(rb*sinB-y1)/rb*(-(cosB*y3b/&
        rb+1.0d0)/W7*W9+w1_over_w7s*W9*W3+one_half*w1_over_w7*a/rbc/cosB*2.0d0*&
-       y3b)))/pi/(N4))+&
+       y3b)))/pi/N4)+&
        b3/2.0d0*(one_quarter*(N1*(-y2/W6s*(1.0d0+a/rb)*(y3b/rb+1.0d0)-one_half*y2/W6*a/&
        rbc*two_y3b+y2*cosB/W7s*W2*W3+one_half*y2*cosB/W7*a/rbc*2.0d0*&
        y3b)-y2/rb*(a/rb2+one_over_w6)+one_half*y2*W8/rbc*(a/rb2+one_over_w6)*2.0d0*&
@@ -881,7 +887,7 @@ subroutine AngDisStrainFSC(y1,y2,y3,beta,b1,b2,b3,nu,a,v11,v22,v33,v12,v13,v23)
        W7*W2+a*y3b/rb2)*two_y3b-y2*W8*cosB/rb/W7s*(w1_over_w7*W2+a*&
        y3b/rb2)*W3+y2*W8*cosB/rb/W7*((cosB*y3b/rb+1.0d0)/W7*W2-W1/&
        W7s*W2*W3-one_half*w1_over_w7*a/rbc*two_y3b+a/rb2-a*y3b/rb2s*2.0d0*&
-       y3b))/pi/(N4))+&
+       y3b))/pi/N4)+&
        b1/2.0d0*(one_quarter*(N3*(N1*rFib_ry1*cotB-y1/W6s*W5/rb*y2-y2/W6*&
        a/rbc*y1+y2*cosB/W7s*W2*(y1/rb-sinB)+y2*cosB/W7*a/rbc&
        *y1)-y2*W8/rbc*(N0/W6+a/rb2)*y1+y2*W8/rb*(-N0/W6s&
@@ -889,7 +895,7 @@ subroutine AngDisStrainFSC(y1,y2,y3,beta,b1,b2,b3,nu,a,v11,v22,v33,v12,v13,v23)
        W2-a*y3b/rb2)*y1-y2*W8*cosB/rb/W7s*(N1-w1_over_w7*W2-a*&
        y3b/rb2)*(y1/rb-sinB)+y2*W8*cosB/rb/W7*(-one_over_rb*cosB*y1/W7*&
        W2+w1_over_w7s*W2*(y1/rb-sinB)+w1_over_w7*a/rbc*y1+2.0d0*a*y3b/rb2s&
-       *y1))/pi/(N4))+&
+       *y1))/pi/N4)+&
        b2/2.0d0*(one_quarter*(N2*N1*cotB*(one_over_rb*y1/W6-cosB*(y1/rb-sinB)/W7)-&
        N3/W6*W5+N3*y1s/W6s*W5/rb+N3*y1s/W6*&
        a/rbc+N3*cosB/W7*W2-N3*z1b/W7s*W2*(y1/rb-&
@@ -902,13 +908,13 @@ subroutine AngDisStrainFSC(y1,y2,y3,beta,b1,b2,b3,nu,a,v11,v22,v33,v12,v13,v23)
        y1/W7+w1_over_w7s*(y1/rb-sinB))-a/rbc*(sinB-y3b*z1b/rb2-&
        z1b*W1/rb/W7)*y1+a/rb*(-y3b*cosB/rb2+two_y3b*z1b/rb2s*y1-&
        cosB*W1/rb/W7-z1b/rb2*cosB*y1/W7+z1b*W1/rbc/W7*y1+z1b*&
-       W1/rb/W7s*(y1/rb-sinB))))/pi/(N4))+&
+       W1/rb/W7s*(y1/rb-sinB))))/pi/N4)+&
        b3/2.0d0*(one_quarter*(N3*rFib_ry1-N3*y2*sinB/W7s*W2*(y1/rb-&
        sinB)-N3*y2*sinB/W7*a/rbc*y1-y2*W8*sinB/rbc/W7*(1.0d0+&
        w1_over_w7*W2+a*y3b/rb2)*y1-y2*W8*sinB/rb/W7s*(1.0d0+w1_over_w7*W2+&
        a*y3b/rb2)*(y1/rb-sinB)+y2*W8*sinB/rb/W7*(one_over_rb*cosB*y1/&
        W7*W2-w1_over_w7s*W2*(y1/rb-sinB)-w1_over_w7*a/rbc*y1-2.0d0*a*y3b/&
-       rb2s*y1))/pi/(N4));
+       rb2s*y1))/pi/N4);
 
   v23 = b1/2.0d0*(one_quarter*(N1*((N3*cotBs-nu)*(y3b/rb+1.0d0)/W6-(N3*&
        cotBs+N1)*cosB*W3/W7)+N1/W6s*(y1*cotB*(1.0d0-W5)+nu*y3b-a+&
@@ -930,13 +936,13 @@ subroutine AngDisStrainFSC(y1,y2,y3,beta,b1,b2,b3,nu,a,v11,v22,v33,v12,v13,v23)
        /W7*(y2s*cosBs-a*z1b*cotB/rb*W1)*two_y3b+one_over_rb/W7s*(y2s&
        *cosBs-a*z1b*cotB/rb*W1)*W3-one_over_rb/W7*(-a*sinB*cotB/rb*W1+&
        one_half*a*z1b*cotB/rbc*W1*two_y3b-a*z1b*cotB/rb*(cosB*y3b/rb+&
-       1.0d0))))/pi/(N4))+&
+       1.0d0))))/pi/N4)+&
        b2/2.0d0*(one_quarter*(N3*N1*rFib_ry3*cotBs-N1*y2/W6s*((W5-1.0d0)*cotB+&
        y1/W6*W4)*(y3b/rb+1.0d0)+N1*y2/W6*(-one_half*a/rbc*two_y3b*cotB-y1/&
        W6s*W4*(y3b/rb+1.0d0)-one_half*y1/W6*a/rbc*two_y3b)+N1*y2*cotB/&
        W7s*W9*W3+one_half*N1*y2*cotB/W7*a/rbc/cosB*two_y3b-a/rbc*&
-       y2*cotB+3.0d0/2.0d0*a*y2*W8*cotB/rbp5*two_y3b+y2/rb/W6*(N1*cotB-2.0d0*&
-       nu*y1/W6-a*y1/rb*(one_over_rb+one_over_w6))-one_half*y2*W8/rbc/W6*(N1*&
+       y2*cotB+3.0d0/2.0d0*a*y2*W8*cotB/rbp5*two_y3b+y2/rb/W6*(N1*cotB-N0*&
+       y1/W6-a*y1/rb*(one_over_rb+one_over_w6))-one_half*y2*W8/rbc/W6*(N1*&
        cotB-N0*y1/W6-a*y1/rb*(one_over_rb+one_over_w6))*two_y3b-y2*W8/rb/W6s&
        *(N1*cotB-N0*y1/W6-a*y1/rb*(one_over_rb+one_over_w6))*(y3b/rb+1.0d0)+y2*&
        W8/rb/W6*(N0*y1/W6s*(y3b/rb+1.0d0)+one_half*a*y1/rbc*(one_over_rb+&
@@ -946,7 +952,7 @@ subroutine AngDisStrainFSC(y1,y2,y3,beta,b1,b2,b3,nu,a,v11,v22,v33,v12,v13,v23)
        rb2/cosB)*two_y3b-y2*W8*cotB/rb/W7s*(N2*cosB+w1_over_w7*&
        W9+a*y3b/rb2/cosB)*W3+y2*W8*cotB/rb/W7*((cosB*y3b/rb+1.0d0)/&
        W7*W9-w1_over_w7s*W9*W3-one_half*w1_over_w7*a/rbc/cosB*two_y3b+a/rb2/&
-       cosB-a*y3b/rb2s/cosB*two_y3b))/pi/(N4))+&
+       cosB-a*y3b/rb2s/cosB*two_y3b))/pi/N4)+&
        b3/2.0d0*(one_quarter*(N1*(-sinB*W3/W7+y1/W6s*(1.0d0+a/rb)*(y3b/rb+1.0d0)+&
        one_half*y1/W6*a/rbc*two_y3b+sinB/W7*W2-z1b/W7s*W2*W3-one_half*&
        z1b/W7*a/rbc*two_y3b)+y1/rb*(a/rb2+one_over_w6)-one_half*y1*W8/rbc&
@@ -959,19 +965,19 @@ subroutine AngDisStrainFSC(y1,y2,y3,beta,b1,b2,b3,nu,a,v11,v22,v33,v12,v13,v23)
        y3b/rb2s*two_y3b)+one_half/rbc/W7*(y2s*cosB*sinB-a*z1b/rb*&
        W1)*two_y3b+one_over_rb/W7s*(y2s*cosB*sinB-a*z1b/rb*W1)*W3-1.0d0/&
        rb/W7*(-a*sinB/rb*W1+one_half*a*z1b/rbc*W1*two_y3b-a*z1b/rb*&
-       (cosB*y3b/rb+1.0d0))))/pi/(N4))+&
+       (cosB*y3b/rb+1.0d0))))/pi/N4)+&
        b1/2.0d0*(one_quarter*(N3*(N1*rFib_ry2*cotB+one_over_w6*W5-y2s/W6s*W5/&
        rb-y2s/W6*a/rbc-cosB/W7*W2+y2s*cosB/W7s*W2/rb+y2s*&
-       cosB/W7*a/rbc)+W8/rb*(N0/W6+a/rb2)-y2s*W8/rbc*(2.0d0*&
-       nu/W6+a/rb2)+y2*W8/rb*(-N0/W6s/rb*y2-2.0d0*a/rb2s*y2)+&
+       cosB/W7*a/rbc)+W8/rb*(N0/W6+a/rb2)-y2s*W8/rbc*(N0/&
+       W6+a/rb2)+y2*W8/rb*(-N0/W6s/rb*y2-2.0d0*a/rb2s*y2)+&
        W8*cosB/rb/W7*(N1-w1_over_w7*W2-a*y3b/rb2)-y2s*W8*cosB/&
        rbc/W7*(N1-w1_over_w7*W2-a*y3b/rb2)-y2s*W8*cosB/rb2/W7s&
        *(N1-w1_over_w7*W2-a*y3b/rb2)+y2*W8*cosB/rb/W7*(-one_over_rb*&
        cosB*y2/W7*W2+w1_over_w7s*W2/rb*y2+w1_over_w7*a/rbc*y2+2.0d0*a*&
-       y3b/rb2s*y2))/pi/(N4))+&
+       y3b/rb2s*y2))/pi/N4)+&
        b2/2.0d0*(one_quarter*(N2*N1*cotB*(one_over_rb*y2/W6-cosB/rb*y2/W7)+(2.0d0-&
-       N0)*y1/W6s*W5/rb*y2+N3*y1/W6*a/rbc*y2-(2.0d0-2.0d0*&
-       nu)*z1b/W7s*W2/rb*y2-N3*z1b/W7*a/rbc*y2-W8/rbc&
+       N0)*y1/W6s*W5/rb*y2+N3*y1/W6*a/rbc*y2-(N3)*&
+       z1b/W7s*W2/rb*y2-N3*z1b/W7*a/rbc*y2-W8/rbc&
        *(N1*cotB-N0*y1/W6-a*y1/rb2)*y2+W8/rb*(N0*y1/W6s/&
        rb*y2+2.0d0*a*y1/rb2s*y2)+W8/W7s*(cosB*sinB+W1*cotB/rb*((2.0d0-&
        N0)*cosB-w1_over_w7)+a/rb*(sinB-y3b*z1b/rb2-z1b*W1/rb/W7))/&
@@ -979,12 +985,12 @@ subroutine AngDisStrainFSC(y1,y2,y3,beta,b1,b2,b3,nu,a,v11,v22,v33,v12,v13,v23)
        cotB/rbc*(N3*cosB-w1_over_w7)*y2+W1*cotB/rb*(-cosB/rb*&
        y2/W7+w1_over_w7s/rb*y2)-a/rbc*(sinB-y3b*z1b/rb2-z1b*W1/&
        rb/W7)*y2+a/rb*(two_y3b*z1b/rb2s*y2-z1b/rb2*cosB*y2/W7+&
-       z1b*W1/rbc/W7*y2+z1b*W1/rb2/W7s*y2)))/pi/(N4))+&
+       z1b*W1/rbc/W7*y2+z1b*W1/rb2/W7s*y2)))/pi/N4)+&
        b3/2.0d0*(one_quarter*(N3*rFib_ry2+N3*sinB/W7*W2-N3*y2s*&
        sinB/W7s*W2/rb-N3*y2s*sinB/W7*a/rbc+W8*sinB/rb/&
        W7*(1.0d0+w1_over_w7*W2+a*y3b/rb2)-y2s*W8*sinB/rbc/W7*(1.0d0+W1/&
        W7*W2+a*y3b/rb2)-y2s*W8*sinB/rb2/W7s*(1.0d0+w1_over_w7*W2+a*&
        y3b/rb2)+y2*W8*sinB/rb/W7*(one_over_rb*cosB*y2/W7*W2-w1_over_w7s*&
-       W2/rb*y2-w1_over_w7*a/rbc*y2-2.0d0*a*y3b/rb2s*y2))/pi/(N4));
+       W2/rb*y2-w1_over_w7*a/rbc*y2-2.0d0*a*y3b/rb2s*y2))/pi/N4);
 
 end subroutine AngDisStrainFSC
