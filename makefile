@@ -187,7 +187,7 @@ MATRIX_SOLVER_OBJS = $(ODIR)/numrec_svd_routines.o $(ODIR)/nnls_lawson.o	\
 # triangular dislocation routines
 #
 
-TRI_GREEN_OBJS = $(ODIR)/tdstresshs.o  $(ODIR)/tddisphs.o  $(ODIR)/tddisphs_bird.o 
+TRI_GREEN_OBJS = $(ODIR)/tdstresshs.o  $(ODIR)/tddisphs.o  
 
 # list of objects for patch i/o. these also include
 # all object files that deal with interaction coefficients

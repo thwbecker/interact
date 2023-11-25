@@ -270,7 +270,7 @@ subroutine TDdisp_HarFunc(X,Y,Z,P1,P2,P3,Ss,Ds,Ts,nu,ue,un,uv,&
   C_PREC,intent(in) :: x,y,z,ss,ds,ts,nu
   C_PREC,intent(in),dimension(3) :: p1,p2,p3
   C_PREC,intent(out) :: ue,un,uv
-  C_PREC,intent(in),dimension(3,3) :: Ar
+  C_PREC,intent(inout),dimension(3,3) :: Ar
   logical,intent(in) :: compute_ar
   C_PREC,dimension(3) :: vnorm,vdip,vstrike
        
