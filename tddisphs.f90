@@ -111,10 +111,10 @@
 ! loc is location vector, X,Y,Z
 ! u is displacement vector, East, North, Vertical
 !
-subroutine  tddisphs(loc,P1,P2,P3,Ss,Ds,Ts,nu,u)
+subroutine  tddisphs(loc,P1,P2,P3,Ss,Ds,Ts,u)
   implicit none
-  C_PREC, PARAMETER :: pi = 3.14159265358979D0, zero = FORTRAN_ZERO
-  C_PREC,intent(in) :: ss,ds,ts,nu
+  C_PREC, PARAMETER :: pi = 3.14159265358979D0, zero = FORTRAN_ZERO, nu = POISSON_NU
+  C_PREC,intent(in) :: ss,ds,ts
   C_PREC,intent(in),dimension(3) :: p1,p2,p3,loc
   C_PREC,intent(out),dimension(3) :: u
   C_PREC :: ueMS,unMS,uvMS,ueFSC,unFSC,uvFSC,ueIS,unIS,uvIS

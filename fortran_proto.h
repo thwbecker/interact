@@ -98,11 +98,7 @@ extern void tdd_coeff(COMP_PRECISION *,COMP_PRECISION *,
     to F90 */
 extern void tddisphs(COMP_PRECISION *,COMP_PRECISION *,COMP_PRECISION *,COMP_PRECISION *,
 		     COMP_PRECISION *,COMP_PRECISION *,
-		     COMP_PRECISION *,COMP_PRECISION *,COMP_PRECISION *);
-extern void tddisphs_bird(double *,double *,double *,double *,double *,
-			  double *,double *,double *,
-			  double *,double *,
-			  double *,double *,double *);
+		     COMP_PRECISION *,COMP_PRECISION *);
 extern void tdstresshs(COMP_PRECISION *,COMP_PRECISION *,COMP_PRECISION *,COMP_PRECISION *,
 		       COMP_PRECISION *,COMP_PRECISION *,COMP_PRECISION *,COMP_PRECISION *,
 		       COMP_PRECISION *);

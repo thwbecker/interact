@@ -1,12 +1,16 @@
 # interact - models static fault interactions using dislocations in an elastic medium
 
 `interact` uses `dc3d.f` as provided by Y. Okada as in Okada (BSSA,
-1992) and  linear algebra routines from SLATEC, LAPACK, and
-EISPACK. Might contain material copyrighted by others (e.g. Numerical
+1992), has .f90 code converted from Nikkhoo and Walter (GJI,2015),
+linear algebra routines from SLATEC, LAPACK, and EISPACK. Might
+contain other copyrighted material by others (e.g. Numerical
 Recipes). Petsc implementation based on Dave May's examples and
-assistance. 
+assistance, and .m to .f90 conversion for slip inspired by code by
+P. Bird.
 
-See files `INSTALLATION`, `README.md`, and `help.txt` for documentation and `COPYRIGHT` and `COPYING` for the license and warranty disclaimers.
+See files `INSTALLATION`, `README.md`, and `help.txt` for
+documentation and `COPYRIGHT` and `COPYING` for the license and
+warranty disclaimers.
 
 If you use `interact` please cite the following
 
