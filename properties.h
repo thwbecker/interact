@@ -37,18 +37,18 @@
 #endif
 
 /* 
-   \lambda = \mu (2 \nu)/(1-2*\nu) 
+   \lambda = (2\mu \nu)/(1-2*\nu) 
    \alpha = (\lambda+\mu)/(\lambda+2 \mu) 
    where \lambda and \mu are the Lame constants 
    (\mu is the shear modulus)
+
    if the possion ratio \nu=1/4, then \mu = \lambda, and \alpha = 2./3.
    E = 2\mu(1+\nu), which is 2.5 for \nu=.25 and \mu=1
 */
 #define POISSON_NU 0.25
-
-/* change those */
-#define LAMBDA SHEAR_MODULUS
-#define ALPHA 0.666666666666666666666666666666666667
+/* CHANGE THOSE IF SHEAR MODULUS or NU CHANGED */
+#define LAMBDA_CONST SHEAR_MODULUS
+#define ALPHA_CONST 0.666666666666666666666666666666666667
 /* 
 
 

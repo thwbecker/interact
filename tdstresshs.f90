@@ -117,28 +117,27 @@ subroutine tdstresshs(loc,P1,P2,P3,Ss,Ds,Ts,stress,strain)
   C_PREC, dimension(6) :: StsMS,StrMS,StsFSC,StrFSC,StsIS,StrIS
   C_PREC, dimension(3,3) :: Ar1,Ar2
 
-  if ((loc(3) .gt. 0.d0).or. (P1(3) > 0.d0).or.( P2(3) > 0d0) .or.( P3(3)>0d0))then 
+  if ((loc(3) .gt. FORTRAN_ZERO).or. (P1(3) > FORTRAN_ZERO).or.( P2(3) > 0d0) .or.( P3(3)>0d0))then 
      write(*,*)'Half-space solution: Z coordinates must be negative!'
      stop 
-  else if ((P1(3)==0.d0).and.(P2(3)==0.d0).and.(P3(3)==0.d0))then
-     Stress = 0.d0
-     Strain = 0.d0
+  else if ((P1(3)==FORTRAN_ZERO).and.(P2(3)==FORTRAN_ZERO).and.(P3(3)==FORTRAN_ZERO))then
+     Stress = FORTRAN_ZERO
+     Strain = FORTRAN_ZERO
      return 
   endif
 
   !print *,Ts,Ss,Ds
-  ! Calculate main dislocation contribution to strains and stresses
+  ! Calculate main dislocation contribution to strains and stresses and save rotation matrix
   call TDstressFS(loc(1),loc(2),loc(3),P1,P2,P3,Ss,Ds,Ts,StsMS,StrMS,Ar1)
   !print *,stsms
   !print *,strms
-  ! Calculate harmonic function contribution to strains and stresses
-  call TDstress_HarFunc(loc(1),loc(2),loc(3),P1,P2,P3,Ss,Ds,Ts,StsFSC,StrFSC,&
-       .false.,Ar1)
+  ! Calculate harmonic function contribution to strains and stresses, and reuse rotation matrix
+  call TDstress_HarFunc(loc(1),loc(2),loc(3),P1,P2,P3,Ss,Ds,Ts,StsFSC,StrFSC,.false.,Ar1)
 
   ! Calculate image dislocation contribution to strains and stresses
   p1n(1:2) = p1(1:2);p2n(1:2)=p2(1:2);p3n(1:2) =  p3(1:2);
   p1n(3)  = -p1(3);  p2n(3)  = -p2(3);p3n(3)   = -p3(3);
-
+  ! this one is a different Ar
   call TDstressFS(loc(1),loc(2),loc(3),P1n,P2n,P3n,Ss,Ds,Ts,StsIS,StrIS,Ar2)
 
   ! Calculate the complete stress and strain tensor components in EFCS
@@ -147,6 +146,7 @@ subroutine tdstresshs(loc,P1,P2,P3,Ss,Ds,Ts,stress,strain)
 
 end subroutine TDstressHS
 
+! compute stuff and save rotation matrix
 subroutine TDstressFS(X,Y,Z,P1,P2,P3,Ss,Ds,Ts,Stress,Strain,Ar)
   USE, INTRINSIC :: IEEE_ARITHMETIC
   ! TDstressFS 
@@ -158,7 +158,9 @@ subroutine TDstressFS(X,Y,Z,P1,P2,P3,Ss,Ds,Ts,Stress,Strain,Ar)
   C_PREC,intent(out),dimension(6) :: stress,strain
   C_PREC,dimension(3,3),intent(out) :: Ar
   
-  C_PREC nu,bx,by,bz,x_,y_,z_,aA,aB,aC,&
+  C_PREC,parameter :: nu = POISSON_NU,two_mu = TWO_TIMES_SHEAR_MODULUS, lambda =  LAMBDA_CONST
+  
+  C_PREC bx,by,bz,x_,y_,z_,aA,aB,aC,&
        Exx,Eyy,Ezz,Exy,Exz,Eyz,&
        Exxr,Eyyr,Ezzr,Exyr,Exzr,Eyzr,&
        Sxx,Syy,Szz,Sxy,Sxz,Syz
@@ -171,10 +173,10 @@ subroutine TDstressFS(X,Y,Z,P1,P2,P3,Ss,Ds,Ts,Stress,Strain,Ar)
   INTEGER :: trimode
   logical :: caseplog,casenlog,casezlog
 
-  nu = LAMBDA/((LAMBDA+SHEAR_MODULUS)*2.d0) 
 
   ! this is the part shared between deformation and stress compution
   !print *,Ts,Ss,Ds
+  ! save the rotation matrix
   call setup_geometry(x,y,z,Ts,Ss,Ds,p1,p2,p3,bx,by,bz,&
        x_,y_,z_,p1_,p2_,p3_,e12,e13,e23,aA,aB,aC,Ar,trimode)
   !print *,bx,by,bz
@@ -235,14 +237,14 @@ subroutine TDstressFS(X,Y,Z,P1,P2,P3,Ss,Ds,Ts,Stress,Strain,Ar)
   call TensTrans(exx,eyy,ezz,exy,exz,eyz,Ar,exxr,eyyr,ezzr,exyr,exzr,eyzr)
 
   ! Calculate the stress tensor components in EFCS
-  etracel = (Exxr+Eyyr+Ezzr) * LAMBDA
-  Sxx = TWO_TIMES_SHEAR_MODULUS * Exxr + etracel
-  Syy = TWO_TIMES_SHEAR_MODULUS * Eyyr + etracel
-  Szz = TWO_TIMES_SHEAR_MODULUS * Ezzr + etracel
+  etracel = (Exxr+Eyyr+Ezzr) * lambda
+  Sxx = two_mu  * Exxr + etracel
+  Syy = two_mu * Eyyr + etracel
+  Szz = two_mu * Ezzr + etracel
 
-  Sxy = TWO_TIMES_SHEAR_MODULUS * Exyr;
-  Sxz = TWO_TIMES_SHEAR_MODULUS * Exzr;
-  Syz = TWO_TIMES_SHEAR_MODULUS * Eyzr;
+  Sxy = two_mu * Exyr;
+  Sxz = two_mu * Exzr;
+  Syz = two_mu * Eyzr;
 
   Strain = (/Exxr,Eyyr,Ezzr,Exyr,Exzr,Eyzr/)
   !print *,'strainFS',strain
@@ -275,6 +277,7 @@ subroutine TDstress_HarFunc(X,Y,Z,P1,P2,P3,Ss,Ds,Ts,stress,strain,compute_ar,ar)
      ! Transform slip vector components from TDCS into EFCS
      call matrix_from_3vec(Vnorm, Vstrike, Vdip,Ar)
   endif
+
   call CoordTrans(bx,by,bz,Ar,bx_,by_,bz_) 
   !print *,'b_',bx_,by_,bz_
   ! Calculate contribution of angular dislocation pair on each TD side
@@ -348,7 +351,7 @@ subroutine TDSetupS(x,y,z,alpha,bx,by,bz,nu,TriVertex,SideVec,exxt,eyyt,ezzt,exy
 
   ! Transform strains from ADCS into TDCS
   B(1,1) = 1.0d0;B(1,2:3)=0.0d0;
-  B(2:3,1) = 0.d0;
+  B(2:3,1) = FORTRAN_ZERO;
   !B(2:3,2:3) = transpose(A)
   B(2,2)=A(1,1);B(2,3)=A(2,1)
   B(3,2)=A(1,2);B(3,3)=A(2,2)
@@ -366,30 +369,32 @@ subroutine AngSetupFSC_S(X,Y,Z,bX,bY,bZ,PA,PB,Stress,Strain)
   C_PREC, intent(in) :: X,Y,Z,bX,bY,bZ
   C_PREC, dimension(6), intent(out) :: stress,strain
   C_PREC, DIMENSION(3), INTENT(IN) :: PA, PB
-  C_PREC, PARAMETER :: pi = 3.14159265358979D0
-  C_PREC :: beta,ltrace_E,nu,Exx,Eyy,Ezz,Exy,Exz,Eyz,&
+  C_PREC, PARAMETER :: pi = 3.14159265358979D0, nu = POISSON_NU,&
+       two_mu = TWO_TIMES_SHEAR_MODULUS, lambda =  LAMBDA_CONST
+  C_PREC, parameter, dimension(3) :: eZ = (/ FORTRAN_ZERO, FORTRAN_ZERO, FORTRAN_UNITY /)
+  C_PREC, PARAMETER :: eps = EPS_FOR_FORTRAN ! a crude approximation of the MatLab "eps" constant.
+  
+  C_PREC :: beta,ltrace_E,Exx,Eyy,Ezz,Exy,Exz,Eyz,&
        Sxx,Syy,Szz,Sxy,Sxz,Syz,&
        v11,v22,v33,v12,v23,v13,v11A,v22A,v33A,v12A,v23A,v13A,&
        v11B,v22B,v33B,v12B,v23B,v13B
-  C_PREC, dimension(3) :: SideVec,eZ,ey1,ey2,ey3
+  C_PREC, dimension(3) :: SideVec,ey1,ey2,ey3
   C_PREC y1A,y2A,y3A,y1B,y2B,y3B,y1AB,y2AB,y3AB,b1,b2,b3
   C_PREC, dimension(3,3) :: A,At
 
-  C_PREC, PARAMETER :: eps = EPS_FOR_FORTRAN ! a crude approximation of the MatLab "eps" constant.
+
   LOGICAL :: I
   ! AngSetupFSC_S calculates the Free Surface Correction to strains and 
   ! stresses associated with angular dislocation pair on each TD side.
-  
-  nu = LAMBDA/(LAMBDA+SHEAR_MODULUS)/2.0d0; ! Poisson's ratio
 
   ! Calculate TD side vector and the angle of the angular dislocation pair
   SideVec = PB - PA;
-  eZ = (/ FORTRAN_ZERO, FORTRAN_ZERO, FORTRAN_UNITY /)
+ 
   beta = acos(-dot_product(SideVec,eZ)/norm2(SideVec));
   !print *,beta
   if ((abs(beta).lt.eps).or.(abs(pi-beta).lt.eps))then
-     Stress = 0.d0
-     Strain = 0.d0
+     Stress = FORTRAN_ZERO
+     Strain = FORTRAN_ZERO
   else
      ey1 = (/ SideVec(1), SideVec(2), FORTRAN_ZERO  /)
      call normalize_vec(ey1,ey1)
@@ -451,14 +456,14 @@ subroutine AngSetupFSC_S(X,Y,Z,bX,bY,bZ,PA,PB,Stress,Strain)
      call TensTrans(v11,v22,v33,v12,v13,v23,At,Exx,Eyy,Ezz,Exy,Exz,Eyz);
 
      ! Calculate total Free Surface Correction to stresses in EFCS
-     ltrace_E = LAMBDA * (exx+eyy+ezz)
+     ltrace_E = lambda * (exx+eyy+ezz)
 
-     Sxx = TWO_TIMES_SHEAR_MODULUS*Exx+ltrace_E
-     Syy = TWO_TIMES_SHEAR_MODULUS*Eyy+ltrace_E
-     Szz = TWO_TIMES_SHEAR_MODULUS*Ezz+ltrace_E
-     Sxy = TWO_TIMES_SHEAR_MODULUS*Exy;
-     Sxz = TWO_TIMES_SHEAR_MODULUS*Exz;
-     Syz = TWO_TIMES_SHEAR_MODULUS*Eyz;
+     Sxx = two_mu*Exx+ltrace_E
+     Syy = two_mu*Eyy+ltrace_E
+     Szz = two_mu*Ezz+ltrace_E
+     Sxy = two_mu*Exy;
+     Sxz = two_mu*Exz;
+     Syz = two_mu*Eyz;
 
      Strain = (/ Exx,Eyy,Ezz,Exy,Exz,Eyz /)
      Stress = (/ Sxx,Syy,Szz,Sxy,Sxz,Syz /)
@@ -525,45 +530,45 @@ subroutine AngDisStrain(x,y,z,alpha,bx,by,bz,nu,Exx,Eyy,Ezz,Exy,Exz,Eyz)
   N2 = 1.0d0-nu
   
   Exx = bx*(rFi_rx)+&
-       bx*P8/(N2)*(eta/Wr+eta*x2/W2r2-eta*x2/Wr3+y/rz-&
+       bx*P8/N2*(eta/Wr+eta*x2/W2r2-eta*x2/Wr3+y/rz-&
        x2*y/r2z2-x2*y/r3z)-&
-       by*x*P8/(N2)*(((N1)/Wr+x2/W2r2-x2/Wr3)*cosA+&
-       (N1)/rz-x2/r2z2-x2/r3z)+&
-       bz*x*sinA*P8/(N2)*((N1)/Wr+x2/W2r2-x2/Wr3);
+       by*x*P8/N2*((N1/Wr+x2/W2r2-x2/Wr3)*cosA+&
+       N1/rz-x2/r2z2-x2/r3z)+&
+       bz*x*sinA*P8/N2*(N1/Wr+x2/W2r2-x2/Wr3);
   
   Eyy = by*(rFi_ry)+&
-       bx*P8/(N2)*((1.0d0/Wr+S2-y2/Wr3)*eta+(N1)*y/rz-y3/r2z2-&
+       bx*P8/N2*((1.0d0/Wr+S2-y2/Wr3)*eta+N1*y/rz-y3/r2z2-&
        y3/r3z-2.0d0*nu*cosA*S)-&
-       by*x*P8/(N2)*(1.0d0/rz-y2/r2z2-y2/r3z+&
+       by*x*P8/N2*(1.0d0/rz-y2/r2z2-y2/r3z+&
        (1.0d0/Wr+S2-y2/Wr3)*cosA)+&
-       bz*x*sinA*P8/(N2)*(1.0d0/Wr+S2-y2/Wr3);
+       bz*x*sinA*P8/N2*(1.0d0/Wr+S2-y2/Wr3);
   
   Ezz = bz*(rFi_rz)+&
-       bx*P8/(N2)*(eta/W/r+eta*C2-eta*z2/Wr3+y*z/r3+&
+       bx*P8/N2*(eta/W/r+eta*C2-eta*z2/Wr3+y*z/r3+&
        2.0d0*nu*sinA*C)-&
-       by*x*P8/(N2)*((1.0d0/Wr+C2-z2/Wr3)*cosA+z/r3)+&
-       bz*x*sinA*P8/(N2)*(1.0d0/Wr+C2-z2/Wr3);
+       by*x*P8/N2*((1.0d0/Wr+C2-z2/Wr3)*cosA+z/r3)+&
+       bz*x*sinA*P8/N2*(1.0d0/Wr+C2-z2/Wr3);
   
   Exy = bx*(rFi_ry)/2.0d0+by*(rFi_rx)/2.0d0-&
-       bx*P8/(N2)*(x*y2/r2z2-nu*x/rz+x*y2/r3z-nu*x*cosA/Wr+&
+       bx*P8/N2*(x*y2/r2z2-nu*x/rz+x*y2/r3z-nu*x*cosA/Wr+&
        eta*x*S/Wr+eta*x*y/Wr3)+&
-       by*P8/(N2)*(x2*y/r2z2-nu*y/rz+x2*y/r3z+nu*cosA*S+&
+       by*P8/N2*(x2*y/r2z2-nu*y/rz+x2*y/r3z+nu*cosA*S+&
        x2*y*cosA/Wr3+x2*cosA*S/Wr)-&
-       bz*sinA*P8/(N2)*(nu*S+x2*S/Wr+x2*y/Wr3);
+       bz*sinA*P8/N2*(nu*S+x2*S/Wr+x2*y/Wr3);
   
   Exz = bx*(rFi_rz)/2.0d0+bz*(rFi_rx)/2.0d0-&
-       bx*P8/(N2)*(-x*y/r3+nu*x*sinA/Wr+eta*x*C/Wr+&
+       bx*P8/N2*(-x*y/r3+nu*x*sinA/Wr+eta*x*C/Wr+&
        eta*x*z/Wr3)+&
-       by*P8/(N2)*(-x2/r3+nu/r+nu*cosA*C+x2*z*cosA/Wr3+&
+       by*P8/N2*(-x2/r3+nu/r+nu*cosA*C+x2*z*cosA/Wr3+&
        x2*cosA*C/Wr)-&
-       bz*sinA*P8/(N2)*(nu*C+x2*C/Wr+x2*z/Wr3);
+       bz*sinA*P8/N2*(nu*C+x2*C/Wr+x2*z/Wr3);
   
   Eyz = by*(rFi_rz)/2.0d0+bz*(rFi_ry)/2.0d0+&
-       bx*P8/(N2)*(y2/r3-nu/r-nu*cosA*C+nu*sinA*S+eta*sinA*cosA/W2-&
+       bx*P8/N2*(y2/r3-nu/r-nu*cosA*C+nu*sinA*S+eta*sinA*cosA/W2-&
        eta*(cfac)/W2r+eta*y*z/W2r2-eta*y*z/Wr3)-&
-       by*x*P8/(N2)*(y/r3+sinA*cosA**2/W2-cosA*(cfac)/&
+       by*x*P8/N2*(y/r3+sinA*cosA**2/W2-cosA*(cfac)/&
        W2r+y*z*cosA/W2r2-y*z*cosA/Wr3)-&
-       bz*x*sinA*P8/(N2)*(y*z/Wr3-sinA*cosA/W2+(cfac)/&
+       bz*x*sinA*P8/N2*(y*z/Wr3-sinA*cosA/W2+(cfac)/&
        W2r-y*z/W2r2);
   
   

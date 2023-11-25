@@ -705,7 +705,8 @@ subroutine normalize_vec(x,y)
   C_PREC,intent(in),dimension(3) :: x
   C_PREC,intent(out),dimension(3) :: y
   C_PREC :: vec_len
-  vec_len = norm2(x)
+  vec_len = sqrt(x(1)**2+x(2)**2+x(3)**2)
+  !vec_len = norm2(x)
   y = x/vec_len
 end subroutine normalize_vec
 
@@ -732,9 +733,9 @@ subroutine setup_geometry(x,y,z,Ts,Ss,Ds,p1,p2,p3,bx,by,bz,&
   
   ! Transform coordinates and slip vector components from EFCS into TDCS
 
-  p1_ = 0.d0
-  p2_ = 0.d0
-  p3_ = 0.d0
+  p1_ = FORTRAN_ZERO
+  p2_ = FORTRAN_ZERO
+  p3_ = FORTRAN_ZERO
 
   call matrix_from_3vec(vnorm,vstrike,vdip,Ar)
   At = transpose(Ar)

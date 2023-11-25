@@ -69,7 +69,7 @@ void eval_rectangle(COMP_PRECISION *x,struct flt *fault,
   double x_local_d[3],u_d[12],disp_d[3];
 #endif
   COMP_PRECISION x_local[3],u[12];
-  static double medium_alpha=ALPHA;
+  const COMP_PRECISION medium_alpha = ALPHA_CONST;
   double al1,al2,aw1,aw2,depth,cpdip;
 #ifdef DEBUG
   COMP_PRECISION corners[4][3],l,w;
@@ -152,7 +152,7 @@ void eval_rectangle(COMP_PRECISION *x,struct flt *fault,
 	 strains and stresses 
       */
       /* this is the isotropic component */
-      iso= LAMBDA*(u[OKUXX]+u[OKUYY]+u[OKUZZ]);
+      iso= LAMBDA_CONST*(u[OKUXX]+u[OKUYY]+u[OKUZZ]);
       /* 
 	 assign sxx,sxy,sxz,syy,syz,szz 
 	 according to 
@@ -195,7 +195,7 @@ void eval_rectangle_basic(COMP_PRECISION *x,
   double depth_d,x_d[3],disp_d[3],u_d[12],dip_d,u_global_d[3];
   int i;
 #endif
-  static double medium_alpha=ALPHA;
+  const COMP_PRECISION medium_alpha = ALPHA_CONST;
   COMP_PRECISION u[12],iso;
   double al1,al2,aw1,aw2;
   al1 = (double)-l;al2 = (double)l;
@@ -233,7 +233,7 @@ void eval_rectangle_basic(COMP_PRECISION *x,
   if(*iret){
     set_stress_and_disp_nan(sm_global,u_global,GC_DISP_AND_STRESS);
   }else{
-    iso= LAMBDA*(u[OKUXX]+u[OKUYY]+u[OKUZZ]);
+    iso= LAMBDA_CONST*(u[OKUXX]+u[OKUYY]+u[OKUZZ]);
     sm_global[INT_X][INT_X]=               iso + TWO_TIMES_SHEAR_MODULUS*u[OKUXX];
     sm_global[INT_X][INT_Y]=sm_global[INT_Y][INT_X]=SHEAR_MODULUS*(u[OKUXY]+u[OKUYX]);
     sm_global[INT_X][INT_Z]=sm_global[INT_Z][INT_X]=SHEAR_MODULUS*(u[OKUXZ]+u[OKUZX]);
@@ -282,7 +282,7 @@ void eval_point_short(COMP_PRECISION *x,COMP_PRECISION *xf,COMP_PRECISION area,
 		      COMP_PRECISION sm_global[3][3],
 		      int *iret,MODE_TYPE mode)
 {
-  static double medium_alpha=ALPHA;
+  const COMP_PRECISION medium_alpha = ALPHA_CONST,mu_alpha = SHEAR_MODULUS/LAMBDA_CONST;
   COMP_PRECISION u[12],
     iso,x_local[3],dx[3],sm_local[3][3];
   double depth,potency[4];
@@ -302,7 +302,7 @@ void eval_point_short(COMP_PRECISION *x,COMP_PRECISION *xf,COMP_PRECISION area,
   if(disp[DIP] != 0.)
     potency[1]=(double)area * disp[DIP];
   if(disp[NORMAL] != 0.)
-    potency[2]=(double)area * disp[NORMAL]* (SHEAR_MODULUS/LAMBDA);
+    potency[2]=(double)area * disp[NORMAL]* mu_alpha;
 #ifdef USE_DOUBLE_PRECISION
   dc3d0(&medium_alpha,(x_local+INT_X),(x_local+INT_Y),(x_local+INT_Z),
 	&depth,&dip,
@@ -331,7 +331,7 @@ void eval_point_short(COMP_PRECISION *x,COMP_PRECISION *xf,COMP_PRECISION area,
     if(mode !=  GC_STRESS_ONLY)
       rotate_vec(u,u_global,cos_alpha,-sin_alpha);
     if(mode != GC_DISP_ONLY){
-      iso= LAMBDA*(u[OKUXX]+u[OKUYY]+u[OKUZZ]);
+      iso= LAMBDA_CONST*(u[OKUXX]+u[OKUYY]+u[OKUZZ]);
 
       sm_local[INT_X][INT_X]=iso+TWO_TIMES_SHEAR_MODULUS*u[OKUXX];
       sm_local[INT_X][INT_Y]=sm_local[INT_Y][INT_X]=
