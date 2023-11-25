@@ -715,10 +715,12 @@ OPTIONS:
 
 * -h  prints out this help message and exits to the operating system
 
-(C) Thorsten Becker, thwbecker@post.harvard.edu, 1999 - 2023
+(C) Thorsten Becker, thwbecker@post.harvard.edu, 1999 - 2023)
     interact - boundary element code for elastic half-spaces
-    Main 3-D dislocation code based on dc3d.f by Y. Okada, as of Okada, BSSA, 1992
-    2-D segment slip solution from Crouch and Starfield (1973)
+    3-D quad dislocationS based on Okada (BSSA, 1992).
+    3-D triangular dislocations based on Nikkhoo and Walter (GJI, 2015).
+    2-D segment slip solution from Crouch and Starfield (1973).
     May include routines based on copyrighted software of others.
-    Distributed under the GNU public license, see `COPYING`.
+    Distributed under the GNU public license, see "COPYING".
+
 
