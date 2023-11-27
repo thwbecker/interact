@@ -4,21 +4,23 @@
 #
 
 l=5
-infile=${1-geom.in}
+infile=${1-geom}		# geom without the .in
 zscaling=${2-1}
 fixedrange=${3-0}
 shrink=${4-0}
 projection=${5-0}
 includepoints=0
-file=geom.ps
+file=$infile.ps
 
-tmpn=/tmp/tmp.$$
 
-if [ ! -s $infile ];then
-    echo $0: can not find $infile
+tmpn=`mktemp`
+trap "rm -f $tmpn*" EXIT
+
+if [ ! -s $infile.in ];then
+    echo $0: can not find $infile.in
     exit
 fi
-cat $infile | patch2xyz  > $tmpn.dat #2> /dev/null
+cat $infile.in | patch2xyz  > $tmpn.dat #2> /dev/null
 
 if [ $fixedrange -eq 0 ];then
     xmin=`gawk -f min.awk col=1 $tmpn.dat | awk '{print($1-1)}' ` 
@@ -57,35 +59,35 @@ elif [ $fixedrange -eq 2 ];then
     daz=10
 fi
 # 
-ann=`echo $dax $day | \
-    gawk '{printf("-Bf%05.2fa%05.2f:x[km]:/f%05.2fa%05.2f:y[km]:/f1a5:z[km]:wESnZ+",$1/10,$1,$2/10,$2)}'`
+ann=`echo $dax $day $daz | \
+    gawk '{printf("-Bf%05.2fa%05.2f:x[km]:/f%05.2fa%05.2f:y[km]:/f%05.2fa%05.2f:z[km]:WESNZ+",$1/10,$1,$2/10,$2,$3/10,$3)}'`
 #ann=-Ba5f1:x:/a5f1:y:/a5f1:z:wESnZ+
 echo $ann
 scl=`echo $dax $day | \
     gawk '{if($1>$2)x=$1*5;else x=$2*5;print(10/x)}'`
 reg=-R$xmin/$xmax/$ymin/$ymax/$zmin/$zmax
-echo $0: determined region of $reg
+echo $0: determined region of $reg ann $ann
 echo $0: z axis is downscaled by $zscaling
 
 
-proj="-Jx$scl -P -Jz`echo $scl | \
-    gawk '{print($1/z)}' z=$zscaling`  -E135/30"
+#proj="-Jx$scl -P -Jz`echo $scl | gawk '{print($1/z)}' z=$zscaling`  -E135/30"
+proj="-Jx$scl -P -Jz`echo $scl | gawk '{print($1/z)}' z=$zscaling`  -E30/30"
 
 echo $0: reading from $tmpn.dat
 # plot the stuff for real
-psxyz $tmpn.dat $reg -L -m $proj $ann -G200/200/200  -K > $file
+psxyz $tmpn.dat $reg -L -m $proj $ann -Ggray   -K > $file
 
 if [ $projection -eq 1 ];then
     # projection on lowest z level
     gawk '{print($1,$2,zmin)}' zmin=$zmin $tmpn.dat  | \
-	psxyz $reg  -L -m $proj -K -W2 -O >> $file
+	psxyz $reg  -L -m $proj -K -W1 -O >> $file
     # projection on max y level
     gawk '{print($1,ymax,$3)}' ymax=$ymax $tmpn.dat  | \
-	psxyz  $reg -L -m $proj -O -K -W2 >> $file
+	psxyz  $reg -L -m $proj -O -K -W1 >> $file
     # projection on x min level
     gawk '{if($1==">")print(">");else print(xmin,$2,$3)}' \
 	xmin=$xmin $tmpn.dat  | \
-	psxyz $reg -L -m $proj -O -K -W2  >> $file
+	psxyz $reg -L -m $proj -O -K -W1  >> $file
 fi
 # plot plane.xyz points
 if [ -s plane.xyz ];then
@@ -93,8 +95,8 @@ if [ -s plane.xyz ];then
 	psxyz plane.xyz $reg  $proj  -K -O  -Sa0.1 >> $file
 fi
 # and put some frame around it
-psxyz $tmpn.dat $reg -L -m $proj -W1  -O $ann >> $file
+psxyz $tmpn.dat $reg -L -m $proj -W.25  -O $ann >> $file
 
 echo $0: output in $file
 modifybb $file
-rm $tmpn*
+

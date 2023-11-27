@@ -1,0 +1,101 @@
+#!/bin/bash
+flabel=${1-vert.0.9}
+depths=${2-"0 -3 -6"}
+glabel=${3-""}
+
+range=30
+reg=-R-$range/$range/-$range/$range;inc=-I2
+
+annl=a10f2
+scale=.1
+
+tmpn=`mktemp`
+trap "rm -f $tmpn*" EXIT
+
+
+if [[ ! -s disp.$flabel.out || ! -s stress.$flabel.out ]];then
+    echo $0: either disp.$flabel.out or stress.$flabel.out not found
+    exit
+fi
+
+
+proj="-Jx$scale"
+
+makecpt -T-.25/.25/.025 -Cvik > disp.cpt
+lupcl=0.1
+
+makecpt -T-300/300/30 -Cvik > stress.cpt
+makecpt -T-1/2/.25  -Croma -I > s2.cpt
+lspcl=100
+
+
+for depth in $depths;do
+    
+    gawk -v d=$depth '{dx=$3-d;if(dx<0)dx=-dx;if(dx<1e-3)print($0)}' disp.$flabel.out > $tmpn.$depth.disp &
+    gawk -v d=$depth '{dx=$3-d;if(dx<0)dx=-dx;if(dx<1e-3)print($0)}' stress.$flabel.out > $tmpn.$depth.stress &
+    wait
+
+    
+    col=4
+    for u in ux uy uz;do
+	gawk -v col=$col '{print($1,$2,$(col))}' $tmpn.$depth.disp | xyz2grd $reg $inc -G$tmpn.$depth.$u.grd &
+	((col=col+1))
+    done
+
+    col=4
+    for s in s11 s12 s13 s22 s23 s33;do
+	gawk -v col=$col '{print($1,$2,$(col))}' $tmpn.$depth.stress | xyz2grd $reg $inc -G$tmpn.$depth.$s.grd &
+	((col=col+1))
+    done
+done
+wait
+rm $tmpn.*.stress $tmpn.*.disp
+
+
+fs=""
+for depth in $depths;do
+    #for s in s11 s12 s13 s22 s23 s33 s2;do
+    for s in ux uy uz s11 s12 s13 s22 s23 s33;do
+	
+	ofile=$tmpn.$depth.$s.ps
+	#grd2cpt -Cvik  $tmpn.$depth.$s.grd > stress.cpt
+	if [ $s = s2 ];then
+	    slabel="log@-10@-(@~s@~@-II@-)"
+	    cmp=s2
+	    ends=-E
+	    lspc=1
+	    grdmath $tmpn.$depth.s11.grd 2 POW \
+		    $tmpn.$depth.s12.grd 2 POW 2 MUL ADD \
+		    $tmpn.$depth.s13.grd 2 POW 2 MUL ADD \
+		    $tmpn.$depth.s22.grd 2 POW ADD \
+		    $tmpn.$depth.s23.grd 2 POW 2 MUL ADD \
+		    $tmpn.$depth.s33.grd 2 POW ADD \
+		    2 DIV SQRT LOG10 = $tmpn.$depth.s2.grd
+	else
+	    if [[ $s = ux || $s = uy || $s = uz ]];then
+		slabel=`echo $s | gawk '{printf("u@-%s@-",substr($1,2))}'`
+		cmp=disp
+		ends=-E
+		lspc=$lupcl
+	    else
+	    
+		slabel=`echo $s | gawk '{printf("@~s@~@-%i@-",substr($1,2))}'`
+		cmp=stress
+		ends=-E
+		lspc=$lspcl
+	    fi
+	fi
+	grdimage $tmpn.$depth.$s.grd $reg $proj -B$annl:"x":/$annl:"y"::."$glabel - z = $depth, $slabel":WesN -P -K -C$cmp.cpt > $ofile
+	#cat $mode/geom.in | patch2xyz | gawk '{print($1,$2)}' |  psxy $reg $proj -W0.25 -L -m -O -K -t70  >> $ofile
+	psscale -D3./-.25/4/.2h -C$cmp.cpt $ends -B$lspc/:"$slabel": -O >> $ofile
+	modifybb $ofile &
+	#gv $ofile;exit
+	fs="$fs $ofile"
+    done
+done
+wait
+epsmerge -x 3 -y 3 --orientation Portrait -par $fs > stress.$flabel.ps
+rm $fs
+echo $0: output in stress.$flabel.ps
+rm $tmpn.*
+

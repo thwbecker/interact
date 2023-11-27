@@ -334,13 +334,12 @@ void normalize_3d(COMP_PRECISION *x)
 void a_equals_b_vector(COMP_PRECISION *a,COMP_PRECISION *b,
 		       int n)
 {
-  int i;
-  for(i=0;i<n;i++)
-    a[i] = b[i];
+  memcpy(a,b,n*sizeof(COMP_PRECISION));
 }
 void a_equals_b_vector_3d(COMP_PRECISION *a,COMP_PRECISION *b)
 {
-  a[INT_X] = b[INT_X];a[INT_Y] = b[INT_Y];a[INT_Z] = b[INT_Z];
+  //a[INT_X] = b[INT_X];a[INT_Y] = b[INT_Y];a[INT_Z] = b[INT_Z];
+  memcpy(a,b,3*sizeof(COMP_PRECISION));
 }
 void swap_ab_vector_3d(COMP_PRECISION *a,COMP_PRECISION *b)
 {

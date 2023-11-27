@@ -210,7 +210,7 @@ void get_local_x_on_plane(float *, float *, float *, float *, float *);
 void get_fault_plane_basevec(float *, float *, float *, struct flt *, struct med *);
 void calc_deviatoric_stress(float [3][3], float [3][3], float *, float *);
 void calc_global_strike_dip_from_local(struct flt *, float *, float *, float *);
-void calc_global_slip_and_traction_from_local(struct flt *, float *, float *, float *, float *, float *, float *, float *);
+void calc_global_slip_and_traction_from_local(struct flt *, float *, float *, float *, float *, float *, float *, float *, unsigned char);
 /* geo_okada.c */
 /* get_projected_fault_parameters.c */
 void get_projected_fault_parameters(float [2][2], float, float *, float *, float *, float *, float *, float *);

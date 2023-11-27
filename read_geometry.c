@@ -160,13 +160,19 @@ void read_geometry(char *patch_filename,struct med **medium,
       }
       // x will be the centroid, to be calculated
       calc_centroid_tri((*fault+i)->xt,(*fault+i)->x);
+      /* this will also compute g and h vectors, like tdcs, leave here
+	 for now */
       (*fault+i)->area = triangle_area((*fault+i)->xt);
+
       (*fault+i)->l = (*fault+i)->w = NAN;
+      (*fault+i)->sin_alpha =  (*fault+i)->cos_alpha =  (*fault+i)->dip = NAN; /* those can be overwritten later if 
+										  global strike and dip are read in */
       /* 
 	 get basis vectors in TDCS system of NW15 
       */
-      get_tdcs_base_vectors(&((*fault+i)->xt[0]),&((*fault+i)->xt[3]),&((*fault+i)->xt[6]),
+      get_tdcs_base_vectors(((*fault+i)->xt+0),((*fault+i)->xt+3),((*fault+i)->xt+6),
 			    (*fault+i)->t_strike,(*fault+i)->t_dip,(*fault+i)->normal);
+      //fprintf(stderr,"tdt %g %g %g\n",(*fault+i)->t_dip[0],(*fault+i)->t_dip[1],(*fault+i)->t_dip[2]);
 #ifdef DEBUG
       if((*medium)->comm_rank == 0)
 	fprintf(stderr,"read_geometry: fault %5i is triangular, x1: (%10.3e, %10.3e, %10.3e) x2: (%10.3e, %10.3e, %10.3e) x3: (%10.3e, %10.3e, %10.3e), area: %10.3e\n",
@@ -265,10 +271,14 @@ void read_geometry(char *patch_filename,struct med **medium,
       // calculate the unity vectors in strike, dip, and normal
       // direction
       //
+      /* 
+	 executed for quads here 
+      */
       calc_quad_base_vecs((*fault+i)->t_strike,
 			  (*fault+i)->normal,(*fault+i)->t_dip,
 			  (*fault+i)->sin_alpha,
 			  (*fault+i)->cos_alpha,sin_dip,cos_dip);
+      //fprintf(stderr,"tdq %g %g %g\n",(*fault+i)->t_dip[0],(*fault+i)->t_dip[1],(*fault+i)->t_dip[2]);
 #ifdef SUPER_DEBUG
       if((*medium)->comm_rank == 0){
 	fprintf(stderr,"fault %5i: strike: %g dip: %g sc_alpha:  %10.3e/%10.3e sc_dip: %10.3e/%10.3e\n",

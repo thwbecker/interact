@@ -630,12 +630,10 @@ void calc_group_geometry(struct med *medium,struct flt *fault,
       */
       global_dip_rad   = DEG2RADF((COMP_PRECISION)fault[i].dip);
       my_sincos(&sin_global_dip_rad,&cos_global_dip_rad,global_dip_rad);
+
       calc_quad_base_vecs(gstrike, gnormal, gdip,
 			  fault[i].sin_alpha, fault[i].cos_alpha,
 			  sin_global_dip_rad, cos_global_dip_rad);
-      calc_quad_base_vecs(gstrike, gnormal, gdip,
-			  fault[i].sin_alpha, fault[i].cos_alpha,
-			  sin_global_dip_rad,   cos_global_dip_rad);
       a_equals_b_vector_3d(dx1,gstrike);
       a_equals_b_vector_3d(dx2,gdip);
     }else{
@@ -1171,7 +1169,11 @@ void calc_deviatoric_stress(COMP_PRECISION sm[3][3],COMP_PRECISION dm[3][3],
 
 #ifdef ALLOW_NON_3DQUAD_GEOM
 
-/* compute the global basis vectors for a triangular patch */
+/* 
+   compute the global basis vectors for a triangular patch as
+   specified by strike and dip from global input, not local syste,
+
+*/
 void calc_global_strike_dip_from_local(struct flt *fault,COMP_PRECISION *gstrike, COMP_PRECISION *gnormal, COMP_PRECISION *gdip)
 {
   COMP_PRECISION global_dip_rad,sin_global_dip_rad,cos_global_dip_rad;
@@ -1181,7 +1183,10 @@ void calc_global_strike_dip_from_local(struct flt *fault,COMP_PRECISION *gstrike
     exit(-1);
   }
 #endif
-  /* compute appropriate projection vectors */
+  /* 
+     compute appropriate projection vectors, triangular fault holds
+     global dip and strike as sin/cos alpha
+  */
   global_dip_rad   = DEG2RADF((COMP_PRECISION)fault->dip);
   my_sincos(&sin_global_dip_rad,&cos_global_dip_rad,global_dip_rad);
   calc_quad_base_vecs(gstrike, gnormal, gdip,
@@ -1197,7 +1202,7 @@ void calc_global_strike_dip_from_local(struct flt *fault,COMP_PRECISION *gstrike
 */
 void calc_global_slip_and_traction_from_local(struct flt *fault,COMP_PRECISION *slip,COMP_PRECISION *trac,
 					      COMP_PRECISION *gstrike, COMP_PRECISION *gnormal, COMP_PRECISION *gdip,
-					      COMP_PRECISION *gslip,COMP_PRECISION *gtrac)
+					      COMP_PRECISION *gslip,COMP_PRECISION *gtrac,my_boolean only_traction)
 {
   int j;
   COMP_PRECISION lslip[3],ltrac[3];
@@ -1207,17 +1212,26 @@ void calc_global_slip_and_traction_from_local(struct flt *fault,COMP_PRECISION *
     exit(-1);
   }
 #endif
-  for(j=0;j<3;j++){		/* global slip and strike vectors */
-    lslip[j] = fault->t_strike[j] * slip[STRIKE] + fault->t_dip[j] * slip[DIP] + fault->normal[j] * slip[NORMAL];
-    ltrac[j] = fault->t_strike[j] * trac[STRIKE] + fault->t_dip[j] * trac[DIP] + fault->normal[j] * trac[NORMAL];
+  if(only_traction){
+    for(j=0;j<3;j++){		/* global slip and strike vectors */
+      ltrac[j] = fault->t_strike[j] * trac[STRIKE] + fault->t_dip[j] * trac[DIP];// + fault->normal[j] * trac[NORMAL];
+    }
+  }else{
+    for(j=0;j<3;j++){		/* global slip and strike vectors */
+      lslip[j] = fault->t_strike[j] * slip[STRIKE] + fault->t_dip[j] * slip[DIP];//+ fault->normal[j] * slip[NORMAL];
+      ltrac[j] = fault->t_strike[j] * trac[STRIKE] + fault->t_dip[j] * trac[DIP];// + fault->normal[j] * trac[NORMAL];
+    }
   }
-  /* project into global coordinate system */
-  gslip[0] = project_vector(lslip,gstrike);
-  gslip[1] = project_vector(lslip,gnormal);
-  gslip[2] = project_vector(lslip,gdip);
-  
+  if(!only_traction){
+    /* project into global coordinate system */
+    gslip[0] = project_vector(lslip,gstrike);
+    //gslip[1] = project_vector(lslip,gnormal);
+    gslip[1] = slip[NORMAL];
+    gslip[2] = project_vector(lslip,gdip);
+  }
   gtrac[0] = project_vector(ltrac,gstrike);
-  gtrac[1] = project_vector(ltrac,gnormal);
+  //gtrac[1] = project_vector(ltrac,gnormal);
+  gtrac[1] = trac[NORMAL];
   gtrac[2] = project_vector(ltrac,gdip);
 }
 #endif

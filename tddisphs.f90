@@ -760,12 +760,14 @@ subroutine setup_geometry(x,y,z,Ts,Ss,Ds,p1,p2,p3,bx,by,bz,&
 end subroutine setup_geometry
 
 subroutine get_tdcs_base_vectors(p1,p2,p3,vstrike,vdip,vnorm)
-  implicit none 
+  implicit none
+  !
   ! Calculate unit strike, dip and normal to TD vectors: For a horizontal TD 
   ! as an exception, if the normal vector points upward, the strike and dip 
   ! vectors point Northward and Westward, whereas if the normal vector points
   ! downward, the strike and dip vectors point Southward and Westward, 
   ! respectively.
+
   C_PREC,intent(in),dimension(3) :: p1,p2,p3
   C_PREC,intent(out),dimension(3) :: vstrike,vdip,vnorm
   C_PREC, PARAMETER,dimension(3) :: &

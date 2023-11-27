@@ -257,14 +257,19 @@ void read_one_step_bc(FILE *in,struct med *medium,struct flt *fault,
 		      my_boolean init_system)
 {
   my_boolean *sma,sma_local[3],printevery,added_to_con,added_to_uncon,
-    print_res_stress_screen=FALSE,tri_warned[3]={FALSE,FALSE,FALSE},
-    rotate_to_local=FALSE,check_for_res_stress_output=FALSE,use_dip,
+    tri_warned[3]={FALSE,FALSE,FALSE},
+    rotate_to_local=FALSE,
+    check_for_res_stress_output=TRUE,
+    use_dip,tri_sd_in_warned=FALSE,
     slip_bc_assigned=FALSE,stress_bc_assigned=FALSE;
   int patch_nr,bc_code,n,inc,start_patch,stop_patch,i,j,i3,j3,nrflt3,patch_nr3;
   COMP_PRECISION bc_value,bc_value_s,bc_value_d,*rhs,global_strike,global_dip,slip[3],
     global_dip_rad,global_alpha_rad,gstrike[3],gnormal[3],gdip[3],*fstress,*gfstress,
     sm[3][3],bstress[3],stress_drop,sin_global_alpha_rad;
   COMP_PRECISION cos_global_alpha_rad, sin_global_dip_rad, cos_global_dip_rad;
+#ifdef ALLOW_NON_3DQUAD_GEOM
+  COMP_PRECISION lgstrike[3],lgdip[3],lgnormal[3],lgstress[3];
+#endif
   FILE *tmp_in,*rsout=NULL;
   if(medium->nr_flt_mode != 3){
     HEADNODE
@@ -414,9 +419,9 @@ void read_one_step_bc(FILE *in,struct med *medium,struct flt *fault,
   */
   while(fscanf(in,IIF_CP_FORMAT,&patch_nr,&bc_code,&bc_value) == 3){
     n++;
-    if(patch_nr < 0){/* the fault patch indicator was negative, meaning
-		      we will assign the next values to a sequence of
-		      fault patches */
+    if(patch_nr < 0){/* the fault patch indicator was negative,
+		      meaning we will assign the next values to a
+		      sequence of fault patches */
       if((bc_code < 0) && (bc_value < 0)){
 	/* both bc_code and bc_values are negative,
 	   assign this boundary code to all patches */
@@ -497,9 +502,12 @@ void read_one_step_bc(FILE *in,struct med *medium,struct flt *fault,
 	exit(-1);
       }
       HEADNODE{
-	fprintf(stderr,"read_boundary_conditions: since at least one patch is triangular, expect strike and dip\n");
-	fprintf(stderr,"read_boundary_conditions: for global refrence frame, read as s: %g and d: %g for patch %i to %i\n",
-		global_strike,global_dip,start_patch,stop_patch);
+	if(!tri_sd_in_warned){
+	  fprintf(stderr,"read_boundary_conditions: at least one patch is triangular, expect strike and dip for each BC line\n");
+	  fprintf(stderr,"read_boundary_conditions: those read as s: %g and d: %g for patch %i to %i, not warning anymore\n",
+		  global_strike,global_dip,start_patch,stop_patch);
+	  tri_sd_in_warned = TRUE;
+	}
       }
       // this is now alpha
       global_alpha_rad = DEG2RADF((90.0-global_strike));
@@ -531,6 +539,12 @@ void read_one_step_bc(FILE *in,struct med *medium,struct flt *fault,
     for(patch_nr3 = start_patch*3,patch_nr=start_patch;
 	patch_nr <= stop_patch;
 	patch_nr += inc, patch_nr3 += 3){
+      /* 
+
+	 MAIN ASSIGNMENT LOOP 
+
+
+       */
 #ifdef ALLOW_NON_3DQUAD_GEOM
       if(patch_is_2d(fault[patch_nr].type)){
 	//
@@ -552,6 +566,16 @@ void read_one_step_bc(FILE *in,struct med *medium,struct flt *fault,
 	fault[patch_nr].cos_alpha = cos_global_alpha_rad;
 	fault[patch_nr].sin_alpha = sin_global_alpha_rad;
       }
+#ifdef SUPER_DEBUG
+      if(fault[patch_nr].type == TRIANGULAR)
+	fprintf(stderr,"read_boundary_conditions: patch %05i BC: %2i val: %11g tri strike %g dip %g SMA %i %i %i\n",
+		patch_nr,bc_code,bc_value,fault[patch_nr].strike,fault[patch_nr].dip,sma[patch_nr*3+0],sma[patch_nr*3+1],sma[patch_nr*3+2]);
+      else
+	fprintf(stderr,"read_boundary_conditions: patch %05i BC: %2i val: %11g quad SMA %i %i %i\n",
+		patch_nr,bc_code,bc_value,sma[patch_nr*3+0],sma[patch_nr*3+1],sma[patch_nr*3+2]);
+#endif
+	
+      
 #endif      
       if(patch_nr > (medium->nrflt - 1)){
 	HEADNODE
@@ -559,6 +583,7 @@ void read_one_step_bc(FILE *in,struct med *medium,struct flt *fault,
 		  BC_FILE,n,patch_nr,medium->nrflt);
 	exit(-1);
       }
+
       switch(bc_code){
 	/* 
 	   
@@ -960,22 +985,20 @@ void read_one_step_bc(FILE *in,struct med *medium,struct flt *fault,
 	//
 	// decide on the way that resolved stresses are output for debugging
 	//
-	if(!check_for_res_stress_output){
-	  if(stop_patch - start_patch > 20){
-	    HEADNODE
-	      fprintf(stderr,"read_boundary_conditions: too many patches for stderr, resolved stresses (strike, dip, normal) written to \"%s\" only\n",
-		      RES_STRESS_FILE);
-	    print_res_stress_screen = FALSE;
-	  }else{
-	    HEADNODE
-	      fprintf(stderr,"read_boundary_conditions: output of resolved stresses (strike, dip, normal) to stderr and \"%s\"\n",
-		      RES_STRESS_FILE);
-	    print_res_stress_screen = TRUE;
+	if(check_for_res_stress_output){
+	  HEADNODE{
+	    if(!rsout){
+	      rsout = myopen(RES_STRESS_FILE,"w");
+#ifdef ALLOW_NON_3DQUAD_GEOM
+	      fprintf(rsout,"# resolved stresses code %i: patch_nr s_strike s_dip s_normal [s_strike^g s_dip^g s_normal^g, if triangular]\n",
+		      bc_code);
+#else
+	      fprintf(rsout,"# resolved stresses code %i: patch_nr s_strike s_dip s_normal\n",bc_code);
+#endif
+	    }
 	  }
-	  rsout = myopen(RES_STRESS_FILE,"w");
-	  fprintf(rsout,"# resolved stresses from BC code %i for each patch: s_strike s_dip s_normal\n",bc_code);
-	  check_for_res_stress_output = TRUE;
 	}
+	
 	/*
 	  
 	  achieve shear stress free or friction stress by slipping 
@@ -990,10 +1013,8 @@ void read_one_step_bc(FILE *in,struct med *medium,struct flt *fault,
 	// resolve on the local components (this works for quads and triangles (I hope))
 	//
 	calc_three_stress_components(sm, fault[patch_nr].normal,
-				     fault[patch_nr].t_strike,
-				     fault[patch_nr].t_dip,fault[patch_nr].normal,
-				     &bstress[STRIKE],&bstress[DIP],
-				     &bstress[NORMAL]);
+				     fault[patch_nr].t_strike,fault[patch_nr].t_dip,fault[patch_nr].normal,
+				     (bstress+STRIKE),(bstress+DIP),(bstress+NORMAL));
 	//
 	// activate the strike and dip slip modes for 3-D, only strike
 	// for 2-D
@@ -1072,34 +1093,33 @@ void read_one_step_bc(FILE *in,struct med *medium,struct flt *fault,
 	if(sma[patch_nr3+DIP])
 	  rhs[patch_nr3+DIP] -= fault[patch_nr].s[DIP];
 	//
-#ifdef SUPER_DEBUG
 	HEADNODE{
+#ifdef SUPER_DEBUG
+
 	  fprintf(stderr,"read_boundary_conditions: patch: %5i res stress strike:  background: %12.4e target: %12.4e\n",
 		  patch_nr,fault[patch_nr].s[STRIKE],rhs[patch_nr3+STRIKE]);
 	  fprintf(stderr,"read_boundary_conditions: patch: %5i res stress dip:     background: %12.4e target: %12.4e\n",
 		  patch_nr,fault[patch_nr].s[DIP],rhs[patch_nr3+DIP]);
-	}
 #endif
-	HEADNODE{
-	  if(print_res_stress_screen){
-	    if(use_dip){
-	      fprintf(stderr,"read_boundary_conditions: bc: %3i resolved s: s/d/n: %9.2e/%9.2e/%9.2e target s: s/d: %9.2e/%9.2e on patch %3i %s\n",
-		      bc_code,bstress[STRIKE],bstress[DIP],bstress[NORMAL],
-		      rhs[patch_nr3+STRIKE],rhs[patch_nr3+DIP],patch_nr,
-		      ((hypot(rhs[patch_nr3+STRIKE],rhs[patch_nr3+DIP])<EPS_COMP_PREC)?
-		       ("(amp = zero!)"):("")));
-	    }else{
-	      fprintf(stderr,"read_boundary_conditions: bc: %3i resolved s: s/d/n: %9.2e/%9.2e/%9.2e target s: strike: %9.2e on patch %3i %s\n",
-		      bc_code,bstress[STRIKE],bstress[DIP],bstress[NORMAL],
-		      rhs[patch_nr3+STRIKE],patch_nr,
-		      ((hypot(rhs[patch_nr3+STRIKE],rhs[patch_nr3+DIP])<EPS_COMP_PREC)?
-		       ("(amp = zero!)"):("")));
+	  if(check_for_res_stress_output){
+	    /* local stress projection */
+	    if(rsout)
+	      fprintf(rsout,"%05i %12.5e %12.5e %12.5e ",patch_nr,bstress[STRIKE],bstress[DIP],bstress[NORMAL]);
+#ifdef ALLOW_NON_3DQUAD_GEOM
+	    if(fault[patch_nr].type == TRIANGULAR){
+	      /* add global if patch is triangular */
+	      calc_global_strike_dip_from_local((fault+patch_nr),lgstrike, lgnormal, lgdip);
+	      calc_three_stress_components(sm,lgnormal,lgstrike,lgdip,lgnormal,(lgstress+STRIKE),(lgstress+DIP),(lgstress+NORMAL));
+	      //fprintf(stderr,"sl %11g %11g %11g\tsg %11g %11g %11g\t",lgstrike[0],lgstrike[1],lgstrike[2],fault[patch_nr].t_strike[0],fault[patch_nr].t_strike[1],fault[patch_nr].t_strike[2]);
+	      //fprintf(stderr,"dl %11g %11g %11g\tdg %11g %11g %11g\t%11g %11g\n",lgdip[0],lgdip[1],lgdip[2],fault[patch_nr].t_dip[0],fault[patch_nr].t_dip[1],fault[patch_nr].t_dip[2],fault[patch_nr].strike,fault[patch_nr].dip);
+	      if(rsout)
+		fprintf(rsout,"%12.5e %12.5e %12.5e",lgstress[STRIKE],lgstress[DIP],lgstress[NORMAL]);
 	    }
+#endif
+	    if(rsout)
+	      fprintf(rsout,"\n");
 	  }
-	  if(check_for_res_stress_output)
-	    fprintf(rsout,"%12.5e %12.5e %12.5e\n",bstress[STRIKE],
-		    bstress[DIP],bstress[NORMAL]);
-	}
+	} /* headode part */
 	break;
       }	/* end of shear stress friction */
       default:{
@@ -1107,16 +1127,22 @@ void read_one_step_bc(FILE *in,struct med *medium,struct flt *fault,
 	  fprintf(stderr,"read_boundary_conditions: file %s, line %i, bc code %i undefined \n",
 		  BC_FILE,n,bc_code);
 	exit(-1);
-      }}			/* end of stress BC cases */
-    }
-  }
+      }
+      }/* end of stress BC cases */
+    }				/* end of loop through patches loop if several are to be specified */
+    /* 
+       end the loop here
+    */
+  }				/* end of total BC loop */
   if(!n){
     HEADNODE
       fprintf(stderr,"read_boundary_conditions: error, couldn't find any boundary conditions specified\n");
     exit(-1);
   }
   if(check_for_res_stress_output)// close the resolved stress file
-    fclose(rsout);
+    HEADNODE
+      if(rsout)
+	fclose(rsout);
 
   if(stress_bc_assigned){
     if(medium->comm_size != 1)

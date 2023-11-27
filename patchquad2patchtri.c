@@ -19,6 +19,7 @@ int main(int argc, char **argv)
   int i,j,k,l,ntflt,con[2][3];
   my_boolean left,verbose = FALSE;
   COMP_PRECISION corner[4][3],*dummy=NULL;
+  FILE *out;
   int assign_mode = 0;	/* 0: left 1: right 2: randomg */
   RAND_GEN(&seed);
   medium=(struct med *)calloc(1,sizeof(struct med)); 
@@ -31,7 +32,9 @@ int main(int argc, char **argv)
     sscanf(argv[1],"%i",&assign_mode);
 
   fprintf(stderr,"%s: reading patch quad format from stdin, writing patch tri  to stdout, assign_mode: %i\n",argv[0],assign_mode);
-
+  out = myopen(TRI_STRIKE_DIP_FILE,"w"); /* output of strike dip
+					  * sorted for the triangular
+					  * elements */
   read_geometry("stdin",&medium,&qfault,FALSE,FALSE,FALSE,verbose);
   ntflt = medium->nrflt*2;
   tfault[0].xt = (COMP_PRECISION *)malloc(sizeof(COMP_PRECISION)*9);
@@ -69,6 +72,9 @@ int main(int argc, char **argv)
       con[1][0] = 0; con[1][1] = 2; con[1][2] = 3;
     }
     tfault[0].group = qfault[i].group;
+    tfault[0].strike = qfault[i].strike;
+    tfault[0].dip = qfault[i].dip;
+    
     for(j=0;j < 2;j++){		/* one quad = two triangle */
       for(k=0;k<3;k++){		/* node loop */
 	for(l=0;l<3;l++)	/* dimension loop */
@@ -76,11 +82,12 @@ int main(int argc, char **argv)
       }
       print_patch_geometry_and_bc(0,tfault,PATCH_OUT_MODE,0.0,
 				  FALSE,stdout,FALSE,dummy);
+      fprintf(out,"%22.15e %22.15e\n", tfault[0].strike, tfault[0].dip);
     }
   }
-  fprintf(stderr,"%s: written %i triangular patches to stdout\n",
-	  argv[0],ntflt);
-  
+  fprintf(stderr,"%s: written %i triangular patches to stdout and their strike and dip to %s\n",
+	  argv[0],ntflt,TRI_STRIKE_DIP_FILE );
+  fclose(out);
   free(qfault);free(medium);
   return 0;
 #endif

@@ -172,8 +172,8 @@ void print_fault_data(char *filename,struct med *medium,struct flt *fault)
 	    /* 
 	       need to compute new global basis vectors 
 	    */
-	    fprintf(stderr,"patch %03i triangular, rotating to global strike %g dip %g (not repeating for same angles)\n",
-		    i,fault[i].strike,fault[i].dip);
+	    //fprintf(stderr,"patch %03i triangular, rotating to global strike %g dip %g (not repeating for same angles)\n",
+	    //i,fault[i].strike,fault[i].dip);
 	    calc_global_strike_dip_from_local((fault+i),gstrike, gnormal, gdip);
 	    old_rdip = fault[i].dip;
 	    old_rstrike = fault[i].strike;
@@ -181,7 +181,8 @@ void print_fault_data(char *filename,struct med *medium,struct flt *fault)
 	  /* 
 	     project to global for output 
 	  */
-	  calc_global_slip_and_traction_from_local((fault+i),fault[i].u,fault[i].s,gstrike, gnormal, gdip,(val+2),(val+5));
+	  calc_global_slip_and_traction_from_local((fault+i),fault[i].u,fault[i].s,gstrike, gnormal, gdip,
+						   (val+2),(val+5),FALSE);
 	}else{
 	  val[2] = fault[i].u[STRIKE];// slip values
 	  val[3] = fault[i].u[NORMAL];

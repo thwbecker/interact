@@ -1,9 +1,6 @@
 /*
-  interact: model fault interactions using dislocations in a 
-            halfspace
-  (C) Thorsten Becker, becker@eps.harvard.edu
-
-  $Id: print_patch_geometry.c,v 1.23 2003/01/07 02:52:29 tbecker Exp $
+  interact: model fault interactions using dislocations in a halfspace
+            (C) Thorsten Becker, becker@post.harvard.edu
 
   output of patch gemeotry and other stuff to *out stream
   in various formats
@@ -191,7 +188,7 @@ void print_patch_geometry_and_bc(int flt_offset,struct flt *fault,
     break;
   }
   case CORNEROUT_MODE:{
-#ifdef ALLOW_POINT_SOUCE
+#ifdef ALLOW_NON_3DQUAD_GEOM  
     if((fault[flt_offset].type != POINT_SOURCE)&&
        (fault[flt_offset].type != RECTANGULAR_PATCH)&&
        (!patch_is_2d(fault[flt_offset].type))){
@@ -240,7 +237,7 @@ void print_patch_geometry_and_bc(int flt_offset,struct flt *fault,
     break;
   }
   case XYZ_AND_VEC_MODE:{
-#ifdef ALLOW_POINT_SOUCE
+#ifdef ALLOW_NON_3DQUAD_GEOM
     if((fault[flt_offset].type != POINT_SOURCE)&&
        (fault[flt_offset].type != RECTANGULAR_PATCH)&&
        (!patch_is_2d(fault[flt_offset].type))){

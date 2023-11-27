@@ -21,6 +21,7 @@
 #define OLOC_FILE "oloc.dat" // 
 #define RES_STRESS_FILE "rstress.dat" // resolved stress on fault segments for one-step loading 
 #define PLANE_COORD_FILE "plane.xyz" // file with real coordinates of fault plane local output
+#define TRI_STRIKE_DIP_FILE "trisd.dat" /* output of triangular global strike and dip */
 
 // program will atuomatically append the PID and ".dat" for the matrix
 // and PID and ".hdr" for the header file

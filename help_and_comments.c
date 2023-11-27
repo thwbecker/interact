@@ -174,7 +174,7 @@ void phelp(void)
   PE("      This file has the x, y, and z coordinates in ASCII as an unformatted list.");
   PE("");
   PE("");
-  PE("     patch_number boundary_code boundary_value");
+  PE("     patch_number boundary_code boundary_value ...");
   PE("");
   PE("      patch_number runs from 0 to N-1, where N is determined from the number of patches");
   PE("      (fully read lines, unformatted) in the geometry file.");
@@ -188,8 +188,6 @@ void phelp(void)
   PE("");
   PE("      If start_fault < 0 and stop_fault < 0, will select all patches.");
   PE("");
-  PE("     The patch_number ... boundary_value line can be repeated as often as necessary (say, twice for each fault");
-  PE("     if the strike and dip movement modes are to be activated the same time).");
 #ifdef ALLOW_NON_3DQUAD_GEOM
   PE("");
   fprintf(stderr,"     If the patches for which boundary conditions are specified are triangular,\n");
@@ -199,6 +197,9 @@ void phelp(void)
   PE("     reference frame internally, and converted back to the global frame on output for fault properties.");
 #endif
   PE("");
+  PE("     The patch_number ... boundary_value line can be repeated as often as necessary (say, twice for each fault");
+  PE("     if the strike and dip movement modes are to be activated the same time, but not for triangles yet, for ");
+  PE("     which specifying either strike or dip stress will enforce the other shear component to be zero.)");
   PE("");
   PE("   Possible boundary conditions (as indicated by their integer codes) are:");
   PE("");
