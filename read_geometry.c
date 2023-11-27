@@ -3,7 +3,6 @@
             halfspace
   (C) Thorsten Becker, thwbecker@post.harvard.edu
 
-  $Id: read_geometry.c,v 1.28 2003/03/02 07:33:49 becker Exp $
 */
 #include "properties.h"
 #include "interact.h"
@@ -164,14 +163,20 @@ void read_geometry(char *patch_filename,struct med **medium,
 	 for now */
       (*fault+i)->area = triangle_area((*fault+i)->xt);
 
-      (*fault+i)->l = (*fault+i)->w = NAN;
-      (*fault+i)->sin_alpha =  (*fault+i)->cos_alpha =  (*fault+i)->dip = NAN; /* those can be overwritten later if 
-										  global strike and dip are read in */
+      (*fault+i)->l = (*fault+i)->w = sqrt((*fault+i)->area);
       /* 
 	 get basis vectors in TDCS system of NW15 
       */
       get_tdcs_base_vectors(((*fault+i)->xt+0),((*fault+i)->xt+3),((*fault+i)->xt+6),
 			    (*fault+i)->t_strike,(*fault+i)->t_dip,(*fault+i)->normal);
+      /* while those strike and dips are local for now, initialize so
+	 that they have a value - if boundary conditions are used, it
+	 will assign global strike and dip values later */
+      (*fault+i)->dip = vec_to_dip((*fault+i)->t_dip);
+      (*fault+i)->strike = vec_to_strike((*fault+i)->t_strike);
+      alpha= 90.0 - (*fault+i)->strike;
+      my_sincos_degd(&(*fault+i)->sin_alpha,&(*fault+i)->cos_alpha,alpha);
+      
       //fprintf(stderr,"tdt %g %g %g\n",(*fault+i)->t_dip[0],(*fault+i)->t_dip[1],(*fault+i)->t_dip[2]);
 #ifdef DEBUG
       if((*medium)->comm_rank == 0)

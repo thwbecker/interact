@@ -261,7 +261,9 @@ void read_one_step_bc(FILE *in,struct med *medium,struct flt *fault,
     rotate_to_local=FALSE,
     check_for_res_stress_output=TRUE,
     use_dip,tri_sd_in_warned=FALSE,
-    slip_bc_assigned=FALSE,stress_bc_assigned=FALSE;
+    reassigned_strike_dip = FALSE,
+    slip_bc_assigned=FALSE,
+    stress_bc_assigned=FALSE;
   int patch_nr,bc_code,n,inc,start_patch,stop_patch,i,j,i3,j3,nrflt3,patch_nr3;
   COMP_PRECISION bc_value,bc_value_s,bc_value_d,*rhs,global_strike,global_dip,slip[3],
     global_dip_rad,global_alpha_rad,gstrike[3],gnormal[3],gdip[3],*fstress,*gfstress,
@@ -559,12 +561,14 @@ void read_one_step_bc(FILE *in,struct med *medium,struct flt *fault,
       }
       if(fault[patch_nr].type == TRIANGULAR){
 	/* 
-	   save part of the global coordinate system 
+	   save part of the global coordinate system and reassign to
+	   fault struture
 	*/
 	fault[patch_nr].strike = global_strike;
 	fault[patch_nr].dip =    global_dip;
 	fault[patch_nr].cos_alpha = cos_global_alpha_rad;
 	fault[patch_nr].sin_alpha = sin_global_alpha_rad;
+	reassigned_strike_dip = TRUE;
       }
 #ifdef SUPER_DEBUG
       if(fault[patch_nr].type == TRIANGULAR)
@@ -1013,7 +1017,8 @@ void read_one_step_bc(FILE *in,struct med *medium,struct flt *fault,
 	// resolve on the local components (this works for quads and triangles (I hope))
 	//
 	calc_three_stress_components(sm, fault[patch_nr].normal,
-				     fault[patch_nr].t_strike,fault[patch_nr].t_dip,fault[patch_nr].normal,
+				     fault[patch_nr].t_strike,fault[patch_nr].t_dip,
+				     fault[patch_nr].normal,
 				     (bstress+STRIKE),(bstress+DIP),(bstress+NORMAL));
 	//
 	// activate the strike and dip slip modes for 3-D, only strike
@@ -1364,6 +1369,13 @@ void read_one_step_bc(FILE *in,struct med *medium,struct flt *fault,
 	fault[i].s[j] = rhs[i*3+j];
   }
   free(rhs);free(sma);
+
+#ifdef ALLOW_NON_3DQUAD_GEOM
+  /* recompute location in fault based on possibly read in global
+     strike and dip */
+  if(reassigned_strike_dip)
+    calculate_position_of_patch(medium,fault);
+#endif
 }
 /*
 

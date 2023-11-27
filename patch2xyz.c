@@ -17,11 +17,11 @@ int main(int argc, char **argv)
     attempt_read_slip = FALSE,verbose = FALSE,use_scalar = FALSE;
   FILE *in;
   medium=(struct med *)calloc(1,sizeof(struct med)); 
-  if(argc > 5){
+  if((argc > 5)||((argc>1)&&(strcmp(argv[1],"-h")==0))){
     fprintf(stderr,"%s [flt.dat] [disp_component, %i] [shrink_patches, %i] [use_scalar, %i]\n\t reads in patch format from stdin and writes GMT xyz to stdout\n",
 	    argv[0],comp,(int)shrink_patches,(int)use_scalar);
-    fprintf(stderr,"if flt.dat is given, will print slip or stress\n");
-    fprintf(stderr,"\twhere 0: strike 1: dip 2: normal 3: vector slip\n");
+    fprintf(stderr,"if flt.dat is given, will print slip or stress if file found\n");
+    fprintf(stderr,"\twhere 0: strike 1: dip 2: normal 3: total shear 4: total slip\n");
     fprintf(stderr,"\twhere 10: strike 11: dip 12: normal 13: vector shear stress\n");
     fprintf(stderr,"\twhere 14: is Coulomb stress for strike\n");
     fprintf(stderr,"\twhere 15: is Coulomb stress for vector shear\n");
@@ -29,7 +29,6 @@ int main(int argc, char **argv)
     fprintf(stderr,"if use_scalar is set, will interpret the flt.dat to be a list of scalars to use for each patch\n");
     exit(-1);
   }
-
   if(argc > 1){
     opmode = PSXYZ_SCALAR_MODE;
     attempt_read_slip = TRUE;
@@ -86,7 +85,10 @@ int main(int argc, char **argv)
 	case 2: 
 	  scalar[i] = fault[i].u[NORMAL];
 	  break;
-	case 3:
+	case 3:			/* total shear */
+	  scalar[i] = hypot(fault[i].u[STRIKE],fault[i].u[DIP]);
+	  break;
+	case 4:			/* total slip */
 	  scalar[i] = sqrt(fault[i].u[STRIKE]*fault[i].u[STRIKE] + 
 			   fault[i].u[DIP]*fault[i].u[DIP] +
 			   fault[i].u[NORMAL]*fault[i].u[NORMAL]);
@@ -101,16 +103,13 @@ int main(int argc, char **argv)
 	  scalar[i] = fault[i].s[NORMAL];
 	  break;
 	case 13:
-	  scalar[i] = sqrt(fault[i].s[STRIKE]*fault[i].s[STRIKE] + 
-			   fault[i].s[DIP]*fault[i].s[DIP]);
+	  scalar[i] = hypot(fault[i].s[STRIKE],fault[i].s[DIP]);
 	  break;
 	case 14:		/* Coulomb with strike shear? */
 	  scalar[i] = fault[i].s[STRIKE] - STATIC_MU * fault[i].s[NORMAL];
 	  break;
 	case 15:		/* Coulomb with total shear? */
-	  scalar[i] = sqrt(fault[i].s[STRIKE]*fault[i].s[STRIKE]+
-			   fault[i].s[DIP]   *fault[i].s[DIP]) -
-	    STATIC_MU * fault[i].s[NORMAL];
+	  scalar[i] = hypot(fault[i].s[STRIKE],fault[i].s[DIP]) - STATIC_MU * fault[i].s[NORMAL];
 	  break;
 	  
 	default:

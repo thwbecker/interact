@@ -634,6 +634,7 @@ void calc_group_geometry(struct med *medium,struct flt *fault,
       calc_quad_base_vecs(gstrike, gnormal, gdip,
 			  fault[i].sin_alpha, fault[i].cos_alpha,
 			  sin_global_dip_rad, cos_global_dip_rad);
+      //fprintf(stderr,"%g %g %g %g %g\n",fault[i].strike,fault[i].dip,gstrike[0],gstrike[1],gstrike[2]);
       a_equals_b_vector_3d(dx1,gstrike);
       a_equals_b_vector_3d(dx2,gdip);
     }else{

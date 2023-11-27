@@ -1,9 +1,7 @@
 /*
-  interact: model fault interactions using dislocations in a 
-            halfspace
-  (C) Thorsten Becker, becker@eps.harvard.edu
+  interact: model fault interactions using dislocations in a halfspace
+            (C) Thorsten Becker, becker@post.harvard.edu
 
-  $Id: output.c,v 2.60 2011/01/07 07:19:58 becker Exp $
 
   
   various output formats, see also input.c and matrixio.c
