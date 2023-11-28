@@ -84,7 +84,8 @@ void phelp(void)
   PE("");
   PE("    - triangular in half-space:");
   PE("      If BOTH fault half-width and length are negative, then the patch is a triangular element.");
-  PE("      In this case, x, y, z, dip, strike, length, and width have no meaning but will be reassigned.");
+  PE("      In this case, x, y, z, have no meaning but will be reassigned from the centroid.");
+  PE("      strike and dip are global projection directions, and length and width will be sqrt(area) subsequently.");
   PE("      The next nine numbers in the input geometry line will be the coordinates of the three nodes of the");
   PE("      triangle, however. FE-style counterclockwise numbering, input is then in the format:\n");
   PE("      999 999 999 999 999 -1 -1 group_0 x_x^1 x_y^1 x_z^1 x_x^2 x_y^2 x_z^2 x_x^3 x_y^3 x_z^3\n");
@@ -174,14 +175,14 @@ void phelp(void)
   PE("      This file has the x, y, and z coordinates in ASCII as an unformatted list.");
   PE("");
   PE("");
-  PE("     patch_number boundary_code boundary_value ...");
+  PE("     patch_number boundary_code boundary_value");
   PE("");
   PE("      patch_number runs from 0 to N-1, where N is determined from the number of patches");
   PE("      (fully read lines, unformatted) in the geometry file.");
   PE("");
   PE("      If patch_number < 0, then the line should instead read");
   PE("");
-  PE("       -increment start_fault stop_fault boundary_code boundary_value ... ...");
+  PE("       -increment start_fault stop_fault boundary_code boundary_value");
   PE("");
   PE("      and boundary code boundary_code will be assigned with value");
   PE("      boundary_value from start_fault to stop_fault with increments increment.");
@@ -191,9 +192,8 @@ void phelp(void)
 #ifdef ALLOW_NON_3DQUAD_GEOM
   PE("");
   fprintf(stderr,"     If the patches for which boundary conditions are specified are triangular,\n");
-  PE("     then two more fields have to be given after the boundary values (dots above),");
-  PE("     the strike and dip dip angle of a global reference frame to which the prescribed slip ");
-  PE("     or stress values refer. The slip boundary conditions will then be converted to the triangle local");
+  PE("     then the strike and dip specified in the geometry input will define global directions");
+  PE("     the prescribed slipor stress values refer. The slip boundary conditions will then be converted to the triangle local");
   PE("     reference frame internally, and converted back to the global frame on output for fault properties.");
 #endif
   PE("");

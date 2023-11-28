@@ -131,7 +131,12 @@ void read_geometry(char *patch_filename,struct med **medium,
  	  (*fault+i)->type = TWO_DIM_HALFPLANE_PLANE_STRAIN;
       }
       nr_2d++;
-    }else if(((*fault+i)->w < 0)&&((*fault+i)->l< 0)){
+    }else if(((*fault+i)->w < 0)&&((*fault+i)->l< 0)){ /* length and
+							  width
+							  negative
+							  will switch
+							  to
+							  triangle */
       /*
 	
 	TRIANGULAR ELEMENT

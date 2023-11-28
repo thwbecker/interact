@@ -260,15 +260,14 @@ void read_one_step_bc(FILE *in,struct med *medium,struct flt *fault,
     tri_warned[3]={FALSE,FALSE,FALSE},
     rotate_to_local=FALSE,
     check_for_res_stress_output=TRUE,
-    use_dip,tri_sd_in_warned=FALSE,
-    reassigned_strike_dip = FALSE,
+    use_dip,
     slip_bc_assigned=FALSE,
     stress_bc_assigned=FALSE;
   int patch_nr,bc_code,n,inc,start_patch,stop_patch,i,j,i3,j3,nrflt3,patch_nr3;
-  COMP_PRECISION bc_value,bc_value_s,bc_value_d,*rhs,global_strike,global_dip,slip[3],
-    global_dip_rad,global_alpha_rad,gstrike[3],gnormal[3],gdip[3],*fstress,*gfstress,
-    sm[3][3],bstress[3],stress_drop,sin_global_alpha_rad;
-  COMP_PRECISION cos_global_alpha_rad, sin_global_dip_rad, cos_global_dip_rad;
+  COMP_PRECISION bc_value,bc_value_s,bc_value_d,*rhs,slip[3],
+    gstrike[3],gnormal[3],gdip[3],*fstress,*gfstress,
+    sm[3][3],bstress[3],stress_drop;
+  COMP_PRECISION sin_global_dip_rad, cos_global_dip_rad;
 #ifdef ALLOW_NON_3DQUAD_GEOM
   COMP_PRECISION lgstrike[3],lgdip[3],lgnormal[3],lgstress[3];
 #endif
@@ -463,7 +462,7 @@ void read_one_step_bc(FILE *in,struct med *medium,struct flt *fault,
 	  break;
 	}
       }
-#endif      
+#endif    
     } else {			/* single patch assignment */
       printevery  = TRUE;
       start_patch = patch_nr;
@@ -490,48 +489,6 @@ void read_one_step_bc(FILE *in,struct med *medium,struct flt *fault,
 	fprintf(stderr,"read_boundary_conditions: mixed bcs, final stress value of %g will take pre-stressing by slip into account\n",
 		bc_value);
     }
-    if(rotate_to_local){
-      /* 
-	 
-	 read a global strike and dip and rotate to local 
-
-      */
-      if(fscanf(in,TWO_CP_FORMAT,&global_strike,&global_dip) != 2){
-	HEADNODE{
-	  fprintf(stderr,"read_boundary_conditions: expected additional strike and dip specification for triangular patch(es)\n");
-	  fprintf(stderr,"read_boundary_conditions: and could not read it\n");
-	}
-	exit(-1);
-      }
-      HEADNODE{
-	if(!tri_sd_in_warned){
-	  fprintf(stderr,"read_boundary_conditions: at least one patch is triangular, expect strike and dip for each BC line\n");
-	  fprintf(stderr,"read_boundary_conditions: those read as s: %g and d: %g for patch %i to %i, not warning anymore\n",
-		  global_strike,global_dip,start_patch,stop_patch);
-	  tri_sd_in_warned = TRUE;
-	}
-      }
-      // this is now alpha
-      global_alpha_rad = DEG2RADF((90.0-global_strike));
-      global_dip_rad   = DEG2RADF(global_dip);
-      // 
-      my_sincos(&sin_global_alpha_rad,&cos_global_alpha_rad,global_alpha_rad);
-      my_sincos(&sin_global_dip_rad,&cos_global_dip_rad,global_dip_rad);
-      //
-      // compute global system basis vectors
-      //
-      // we treat those global strike and dip as if they were to apply to a Okada patch
-      //
-      calc_quad_base_vecs(gstrike, gnormal, gdip,
-			  sin_global_alpha_rad, cos_global_alpha_rad,
-			  sin_global_dip_rad,   cos_global_dip_rad);
-#ifdef SUPER_DEBUG
-      HEADNODE
-	fprintf(stderr," vec: s: (%10.3e,%10.3e,%10.3e) d: (%10.3e,%10.3e,%10.3e) n: (%10.3e,%10.3e,%10.3e)\n",
-		gstrike[INT_X],gstrike[INT_Y],gstrike[INT_Z],gdip[INT_X],gdip[INT_Y],gdip[INT_Z],
-		gnormal[INT_X],gnormal[INT_Y],gnormal[INT_Z]);
-#endif
-    } /* end rotate_to_local prep part */
     /* 
 
        now assign to temporary arrays since we have sorted by faults
@@ -559,17 +516,6 @@ void read_one_step_bc(FILE *in,struct med *medium,struct flt *fault,
 	  exit(-1);
 	}
       }
-      if(fault[patch_nr].type == TRIANGULAR){
-	/* 
-	   save part of the global coordinate system and reassign to
-	   fault struture
-	*/
-	fault[patch_nr].strike = global_strike;
-	fault[patch_nr].dip =    global_dip;
-	fault[patch_nr].cos_alpha = cos_global_alpha_rad;
-	fault[patch_nr].sin_alpha = sin_global_alpha_rad;
-	reassigned_strike_dip = TRUE;
-      }
 #ifdef SUPER_DEBUG
       if(fault[patch_nr].type == TRIANGULAR)
 	fprintf(stderr,"read_boundary_conditions: patch %05i BC: %2i val: %11g tri strike %g dip %g SMA %i %i %i\n",
@@ -580,7 +526,18 @@ void read_one_step_bc(FILE *in,struct med *medium,struct flt *fault,
 #endif
 	
       
-#endif      
+#endif
+      if(rotate_to_local){
+	//
+	// have to project to local coordinate system, this is the
+	// case for triangular elements
+	//
+	/* compute global projection vector here */
+	my_sincos(&sin_global_dip_rad,&cos_global_dip_rad,(COMP_PRECISION)DEG2RADF(fault[patch_nr].dip));
+	calc_quad_base_vecs(gstrike, gnormal, gdip,
+			    fault[patch_nr].sin_alpha, fault[patch_nr].cos_alpha,
+			    sin_global_dip_rad,   cos_global_dip_rad);
+      }
       if(patch_nr > (medium->nrflt - 1)){
 	HEADNODE
 	  fprintf(stderr,"read_boundary_conditions: file %s, line %i, fault number %i out of range (max nr flt: %i)\n",
@@ -628,14 +585,12 @@ void read_one_step_bc(FILE *in,struct med *medium,struct flt *fault,
 	  for(i=0;i < 3;i++)
 	    slip[i] = (i == bc_code)?(bc_value):(0.0);
 	}else{
-	  //
-	  // have to project to local coordinate system, this is the
-	  // case for triangular elements
-	  //
+	 
 #ifdef SUPER_DEBUG
-	  fprintf(stderr,"read_boundary_conditions: global strike into s/d %g/%g dip into s/d %g/%g\n",
+	  fprintf(stderr,"read_boundary_conditions: rotating global strike into s/d %g/%g dip into s/d %g/%g (%g/%g)\n",
 		  project_vector(fault[patch_nr].t_strike,gstrike),project_vector(fault[patch_nr].t_dip,gstrike),
-		  project_vector(fault[patch_nr].t_strike,   gdip),project_vector(fault[patch_nr].t_dip,gdip));
+		  project_vector(fault[patch_nr].t_strike,   gdip),project_vector(fault[patch_nr].t_dip,gdip),
+		  fault[patch_nr].strike,fault[patch_nr].dip);
 #endif
 	  if(bc_code == STRIKE){// global strike component
 	    slip[STRIKE] = project_vector(fault[patch_nr].t_strike,gstrike)*bc_value;
@@ -686,9 +641,11 @@ void read_one_step_bc(FILE *in,struct med *medium,struct flt *fault,
 	break;
       }	/* end displacement assignment */
 	/* 
+	   ________________________________________________________________________________
 	   
 	   STRESS BOUNDARY CONDITIONS FOLLOW
 	   
+	   ________________________________________________________________________________
 	   
 	   will be assembled in a huge array first, then assigned to
 	   rhs. later so we can keep up with a general ordering scheme
@@ -742,10 +699,13 @@ void read_one_step_bc(FILE *in,struct med *medium,struct flt *fault,
 	  rhs[patch_nr3+DIP]    = bc_value_d - fault[patch_nr].s[DIP];
 	  sma[patch_nr3+STRIKE] = ACTIVATED;
 	  sma[patch_nr3+DIP] = ACTIVATED;
+
 #ifdef SUPER_DEBUG
 	  HEADNODE
-	    fprintf(stderr,"read_boundary_conditions: %5i resolving strike bc: %12.4e background: %12.4e/%12.4e target: %12.4e/%12.4e\n",
-		    patch_nr,bc_value,fault[patch_nr].s[STRIKE],fault[patch_nr].s[DIP],rhs[patch_nr3+STRIKE],rhs[patch_nr3+DIP]);
+	    fprintf(stderr,"read_boundary_conditions: %5i resolving strike bc: %12.4e background: %12.4e/%12.4e target: %12.4e/%12.4e s/d %g %g\n",
+		    patch_nr,bc_value,fault[patch_nr].s[STRIKE],fault[patch_nr].s[DIP],
+		    rhs[patch_nr3+STRIKE],rhs[patch_nr3+DIP],
+		    fault[patch_nr].strike,fault[patch_nr].dip);
 #endif
 	}
 	//
@@ -1014,7 +974,7 @@ void read_one_step_bc(FILE *in,struct med *medium,struct flt *fault,
 	background_stress(sm,fault[patch_nr].x,0.0,bgs_a,bgs_b,medium->pressure);
 	//
 	// determine stress on patch given stress tensor sm and plan with normal 
-	// resolve on the local components (this works for quads and triangles (I hope))
+	// resolve on the local components (this works for quads and triangles)
 	//
 	calc_three_stress_components(sm, fault[patch_nr].normal,
 				     fault[patch_nr].t_strike,fault[patch_nr].t_dip,
@@ -1370,12 +1330,6 @@ void read_one_step_bc(FILE *in,struct med *medium,struct flt *fault,
   }
   free(rhs);free(sma);
 
-#ifdef ALLOW_NON_3DQUAD_GEOM
-  /* recompute location in fault based on possibly read in global
-     strike and dip */
-  if(reassigned_strike_dip)
-    calculate_position_of_patch(medium,fault);
-#endif
 }
 /*
 

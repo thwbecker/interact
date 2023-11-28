@@ -555,18 +555,19 @@ my_boolean check_planar(COMP_PRECISION *x)
 
 /*
   
-  determine alpha and dip vectors given non-normalized
-  g and h vectors, also determines area
-  
-  this does not give us sitrke, dip rake angles, but leave this in
-  here
+  determine alpha and dip vectors given non-normalized g and h
+  vectors, also determines area- note that there is also
+  get_tdcs_base_vectors
+
 */
 void get_alpha_dip_tri_gh(COMP_PRECISION *xt,double *sin_alpha,
-			  double *cos_alpha,COMP_PRECISION *dip,
+			  double *cos_alpha,
+			  COMP_PRECISION *alpha,
+			  COMP_PRECISION *dip_rad,
 			  COMP_PRECISION *area)
 {
   COMP_PRECISION normal[3],nl,gvec[3],hvec[3];
-  double alpha;
+  double tmp_dbl;
   int i;
   get_gh_tri_vec(xt,gvec,hvec);
   //fprintf(stderr,"g: %g %g %g\n",gvec[INT_X],gvec[INT_Y],gvec[INT_Z]);
@@ -585,11 +586,13 @@ void get_alpha_dip_tri_gh(COMP_PRECISION *xt,double *sin_alpha,
   //normal[INT_X]/=nl; not needed
   normal[INT_Y]/=nl;
   normal[INT_Z]/=nl;
-  *dip= (COMP_PRECISION)acos((double)normal[INT_Z]);
-  alpha=(double)acos((double)normal[INT_Y]);
+  *dip_rad = (COMP_PRECISION)acos((double)normal[INT_Z]);
+  *alpha   = (double)acos((double)normal[INT_Y]);
   // might have to check for bounds
-  check_angles(dip,&alpha);
-  my_sincosd(sin_alpha,cos_alpha,alpha);
+  tmp_dbl = (double)(*alpha);
+  check_angles(dip_rad,&tmp_dbl);
+  *alpha = (COMP_PRECISION)tmp_dbl;
+  my_sincosd(sin_alpha,cos_alpha,*alpha);
 }
 
 

@@ -13,9 +13,10 @@ int main(int argc, char **argv)
   fprintf(stderr,"%s needs ALLOW_NON_3DQUAD_GEOM to be set\n",argv[0]);exit(-1);
 #else
   struct flt *fault;
-  struct med *medium;COMP_PRECISION *dummy;
+  struct med *medium;
+  COMP_PRECISION *dummy=NULL;
   int i,j,opmode=PATCH_OUT_MODE,n,eltype=TRIANGULAR;
-  COMP_PRECISION tmpdbl,sin_dip,cos_dip,alpha;
+  COMP_PRECISION tmpdbl,sin_dip,cos_dip,alpha_rad;
   medium=(struct med *)calloc(1,sizeof(struct med));
   if(argc!=2){
     fprintf(stderr,"%s mode\n\tread in three 3-D points per line from stdin\n",
@@ -54,23 +55,25 @@ int main(int argc, char **argv)
     if(!fault[n+1].xt)MEMERROR("main");
     // init the triangular properties
     calc_centroid_tri(fault[n].xt,fault[n].x);
+    //
     // w will be the triangle area
-    get_alpha_dip_tri_gh(fault[n].xt,&fault[n].sin_alpha,
-			 &fault[n].cos_alpha ,&tmpdbl,&fault[n].w);
-    fault[n].dip=(float)RAD2DEGF(tmpdbl);
+    get_alpha_dip_tri_gh(fault[n].xt,&fault[n].sin_alpha,&fault[n].cos_alpha ,&alpha_rad,&tmpdbl,&fault[n].area);
+    fault[n].dip = (float)RAD2DEGF(tmpdbl);
+    fault[n].strike = 90 - RAD2DEGF(alpha_rad);
     fault[n].group=0;
+    
     if(eltype == TRIANGULAR){
       // simply write triangular element type to stdout
       fault[n].type=TRIANGULAR;
       /* in case */
+      fault[n].l = fault[n].w = sqrt(fault[n].area);
       get_tdcs_base_vectors(&((fault+n)->xt[0]),&((fault+n)->xt[3]),&((fault+n)->xt[6]),
 			    (fault+n)->t_strike,(fault+n)->t_dip,(fault+n)->normal);
     }else{// convert to rectangular
       // L=W=sqrt(A/4)
       fault[n].l=sqrt(fault[n].w/4.0);
       fault[n].w=fault[n].l;
-      alpha=RAD2DEGF(asin(fault[n].sin_alpha));
-      fault[n].strike= 90.0 - alpha;
+      /* recompute */
       my_sincos_deg(&sin_dip,&cos_dip,(COMP_PRECISION)fault[n].dip);
       calc_quad_base_vecs(fault[n].t_strike,fault[n].normal,fault[n].t_dip,
 			  fault[n].sin_alpha,fault[n].cos_alpha,sin_dip,cos_dip);

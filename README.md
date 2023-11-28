@@ -204,9 +204,6 @@ patch2xyzvec:
 	converts a patch file (with fault segments) into a file that
 	holds the corner coordinates and basis (strike, normal, dip) vectors
 
-patch2poly3d:
-	converts a patch and a boundary condition file to Poly3D
-	format
 
 read_bin_events:
 	reads in binary events from an interact loading simulation and
@@ -216,8 +213,12 @@ sort_events:
 	reads in cevents.dat file and sorts for fore- and 
 	aftershocks
 
-tri2patch: (not really implemented yet)
-	convert three points defining a triangle in 3-D to internal format.
+patchquad2patchtri:
+	converts rectangular patches into triangles
+
+tri2patch: 
+	convert three points defining a triangle in 3-D to internal
+	format.
 
 iii) interaction matrix related
 

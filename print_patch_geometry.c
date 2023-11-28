@@ -14,7 +14,7 @@
 void print_patch_geometry_and_bc(int flt_offset,struct flt *fault,
 				 int opmode,
 				 COMP_PRECISION stop_time,
-				 my_boolean calculate_base_vecs,
+				 MODE_TYPE calculate_base_vecs,
 				 FILE *out,
 				 my_boolean shrink_patches,
 				 COMP_PRECISION *scalar)
@@ -25,7 +25,7 @@ void print_patch_geometry_and_bc(int flt_offset,struct flt *fault,
   COMP_PRECISION corner[4][3],sin_dip,cos_dip,leeway;
   double alpha;
 #ifdef ALLOW_NON_3DQUAD_GEOM
-  COMP_PRECISION tmp_real,lfac,x[3];
+  COMP_PRECISION lfac,x[3];
 #endif
   //
   // shrink patches for easier viewing
@@ -36,6 +36,11 @@ void print_patch_geometry_and_bc(int flt_offset,struct flt *fault,
     leeway = 1.0;
 
   if(calculate_base_vecs){
+    /* 
+       
+       recompute the base vectors?
+
+     */
 #ifdef ALLOW_NON_3DQUAD_GEOM
     if(fault[flt_offset].type != TRIANGULAR){
       // normal (rectangular, 2-D, or point source)
@@ -45,12 +50,19 @@ void print_patch_geometry_and_bc(int flt_offset,struct flt *fault,
       calc_quad_base_vecs(fault[flt_offset].t_strike,fault[flt_offset].normal,fault[flt_offset].t_dip,
 		     fault[flt_offset].sin_alpha,fault[flt_offset].cos_alpha,sin_dip,cos_dip);
     }else{// triangular element
-      get_alpha_dip_tri_gh((fault+flt_offset)->xt,&(fault+flt_offset)->sin_alpha,
-			   &(fault+flt_offset)->cos_alpha,&tmp_real,&(fault+flt_offset)->w);
-      (fault+flt_offset)->dip=(float)tmp_real;
-      (fault+flt_offset)->area = (fault+flt_offset)->w;
-      alpha = RAD2DEGF(asin((fault+flt_offset)->sin_alpha));
-      (fault+flt_offset)->strike= (COMP_PRECISION)(90.0 - alpha);
+      calc_centroid_tri((fault+flt_offset)->xt,(fault+flt_offset)->x);
+      (fault+flt_offset)->area = triangle_area((fault+flt_offset)->xt);
+      (fault+flt_offset)->w = (fault+flt_offset)->l = sqrt( (fault+flt_offset)->area);
+      get_tdcs_base_vectors(((fault+flt_offset)->xt+0),((fault+flt_offset)->xt+3),((fault+flt_offset)->xt+6),
+			    (fault+flt_offset)->t_strike,(fault+flt_offset)->t_dip,(fault+flt_offset)->normal);
+      /*  */
+      if(calculate_base_vecs > 1){
+	/* this will override any possible global settings */
+	(fault+flt_offset)->dip = vec_to_dip((fault+flt_offset)->t_dip);
+	(fault+flt_offset)->strike = vec_to_strike((fault+flt_offset)->t_strike);
+      }
+      alpha= 90.0 - (fault+flt_offset)->strike;
+      my_sincos_degd(&((fault+flt_offset)->sin_alpha),&((fault+flt_offset)->cos_alpha),alpha);
     }
 #else
     //
@@ -92,7 +104,10 @@ void print_patch_geometry_and_bc(int flt_offset,struct flt *fault,
     }
     case TRIANGULAR:{// xt has to be assigned and allocated before
       fprintf(out,"%19.12e %19.12e %19.12e %10.6f %10.6f %19.12e %19.12e %6i ",
-	      999.,999.,999.,999.,999.,-1.,-1.,fault[flt_offset].group);
+	      fault[flt_offset].x[INT_X],	      fault[flt_offset].x[INT_Y],	      fault[flt_offset].x[INT_Z],
+	      fault[flt_offset].strike,fault[flt_offset].dip,
+	      -fault[flt_offset].l,-fault[flt_offset].w,
+	      fault[flt_offset].group);
       fprintf(out,"%19.12e %19.12e %19.12e %19.12e %19.12e %19.12e %19.12e %19.12e %19.12e\n",
 	      fault[flt_offset].xt[INT_X],fault[flt_offset].xt[INT_Y],fault[flt_offset].xt[INT_Z],
 	      fault[flt_offset].xt[3+INT_X],fault[flt_offset].xt[3+INT_Y],fault[flt_offset].xt[3+INT_Z],

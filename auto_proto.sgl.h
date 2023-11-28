@@ -188,7 +188,7 @@ float triangle_area_gh(float *, float *);
 void get_gh_tri_vec(float *, float *, float *);
 void get_gh_quad_vec(float *, float *, float *, float *);
 unsigned char check_planar(float *);
-void get_alpha_dip_tri_gh(float *, double *, double *, float *, float *);
+void get_alpha_dip_tri_gh(float *, double *, double *, float *, float *, float *);
 void calc_group_geometry(struct med *, struct flt *, struct geog *);
 void vec_to_angles(float *, float *, float *);
 void angles_to_vec(float, float, float *);

@@ -239,19 +239,20 @@ check_feedback:
 
 ________________________________________________________________________________
 
-Output from interact -h follows (run code for updated versions!)
+Output from interact -h follows (RUN CODE FOR UPDATED VERSIONS!)
 
 ________________________________________________________________________________
 main: binary: interact
-main: compiled for double precision, initializing
-init: compiled on Nov 11 2023 11:09:12, running in serial
+main: internal double prec, A matrix double prec
+main: initializing on 2023-11-27 23:08:18
+init: compiled on Nov 27 2023 22:36:41, running in serial
 
 Interact: calculate fault stresses and displacements in a half space or in 2-D
           using a boundary element approach.
 
-Program reads in fault patch geometries (usually rectangular) and either solves
+Program reads in patch dividing a fault geometry and either solves
 for stresses and/or displacements in a one-step problem for various boundary
-conditions (sign-constrained or unconstrained), or for a simulated loading
+conditions (sign (i.e. direction) constrained or unconstrained), or for a simulated loading
 cycle where each patch follows a frictional constitutive law (e.g. Navier-Coulomb)
 and repetitive rupture is allowed during continuous "plate-tectonic" loading.
 
@@ -262,13 +263,12 @@ Output is written to files and in real-time to X11 if PGPLOT support was compile
 PGPlot support was compiled in. 
 
 PetSc support was compiled in, providing limited access to parallel solves for one-step problems.
-      For LU solve, use    "-pc_factor_mat_solver_type scalapack -mat_type scalapack" or
+      For direct solve, use    "-pc_factor_mat_solver_type scalapack -mat_type scalapack" or
                            "-pc_factor_mat_solver_type elemental -mat_type elemental".
       For iterative solve "-ksp_type fgmres -pc_type none   -ksp_max_it 10000 -ksp_rtol 1.0e-8" or
                           "-ksp_type fgmres -pc_type jacobi -ksp_max_it 10000 -ksp_rtol 1.0e-8".
       Check the makefile for other solver options and MPI settings.
-      When running a one-step computation, will also compute stress fields
-      in parallel.
+      When running a one-step computation, will also compute stress fields in parallel.
 
 (1) The fault geometry is input via the file "geom.in",
     a list of fault patches.
@@ -297,7 +297,40 @@ PetSc support was compiled in, providing limited access to parallel solves for o
     - group is the patch's fault group, a number that is used to define faults that consist of
       several patches (discretizing fault planes by rectangular elements) (0 <= group <= N-1))
     - ... at the end mean possible additional input, see below.
-    If you would like to use the 2-D mode, point sources or triangles, recompile with ALLOW_NON_3DQUAD_GEOM flag set.
+
+    Since the "ALLOW_NON_3DQUAD_GEOM" flag was used during runtime, the program can deal with
+    some additional patch geometries besides rectangular. Those are selected as follows:
+
+    - point source in half-space
+      If ONLY fault half-length is set to a negative value, a point source will be assumed instead
+      of a rectangular fault patch. In this case, width should be set to the `fault' area
+      and half-length is equivalent to -aspect_ratio, where aspect_ratio is some equivalent L/W.
+
+      WARNING: Not properly tested yet.
+
+    - triangular in half-space:
+      If BOTH fault half-width and length are negative, then the patch is a triangular element.
+      In this case, x, y, z, have no meaning but will be reassigned from the centroid.
+      strike and dip are global projection directions, and length and width will be sqrt(area) subsequently.
+      The next nine numbers in the input geometry line will be the coordinates of the three nodes of the
+      triangle, however. FE-style counterclockwise numbering, input is then in the format:
+
+      999 999 999 999 999 -1 -1 group_0 x_x^1 x_y^1 x_z^1 x_x^2 x_y^2 x_z^2 x_x^3 x_y^3 x_z^3
+
+      where exponents indicate the local number of the node, and 999 are place holder values, not used.
+
+      WARNING: This is experimental and not fully tested.
+
+    - segments in two dimensions in the x-y plane
+      If fault half-width is zero, then dip should be 90, z=0, and program will run in 2-D mode.
+      In this case, all z coordinates should still be specified (e.g. in the grid output requests)
+      but z should be set to zero. Computation is plane-strain unless changed by -ps.
+      For plane stress, all output values of u[Z] (displacements into stress free direction) are
+      given as strains e_zz.
+      Calculations are performed in a full plane by default, can be changed with the -hp option.
+
+    If all your patches are rectangular in 3-D, you could recompile
+    without the ALLOW_NON_3DQUAD_GEOM set to save memory and enhance speed.
 
 
     Examples:
@@ -306,6 +339,14 @@ PetSc support was compiled in, providing limited access to parallel solves for o
 
     for a rectangular, vertical fault patch centered at depth -1, striking 30 degrees from North
     with length 8 and width 4, patch group number is 0.
+
+    0 0 -1 30 90 -1 32 0
+
+    is the same kind of fault, only as a point source. Note that 32 is the fault area from above.
+
+    999 999 999 999 999 -1 -1 0   2.0 3.4641 0  -2.0 -3.4641 0  0 0 -4
+
+    would be for a triangular element with roughly the same geometry.
 
     Please note that there are various programs to convert to and from the above patch format,
     e.g. patch2xyz to go to GMT style xyz coordinates for the edges of each patch,
@@ -356,16 +397,22 @@ PetSc support was compiled in, providing limited access to parallel solves for o
 
       If patch_number < 0, then the line should instead read
 
-       -increment start_fault stop_fault boundary_code boundary_value ... ...
+       -increment start_fault stop_fault boundary_code boundary_value
 
       and boundary code boundary_code will be assigned with value
       boundary_value from start_fault to stop_fault with increments increment.
 
       If start_fault < 0 and stop_fault < 0, will select all patches.
 
-     The patch_number ... boundary_value line can be repeated as often as necessary (say, twice for each fault
-     if the strike and dip movement modes are to be activated the same time).
 
+     If the patches for which boundary conditions are specified are triangular,
+     then the strike and dip specified in the geometry input will define global directions
+     the prescribed slipor stress values refer. The slip boundary conditions will then be converted to the triangle local
+     reference frame internally, and converted back to the global frame on output for fault properties.
+
+     The patch_number ... boundary_value line can be repeated as often as necessary (say, twice for each fault
+     if the strike and dip movement modes are to be activated the same time, but not for triangles yet, for 
+     which specifying either strike or dip stress will enforce the other shear component to be zero.)
 
    Possible boundary conditions (as indicated by their integer codes) are:
 
@@ -383,6 +430,7 @@ PetSc support was compiled in, providing limited access to parallel solves for o
     For normal: positive values of slip mean explosive source, negative implosive;
     	this corresponds to a resulting drop resp. increase in the normal component of stress.
 
+    For triangles, these are all referring to the global frame specified.
 
    (B) 10, 11, 12 or 20, 21, 22 or 30, 31, 32: stresses are specified
 
@@ -394,6 +442,9 @@ PetSc support was compiled in, providing limited access to parallel solves for o
     20	dip direction, either way
     21	dip direction, thrust       (stress drop bc usually < 0 for activation)
     22	dip direction, normal       (stress drop bc usually > 0 for activation)
+    30	normal direction, either way
+    31	normal direction, explosive (stress drop bc usually < 0 for activation)
+    32	normal direction, implosive (stress drop bc usually > 0 for activation)
 
     If any of the strike or dip modes (10, 11, 12 or 20, 21, or 22) are given as 
     (110, 111, 112 or 120, 121, or 122) instead (add 100) this means
@@ -420,6 +471,8 @@ PetSc support was compiled in, providing limited access to parallel solves for o
     boundary conditions, slip has to be completely specified first such that subsequent stress conditions
     can take the stress changes induced by the slip into account.
 
+    WARNING: Stress boundary conditions will NOT work for point sources, and are
+    unreliable for triangular sources right now.
 
     Example:
     1 1
@@ -440,7 +493,7 @@ PetSc support was compiled in, providing limited access to parallel solves for o
    program's prediction of the next rupture time or change in shear stress sign.
    The max step is given by print_interval to ensure frequent
    enough output to the flt.*.dat files.
-   The minimum time step was set to 1e-15.
+   The minimum time step was set to 1.42857e-16.
    Time has to monotonously increase from zero.
 
    If X windows output is chosen, the next line (two numbers) should read
@@ -475,6 +528,9 @@ PetSc support was compiled in, providing limited access to parallel solves for o
      121	dip direction, Coulomb correction, thrust
      22		dip direction, normal
      122	dip direction, Coulomb correction, normal
+     30		normal direction, either way (not implemented yet)
+     31		normal direction, explosive  (not implemented yet)
+     32		normal direction, implosive  (not implemented yet)
      40		maximum stress direction in strike/dip plane
      140	maximum stress direction in strike/dip plane, Coulomb correction
 
@@ -485,9 +541,8 @@ PetSc support was compiled in, providing limited access to parallel solves for o
 
 
  NOTICE:
- Program was compiled with the NO_OPENING_MODES switch set, therefore all
- normal (opening) modes of slip are suppressed to save memory
-
+ Program maintains normal (opening) modes. If this is not needed, recompile
+ with the NO_OPENING_MODES switch set to save memory.
 
 
 PARAMETERS:
@@ -525,7 +580,7 @@ PARAMETERS:
                              (5.000000e-05 by default.)
                 (only used if I matrix is stored as sparse, see -nd option, or for sparse Ax=b solver.)
 
- -wc value      will use value as the maximum fraction of singular value for an SVD solution (default: 7.00e-15)
+ -wc value      will use value as the maximum fraction of singular value for an SVD solution (default: 1.00e-15)
 
 
 
@@ -596,7 +651,7 @@ OPTIONS:
      on triggering patches is exhaustive, and iteration checks for triggering step
      by step (faster, since old solution doesn't have to be removed from stress
      field). The exhaustive method is affected by tiny differences in critical stress!
-     If keep slipping, critical stress is -7.000000e-15, else -7.000000e-15.
+     If keep slipping, critical stress is -1.000000e-15, else -1.000000e-15.
      ON by default, if switch is set will be OFF.
 
  -v  whole fault deactivation mode (loading simulation)
@@ -703,13 +758,19 @@ OPTIONS:
 
  -fpetsc    force Petsc solvers even for serial runs (else LAPACK for LU)
 
+ -ps Change the default 2-D elastic approximation for segments from plane-strain to plane-stress.
+     OFF by default, if switch is set will be ON.
+
+ -hp run a 2-D plane strain calculation in a half-plane (y<=0) instead of plane
+     OFF by default, if switch is set will be ON.
 
  -h  prints out this help message and exits to the operating system
 
 (C) Thorsten Becker, thwbecker@post.harvard.edu, 1999 - 2023)
     interact - boundary element code for elastic half-spaces
-    Main 3-D dislocation code based on dc3d.f by Y. Okada, as of Okada, BSSA, 1992
-    2-D segment slip solution from Crouch and Starfield (1973)
+    3-D quad dislocationS based on Okada (BSSA, 1992).
+    3-D triangular dislocations based on Nikkhoo and Walter (GJI, 2015).
+    2-D segment slip solution from Crouch and Starfield (1973).
     May include routines based on copyrighted software of others.
     Distributed under the GNU public license, see "COPYING".
 

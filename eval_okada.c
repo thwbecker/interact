@@ -69,7 +69,7 @@ void eval_rectangle(COMP_PRECISION *x,struct flt *fault,
   double x_local_d[3],u_d[12],disp_d[3];
 #endif
   COMP_PRECISION x_local[3],u[12];
-  static COMP_PRECISION medium_alpha = ALPHA_CONST;
+  static double medium_alpha = ALPHA_CONST;
   double al1,al2,aw1,aw2,depth,cpdip;
 #ifdef DEBUG
   COMP_PRECISION corners[4][3],l,w;
@@ -195,7 +195,7 @@ void eval_rectangle_basic(COMP_PRECISION *x,
   double depth_d,x_d[3],disp_d[3],u_d[12],dip_d,u_global_d[3];
   int i;
 #endif
-  COMP_PRECISION medium_alpha = ALPHA_CONST;
+  double medium_alpha = ALPHA_CONST;
   COMP_PRECISION u[12],iso;
   double al1,al2,aw1,aw2;
   al1 = (double)-l;al2 = (double)l;
@@ -282,7 +282,8 @@ void eval_point_short(COMP_PRECISION *x,COMP_PRECISION *xf,COMP_PRECISION area,
 		      COMP_PRECISION sm_global[3][3],
 		      int *iret,MODE_TYPE mode)
 {
-  COMP_PRECISION medium_alpha = ALPHA_CONST,mu_alpha = SHEAR_MODULUS/LAMBDA_CONST;
+  double medium_alpha = ALPHA_CONST;
+  COMP_PRECISION mu_alpha = SHEAR_MODULUS/LAMBDA_CONST;
   COMP_PRECISION u[12],
     iso,x_local[3],dx[3],sm_local[3][3];
   double depth,potency[4];
