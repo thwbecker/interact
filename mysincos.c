@@ -24,24 +24,20 @@ void my_sincos_deg(COMP_PRECISION *sin_val,COMP_PRECISION *cos_val,
 
 
 // fortran version
-void my_sincos_deg_ftnd(double *sin_val,double *cos_val,
-			double *alpha_in_degrees)
+void my_sincos_deg_ftnd(double *sin_val,double *cos_val,double *alpha_in_degrees)
 {
   double tmp;
   tmp = *alpha_in_degrees * DEG2RAD;
   sincos(tmp,sin_val,cos_val);
 }
 
-void my_sincos_ftn(COMP_PRECISION *sin_val,COMP_PRECISION *cos_val,
-		   COMP_PRECISION *alpha)
+void my_sincos_ftn(COMP_PRECISION *sin_val,COMP_PRECISION *cos_val,COMP_PRECISION *alpha)
 {
   sincos(*alpha,sin_val,cos_val);
 }
 
 
-void my_sincos(COMP_PRECISION *sin_val,
-	       COMP_PRECISION *cos_val,
-	       COMP_PRECISION arad)
+void my_sincos(COMP_PRECISION *sin_val,COMP_PRECISION *cos_val,COMP_PRECISION arad)
 {
 #if defined(USE_DOUBLE_PRECISION)
   sincos(arad,sin_val,cos_val);
@@ -52,20 +48,15 @@ void my_sincos(COMP_PRECISION *sin_val,
   *sin_val = (COMP_PRECISION)sin_vald;
   *cos_val = (COMP_PRECISION)cos_vald;
 #endif
-  
-#endif
 }
-void my_sincosd(double *sin_val,
-		double *cos_val,
-	        double arad)
+
+void my_sincosd(double *sin_val,double *cos_val,double arad)
 {
   sincos(arad,sin_val,cos_val);
 }
 
 
-void my_sincos_degd(double *sin_val,
-		    double *cos_val,
-		    double adeg)
+void my_sincos_degd(double *sin_val,double *cos_val,double adeg)
 {
   double arad;
   arad = adeg * DEG2RAD;
