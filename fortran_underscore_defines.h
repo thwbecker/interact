@@ -46,7 +46,9 @@
 #define tdstresshs tdstresshs_
 #define get_tdcs_base_vectors get_tdcs_base_vectors_
 //other
-#define my_sincos_deg_ftn my_sincos_deg_ftn_
+#define my_sincos_deg_ftnd my_sincos_deg_ftnd_
+#define my_sincos_ftn my_sincos_ftn_
+
 // weird fix for calling convention
 #ifdef LINUX_FORTRAN_CALL_FIX
 #define my_sincos_deg_ftn_ my_sincos_deg_ftn__

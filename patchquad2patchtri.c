@@ -68,20 +68,15 @@ int main(int argc, char **argv)
       con[1][0] = 0; con[1][1] = 2; con[1][2] = 3;
     }
     tfault[0].group =  qfault[i].group;
-    /* assign quad-like strike and dip to triangular fault patch */
-    tfault[0].strike = qfault[i].strike;
-    tfault[0].dip =    qfault[i].dip;
-    
     for(j=0;j < 2;j++){		/* one quad = two triangle */
       for(k=0;k<3;k++){		/* node loop */
 	for(l=0;l<3;l++)	/* dimension loop */
 	  tfault[0].xt[3*k+l] = corner[con[j][k]][l];
       }
-      calc_centroid_tri(tfault[0].xt,tfault[0].x);
-      tfault[0].area = triangle_area(tfault[0].xt);
-      tfault[0].l = tfault[0].w = sqrt( tfault[0].area);
-      print_patch_geometry_and_bc(0,tfault,PATCH_OUT_MODE,0.0,
-				  0,stdout,FALSE,dummy);
+      get_tri_prop_based_on_gh(tfault);
+
+      //fprintf(stderr,"%g %g - %g %g - %g %g\n",tfault->strike,qfault[i].strike,tfault->dip,qfault[i].dip,tfault->area,qfault[i].area);
+      print_patch_geometry_and_bc(0,tfault,PATCH_OUT_MODE,0.0,0,stdout,FALSE,dummy);
     }
   }
   fprintf(stderr,"%s: written %i triangular patches to stdout\n",argv[0],ntflt);

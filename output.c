@@ -137,9 +137,10 @@ void print_fault_data(char *filename,struct med *medium,struct flt *fault)
 {
   int i,j,grp;
   FILE *out;
+  my_boolean rotate = FALSE;
   COMP_PRECISION val[NR_VAL],abs_tau;
 #ifdef ALLOW_NON_3DQUAD_GEOM
-  COMP_PRECISION gstrike[3],gdip[3],gnormal[3],old_rdip = FLT_MAX,old_rstrike = FLT_MAX;
+  COMP_PRECISION gstrike[3],gdip[3],gnormal[3];
 #endif
   out=myopen(filename,"w");
   fprintf(stderr,
@@ -147,8 +148,8 @@ void print_fault_data(char *filename,struct med *medium,struct flt *fault)
   fprintf(stderr,
 	  "print_fault_data: format: pos_1 pos_2 area s_c m_d*s_n u_s u_n u_d s_s s_n s_d patch_nr group_nr\n");
   fprintf(out,"# fault state: note that stresses are only those due to slip and do not include background stress\n");
-  fprintf(out,"%10s %10s %10s %10s %10s %18s %18s %18s %18s %18s %18s %5s %5s\n",
-	  "#    pos_1/W","pos_2/W","area","s_c", "m_d*s_n", "u_s", "u_n", "u_d", 
+  fprintf(out,"%10s %10s %10s %10s %10s %20s %20s %20s %20s %20s %20s %6s %6s\n",
+	  "#  pos_1/W","pos_2/W","area","s_c", "m_d*s_n", "u_s", "u_n", "u_d", 
 	  "s_s", "s_n", "s_d","pach#","grp#");
 
   /* 
@@ -163,19 +164,8 @@ void print_fault_data(char *filename,struct med *medium,struct flt *fault)
 			 fault[i].s[NORMAL],medium->cohesion);
 	val[1] = ((COMP_PRECISION)fault[i].mu_d)*fault[i].s[NORMAL];
 #ifdef ALLOW_NON_3DQUAD_GEOM
-	if(fault[i].type==TRIANGULAR){
-	  /* triangular element will have local stress and slip
-	     rotated into global system */
-	  if((fault[i].strike != old_rstrike)||(fault[i].dip != old_rdip)){
-	    /* 
-	       need to compute new global basis vectors 
-	    */
-	    //fprintf(stderr,"patch %03i triangular, rotating to global strike %g dip %g (not repeating for same angles)\n",
-	    //i,fault[i].strike,fault[i].dip);
-	    calc_global_strike_dip_from_local((fault+i),gstrike, gnormal, gdip);
-	    old_rdip = fault[i].dip;
-	    old_rstrike = fault[i].strike;
-	  }
+	if((fault[i].type==TRIANGULAR)&&(rotate)){
+	  calc_global_strike_dip_from_local((fault+i),gstrike, gnormal, gdip);
 	  /* 
 	     project to global for output 
 	  */
@@ -209,7 +199,7 @@ void print_fault_data(char *filename,struct med *medium,struct flt *fault)
 	  //val[j] = reformat_small(val[j]);
 	  fprintf(out,"%20.12e ",val[j]);
 	}
-	fprintf(out,"%5i %5i",i,grp);
+	fprintf(out,"%6i %6i",i,grp);
 	fprintf(out,"\n");
       }
     }

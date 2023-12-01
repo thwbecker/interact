@@ -1,9 +1,8 @@
 /*
   interact: model fault interactions using dislocations in a 
             halfspace
-  (C) Thorsten Becker, becker@eps.harvard.edu
+  (C) Thorsten Becker, becker@post.harvard.edu
 
-  $Id: project_stress.c,v 2.11 2003/02/13 22:45:12 becker Exp $
 */
 #include "interact.h"
 /*
@@ -105,8 +104,8 @@ int main(int argc, char **argv)
       sm[INT_Z][INT_X]=sm[INT_X][INT_Z];
       sm[INT_Z][INT_Y]=sm[INT_Y][INT_Z];
       resolve_force(fault->normal,sm,trac);
-      st = project_vector(trac,rake_vec);
-      sn = project_vector(trac,fault->normal);
+      st = dotp_3d(trac,rake_vec);
+      sn = dotp_3d(trac,fault->normal);
       fprintf(stdout,"%15.8e %15.8e %15.8e %15.8e %15.8e\n",x,y,z,st,sn);
     }
   }

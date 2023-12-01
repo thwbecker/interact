@@ -1,16 +1,15 @@
 /*
-
 ################################################################################
 #                                                                              #
 #  interact: model fault interactions using dislocations in an elastic         #
 #            medium                                                            #
 #	                                                                       #
-#    Copyright (C) Thorsten W. Becker 2000 - 2021                              #
+#    Copyright (C) Thorsten W. Becker 2000 - 2023                              #
 #                                                                              #
-#    Unteract uses dc3d.f as provided by Y. Okada as in Okada (BSSA, 1992) and #
+#    Interact uses dc3d.f as provided by Y. Okada as in Okada (BSSA, 1992) and #
 #    linear algebra routines from SLATEC, LAPACK, and EISPACK.                 #
+#    Contains f90 converted routines from Nikkhoo and Walter (GJI, 2015)       #
 #    Might contain material copyrighted by others (e.g. Numerical Recipes etc) #
-#                                                                              #
 #                                                                              #
 #    This program is free software; you can redistribute it and/or modify      #
 #    it under the terms of the GNU General Public License as published by      #
@@ -149,10 +148,10 @@ int main(int argc, char **argv)
       add solution without calling the quake output routine
        
     */
-    if(medium->comm_rank==0)
+    HEADNODE{
       if(medium->int_mat_init)
 	print_interaction_matrix(medium,fault);
-
+    }
     if((medium->naflt)||(medium->naflt_con)){
       solve(medium,fault);
 #ifdef DEBUG

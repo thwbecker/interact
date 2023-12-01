@@ -465,13 +465,13 @@ void get_gh_tri_vec(COMP_PRECISION *xt,// 3 points in FE ordering
 		    COMP_PRECISION *gvec,// output
 		    COMP_PRECISION *hvec)// output
 {
-  gvec[INT_X]=xt[3+INT_X]-xt[ +INT_X];
-  gvec[INT_Y]=xt[3+INT_Y]-xt[ +INT_Y];
-  gvec[INT_Z]=xt[3+INT_Z]-xt[ +INT_Z];
+  gvec[INT_X]=xt[3+INT_X]-xt[INT_X];
+  gvec[INT_Y]=xt[3+INT_Y]-xt[INT_Y];
+  gvec[INT_Z]=xt[3+INT_Z]-xt[INT_Z];
   
-  hvec[INT_X]=xt[6+INT_X]-xt[ +INT_X];
-  hvec[INT_Y]=xt[6+INT_Y]-xt[ +INT_Y];
-  hvec[INT_Z]=xt[6+INT_Z]-xt[ +INT_Z];
+  hvec[INT_X]=xt[6+INT_X]-xt[INT_X];
+  hvec[INT_Y]=xt[6+INT_Y]-xt[INT_Y];
+  hvec[INT_Z]=xt[6+INT_Z]-xt[INT_Z];
 }
 
 /*
@@ -524,8 +524,8 @@ my_boolean check_planar(COMP_PRECISION *x)
   c_eq_a_minus_b_3d(&vec[2][INT_X],(x+9+INT_X),(x+6+INT_X));
   c_eq_a_minus_b_3d(&vec[3][INT_X],(x+INT_X),(x+9+INT_X));
   cross_product(&vec[0][INT_X],&vec[1][INT_X],normal);
-  if((project_vector(&vec[2][INT_X],normal) > eps)||
-     (project_vector(&vec[2][INT_X],normal) > eps)){
+  if((dotp_3d(&vec[2][INT_X],normal) > eps)||
+     (dotp_3d(&vec[2][INT_X],normal) > eps)){
     /* 
        fprintf(stderr,"check_planar: rectangular element points possibly not on plane\n");
        fprintf(stderr,"check_planar: points: %g %g %g; %g %g %g; %g %g %g; %g %g %g\n",
@@ -535,18 +535,18 @@ my_boolean check_planar(COMP_PRECISION *x)
     return(FALSE);
   }
   // check right angles
-  if((fabs(project_vector(&vec[0][INT_X],&vec[1][INT_X])) > eps)||
-     (fabs(project_vector(&vec[1][INT_X],&vec[2][INT_X])) > eps)||
-     (fabs(project_vector(&vec[2][INT_X],&vec[3][INT_X])) > eps)){
+  if((fabs(dotp_3d(&vec[0][INT_X],&vec[1][INT_X])) > eps)||
+     (fabs(dotp_3d(&vec[1][INT_X],&vec[2][INT_X])) > eps)||
+     (fabs(dotp_3d(&vec[2][INT_X],&vec[3][INT_X])) > eps)){
     /*
       fprintf(stderr,"check_planar: rectangular element points possibly not all 90 degree angles\n");
       fprintf(stderr,"check_planar: points: %g %g %g; %g %g %g; %g %g %g; %g %g %g\n",
       x[INT_X],x[INT_Y],x[INT_Z], x[INT_X+3],x[INT_Y+3],x[INT_Z+3], x[INT_X+6],x[INT_Y+6],x[INT_Z+6], 
       x[INT_X+9],x[INT_Y+9],x[INT_Z+9]);
       fprintf(stderr,"check_planar: dotps: 01: %g 12: %g 23: %g\n",
-      project_vector(&vec[0][INT_X],&vec[1][INT_X]),
-      project_vector(&vec[1][INT_X],&vec[2][INT_X]),
-      project_vector(&vec[2][INT_X],&vec[3][INT_X]));
+      dotp_3d(&vec[0][INT_X],&vec[1][INT_X]),
+      dotp_3d(&vec[1][INT_X],&vec[2][INT_X]),
+      dotp_3d(&vec[2][INT_X],&vec[3][INT_X]));
     */
     return(FALSE);
   }
@@ -555,44 +555,36 @@ my_boolean check_planar(COMP_PRECISION *x)
 
 /*
   
-  determine alpha and dip vectors given non-normalized g and h
-  vectors, also determines area- note that there is also
-  get_tdcs_base_vectors
-
+  compute local coordinate system, strike and dip given initialized
+  triangular points xt 
 */
-void get_alpha_dip_tri_gh(COMP_PRECISION *xt,double *sin_alpha,
-			  double *cos_alpha,
-			  COMP_PRECISION *alpha,
-			  COMP_PRECISION *dip_rad,
-			  COMP_PRECISION *area)
+void get_tri_prop_based_on_gh(struct flt *fault)
 {
-  COMP_PRECISION normal[3],nl,gvec[3],hvec[3];
-  double tmp_dbl;
-  int i;
-  get_gh_tri_vec(xt,gvec,hvec);
-  //fprintf(stderr,"g: %g %g %g\n",gvec[INT_X],gvec[INT_Y],gvec[INT_Z]);
-  //fprintf(stderr,"h: %g %g %g\n",hvec[INT_X],hvec[INT_Y],hvec[INT_Z]);
-  cross_product(gvec,hvec,normal);
-  //fprintf(stderr,"n: %g %g %g\n",normal[INT_X],normal[INT_Y],normal[INT_Z]);
-  nl=norm_3d(normal);
-  if(nl == 0.0){
-    fprintf(stderr,"get_alpha_dip_tri_gh: triangle degenerate:\n");
-    for(i=0;i<3;i++)
-      fprintf(stderr,"%i: x: %g y: %g z: %g\n",i+1,
-	      xt[i*3+INT_X],xt[i*3+INT_Y],xt[i*3+INT_Z]);
-    exit(-1);
-  }
-  *area= nl/2.0;
-  //normal[INT_X]/=nl; not needed
-  normal[INT_Y]/=nl;
-  normal[INT_Z]/=nl;
-  *dip_rad = (COMP_PRECISION)acos((double)normal[INT_Z]);
-  *alpha   = (double)acos((double)normal[INT_Y]);
-  // might have to check for bounds
-  tmp_dbl = (double)(*alpha);
-  check_angles(dip_rad,&tmp_dbl);
-  *alpha = (COMP_PRECISION)tmp_dbl;
-  my_sincosd(sin_alpha,cos_alpha,*alpha);
+  COMP_PRECISION dip;
+  double strike,alpha;
+  
+  calc_centroid_tri(fault->xt,fault->x); /* assingn centroid to x */
+  
+  get_tdcs_base_vectors(&(fault->xt[0]),&(fault->xt[3]),&(fault->xt[6]),
+			fault->t_strike,fault->t_dip,fault->normal,
+			&fault->area);
+  fault->l = fault->w = sqrt(fault->area);
+
+  strike = atan2(fault->t_strike[INT_X],fault->t_strike[INT_Y])*RAD2DEG;  
+  /*  */
+  if((fault->t_dip[INT_Z]-1) < EPS_COMP_PREC)
+    dip = 90;
+  else
+    dip = (COMP_PRECISION)asin((double)fault->t_dip[INT_Z])*RAD2DEG;
+  
+  check_angles(&dip,&strike);
+  /*  */
+  fault->strike = (COMP_PRECISION)strike;
+  fault->dip    = dip;
+  /*  */
+  alpha = 90 - fault->strike;
+  my_sincos_degd(&(fault->sin_alpha),&(fault->cos_alpha),alpha);
+
 }
 
 
@@ -686,9 +678,9 @@ void calc_group_geometry(struct med *medium,struct flt *fault,
     if(dist > dist_max)
       dist_max = dist;
     fault[i].pos[STRIKE]=(float)
-      project_vector(dx1,grp[fault[i].group].strike_vec);
+      dotp_3d(dx1,grp[fault[i].group].strike_vec);
     fault[i].pos[DIP]=(float)
-      project_vector(dx1,grp[fault[i].group].dip_vec);
+      dotp_3d(dx1,grp[fault[i].group].dip_vec);
   }
 
   for(i=0;i < medium->nrflt;i++){
@@ -713,8 +705,8 @@ void calc_group_geometry(struct med *medium,struct flt *fault,
     for(j=0;j < clim;j++){
       for(k=0;k<3;k++)
 	dx1[k] = corner[j][k] - grp[fault[i].group].center[k];
-      pos[STRIKE] = project_vector(dx1,grp[fault[i].group].strike_vec);
-      pos[DIP] = project_vector(dx1,grp[fault[i].group].dip_vec);
+      pos[STRIKE] = dotp_3d(dx1,grp[fault[i].group].strike_vec);
+      pos[DIP] = dotp_3d(dx1,grp[fault[i].group].dip_vec);
       // determine min/max
       for(k=0;k<2;k++){
 	if(grp[fault[i].group].pmin[k] > pos[k])
@@ -1175,10 +1167,12 @@ void calc_deviatoric_stress(COMP_PRECISION sm[3][3],COMP_PRECISION dm[3][3],
 
 /* 
    compute the global basis vectors for a triangular patch as
-   specified by strike and dip from global input, not local syste,
+   specified by its strike and dip using the rectangular patch
+   convention
 
 */
-void calc_global_strike_dip_from_local(struct flt *fault,COMP_PRECISION *gstrike, COMP_PRECISION *gnormal, COMP_PRECISION *gdip)
+void calc_global_strike_dip_from_local(struct flt *fault,
+				       COMP_PRECISION *gstrike, COMP_PRECISION *gnormal, COMP_PRECISION *gdip)
 {
   COMP_PRECISION global_dip_rad,sin_global_dip_rad,cos_global_dip_rad;
 #ifdef DEBUG
@@ -1228,14 +1222,14 @@ void calc_global_slip_and_traction_from_local(struct flt *fault,COMP_PRECISION *
   }
   if(!only_traction){
     /* project into global coordinate system */
-    gslip[0] = project_vector(lslip,gstrike);
-    //gslip[1] = project_vector(lslip,gnormal);
+    gslip[0] = dotp_3d(lslip,gstrike);
+    //gslip[1] = dotp_3d(lslip,gnormal);
     gslip[1] = slip[NORMAL];
-    gslip[2] = project_vector(lslip,gdip);
+    gslip[2] = dotp_3d(lslip,gdip);
   }
-  gtrac[0] = project_vector(ltrac,gstrike);
-  //gtrac[1] = project_vector(ltrac,gnormal);
+  gtrac[0] = dotp_3d(ltrac,gstrike);
+  //gtrac[1] = dotp_3d(ltrac,gnormal);
   gtrac[1] = trac[NORMAL];
-  gtrac[2] = project_vector(ltrac,gdip);
+  gtrac[2] = dotp_3d(ltrac,gdip);
 }
 #endif

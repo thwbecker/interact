@@ -89,11 +89,11 @@ void initialize_stress_state(struct flt *fault,struct med *medium,
       //
       // these are the increments of stress for each dt0 step
       //
-      fault[i].sinc[STRIKE] = project_vector(trac,fault[i].t_strike) -
+      fault[i].sinc[STRIKE] = dotp_3d(trac,fault[i].t_strike) -
 	fault[i].s[STRIKE];
-      fault[i].sinc[DIP] =    project_vector(trac,fault[i].t_dip) -
+      fault[i].sinc[DIP] =    dotp_3d(trac,fault[i].t_dip) -
 	fault[i].s[DIP];
-      fault[i].sinc[NORMAL] = project_vector(trac,fault[i].normal) -
+      fault[i].sinc[NORMAL] = dotp_3d(trac,fault[i].normal) -
 	fault[i].s[NORMAL];
       // read in additional initial stress from file
       if(read_initial_fault_stress){
@@ -510,11 +510,11 @@ void calc_fields(struct med *medium,struct flt *fault,
     }
   }
   if(singular_count)
-    sprintf(out_string,"core %03i/%03i fault %05i to %05i: WARNING: %i singular",
+    sprintf(out_string,"core %03i/%03i fault %05i to %05i: WARNING: %05i values singular",
 	    medium->comm_rank+1,medium->comm_size,medium->myfault0,medium->myfaultn,
 	    singular_count);
   else
-    sprintf(out_string,"core %3i/%3i fault %5i < %5i: no singular entries",
+    sprintf(out_string,"core %03i/%03i fault %05i to %05i: no singular entries",
 	    medium->comm_rank+1,medium->comm_size,medium->myfault0,medium->myfaultn);
   time_report("calc_fields",out_string,medium);
 

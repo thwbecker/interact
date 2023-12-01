@@ -25,8 +25,8 @@ void read_geometry(char *patch_filename,struct med **medium,
 {
   int i,j,k,tmpint,ic;
   FILE *in,*in2=NULL;
-  COMP_PRECISION sin_dip,cos_dip,mus_avg,mud_avg,d_mu,corner[4][3],
-    lloc,wloc,eps_for_z = EPS_COMP_PREC * 100.0;
+  COMP_PRECISION sin_dip,cos_dip,mus_avg,mud_avg,d_mu,corner[4][3],p[3],
+    lloc,wloc,eps_for_z = EPS_COMP_PREC * 100.0,t_strike[3],t_dip[3],normal[3];
   float wmin,wmax,lmin,lmax;
   double alpha;
   static my_boolean init=FALSE;
@@ -162,27 +162,26 @@ void read_geometry(char *patch_filename,struct med **medium,
 	  exit(-1);
 	}
       }
-      // x will be the centroid, to be calculated
-      calc_centroid_tri((*fault+i)->xt,(*fault+i)->x);
-      /* this will also compute g and h vectors, like tdcs, leave here
-	 for now */
-      (*fault+i)->area = triangle_area((*fault+i)->xt);
+      /* compute all the triangular properties */
+      get_tri_prop_based_on_gh((*fault+i));
+      if(0){			/* check for consistency */
+	/*  */
+	calc_global_strike_dip_from_local((*fault+i),t_strike,normal,t_dip);
+	p[0] = dotp_3d((*fault+i)->t_strike,t_strike);
+	p[1] = dotp_3d((*fault+i)->t_dip,t_dip);
+	p[2] = dotp_3d((*fault+i)->normal,normal);
+	fprintf(stderr,"tri*g: s %5.2f d %5.2f n %5.2f\n",p[0],p[1],p[2]);
+	if((p[0] < .95)||(p[1] < .95)||(p[2] < .95)){
+	  fprintf(stderr,"tri s: %5.2f %5.2f %5.2f d: %5.2f %5.2f %5.2f n: %5.2f %5.2f %5.2f qbsd: %5.2f %5.2f %5.2f d: %5.2f %5.2f %5.2f n: %5.2f %5.2f %5.2f \n",
+		  (*fault+i)->t_strike[INT_X],(*fault+i)->t_strike[INT_Y],(*fault+i)->t_strike[INT_Z],
+		  (*fault+i)->t_dip[INT_X],(*fault+i)->t_dip[INT_Y],(*fault+i)->t_dip[INT_Z],
+		  (*fault+i)->normal[INT_X],(*fault+i)->normal[INT_Y],(*fault+i)->normal[INT_Z],
+		  t_strike[INT_X],t_strike[INT_Y],t_strike[INT_Z],
+		  t_dip[INT_X],t_dip[INT_Y],t_dip[INT_Z],
+		  normal[INT_X],normal[INT_Y],normal[INT_Z]);
+	}
 
-      (*fault+i)->l = (*fault+i)->w = sqrt((*fault+i)->area);
-      /* 
-	 get basis vectors in TDCS system of NW15 
-      */
-      get_tdcs_base_vectors(((*fault+i)->xt+0),((*fault+i)->xt+3),((*fault+i)->xt+6),
-			    (*fault+i)->t_strike,(*fault+i)->t_dip,(*fault+i)->normal);
-      /* while those strike and dips are local for now, initialize so
-	 that they have a value - if boundary conditions are used, it
-	 will assign global strike and dip values later */
-      (*fault+i)->dip = vec_to_dip((*fault+i)->t_dip);
-      (*fault+i)->strike = vec_to_strike((*fault+i)->t_strike);
-      alpha= 90.0 - (*fault+i)->strike;
-      my_sincos_degd(&(*fault+i)->sin_alpha,&(*fault+i)->cos_alpha,alpha);
-      
-      //fprintf(stderr,"tdt %g %g %g\n",(*fault+i)->t_dip[0],(*fault+i)->t_dip[1],(*fault+i)->t_dip[2]);
+      }
 #ifdef DEBUG
       if((*medium)->comm_rank == 0)
 	fprintf(stderr,"read_geometry: fault %5i is triangular, x1: (%10.3e, %10.3e, %10.3e) x2: (%10.3e, %10.3e, %10.3e) x3: (%10.3e, %10.3e, %10.3e), area: %10.3e\n",

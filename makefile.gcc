@@ -39,7 +39,7 @@ LDFLAGS =
 # X 11 only needed for PGPLOT
 X11LIBDIR = /usr/lib/x86_64-linux-gnu/
 #
-MATHLIB = -lm
+MATHLIBS = -llapack -lblas -lm
 #
 # warning options
 GCCWOPT = -Wall 

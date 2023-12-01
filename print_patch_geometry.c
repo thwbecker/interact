@@ -48,21 +48,9 @@ void print_patch_geometry_and_bc(int flt_offset,struct flt *fault,
       my_sincos_degd(&fault[flt_offset].sin_alpha,&fault[flt_offset].cos_alpha,alpha);
       my_sincos_deg(&sin_dip,&cos_dip,(COMP_PRECISION)fault[flt_offset].dip);
       calc_quad_base_vecs(fault[flt_offset].t_strike,fault[flt_offset].normal,fault[flt_offset].t_dip,
-		     fault[flt_offset].sin_alpha,fault[flt_offset].cos_alpha,sin_dip,cos_dip);
+			  fault[flt_offset].sin_alpha,fault[flt_offset].cos_alpha,sin_dip,cos_dip);
     }else{// triangular element
-      calc_centroid_tri((fault+flt_offset)->xt,(fault+flt_offset)->x);
-      (fault+flt_offset)->area = triangle_area((fault+flt_offset)->xt);
-      (fault+flt_offset)->w = (fault+flt_offset)->l = sqrt( (fault+flt_offset)->area);
-      get_tdcs_base_vectors(((fault+flt_offset)->xt+0),((fault+flt_offset)->xt+3),((fault+flt_offset)->xt+6),
-			    (fault+flt_offset)->t_strike,(fault+flt_offset)->t_dip,(fault+flt_offset)->normal);
-      /*  */
-      if(calculate_base_vecs > 1){
-	/* this will override any possible global settings */
-	(fault+flt_offset)->dip = vec_to_dip((fault+flt_offset)->t_dip);
-	(fault+flt_offset)->strike = vec_to_strike((fault+flt_offset)->t_strike);
-      }
-      alpha= 90.0 - (fault+flt_offset)->strike;
-      my_sincos_degd(&((fault+flt_offset)->sin_alpha),&((fault+flt_offset)->cos_alpha),alpha);
+      get_tri_prop_based_on_gh((fault+flt_offset));
     }
 #else
     //

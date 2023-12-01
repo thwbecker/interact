@@ -284,8 +284,6 @@ int solve(struct med *medium,struct flt *fault)
       */
       PetscCall(MatAssemblyBegin(medium->pA, MAT_FINAL_ASSEMBLY));
       PetscCall(MatAssemblyEnd(medium->pA, MAT_FINAL_ASSEMBLY));
-      HEADNODE
-	time_report("solve","parallel assembly done",medium);
      
       /* Convert MATDENSE to another format required by solver package */
       PetscCall(PetscOptionsGetString(NULL, NULL, "-mat_type", mattype, PETSC_HELPER_STR_LEN, &pset));
@@ -305,7 +303,10 @@ int solve(struct med *medium,struct flt *fault)
       PetscCall(VecAssemblyBegin(medium->pb));
       PetscCall(VecAssemblyEnd(medium->pb));
 
-      //PetscCall(VecView(medium->pb,PETSC_VIEWER_STDOUT_WORLD)); 
+      //PetscCall(VecView(medium->pb,PETSC_VIEWER_STDOUT_WORLD));
+      HEADNODE
+	time_report("solve","parallel assembly done",medium);
+
       /* 
 	 solver
       */
@@ -330,7 +331,7 @@ int solve(struct med *medium,struct flt *fault)
       PetscCall(VecScatterBegin(ctx,px,pxout,INSERT_VALUES,SCATTER_FORWARD));
       PetscCall(VecScatterEnd(ctx,px,pxout,INSERT_VALUES,SCATTER_FORWARD));
       /* assign to x solution vector */
-      if(medium->comm_rank == 0){
+      HEADNODE{
 	PetscCall(VecGetArray(pxout,&values));
 	for(i=0;i<m;i++)
 	  medium->xsol[i] = (A_MATRIX_PREC)values[i];
@@ -764,7 +765,7 @@ int par_assemble_a_matrix(int naflt,my_boolean *sma,int nreq,int *nameaf,
   my_boolean *assigned;
   PetscScalar amin,amax;
   
-  fprintf(stderr,"par_assemble_a_matrix: core %03i/%03i: assigning row %5i to %i\n",
+  fprintf(stderr,"par_assemble_a_matrix: core %03i/%03i: assigning row %5i to %5i\n",
 	  medium->comm_rank,medium->comm_size,medium->rs,medium->re);
 
 #endif

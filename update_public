@@ -1,0 +1,59 @@
+#!/bin/bash
+#
+# update public distribution of interact
+#
+ds=`date +"%m%d%y"`
+odir=$HOME/tmp.$$/
+pwd=`pwd`
+
+echo This file contains the help page that can be extracted > help.txt
+echo from the interact program by typing \"interact -h\". >> help.txt
+echo This man-page type document describes the main features, >> help.txt
+echo usage, and input as well as output formats of interact. >> help.txt
+echo >> help.txt
+echo For further assistance, refer to INSTALLATION and README.md >> help.txt
+echo >> help.txt
+echo >> help.txt
+interact -h 2>> help.txt
+
+mkdir $odir/
+mkdir $odir/interact/
+
+cp -r *.c *.F *.h help.txt COPYING COPYRIGHT INSTALLATION eispack slatec \
+    README.md  makefile* example.*.txt *.awk pstr* pfstr pdisp pfstress plotgr \
+	peventfile *.gpl fltdat2cquad pslip modifybb pgeom pgeom2d pstr pdisp \
+	$odir/interact/
+
+
+rm $odir/interact/*~ 2> /dev/null
+
+
+cd $odir/
+
+tar --verbose --create --gzip --file $pwd/interact.$ds.tgz interact/
+cd $pwd
+echo $0: produced interact.$ds.tgz
+
+
+
+
+rm -rf $odir/interact/
+rm -rf $odir/
+
+
+
+
+
+
+
+#wdir=$HOME/public_html/
+wdir=$HOME/dokumente/web_pages/
+
+cp interact.$ds.tgz $wdir/software/interact.$ds.tgz
+cd $wdir/software/
+ln -sf interact.$ds.tgz interact.latest.tgz
+cd -
+
+
+rm interact.$ds.tgz
+

@@ -274,7 +274,7 @@ subroutine TDdisp_HarFunc(X,Y,Z,P1,P2,P3,Ss,Ds,Ts,nu,ue,un,uv,&
   logical,intent(in) :: compute_ar
   C_PREC,dimension(3) :: vnorm,vdip,vstrike
        
-  C_PREC bx,by,bz,b_x,b_y,b_z,u3,v3,w3,u1,v1,w1,u2,v2,w2
+  C_PREC bx,by,bz,b_x,b_y,b_z,u3,v3,w3,u1,v1,w1,u2,v2,w2,area
   
   bx = Ts; ! Tensile-slip
   by = Ss; ! Strike-slip
@@ -283,7 +283,7 @@ subroutine TDdisp_HarFunc(X,Y,Z,P1,P2,P3,Ss,Ds,Ts,nu,ue,un,uv,&
   
   !print *,'Ar on input',Ar
   if(compute_ar)then            !compute locally, or reuse?
-     call get_tdcs_base_vectors(p1,p2,p3,vstrike,vdip,vnorm)
+     call get_tdcs_base_vectors(p1,p2,p3,vstrike,vdip,vnorm,area)
      
      ! Transform slip vector components from TDCS into EFCS
      call matrix_from_3vec(vnorm,vstrike,vdip,Ar)
@@ -485,8 +485,10 @@ SUBROUTINE Angdisdisp(x, y, z, alpha, bx, by, bz, nu, & ! inputs
   !eta = y*cosA-z*sinA;
   !zeta = y*sinA+z*cosA;
   !r = sqrt(x.^2+y.^2+z.^2);
-  cosA = COS(alpha)
-  sinA = SIN(alpha)
+  !cosA = COS(alpha)
+  !sinA = SIN(alpha)
+  call my_sincos_ftn(sinA,cosA,alpha)
+  
   eta =  y * cosA - z * sinA
   zeta = y * sinA + z * cosA
   xs = x**2
@@ -565,7 +567,7 @@ SUBROUTINE Angdisdispfsc(y1, y2, y3, beta, b1, b2, b3, nu, a, & ! inputs
        & v1cb1, v1cb2, v1cb3, v2cb1, v2cb2, v2cb3, v3cb1, v3cb2, v3cb3, &
        & y3b, z1b, z3b,y1s,cosBs
 
-  C_PREC :: N1, N2, N3,one_over_rb,N4,log_rbpy3b,log_rbpz3b,rbc,y2s,cotBs
+  C_PREC :: N1, N2, N3,one_over_rb,N4,log_rbpy3b,log_rbpz3b,rbc,y2s,cotBs,cotBh
 
   !sinB = sin(beta);
   !cosB = cos(beta);
@@ -575,11 +577,18 @@ SUBROUTINE Angdisdispfsc(y1, y2, y3, beta, b1, b2, b3, nu, a, & ! inputs
   !z3b = -y1*sinB+y3b*cosB;
   !r2b = y1.^2+y2.^2+y3b.^2;
   !rb = sqrt(r2b);
-  sinB = SIN(beta)
-  cosB = COS(beta)
+  !sinB = SIN(beta)
+  !cosB = COS(beta)
+  call my_sincos_ftn(sinB,cosB,beta)
+  
   cosBs = cosB**2
   
-  cotB = unity / TAN(beta)
+  cotB = cosB/sinB
+  !cotB = unity / TAN(beta)
+
+  !cot(beta/2)
+  cotBh = -sinB/(cosB-unity)
+  
   cotBs = cotB**2
   
   y3b = y3 + 2.0D0 * a
@@ -605,7 +614,10 @@ SUBROUTINE Angdisdispfsc(y1, y2, y3, beta, b1, b2, b3, nu, a, & ! inputs
 
   
   !Fib = 2*atan(-y2./(-(rb+y3b)*cot(beta/2)+y1)); % The Burgers' function
-  Fib = 2.0D0 * ATAN(-y2 / (-(rb + y3b) / TAN(beta / 2.0D0) + y1)) ! The Burgers' function
+
+  !Fib = 2.0D0 * ATAN(-y2 / (-(rb + y3b) * cotBh + y1)) ! The Burgers' function
+  Fib = 2.0D0 * ATAN2(-y2, -(rb + y3b) * cotBh + y1) ! The Burgers' function
+  
 
  
   v1cb1 = b1*one_over_four_pi/N1*(-N3*N2*Fib*cotBs+N2*y2/ &
@@ -724,12 +736,13 @@ subroutine setup_geometry(x,y,z,Ts,Ss,Ds,p1,p2,p3,bx,by,bz,&
   C_PREC,intent(out),dimension(3) :: p1_,p2_,p3_,e12,e13,e23
   C_PREC,dimension(3,3) :: At
   C_PREC,dimension(3) :: vnorm,vstrike,vdip
+  C_PREC :: area
   ! burgers vector
   bx = Ts; ! Tensile-slip
   by = Ss; ! Strike-slip
   bz = Ds; ! Dip-slip
   !print *,bx,by,bz
-  call get_tdcs_base_vectors(p1,p2,p3,vstrike,vdip,vnorm)
+  call get_tdcs_base_vectors(p1,p2,p3,vstrike,vdip,vnorm,area)
   
   ! Transform coordinates and slip vector components from EFCS into TDCS
 
@@ -759,7 +772,10 @@ subroutine setup_geometry(x,y,z,Ts,Ss,Ds,p1,p2,p3,bx,by,bz,&
   
 end subroutine setup_geometry
 
-subroutine get_tdcs_base_vectors(p1,p2,p3,vstrike,vdip,vnorm)
+!
+! also called from C
+!
+subroutine get_tdcs_base_vectors(p1,p2,p3,vstrike,vdip,vnorm,area)
   implicit none
   !
   ! Calculate unit strike, dip and normal to TD vectors: For a horizontal TD 
@@ -770,13 +786,17 @@ subroutine get_tdcs_base_vectors(p1,p2,p3,vstrike,vdip,vnorm)
 
   C_PREC,intent(in),dimension(3) :: p1,p2,p3
   C_PREC,intent(out),dimension(3) :: vstrike,vdip,vnorm
+  C_PREC,intent(out) :: area
   C_PREC, PARAMETER,dimension(3) :: &
        eY = (/ FORTRAN_ZERO, FORTRAN_UNITY, FORTRAN_ZERO /), &
        eZ = (/ FORTRAN_ZERO, FORTRAN_ZERO,  FORTRAN_UNITY /);
-  
-  call dcross(P2-P1,P3-P1,vnorm);
-  call normalize_vec(vnorm,vnorm)
-  
+  C_PREC :: len
+  ! g \cross h
+  call dcross(P2-P1,P3-P1,vnorm)
+  len = norm2(vnorm)
+  area = len/2.0d0
+  !call normalize_vec(vnorm,vnorm)
+  vnorm = vnorm/len
 
   call dcross(eZ,Vnorm,vstrike);
   if(norm2(Vstrike) == FORTRAN_ZERO )then

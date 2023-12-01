@@ -53,22 +53,14 @@ int main(int argc, char **argv)
       MEMERROR("main");
     fault[n+1].xt=(COMP_PRECISION *)malloc(sizeof(COMP_PRECISION)*9);
     if(!fault[n+1].xt)MEMERROR("main");
+    /*  */
     // init the triangular properties
-    calc_centroid_tri(fault[n].xt,fault[n].x);
-    //
-    // w will be the triangle area
-    get_alpha_dip_tri_gh(fault[n].xt,&fault[n].sin_alpha,&fault[n].cos_alpha ,&alpha_rad,&tmpdbl,&fault[n].area);
-    fault[n].dip = (float)RAD2DEGF(tmpdbl);
-    fault[n].strike = 90 - RAD2DEGF(alpha_rad);
+    get_tri_prop_based_on_gh((fault+n));
     fault[n].group=0;
     
     if(eltype == TRIANGULAR){
       // simply write triangular element type to stdout
       fault[n].type=TRIANGULAR;
-      /* in case */
-      fault[n].l = fault[n].w = sqrt(fault[n].area);
-      get_tdcs_base_vectors(&((fault+n)->xt[0]),&((fault+n)->xt[3]),&((fault+n)->xt[6]),
-			    (fault+n)->t_strike,(fault+n)->t_dip,(fault+n)->normal);
     }else{// convert to rectangular
       // L=W=sqrt(A/4)
       fault[n].l=sqrt(fault[n].w/4.0);

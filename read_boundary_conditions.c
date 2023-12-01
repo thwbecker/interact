@@ -257,19 +257,16 @@ void read_one_step_bc(FILE *in,struct med *medium,struct flt *fault,
 		      my_boolean init_system)
 {
   my_boolean *sma,sma_local[3],printevery,added_to_con,added_to_uncon,
-    tri_warned[3]={FALSE,FALSE,FALSE},
-    rotate_to_local=FALSE,
-    check_for_res_stress_output=TRUE,
+    check_for_res_stress_output=FALSE,
     use_dip,
     slip_bc_assigned=FALSE,
     stress_bc_assigned=FALSE;
-  int patch_nr,bc_code,n,inc,start_patch,stop_patch,i,j,i3,j3,nrflt3,patch_nr3;
-  COMP_PRECISION bc_value,bc_value_s,bc_value_d,*rhs,slip[3],
-    gstrike[3],gnormal[3],gdip[3],*fstress,*gfstress,
+  int patch_nr,bc_code,n,inc,start_patch,stop_patch,i,j,i3,nrflt3,patch_nr3;
+  COMP_PRECISION bc_value,*rhs,slip[3],
     sm[3][3],bstress[3],stress_drop;
-  COMP_PRECISION sin_global_dip_rad, cos_global_dip_rad;
-#ifdef ALLOW_NON_3DQUAD_GEOM
-  COMP_PRECISION lgstrike[3],lgdip[3],lgnormal[3],lgstress[3];
+#ifdef USE_PETSC
+  COMP_PRECISION *fstress,*gfstress;
+  int j3;
 #endif
   FILE *tmp_in,*rsout=NULL;
   if(medium->nr_flt_mode != 3){
@@ -448,21 +445,15 @@ void read_one_step_bc(FILE *in,struct med *medium,struct flt *fault,
 	fprintf(stderr,"read_boundary_conditions: const: %5i, patches %5i to %5i, bcode: %4i, value: %9.6f, %s\n",
 		n,start_patch,stop_patch,bc_code,bc_value,
 		comment_on_code_bc(bc_code,bc_value));
-#ifdef ALLOW_NON_3DQUAD_GEOM
       // check if we have triangular elements and prescribed slip
-      for(rotate_to_local=FALSE,i=start_patch;i <= stop_patch;i++){
+      for(i=start_patch;i <= stop_patch;i++){
 	if((i > medium->nrflt - 1)||(i<0)){
 	  HEADNODE
 	    fprintf(stderr,"read_boundary_conditions: error, trying to address patch %i out of %i total\n",
 		    i+1,medium->nrflt);
 	  exit(-1);
 	}
-	if(fault[i].type == TRIANGULAR){
-	  rotate_to_local = TRUE;
-	  break;
-	}
       }
-#endif    
     } else {			/* single patch assignment */
       printevery  = TRUE;
       start_patch = patch_nr;
@@ -474,14 +465,6 @@ void read_one_step_bc(FILE *in,struct med *medium,struct flt *fault,
 		  i+1,medium->nrflt);
 	exit(-1);
       }
-#ifdef ALLOW_NON_3DQUAD_GEOM
-      /* only for triangular elements do we have to rotate into
-	 a local cooridnate system */
-      if(fault[patch_nr].type == TRIANGULAR)
-	rotate_to_local = TRUE;
-      else
-	rotate_to_local = FALSE;	
-#endif      
     }
     // message for mixed BCs
     if((!slip_type_bc(bc_code)) && (slip_bc_assigned)){
@@ -516,28 +499,7 @@ void read_one_step_bc(FILE *in,struct med *medium,struct flt *fault,
 	  exit(-1);
 	}
       }
-#ifdef SUPER_DEBUG
-      if(fault[patch_nr].type == TRIANGULAR)
-	fprintf(stderr,"read_boundary_conditions: patch %05i BC: %2i val: %11g tri strike %g dip %g SMA %i %i %i\n",
-		patch_nr,bc_code,bc_value,fault[patch_nr].strike,fault[patch_nr].dip,sma[patch_nr*3+0],sma[patch_nr*3+1],sma[patch_nr*3+2]);
-      else
-	fprintf(stderr,"read_boundary_conditions: patch %05i BC: %2i val: %11g quad SMA %i %i %i\n",
-		patch_nr,bc_code,bc_value,sma[patch_nr*3+0],sma[patch_nr*3+1],sma[patch_nr*3+2]);
 #endif
-	
-      
-#endif
-      if(rotate_to_local){
-	//
-	// have to project to local coordinate system, this is the
-	// case for triangular elements
-	//
-	/* compute global projection vector here */
-	my_sincos(&sin_global_dip_rad,&cos_global_dip_rad,(COMP_PRECISION)DEG2RADF(fault[patch_nr].dip));
-	calc_quad_base_vecs(gstrike, gnormal, gdip,
-			    fault[patch_nr].sin_alpha, fault[patch_nr].cos_alpha,
-			    sin_global_dip_rad,   cos_global_dip_rad);
-      }
       if(patch_nr > (medium->nrflt - 1)){
 	HEADNODE
 	  fprintf(stderr,"read_boundary_conditions: file %s, line %i, fault number %i out of range (max nr flt: %i)\n",
@@ -562,8 +524,7 @@ void read_one_step_bc(FILE *in,struct med *medium,struct flt *fault,
 #endif
       case STRIKE:
       case NORMAL:{
-	if(!slip_bc_assigned)
-	  slip_bc_assigned = TRUE;
+	slip_bc_assigned = TRUE;
 	if(stress_bc_assigned){
 	  HEADNODE{
 	    fprintf(stderr,"read_boundary_conditions: error patch %i: slip BC assigned after stress BCs\n",
@@ -575,35 +536,14 @@ void read_one_step_bc(FILE *in,struct med *medium,struct flt *fault,
 	/* 
 	   and the slip contribution of this patch
 	*/
-	if(!rotate_to_local){
-	  //
-	  // simply assign the boundary condition value and mark it as a
-	  // quake, ie. add to fault's own slip and calculate the stress
-	  // effect on the slipping fault and all other faults
-	  //
-	  // initialize 3-D slip vectors and activation flags
-	  for(i=0;i < 3;i++)
+	//
+	// simply assign the boundary condition value and mark it as a
+	// quake, ie. add to fault's own slip and calculate the stress
+	// effect on the slipping fault and all other faults
+	//
+	// initialize 3-D slip vectors and activation flags
+	for(i=0;i < 3;i++)
 	    slip[i] = (i == bc_code)?(bc_value):(0.0);
-	}else{
-	 
-#ifdef SUPER_DEBUG
-	  fprintf(stderr,"read_boundary_conditions: rotating global strike into s/d %g/%g dip into s/d %g/%g (%g/%g)\n",
-		  project_vector(fault[patch_nr].t_strike,gstrike),project_vector(fault[patch_nr].t_dip,gstrike),
-		  project_vector(fault[patch_nr].t_strike,   gdip),project_vector(fault[patch_nr].t_dip,gdip),
-		  fault[patch_nr].strike,fault[patch_nr].dip);
-#endif
-	  if(bc_code == STRIKE){// global strike component
-	    slip[STRIKE] = project_vector(fault[patch_nr].t_strike,gstrike)*bc_value;
-	    slip[DIP]    = project_vector(fault[patch_nr].t_dip,   gstrike)*bc_value;
-	    slip[NORMAL] = 0.0;
-	  }else if(bc_code == DIP){// global dip component
-	    slip[STRIKE] = project_vector(fault[patch_nr].t_strike,gdip)*bc_value;
-	    slip[DIP]    = project_vector(fault[patch_nr].t_dip,   gdip)*bc_value;
-	    slip[NORMAL] = 0.0;
-	  }else{// global normal component is equal to the local normal
-	    slip[STRIKE] = slip[DIP] = 0.0;
-	    slip[NORMAL] = bc_value;
-	  }
 #ifdef DEBUG
 	  HEADNODE
 	    fprintf(stderr,"read_boundary_conditions:  patch %i (s: %g, d: %g) cum. rot. u: s:%g d:%g n:%g\n",
@@ -612,7 +552,7 @@ void read_one_step_bc(FILE *in,struct med *medium,struct flt *fault,
 		    fault[patch_nr].u[STRIKE],fault[patch_nr].u[DIP],
 		    fault[patch_nr].u[NORMAL]);
 #endif
-	} /* end rotate part */
+	}
 	for(i=0;i < 3;i++){	/* check if modes are active */
 	  if(fabs(slip[i]) > EPS_COMP_PREC) /* having local modes
 					     * allows adding stress
@@ -639,7 +579,7 @@ void read_one_step_bc(FILE *in,struct med *medium,struct flt *fault,
 		    n,start_patch,stop_patch,bc_code,bc_value,
 		    comment_on_code_bc(bc_code,bc_value));
 	break;
-      }	/* end displacement assignment */
+      	/* end displacement assignment */
 	/* 
 	   ________________________________________________________________________________
 	   
@@ -660,94 +600,29 @@ void read_one_step_bc(FILE *in,struct med *medium,struct flt *fault,
       case STRIKE_SLIP_LEFTLATERAL:
       case STRIKE_SLIP_RIGHTLATERAL:
       case STRIKE_SLIP:{
-	if(!stress_bc_assigned)
-	  stress_bc_assigned = TRUE;
+	stress_bc_assigned = TRUE;
 	if(sma[patch_nr3+STRIKE]){
 	  HEADNODE
 	    fprintf(stderr,"read_boundary_conditions: stress component %i on fault %i was already constrained\n",
 		    bc_code,patch_nr);
 	  exit(-1);
 	} 
-	if(!rotate_to_local){
-	  // assign right hand side and activate slipping mode
-	  //fprintf(stderr,"%g %g\n", bc_value , fault[patch_nr].s[STRIKE]);
-	  /* unclear why the fault would be pre-stressed? */
-	  rhs[patch_nr3+STRIKE] = bc_value - fault[patch_nr].s[STRIKE];
-	  sma[patch_nr3+STRIKE] = ACTIVATED;
-#ifdef SUPER_DEBUG
-	  HEADNODE
-	    fprintf(stderr,"read_boundary_conditions: patch: %5i s_strike bc: %12.4e background: %12.4e target: %12.4e\n",
-		    patch_nr,bc_value,fault[patch_nr].s[STRIKE],rhs[patch_nr3+STRIKE]);
-#endif
-	}else{
-	  /* 
-	     rotate prescribed global strike stress into local dip and
-	     strike - THIS WILL MAKE DIP ZERO if not specified
+	// assign right hand side and activate slipping mode
+	//fprintf(stderr,"%g %g\n", bc_value , fault[patch_nr].s[STRIKE]);
+	/* 
+	   the fault might have a pre-stress as per the -l option 
 
-	  */
-	  HEADNODE
-	    if(!tri_warned[0]){	/* this could be fixed with some
-				 * matrix multiplication to the
-				 * interaction matrix, worry about
-				 * that later */
-	      fprintf(stderr,"WARNING: prescribing shear  for triangular dislocation means dip stress will be zero\n");
-	      tri_warned[0] = TRUE;
-	    }
-	  bc_value_s = project_vector(fault[patch_nr].t_strike,gstrike) * bc_value;
-	  bc_value_d = project_vector(fault[patch_nr].t_dip,   gstrike) * bc_value;
-	  rhs[patch_nr3+STRIKE] = bc_value_s - fault[patch_nr].s[STRIKE];
-	  rhs[patch_nr3+DIP]    = bc_value_d - fault[patch_nr].s[DIP];
-	  sma[patch_nr3+STRIKE] = ACTIVATED;
-	  sma[patch_nr3+DIP] = ACTIVATED;
-
+	*/
+	rhs[patch_nr3+STRIKE] = bc_value - fault[patch_nr].s[STRIKE];
+	sma[patch_nr3+STRIKE] = ACTIVATED;
 #ifdef SUPER_DEBUG
-	  HEADNODE
-	    fprintf(stderr,"read_boundary_conditions: %5i resolving strike bc: %12.4e background: %12.4e/%12.4e target: %12.4e/%12.4e s/d %g %g\n",
-		    patch_nr,bc_value,fault[patch_nr].s[STRIKE],fault[patch_nr].s[DIP],
-		    rhs[patch_nr3+STRIKE],rhs[patch_nr3+DIP],
-		    fault[patch_nr].strike,fault[patch_nr].dip);
+	HEADNODE
+	  fprintf(stderr,"read_boundary_conditions: patch: %5i s_strike bc: %12.4e background: %12.4e target: %12.4e\n",
+		  patch_nr,bc_value,fault[patch_nr].s[STRIKE],rhs[patch_nr3+STRIKE]);
 #endif
-	}
 	//
 	// assign strike mode
 	fault[patch_nr].mode[STRIKE]=(MODE_TYPE)bc_code;
-	if(rotate_to_local){
-	  /* for rotate to local, a global strike mode will activate
-	     local strike and dip modes */
-	  if(!bc_is_directionally_unconstrained(fault[patch_nr].mode[STRIKE])){
-	    /* 
-	       prescibed direction, decide on the local strike and dip modes that can accommodate this motion
-	    */
-	    if((fault[patch_nr].mode[STRIKE] == COULOMB_STRIKE_SLIP_LEFTLATERAL)||(fault[patch_nr].mode[STRIKE] == COULOMB_STRIKE_SLIP_RIGHTLATERAL)){
-	      /* coulomb */
-	      if(rhs[patch_nr3+STRIKE]>0)
-		fault[patch_nr].mode[STRIKE] = COULOMB_STRIKE_SLIP_RIGHTLATERAL;
-	      else
-		fault[patch_nr].mode[STRIKE] = COULOMB_STRIKE_SLIP_LEFTLATERAL;
-	      if(rhs[patch_nr3+DIP]>0)
-	      	fault[patch_nr].mode[DIP] = COULOMB_DIP_SLIP_DOWNWARD;
-	      else
-	      	fault[patch_nr].mode[DIP] = COULOMB_DIP_SLIP_UPWARD;
-	    }else{
-	      /* only shear/dip */
-	      if(rhs[patch_nr3+STRIKE]>0)
-		fault[patch_nr].mode[STRIKE] = STRIKE_SLIP_RIGHTLATERAL;
-	      else
-		fault[patch_nr].mode[STRIKE] = STRIKE_SLIP_LEFTLATERAL;
-	      if(rhs[patch_nr3+DIP]>0)
-		fault[patch_nr].mode[DIP] = DIP_SLIP_DOWNWARD;
-	      else
-		fault[patch_nr].mode[DIP] = DIP_SLIP_UPWARD;
-	    }
-	  }else{		/* unconstrained */
-	    if(fault[patch_nr].mode[STRIKE] == COULOMB_STRIKE_SLIP) /* coulomb */
-	      fault[patch_nr].mode[DIP] = COULOMB_DIP_SLIP;
-	    else		/* only shear, switch on dip also */
-	      fault[patch_nr].mode[DIP] = DIP_SLIP;
-	  }
-	  //fprintf(stderr,"rtl: code %i unconstrained %i strike %i dip %i\n",bc_code,bc_is_directionally_unconstrained(bc_code),
-	  //fault[patch_nr].mode[STRIKE],fault[patch_nr].mode[DIP]);
-	}
 	if(bc_code > OS_C_OFFSET){// need to correct for normal stress changes
 	  if(fault[patch_nr].mu_s == 0.0){
 	    HEADNODE
@@ -758,12 +633,6 @@ void read_one_step_bc(FILE *in,struct med *medium,struct flt *fault,
 	    fault[patch_nr].cf[STRIKE]=  (COMP_PRECISION)fault[patch_nr].mu_d;
 	  else
 	    fault[patch_nr].cf[STRIKE]= -(COMP_PRECISION)fault[patch_nr].mu_d;
-	  if(rotate_to_local){	/* not sure about this one */
-	    if(rhs[patch_nr3+DIP]>0)
-	      fault[patch_nr].cf[DIP]=  (COMP_PRECISION)fault[patch_nr].mu_d;
-	    else
-	      fault[patch_nr].cf[DIP]= -(COMP_PRECISION)fault[patch_nr].mu_d;
-	  }
 	}
 	if(printevery)
 	  HEADNODE
@@ -777,8 +646,7 @@ void read_one_step_bc(FILE *in,struct med *medium,struct flt *fault,
       case DIP_SLIP_UPWARD:
       case DIP_SLIP_DOWNWARD:
       case DIP_SLIP:{
-	if(!stress_bc_assigned)
-	  stress_bc_assigned = TRUE;
+	stress_bc_assigned = TRUE;
 	if(sma[patch_nr3+DIP]){
 	  HEADNODE
 	    fprintf(stderr,"read_boundary_conditions: stress component %i on fault %i was already constrained\n",
@@ -792,76 +660,15 @@ void read_one_step_bc(FILE *in,struct med *medium,struct flt *fault,
 	  exit(-1);
 	}
 #endif
-	if(!rotate_to_local){
-	  // assign right hand side and activate slipping mode
-	  rhs[patch_nr3+DIP] = bc_value - fault[patch_nr].s[DIP];
-	  sma[patch_nr3+DIP] = ACTIVATED;
+	// assign right hand side and activate slipping mode
+	rhs[patch_nr3+DIP] = bc_value - fault[patch_nr].s[DIP];
+	sma[patch_nr3+DIP] = ACTIVATED;
 #ifdef SUPER_DEBUG
-	  HEADNODE
-	    fprintf(stderr,"read_boundary_conditions: patch: %5i s_dip    bc: %12.4e background: %12.4e target: %12.4e\n",
-		    patch_nr,bc_value,fault[patch_nr].s[DIP],rhs[patch_nr3+DIP]);
+	HEADNODE
+	  fprintf(stderr,"read_boundary_conditions: patch: %5i s_dip    bc: %12.4e background: %12.4e target: %12.4e\n",
+		  patch_nr,bc_value,fault[patch_nr].s[DIP],rhs[patch_nr3+DIP]);
 #endif
-	}else{
-	  HEADNODE
-	    if(!tri_warned[1]){	/* could be fixed with matrix
-				 * multiplicationm */
-	      fprintf(stderr,"WARNING: prescribing dip for triangular dislocation means strike shear stress will be zero\n");
-	      tri_warned[1] = TRUE;
-	    }
-
-	  /* 
-	     rotate dip slip into local this will make STRIKE ZERO if
-	     not specified
-	  
-	  */
-	  bc_value_s = project_vector(fault[patch_nr].t_strike,gdip) * bc_value;
-	  bc_value_d = project_vector(fault[patch_nr].t_dip,   gdip) * bc_value;
-	  rhs[patch_nr3+STRIKE] = bc_value_s - fault[patch_nr].s[STRIKE];
-	  rhs[patch_nr3+DIP] =    bc_value_d - fault[patch_nr].s[DIP];
-	  sma[patch_nr3+STRIKE] = ACTIVATED;
-	  sma[patch_nr3+DIP] = ACTIVATED;
-#ifdef SUPER_DEBUG
-	  HEADNODE
-	    fprintf(stderr,"read_boundary_conditions: %5i resolving dip bc: %12.4e background: %12.4e/%12.4e target: %12.4e/%12.4e\n",
-		    patch_nr,bc_value,fault[patch_nr].s[STRIKE],fault[patch_nr].s[DIP],rhs[patch_nr3+STRIKE],rhs[patch_nr3+DIP]);
-#endif
-	}
 	fault[patch_nr].mode[DIP]=(MODE_TYPE)bc_code;
-	if(rotate_to_local){
-	  /* for rotate to local, a global dip mode will activate
-	     local strike and dip modes */
-	  if(!bc_is_directionally_unconstrained(fault[patch_nr].mode[DIP])){
-	    /* 
-	       prescibed direction, decide on the local strike and dip modes that can accommodate this motion
-	    */
-	    if((fault[patch_nr].mode[DIP] == COULOMB_DIP_SLIP_DOWNWARD)||(fault[patch_nr].mode[DIP] == COULOMB_DIP_SLIP_UPWARD)){
-	      /* coulomb, redefine modes */
-	      if(rhs[patch_nr3+STRIKE] > 0)
-		fault[patch_nr].mode[STRIKE] = COULOMB_STRIKE_SLIP_RIGHTLATERAL;
-	      else
-		fault[patch_nr].mode[STRIKE] = COULOMB_STRIKE_SLIP_LEFTLATERAL;
-	     if(rhs[patch_nr3+DIP]>0)
-	       fault[patch_nr].mode[DIP] = COULOMB_DIP_SLIP_DOWNWARD;
-	      else
-		fault[patch_nr].mode[DIP] = COULOMB_DIP_SLIP_UPWARD;
-	    }else{
-	      /* only shear/dip */
-	      if(rhs[patch_nr3+STRIKE]>0)
-		fault[patch_nr].mode[STRIKE] = STRIKE_SLIP_RIGHTLATERAL;
-	      else
-		fault[patch_nr].mode[STRIKE] = STRIKE_SLIP_LEFTLATERAL;
-	      if(rhs[patch_nr3+DIP]>0)
-		fault[patch_nr].mode[DIP] = DIP_SLIP_DOWNWARD;
-	      else
-		fault[patch_nr].mode[DIP] = DIP_SLIP_UPWARD;
-	    }
-	  }else{		/* unconstrained */
-	    if(fault[patch_nr].mode[DIP] == COULOMB_DIP_SLIP) /* coulomb */
-	      fault[patch_nr].mode[STRIKE] = COULOMB_STRIKE_SLIP;
-	    else		/* only shear, switch on struke also */
-	      fault[patch_nr].mode[STRIKE] = STRIKE_SLIP;
-	  }
-	}			   /* end rotate to local */
 	//
 	if(bc_code > OS_C_OFFSET){// need to correct for normal stress changes
 	  if(fault[patch_nr].mu_s == 0.0){
@@ -873,14 +680,7 @@ void read_one_step_bc(FILE *in,struct med *medium,struct flt *fault,
 	    fault[patch_nr].cf[DIP]=  (COMP_PRECISION)fault[patch_nr].mu_d;
 	  else
 	    fault[patch_nr].cf[DIP]= -(COMP_PRECISION)fault[patch_nr].mu_d;
-	  if(rotate_to_local){	/* again not sure here */
-	    if(rhs[patch_nr3+STRIKE]>0)
-	      fault[patch_nr].cf[STRIKE]=  (COMP_PRECISION)fault[patch_nr].mu_d;
-	    else
-	      fault[patch_nr].cf[STRIKE]= -(COMP_PRECISION)fault[patch_nr].mu_d;
-	  }
 	}
-	
 	if(printevery)
 	  HEADNODE
 	    fprintf(stderr,"read_boundary_conditions: const: %5i, flts %5i to %5i, bcode: %4i, value: %9.6f, %s\n",
@@ -890,8 +690,7 @@ void read_one_step_bc(FILE *in,struct med *medium,struct flt *fault,
       case NORMAL_SLIP_OUTWARD:
       case NORMAL_SLIP_INWARD:
       case NORMAL_SLIP:{
-	if(!stress_bc_assigned)
-	  stress_bc_assigned = TRUE;
+	stress_bc_assigned = TRUE;
 #ifdef NO_OPENING_MODES
 	HEADNODE
 	  fprintf(stderr,"read_boundary_conditions: normal mode slipping not compiled in, how did we get this far?\n");
@@ -931,8 +730,7 @@ void read_one_step_bc(FILE *in,struct med *medium,struct flt *fault,
 	  (we adjust for rpeexisting stresses (from slip) at the end!)
 
 	*/
-	if(!stress_bc_assigned)
-	  stress_bc_assigned = TRUE;
+	stress_bc_assigned = TRUE;
 	
 	if(sma[patch_nr3+DIP]){
 	  HEADNODE
@@ -985,17 +783,7 @@ void read_one_step_bc(FILE *in,struct med *medium,struct flt *fault,
 	// for 2-D
 	//
 	if(bc_code == SHEAR_STRESS_FREE_STRIKE_ONLY){
-	  if(!rotate_to_local){
-	    use_dip = FALSE;	/* only strike slip motion */
-	  }
-	  else{
-	    HEADNODE
-	      if(!tri_warned[2]){
-		fprintf(stderr,"WARNING: activating dip for triangular dislocation even though strike only requested \n");
-		tri_warned[2] = TRUE;
-	      }
-	    use_dip = TRUE;	/* will activate dip */
-	  }
+	  use_dip = FALSE;	/* only strike slip motion */
 	}else{
 #ifdef ALLOW_NON_3DQUAD_GEOM
 	  if(patch_is_2d(fault[patch_nr].type))
@@ -1069,20 +857,7 @@ void read_one_step_bc(FILE *in,struct med *medium,struct flt *fault,
 	  if(check_for_res_stress_output){
 	    /* local stress projection */
 	    if(rsout)
-	      fprintf(rsout,"%05i %12.5e %12.5e %12.5e ",patch_nr,bstress[STRIKE],bstress[DIP],bstress[NORMAL]);
-#ifdef ALLOW_NON_3DQUAD_GEOM
-	    if(fault[patch_nr].type == TRIANGULAR){
-	      /* add global if patch is triangular */
-	      calc_global_strike_dip_from_local((fault+patch_nr),lgstrike, lgnormal, lgdip);
-	      calc_three_stress_components(sm,lgnormal,lgstrike,lgdip,lgnormal,(lgstress+STRIKE),(lgstress+DIP),(lgstress+NORMAL));
-	      //fprintf(stderr,"sl %11g %11g %11g\tsg %11g %11g %11g\t",lgstrike[0],lgstrike[1],lgstrike[2],fault[patch_nr].t_strike[0],fault[patch_nr].t_strike[1],fault[patch_nr].t_strike[2]);
-	      //fprintf(stderr,"dl %11g %11g %11g\tdg %11g %11g %11g\t%11g %11g\n",lgdip[0],lgdip[1],lgdip[2],fault[patch_nr].t_dip[0],fault[patch_nr].t_dip[1],fault[patch_nr].t_dip[2],fault[patch_nr].strike,fault[patch_nr].dip);
-	      if(rsout)
-		fprintf(rsout,"%12.5e %12.5e %12.5e",lgstress[STRIKE],lgstress[DIP],lgstress[NORMAL]);
-	    }
-#endif
-	    if(rsout)
-	      fprintf(rsout,"\n");
+	      fprintf(rsout,"%05i %12.5e %12.5e %12.5e\n",patch_nr,bstress[STRIKE],bstress[DIP],bstress[NORMAL]);
 	  }
 	} /* headode part */
 	break;

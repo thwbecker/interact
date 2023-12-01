@@ -122,14 +122,7 @@ COMP_PRECISION tensor3d_norm(COMP_PRECISION x[3][3])
   return((COMP_PRECISION)sqrt(sum));
     
 }
-/* 
-   project a vector by doing the dot product 
-*/
-COMP_PRECISION project_vector(COMP_PRECISION *vector,
-			      COMP_PRECISION *test)
-{
-  return dotp_3d(vector,test);
-}
+
 /* 
    Euclidian norm of vector difference in 3D
 */

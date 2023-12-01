@@ -85,7 +85,7 @@ void phelp(void)
   PE("    - triangular in half-space:");
   PE("      If BOTH fault half-width and length are negative, then the patch is a triangular element.");
   PE("      In this case, x, y, z, have no meaning but will be reassigned from the centroid.");
-  PE("      strike and dip are global projection directions, and length and width will be sqrt(area) subsequently.");
+  PE("      strike and dip will also be recomputed from element local g and h vectors, and length and width will be sqrt(area) subsequently.");
   PE("      The next nine numbers in the input geometry line will be the coordinates of the three nodes of the");
   PE("      triangle, however. FE-style counterclockwise numbering, input is then in the format:\n");
   PE("      999 999 999 999 999 -1 -1 group_0 x_x^1 x_y^1 x_z^1 x_x^2 x_y^2 x_z^2 x_x^3 x_y^3 x_z^3\n");
@@ -193,8 +193,7 @@ void phelp(void)
   PE("");
   fprintf(stderr,"     If the patches for which boundary conditions are specified are triangular,\n");
   PE("     then the strike and dip specified in the geometry input will define global directions");
-  PE("     the prescribed slipor stress values refer. The slip boundary conditions will then be converted to the triangle local");
-  PE("     reference frame internally, and converted back to the global frame on output for fault properties.");
+  PE("     the prescribed slip or stress values refer.");
 #endif
   PE("");
   PE("     The patch_number ... boundary_value line can be repeated as often as necessary (say, twice for each fault");
@@ -218,9 +217,6 @@ void phelp(void)
   PE("    \tthis corresponds to a resulting drop resp. increase in the dip component of stress.");
   PE("    For normal: positive values of slip mean explosive source, negative implosive;");
   PE("    \tthis corresponds to a resulting drop resp. increase in the normal component of stress.\n");
-#ifdef ALLOW_NON_3DQUAD_GEOM
-  PE("    For triangles, these are all referring to the global frame specified.");
-#endif
   PE("");
   fprintf(stderr,"   (B) %i, %i, %i or %i, %i, %i or %i, %i, %i: stresses are specified\n",
 	  STRIKE_SLIP,STRIKE_SLIP_LEFTLATERAL,STRIKE_SLIP_RIGHTLATERAL,
@@ -482,7 +478,7 @@ void phelp(void)
 	  name_boolean(SUPPRESS_INTERACTIONS_DEF),name_boolean(TOGV(SUPPRESS_INTERACTIONS_DEF)));
   
   PE("");
-  PE(" -ni suppress all interactions between faults except the interactions of fault patches");
+  PE(" -ni suppress all interactions between faults except the interactions of patches within the fault group");
   PE("");
   PE(" -ct use constant time steps for the loading simulation");
   fprintf(stderr,"     %s by default, if switch is set will be %s.\n",
@@ -652,6 +648,7 @@ void phelp(void)
 	  name_boolean(TOGV(PRINT_PLANE_COORD_DEF)),
 	  name_boolean(PRINT_PLANE_COORD_DEF));
   PE("");
+
   PE(" -sv uses SVD solver for the unconstrained A x = b system.");
   PE("     This approach should reliably find the least-squares minimum norm solution");
   PE("     if the A matrix is singular.");

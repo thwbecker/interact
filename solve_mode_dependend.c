@@ -119,21 +119,21 @@ void assemble_ap_matrix_4(A_MATRIX_PREC *a,int naflt,int naflt_con,
 	      }
 #endif
 #ifdef COMP_MODE_1
-	      *(a+eqc2m+eqc1) = (A_MATRIX_PREC)
+	      a[eqc2m+eqc1] = (A_MATRIX_PREC)
 		ICIM(medium->i,namef1tmp,namef2tmp,l,j);
 	      if(cf != 0.0)
-		*(a+eqc2m+eqc1) += (A_MATRIX_PREC)
+		a[eqc2m+eqc1] += (A_MATRIX_PREC)
 		  ICIM(medium->i,namef1tmp,namef2tmp,l,NORMAL) * cf;
 #elif defined COMP_MODE_2
-	      *(a+eqc2m+eqc1) = (A_MATRIX_PREC)
+	      a[eqc2m+eqc1] = (A_MATRIX_PREC)
 		ic_from_file(namef1tmp,namef2tmp,l,j,medium);
 	      if(cf != 0.0){
 		itmp=(A_MATRIX_PREC)ic_from_file(namef1tmp,namef2tmp,l,NORMAL,medium);
-		*(a+eqc2m+eqc1) +=  (A_MATRIX_PREC) itmp * cf;
+		a[eqc2m+eqc1] +=  (A_MATRIX_PREC) itmp * cf;
 	      }
 #elif defined COMP_MODE_3
 	      // need to calculate interaction coefficient right here
-	      *(a+eqc2m+eqc1) = (A_MATRIX_PREC)
+	      a[eqc2m+eqc1] = (A_MATRIX_PREC)
 		interaction_coefficient(namef1tmp,namef2tmp,l,j,fault,&iret);
 	      if(cf != 0.0){
 		itmp=(A_MATRIX_PREC)interaction_coefficient(namef1tmp,namef2tmp,l,
@@ -143,29 +143,29 @@ void assemble_ap_matrix_4(A_MATRIX_PREC *a,int naflt,int naflt_con,
 			  (int)namef1tmp,(int)namef2tmp,(int)l,(int)j);
 		  itmp=0.0;
 		}
-		*(a+eqc2m+eqc1) +=  (A_MATRIX_PREC) itmp * cf;
+		a[eqc2m+eqc1] +=  (A_MATRIX_PREC) itmp * cf;
 	      }
 #else
 	      // have I matrix in numerical recipes sparse matrix 
 	      // storage
-	      *(a+eqc2m+eqc1) = (A_MATRIX_PREC)
+	      a[eqc2m+eqc1] = (A_MATRIX_PREC)
 		get_nrs_sparse_el(POSII(namef2tmp,l),POSIJ(namef1tmp,j),
 				  medium->is1,medium->val);
 	      if(cf != 0.0){
 		itmp=(A_MATRIX_PREC)
 		  get_nrs_sparse_el(POSII(namef2tmp,l),POSIJ(namef1tmp,NORMAL),
 				    medium->is1,medium->val);
-		*(a+eqc2m+eqc1) +=  (A_MATRIX_PREC) itmp * cf;
+		a[eqc2m+eqc1] +=  (A_MATRIX_PREC) itmp * cf;
 	      }
 #endif
 	      /* reset to zero if there are no interactions between
 		 faults wanted */
 	      if(medium->no_interactions)
 		if(fault[i].group != fault[k].group)
-		  *(a+eqc2m+eqc1) = 0.0;
+		  a[eqc2m+eqc1] = 0.0;
 #ifdef SUPER_DEBUG
 	      fprintf(stderr,"assemble_ap_matrix: i:%3i j:%i(%i) %e\n",
-		      (int)eqc2,(int)eqc1,(int)m,*(a+eqc2m+eqc1));
+		      (int)eqc2,(int)eqc1,(int)m,a[eqc2m+eqc1]);
 #endif
 	      eqc2++;
 	      eqc2m += m;
@@ -238,24 +238,24 @@ void assemble_a_matrix_4(A_MATRIX_PREC *a,int naflt,
 #endif
 #ifdef COMP_MODE_1
 	      // have I matrix in memory
-	      *(a+eqc2nreq+eqc1) = (A_MATRIX_PREC)
+	      a[eqc2nreq+eqc1] = (A_MATRIX_PREC)
 		ICIM(medium->i,nameaf[i],nameaf[k],l,j);
 	      if(cf != 0.0)
-		*(a+eqc2nreq+eqc1) += (A_MATRIX_PREC)
+		a[eqc2nreq+eqc1] += (A_MATRIX_PREC)
 		  ICIM(medium->i,nameaf[i],nameaf[k],l,NORMAL) * cf;
 #elif defined COMP_MODE_2
 	      // need to read it from file
-	      *(a+eqc2nreq+eqc1) = (A_MATRIX_PREC)
+	      a[eqc2nreq+eqc1] = (A_MATRIX_PREC)
 		ic_from_file(nameaf[i],nameaf[k],l,j,medium);
 	      if(cf != 0.0){// correct 
 		itmp=(A_MATRIX_PREC)ic_from_file(nameaf[i],nameaf[k],l,NORMAL,medium);
-		*(a+eqc2nreq+eqc1) +=  (A_MATRIX_PREC) itmp * cf;
+		a[eqc2nreq+eqc1] +=  (A_MATRIX_PREC) itmp * cf;
 	      }
 #elif defined COMP_MODE_3
 	      //
 	      // calculate interaction coefficients right now
 	      //
-	      *(a+eqc2nreq+eqc1) = (A_MATRIX_PREC)
+	      a[eqc2nreq+eqc1] = (A_MATRIX_PREC)
 		interaction_coefficient(nameaf[i],nameaf[k],l,j,fault,&iret);
 	       if(cf != 0.0){	/* coulomb addition */
 		 itmp=(A_MATRIX_PREC)interaction_coefficient(nameaf[i],nameaf[k],l,NORMAL,fault,&iret);
@@ -264,29 +264,29 @@ void assemble_a_matrix_4(A_MATRIX_PREC *a,int naflt,
 			   nameaf[i],nameaf[k],(int)l,(int)j);
 		   itmp=0.0;
 		 }
-		 *(a+eqc2nreq+eqc1) +=  (A_MATRIX_PREC) itmp * cf;
+		 a[eqc2nreq+eqc1] +=  (A_MATRIX_PREC) itmp * cf;
 	       }
 	       if(medium->debug)
 		 if((i < 15)&&(j<15))
 		   fprintf(stderr,"assemble_a_matrix_3: f1 %3i f2 %3i i1 %i i2 %i %12.3e\n",
-			   (int)i,(int)k,(int)j,(int)l,*(a+eqc2nreq+eqc1));
+			   (int)i,(int)k,(int)j,(int)l,a[eqc2nreq+eqc1]);
 	       
 #else
 	      // have I matrix in numerical recipes 
 	      // sparse matrix storage
-	      *(a+eqc2nreq+eqc1) = (A_MATRIX_PREC)
+	      a[eqc2nreq+eqc1] = (A_MATRIX_PREC)
 		get_nrs_sparse_el(POSII(nameaf[k],l),POSIJ(nameaf[i],j),
 				  medium->is1,medium->val);
 	      if(cf != 0.0){
 		itmp=(A_MATRIX_PREC)get_nrs_sparse_el(POSII(nameaf[k],l),
 						      POSIJ(nameaf[i],NORMAL),
 						      medium->is1,medium->val);
-		*(a+eqc2nreq+eqc1) +=  (A_MATRIX_PREC) itmp * cf;
+		a[eqc2nreq+eqc1] +=  (A_MATRIX_PREC) itmp * cf;
 	      }
 #endif
 	      if(medium->no_interactions)
 		if(fault[i].group != fault[k].group)
-		  *(a+eqc2nreq+eqc1) = 0.0;
+		  a[eqc2nreq+eqc1] = 0.0;
 	      eqc2++;
 	      eqc2nreq += nreq;
 	    }
@@ -314,6 +314,7 @@ void assemble_a_matrix_4(A_MATRIX_PREC *a,int naflt,
 
 */
 
+//#define SUPER_DUPER_DEBUG
 #ifdef COMP_MODE_1
 void add_quake_stress_1(my_boolean *sma,COMP_PRECISION *slip,
 			int r_flt,struct flt *fault,

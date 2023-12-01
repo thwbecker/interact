@@ -200,11 +200,11 @@ void calc_interaction_matrix(struct med *medium,struct flt *fault,
 	    */
 	    resolve_force(fault[i].normal,sm,trac);
 	    s[STRIKE]=(I_MATRIX_PREC)
-	      project_vector(trac,fault[i].t_strike);
+	      dotp_3d(trac,fault[i].t_strike);
 	    s[DIP]=(I_MATRIX_PREC)
-	      project_vector(trac,fault[i].t_dip);
+	      dotp_3d(trac,fault[i].t_dip);
 	    s[NORMAL]=(I_MATRIX_PREC)
-	      project_vector(trac,fault[i].normal);
+	      dotp_3d(trac,fault[i].normal);
 	  }
 	  /* 
 	     determine absolute maximum and add for mean
@@ -449,15 +449,15 @@ COMP_PRECISION interaction_coefficient(int i, int j, int k, int l,
   if(! *iret){// project if not singular
     switch(l){
     case STRIKE:{
-      fac=  project_vector(trac,fault[i].t_strike);
+      fac=  dotp_3d(trac,fault[i].t_strike);
       break;
     }
     case DIP:{
-      fac=  project_vector(trac,fault[i].t_dip);
+      fac=  dotp_3d(trac,fault[i].t_dip);
       break;
     }
     case NORMAL:{
-      fac=  project_vector(trac,fault[i].normal);
+      fac=  dotp_3d(trac,fault[i].normal);
       break;
     }
     default:{

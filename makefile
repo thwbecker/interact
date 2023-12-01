@@ -98,7 +98,8 @@ MY_PRECISION = -DUSE_DOUBLE_PRECISION
 #MY_PRECISION = 			#single
 
 #COMMON_DEFINES =  -DBINARY_PATCH_EVENT_FILE -DCHECK_CI_ONE_WAY -DNO_OPENING_MODES
-COMMON_DEFINES =  -DBINARY_PATCH_EVENT_FILE -DCHECK_CI_ONE_WAY  -DALLOW_NON_3DQUAD_GEOM  
+COMMON_DEFINES =  -DBINARY_PATCH_EVENT_FILE -DCHECK_CI_ONE_WAY  \
+	-DALLOW_NON_3DQUAD_GEOM  
 #
 # noise level for random interact version. this version 
 # doesn't get compiled automatically.
@@ -121,6 +122,7 @@ OKROUTINE = $(ODIR)/dc3d.o	# my modified version
 # include the machine dependent flags
 # 
 include makefile.gcc
+#include makefile.mixed
 #include makefile.icc
 #
 # add this for pgplot support, otherwise comment it out
@@ -286,7 +288,7 @@ TOBJ = $(ODIR)/test_stuff.o $(INTERACT_OBJS)
 #
 GEN_P_INC = interact.h precision_single.h precision_double.h \
 	structures.h macros.h auto_proto.h auto_proto.sgl.h fortran_proto.h \
-	filenames.h properties.h blockinvert.h
+	filenames.h properties.h blockinvert.h constants.h
 
 LIBLIST = $(ODIR)/libpatchio.a $(ODIR)/libinput.a $(EISPACK_DIR)/libmyeis.a
 
@@ -845,7 +847,7 @@ $(ODIR)/%.o:	%.F $(GEN_P_INC)
 	$(F77) $(FFLAGS) $(MY_PRECISION) -c $<  -o $(ODIR)/$*.o
 
 $(ODIR)/%.o:	%.f90 $(GEN_P_INC)
-	$(F90) $(F90FLAGS) $(MY_PRECISION) -c $<  -o $(ODIR)/$*.o
+	$(F90)   $(F90FLAGS) $(MY_PRECISION) -c $<  -o $(ODIR)/$*.o
 
 # single prec versions
 $(ODIR)/%.sgl.o:	%.c $(GEN_P_INC)
@@ -858,4 +860,4 @@ $(ODIR)/%.sgl.o:	%.F $(GEN_P_INC)
 	$(F77) $(FFLAGS) -c $<  -o $(ODIR)/$*.sgl.o
 
 $(ODIR)/%.sgl.o:	%.f90 $(GEN_P_INC)
-	$(F90) $(F90FLAGS) -c $<  -o $(ODIR)/$*.sgl.o
+	$(F90)  $(F90FLAGS) -c $<  -o $(ODIR)/$*.sgl.o

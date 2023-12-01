@@ -110,7 +110,7 @@ don't expect anything to work....
  #define FLT_MIN 1.17549435E-38F
 #endif
 
-
+#define STRLEN 200
 //
 #ifdef USE_PGPLOT
 // 
@@ -125,7 +125,9 @@ don't expect anything to work....
 #ifdef SGI_SUBROUTINE_CONVENTION
 #include "fortran_underscore_defines.h"
 #endif
-// function definitions and real constants 
+/*  */
+#include "constants.h"
+// function definitions
 #include "macros.h"
 // filenames
 #include "filenames.h"

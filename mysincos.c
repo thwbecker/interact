@@ -24,8 +24,8 @@ void my_sincos_deg(COMP_PRECISION *sin_val,COMP_PRECISION *cos_val,
 
 
 // fortran version
-void my_sincos_deg_ftn(double *sin_val,double *cos_val,
-		       double *alpha_in_degrees)
+void my_sincos_deg_ftnd(double *sin_val,double *cos_val,
+			double *alpha_in_degrees)
 {
   double tmp;
   tmp = *alpha_in_degrees * DEG2RAD;
@@ -34,6 +34,17 @@ void my_sincos_deg_ftn(double *sin_val,double *cos_val,
   *cos_val = cos(tmp);
 #else
   sincos(tmp,sin_val,cos_val);
+#endif
+}
+
+void my_sincos_ftn(COMP_PRECISION *sin_val,COMP_PRECISION *cos_val,
+		   COMP_PRECISION *alpha)
+{
+#if !defined(SUN_TRIG_FUNCTIONS) 
+  *sin_val = sin(*alpha);
+  *cos_val = cos(*alpha);
+#else
+  sincos(*alpha,sin_val,cos_val);
 #endif
 }
 

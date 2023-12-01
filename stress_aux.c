@@ -121,7 +121,7 @@ COMP_PRECISION resolved_stress(COMP_PRECISION *norm,COMP_PRECISION sm[3][3],
 {
   COMP_PRECISION trac[3];
   resolve_force(norm,sm,trac);
-  return(project_vector(trac,tang));
+  return(dotp_3d(trac,tang));
 }
 /* 
    - calculates the traction vector on a given plane as
@@ -146,7 +146,7 @@ void calc_three_stress_components(COMP_PRECISION sm[3][3],
 {
   COMP_PRECISION trac[3];
   resolve_force(normal_vec,sm,trac);
-  *s1 = project_vector(trac,vec1);
-  *s2 = project_vector(trac,vec2);
-  *s3 = project_vector(trac,vec3);
+  *s1 = dotp_3d(trac,vec1);
+  *s2 = dotp_3d(trac,vec2);
+  *s3 = dotp_3d(trac,vec3);
 }

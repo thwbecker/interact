@@ -261,7 +261,7 @@ subroutine TDstress_HarFunc(X,Y,Z,P1,P2,P3,Ss,Ds,Ts,stress,strain,compute_ar,ar)
   C_PREC,intent(out),dimension(6) :: stress,strain
   C_PREC,dimension(6) :: stress1,strain1,stress2,strain2,stress3,strain3
   C_PREC,dimension(3) :: vstrike,vnorm,vdip
-  C_PREC bx,by,bz,bx_,by_,bz_
+  C_PREC bx,by,bz,bx_,by_,bz_,area
   ! TDstress_HarFunc calculates the harmonic function contribution to the
   ! strains and stresses associated with a triangular dislocation in a 
   ! half-space. The function cancels the surface normal tractions induced by 
@@ -272,7 +272,7 @@ subroutine TDstress_HarFunc(X,Y,Z,P1,P2,P3,Ss,Ds,Ts,stress,strain,compute_ar,ar)
   bz = Ds; ! Dip-slip
 
   if(compute_ar)then            !compute locally, or reuse?
-     call get_tdcs_base_vectors(p1,p2,p3,vstrike,vdip,vnorm)
+     call get_tdcs_base_vectors(p1,p2,p3,vstrike,vdip,vnorm,area)
 
      ! Transform slip vector components from TDCS into EFCS
      call matrix_from_3vec(Vnorm, Vstrike, Vdip,Ar)
@@ -483,8 +483,10 @@ subroutine AngDisStrain(x,y,z,alpha,bx,by,bz,nu,Exx,Eyy,Ezz,Exy,Exz,Eyz)
   C_PREC, PARAMETER :: pi = 3.14159265358979D0, unity = FORTRAN_UNITY,&
        P4 = unity/(4.0d0*pi), P8 = P4/2.0d0
 
-  sinA = sin(alpha);
-  cosA = cos(alpha);
+  !sinA = sin(alpha);
+  !cosA = cos(alpha);
+  call my_sincos_ftn(sinA,cosA,alpha)
+  
   eta = y*cosA-z*sinA;
   zeta = y*sinA+z*cosA;
 
@@ -596,11 +598,15 @@ subroutine AngDisStrainFSC(y1,y2,y3,beta,b1,b2,b3,nu,a,v11,v22,v33,v12,v13,v23)
 
   oopin4 = unity/(pi*N4)
   
-  sinB = sin(beta);
-  cosB = cos(beta);
+  !sinB = sin(beta);
+  !cosB = cos(beta);
+  call my_sincos_ftn(sinB,cosB,beta)
+
   cosBs = cosB**2
   
-  cotB = unity / TAN(beta)
+  !cotB = unity / TAN(beta)
+  cotB = cosB/sinB
+  
   cotBs = cotB**2
 
   cosBtcotB = cosB*cotB
@@ -630,8 +636,6 @@ subroutine AngDisStrainFSC(y1,y2,y3,beta,b1,b2,b3,nu,a,v11,v22,v33,v12,v13,v23)
   one_over_rb   = unity/rb
   one_over_rb2  = unity/rb2
   one_over_rbp3 = unity/rbc
-  
- 
   
   W1 = rb*cosB+y3b;
   W2 = cosB+a/rb;

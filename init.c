@@ -53,7 +53,8 @@ void check_parameters_and_init(int argc, char **argv,
 		  &suppress_nan_output,&pressure,
 		  &twod_approx_is_plane_stress,&print_plane_coord,
 		  &half_plane,&variable_time_step,&debug,&wcutoff,
-		  &no_interactions,&force_petsc,(*medium)->comm_rank);
+		  &no_interactions,&force_petsc,
+		  (*medium)->comm_rank);
   // load files, etc
   initialize(medium,fault,read_fault_properties,max_nr_flt_files,
 	     suppress_interactions,whole_fault_mode,med_cohesion,a,b,
