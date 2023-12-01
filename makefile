@@ -672,18 +672,17 @@ auto_proto.h:
 	touch auto_proto.h;\
 	cproto  $(DEFINE_FLAGS)  $(GEOPROJECT_INCLUDES) \
 		$(PGPLOT_DEFINES) $(PGPLOT_INCLUDES) $(MY_PRECISION) \
-		$(SLATEC_INCLUDES)  $(SUPERLU_INCLUDES)  -f2 -q \
-		`ls *.c | grep -v solve_mode_dependent.c | grep -v geoproject.c `  | \
-		grep -v "void main("  | grep -v "int main(" > tmp.h;\
-	mv tmp.h auto_proto.h
+		$(SLATEC_INCLUDES)  $(SUPERLU_INCLUDES)  -f2 -q *.c 2> /dev/null | grep -v "void main("  | grep -v "int main(" > tmp.h; \
+		mv tmp.h auto_proto.h
+
+
 
 auto_proto.sgl.h: 
 	rm -f auto_proto.sgl.h 2> /dev/null;\
 	touch auto_proto.sgl.h;\
 	cproto  $(DEFINE_FLAGS)  $(GEOPROJECT_INCLUDES) \
 		$(PGPLOT_DEFINES) $(PGPLOT_INCLUDES)  \
-		$(SLATEC_INCLUDES)  $(SUPERLU_INCLUDES)  -f2 -q \
-		`ls *.c | grep -v solve_mode_dependent.c | grep -v geoproject.c `  | \
+		$(SLATEC_INCLUDES)  $(SUPERLU_INCLUDES)  -f2 -q *.c 2> /dev/null  | \
 		grep -v "void main("  | grep -v "int main(" > tmp.h;\
 	mv tmp.h auto_proto.sgl.h
 

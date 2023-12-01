@@ -12,7 +12,7 @@
 #                  will read from file. This is so slow, it's next to impossible to work.
 #
 MACHINE_DEFINES = -DIMAT_SPARSE_LIM=8000.0 -DIMAT_SIZE_LIM=4000.1  \
-	-DSGI_SUBROUTINE_CONVENTION -DSUN_TRIG_FUNCTIONS -Wno-discarded-qualifiers
+	-DSGI_SUBROUTINE_CONVENTION  -Wno-discarded-qualifiers
 #
 # LINUX system dependent flags for gcc
 #

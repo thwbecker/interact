@@ -29,23 +29,13 @@ void my_sincos_deg_ftnd(double *sin_val,double *cos_val,
 {
   double tmp;
   tmp = *alpha_in_degrees * DEG2RAD;
-#if !defined(SUN_TRIG_FUNCTIONS) 
-  *sin_val = sin(tmp);
-  *cos_val = cos(tmp);
-#else
   sincos(tmp,sin_val,cos_val);
-#endif
 }
 
 void my_sincos_ftn(COMP_PRECISION *sin_val,COMP_PRECISION *cos_val,
 		   COMP_PRECISION *alpha)
 {
-#if !defined(SUN_TRIG_FUNCTIONS) 
-  *sin_val = sin(*alpha);
-  *cos_val = cos(*alpha);
-#else
   sincos(*alpha,sin_val,cos_val);
-#endif
 }
 
 
@@ -53,10 +43,6 @@ void my_sincos(COMP_PRECISION *sin_val,
 	       COMP_PRECISION *cos_val,
 	       COMP_PRECISION arad)
 {
-#if !defined(SUN_TRIG_FUNCTIONS) 
-  *sin_val = sin(arad);
-  *cos_val = cos(arad);
-#else
 #if defined(USE_DOUBLE_PRECISION)
   sincos(arad,sin_val,cos_val);
 #else
@@ -73,12 +59,7 @@ void my_sincosd(double *sin_val,
 		double *cos_val,
 	        double arad)
 {
-#if !defined(SUN_TRIG_FUNCTIONS) 
-  *sin_val = sin(arad);
-  *cos_val = cos(arad);
-#else
   sincos(arad,sin_val,cos_val);
-#endif
 }
 
 

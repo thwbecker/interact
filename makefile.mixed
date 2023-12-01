@@ -1,0 +1,71 @@
+#
+# LINUX system dependent flags
+#
+
+# LINUX system dependent flags for gcc and intel fortran
+#
+#
+MACHINE_DEFINES = -DIMAT_SPARSE_LIM=8000.0 -DIMAT_SIZE_LIM=4000.1  -I/usr/lib/x86_64-linux-gnu/openmpi/include/  \
+	-DSGI_SUBROUTINE_CONVENTION  -Wno-discarded-qualifiers
+# compilers
+CC = /opt/intel/oneapi/mpi/latest/bin/mpicc
+MPICC = /opt/intel/oneapi/mpi/latest/bin/mpicc
+#F77 = /disk/rh_usr_local/intel/oneapi/compiler/latest/linux/bin/intel64/ifort
+F77 =/opt/intel/oneapi/mpi/latest/bin/mpif90
+F90 = $(F77)
+LD = $(F77)
+MPILD = /opt/intel/oneapi/mpi/latest/bin/mpif90
+AR = ar
+# set the compiler flag for library directories
+# usually -L, could be -Wl,-L as for HPUX
+MY_LIBDIR_SPEC = -L
+
+
+USE_IPO = 
+
+# LINKER FLAGS (without -lm, that get's added later)
+# gcc
+LDFLAGS =  -L/opt/intel/oneapi/mpi/latest/lib/
+
+# X 11 only needed for PGPLOT
+X11LIBDIR = /usr/lib/x86_64-linux-gnu/
+#
+MATHLIB = -lm
+#
+# warning options
+GCCWOPT = -Wall 
+#-Werror
+
+
+# fast execution options, comment those two lines if debug output is wanted
+SCARGS = -Ofast  -I/usr/lib/x86_64-linux-gnu/openmpi/include/ $(GCCWOPT)
+DEBUG_FLAGS=
+
+
+#
+# fortran flags
+#
+SFARGS = -I/usr/lib/x86_64-linux-gnu/openmpi/include/ -Ofast -fPIE -nofor-main -extend_source   -fpp   -nofor-main 
+SF90ARGS =  $(SFARGS)
+#
+SFARGSSAVE = $(SFARGS)
+#
+# BLAS
+BLASLIB =  $(MATHLIBS)
+
+COMPUTATIONAL_LIBS = $(BLASLIB)
+#
+# where are the modified EISPACK routines from the myeispack.tar.gz
+EISPACK_DIR = eispack/
+# file installed?
+EISPACK_LIB = -L$(EISPACK_DIR)/ -lmyeis
+
+
+
+
+# name of interact binary depending on compiler flags
+INTERACT_BINARY_NAME = interact
+
+
+
+
