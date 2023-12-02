@@ -19,10 +19,12 @@ MACHINE_DEFINES = -DIMAT_SPARSE_LIM=8000.0 -DIMAT_SIZE_LIM=4000.1  \
 #
 # compilers
 CC = icx
-MPICC = mpicc
+#MPICC = mpicc
+MPICC = $(CC)
 F77 = ifort
 F90 = ifort 
 LD = $(F77)
+# rest in .petsc or here to include MPI linked
 MPILD = ifort
 AR = ar
 

@@ -19,11 +19,13 @@ MACHINE_DEFINES = -DIMAT_SPARSE_LIM=8000.0 -DIMAT_SIZE_LIM=4000.1  \
 #
 # compilers
 CC = gcc
-MPICC = mpicc
+# if parallel desired, define here or in .petsc to be mpicc
+MPICC = $(CC)
 F77 = /usr/bin/gfortran
 F90 = /usr/bin/gfortran
 LD = $(F77)
-MPILD = mpif77
+# if petsc or parallel compile is desired, define in .petsc or here to use mpif77
+MPILD = $(LD)
 AR = ar
 # set the compiler flag for library directories
 # usually -L, could be -Wl,-L as for HPUX
@@ -87,7 +89,3 @@ EISPACK_LIB = -L$(EISPACK_DIR)/ -lmyeis
 
 # name of interact binary depending on compiler flags
 INTERACT_BINARY_NAME = interact
-
-
-
-

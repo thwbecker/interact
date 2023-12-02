@@ -1,36 +1,46 @@
 #
 # LINUX system dependent flags
 #
-
-# LINUX system dependent flags for gcc and intel fortran
+# CONSTANTS
 #
+# constants you might want to change according to the machine specs
 #
-MACHINE_DEFINES = -DIMAT_SPARSE_LIM=8000.0 -DIMAT_SIZE_LIM=4000.1  -I/usr/lib/x86_64-linux-gnu/openmpi/include/  \
+# IMAT_SPARSE_LIM: limit in MB for I matrix size at which the program switches 
+#                  automatically to sparse matrix storage, ~70% of RAM of machine
+# IMAT_SIZE_LIM:   max size of the interaction matrix in MB that we want in 
+#                  in memory, if size is larger AND NO SPARSE STORAGE is invoked
+#                  will read from file. This is so slow, it's next to impossible to work.
+#
+MACHINE_DEFINES = -DIMAT_SPARSE_LIM=8000.0 -DIMAT_SIZE_LIM=4000.1  \
 	-DSGI_SUBROUTINE_CONVENTION  -Wno-discarded-qualifiers
+#
+# LINUX system dependent flags for gcc and a few f90 intel compiles
+#
+#
 # compilers
-CC = /opt/intel/oneapi/mpi/latest/bin/mpicc
-MPICC = /opt/intel/oneapi/mpi/latest/bin/mpicc
-#F77 = /disk/rh_usr_local/intel/oneapi/compiler/latest/linux/bin/intel64/ifort
-F77 =/opt/intel/oneapi/mpi/latest/bin/mpif90
-F90 = $(F77)
+CC = gcc
+# if parallel desired, define here or in .petsc to be mpicc
+MPICC = $(CC)
+F77 = /usr/bin/gfortran
+
+F90 = /opt/intel/oneapi/compiler/2023.0.0/linux/bin/ifx
+
 LD = $(F77)
-MPILD = /opt/intel/oneapi/mpi/latest/bin/mpif90
+# if petsc or parallel compile is desired, define in .petsc or here to use mpif77
+MPILD = $(LD)
 AR = ar
 # set the compiler flag for library directories
 # usually -L, could be -Wl,-L as for HPUX
 MY_LIBDIR_SPEC = -L
 
+# to get intel libs
+LDFLAGS = -L/disk/rh_usr_local/intel/oneapi/compiler/2023.0.0/linux/compiler/lib/intel64_lin/ -limf -lifcore -ldl
 
-USE_IPO = 
-
-# LINKER FLAGS (without -lm, that get's added later)
-# gcc
-LDFLAGS =  -L/opt/intel/oneapi/mpi/latest/lib/
 
 # X 11 only needed for PGPLOT
 X11LIBDIR = /usr/lib/x86_64-linux-gnu/
 #
-MATHLIB = -lm
+MATHLIBS = -llapack -lblas -lm
 #
 # warning options
 GCCWOPT = -Wall 
@@ -38,15 +48,23 @@ GCCWOPT = -Wall
 
 
 # fast execution options, comment those two lines if debug output is wanted
-SCARGS = -Ofast  -I/usr/lib/x86_64-linux-gnu/openmpi/include/ $(GCCWOPT)
+SCARGS = -Ofast -march=native $(GCCWOPT)
 DEBUG_FLAGS=
+
+# these next three lines for debugging, comment if fast execution is desired
+
+
 
 
 #
 # fortran flags
 #
-SFARGS = -I/usr/lib/x86_64-linux-gnu/openmpi/include/ -Ofast -fPIE -nofor-main -extend_source   -fpp   -nofor-main 
-SF90ARGS =  $(SFARGS)
+SFARGS = $(SCARGS) -ffixed-line-length-132  -fmax-errors=0 -x f77-cpp-input
+
+#
+# f90 is intel
+#
+SF90ARGS =  -fpp -fpie -Ofast 
 #
 SFARGSSAVE = $(SFARGS)
 #
@@ -64,8 +82,4 @@ EISPACK_LIB = -L$(EISPACK_DIR)/ -lmyeis
 
 
 # name of interact binary depending on compiler flags
-INTERACT_BINARY_NAME = interact
-
-
-
-
+INTERACT_BINARY_NAME = interact.mixed

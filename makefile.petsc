@@ -25,7 +25,8 @@ PETSC_LIBADD := $(shell pkg-config --libs-only-l $(PACKAGES)) -lm
 PETSC_INCLUDES = -I$(PETSC_DIR)/include/ $(CPPFLAGS) -DUSE_PETSC
 #
 #
-PETSC_LIBS = -L$(PETSC_DIR)/lib/  $(PETSC_LDIR) $(PETSC_LIBADD) 
+PETSC_LIBS = -L$(PETSC_DIR)/lib/  $(PETSC_LDIR) $(PETSC_LIBADD)  # -L/disk/rh_usr_local/intel/oneapi/mpi/latest/lib/
 
-	
+MPICC = mpicc
+MPILD = mpif77
 
