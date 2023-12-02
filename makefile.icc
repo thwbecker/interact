@@ -12,21 +12,21 @@
 #                  will read from file. This is so slow, it's next to impossible to work.
 #
 MACHINE_DEFINES = -DIMAT_SPARSE_LIM=8000.0 -DIMAT_SIZE_LIM=4000.1  \
-	-DSGI_SUBROUTINE_CONVENTION  -Wno-discarded-qualifiers
+	-DSGI_SUBROUTINE_CONVENTION  
 #
-# LINUX system dependent flags for gcc
+# LINUX system dependent flags for icc
 #
 #
 # compilers
-CC = icc
+CC = icx
 MPICC = mpicc
 F77 = ifort
-F90 = ifort
+F90 = ifort 
 LD = $(F77)
-MPILD = mpif77
+MPILD = ifort
 AR = ar
+
 # set the compiler flag for library directories
-# usually -L, could be -Wl,-L as for HPUX
 MY_LIBDIR_SPEC = -L
 
 
@@ -34,25 +34,25 @@ USE_IPO =
 
 # LINKER FLAGS (without -lm, that get's added later)
 # gcc
-LDFLAGS = 
+LDFLAGS =  -nofor-main -L/disk/rh_usr_local/intel/oneapi/mpi/latest/lib/
 
 # X 11 only needed for PGPLOT
 X11LIBDIR = /usr/lib/x86_64-linux-gnu/
 #
-MATHLIB = -lm
+MATHLIBS = -llapack -lblas -lm
 #
 # warning options
-WOPT = -Wall 
+GCCWOPT = -Wall 
 #-Werror
 
 
 # fast execution options, comment those two lines if debug output is wanted
-SCARGS = -fast $(WOPT)
+SCARGS = -Ofast -fPIE  $(GCCWOPT)
 DEBUG_FLAGS=
 
 # these next three lines for debugging, comment if fast execution is desired
-#SCARGS =  $(WOPT) 
-#PETSC_ARCH=arch-linux-c-debug
+
+#SCARGS =  $(GCCWOPT) 
 #DEBUG_FLAGS=-DDEBUG -g -O0
 
 # other debugging options, comment in for debugging
@@ -62,13 +62,10 @@ DEBUG_LIBS =
 #	-DDEBUG -DSUPER_DEBUG  
 
 
-
-
-#
 # fortran flags
 #
-SFARGS = $(SCARGS)  -extend_source   -fmax-errors=0 
-SF90ARGS = $(SCARGS)   -fmax-errors=0 -cpp
+SFARGS = -Ofast -nofor-main -fPIE -extend-source  -fpp
+SF90ARGS = -Ofast -nofor-main  -fPIE -fpp
 #
 SFARGSSAVE = $(SFARGS)
 #

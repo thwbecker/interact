@@ -121,9 +121,9 @@ OKROUTINE = $(ODIR)/dc3d.o	# my modified version
 # 
 # include the machine dependent flags
 # 
-include makefile.gcc
+#include makefile.gcc
 #include makefile.mixed
-#include makefile.icc
+include makefile.icc
 #
 # add this for pgplot support, otherwise comment it out
 # you will use runtime plotting capabilities
@@ -136,7 +136,7 @@ include makefile.pgplot
 #
 # petsc, will override some of the flags
 # comment out if not needed
-include makefile.petsc
+#include makefile.petsc
 ifndef MPILD
 MPILD = $(LD)
 endif

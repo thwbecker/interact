@@ -33,7 +33,11 @@ void my_sincos_deg_ftnd(double *sin_val,double *cos_val,double *alpha_in_degrees
 
 void my_sincos_ftn(COMP_PRECISION *sin_val,COMP_PRECISION *cos_val,COMP_PRECISION *alpha)
 {
+#ifdef USE_DOUBLE_PRECISION
   sincos(*alpha,sin_val,cos_val);
+#else
+  sincosf(*alpha,sin_val,cos_val);
+#endif
 }
 
 

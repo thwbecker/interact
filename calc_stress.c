@@ -201,7 +201,7 @@ void calc_fields(struct med *medium,struct flt *fault,
 {
   int i,j,k,iflt,o1,iret,p1,p2,singular_count,not_ok;
   long int nxy,nxyz;
-  int nz;
+  int nz=0;
   my_boolean use_fault_plane = FALSE;
   COMP_PRECISION dx[3],x[3],xl[3],u[3],sm[3][3],vec_1[3],vec_2[3],
     flt_mean_x[3],s1,s2,d1,d2;
@@ -232,6 +232,9 @@ void calc_fields(struct med *medium,struct flt *fault,
       sprintf(out_string,"calculating fields for %i spotted observations",medium->n[INT_Z]);
       time_report("calc_fields",out_string,medium);
     }
+  }else{
+    fprintf(stderr,"calc_fields: either bulk field or oloc from file should be set\n");
+    exit(-1);
   }
   nxy = (long int)medium->n[INT_X] * (long int) medium->n[INT_Y];
   nxyz = (long int)nz * nxy;

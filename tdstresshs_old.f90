@@ -158,7 +158,7 @@ subroutine TDstressFS(X,Y,Z,P1,P2,P3,Ss,Ds,Ts,Stress,Strain,Ar)
   C_PREC,intent(out),dimension(6) :: stress,strain
   C_PREC,dimension(3,3),intent(out) :: Ar
   
-  C_PREC,parameter :: two_mu = TWO_TIMES_SHEAR_MODULUS_FTN, lambda =  LAMBDA_CONST_FTN
+  C_PREC,parameter :: nu = POISSON_NU,two_mu = TWO_TIMES_SHEAR_MODULUS, lambda =  LAMBDA_CONST
   
   C_PREC bx,by,bz,x_,y_,z_,aA,aB,aC,&
        Exx,Eyy,Ezz,Exy,Exz,Eyz,&
@@ -191,11 +191,11 @@ subroutine TDstressFS(X,Y,Z,P1,P2,P3,Ss,Ds,Ts,Stress,Strain,Ar)
   if (casepLog) then
      !print *,x_,y_,z_,aA,bx,by,bz,nu,p1_,-e13
      ! Calculate first angular dislocation contribution
-     call TDSetupS(x_,y_,z_,aA,bx,by,bz,p1_,-e13,Exx1,Eyy1,Ezz1,Exy1,Exz1,Eyz1);
+     call TDSetupS(x_,y_,z_,aA,bx,by,bz,nu,p1_,-e13,Exx1,Eyy1,Ezz1,Exy1,Exz1,Eyz1);
      ! Calculate second angular dislocation contribution
-     call TDSetupS(x_,y_,z_,aB,bx,by,bz,p2_, e12,Exx2,Eyy2,Ezz2,Exy2,Exz2,Eyz2);
+     call TDSetupS(x_,y_,z_,aB,bx,by,bz,nu,p2_, e12,Exx2,Eyy2,Ezz2,Exy2,Exz2,Eyz2);
      ! Calculate third angular dislocation contribution
-     call TDSetupS(x_,y_,z_,aC,bx,by,bz,p3_, e23,Exx3,Eyy3,Ezz3,Exy3,Exz3,Eyz3);
+     call TDSetupS(x_,y_,z_,aC,bx,by,bz,nu,p3_, e23,Exx3,Eyy3,Ezz3,Exy3,Exz3,Eyz3);
      !print *,'exx1'
      !print *,Exx1,Eyy1,Ezz1,Exy1,Exz1,Eyz1
      !print *,'exx2'
@@ -206,11 +206,11 @@ subroutine TDstressFS(X,Y,Z,P1,P2,P3,Ss,Ds,Ts,Stress,Strain,Ar)
   else if (casenLog) then 
      ! Configuration II
      ! Calculate first angular dislocation contribution
-     call TDSetupS(x_,y_,z_,aA,bx,by,bz,p1_, e13,Exx1,Eyy1,Ezz1,Exy1,Exz1,Eyz1);
+     call TDSetupS(x_,y_,z_,aA,bx,by,bz,nu,p1_, e13,Exx1,Eyy1,Ezz1,Exy1,Exz1,Eyz1);
      ! Calculate second angular dislocation contribution
-     call TDSetupS(x_,y_,z_,aB,bx,by,bz,p2_,-e12,Exx2,Eyy2,Ezz2,Exy2,Exz2,Eyz2);
+     call TDSetupS(x_,y_,z_,aB,bx,by,bz,nu,p2_,-e12,Exx2,Eyy2,Ezz2,Exy2,Exz2,Eyz2);
      ! Calculate third angular dislocation contribution
-     call TDSetupS(x_,y_,z_,aC,bx,by,bz,p3_,-e23,Exx3,Eyy3,Ezz3,Exy3,Exz3,Eyz3);    
+     call TDSetupS(x_,y_,z_,aC,bx,by,bz,nu,p3_,-e23,Exx3,Eyy3,Ezz3,Exy3,Exz3,Eyz3);    
   end if
 
   ! Calculate the strain tensor components in TDCS
@@ -328,12 +328,12 @@ end subroutine TensTrans
 
 
 
-subroutine TDSetupS(x,y,z,alpha,bx,by,bz,TriVertex,SideVec,exxt,eyyt,ezzt,exyt,exzt,eyzt)
+subroutine TDSetupS(x,y,z,alpha,bx,by,bz,nu,TriVertex,SideVec,exxt,eyyt,ezzt,exyt,exzt,eyzt)
   ! TDSetupS transforms coordinates of the calculation points as well as 
   ! slip vector components from ADCS into TDCS. It then calculates the 
   ! strains in ADCS and transforms them into TDCS.
   IMPLICIT NONE
-  C_PREC, INTENT(IN) :: alpha, bx, by, bz, x, y, z
+  C_PREC, INTENT(IN) :: alpha, bx, by, bz, nu, x, y, z
   C_PREC, DIMENSION(3), INTENT(IN) :: SideVec, TriVertex
   C_PREC, INTENT(OUT) :: exxt,eyyt,ezzt,exyt,exzt,eyzt
   C_PREC :: exx,eyy,ezz,exy,exz,eyz
@@ -347,7 +347,7 @@ subroutine TDSetupS(x,y,z,alpha,bx,by,bz,TriVertex,SideVec,exxt,eyyt,ezzt,exyt,e
 
 
   ! Calculate strains associated with an angular dislocation in ADCS
-  call AngDisStrain(x,y1,z1,-pi+alpha,bx,by1,bz1,exx,eyy,ezz,exy,exz,eyz);
+  call AngDisStrain(x,y1,z1,-pi+alpha,bx,by1,bz1,nu,exx,eyy,ezz,exy,exz,eyz);
 
   ! Transform strains from ADCS into TDCS
   B(1,1) = 1.0d0;B(1,2:3)=0.0d0;
@@ -433,12 +433,12 @@ subroutine AngSetupFSC_S(X,Y,Z,bX,bY,bZ,PA,PB,Stress,Strain)
      v23B = FORTRAN_ZERO
      IF (I) THEN
         ! Configuration I
-        call AngDisStrainFSC(y1A,y2A,y3A,-pi+beta,b1,b2,b3,-PA(3),v11A,v22A,v33A,v12A,v13A,v23A);
-        call AngDisStrainFSC(y1B,y2B,y3B,-pi+beta,b1,b2,b3,-PB(3),v11B,v22B,v33B,v12B,v13B,v23B);
+        call AngDisStrainFSC(y1A,y2A,y3A,-pi+beta,b1,b2,b3,nu,-PA(3),v11A,v22A,v33A,v12A,v13A,v23A);
+        call AngDisStrainFSC(y1B,y2B,y3B,-pi+beta,b1,b2,b3,nu,-PB(3),v11B,v22B,v33B,v12B,v13B,v23B);
      else
         ! Configuration II
-        call AngDisStrainFSC(y1A,y2A,y3A,beta,b1,b2,b3,    -PA(3),v11A,v22A,v33A,v12A,v13A,v23A);
-        call AngDisStrainFSC(y1B,y2B,y3B,beta,b1,b2,b3,    -PB(3),v11B,v22B,v33B,v12B,v13B,v23B);
+        call AngDisStrainFSC(y1A,y2A,y3A,beta,b1,b2,b3,nu,    -PA(3),v11A,v22A,v33A,v12A,v13A,v23A);
+        call AngDisStrainFSC(y1B,y2B,y3B,beta,b1,b2,b3,nu,    -PB(3),v11B,v22B,v33B,v12B,v13B,v23B);
      endif
 
      !print *,v11A,v22A,v33A,v12A,v13A,v23A
@@ -471,19 +471,18 @@ subroutine AngSetupFSC_S(X,Y,Z,bX,bY,bZ,PA,PB,Stress,Strain)
 
 end subroutine AngSetupFSC_S
 
-subroutine AngDisStrain(x,y,z,alpha,bx,by,bz,Exx,Eyy,Ezz,Exy,Exz,Eyz) ! removed reference to nu 
+subroutine AngDisStrain(x,y,z,alpha,bx,by,bz,nu,Exx,Eyy,Ezz,Exy,Exz,Eyz)
   IMPLICIT NONE
   ! AngDisStrain calculates the strains associated with an angular 
   ! dislocation in an elastic full-space.
-  C_PREC,intent(in) :: x,y,z,alpha,bx,by,bz
+  C_PREC,intent(in) :: x,y,z,alpha,bx,by,bz,nu
   C_PREC,intent(out) :: exx,eyy,ezz,exy,exz,eyz
 
   C_PREC sinA,cosA,eta,zeta,x2,y2,z2,r2,r,r3,rz,r3z,W,W2,Wr,W2r,Wr3,W2r2, C,S,S2,y3
-  C_PREC rFi_rx,rFi_ry,rFi_rz,r2z2,cfac,rmz,C2
+  C_PREC rFi_rx,rFi_ry,rFi_rz,r2z2,N0,N1,N2,cfac,rmz,C2
   C_PREC, PARAMETER :: pi = 3.14159265358979D0, unity = FORTRAN_UNITY,&
        P4 = unity/(4.0d0*pi), P8 = P4/2.0d0
-  C_PREC, PARAMETER :: nu = POISSON_NU, N0 = 2.0d0*nu, N1 = N0+unity, N2 = unity-nu
-  
+
   !sinA = sin(alpha);
   !cosA = cos(alpha);
   call my_sincos_ftn(sinA,cosA,alpha)
@@ -525,7 +524,9 @@ subroutine AngDisStrain(x,y,z,alpha,bx,by,bz,Exx,Eyy,Ezz,Exy,Exz,Eyz) ! removed 
   rFi_ry = (x/r/(rmz)-cosA*x/r/(-W))*P4;
   rFi_rz = (sinA*x/r/(-W))*P4;
 
- 
+  N0 = 2.0d0*nu
+  N1 = N0+unity
+  N2 = unity-nu
   
   Exx = bx*(rFi_rx)+&
        bx*P8/N2*(eta/Wr+eta*x2/W2r2-eta*x2/Wr3+y/rz-&
@@ -574,27 +575,27 @@ end subroutine AngDisStrain
 
 
 
-subroutine AngDisStrainFSC(y1,y2,y3,beta,b1,b2,b3,a,v11,v22,v33,v12,v13,v23) ! removed refrence to nu
+subroutine AngDisStrainFSC(y1,y2,y3,beta,b1,b2,b3,nu,a,v11,v22,v33,v12,v13,v23)
   ! AngDisStrainFSC calculates the harmonic function contribution to the 
   ! strains associated with an angular dislocation in an elastic half-space.
   IMPLICIT NONE
-  C_PREC, intent(in) :: y1,y2,y3,beta,b1,b2,b3,a
+  C_PREC, intent(in) :: y1,y2,y3,beta,b1,b2,b3,nu,a
   C_PREC, intent (out) :: v11,v22,v33,v12,v13,v23
   C_PREC, PARAMETER :: pi = 3.14159265358979D0, unity = FORTRAN_UNITY,&
        one_quarter = unity/4.0d0, one_half = unity/2.0d0, three_halves = 3.0d0/2.0d0
-  ! poisson ratio related factors
-  C_PREC, PARAMETER :: nu = POISSON_NU, & ! compile in, does not change during runtime normally
-       N0 =  2.0d0*nu,N1 =  unity-N0,N2 = -2.0d0+N0, & !     -2.0d0+2.0d0*nu
-       N3 =  -N2,& !2.0d0-N0 = 2.0d0-2.0d0*nu
-       N4 = unity-nu, oopin4 = unity/(pi*N4)
-  
   C_PREC y3b,z1b,z3b,rb2,rb,W1,W2,W3,W4,W5,W6,W7,W8,W9,y2s,rb2s,rbc, &
-       W6s,W7s,rbp5,cosBs,fac1,twoa
+       W6s,W7s,rbp5,cosBs,fac1,oopin4,twoa
   C_PREC rFib_ry2,rFib_ry1,y1s,y1c,y2c,two_y3b,&
-       rFib_ry3,cosB,sinB,cotB,cotBs,&
+       rFib_ry3,cosB,sinB,cotB,cotBs,N0,N1,N2,N3,N4,&
        one_over_rb,one_over_rb2,one_over_rbp3,one_over_W6,&
        one_over_W6_p2,w1_over_w7,w1_over_w7s,one_over_w7,cosBtcotB
- 
+  N0 =  2.0d0*nu
+  N1 =  unity-N0
+  N2 = -2.0d0+N0 !     -2.0d0+2.0d0*nu
+  N3 =  -N2 !2.0d0-N0 = 2.0d0-2.0d0*nu
+  N4 = unity-nu
+
+  oopin4 = unity/(pi*N4)
   
   !sinB = sin(beta);
   !cosB = cos(beta);

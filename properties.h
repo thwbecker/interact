@@ -21,7 +21,6 @@
 #ifdef STRESS_DROP_NORM
 /* set by stress drop */
 #define SHEAR_MODULUS 1.0e4
-#define TWO_TIMES_SHEAR_MODULUS  2.0e4
 /* 
    define stress drop in consistent units
    for Earth, \Delta \sigma \sim 3e6 Pa, \mu= \sim 3e10 Pa,
@@ -32,7 +31,7 @@
 #else
 /*   characteristic stress set by shear modulus  */
 #define SHEAR_MODULUS  1.0
-#define TWO_TIMES_SHEAR_MODULUS  2.0
+
 #define STRESS_DROP 1.0e-4
 #endif
 
@@ -46,9 +45,17 @@
    E = 2\mu(1+\nu), which is 2.5 for \nu=.25 and \mu=1
 */
 #define POISSON_NU 0.25
-/* CHANGE THOSE IF SHEAR MODULUS or NU CHANGED */
-#define LAMBDA_CONST SHEAR_MODULUS
-#define ALPHA_CONST 0.666666666666666666666666666666666667
+
+
+/* those will be computed from myu and poisson */
+#define TWO_TIMES_SHEAR_MODULUS  (2.0*SHEAR_MODULUS)
+#define TWO_TIMES_SHEAR_MODULUS_FTN  (2.0d0*SHEAR_MODULUS)
+
+#define LAMBDA_CONST (TWO_TIMES_SHEAR_MODULUS*POISSON_NU)/(1.0-2.0*POISSON_NU)
+#define LAMBDA_CONST_FTN (TWO_TIMES_SHEAR_MODULUS_FTN*POISSON_NU)/(1.0d0-2.0d0*POISSON_NU) 
+
+#define ALPHA_CONST (LAMBDA_CONST+SHEAR_MODULUS)/(LAMBDA_CONST+TWO_TIMES_SHEAR_MODULUS) 
+
 /* 
 
 

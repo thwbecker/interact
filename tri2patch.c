@@ -16,7 +16,7 @@ int main(int argc, char **argv)
   struct med *medium;
   COMP_PRECISION *dummy=NULL;
   int i,j,opmode=PATCH_OUT_MODE,n,eltype=TRIANGULAR;
-  COMP_PRECISION tmpdbl,sin_dip,cos_dip,alpha_rad;
+  COMP_PRECISION sin_dip,cos_dip;
   medium=(struct med *)calloc(1,sizeof(struct med));
   if(argc!=2){
     fprintf(stderr,"%s mode\n\tread in three 3-D points per line from stdin\n",

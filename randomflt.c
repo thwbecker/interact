@@ -2,9 +2,7 @@
 
   interact: model fault interactions using dislocations in a 
             halfspace
-  (C) Thorsten Becker, becker@eps.harvard.edu
-
-  $Id: randomflt.c,v 2.29 2003/02/13 22:45:12 becker Exp $
+  (C) Thorsten Becker, becker@post.harvard.edu
 
 
   generates a set of randomly oriented, non-intersecting 
@@ -25,7 +23,7 @@ int main(int argc, char **argv)
 {
   int i,j,hit,n=1,seg[2]={1,1},random_mode,icnt,iclim,
     opmode,iter,evil_pair[2],nrpatches,old_nrpatches;
-  COMP_PRECISION *dummy;
+  COMP_PRECISION *dummy=NULL;
   long int seed=-1;
   COMP_PRECISION 
     w0=1.,/* length bounds, base length */

@@ -899,7 +899,7 @@ void calculate_slipsol_sigma(struct bmd *mod,COMP_PRECISION *vslip,
 	      test_xsol[lblock[1]*BLOCK_NBASE+l] +=
 		mod->sigma[lblock[1]*BLOCK_NBASE+l];
 	    }
-	    if((j==3)){	/* right block - */
+	    if(j==3){	/* right block - */
 	      test_xsol[lblock[1]*BLOCK_NBASE+l] -=
 		mod->sigma[lblock[1]*BLOCK_NBASE+l];
 	    }

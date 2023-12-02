@@ -1,10 +1,9 @@
 /*
   interact: model fault interactions using dislocations in a 
             halfspace
-  (C) Thorsten Becker, becker@eps.harvard.edu
+  (C) Thorsten Becker, becker@post.harvard.edu
   
 
-  $Id: randomize_strike.c,v 1.47 2003/02/13 22:45:12 becker Exp $
 */
 #include "interact.h"
 #include "properties.h"
@@ -29,7 +28,7 @@ int main(int argc, char **argv)
   int i,j,hit,nr_inp_flts,seg[2],opmode,iter,iter2,segn[2],
     nrpatches,old_nrpatches,interact_prob,mindi[2]={0,0},
     evil_pair[2];
-    COMP_PRECISION *dummy;
+  COMP_PRECISION *dummy=NULL;
   long int seed,titer;
   my_boolean depth_adjust=FALSE,fix_first=FALSE,
     fix_second=FALSE,sort=TRUE,

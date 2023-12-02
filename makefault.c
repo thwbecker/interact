@@ -1,9 +1,8 @@
 /*
   interact: model fault interactions using dislocations in a 
             halfspace
-  (C) Thorsten Becker, becker@eps.harvard.edu
+  (C) Thorsten Becker, becker@post.harvard.edu
 
-  $Id: makefault.c,v 2.23 2003/03/02 07:34:11 becker Exp $
 */
 #include "interact.h"
 #include "properties.h"
@@ -11,7 +10,7 @@
 int main(int argc, char **argv)
 {
   int i,j,seg[2],grp,opmode=PATCH_OUT_MODE,nrpatches=0,*list;
-  COMP_PRECISION l,w,d,x,y,z,s,a,stop_time,td[2]={-1,-1},srand,drand,*dummy;
+  COMP_PRECISION l,w,d,x,y,z,s,a,stop_time,td[2]={-1,-1},srand,drand,*dummy=NULL;
   my_boolean circular,randomize_order=FALSE;
   long seed = -1;
 #ifdef ALLOW_NON_3DQUAD_GEOM

@@ -411,19 +411,12 @@ extern void GMT_end(int, char **);
 #include "auto_proto.sgl.h"
 #endif
 
+/* other prototypes which are hard to make automatically */
+#include "prototypes.h"
+
 #ifndef NO_LAPACK3
 #define USE_LAPACK_DAC
 #endif
 
 
 
-void assemble_ap_matrix_1(A_MATRIX_PREC *,int ,int ,my_boolean *,my_boolean *,int ,int ,
-			  int *,int *,struct flt *,struct med *);
-void assemble_ap_matrix_2(A_MATRIX_PREC *,int ,int ,my_boolean *,my_boolean *,int ,int ,
-			  int *,int *,struct flt *,struct med *);
-void assemble_ap_matrix_3(A_MATRIX_PREC *,int ,int ,my_boolean *,my_boolean *,int ,int ,
-			  int *,int *,struct flt *,struct med *);
-void assemble_ap_matrix_4(A_MATRIX_PREC *,int ,int ,my_boolean *,my_boolean *,int ,int ,
-			  int *,int *,struct flt *,struct med *);
-
-int par_assemble_a_matrix(int ,my_boolean *,int ,int *,struct flt *,struct med *);

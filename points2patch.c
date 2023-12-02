@@ -46,7 +46,7 @@ int main(int argc, char **argv)
   struct flt fault[1],*patch;
   struct med *medium;
   COMP_PRECISION x[12],dx;
-  COMP_PRECISION *dummy;
+  COMP_PRECISION *dummy=NULL;
   int i,opmode=PATCH_OUT_MODE,nrpatches,seg[2],code;
   long seed = -1;
   my_boolean adjust_area=TRUE,use_code=FALSE;

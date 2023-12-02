@@ -11,7 +11,7 @@ int main(int argc, char **argv)
   
   struct flt *fault;
   struct med *medium;
-  COMP_PRECISION *dummy;
+  COMP_PRECISION *dummy=NULL;
   int opmode=CORNEROUT_MODE,i;
   medium=(struct med *)calloc(1,sizeof(struct med));
   if(argc!=1){

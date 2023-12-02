@@ -67,11 +67,14 @@ int main(int argc, char **argv)
 #else
   medium->comm_size = 1;
 #endif
-  HEADNODE
-    fprintf(stderr,"main: binary: %s\nmain: internal %s prec, A matrix %s prec\nmain: initializing on %s\n",
+  HEADNODE{
+    fprintf(stderr,"%s: internal %s prec, A matrix %s prec\nmain: initializing on %s\n",
 	    argv[0],(sizeof(COMP_PRECISION)==sizeof(double))?("double"):("single"),
 	    (sizeof(A_MATRIX_PREC)==sizeof(double))?("double"):("single"),
 	    time_out_string );
+    fprintf(stderr,"%s: nu: %.5f mu: %.3e from properties.h, therefore lambda/mu: %.5f alpha: %.5f\n",
+	    argv[0],POISSON_NU,SHEAR_MODULUS,LAMBDA_CONST/SHEAR_MODULUS, ALPHA_CONST);
+  }
   check_parameters_and_init(argc,argv,&medium,&fault,&read_initial_fault_stress,a,b);
   // decide which mode we are in and execute main loops
   switch(medium->op_mode){

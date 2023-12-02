@@ -1154,7 +1154,7 @@ C-----
       ALP5= ALPHA                                                       
 C-----                          
 c     obtain sin and cos of dip, given in degrees
-      call my_sincos_deg_ftn(sd,cd,dip)
+      call my_sincos_deg_ftnd(sd,cd,dip)
       IF(DABS(CD).LT.EPS) THEN                                          
          CD=F0                                                           
          IF(SD.GT.F0) SD= F1                                             
