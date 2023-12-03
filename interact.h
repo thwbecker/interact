@@ -34,6 +34,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+#ifdef USE_MKL
+#include "mkl.h"
+#endif
 #include <string.h>
 #include <limits.h>
 #include <sys/types.h>

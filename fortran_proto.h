@@ -17,8 +17,10 @@
 // LAPACK fortran style (not C implementation as in sunperf.h)
 // 
 
+
 extern void ilwvd(int *,int *, int *, int * );
 
+#ifndef USE_MKL
 extern void dgelss( int *, int *,int *, double *, int *, 
 		    double *, int *,  double *,  double *,
 		    int *, double *, int *, int * );
@@ -49,7 +51,7 @@ extern void dgesv(int *, int *, double *, int *, int *, double *,
 extern void sgesv(int *, int *, float *, int *, int *, float *, 
 		  int *, int *);
 
-
+#endif
 
 extern void law_nnls(A_MATRIX_PREC *,int *,int *, int *,
 		     A_MATRIX_PREC *,A_MATRIX_PREC *,

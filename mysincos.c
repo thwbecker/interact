@@ -8,12 +8,13 @@
   uses SUN's sincos routines that are only available in double precision!?
 */
 #include "interact.h"
-#include <math.h>
+
 void sincos(double, double *, double *);
 void sincosf(float, float *, float *);
 void sincosl(long double , long double *, long double *);
 
 
+/* called with degree, convert */
 void my_sincos_deg(COMP_PRECISION *sin_val,COMP_PRECISION *cos_val,
 		   COMP_PRECISION alpha_in_degrees)
 {
@@ -34,32 +35,54 @@ void my_sincos_deg_ftnd(double *sin_val,double *cos_val,double *alpha_in_degrees
 void my_sincos_ftn(COMP_PRECISION *sin_val,COMP_PRECISION *cos_val,COMP_PRECISION *alpha)
 {
 #ifdef USE_DOUBLE_PRECISION
+  /* double prec */
+ #ifdef USE_MKL_SINCOS		/* this was really slow, it seemed */
+  const int unity = 1;
+  vdSinCos(unity,alpha,sin_val,cos_val);
+ #else
   sincos(*alpha,sin_val,cos_val);
+ #endif
 #else
+  /* single prec */
+ #ifdef USE_MKL_SINCOS
+  const int unity = 1;
+  vsSinCos(unity,alpha,sin_val,cos_val);
+ #else
   sincosf(*alpha,sin_val,cos_val);
+ #endif
 #endif
 }
-
 
 void my_sincos(COMP_PRECISION *sin_val,COMP_PRECISION *cos_val,COMP_PRECISION arad)
 {
-#if defined(USE_DOUBLE_PRECISION)
-  sincos(arad,sin_val,cos_val);
-#else
-  double sin_vald,cos_vald,aradd;
-  aradd = (double)arad;
-  sincos(aradd,&sin_vald,&cos_vald);
-  *sin_val = (COMP_PRECISION)sin_vald;
-  *cos_val = (COMP_PRECISION)cos_vald;
+#ifdef USE_DOUBLE_PRECISION
+  /* double prec */
+ #ifdef USE_MKL_SINCOS
+   const int unity = 1;
+   vdSinCos(unity,&arad,sin_val,cos_val);
+ #else
+   sincos(arad,sin_val,cos_val);
+ #endif
+#else  /* single prec */
+ #ifdef USE_MKL_SINCOS
+   const int unity = 1;
+   vsSinCos(unity,&arad,sin_val,cos_val);
+ #else
+   sincosf(arad,sin_val,cos_val);
+ #endif
 #endif
 }
 
+
 void my_sincosd(double *sin_val,double *cos_val,double arad)
 {
+#ifdef USE_MKL_SINCOS
+  const int unity = 1;
+  vdSinCos(unity,&arad,sin_val,cos_val);
+#else
   sincos(arad,sin_val,cos_val);
+#endif
 }
-
-
 void my_sincos_degd(double *sin_val,double *cos_val,double adeg)
 {
   double arad;

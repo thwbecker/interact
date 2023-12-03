@@ -105,7 +105,7 @@ COMMON_DEFINES =  -DBINARY_PATCH_EVENT_FILE -DCHECK_CI_ONE_WAY  \
 # doesn't get compiled automatically.
 NOISELEVEL=1e-08
 #
-MAIN_DEFINES = $(COMMON_DEFINES)
+MAIN_DEFINES = $(COMMON_DEFINES) 
 
 #
 #
@@ -122,6 +122,7 @@ OKROUTINE = $(ODIR)/dc3d.o	# my modified version
 # include the machine dependent flags
 # 
 #include makefile.gcc
+#include makefile.mixed_mkl
 include makefile.mixed
 #include makefile.icc
 #
@@ -141,10 +142,6 @@ ifndef MPILD
 MPILD = $(LD)
 endif
 
-# /opt/intel/oneapi/compiler/2023.0.0/linux/bin/ifx -c -fpp -fpie -Ofast -DUSE_DOUBLE_PRECISION *.f90 
-
-
-#LDFLAGS = -L/disk/rh_usr_local/intel/oneapi/compiler/2023.0.0/linux/compiler/lib/intel64_lin/ -limf -lifcore -ldl
 #
 # add this for superlu support, otherwise comment it out
 # you will loose sparse matrix SuperLU LU solver capabilities

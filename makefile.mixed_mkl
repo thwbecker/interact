@@ -11,11 +11,16 @@
 #                  in memory, if size is larger AND NO SPARSE STORAGE is invoked
 #                  will read from file. This is so slow, it's next to impossible to work.
 #
-MACHINE_DEFINES = -DIMAT_SPARSE_LIM=8000.0 -DIMAT_SIZE_LIM=4000.1  -DSGI_SUBROUTINE_CONVENTION  \
+MACHINE_DEFINES = -DIMAT_SPARSE_LIM=8000.0 -DIMAT_SIZE_LIM=4000.1  \
+		-DSGI_SUBROUTINE_CONVENTION -DUSE_MKL \
 		 -I/disk/rh_usr_local/intel/oneapi/mkl/2023.0.0/include/
 #
-# LINUX system dependent flags for gcc and a few f90 intel compiles
+# we could also define this, but it was very slow
+# -DUSE_MKL_SINCOS
 #
+# LINUX system dependent flags for gcc and a few f90 intel compiles using MKL
+#
+
 #
 # compilers
 CC = gcc
@@ -27,20 +32,22 @@ F77 = /usr/bin/gfortran
 F90 = /opt/intel/oneapi/compiler/2023.0.0/linux/bin/intel64/ifort
 
 LD = $(F77)
-#LD = /opt/intel/oneapi/compiler/2023.0.0/linux/bin/intel64/xild
 # if petsc or parallel compile is desired, define in .petsc or here to use mpif77
 MPILD = $(LD)
 AR = ar
+# set the compiler flag for library directories
+# usually -L, could be -Wl,-L as for HPUX
 MY_LIBDIR_SPEC = -L
 
-# to get core intel libs
-LDFLAGS =  $(MY_LIBDIR_SPEC)/disk/rh_usr_local/intel/oneapi/compiler/2023.0.0/linux/compiler/lib/intel64_lin/ -limf -lifcore -ldl
+# to get intel libs
+LDFLAGS = -L/disk/rh_usr_local/intel/oneapi/compiler/2023.0.0/linux/compiler/lib/intel64_lin/ -limf -lifcore -ldl
 
 
 # X 11 only needed for PGPLOT
 X11LIBDIR = /usr/lib/x86_64-linux-gnu/
 #
-MATHLIBS = -llapack -lblas -lm
+MATHLIBS = -L/disk/rh_usr_local/intel/oneapi/mkl/2023.0.0/lib/intel64/ -lmkl_intel_lp64 -lmkl_intel_thread -lmkl_core -liomp5 -lpthread
+#MATHLIBS = -llapack -lblas -lm
 #
 # warning options
 GCCWOPT = -Wall -Wno-discarded-qualifiers 
@@ -64,8 +71,7 @@ SFARGS = $(SCARGS) -ffixed-line-length-132  -fmax-errors=0 -x f77-cpp-input
 #
 # f90 is intel
 #
-SF90ARGS =  -fpp -fpie -Ofast
-#SF90ARGS =  -fpp -fpie -O3 -xHost # super slow?!
+SF90ARGS =  -fpp -fpie -Ofast 
 #
 SFARGSSAVE = $(SFARGS)
 #
@@ -77,7 +83,7 @@ COMPUTATIONAL_LIBS = $(BLASLIB)
 # where are the modified EISPACK routines from the myeispack.tar.gz
 EISPACK_DIR = eispack/
 # file installed?
-EISPACK_LIB = $(MY_LIBDIR_SPEC)$(EISPACK_DIR)/ -lmyeis
+EISPACK_LIB = -L$(EISPACK_DIR)/ -lmyeis
 
 
 

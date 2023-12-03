@@ -21,6 +21,10 @@
 // eispack
 #define rs rs_
 #define s_rs s_rs_
+
+#define ilwvd ilwvd_
+
+#ifndef USE_MKL
 // LAPACK
 #define dgelss dgelss_
 #define sgelss sgelss_
@@ -30,7 +34,7 @@
 #define sgesv sgesv_
 #define dgesvd dgesvd_
 #define sgesvd sgesvd_
-#define ilwvd ilwvd_
+
 // BLAS
 #define ddot ddot_
 #define sdot sdot_
@@ -38,6 +42,7 @@
 #define sgemm sgemm_
 #define dgemv dgemv_
 #define sgemv sgemv_
+#endif
 
 #define law_nnls law_nnls_
 /*  */

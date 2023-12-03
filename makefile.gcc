@@ -28,7 +28,6 @@ LD = $(F77)
 MPILD = $(LD)
 AR = ar
 # set the compiler flag for library directories
-# usually -L, could be -Wl,-L as for HPUX
 MY_LIBDIR_SPEC = -L
 
 
@@ -82,10 +81,10 @@ COMPUTATIONAL_LIBS = $(BLASLIB)
 # where are the modified EISPACK routines from the myeispack.tar.gz
 EISPACK_DIR = eispack/
 # file installed?
-EISPACK_LIB = -L$(EISPACK_DIR)/ -lmyeis
+EISPACK_LIB = $(MY_LIBDIR_SPEC)$(EISPACK_DIR)/ -lmyeis
 
 
 
 
 # name of interact binary depending on compiler flags
-INTERACT_BINARY_NAME = interact
+INTERACT_BINARY_NAME = interact.gcc
