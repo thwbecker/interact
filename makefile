@@ -123,12 +123,12 @@ OKROUTINE = $(ODIR)/dc3d.o	# my modified version
 # 
 #include makefile.gcc
 #include makefile.mixed_mkl
-include makefile.mixed
-#include makefile.icc
+#include makefile.mixed
+include makefile.icc_frontera
 #
 # add this for pgplot support, otherwise comment it out
 # you will use runtime plotting capabilities
-include makefile.pgplot
+#include makefile.pgplot
 #
 # add this for slatec NNLS routine support, otherwise comment it out
 # you will use NNLS solving capabilities

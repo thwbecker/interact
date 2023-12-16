@@ -1,0 +1,93 @@
+#
+# LINUX system dependent flags
+#
+# CONSTANTS
+#
+# constants you might want to change according to the machine specs
+#
+# IMAT_SPARSE_LIM: limit in MB for I matrix size at which the program switches 
+#                  automatically to sparse matrix storage, ~70% of RAM of machine
+# IMAT_SIZE_LIM:   max size of the interaction matrix in MB that we want in 
+#                  in memory, if size is larger AND NO SPARSE STORAGE is invoked
+#                  will read from file. This is so slow, it's next to impossible to work.
+#
+MACHINE_DEFINES = -DIMAT_SPARSE_LIM=8000.0 -DIMAT_SIZE_LIM=4000.1  \
+	-DSGI_SUBROUTINE_CONVENTION  
+#
+# LINUX system dependent flags for icc
+#
+#
+# compilers
+CC = icx
+#MPICC = mpicc
+MPICC = $(CC)
+F77 = ifort
+F90 = ifort 
+LD = $(F77)
+# rest in .petsc or here to include MPI linked
+MPILD = ifort
+AR = ar
+
+# set the compiler flag for library directories
+MY_LIBDIR_SPEC = -L
+
+
+USE_IPO = 
+
+# LINKER FLAGS (without -lm, that get's added later)
+# gcc
+LDFLAGS =  -nofor-main -L/disk/rh_usr_local/intel/oneapi/mpi/latest/lib/
+
+# X 11 only needed for PGPLOT
+X11LIBDIR = /usr/lib/x86_64-linux-gnu/
+#
+#MATHLIBS = -llapack -lblas -lm
+MATHLIBS = -mkl
+#
+# warning options
+GCCWOPT = -Wall 
+#-Werror
+
+
+# fast execution options, comment those two lines if debug output is wanted
+SCARGS = -Ofast -fPIE  $(GCCWOPT)
+DEBUG_FLAGS=
+
+# these next three lines for debugging, comment if fast execution is desired
+
+#SCARGS =  $(GCCWOPT) 
+#DEBUG_FLAGS=-DDEBUG -g -O0
+
+# other debugging options, comment in for debugging
+# -DSUPER_DUPER_DEBUG -DDDMALLOC
+DEBUG_LIBS = 
+#-DMEM_ALLOC_DEBUG \
+#	-DDEBUG -DSUPER_DEBUG  
+
+
+# fortran flags
+#
+SFARGS = -Ofast -nofor-main -fPIE -extend-source  -fpp
+SF90ARGS = -Ofast -nofor-main  -fPIE -fpp
+#
+SFARGSSAVE = $(SFARGS)
+#
+# BLAS
+BLASLIB =  $(MATHLIBS)
+
+COMPUTATIONAL_LIBS = $(BLASLIB)
+#
+# where are the modified EISPACK routines from the myeispack.tar.gz
+EISPACK_DIR = eispack/
+# file installed?
+EISPACK_LIB = -L$(EISPACK_DIR)/ -lmyeis
+
+
+
+
+# name of interact binary depending on compiler flags
+INTERACT_BINARY_NAME = interact
+
+
+
+
