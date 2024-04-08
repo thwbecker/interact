@@ -121,10 +121,10 @@ OKROUTINE = $(ODIR)/dc3d.o	# my modified version
 # 
 # include the machine dependent flags
 # 
-#include makefile.gcc
+include makefile.gcc
 #include makefile.mixed_mkl
 #include makefile.mixed
-include makefile.icc_frontera
+#include makefile.icc_frontera
 #
 # add this for pgplot support, otherwise comment it out
 # you will use runtime plotting capabilities
@@ -137,7 +137,7 @@ include makefile.icc_frontera
 #
 # petsc, will override some of the flags
 # comment out if not needed
-include makefile.petsc
+#include makefile.petsc
 ifndef MPILD
 MPILD = $(LD)
 endif
@@ -190,7 +190,7 @@ MATRIX_SOLVER_OBJS = $(ODIR)/numrec_svd_routines.o $(ODIR)/nnls_lawson.o	\
 # triangular dislocation routines
 #
 
-TRI_GREEN_OBJS = $(ODIR)/tdstresshs.o  $(ODIR)/tddisphs.o  
+TRI_GREEN_OBJS = $(ODIR)/tdstresshs.o  $(ODIR)/tddisphs.o   $(ODIR)/tdstress_hbi.o 
 
 # list of objects for patch i/o. these also include
 # all object files that deal with interaction coefficients
@@ -280,7 +280,9 @@ FSTRESS2HOR_OBJS = $(ODIR)/block_read_gps.sph.o $(ODIR)/svd.o $(ODIR)/numrec_svd
 OBJ = $(ODIR)/main.o $(INTERACT_OBJS) 
 OBJ_SGL = $(OBJ:.o=.sgl.o)
 NOBJ = $(ODIR)/main.o $(INTERACT_NOISE_OBJS)
-TOBJ = $(ODIR)/test_stuff.o $(INTERACT_OBJS) 
+# test programs
+TOBJ = $(ODIR)/test_stuff.o $(INTERACT_OBJS)
+T2OBJ = $(ODIR)/test_triangle_stress.o $(INTERACT_OBJS) 
 #
 
 #
@@ -350,7 +352,7 @@ converters: $(BDIR)/patch2xyz   $(BDIR)/patch2vtk $(BDIR)/patch2bc \
 
 geom_converters: $(BDIR)/points2patch $(BDIR)/tri2patch  $(BDIR)/patchquad2patchtri 
 
-test:    $(ODIR)/test_stuff 
+test:    $(ODIR)/test_stuff  $(ODIR)/test_triangle_stress
 
 matrix_test_progs: $(BDIR)/test_sparse $(BDIR)/test_optimize $(BDIR)/test_solvers \
 	$(BDIR)/ex_dense
@@ -402,8 +404,12 @@ $(BDIR)/interact_noise.$(NOISELEVEL): $(NOBJ) $(GEN_P_INC) $(LIBLIST)
 
 
 $(ODIR)/test_stuff: $(TOBJ) $(GEN_P_INC)  $(LIBLIST)  
-	$(LD) $(LDFLAGS) $(TOBJ) -o $(ODIR)/test_stuff \
+	$(LD) $(LDFLAGS) $(TOBJ) -o $(BDIR)/test_stuff \
 	$(LIBS) $(PGLIBS)  $(SUPERLU_LIBS)  $(SLATEC_LIBS) 
+
+$(ODIR)/test_triangle_stress: $(T2OBJ) $(GEN_P_INC)  $(LIBLIST)  $(TRI_GREEN_OBJS)
+	$(LD) $(LDFLAGS) $(T2OBJ) $(TRI_GREEN_OBJS) -o $(BDIR)/test_triangle_stress \
+	$(LIBS) $(PGLIBS)  $(SUPERLU_LIBS)  $(SLATEC_LIBS)  $(LDFLAGS)
 
 $(BDIR)/randomflt: $(RANDOMFLT_OBJS)  $(GEN_P_INC)  $(LIBLIST) 
 	$(MPILD) $(RANDOMFLT_OBJS) \
