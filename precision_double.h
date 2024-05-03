@@ -3,7 +3,7 @@
 
 /* for the stress and displacement summation, adding up fault
    contributions? */
-/* #define SUM_ARR_PREC_IN_DOUBLE */
+/* #define SUM_ARR_PREC_IN_DOUBLE  */
 
 
 /* for the A matrix */

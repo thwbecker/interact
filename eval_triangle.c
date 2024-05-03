@@ -31,8 +31,13 @@ void eval_triangle(COMP_PRECISION *x,struct flt *fault,
 		   MODE_TYPE mode)
 {
  
-  COMP_PRECISION stress[6],strain[6];
-
+  COMP_PRECISION stress[6];
+#ifdef USE_HBI_TDDEF
+  double mu = SHEAR_MODULUS,lambda = LAMBDA_CONST;
+#else
+  COMP_PRECISION strain[6];
+#endif
+    
   if(mode != GC_STRESS_ONLY){
     /* input is x y z, vertices, and slip as strike, dip, normal
        displacements are output as east, north, up
@@ -60,10 +65,15 @@ void eval_triangle(COMP_PRECISION *x,struct flt *fault,
     /* 
        stress and strain are given as: Sxx, Syy, Szz, Sxy, Sxz and Syz
     */
+#ifdef USE_HBI_TDDEF
+    hbi_tdstresshs_(x,(x+1),(x+2),&(fault->xt[0]),&(fault->xt[3]),&(fault->xt[6]),slip,(slip+1),(slip+2),&mu,&lambda,
+		    (stress),(stress+1),(stress+2),(stress+3),(stress+4),(stress+5));
+#else
     tdstresshs(x,&(fault->xt[0]),&(fault->xt[3]),&(fault->xt[6]),
 	       (slip),(slip+1),(slip+2),stress,strain);
 #ifdef CRAZY_DEBUG
     fprintf(stderr,"eval_triangle: stress: %g %g %g %g %g %g\n",strain[0],strain[1],strain[2],strain[3],strain[4],strain[5]);
+#endif
 #endif
     if((!finite(stress[0]))||(!finite(stress[1]))||(!finite(stress[2]))||
        (!finite(stress[3]))||(!finite(stress[4]))||(!finite(stress[5]))){

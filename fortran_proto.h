@@ -106,3 +106,7 @@ extern void tdstresshs(COMP_PRECISION *,COMP_PRECISION *,COMP_PRECISION *,COMP_P
 		       COMP_PRECISION *);
 extern void get_tdcs_base_vectors(COMP_PRECISION *,COMP_PRECISION *,COMP_PRECISION *,
 				  COMP_PRECISION *,COMP_PRECISION *,COMP_PRECISION *, COMP_PRECISION *);
+
+extern void hbi_tdstresshs(double *,double *,double *,double *,double *,double *,double *,double *,double *,
+			   double *,double *,double *,double *,double *,
+			   double *,double *,double *);

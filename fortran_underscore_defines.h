@@ -49,6 +49,7 @@
 #define tddisphs tddisphs_
 #define tddisphs_bird tddisphs_bird_
 #define tdstresshs tdstresshs_
+#define hbi_tdstress hbi_tdstresshs_
 #define get_tdcs_base_vectors get_tdcs_base_vectors_
 //other
 #define my_sincos_deg_ftnd my_sincos_deg_ftnd_

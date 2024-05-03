@@ -167,7 +167,9 @@ don't expect anything to work....
 // 
 #define MIN_TIME_STEP (EPS_COMP_PREC/7)
 // limit for solution iterations in rupture.c
-#define RUPTURE_ITER_LIM 150
+//#define RUPTURE_ITER_LIM 150
+#define RUPTURE_ITER_LIM 1000
+
 // critical cutoff values for coulomb stress (critical when stress > - crit_cutoff)
 #define CRITICAL_STRESS_EPS (-EPS_COMP_PREC)
 // if exhaustive slipping (not keep_slipping), 

@@ -14,10 +14,9 @@ int main(int argc,char **argv)
     for(loc[0]=-0.5;loc[0]<=1.5;loc[0]+=0.1){
       for(loc[2]=-1.5;loc[2] < 0;loc[2]+=0.1){
 	
-	
 	tdstresshs_(loc,p1,p2,p3,&Ss,&Ds,&Ts,stress1,strain);
-	hbi_tdstresshs_(loc,(loc+1),(loc+2),p1,p2,p3,&Ss,&Ds,&Ts,&mu,&lambda,
-			(stress2),(stress2+1),(stress2+2),(stress2+3),(stress2+4),(stress2+5));
+	hbi_tdstresshs(loc,(loc+1),(loc+2),p1,p2,p3,&Ss,&Ds,&Ts,&mu,&lambda,
+		       (stress2),(stress2+1),(stress2+2),(stress2+3),(stress2+4),(stress2+5));
 	for(i=0;i<6;i++){
 	  if((finite(stress1[i])&&(!finite(stress2[i])))||
 	     (!finite(stress1[i])&&(finite(stress2[i])))||
