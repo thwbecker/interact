@@ -96,4 +96,43 @@ void eval_triangle(COMP_PRECISION *x,struct flt *fault,
   }
   *giret = 0;
 }
+
+
+/*
+  
+  compute local coordinate system, strike and dip given initialized
+  triangular points xt 
+
+  moved here such that geometry.c can compile without the f90 routines
+
+*/
+void get_tri_prop_based_on_gh(struct flt *fault)
+{
+  COMP_PRECISION dip;
+  double strike,alpha;
+  
+  calc_centroid_tri(fault->xt,fault->x); /* assingn centroid to x */
+  /* F90 routine */
+  get_tdcs_base_vectors(&(fault->xt[0]),&(fault->xt[3]),&(fault->xt[6]),
+			fault->t_strike,fault->t_dip,fault->normal,
+			&fault->area);
+  fault->l = fault->w = sqrt(fault->area);
+
+  strike = atan2(fault->t_strike[INT_X],fault->t_strike[INT_Y])*RAD2DEG;  
+  /*  */
+  if((fault->t_dip[INT_Z]-1) < EPS_COMP_PREC)
+    dip = 90;
+  else
+    dip = (COMP_PRECISION)asin((double)fault->t_dip[INT_Z])*RAD2DEG;
+  
+  check_angles(&dip,&strike);
+  /*  */
+  fault->strike = (COMP_PRECISION)strike;
+  fault->dip    = dip;
+  /*  */
+  alpha = 90 - fault->strike;
+  my_sincos_degd(&(fault->sin_alpha),&(fault->cos_alpha),alpha);
+
+}
+/* end of triangle geometry allowed branch */
 #endif
