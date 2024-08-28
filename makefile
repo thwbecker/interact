@@ -99,7 +99,10 @@ MY_PRECISION = -DUSE_DOUBLE_PRECISION
 
 #COMMON_DEFINES =  -DBINARY_PATCH_EVENT_FILE -DCHECK_CI_ONE_WAY -DNO_OPENING_MODES
 COMMON_DEFINES =  -DBINARY_PATCH_EVENT_FILE -DCHECK_CI_ONE_WAY  \
-	-DALLOW_NON_3DQUAD_GEOM  
+	-DALLOW_NON_3DQUAD_GEOM
+#
+# if we want to test the HBI version of the triangular stress routine
+# -DUSE_HBI_TDDEF
 #
 # noise level for random interact version. this version 
 # doesn't get compiled automatically.
@@ -110,9 +113,9 @@ MAIN_DEFINES = $(COMMON_DEFINES)
 #
 #
 # directory for object files
-ODIR = objects/
+ODIR = objects
 # directory for binaries
-BDIR = bin/
+BDIR = bin
 #
 # choice of Okada routine
 OKROUTINE = $(ODIR)/dc3d.o	# my modified version
@@ -137,7 +140,7 @@ include makefile.gcc
 #
 # petsc, will override some of the flags
 # comment out if not needed
-#include makefile.petsc
+include makefile.petsc
 ifndef MPILD
 MPILD = $(LD)
 endif
@@ -165,8 +168,6 @@ FLAGS = $(DEFINE_FLAGS) $(PGPLOT_INCLUDES) $(SLATEC_INCLUDES) \
 CFLAGS =   $(FLAGS) $(SCARGS)   $(DEBUG_FLAGS) $(MACHINE_DEFINES)
 FFLAGS =   $(FLAGS) $(SFARGS)   $(DEBUG_FLAGS) $(MACHINE_DEFINES)
 F90FLAGS = $(FLAGS) $(SF90ARGS) $(DEBUG_FLAGS) $(MACHINE_DEFINES)
-
-
 
 
 #
@@ -204,10 +205,10 @@ PATCH_IO_OBJS = $(ODIR)/divide_fault_in_patches.o $(ODIR)/sparse.o	\
 	$(ODIR)/check_interaction.o $(ODIR)/eval_2dsegment.o		\
 	$(ODIR)/eval_okada.o $(ODIR)/tdd_coeff.o $(ODIR)/rhs.o		\
 	$(ODIR)/eval_green.o $(ODIR)/eval_triangle.o			\
-	$(ODIR)/interact.o   $(ODIR)/mysincos.o $(TRI_GREEN_OBJS)	\
+	$(ODIR)/interact.o   $(ODIR)/mysincos.o 	\
 	$(OKROUTINE) $(ODIR)/fracture_criterion.o			\
 	$(ODIR)/myopen.o  $(ODIR)/randgen.o \
-	$(ODIR)/string_compare.o 
+	$(ODIR)/string_compare.o  $(TRI_GREEN_OBJS)
 
 PATCH_IO_OBJS_SGL = $(PATCH_IO_OBJS:.o=.sgl.o)
 #
@@ -316,8 +317,8 @@ all: obj_directories libraries main_prog \
 
 really_all: obj_directories libraries main_prog \
 	tools converters geom_converters \
-	inoise analysis geographic_tools \
-	 pgplot_progs 
+	inoise analysis geographic_tools 
+#	pgplot_progs 
 
 main_prog: $(BDIR)/$(INTERACT_BINARY_NAME) $(BDIR)/$(INTERACT_BINARY_NAME).sgl
 

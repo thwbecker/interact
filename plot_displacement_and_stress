@@ -3,11 +3,6 @@ flabel=${1-vert.0.9}
 depths=${2-"0 -3 -6"}
 glabel=${3-""}
 
-range=30
-reg=-R-$range/$range/-$range/$range;inc=-I2
-
-annl=a10f2
-scale=.1
 
 tmpn=`mktemp`
 trap "rm -f $tmpn*" EXIT
@@ -17,16 +12,35 @@ if [[ ! -s disp.$flabel.out || ! -s stress.$flabel.out ]];then
     echo $0: either disp.$flabel.out or stress.$flabel.out not found
     exit
 fi
+read xmin xmax nx ymin ymax ny zmin zmaz nz < stress.$flabel.hdr
+
+#range=30;reg=-R-$range/$range/-$range/$range;inc=-I2
+reg=-R$xmin/$xmax/$ymin/$ymax
+dx=`echo $xmin $xmax $nx | gawk '{print(($2-$1)/($3-1))}'`
+dy=`echo $ymin $ymax $ny | gawk '{print(($2-$1)/($3-1))}'`
+dz=`echo $zmin $zmax $nz | gawk '{print(($2-$1)/($3-1))}'`
+inc=-I$dx/$dy
+
+annl=a10f2
+scale=.1
+
+
 
 
 proj="-Jx$scale"
-
-makecpt -T-.25/.25/.025 -Cvik > disp.cpt
-lupcl=0.1
-
-makecpt -T-300/300/30 -Cvik > stress.cpt
-makecpt -T-1/2/.25  -Croma -I > s2.cpt
-lspcl=100
+if [ `echo $flabel| gawk -F. '{if($(NF)=="diff")print(1);else print(0)}'` -eq 1 ];then
+    makecpt -T-.25e-7/.25e-7/.025e-7 -Cvik > disp.cpt
+    lupcl=0.1e-7
+    makecpt -T-300e-7/300e-7/30e-7 -Cvik > stress.cpt
+    makecpt -T-1e-7/2e-7/.25e-7  -Croma -I > s2.cpt
+    lspcl=100e-7
+else
+    makecpt -T-.25/.25/.025 -Cvik > disp.cpt
+    lupcl=0.1
+    makecpt -T-300/300/30 -Cvik > stress.cpt
+    makecpt -T-1/2/.25  -Croma -I > s2.cpt
+    lspcl=100
+fi
 
 
 for depth in $depths;do
@@ -88,7 +102,7 @@ for depth in $depths;do
 	grdimage $tmpn.$depth.$s.grd $reg $proj -B$annl:"x":/$annl:"y"::."$glabel - z = $depth, $slabel":WesN -P -K -C$cmp.cpt > $ofile
 	#cat $mode/geom.in | patch2xyz | gawk '{print($1,$2)}' |  psxy $reg $proj -W0.25 -L -m -O -K -t70  >> $ofile
 	psscale -D3./-.25/4/.2h -C$cmp.cpt $ends -B$lspc/:"$slabel": -O >> $ofile
-	modifybb $ofile &
+	modifybb $ofile 0 &
 	#gv $ofile;exit
 	fs="$fs $ofile"
     done
@@ -97,5 +111,5 @@ wait
 epsmerge -x 3 -y 3 --orientation Portrait -par $fs > stress.$flabel.ps
 rm $fs
 echo $0: output in stress.$flabel.ps
-rm $tmpn.*
+#rm $tmpn.*
 

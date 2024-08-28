@@ -11,7 +11,7 @@
 #                  in memory, if size is larger AND NO SPARSE STORAGE is invoked
 #                  will read from file. This is so slow, it's next to impossible to work.
 #
-MACHINE_DEFINES = -DIMAT_SPARSE_LIM=8000.0 -DIMAT_SIZE_LIM=4000.1  -DSGI_SUBROUTINE_CONVENTION  \
+MACHINE_DEFINES = -DIMAT_SPARSE_LIM=8000.0 -DIMAT_SIZE_LIM=8000.1  -DSGI_SUBROUTINE_CONVENTION  \
 		 -I/disk/rh_usr_local/intel/oneapi/mkl/2023.0.0/include/
 #
 # LINUX system dependent flags for gcc and a few f90 intel compiles
@@ -83,4 +83,5 @@ EISPACK_LIB = $(MY_LIBDIR_SPEC)$(EISPACK_DIR)/ -lmyeis
 
 
 # name of interact binary depending on compiler flags
-INTERACT_BINARY_NAME = interact.mixed
+#INTERACT_BINARY_NAME = interact.mixed
+INTERACT_BINARY_NAME = interact

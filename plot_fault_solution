@@ -47,11 +47,11 @@ for prop in 0 1 2 10 11 12;do
 	exit
     fi
     if [ $disp -eq 1 ];then
-	makecpt -T-1/1/.1 -Cvik > $tmpn.cpt
+	makecpt -T-1.25/1.25/.125 -Cvik > $tmpn.cpt
 	lspc=.5
     else
-	makecpt -T-500/500/50 -Croma > $tmpn.cpt
-	lspc=250
+	makecpt -T-2000/2000/200 -Croma > $tmpn.cpt
+	lspc=1000
     fi
     
     ofile=$ff.$prop.ps
@@ -60,7 +60,7 @@ for prop in 0 1 2 10 11 12;do
     echo 0 1.1 55 0 29 LM "$tlabel" | pstext -R0/1/0/1 -JX5 -O -Gwhite -K -N >>$ofile
     echo 0 .9 45 0 29 LM "$label" | pstext -R0/1/0/1 -JX5 -O -Gwhite -K -N >>$ofile
     psscale -D1/0.5/3/.2h -E -C$tmpn.cpt -B$lspc:$label:  -O >> $ofile
-    modifybb $ofile &
+    modifybb $ofile 0 &
     #gv $ofile;exit
     fs="$fs $ofile"
 done
