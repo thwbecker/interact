@@ -15,7 +15,7 @@
 
 int main(int argc,char **argv)
 {
-  COMP_PRECISION *s1,*s2,*ds,dsm[6],rms1,rms2,sfit[6],drms,
+  COMP_PRECISION *s1,*s2,*ds,dsm[6],rms1,rms2,drms,
     lon1,lat1,lon2,lat2,*w,*azi1,*azi2,*dazi,dcorrect[6],
     s1h,s2h,hazi;
   int n,n6,i;
@@ -89,7 +89,6 @@ int main(int argc,char **argv)
 	     wmean(dazi,1,n,w),wmean_abs(dazi,1,n,w));
       }
     }
-  sfit[0]=0.0;
   return 0;
 }
 

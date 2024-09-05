@@ -29,6 +29,7 @@ int read_fltdat(char *filename,struct flt *fault,struct med *medium,
   char stdin_string[6]="stdin";
   COMP_PRECISION coulomb,mud_normal;
   char *line=NULL;
+  int iret;
   if(!medium->geometry_init){
     fprintf(stderr,"read_fltdat: error, initialize fault geometry first\n");
     exit(-1);
@@ -50,8 +51,8 @@ int read_fltdat(char *filename,struct flt *fault,struct med *medium,
   /* 
      read two header 
   */
-  getline(&line,&size_dummy,in);free(line);line=NULL;
-  getline(&line,&size_dummy,in);free(line);line=NULL;
+  iret=getline(&line,&size_dummy,in);free(line);line=NULL;
+  iret=getline(&line,&size_dummy,in);free(line);line=NULL;
 
   for(grp=0;grp<medium->nrgrp;grp++)
     for(i=0;i<medium->nrflt;i++){

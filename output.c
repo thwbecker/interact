@@ -11,6 +11,17 @@
 #include "interact.h"
 #include "properties.h"
 
+int mysystem(const char *command)
+{
+  int rval;
+  rval = system(command);
+  if(rval != 0){
+    fprintf(stderr,"mysystem: error %i upon executing %s\n",
+	    rval,command);
+    exit(-1);
+  }
+  return rval;
+}
 /* 
    
    slip line files, ie. slip on a fault at a certain time

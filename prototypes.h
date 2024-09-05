@@ -22,3 +22,4 @@ void assemble_a_matrix_1(A_MATRIX_PREC *,int ,my_boolean *,int ,int *,struct flt
 void assemble_a_matrix_2(A_MATRIX_PREC *,int ,my_boolean *,int ,int *,struct flt *,struct med *);
 void assemble_a_matrix_3(A_MATRIX_PREC *,int ,my_boolean *,int ,int *,struct flt *,struct med *);
 void assemble_a_matrix_4(A_MATRIX_PREC *,int ,my_boolean *,int ,int *,struct flt *,struct med *);
+int mysystem(const char *);

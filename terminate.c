@@ -23,7 +23,7 @@
 
 void terminate(struct med *medium, struct flt *fault)
 {
-  int i,serr;
+  int i;
   char tmpstr[STRLEN];
   HEADNODE{
     fprintf(stderr,"terminate: closing files and cleaning up\n");
@@ -53,11 +53,7 @@ void terminate(struct med *medium, struct flt *fault)
 	  fprintf(stderr,"terminate: removing the interaction matrix files \"%s\" and \"%s\"\n",
 		  medium->mfname,medium->hfname);
 	snprintf(tmpstr,STRLEN,"rm  %s %s.hdr",medium->mfname,medium->hfname);
-	serr = system(tmpstr);
-	if(serr){
-	  fprintf(stderr,"initialize: error with %s\n",tmpstr);
-	  exit(-1);
-	}
+	mysystem(tmpstr);
       }
     }else{// I matrix was kept in memory but might still be on file
       ;

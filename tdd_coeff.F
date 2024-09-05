@@ -84,7 +84,7 @@ c
 	   fl2 = 0.5d0 * log(r2s)
 	   fb2 = con * (fl1 - fl2)
 	   call det_atan_f3(xbpa,xbma,xb,yb,a,con,fb3)
- 20	   fb4 = con * (yb/r1s - yb/r2s)
+ 	   fb4 = con * (yb/r1s - yb/r2s)
 	   fb5 = con * ((xbma)/r1s - (xbpa)/r2s)
 	   fb6 = con * (((xbma)**2-yb*yb)/r1s**2-((xbpa)**2-yb*yb)/r2s**2)
 	   fb7 = 2.*con*yb*((xbma)/r1s**2-(xbpa)/r2s**2)
@@ -128,7 +128,7 @@ c
 	      r1sp = (xbpma) * (xbpma) + ybp * ybp
 	      r2sp = (xbppa) * (xbppa) + ybp * ybp
 	      if((abs(r1sp).le.EPS_COMP_PREC_FOR_NAN).or.
-     & 		   (abs(r2sp).le.EPS_COMP_PREC_FOR_NAN))then
+     1           (abs(r2sp).le.EPS_COMP_PREC_FOR_NAN))then
 		 iret=1
 	      endif
 	      if(iret.eq.0)then
@@ -136,18 +136,19 @@ c
 		 fl2p = 0.5d0 * log(r2sp)
 		 fbp2 = con * (fl1p - fl2p)
 		 call det_atan_f3(xbppa,xbpma,xbp,ybp,a,con,fbp3)
- 120		 fbp4 = con * (ybp/r1sp - ybp/r2sp)
+ 		 fbp4 = con * (ybp/r1sp - ybp/r2sp)
 		 fbp5 = con * ((xbpma)/r1sp - (xbppa)/r2sp)
 		 fbp6 = con * (((xbpma)**2-ybp*ybp)/r1sp**2-
      1                ((xbppa)**2-ybp*ybp)/r2sp**2)
 		 fbp7 = 2.0d0*con*ybp*((xbpma)/r1sp**2-(xbppa)/r2sp**2)
-		 fbp8 = 2.0d0*con*ybp*((ybp**2-3*(xbpma)**2)/((xbpma)**2+ybp**2)**3-
+		 fbp8 = 2.0d0*con*ybp*((ybp**2-3*(xbpma)**2)/
+     1                     ((xbpma)**2+ybp**2)**3-
      1                     (ybp**2-3*(xbppa)**2)/((xbppa)**2+ybp**2)**3)
 		 fbp9 = 2.0d0*con*((xbpma)/((xbpma)**2+ybp**2)**2-
      1                 (xbppa)/((xbppa)**2+ybp**2)**2+
      2                 4.0d0*ybp**2*((xbppa)/((xbppa)**2+ybp**2)**3-
      3                           (xbpma)/((xbpma)**2+ybp**2)**3))
-c
+
 
 		 uxpds = pr1*sinb*fbp2-pr2*cosb*fbp3+
      1          (chi*(y*sin2b-yb*sinb)+2.0d0*y*sin2b)*fbp4+

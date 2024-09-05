@@ -98,7 +98,7 @@ void read_boundary_conditions(struct med *medium,
 #else
 	HEADNODE
 	  fprintf(stderr,"read_boundary_conditions: you requested X output but program was compiled without PGPLOT support\n");
-	fscanf(in,"%*f %*f");
+	i = fscanf(in,"%*f %*f");
 #endif
       }
       /* 

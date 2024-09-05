@@ -98,7 +98,6 @@ void initialize(struct med **medium, struct flt **fault,
 		my_boolean init_system,COMP_PRECISION wcutoff,
 		my_boolean no_interactions,my_boolean force_petsc)
 {
-  int serr;
 #ifdef USE_PETSC
   int fchunk;
 #endif
@@ -159,11 +158,7 @@ void initialize(struct med **medium, struct flt **fault,
   if(((*medium)->debug = debug)){
     fprintf(stderr,"initialize: running in debugging mode, output in directory %s\n",INT_TMP_DIR);
     snprintf(tmpstring,STRLEN,"mkdir -p %s",INT_TMP_DIR);
-    serr = system(tmpstring);
-    if(serr){
-      fprintf(stderr,"initialize: could not make temporary output dir %s\n",INT_TMP_DIR);
-      exit(-1);
-    }
+    mysystem(tmpstring);
   }
   //
   // read in boundary conditions, e.g. what kind of simulations, if

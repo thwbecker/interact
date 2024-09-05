@@ -209,7 +209,11 @@ int solve(struct med *medium,struct flt *fault)
 
     */
     if(medium->force_petsc || (medium->comm_size>1)){
-      /* parallel solve using PETSC */
+      /* 
+
+	 parallel matrix solve 
+	 
+      */
       HEADNODE{
 	sprintf(out_string,"attempting Petsc LU solve, %i core(s) requested",
 	       medium->comm_size);
@@ -503,7 +507,7 @@ int solve(struct med *medium,struct flt *fault)
 	if(medium->debug){
 	  if(!medium->save_amat){// if A is not to be saved, remove
 	    sprintf(command_str,"rm %s",A_MATRIX_FILE);
-	    system(command_str);
+	    mysystem(command_str);
 	  }
 	}
 	fprintf(stderr,"solve: unconstrained: conversion complete (sparse size: %g MB) gain: %g\n",
