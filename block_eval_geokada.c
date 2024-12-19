@@ -65,7 +65,7 @@ void block_eval_geookada(COMP_PRECISION *xl,
     px[INT_Z] = -udepth;			
     //
     // evaluate displacements in rotated frame
-    eval_rectangle_basic(px,fl,fw,fdip,-fz,disp,pu,ps,iret);
+    eval_okada_basic(px,fl,fw,fdip,-fz,disp,pu,ps,iret);
     /* this will also return stresses, but possibly at 
        different depth from sdepth */
     if(*iret){
@@ -93,7 +93,7 @@ void block_eval_geookada(COMP_PRECISION *xl,
     }else{
       /* reevaluate stresses, since different depth */
       px[INT_Z] = -sdepth;
-      eval_rectangle_basic(px,fl,fw,fdip,-fz,disp,pu,ps,iret);
+      eval_okada_basic(px,fl,fw,fdip,-fz,disp,pu,ps,iret);
       if(*iret){
 	fprintf(stderr,"block_eval_geookada: WARNING: singular at obs point: %g, %g, %g\n",
 		*(xl+INT_X),*(xl+INT_Y),sdepth);

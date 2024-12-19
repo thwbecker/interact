@@ -1,9 +1,9 @@
 /*
   interact: model fault interactions using dislocations in a 
   halfspace
-  (C) Thorsten Becker, becker@eps.harvard.edu
+
+  (c) Thorsten Becker, thbecker@post.harvard.edu
   
-  $Id: geometry.c,v 2.44 2003/12/20 21:53:59 becker Exp $
 */
 #include "interact.h"
 #include "properties.h"
@@ -167,100 +167,169 @@ void get_maxsdir_stress_drops(COMP_PRECISION *stress,
 }
 
 /* 
-   calculate the positions of the corners of a fault patch if
+   calculate the positions of the vertices of a fault patch if
    fault is a 3-D rectangle
 
-   if fault is a segment, only calculate the first two corners, 
+   if fault is a segment, only calculate the first two vertexs, 
    which will be the left and right endpoint of the segment 
 
    this will also return total (not half) fault length and width
 
 */
-void calculate_corners(COMP_PRECISION corner[4][3],
-		       struct flt *fault,
-		       COMP_PRECISION *l, COMP_PRECISION *w)
+void calculate_vertices(COMP_PRECISION *vertex,
+			struct flt *fault,
+			COMP_PRECISION *l, COMP_PRECISION *w)
 {
 #ifdef ALLOW_NON_3DQUAD_GEOM
   if(patch_is_2d(fault->type)){	/* 2D */
-    calculate_seg_corners(corner,fault,1.0);
+    calculate_seg_vertices(vertex,fault,1.0);
     *l = fault->l*2;*w = NAN;
-  }else if(fault->type == RECTANGULAR_PATCH){ /* quad */
-    calculate_quad_corners(corner,fault,1.0);
+  }else if(fault->type == OKADA_PATCH){ /* quad */
+    calculate_quad_vertices(vertex,fault,1.0);
     *l = fault->l*2;*w = fault->w*2;
   }else if(fault->type == POINT_SOURCE){ /* point source */
-    calculate_point_source_corners(corner,fault,1.0,l,w);
+    calculate_point_source_vertices(vertex,fault,1.0,l,w);
     *l = *w = NAN;
   }else if(fault->type == TRIANGULAR){
-    calculate_tri_corners(corner,fault,1.0);
+    calculate_tri_vertices(vertex,fault,1.0);
+    *l = *w = NAN;
+  }else if(fault->type == IQUAD){
+    calculate_iquad_vertices(vertex,fault,1.0);
     *l = *w = NAN;
   }else{
-    fprintf(stderr,"calculate_corners: error, element type %i is not implemented\n",
+    fprintf(stderr,"calculate_vertices: error, element type %i is not implemented\n",
 	    fault->type);
     exit(-1);
   }
 #else
-  calculate_quad_corners(corner,fault,1.0);
+  calculate_quad_vertices(vertex,fault,1.0);
   *l = fault->l*2;*w = fault->w*2;
 #endif
 }
 /*
   blows up the faults length and width by a factor 
-  leeway and calculates the corners
+  leeway and calculates the vertices
   if leeway = 1 same as above
   
 */
-void calculate_bloated_corners(COMP_PRECISION corner[4][3],
+void calculate_bloated_vertices(COMP_PRECISION *vertex,
 			       struct flt *fault,
 			       COMP_PRECISION leeway)
 {
 #ifdef ALLOW_NON_3DQUAD_GEOM
   COMP_PRECISION lloc,wloc;
   if(patch_is_2d(fault->type))
-    calculate_seg_corners(corner,fault,leeway);
-  else if(fault->type == RECTANGULAR_PATCH)
-    calculate_quad_corners(corner,fault,leeway);
+    calculate_seg_vertices(vertex,fault,leeway);
+  else if(fault->type == OKADA_PATCH)
+    calculate_quad_vertices(vertex,fault,leeway);
   else if(fault->type == TRIANGULAR)
-    calculate_tri_corners(corner,fault,leeway);
+    calculate_tri_vertices(vertex,fault,leeway);
+  else if(fault->type == IQUAD)
+    calculate_iquad_vertices(vertex,fault,leeway);
   else if(fault->type == POINT_SOURCE)
-    calculate_point_source_corners(corner,fault,leeway,&lloc,
-				   &wloc);
+    calculate_point_source_vertices(vertex,fault,leeway,&lloc,
+				    &wloc);
   else{
-    fprintf(stderr,"calculate_bloated_corners: error, fault type %i not implemented\n",
+    fprintf(stderr,"calculate_bloated_vertices: error, fault type %i not implemented\n",
 	    fault->type);
     exit(-1);
   }
 #else
-  calculate_quad_corners(corner,fault,leeway);
+  calculate_quad_vertices(vertex,fault,leeway);
 #endif
 }
-/* determine the number of vertices in each patch */
-int ncon_of_patch(struct flt *fault)
+/* 
+   determine the total number of vertices in each patch for plotting
+   purposes
+
+*/
+int nvert_of_patch(struct flt *fault)
+{
+  int nvert;
+#ifdef ALLOW_NON_3DQUAD_GEOM
+  if(patch_is_2d(fault->type))
+    nvert = 2;
+  else if(fault->type == OKADA_PATCH)
+    nvert = 4;
+  else if(fault->type == IQUAD)
+    nvert = 5;
+  else if(fault->type == TRIANGULAR)
+    nvert = 3;
+  else if(fault->type == POINT_SOURCE)
+    nvert = 1;
+  else{
+    fprintf(stderr,"nvert_of_patch: mode %i undefined\n",fault->type);
+    exit(-1);
+  }
+#else
+  nvert = 4;
+#endif
+#ifdef DEBUG
+  if(nvert > MAX_NR_EL_VERTICES){
+    fprintf(stderr,"nvert_of_patch: %i out of range %i\n",nvert, MAX_NR_EL_VERTICES);
+    exit(-1);
+  }
+#endif
+  return nvert;
+}
+
+/* number of subelement connections */
+int ncon_of_subpatch(struct flt *fault, int nsubel)
 {
 #ifdef ALLOW_NON_3DQUAD_GEOM
   if(patch_is_2d(fault->type))
     return 2;
-  else if(fault->type == RECTANGULAR_PATCH)
+  else if(fault->type == OKADA_PATCH)
     return 4;
+  else if(fault->type == IQUAD)
+    return 3;
   else if(fault->type == TRIANGULAR)
     return 3;
   else if(fault->type == POINT_SOURCE)
     return 1;
   else{
-    fprintf(stderr,"ncon_of_patch: mode %i undefined\n",fault->type);
+    fprintf(stderr,"ncon_of_subpatch: mode %i undefined\n",fault->type);
     exit(-1);
   }
 #else
   return 4;
 #endif
 }
+
+COMP_PRECISION projected_slip_major_to_minor_patch(struct flt *fault, int main_dir, int project_dir, int nsubel)
+{
+#ifdef ALLOW_NON_3DQUAD_GEOM
+  if(fault->type == IQUAD){
+    if(nsubel==0){
+      return ((main_dir==project_dir)?(1.0):(0.0));
+    }else if(nsubel==1){
+      return fault->xn[(MAX_NR_EL_VERTICES+project_dir)*3+main_dir];
+    }else{
+      return fault->xn[(MAX_NR_EL_VERTICES+3+project_dir)*3+main_dir];
+    }
+  }else{
+    return ((main_dir==project_dir)?(1.0):(0.0));
+  }
+#else
+  return ((main_dir==project_dir)?(1.0):(0.0));
+#endif
+  
+
+}
+
+
+
+
 /* determine the VTK code of the patch type */
-int vtk_type_of_patch(struct flt *fault)
+int vtk_type_of_patch(struct flt *fault, int nsubel)
 {
 #ifdef ALLOW_NON_3DQUAD_GEOM
   if(patch_is_2d(fault->type))
     return 3;			/* vtk line */
-  else if(fault->type == RECTANGULAR_PATCH)
+  else if(fault->type == OKADA_PATCH)
     return 9;			     /* vtk quad */
+  else if(fault->type == IQUAD)
+    return 5;			     /* vtk three triangles approximation */
   else if(fault->type == TRIANGULAR) /*  */
     return 5;			     /* vtk tri */
   else if(fault->type == POINT_SOURCE)
@@ -273,9 +342,62 @@ int vtk_type_of_patch(struct flt *fault)
   return 9;
 #endif
 }
+
+/* number of sub elements */
+int number_of_subpatches(struct flt *fault)
+{
+#ifdef ALLOW_NON_3DQUAD_GEOM
+  if(fault->type == IQUAD)
+    return 3;
+  else
+    return 1;
+#else
+  return 1;
+#endif
+}
+
+int node_number_of_subelement(struct flt *fault,
+			      int inode, int isubel)
+{
+#ifdef ALLOW_NON_3DQUAD_GEOM
+#ifdef DEBUG
+  if((isubsel >2)||(inode>2)){
+    fprintf(stderr,"node_number_of_subelement: isubsel %i inode %i\n",
+	    isubsel,inode);
+    exit(-1);
+  }
+#endif
+  if(fault->type == IQUAD){
+    if(isubel==0){		/* main triangle */
+      return inode;
+    }else if(isubel==1){	/* first aux triangle */
+      if(inode==0)		/*  */
+	return 3;
+      else if(inode==1)
+	return 0;
+      else
+	return 2;
+    }else{			/* second aux triangle */
+      if(inode==0)
+	return 0;
+      else if(inode==1)
+	return 4;
+      else
+	return 1;
+    }
+  }else{
+    return inode;
+  }
+#else
+  return inode;
+#endif
+
+}
+  
+
 /*
   
-  calculate the corners of a rectangular patch, sorted FE CCW style
+  calculate the vertices of a rectangular patch, sorted FE CCW style
   from lower left
 
   3 --- 2
@@ -283,8 +405,8 @@ int vtk_type_of_patch(struct flt *fault)
   0 --- 1 
 
  */
-void calculate_quad_corners(COMP_PRECISION corner[4][3],struct flt *fault,
-			    COMP_PRECISION leeway)
+void calculate_quad_vertices(COMP_PRECISION *vertex,struct flt *fault,
+			     COMP_PRECISION leeway)
 {
   int i;
   COMP_PRECISION sx,dx;
@@ -292,13 +414,13 @@ void calculate_quad_corners(COMP_PRECISION corner[4][3],struct flt *fault,
     sx = fault->t_strike[i] * (COMP_PRECISION)fault->l * leeway;
     dx = fault->t_dip[i]    * (COMP_PRECISION)fault->w * leeway;
     // lower left
-    corner[0][i]=fault->x[i]-sx-dx;
+    vertex[0*3+i]=fault->x[i]-sx-dx;
     // lower right
-    corner[1][i]=fault->x[i]+sx-dx;
+    vertex[1*3+i]=fault->x[i]+sx-dx;
     // upper right
-    corner[2][i]=fault->x[i]+sx+dx;
+    vertex[2*3+i]=fault->x[i]+sx+dx;
     // upper left
-    corner[3][i]=fault->x[i]-sx+dx;
+    vertex[3*3+i]=fault->x[i]-sx+dx;
   }
 }
 #ifdef ALLOW_NON_3DQUAD_GEOM
@@ -306,12 +428,12 @@ void calculate_quad_corners(COMP_PRECISION corner[4][3],struct flt *fault,
 /* 
 
    calculate the three vertices for a triangle those are identical to
-   the ->xt array, but for visualization purposes, we also allow for
+   the ->xn array, but for visualization purposes, we also allow for
    shrinking a patch, in which case they are computed by reduced
    vectors from centroid
 */
-void calculate_tri_corners(COMP_PRECISION corner[4][3],struct flt *fault,
-			   COMP_PRECISION leeway)
+void calculate_tri_vertices(COMP_PRECISION *vertex,struct flt *fault,
+			    COMP_PRECISION leeway)
 {
   static my_boolean init = FALSE;
   COMP_PRECISION vec[3];
@@ -319,38 +441,62 @@ void calculate_tri_corners(COMP_PRECISION corner[4][3],struct flt *fault,
   if(leeway == 1.0){
     for(i=0;i<3;i++)
       for(j=0;j<3;j++)
-	corner[i][j] = fault->xt[i*3+j];
+	vertex[i*3+j] = fault->xn[i*3+j];
    
   }else{
     if(!init)
-      fprintf(stderr,"calculate_tri_corners: WARNING: leeway != 1 only approximate\n");
+      fprintf(stderr,"calculate_tri_vertices: WARNING: leeway != 1 only approximate\n");
     for(i=0;i<3;i++){
       for(j=0;j<3;j++){
-	vec[j] = fault->xt[i*3+j] - fault->x[j]; /* diff from centroid */
-	corner[i][j] = fault->x[j] + leeway * vec[j];
+	vec[j] = fault->xn[i*3+j] - fault->x[j]; /* diff from centroid */
+	vertex[i*3+j] = fault->x[j] + leeway * vec[j];
       }
     }
   }
   for(j=0;j<3;j++)
-    corner[3][j] = NAN;
+    vertex[3*3+j] = NAN;
   init = TRUE;
 }
+
+void calculate_iquad_vertices(COMP_PRECISION *vertex,struct flt *fault,
+			      COMP_PRECISION leeway)
+{
+  COMP_PRECISION dx;
+  int i,j;
+  if(leeway == 1.0){
+    for(i=0;i<15;i++){
+      vertex[i] = fault->xn[i];
+    }
+  }else{
+    for(j=0;j<5;j++){
+      for(i=0;i<3;i++){
+	dx = fault->xn[j*3+i] - fault->x[i]; /* diff from centroid */
+	vertex[j*3+i] = fault->x[i] + leeway * dx;
+      }
+    }
+  }
+}
+
+
+
+
+
 #endif
 /*
   
-  calculate the "corners" of a point source patch
+  calculate the "vertices" of a point source patch
 
 */
-void calculate_point_source_corners(COMP_PRECISION corner[4][3],
-				    struct flt *fault,
-				    COMP_PRECISION leeway,
-				    COMP_PRECISION *l,
-				    COMP_PRECISION *w)
+void calculate_point_source_vertices(COMP_PRECISION *vertex,
+				     struct flt *fault,
+				     COMP_PRECISION leeway,
+				     COMP_PRECISION *l,
+				     COMP_PRECISION *w)
 {
   int i;
   COMP_PRECISION sx,dx;
   if(fault->l > 0){
-    fprintf(stderr,"calculate_point_source_corners: fault->l should be < 0 and \"aspect ratio\"\n");
+    fprintf(stderr,"calculate_point_source_vertices: fault->l should be < 0 and \"aspect ratio\"\n");
     exit(-1);
   }
   // W = sqrt(area/(4 aspect ratio)) = sqrt(W'/(4 -L'))
@@ -362,37 +508,37 @@ void calculate_point_source_corners(COMP_PRECISION corner[4][3],
     sx = fault->t_strike[i] * (*l) * leeway;
     dx = fault->t_dip[i]    * (*w) * leeway;
     // lower left
-    corner[0][i]=fault->x[i]-sx-dx;
+    vertex[0*3+i]=fault->x[i]-sx-dx;
     // lower right
-    corner[1][i]=fault->x[i]+sx-dx;
+    vertex[1*3+i]=fault->x[i]+sx-dx;
     // upper right
-    corner[2][i]=fault->x[i]+sx+dx;
+    vertex[2*3+i]=fault->x[i]+sx+dx;
     // upper left
-    corner[3][i]=fault->x[i]-sx+dx;
+    vertex[3*3+i]=fault->x[i]-sx+dx;
   }
 }
 /*
   
-  calculate the two corners of a 2-D segment
+  calculate the two vertices of a 2-D segment
 
-  corners 3 and four remain undefined
+  vertices 3 and four remain undefined
 */
-void calculate_seg_corners(COMP_PRECISION corner[4][3],struct flt *fault,
-			   COMP_PRECISION leeway)
+void calculate_seg_vertices(COMP_PRECISION *vertex,struct flt *fault,
+			    COMP_PRECISION leeway)
 {
   int i,j;
   COMP_PRECISION sx;
   for(i=0;i<2;i++){
     sx = fault->t_strike[i] * (COMP_PRECISION)fault->l * leeway;
     // lower left
-    corner[0][i]=fault->x[i]-sx;
+    vertex[0*3+i]=fault->x[i]-sx;
     // lower right
-    corner[1][i]=fault->x[i]+sx;
+    vertex[1*3+i]=fault->x[i]+sx;
   }
-  corner[0][INT_Z] = corner[1][INT_Z] = 0.0;
+  vertex[0*3+INT_Z] = vertex[1*3+INT_Z] = 0.0;
   for(i=3;i<4;i++)
     for(j=0;j<3;j++)
-      corner[i][j] = NAN;
+      vertex[i*3+j] = NAN;
 }
 
 /*
@@ -566,10 +712,10 @@ void calc_group_geometry(struct med *medium,struct flt *fault,
 			 struct geog *grp)
 {
   int i,j,k,clim,igrp;
-  COMP_PRECISION dx1[3],dx2[3],corner[4][3],fac,pos[2],l,w,dist_max,dist;
+  COMP_PRECISION dx1[3],dx2[3],vertex[MAX_NR_EL_VERTICES*3],fac,pos[2],l,w,dist_max,dist;
   static int group_geom_mode = 1;
 #ifdef ALLOW_NON_3DQUAD_GEOM
-  COMP_PRECISION global_dip_rad,sin_global_dip_rad,cos_global_dip_rad,
+  COMP_PRECISION global_dip_rad,sin_global_dip_rad,cos_global_dip_rad,xp[12],xc[3],
     gnormal[3],gstrike[3],gdip[3];  
 #endif
   /*
@@ -598,6 +744,22 @@ void calc_group_geometry(struct med *medium,struct flt *fault,
       //fprintf(stderr,"%g %g %g %g %g\n",fault[i].strike,fault[i].dip,gstrike[0],gstrike[1],gstrike[2]);
       a_equals_b_vector_3d(dx1,gstrike);
       a_equals_b_vector_3d(dx2,gdip);
+    }else if(fault[i].type == IQUAD){
+      xc[0]=xc[1]=xc[2]=0.0;
+      for(j=0;j<3;j++){
+	xc[j] += fault[i].xn[3*3+j];
+	xc[j] += fault[i].xn[4*3+j];
+	xc[j] += fault[i].xn[1*3+j];
+	xc[j] += fault[i].xn[2*3+j];
+
+	xp[0*3+j] = fault[i].xn[3*3+j];
+	xp[1*3+j] = fault[i].xn[4*3+j];
+	xp[2*3+j] = fault[i].xn[1*3+j];
+	xp[2*3+j] = fault[i].xn[2*3+j];
+      }
+      xc[0]/=4.;	  xc[1]/=4.;	  xc[2]/=4.;
+      get_gh_quad_vec(xp,xc,dx1,dx2);
+       
     }else{
       /* for quad, local */
       a_equals_b_vector_3d(dx1,fault[i].t_strike);
@@ -662,15 +824,15 @@ void calc_group_geometry(struct med *medium,struct flt *fault,
 	    grp[fault[i].group].dip_vec[INT_Z],
 	    fault[i].pos[STRIKE]/dist_max,fault[i].pos[DIP]/dist_max);
 #endif
-    // determine actual extent of corners of patch
-    calculate_corners(corner,(fault+i),&l,&w);
-    clim = ncon_of_patch((fault+i));
-    /* here, we treate point source as having quasi corners (?!) */
+    // determine actual extent of vertices of patch
+    calculate_vertices(vertex,(fault+i),&l,&w);
+    clim = ncon_of_subpatch((fault+i),0);
+    /* here, we treate point source as having quasi vertices (?!) */
     if(clim == 1)
       clim = 4;
     for(j=0;j < clim;j++){
       for(k=0;k<3;k++)
-	dx1[k] = corner[j][k] - grp[fault[i].group].center[k];
+	dx1[k] = vertex[j*3+k] - grp[fault[i].group].center[k];
       pos[STRIKE] = dotp_3d(dx1,grp[fault[i].group].strike_vec);
       pos[DIP] = dotp_3d(dx1,grp[fault[i].group].dip_vec);
       // determine min/max
@@ -1132,7 +1294,62 @@ void calc_deviatoric_stress(COMP_PRECISION sm[3][3],COMP_PRECISION dm[3][3],
 }
 
 
+void get_sub_normal_vectors(struct flt *fault, int subel,
+			    COMP_PRECISION *strike,
+			    COMP_PRECISION *dip,
+			    COMP_PRECISION *normal,
+			    COMP_PRECISION *area)
+{
+  struct flt afault;
 #ifdef ALLOW_NON_3DQUAD_GEOM
+  int j,l;
+#endif
+#ifdef DEBUG
+  if((subel <0) || (subel >= number_of_subpatches(fault))){
+    fprintf(stderr,"get_iquad_sub_normal_vectors: subel %i out of %i\n",subel, number_of_subpatches(fault));
+    exit(-1);
+  }
+#endif
+  
+  if(subel==0){			/* first iquad or regular element */
+    a_equals_b_vector_3d(strike,fault->t_strike);
+    a_equals_b_vector_3d(dip,fault->t_dip);
+    a_equals_b_vector_3d(normal,fault->normal);
+    *area = fault->l * fault->l;
+  }else{
+#ifdef ALLOW_NON_3DQUAD_GEOM
+    if(fault->type==IQUAD){
+      afault.xn = (COMP_PRECISION *)
+	malloc(sizeof(COMP_PRECISION)*9);
+      for(j=0;j<3;j++)
+	for(l=0;l<3;l++)
+	  afault.xn[l*3+j] =
+	    fault->xn[node_number_of_subelement(fault,l,subel)*3+j];
+      get_tri_prop_based_on_gh(&afault);
+      
+      a_equals_b_vector_3d(strike,afault.t_strike);
+      a_equals_b_vector_3d(dip,afault.t_dip);
+      a_equals_b_vector_3d(normal,afault.normal);
+
+      *area = afault.l * afault.l;
+
+      free(afault.xn);
+    }else{
+      fprintf(stderr,"get_sub_normal_vectors: fault type %i and subel > 0\n",fault->type);
+      exit(-1);
+    }
+#else
+    printf(stderr,"get_sub_normal_vectors: only Okada and subel > 0\n",fault->type);
+      exit(-1);
+#endif
+  }
+}
+
+
+#ifdef ALLOW_NON_3DQUAD_GEOM
+
+
+
 
 /* 
    compute the global basis vectors for a triangular patch as

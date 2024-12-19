@@ -42,7 +42,7 @@ void fit_plane(int n,
 	       my_boolean adjust_area)
 {
   char c1='O',c2='N';		/* for SVD routine */
-  COMP_PRECISION *p,*work,s[3],*dummy=NULL,scale;
+  COMP_PRECISION *p,*work,s[3],*dummy=NULL;
   COMP_PRECISION orig_area=0,cx[3],aspect,strike,dip,alpha,
     sin_dip,cos_dip,*xqc,dist_to_plane,*ll,*ww,llm,wwm;
   int mn,m=3,lwork,i,j,info;
@@ -76,7 +76,7 @@ void fit_plane(int n,
   // remove from coordinates. the new coordinates are xqc
   //
   calc_mean_quad_coord(xq,mx);
-  for(scale=0.0,i=0;i<mn;i += 3) /* shift to new origin */
+  for(i=0;i<mn;i += 3) /* shift to new origin */
     c_eq_a_minus_b_3d((xqc+i),(xq+i),mx);
   //
   // P matrix has points in columns, copy of xqc 
@@ -223,7 +223,7 @@ void points2patch(struct flt *fault,COMP_PRECISION *xq,
 		  my_boolean adjust_area)
 {
 #ifdef ALLOW_NON_3DQUAD_GEOM
-  fault->type = RECTANGULAR_PATCH;
+  fault->type = OKADA_PATCH;
 #endif
   /*
     fprintf(stderr,"before: x: %g %g %g; %g %g %g; %g %g %g; %g %g %g\n",

@@ -19,10 +19,10 @@ void print_patch_geometry_and_bc(int flt_offset,struct flt *fault,
 				 my_boolean shrink_patches,
 				 COMP_PRECISION *scalar)
 {
-  int k,l,ncon;
+  int k,l,i,ncon,ielmul;
   static my_boolean bc_init=FALSE;
   static int nrf,bc_code;
-  COMP_PRECISION corner[4][3],sin_dip,cos_dip,leeway;
+  COMP_PRECISION vertex[MAX_NR_EL_VERTICES*3],sin_dip,cos_dip,leeway;
   double alpha;
 #ifdef ALLOW_NON_3DQUAD_GEOM
   COMP_PRECISION lfac,x[3];
@@ -42,7 +42,7 @@ void print_patch_geometry_and_bc(int flt_offset,struct flt *fault,
 
      */
 #ifdef ALLOW_NON_3DQUAD_GEOM
-    if(fault[flt_offset].type != TRIANGULAR){
+    if((fault[flt_offset].type != TRIANGULAR)&&(fault[flt_offset].type != IQUAD)){
       // normal (rectangular, 2-D, or point source)
       alpha=90.0-(double)fault[flt_offset].strike;
       my_sincos_degd(&fault[flt_offset].sin_alpha,&fault[flt_offset].cos_alpha,alpha);
@@ -97,12 +97,25 @@ void print_patch_geometry_and_bc(int flt_offset,struct flt *fault,
 	      -fault[flt_offset].l,-fault[flt_offset].w,
 	      fault[flt_offset].group);
       fprintf(out,"%19.12e %19.12e %19.12e %19.12e %19.12e %19.12e %19.12e %19.12e %19.12e\n",
-	      fault[flt_offset].xt[INT_X],fault[flt_offset].xt[INT_Y],fault[flt_offset].xt[INT_Z],
-	      fault[flt_offset].xt[3+INT_X],fault[flt_offset].xt[3+INT_Y],fault[flt_offset].xt[3+INT_Z],
-      	      fault[flt_offset].xt[6+INT_X],fault[flt_offset].xt[6+INT_Y],fault[flt_offset].xt[6+INT_Z]);
+	      fault[flt_offset].xn[INT_X  ],fault[flt_offset].xn[INT_Y  ],fault[flt_offset].xn[INT_Z],
+	      fault[flt_offset].xn[3+INT_X],fault[flt_offset].xn[3+INT_Y],fault[flt_offset].xn[3+INT_Z],
+      	      fault[flt_offset].xn[6+INT_X],fault[flt_offset].xn[6+INT_Y],fault[flt_offset].xn[6+INT_Z]);
       break;
     }
-    case RECTANGULAR_PATCH:{
+    case IQUAD:{// xt has to be assigned and allocated before
+      fprintf(out,"%19.12e %19.12e %19.12e %10.6f %10.6f %19.12e %19.12e %6i ",
+	      fault[flt_offset].x[INT_X],	      fault[flt_offset].x[INT_Y],	      fault[flt_offset].x[INT_Z],
+	      fault[flt_offset].strike,fault[flt_offset].dip,
+	      fault[flt_offset].l,-fault[flt_offset].w,
+	      fault[flt_offset].group);
+      fprintf(out,"%19.12e %19.12e %19.12e %19.12e %19.12e %19.12e %19.12e %19.12e %19.12e %19.12e %19.12e %19.12e\n",
+	      fault[flt_offset].xn[9+INT_X],fault[flt_offset].xn[9+INT_Y],fault[flt_offset].xn[9+INT_Z],
+	      fault[flt_offset].xn[12+INT_X],fault[flt_offset].xn[12+INT_Y],fault[flt_offset].xn[12+INT_Z],
+      	      fault[flt_offset].xn[3+INT_X],fault[flt_offset].xn[3+INT_Y],fault[flt_offset].xn[3+INT_Z],
+	      fault[flt_offset].xn[6+INT_X],fault[flt_offset].xn[6+INT_Y],fault[flt_offset].xn[6+INT_Z]);
+      break;
+    }
+    case OKADA_PATCH:{
       fprintf(out,"%19.12e %19.12e %19.12e %10.6f %10.6f %19.12e %19.12e %6i\n",
 	      fault[flt_offset].x[INT_X], fault[flt_offset].x[INT_Y], fault[flt_offset].x[INT_Z],fault[flt_offset].strike,
 	      fault[flt_offset].dip,fault[flt_offset].l,fault[flt_offset].w,fault[flt_offset].group);
@@ -132,7 +145,7 @@ void print_patch_geometry_and_bc(int flt_offset,struct flt *fault,
   case PSXYZ_MODE:{
     if(opmode == PSXYZ_SCALAR_MODE)
       fprintf(out,"> -Z%g\n",scalar[flt_offset]);
-    calculate_bloated_corners(corner,(fault+flt_offset),leeway);
+    calculate_bloated_vertices(vertex,(fault+flt_offset),leeway);
 #ifdef ALLOW_NON_3DQUAD_GEOM
     switch(fault[flt_offset].type){
     case TWO_DIM_SEGMENT_PLANE_STRAIN:
@@ -140,33 +153,48 @@ void print_patch_geometry_and_bc(int flt_offset,struct flt *fault,
       // draw segment with endbars
       lfac = fault[flt_offset].l * 0.2;
       for(l=0;l<3;l++)
-	x[l] = corner[0][l] + fault[flt_offset].normal[l] * lfac;
+	x[l] = vertex[0*3+l] + fault[flt_offset].normal[l] * lfac;
       fprintf(out,"%g %g %g\n",x[INT_X]/CHAR_FAULT_DIM,x[INT_Y]/CHAR_FAULT_DIM,x[INT_Z]/CHAR_FAULT_DIM);
       for(l=0;l<3;l++)
-	x[l] = corner[0][l] - fault[flt_offset].normal[l] * lfac;
+	x[l] = vertex[0*3+l] - fault[flt_offset].normal[l] * lfac;
       fprintf(out,"%g %g %g\n",x[INT_X]/CHAR_FAULT_DIM,x[INT_Y]/CHAR_FAULT_DIM,x[INT_Z]/CHAR_FAULT_DIM);
       for(l=0;l<3;l++)
-	x[l] = corner[0][l];
+	x[l] = vertex[0*3+l];
       fprintf(out,"%g %g %g\n",x[INT_X]/CHAR_FAULT_DIM,x[INT_Y]/CHAR_FAULT_DIM,x[INT_Z]/CHAR_FAULT_DIM);
       for(l=0;l<3;l++)
-	x[l] = corner[1][l];
+	x[l] = vertex[1*3+l];
       fprintf(out,"%g %g %g\n",x[INT_X]/CHAR_FAULT_DIM,x[INT_Y]/CHAR_FAULT_DIM,x[INT_Z]/CHAR_FAULT_DIM);
       for(l=0;l<3;l++)
-	x[l] = corner[1][l] + fault[flt_offset].normal[l] * lfac;
+	x[l] = vertex[1*3+l] + fault[flt_offset].normal[l] * lfac;
       fprintf(out,"%g %g %g\n",x[INT_X]/CHAR_FAULT_DIM,x[INT_Y]/CHAR_FAULT_DIM,x[INT_Z]/CHAR_FAULT_DIM);
       for(l=0;l<3;l++)
-	x[l] = corner[1][l] - fault[flt_offset].normal[l] * lfac;
+	x[l] = vertex[1*3+l] - fault[flt_offset].normal[l] * lfac;
       fprintf(out,"%g %g %g\n",x[INT_X]/CHAR_FAULT_DIM,x[INT_Y]/CHAR_FAULT_DIM,x[INT_Z]/CHAR_FAULT_DIM);
       break;
     }
+    case IQUAD:
+      ielmul = number_of_subpatches((fault+flt_offset));
+      for(i=0;i < ielmul;i++){
+	ncon = ncon_of_subpatch((fault+flt_offset),i);
+	for(k=0;k < ncon;k++){
+	  for(l=0;l<3;l++){
+	    if(fabs(vertex[node_number_of_subelement((fault+flt_offset),k, i)*3+l]/CHAR_FAULT_DIM) > EPS_COMP_PREC)
+	      fprintf(out,"%g ",vertex[node_number_of_subelement((fault+flt_offset),k, i)*3+l]/CHAR_FAULT_DIM);
+	    else
+	      fprintf(out,"0.0 ");
+	}
+	  fprintf(out,"\n");
+	}
+      }
+      break;
     case POINT_SOURCE:
     case TRIANGULAR:
-    case RECTANGULAR_PATCH:{
-      ncon = ncon_of_patch((fault+flt_offset));
+    case OKADA_PATCH:{
+      ncon = ncon_of_subpatch((fault+flt_offset),0);
       for(k=0;k < ncon;k++){
 	for(l=0;l<3;l++){
-	  if(fabs(corner[k][l]/CHAR_FAULT_DIM) > EPS_COMP_PREC)
-	    fprintf(out,"%g ",corner[k][l]/CHAR_FAULT_DIM);
+	  if(fabs(vertex[k*3+l]/CHAR_FAULT_DIM) > EPS_COMP_PREC)
+	    fprintf(out,"%g ",vertex[k*3+l]/CHAR_FAULT_DIM);
 	  else
 	    fprintf(out,"0.0 ");
 	}
@@ -177,9 +205,9 @@ void print_patch_geometry_and_bc(int flt_offset,struct flt *fault,
 #else
     for(k=0;k<4;k++){
       for(l=0;l<3;l++){
-	if(fabs(corner[k][l]/CHAR_FAULT_DIM)>
+	if(fabs(vertex[k*3+l]/CHAR_FAULT_DIM)>
 	   EPS_COMP_PREC)
-	  fprintf(out,"%g ",corner[k][l]/CHAR_FAULT_DIM);
+	  fprintf(out,"%g ",vertex[k*3+l]/CHAR_FAULT_DIM);
 	else
 	  fprintf(out,"0.0 ");
       }
@@ -193,18 +221,18 @@ void print_patch_geometry_and_bc(int flt_offset,struct flt *fault,
   case CORNEROUT_MODE:{
 #ifdef ALLOW_NON_3DQUAD_GEOM  
     if((fault[flt_offset].type != POINT_SOURCE)&&
-       (fault[flt_offset].type != RECTANGULAR_PATCH)&&
+       (fault[flt_offset].type != OKADA_PATCH)&&
        (!patch_is_2d(fault[flt_offset].type))){
-      fprintf(stderr,"print_patch_geometry: corner out defined for rectangular, point source and 2-Dpatches only\n");
+      fprintf(stderr,"print_patch_geometry: vertex out defined for rectangular, point source and 2-Dpatches only\n");
       exit(-1);
     }
 #endif
-    calculate_bloated_corners(corner,(fault+flt_offset),leeway);
+    calculate_bloated_vertices(vertex,(fault+flt_offset),leeway);
     for(k=0;k<4;k++){
       for(l=0;l<3;l++){
-	if(fabs(corner[k][l]/CHAR_FAULT_DIM)>
+	if(fabs(vertex[k*3+l]/CHAR_FAULT_DIM)>
 	   EPS_COMP_PREC)
-	  fprintf(out,"%g ",corner[k][l]/CHAR_FAULT_DIM);
+	  fprintf(out,"%g ",vertex[k*3+l]/CHAR_FAULT_DIM);
 	else
 	  fprintf(out,"0 ");
       }
@@ -242,18 +270,18 @@ void print_patch_geometry_and_bc(int flt_offset,struct flt *fault,
   case XYZ_AND_VEC_MODE:{
 #ifdef ALLOW_NON_3DQUAD_GEOM
     if((fault[flt_offset].type != POINT_SOURCE)&&
-       (fault[flt_offset].type != RECTANGULAR_PATCH)&&
+       (fault[flt_offset].type != OKADA_PATCH)&&
        (!patch_is_2d(fault[flt_offset].type))){
-      fprintf(stderr,"print_patch_geometry: corner out defined for rectangular, point source and 2-Dpatches only\n");
+      fprintf(stderr,"print_patch_geometry: vertex out defined for rectangular, point source and 2-Dpatches only\n");
       exit(-1);
     }
 #endif
-    calculate_bloated_corners(corner,(fault+flt_offset),leeway);
+    calculate_bloated_vertices(vertex,(fault+flt_offset),leeway);
     for(k=0;k<4;k++){
       for(l=0;l<3;l++){
-	if(fabs(corner[k][l]/CHAR_FAULT_DIM)>
+	if(fabs(vertex[k*3+l]/CHAR_FAULT_DIM)>
 	   EPS_COMP_PREC)
-	  fprintf(out,"%12.5e ",corner[k][l]/CHAR_FAULT_DIM);
+	  fprintf(out,"%12.5e ",vertex[k*3+l]/CHAR_FAULT_DIM);
 	else
 	  fprintf(out,"%12.5e ",0.0);
       }

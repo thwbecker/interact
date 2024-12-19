@@ -23,15 +23,16 @@ void read_geometry(char *patch_filename,struct med **medium,
 		   my_boolean half_plane,
 		   my_boolean verbose)
 {
-  int i,j,k,tmpint,ic;
+  int i,j,k,tmpint,ic,l,off;
   FILE *in,*in2=NULL;
-  COMP_PRECISION sin_dip,cos_dip,mus_avg,mud_avg,d_mu,corner[4][3],p[3],
-    lloc,wloc,eps_for_z = EPS_COMP_PREC * 100.0,t_strike[3],t_dip[3],normal[3];
+  COMP_PRECISION sin_dip,cos_dip,mus_avg,mud_avg,d_mu,vertex[MAX_NR_EL_VERTICES*3],p[3],four_points[12],
+    lloc,wloc,eps_for_z = EPS_COMP_PREC * 100.0,t_strike[3],t_dip[3],normal[3],area,earea;
+
   float wmin,wmax,lmin,lmax;
   double alpha;
   static my_boolean init=FALSE;
 #ifdef ALLOW_NON_3DQUAD_GEOM
-  int nr_pt_src=0,nr_triangle=0,nr_2d=0;
+  int nr_pt_src=0,nr_triangle=0,nr_2d=0,nr_iquad=0;
 #endif
   if(init){
     if((*medium)->comm_rank == 0)
@@ -113,6 +114,8 @@ void read_geometry(char *patch_filename,struct med **medium,
 #ifdef ALLOW_NON_3DQUAD_GEOM
     if((*fault+i)->w == 0.0){
       /*
+	
+	W == 0 --> 2-D
 
 	2-D element
 	
@@ -138,25 +141,27 @@ void read_geometry(char *patch_filename,struct med **medium,
 							  to
 							  triangle */
       /*
+	L,W < 0 --> triangle
 	
 	TRIANGULAR ELEMENT
 	
       */
       (*fault+i)->type = TRIANGULAR;
-      (*fault+i)->xt=(COMP_PRECISION *)malloc(sizeof(COMP_PRECISION)*9);
-      if(!(*fault+i)->xt)MEMERROR("read_geometry");
+      (*fault+i)->xn=(COMP_PRECISION *)
+	malloc(sizeof(COMP_PRECISION)*9);
+      if(!(*fault+i)->xn)MEMERROR("read_geometry");
       // next nine fields are nodal coordinates
       if(fscanf(in,NINE_CP_FORMAT,
-		&(*fault+i)->xt[  INT_X],&(*fault+i)->xt[  INT_Y],
-		&(*fault+i)->xt[  INT_Z],
-		&(*fault+i)->xt[3+INT_X],&(*fault+i)->xt[3+INT_Y],
-		&(*fault+i)->xt[3+INT_Z],
-		&(*fault+i)->xt[6+INT_X],&(*fault+i)->xt[6+INT_Y],
-		&(*fault+i)->xt[6+INT_Z])!=9)
+		&(*fault+i)->xn[  INT_X],&(*fault+i)->xn[  INT_Y],
+		&(*fault+i)->xn[  INT_Z],
+		&(*fault+i)->xn[3+INT_X],&(*fault+i)->xn[3+INT_Y],
+		&(*fault+i)->xn[3+INT_Z],
+		&(*fault+i)->xn[6+INT_X],&(*fault+i)->xn[6+INT_Y],
+		&(*fault+i)->xn[6+INT_Z])!=9)
 	READ_ERROR("read_geometry");
       /* check */
       for(j=0;j<3;j++){
-	if((*fault+i)->xt[j*3+INT_Z] > 0){
+	if((*fault+i)->xn[j*3+INT_Z] > 0){
 	  fprintf(stderr,"read_geometry: triangular patch %i node %i above ground, error\n",
 		  i,j);
 	  exit(-1);
@@ -185,15 +190,107 @@ void read_geometry(char *patch_filename,struct med **medium,
 #ifdef DEBUG
       if((*medium)->comm_rank == 0)
 	fprintf(stderr,"read_geometry: fault %5i is triangular, x1: (%10.3e, %10.3e, %10.3e) x2: (%10.3e, %10.3e, %10.3e) x3: (%10.3e, %10.3e, %10.3e), area: %10.3e\n",
-		i,(*fault+i)->xt[  INT_X],(*fault+i)->xt[  INT_Y],(*fault+i)->xt[  INT_Z],
-		(*fault+i)->xt[3+INT_X],(*fault+i)->xt[3+INT_Y],(*fault+i)->xt[3+INT_Z],
-		(*fault+i)->xt[6+INT_X],(*fault+i)->xt[6+INT_Y],(*fault+i)->xt[6+INT_Z],
+		i,(*fault+i)->xn[  INT_X],(*fault+i)->xn[  INT_Y],(*fault+i)->xn[  INT_Z],
+		(*fault+i)->xn[3+INT_X],(*fault+i)->xn[3+INT_Y],(*fault+i)->xn[3+INT_Z],
+		(*fault+i)->xn[6+INT_X],(*fault+i)->xn[6+INT_Y],(*fault+i)->xn[6+INT_Z],
 		(*fault+i)->area);
 #endif
       nr_triangle++;
+   }else if(((*fault+i)->w < 0)){
+      /*
+	W < 0 --> iquad
+	
+      */
+      (*fault+i)->type = IQUAD;
+      /* 
+
+	 five nodes in element, we read in only four (A, B, C, D) for
+	 now, and assign base node from average from A and B
+	 
+	 D              C
+	 2--------------1
+         |\            /|
+	 | \          / |
+         |  \   X    /  |
+	 |   \      /   |
+	 |    \    /    |
+	 | N1  \  / N2  |
+	 |      \/      |
+	 3 ---- 0 ----- 4
+	 A              B
+      */
+      /* fault holds five nodes, plus two auxiliary fault plane angle
+	 projection sets 3*(5+2*3)
+
+      */
+      (*fault+i)->xn=(COMP_PRECISION *)
+	malloc(sizeof(COMP_PRECISION)*(MAX_NR_EL_VERTICES+3*2)*3);
+      if(!(*fault+i)->xn)MEMERROR("read_geometry");
+      // next 12 fields are nodal coordinates, read in four points
+      for(j=0;j<12;j++)
+	if(fscanf(in,ONE_CP_FORMAT,(four_points+j))!=1)
+	  READ_ERROR("read_geometry");
+      /* check */
+      for(j=0;j < 4;j++){
+	if(four_points[j*3+INT_Z] > 0){
+	  fprintf(stderr,"read_geometry: iqad patch %i node %i above ground, error\n",
+		  i,j);
+	  exit(-1);
+	}
+      }
+      
+      for(j=0;j<3;j++){
+	/* bottom middle point */
+	(*fault+i)->xn[0*3+j] = (four_points[0*3+j] + four_points[1*3+j])/2.0;
+	(*fault+i)->xn[1*3+j] = four_points[2*3+j]; /* top right */
+	(*fault+i)->xn[2*3+j] = four_points[3*3+j]; /* top left */
+	/*  */
+	(*fault+i)->xn[3*3+j] = four_points[0*3+j]; /* bottom left */
+	(*fault+i)->xn[4*3+j] = four_points[1*3+j]; /* bottom right */
+      }
+      /* compute all the triangular properties for the main triangle */
+      get_tri_prop_based_on_gh((*fault+i));
+      
+      area = (*fault+i)->l * (*fault+i)->l;
+
+      for(off=5,l=1;l<3;l++){
+	/* compute auxiliary triagnle one and two */
+	get_sub_normal_vectors((*fault+i),l,t_strike,t_dip, normal,&earea);
+	/* aseemble projection matrix used to go from main triangle slip
+	   to local slip systems */
+	(*fault+i)->xn[off*3+0] = dotp_3d((*fault+i)->t_strike,t_strike); /* 5 and 8 for N1 and N2 */
+	(*fault+i)->xn[off*3+1] = dotp_3d((*fault+i)->t_dip,   t_strike);
+	(*fault+i)->xn[off*3+2] = dotp_3d((*fault+i)->normal,  t_strike);
+	off++;
+	(*fault+i)->xn[off*3+0] = dotp_3d((*fault+i)->t_strike,t_dip); /* 6 and 9 for N1 and N2 */
+	(*fault+i)->xn[off*3+1] = dotp_3d((*fault+i)->t_dip,   t_dip);
+	(*fault+i)->xn[off*3+2] = dotp_3d((*fault+i)->normal,  t_dip);
+	off++;
+	(*fault+i)->xn[off*3+0] = dotp_3d((*fault+i)->t_strike,normal); /* 7 and 10 for N1 and N2 */
+	(*fault+i)->xn[off*3+1] = dotp_3d((*fault+i)->t_dip,   normal);
+	(*fault+i)->xn[off*3+2] = dotp_3d((*fault+i)->normal,  normal);
+	off++;
+	area += earea;
+      }
+    
+      (*fault+i)->l = (*fault+i)->w = sqrt(area);
+      
+#ifdef DEBUG
+      if((*medium)->comm_rank == 0)
+	fprintf(stderr,"read_geometry: fault %5i is iqaud, x1: (%10.3e, %10.3e, %10.3e) x2: (%10.3e, %10.3e, %10.3e) x3: (%10.3e, %10.3e, %10.3e) x4: (%10.3e, %10.3e, %10.3e), area: %10.3e\n",
+		i,
+		(*fault+i)->xn[3*3+INT_X],(*fault+i)->xn[3*3+INT_Y],(*fault+i)->xn[3*3+INT_Z],
+		(*fault+i)->xn[4*3+INT_X],(*fault+i)->xn[4*3+INT_Y],(*fault+i)->xn[4*3+INT_Z],
+		(*fault+i)->xn[1*3+INT_X],(*fault+i)->xn[1*3+INT_Y],(*fault+i)->xn[1*3+INT_Z],
+		(*fault+i)->xn[2*3+INT_X],(*fault+i)->xn[2*3+INT_Y],(*fault+i)->xn[2*3+INT_Z],
+		(*fault+i)->area);
+#endif
+      nr_iquad++;
     }else if((*fault+i)->l < 0){
       /*
 
+	L < 0 --> point source 
+	
 	POINT SOURCE
 	
       */
@@ -210,14 +307,14 @@ void read_geometry(char *patch_filename,struct med **medium,
 	regular, rectangular patch
 
       */
-      (*fault+i)->type = RECTANGULAR_PATCH; 
+      (*fault+i)->type = OKADA_PATCH; 
     }
 #else
     if(((*fault+i)->l <= 0)||((*fault+i)->w <= 0)){
       if((*medium)->comm_rank == 0){
 	fprintf(stderr,"read_geometry: fault %i: half length l and width have to be >= 0 (%g/%g)!\n",
 		i,(*fault+i)->l,(*fault+i)->w);
-	fprintf(stderr,"read_geometry: if 2-D, point source, or triangular elements were\n");
+	fprintf(stderr,"read_geometry: if 2-D, point source, iquads, or triangular elements were\n");
 	fprintf(stderr,"read_geometry: what you were looking for,\n");
 	fprintf(stderr,"read_geometry: recompile with  ALLOW_NON_3DQUAD_GEOM flag set\n");
       }
@@ -248,7 +345,7 @@ void read_geometry(char *patch_filename,struct med **medium,
 	(*medium)->xmax[j] = (*fault+i)->x[j];
     }
 #ifdef ALLOW_NON_3DQUAD_GEOM
-    if((*fault+i)->type != TRIANGULAR){
+    if( ( (*fault+i)->type != TRIANGULAR) || ( (*fault+i)->type != IQUAD) ){
 #endif
       // check for illegal angles
       check_fault_angles((*fault+i));
@@ -302,13 +399,19 @@ void read_geometry(char *patch_filename,struct med **medium,
       //
       // determine geometrical boundaries for plotting
       //
-      calculate_corners(corner,(*fault+i),&lloc,&wloc); /* lloc and wloc will be full l and w, not half */
-      for(j=0; j < ncon_of_patch((*fault+i));j++){
+      calculate_vertices(vertex,(*fault+i),&lloc,&wloc); /* lloc and
+							   wloc will
+							   be full l
+							   and w, not
+							   half */
+      for(j=0; j < nvert_of_patch((*fault+i));j++){ /* loop through all vertices */
+	//
 	// check depth alignment
-	if(corner[j][INT_Z] > eps_for_z){
+	//
+	if(vertex[j*3+INT_Z] > eps_for_z){
 	  if((*medium)->comm_rank == 0){
-	    fprintf(stderr,"read_geometry: patch %i, corner %i above surface, z: %20.10e (eps: %g)\n",
-		    i,j,corner[j][INT_Z],eps_for_z);
+	    fprintf(stderr,"read_geometry: patch %i, vertex %i above surface, z: %20.10e (eps: %g)\n",
+		    i,j,vertex[j*3+INT_Z],eps_for_z);
 	    fprintf(stderr,"z: %g w: %g dip: %g\n",(*fault+i)->x[INT_Z],(*fault+i)->w,(*fault+i)->dip);
 	    fprintf(stderr,"read_geometry: exiting\n");
 	  }
@@ -317,20 +420,20 @@ void read_geometry(char *patch_filename,struct med **medium,
 #ifdef ALLOW_NON_3DQUAD_GEOM
 	if((*fault+i)->type == TWO_DIM_HALFPLANE_PLANE_STRAIN){
 	  /* check if segment is sticking out into the air */
-	  if((corner[0][INT_Y] > 0 )||(corner[1][INT_Y] > 0)){
+	  if((vertex[0*3+INT_Y] > 0 )||(vertex[1*3+INT_Y] > 0)){
 	    if((*medium)->comm_rank == 0){
 	      fprintf(stderr,"read_geometry: error, half-plane segment %i endpoints: %g,%g and %g,%g\n",
-		      i,corner[0][INT_X] ,corner[0][INT_Y],corner[1][INT_X] ,corner[1][INT_Y]);
+		      i,vertex[0*3+INT_X] ,vertex[0*3+INT_Y],vertex[1*3+INT_X] ,vertex[1*3+INT_Y]);
 	    }
 	    exit(-1);
 	  }
 	}
 #endif
 	for(k=0;k<3;k++){
-	  if(((*medium)->xmax[k]) < corner[j][k])
-	    (*medium)->xmax[k] = corner[j][k];
-	  if(((*medium)->xmin[k]) > corner[j][k])
-	    (*medium)->xmin[k] = corner[j][k];
+	  if(((*medium)->xmax[k]) < vertex[j*3+k])
+	    (*medium)->xmax[k] = vertex[j*3+k];
+	  if(((*medium)->xmin[k]) > vertex[j*3+k])
+	    (*medium)->xmin[k] = vertex[j*3+k];
 	}
       }
 #ifdef ALLOW_NON_3DQUAD_GEOM
@@ -470,15 +573,15 @@ void read_geometry(char *patch_filename,struct med **medium,
       ((*medium)->xmax[i] ): (MIN_GEOM_RANGE);
   }
 #ifdef ALLOW_NON_3DQUAD_GEOM
-  if(nr_pt_src + nr_triangle + nr_2d == 0){
+  if(nr_pt_src + nr_triangle + nr_2d + nr_iquad == 0){
     if(verbose){
       fprintf(stderr,"read_geometry: no non-quad patches were read in, recompiling without ALLOW_NON_3DQUAD_GEOM flag\n");
       fprintf(stderr,"read_geometry: might possibly improve speed and size requirements of interact\n");
     }
   }else{
     if((*medium)->comm_rank == 0){
-      fprintf(stderr,"read_geometry: read in %i 2D elements, %i points, %i triangles, and %i quads\n",
-	      nr_2d,nr_pt_src,nr_triangle,(*medium)->nrflt - nr_triangle - nr_pt_src - nr_2d);
+      fprintf(stderr,"read_geometry: %i 2D elements, %i points, %i triangles, %i irregular, and %i regular quads\n",
+	      nr_2d,nr_pt_src,nr_triangle,nr_iquad,(*medium)->nrflt - nr_triangle - nr_pt_src - nr_2d - nr_iquad);
       if(nr_2d)
 	fprintf(stderr,"read_geometry: two dimensional approximation: plane %s %s\n",
 		((*medium)->twod_approx_is_plane_stress)?("stress"):("strain"),

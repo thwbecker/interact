@@ -190,7 +190,7 @@ int main(int argc, char **argv)
     fault[0].w = fault[0].area;
   }else{
     if(!twod)
-      fault[0].type = RECTANGULAR_PATCH;
+      fault[0].type = OKADA_PATCH;
     else
       fault[0].type = TWO_DIM_SEGMENT_PLANE_STRAIN;
   }

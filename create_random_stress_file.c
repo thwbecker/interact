@@ -253,7 +253,7 @@ int main(int argc, char **argv)
     }
     if(!reject_pos_coulomb)
       // check for positive Coulomb and extensional normal stress
-      for(i=0,hit=FALSE;i<medium->nrflt;i++)
+      for(i=0,hit=FALSE;i<medium->nrflt;i++){
 	if((hypot(st[i]*fac[STRIKE],
 		  st[i+osdip]*fac[DIP]) - 
 	    STATIC_MU * (PRESSURE_DEF - 
@@ -263,12 +263,14 @@ int main(int argc, char **argv)
 	if(st[i+osnormal]*fac[NORMAL] > PRESSURE_DEF){
 	  hit=TRUE;break;
 	}
-    else
+      }
+    else{
       // check for extensional normal stress
       for(i=0,hit=FALSE;i<medium->nrflt;i++)
 	if(st[i+osnormal]*fac[NORMAL] > PRESSURE_DEF){
 	  hit=TRUE;break;
 	}
+    }
   }while((hit) && (biter<maxbiter));
   if(biter == maxbiter){
     fprintf(stderr,"no solution found, maxbiter exceeded\n");

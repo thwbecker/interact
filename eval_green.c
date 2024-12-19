@@ -76,8 +76,12 @@ void eval_green(COMP_PRECISION *x,struct flt *fault,
     eval_triangle(x,fault,disp,u_global,sm_global,iret,mode);
     break;
   }
-  case RECTANGULAR_PATCH:{
-    eval_rectangle(x,fault,disp,u_global,sm_global,iret,mode);
+  case IQUAD:{
+    eval_iquad(x,fault,disp,u_global,sm_global,iret,mode);
+    break;
+  }
+  case OKADA_PATCH:{
+    eval_okada(x,fault,disp,u_global,sm_global,iret,mode);
     break;
   }
   case TWO_DIM_SEGMENT_PLANE_STRAIN:{
@@ -99,7 +103,7 @@ void eval_green(COMP_PRECISION *x,struct flt *fault,
     exit(-1);
   }}
 #else
-  eval_rectangle(x,fault,disp,u_global,sm_global,iret,mode);
+  eval_okada(x,fault,disp,u_global,sm_global,iret,mode);
 #endif
 }
 /* 
@@ -125,13 +129,13 @@ void eval_green_basic(COMP_PRECISION *x,struct flt *fault,
 #endif
 #ifdef ALLOW_NON_3DQUAD_GEOM
   switch(fault->type){
-  case RECTANGULAR_PATCH:{
-    eval_rectangle_basic(x,
-			 (COMP_PRECISION)fault->l,
-			 (COMP_PRECISION)fault->w,
-			 (COMP_PRECISION)fault->dip,
-			 (COMP_PRECISION) -fault->x[INT_Z],
-			 disp,u_global,sm_global,iret);
+  case OKADA_PATCH:{
+    eval_okada_basic(x,
+		     (COMP_PRECISION)fault->l,
+		     (COMP_PRECISION)fault->w,
+		     (COMP_PRECISION)fault->dip,
+		     (COMP_PRECISION) -fault->x[INT_Z],
+		     disp,u_global,sm_global,iret);
     break;
   }
   case TWO_DIM_SEGMENT_PLANE_STRAIN:{
@@ -150,6 +154,6 @@ void eval_green_basic(COMP_PRECISION *x,struct flt *fault,
     exit(-1);
   }}
 #else
-  eval_rectangle(x,fault,disp,u_global,sm_global,iret,GC_DISP_AND_STRESS);
+  eval_okada(x,fault,disp,u_global,sm_global,iret,GC_DISP_AND_STRESS);
 #endif
 }

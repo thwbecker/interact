@@ -135,14 +135,17 @@ void eval_2dsegment_plane_strain_tdd(double *, struct flt *, double *, double *,
 void eval_green_and_project_stress_to_fault(struct flt *, int, int, double *, double *);
 void eval_green(double *, struct flt *, double *, double *, double [3][3], int *, unsigned char);
 void eval_green_basic(double *, struct flt *, double *, double *, double [3][3], int *);
+/* eval_iquad.c */
+void eval_iquad(double *, struct flt *, double *, double *, double [3][3], int *, unsigned char);
 /* eval_okada.c */
-void eval_rectangle(double *, struct flt *, double *, double *, double [3][3], int *, unsigned char);
-void eval_rectangle_basic(double *, double, double, double, double, double *, double *, double [3][3], int *);
+void eval_okada(double *, struct flt *, double *, double *, double [3][3], int *, unsigned char);
+void eval_okada_basic(double *, double, double, double, double, double *, double *, double [3][3], int *);
 void eval_point(double *, struct flt *, double *, double *, double [3][3], int *, unsigned char);
 void eval_point_short(double *, double *, double, double, double, double, double *, double *, double [3][3], int *, unsigned char);
 void set_stress_and_disp_nan(double [3][3], double *, unsigned char);
 /* eval_triangle.c */
 void eval_triangle(double *, struct flt *, double *, double *, double [3][3], int *, unsigned char);
+void get_tri_prop_based_on_gh(struct flt *);
 /* eval_triangle_gauss.c */
 void eval_triangle_gauss(double *, struct flt *, double *, double *, double [3][3], int *);
 void get_gauss_points(double *, double *, double *, int);
@@ -175,21 +178,25 @@ void resolve_force(double *, double [3][3], double *);
 void calc_quad_base_vecs(double *, double *, double *, double, double, double, double);
 void get_maxsdir_stress_drops2(double *, double, double *);
 void get_maxsdir_stress_drops(double *, double, double *, double, double *, double *);
-void calculate_corners(double [4][3], struct flt *, double *, double *);
-void calculate_bloated_corners(double [4][3], struct flt *, double);
-int ncon_of_patch(struct flt *);
-int vtk_type_of_patch(struct flt *);
-void calculate_quad_corners(double [4][3], struct flt *, double);
-void calculate_tri_corners(double [4][3], struct flt *, double);
-void calculate_point_source_corners(double [4][3], struct flt *, double, double *, double *);
-void calculate_seg_corners(double [4][3], struct flt *, double);
+void calculate_vertices(double *, struct flt *, double *, double *);
+void calculate_bloated_vertices(double *, struct flt *, double);
+int nvert_of_patch(struct flt *);
+int ncon_of_subpatch(struct flt *, int);
+double projected_slip_major_to_minor_patch(struct flt *, int, int, int);
+int vtk_type_of_patch(struct flt *, int);
+int number_of_subpatches(struct flt *);
+int node_number_of_subelement(struct flt *, int, int);
+void calculate_quad_vertices(double *, struct flt *, double);
+void calculate_tri_vertices(double *, struct flt *, double);
+void calculate_iquad_vertices(double *, struct flt *, double);
+void calculate_point_source_vertices(double *, struct flt *, double, double *, double *);
+void calculate_seg_vertices(double *, struct flt *, double);
 double quad_area(double *);
 double triangle_area(double *);
 double triangle_area_gh(double *, double *);
 void get_gh_tri_vec(double *, double *, double *);
 void get_gh_quad_vec(double *, double *, double *, double *);
 unsigned char check_planar(double *);
-void get_tri_prop_based_on_gh(struct flt *);
 void calc_group_geometry(struct med *, struct flt *, struct geog *);
 void vec_to_angles(double *, double *, double *);
 void angles_to_vec(double, double, double *);
@@ -210,6 +217,7 @@ void background_disp(double *, double *, struct med *, double *, double *);
 void get_local_x_on_plane(double *, double *, double *, double *, double *);
 void get_fault_plane_basevec(double *, double *, double *, struct flt *, struct med *);
 void calc_deviatoric_stress(double [3][3], double [3][3], double *, double *);
+void get_sub_normal_vectors(struct flt *, int, double *, double *, double *, double *);
 void calc_global_strike_dip_from_local(struct flt *, double *, double *, double *);
 void calc_global_slip_and_traction_from_local(struct flt *, double *, double *, double *, double *, double *, double *, double *, unsigned char);
 /* geoproject.c */
@@ -256,7 +264,6 @@ void rotate_vec2d(double *, double *, double, double);
 void rotate_mat(double [3][3], double [3][3], double [3][3]);
 void rotate_mat_z(double [3][3], double [3][3], double, double);
 double tensor3d_norm(double [3][3]);
-double project_vector(double *, double *);
 double distance_3d(double *, double *);
 double distance(double *, double *, int);
 float distance_float(float *, float *, int);
@@ -356,6 +363,7 @@ double distsq(struct flt *, struct flt *);
 double max_dist(struct flt *, struct med *);
 double penalty_dist(struct flt *, struct med *, double);
 /* output.c */
+int mysystem(const char *);
 void print_slip_line(struct med *, struct flt *);
 void flush_slipline(struct med *, struct flt *);
 void print_fault_stress_and_slip(struct med *, struct flt *, unsigned char);
@@ -390,19 +398,7 @@ void spread(float, float *, int, float, int);
 void realft(float *, int, int);
 void four1(float *, int, int);
 /* plotevents.c */
-void drawset(int *, int, int, int, struct pa *);
 /* plotting.c */
-void update_plots(struct med *, struct flt *);
-void init_plot_window(struct med *, struct flt *);
-void close_plot_window(struct med *, struct flt *);
-void plot_time_label(struct med *, struct flt *, int);
-void plot_patch(int, struct med *, struct flt *, int, int);
-void plot_projected_patch(int, struct med *, struct flt *, int, int);
-void plot_time_tics(struct med *, struct flt *, float);
-void add_to_plotting_list(int, int **, int *);
-void plot_quake(int, struct med *, struct flt *);
-void plot_moment_array(struct med *, float *, int);
-void psticks(float *, float *, int);
 /* points2patch.c */
 unsigned char read_points_local(double *, int *, unsigned char, FILE *);
 /* print_patch_geometry.c */
@@ -428,6 +424,7 @@ void randomize_list(int **, int, unsigned char);
 int slist_sort(const void *, const void *);
 /* randomize_strike.c */
 /* read_bin_events.c */
+/* read_bin_events_old.c */
 /* read_boundary_conditions.c */
 void read_boundary_conditions(struct med *, struct flt *, double *, double *, unsigned char);
 void read_one_step_bc(FILE *, struct med *, struct flt *, double *, double *, unsigned char);
@@ -503,6 +500,7 @@ void terminate(struct med *, struct flt *);
 double mat_value(int, int, int);
 /* test_sparse.c */
 /* test_stuff.c */
+/* test_triangle_stress.c */
 /* tri2patch.c */
 /* trigonometry.c */
 double dist_on_sphere(double, double, double, double);

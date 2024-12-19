@@ -1,9 +1,8 @@
 /*
   interact: model fault interactions using dislocations in a 
             halfspace
-  (C) Thorsten Becker, becker@eps.harvard.edu
+  (C) Thorsten Becker, thbecker@post.harvard.edu
 
-  $Id: plotevents.c,v 2.17 2003/01/07 03:18:21 becker Exp $
 */
 #include <stdio.h>
 #include <stdlib.h>
@@ -20,7 +19,7 @@ int main(void)
   COMP_PRECISION xmin[3]={1e20,1e20,1e20},
     xmax[3]={-1e20,-1e20,-1e20},dummy,
     otime,mom_thres,optime,tloc[2],alpha,
-    sin_dip,cos_dip, corner[4][3];
+    sin_dip,cos_dip, corner[MAX_NR_EL_VERTICES*3];
   float mom,slip[3],time;
   my_boolean del;
   struct flt *fault;
@@ -48,22 +47,22 @@ int main(void)
     calc_quad_base_vecs(fault[n].t_strike,fault[n].normal,fault[n].t_dip,
 		   fault[n].sin_alpha,fault[n].cos_alpha,sin_dip,cos_dip);
     fault[n].area = fault[n].l * fault[n].w * 4.0;
-    calculate_corners(corner,(fault+n),&dummy,&dummy);
+    calculate_vertices(corner,(fault+n),&dummy,&dummy);
     for(j=0;j<4;j++){
-      patch[n].x[j]=(float)corner[j][INT_X];
-      patch[n].y[j]=(float)corner[j][INT_Y];
-      patch[n].z[j]=(float)corner[j][INT_Z];
+      patch[n].x[j]=(float)corner[j*3+INT_X];
+      patch[n].y[j]=(float)corner[j*3+INT_Y];
+      patch[n].z[j]=(float)corner[j*3+INT_Z];
       // extrema
       for(i=0;i<3;i++){
-	if(xmax[i]<corner[j][i])
-	  xmax[i]=corner[j][i];
-	if(xmin[i]>corner[j][i])
-	  xmin[i]=corner[j][i];
+	if(xmax[i]<corner[j*3+i])
+	  xmax[i]=corner[j*3+i];
+	if(xmin[i]>corner[j*3+i])
+	  xmin[i]=corner[j*3+i];
       }
     }
-    patch[n].x[4]=(float)corner[0][INT_X];
-    patch[n].y[4]=(float)corner[0][INT_Y];
-    patch[n].z[4]=(float)corner[0][INT_Z];
+    patch[n].x[4]=(float)corner[0*3+INT_X];
+    patch[n].y[4]=(float)corner[0*3+INT_Y];
+    patch[n].z[4]=(float)corner[0*3+INT_Z];
     n++;
   }
   fclose(in);

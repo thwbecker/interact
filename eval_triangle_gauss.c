@@ -54,7 +54,7 @@ void eval_triangle_gauss(COMP_PRECISION *x,struct flt *fault,
   *giret=0;
   for(i=0;i<GAUSS_POINTS;i++){
     // assign the coordinate in element
-    globalx(fault->xt,g[i],h[i],xf);
+    globalx(fault->xn,g[i],h[i],xf);
     /*
       fprintf(stderr,"eval_triangle: gp %2i: x: %g/%g/%g, g/h/w: %g/%g/%g, cen: %g/%g/%g\n",
       i,xf[INT_X],xf[INT_Y],xf[INT_Z],g[i],h[i],w[i],
@@ -82,9 +82,9 @@ void eval_triangle_gauss(COMP_PRECISION *x,struct flt *fault,
       fprintf(stderr,"eval_triangle: gauss point %i is undefined: x: (%g, %g, %g) xg: (%g, %g, %g)\n",
 	      i,x[INT_X],x[INT_Y],x[INT_Z],xf[INT_X],xf[INT_Y],xf[INT_Z]);
       fprintf(stderr,"eval_triangle: xt: (%g, %g, %g) (%g, %g, %g) (%g, %g, %g)\n",
-	      fault->xt[INT_X  ],fault->xt[INT_Y  ],fault->xt[INT_Z  ],
-	      fault->xt[3+INT_X],fault->xt[3+INT_Y],fault->xt[3+INT_Z],
-	      fault->xt[6+INT_X],fault->xt[6+INT_Y],fault->xt[6+INT_Z]);
+	      fault->xn[INT_X  ],fault->xn[INT_Y  ],fault->xn[INT_Z  ],
+	      fault->xn[3+INT_X],fault->xn[3+INT_Y],fault->xn[3+INT_Z],
+	      fault->xn[6+INT_X],fault->xn[6+INT_Y],fault->xn[6+INT_Z]);
       *giret = iret;
     }
   }

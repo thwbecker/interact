@@ -9,12 +9,12 @@ int main(int argc, char **argv)
   
   struct flt *fault;
   struct med *medium;
-  int i,j,k,ncon,tncon;
+  int i,j,k,l,ncon,tncon,ielmul,nvert,nel,tnvert;
   my_boolean shrink_patches=FALSE,
     verbose=FALSE,
     attempt_read_slip=FALSE,
     read_slip;
-  COMP_PRECISION leeway,corner[4][3],u[3];
+  COMP_PRECISION leeway,vertex[MAX_NR_EL_VERTICES*3],u[3],t_strike[3],t_dip[3],normal[3],area;
   medium=(struct med *)calloc(1,sizeof(struct med));
   
   if(argc > 1)
@@ -42,43 +42,59 @@ int main(int argc, char **argv)
     leeway = 0.9;
   else
     leeway = 1.0;
-  /* count all nodes  */
-  for(tncon=i=0;i < medium->nrflt;i++)
-    tncon += ncon_of_patch((fault+i)) ; 
+  
+  /* 
+     count all nodes  
+  */
+  for(nel=tncon=tnvert=i=0;i < medium->nrflt;i++){
+    tnvert += nvert_of_patch((fault+i));
+    ielmul = number_of_subpatches((fault+i));
+    nel += ielmul;
+    for(l=0;l < ielmul;l++)
+      tncon += ncon_of_subpatch((fault+i),l);
+  }
+    
   printf("# vtk DataFile Version 2.0\n");
   printf("from patch2vtk\n");
   printf("ASCII\n");
   printf("DATASET UNSTRUCTURED_GRID\n");
   
-  printf("POINTS %i float\n",tncon);
+  printf("POINTS %i float\n",tnvert);
   for(i=0;i < medium->nrflt;i++){
-    calculate_bloated_corners(corner,(fault+i),leeway);
-    ncon = ncon_of_patch((fault+i));
-    for(j=0;j < ncon;j++){
+    nvert = nvert_of_patch((fault+i));
+    calculate_bloated_vertices(vertex,(fault+i),leeway);
+    for(j=0;j < nvert;j++){
       for(k=0;k < 3;k++)
-	if(fabs(corner[j][k]/CHAR_FAULT_DIM) > EPS_COMP_PREC)
-	  printf("%g ",corner[j][k]/CHAR_FAULT_DIM);
+	if(fabs(vertex[j*3+k]/CHAR_FAULT_DIM) > EPS_COMP_PREC)
+	  printf("%g ",vertex[j*3+k]/CHAR_FAULT_DIM);
 	else
 	  printf("0.0 ");
       printf("\t");
     }
     printf("\n");
   }
-  
-  printf("CELLS %i %i\n",medium->nrflt,tncon+medium->nrflt);
+
+  printf("CELLS %i %i\n",nel,tncon+nel);
   for(i=k=0;i<medium->nrflt;i++){
-    ncon = ncon_of_patch((fault+i));
-    printf("%i ",ncon);
-    for(j=0;j < ncon;j++,k++)
-      printf("%i ",k);
-    printf("\n");
-  }
-  printf("CELL_TYPES %i\n",medium->nrflt);
-  for(i=j=0;i<medium->nrflt;i++,j++){
-    printf("%i ",vtk_type_of_patch((fault+i)));
-    if(j>40){
+    ielmul = number_of_subpatches((fault+i));
+    for(l=0;l < ielmul;l++){
+      ncon = ncon_of_subpatch((fault+i),l);
+      printf("%i ",ncon);
+      for(j=0;j < ncon;j++)
+	printf("%i ",k+node_number_of_subelement((fault+i),j, l));
       printf("\n");
-      j=0;
+    }
+    k += nvert_of_patch((fault+i));
+  }
+  printf("CELL_TYPES %i\n",nel);
+  for(i=j=0;i<medium->nrflt;i++){
+    ielmul = number_of_subpatches((fault+i));
+    for(l=0;l < ielmul;l++,j++){
+      printf("%i ",vtk_type_of_patch((fault+i),l));
+      if(j>40){
+	printf("\n");
+	j=0;
+      }
     }
   }
   if(j)
@@ -87,37 +103,66 @@ int main(int argc, char **argv)
     /* 
        use slip for coloring 
     */
-    printf("CELL_DATA %i\n",medium->nrflt);
+    printf("CELL_DATA %i\n",nel);
     
     printf("SCALARS sqrt(s^2+d^2) float 1\n");
     printf("LOOKUP_TABLE default\n");
-    for(i=0;i < medium->nrflt;i++)
-      printf("%g\n",sqrt(fault[i].u[STRIKE]*fault[i].u[STRIKE] 
-			 + fault[i].u[DIP]*fault[i].u[DIP]));
+    for(i=0;i < medium->nrflt;i++){
+      ielmul = number_of_subpatches((fault+i));
+      for(l=0;l < ielmul;l++){
+	u[STRIKE]=u[DIP]=0.;
+	for(k=0;k<3;k++){
+	  u[STRIKE] += projected_slip_major_to_minor_patch((fault+i),k,STRIKE,l) * fault[i].u[k];
+	  u[DIP] +=    projected_slip_major_to_minor_patch((fault+i),k,DIP,   l) * fault[i].u[k];
+	}
+	printf("%g\n",sqrt(u[STRIKE]*u[STRIKE] + u[DIP]*u[DIP]));
+      }
+    }
+      
 
     printf("SCALARS strike_slip float 1\n");
     printf("LOOKUP_TABLE default\n");
-    for(i=0;i < medium->nrflt;i++)
-      printf("%g\n",fault[i].u[STRIKE]);
+    for(i=0;i < medium->nrflt;i++){
+      ielmul = number_of_subpatches((fault+i));
+      for(l=0;l < ielmul;l++){
+	u[STRIKE]=0.;
+	for(k=0;k<3;k++)
+	  u[STRIKE] += projected_slip_major_to_minor_patch((fault+i),k, STRIKE,l) * fault[i].u[k];
+	printf("%g\n",u[STRIKE]);
+      }
+    }
  
     printf("SCALARS dip_slip float 1\n");
     printf("LOOKUP_TABLE default\n");
-    for(i=0;i < medium->nrflt;i++)
-      printf("%g\n",fault[i].u[DIP]);
+    for(i=0;i < medium->nrflt;i++){
+      ielmul = number_of_subpatches((fault+i));
+      for(l=0;l < ielmul;l++){
+	u[DIP]=0.;
+	for(k=0;k<3;k++)
+	  u[DIP] += projected_slip_major_to_minor_patch((fault+i),k,DIP,l) * fault[i].u[k];
+	printf("%g\n",u[DIP]);
+      }
+    }
 
     /* 
        vectors for displacement 
     */
     printf("VECTORS slip float\n");
     for(i=0;i < medium->nrflt;i++){
-      for(j=0;j<3;j++){
-	u[j]  = fault[i].t_strike[j] * fault[i].u[STRIKE];
-	u[j] += fault[i].t_dip[j]    * fault[i].u[DIP];
-	u[j] += fault[i].normal[j]   * fault[i].u[NORMAL];
+      ielmul = number_of_subpatches((fault+i));
+      for(l=0;l < ielmul;l++){
+	get_sub_normal_vectors((fault+i),l,t_strike,t_dip,normal,&area);
+	for(j=0;j<3;j++){
+	  u[j] = 0.0;
+	  for(k=0;k<3;k++){
+	    u[j] += t_strike[j] * fault[i].u[k]*projected_slip_major_to_minor_patch((fault+i),k,STRIKE,l) ;
+	    u[j] += t_dip[j]    * fault[i].u[k]*projected_slip_major_to_minor_patch((fault+i),k,DIP,l) ;
+	    u[j] += normal[j]   * fault[i].u[k]*projected_slip_major_to_minor_patch((fault+i),k,NORMAL,l) ;
+	  }
+	}
+	printf("%g %g %g\n",u[INT_X],u[INT_Y],u[INT_Z]);
       }
-      printf("%g %g %g\n",u[INT_X],u[INT_Y],u[INT_Z]);
     }
-
   }
   fprintf(stderr,"%s: written VTK to stdout\n",argv[0]);
   exit(0);

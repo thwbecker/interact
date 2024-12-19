@@ -1,9 +1,9 @@
 /*
   interact: model fault interactions using dislocations in a 
             halfspace
-  (C) Thorsten Becker, becker@eps.harvard.edu
+  (C) Thorsten Becker, thwbecker@post.harvard.edu
 
-  $Id: sparse_nr.c,v 1.2 2002/10/08 19:24:44 tbecker Exp $
+
 */
 
 #include "interact.h"
@@ -21,10 +21,10 @@ size_t create_nrs_sparse(struct med *medium, I_MATRIX_PREC thres,
 			 my_boolean matrix_in_memory)
 {
   if(matrix_in_memory)// this is for debugging only
-    return create_nrs_sparse_from_memory(medium->nmat, imat,thres,
+    return create_nrs_sparse_from_memory(medium->nmat1, imat,thres,
 				     &medium->is1,&medium->val);
   else
-    return create_nrs_sparse_from_file(medium->nmat,thres,
+    return create_nrs_sparse_from_file(medium->nmat1,thres,
 				       &medium->is1,&medium->val,
 				       medium->i_mat_in);
 }

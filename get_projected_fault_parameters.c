@@ -2,9 +2,7 @@
 
   interact: model fault interactions using dislocations in a 
             halfspace
-  (C) Thorsten Becker, becker@eps.harvard.edu
-
-  $Id: get_projected_fault_parameters.c,v 1.7 2003/03/18 03:00:09 becker Exp $
+  (C) Thorsten Becker, thbecker@post.harvard.edu
 
 
 
@@ -42,7 +40,7 @@ void get_projected_fault_parameters(COMP_PRECISION fx[2][2],
   int i,j;
   COMP_PRECISION fxr[2][2],pfx[2][2],azir,
     centerr[2],gdistance,dummy=0;
-  // convert fault endpoint coordinates to radians
+  // convert fault endpoint coordinates to radians2
   for(i=0;i<2;i++)
     for(j=0;j<2;j++)
       fxr[i][j] = DEG2RADF(fx[i][j]);

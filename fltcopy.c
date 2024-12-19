@@ -30,7 +30,11 @@ void fltcp(struct flt *a, struct flt *b)
 #ifdef ALLOW_NON_3DQUAD_GEOM
   b->type = a->type;
   if(a->type == TRIANGULAR){
-    a_equals_b_vector(b->xt,a->xt,9);
+    a_equals_b_vector(b->xn,a->xn,9);
+  }
+  if(a->type == IQUAD){
+    a_equals_b_vector(b->xn,a->xn,33); /* 5 nodes plus two sets of
+					  three projection angles */
   }
 #endif 
   for(i=0;i<2;i++){

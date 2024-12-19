@@ -7,7 +7,7 @@ reads in a rectangular Okada style fault geometry from "geom.in" in
 interact format and a "bc.in" boundary condition file and produces
 output for Poly3D
 
-$Id: patch2poly3d.c,v 1.5 2011/01/09 02:02:43 becker Exp $
+
 
 
 */
@@ -20,7 +20,7 @@ int main(int argc, char **argv)
   struct med *medium;
   FILE *in;
   int i,opcode,j,ecnt,dim,tri;
-  COMP_PRECISION a[6],b[6],corner[4][3],lloc,wloc;
+  COMP_PRECISION a[6],b[6],corner[MAX_NR_EL_VERTICES*3],lloc,wloc;
   char bcstring[200];
   if(argc > 2){
     fprintf(stderr,"%s tri[0] \n\t reads in interact patch format from %s\n",
@@ -158,11 +158,11 @@ int main(int argc, char **argv)
       if(fault[j].group == i){
 #ifdef ALLOW_NON_3DQUAD_GEOM
 	switch(fault[j].type){
-	case RECTANGULAR_PATCH:
+	case OKADA_PATCH:
 	  /* 
 	     output of rectangular patch 
 	  */
-	  calculate_corners(corner,(fault+j),&lloc,&wloc);
+	  calculate_vertices(corner,(fault+j),&lloc,&wloc);
 	  if(!tri){		/* quad */
 	    /* vertices 
 	       v name csys x1 x2 x3
@@ -171,13 +171,13 @@ int main(int argc, char **argv)
 	    printf("* element %6i from patch %6i group %3i\n",
 		   ecnt,j,i);
 	    printf("v g%03if%06ia global %24.15e %24.15e %24.15e\n",
-		   i,j,corner[0][INT_X],corner[0][INT_Y],corner[0][INT_Z]);
+		   i,j,corner[0*3+INT_X],corner[0*3+INT_Y],corner[0*3+INT_Z]);
 	    printf("v g%03if%06ib global %24.15e %24.15e %24.15e\n",
-		   i,j,corner[1][INT_X],corner[1][INT_Y],corner[1][INT_Z]);
+		   i,j,corner[1*3+INT_X],corner[1*3+INT_Y],corner[1*3+INT_Z]);
 	    printf("v g%03if%06ic global %24.15e %24.15e %24.15e\n",
-		   i,j,corner[2][INT_X],corner[2][INT_Y],corner[2][INT_Z]);
+		   i,j,corner[2*3+INT_X],corner[2*3+INT_Y],corner[2*3+INT_Z]);
 	    printf("v g%03if%06id global %24.15e %24.15e %24.15e\n",
-		   i,j,corner[3][INT_X],corner[3][INT_Y],corner[3][INT_Z]);
+		   i,j,corner[3*3+INT_X],corner[3*3+INT_Y],corner[3*3+INT_Z]);
 	    
 	    /* elements
 	       e nrnd csys btype bval1 bval2 bval3 nnd1 nnd2 nnd3 ...
@@ -201,11 +201,11 @@ int main(int argc, char **argv)
 	    printf("* element %6i from patch %6i group %3i, triangle one\n",
 		   ecnt,j,i);
 	    printf("v g%03if%06ia global %24.15e %24.15e %24.15e\n",
-		   i,j,corner[0][INT_X],corner[0][INT_Y],corner[0][INT_Z]);
+		   i,j,corner[0*3+INT_X],corner[0*3+INT_Y],corner[0*3+INT_Z]);
 	    printf("v g%03if%06ib global %24.15e %24.15e %24.15e\n",
-		   i,j,corner[1][INT_X],corner[1][INT_Y],corner[1][INT_Z]);
+		   i,j,corner[1*3+INT_X],corner[1*3+INT_Y],corner[1*3+INT_Z]);
 	    printf("v g%03if%06ic global %24.15e %24.15e %24.15e\n",
-		   i,j,corner[2][INT_X],corner[2][INT_Y],corner[2][INT_Z]);
+		   i,j,corner[2*3+INT_X],corner[2*3+INT_Y],corner[2*3+INT_Z]);
 	    sprintf(bcstring,"%1s%1s%1s %15.8e %15.8e %15.8e",
 		    (slip_type_bc(fault[i].mode[DIP]))?("b"):("t"),
 		    (slip_type_bc(fault[i].mode[STRIKE]))?("b"):("t"),
@@ -220,11 +220,11 @@ int main(int argc, char **argv)
 	    printf("* element %6i from patch %6i group %3i, triangle two\n",
 		   ecnt,j,i);
 	    printf("v g%03if%06ia global %24.15e %24.15e %24.15e\n",
-		   i,j,corner[0][INT_X],corner[0][INT_Y],corner[0][INT_Z]);
+		   i,j,corner[0*3+INT_X],corner[0*3+INT_Y],corner[0*3+INT_Z]);
 	    printf("v g%03if%06ic global %24.15e %24.15e %24.15e\n",
-		   i,j,corner[2][INT_X],corner[2][INT_Y],corner[2][INT_Z]);
+		   i,j,corner[2*3+INT_X],corner[2*3+INT_Y],corner[2*3+INT_Z]);
 	    printf("v g%03if%06id global %24.15e %24.15e %24.15e\n",
-		   i,j,corner[3][INT_X],corner[3][INT_Y],corner[3][INT_Z]);
+		   i,j,corner[3*3+INT_X],corner[3*3+INT_Y],corner[3*3+INT_Z]);
 	    sprintf(bcstring,"%1s%1s%1s %15.8e %15.8e %15.8e",
 		    (slip_type_bc(fault[i].mode[DIP]))?("b"):("t"),
 		    (slip_type_bc(fault[i].mode[STRIKE]))?("b"):("t"),
@@ -245,7 +245,7 @@ int main(int argc, char **argv)
 	}
 #else
 
-	calculate_corners(corner,(fault+j),&lloc,&wloc);
+	calculate_vertices(corner,(fault+j),&lloc,&wloc);
 	/* vertices 
 	   v name csys x1 x2 x3
 	*/
@@ -253,13 +253,13 @@ int main(int argc, char **argv)
 	printf("* element %6i from patch %6i group %3i\n",
 	       ecnt,j,i);
 	printf("v g%03if%06ia global %24.15e %24.15e %24.15e\n",
-	       i,j,corner[0][INT_X],corner[0][INT_Y],corner[0][INT_Z]);
+	       i,j,corner[0*3+INT_X],corner[0*3+INT_Y],corner[0*3+INT_Z]);
 	printf("v g%03if%06ib global %24.15e %24.15e %24.15e\n",
-	       i,j,corner[1][INT_X],corner[1][INT_Y],corner[1][INT_Z]);
+	       i,j,corner[1*3+INT_X],corner[1*3+INT_Y],corner[1*3+INT_Z]);
 	printf("v g%03if%06ic global %24.15e %24.15e %24.15e\n",
-	       i,j,corner[2][INT_X],corner[2][INT_Y],corner[2][INT_Z]);
+	       i,j,corner[2*3+INT_X],corner[2*3+INT_Y],corner[2*3+INT_Z]);
 	printf("v g%03if%06id global %24.15e %24.15e %24.15e\n",
-	       i,j,corner[3][INT_X],corner[3][INT_Y],corner[3][INT_Z]);
+	       i,j,corner[3*3+INT_X],corner[3*3+INT_Y],corner[3*3+INT_Z]);
 	
 	/* elements
 	   e nrnd csys btype bval1 bval2 bval3 nnd1 nnd2 nnd3 ...

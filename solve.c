@@ -24,7 +24,7 @@ int solve(struct med *medium,struct flt *fault)
   size_t full_size,sparse_size;
   static int izero=0;
   FILE *aio;
-  long int isize,index_numbers;
+  long int isize;
 #ifdef USE_SLATEC_NNLS
   A_MATRIX_PREC *x,prgopt[1]={1.0},rnorm,*work,dummy;
   int *iwork,mode,l,nm;
@@ -43,7 +43,7 @@ int solve(struct med *medium,struct flt *fault)
   PetscInt lm, ln, dn, on;
   VecScatter ctx;
 #else
-  unsigned int i,m,n;
+  unsigned int i;
 #endif
 
   

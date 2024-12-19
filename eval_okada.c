@@ -8,8 +8,8 @@
   functions given constant slip on a rectangle or for a point source
 
 
-WARNING: FOR ALL CHANGES: REMEMBER TO ALSO CHANGE THE BASIC VERSION
-BELOW!
+  WARNING: FOR ALL CHANGES: REMEMBER TO ALSO CHANGE THE BASIC VERSION
+  BELOW!
 
 
 */
@@ -52,15 +52,15 @@ extern void dc3d0(double*,double*,double*,double*,double*,double*,double*,double
   matrix [6] in sm_global 
 
 
-  (also see eval_rectangle_basic below, which only works for
+  (also see eval_okada_basic below, which only works for
   strike = 90)
 
 */
-void eval_rectangle(COMP_PRECISION *x,struct flt *fault,
-		    COMP_PRECISION *disp,
-		    COMP_PRECISION *u_global, 
-		    COMP_PRECISION sm_global[3][3],int *iret,
-		    MODE_TYPE mode)
+void eval_okada(COMP_PRECISION *x,struct flt *fault,
+		COMP_PRECISION *disp,
+		COMP_PRECISION *u_global, 
+		COMP_PRECISION sm_global[3][3],int *iret,
+		MODE_TYPE mode)
 {
 
   COMP_PRECISION iso,dx[3],sm_local[3][3];
@@ -72,17 +72,17 @@ void eval_rectangle(COMP_PRECISION *x,struct flt *fault,
   static double medium_alpha = ALPHA_CONST;
   double al1,al2,aw1,aw2,depth,cpdip;
 #ifdef DEBUG
-  COMP_PRECISION corners[4][3],l,w;
+  COMP_PRECISION corners[MAX_NR_EL_VERTICES*3],l,w;
 #endif
   cpdip=(double)fault->dip;
 #ifdef DEBUG
   if(cpdip < 0 || cpdip > 90){
-    fprintf(stderr,"eval_rectangle: dip (%g) should be between 0 and 90 (maybe)\n",
+    fprintf(stderr,"eval_okada: dip (%g) should be between 0 and 90 (maybe)\n",
 	    cpdip);
     exit(-1);
   }
   if(fault->x[INT_Z] >0){
-    fprintf(stderr,"eval_rectangle: error: fault z: %g (needs to be <=0)\n",
+    fprintf(stderr,"eval_okada: error: fault z: %g (needs to be <=0)\n",
 	    fault->x[INT_Z]);
     exit(-1);
   }
@@ -127,14 +127,14 @@ void eval_rectangle(COMP_PRECISION *x,struct flt *fault,
 #endif
   if(*iret){
 #ifdef DEBUG
-    calculate_corners(corners,fault,&l,&w);
+    calculate_vertices(corners,fault,&l,&w);
     fprintf(stderr,
-	    "eval_rectangle: SINGULAR: x: (%g, %g, %g) fault corners: (%g, %g, %g) (%g, %g, %g) (%g, %g, %g) (%g, %g, %g)\n",
+	    "eval_okada: SINGULAR: x: (%g, %g, %g) fault corners: (%g, %g, %g) (%g, %g, %g) (%g, %g, %g) (%g, %g, %g)\n",
 	    x_local[INT_X],x_local[INT_Y],x_local[INT_Z],
-	    corners[0][INT_X],corners[0][INT_Y],corners[0][INT_Z],
-	    corners[1][INT_X],corners[1][INT_Y],corners[1][INT_Z],
-	    corners[2][INT_X],corners[2][INT_Y],corners[2][INT_Z],
-	    corners[3][INT_X],corners[3][INT_Y],corners[3][INT_Z]);
+	    corners[0*3+INT_X],corners[0*3+INT_Y],corners[0*3+INT_Z],
+	    corners[1*3+INT_X],corners[1*3+INT_Y],corners[1*3+INT_Z],
+	    corners[2*3+INT_X],corners[2*3+INT_Y],corners[2*3+INT_Z],
+	    corners[3*3+INT_X],corners[3*3+INT_Y],corners[3*3+INT_Z]);
 #endif
     set_stress_and_disp_nan(sm_global,u_global,mode);
   }else{
@@ -182,14 +182,14 @@ input is L, W, dip, and depth (>0) as opposed to fault structure
 will compute both displacement and stress
 
 */
-void eval_rectangle_basic(COMP_PRECISION *x,
-			  COMP_PRECISION l, COMP_PRECISION w,
-			  COMP_PRECISION dip,
-			  COMP_PRECISION depth,
-			  COMP_PRECISION *disp,
-			  COMP_PRECISION *u_global, 
-			  COMP_PRECISION sm_global[3][3],
-			  int *iret)
+void eval_okada_basic(COMP_PRECISION *x,
+		      COMP_PRECISION l, COMP_PRECISION w,
+		      COMP_PRECISION dip,
+		      COMP_PRECISION depth,
+		      COMP_PRECISION *disp,
+		      COMP_PRECISION *u_global, 
+		      COMP_PRECISION sm_global[3][3],
+		      int *iret)
 {
 #ifndef USE_DOUBLE_PRECISION
   double depth_d,x_d[3],disp_d[3],u_d[12],dip_d,u_global_d[3];
@@ -202,7 +202,7 @@ void eval_rectangle_basic(COMP_PRECISION *x,
   aw1 = (double)-w;aw2 = (double)w;
   //#ifdef DEBUG
   if((depth < 0)||(x[INT_Z]>0)){
-    fprintf(stderr,"eval_rectangle_basic: error: depth: %g (has to be >0) z: %g (has to be <0)\n",
+    fprintf(stderr,"eval_okada_basic: error: depth: %g (has to be >0) z: %g (has to be <0)\n",
 	    depth,x[INT_Z]);
     exit(-1);
   }

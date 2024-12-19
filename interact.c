@@ -4,15 +4,12 @@
 
 	    (C) Thorsten Becker, becker@eps.harvard.edu
 
-  $Id: interact.c,v 2.38 2003/02/13 22:45:12 becker Exp $
-
-
   Okada and other dislocation routines based elastic half-space
   fault-patch interaction program
 
-  calculates the stresses on fault patches due to slip on 
-  other faults. inversion of the interaction matrix is done using
-  various matrix solves, see 'interact -h' for description
+  calculates the stresses on fault patches due to slip on other
+  faults. inversion of the interaction matrix is done using various
+  matrix solves, see 'interact -h' for description
 
 
 
@@ -23,12 +20,6 @@
   2
   0.01 0.05 70 
   -1 0 0 10
-  then:
-  interact runs with sparse matrix storage (mostly I assembly!) take 
-  (second figure is for t_end 7000 as opposed to 70):
-
-  Athlon 1400Mhz, ATLAS blas           324.870u     453.100u
-  O2 170Mhz R10000, complib.sgimath    975.880u    1283.257u
   
 
 */
@@ -36,15 +27,14 @@
 void calc_interaction_matrix(struct med *medium,struct flt *fault,
 			     my_boolean write_to_screen)
 {
-  COMP_PRECISION sm[3][3],disp[3],trac[3],adv,
+  COMP_PRECISION sm[3][3],disp[3]={0.,0.,0.},trac[3],adv,
     std,tmpflt;
   I_MATRIX_PREC iflt,s[3];
-  int iret,i,j,k,l,nzc,nsmall,
+  int iret,i,j,k,l,nzc,nsmall,m,
     sparse_matrix_size,evil_pair[2],pid;
   size_t dense_matrix_size,isize;
   FILE *out;  
   COMP_PRECISION shear_strike,shear_dip,normal;
-  int m;
 #ifdef SUPER_DUPER_DEBUG
   write_to_screen=TRUE;
 #endif
@@ -57,9 +47,13 @@ void calc_interaction_matrix(struct med *medium,struct flt *fault,
   medium->i_matrix_prec_size = sizeof(I_MATRIX_PREC);
   // size in bytes
   dense_matrix_size = isize * medium->i_matrix_prec_size;
+  //
   // size of square matrix, has to have three slip modes
   // so that s is [3][3], if NRMODE==3, identical to sqrt(isize)
-  medium->nmat=medium->nrflt*3;
+  // (will check below)
+  medium->nmat1 = medium->nrflt*3;  
+  medium->nmat2 = medium->nrflt*medium->nrmode;
+
   // check if we want to switch to sparse storage for I matrix
   if(medium->use_sparse_storage){
     fprintf(stderr,"calc_interaction_matrix: sparse storage selected\n");
@@ -77,9 +71,8 @@ void calc_interaction_matrix(struct med *medium,struct flt *fault,
     if(!(medium->i=(struct icm **)
 	 malloc(sizeof(struct icm *)*medium->nrflt)))
       MEMERROR("calc_interaction_matrix: 1:");
-    for(i=0;i<medium->nrflt;i++)// init with zeroes
-      if(! (*(medium->i+i)=(struct icm *)
-	    calloc(medium->nrflt,sizeof(struct icm)))){
+    for(i=0;i < medium->nrflt;i++)// init with zeroes
+      if(! (*(medium->i+i)=(struct icm *)calloc(medium->nrflt,sizeof(struct icm)))){
 	fprintf(stderr,"calc_interaction_matrix: 2: mem error, i: %i, inc s: %g MB ts: %g MB\n",
 		i,(double)sizeof(struct icm)*(double)medium->nrflt/ONE_MEGABYTE,
 		SQUARE((double)medium->nrflt)*(double)sizeof(struct icm)/ONE_MEGABYTE);
@@ -98,10 +91,11 @@ void calc_interaction_matrix(struct med *medium,struct flt *fault,
       fprintf(stderr,"calc_interaction_matrix: exiting, no file operation wanted\n");
       exit(-1);
       //      fprintf(stderr,"calc_interaction_matrix: will attempt to read from file during program run, have fun!\n");
-    }else{// use sparse matrix storage
+    }else{// use sparse matrix storage which somehow wants N^2
+      
       fprintf(stderr,"calc_interaction_matrix: preparing for sparse matrix storage, writing to \"%s\"\n",
 	      INTERACTION_MATRIX_FILE);
-      if(NRMODE_DEF == 2){
+      if(medium->nrmode == 2){
 	fprintf(stderr,"calc_interaction_matrix: for now, we need square matrix and opening modes are blocked!\n");
 	fprintf(stderr,"calc_interaction_matrix: hence compile with opening modes for sparse storage\n");
 	exit(-1);
@@ -120,22 +114,19 @@ void calc_interaction_matrix(struct med *medium,struct flt *fault,
 
       sprintf(medium->hfname,"%s.%i.hdr",INTERACTION_MATRIX_FILE,pid);
       out=myopen(medium->hfname,"w");
-      fprintf(out,"%i %i %i %i\n",medium->nmat,
-	      (int)medium->i_matrix_prec_size,
-	      medium->nrflt,NRMODE_DEF);
+      /* header */
+      fprintf(out,"%i %i %i %i %i\n",medium->nmat1,(int)medium->i_matrix_prec_size,medium->nmat2,medium->nrflt,medium->nrmode);
       fclose(out);
       // initialize I matrix file with zeroes
       sprintf(medium->mfname,"%s.%i.dat",INTERACTION_MATRIX_FILE,pid);
-      medium->i_mat_in=myopen(medium->mfname,"w");
-      for(iflt=0.0,i=0;i<medium->nmat;i++)
-	for(j=0;j<medium->nmat;j++)
-	  if(fwrite(&iflt,medium->i_matrix_prec_size,1,
-		    medium->i_mat_in) != 1){
+      medium->i_mat_in = myopen(medium->mfname,"w");
+      for(iflt=0.0,i=0;i < medium->nmat1;i++)
+	for(j=0;j < medium->nmat2;j++)
+	  if(fwrite(&iflt,medium->i_matrix_prec_size,1,medium->i_mat_in) != 1){
 	    fprintf(stderr,"interact: write error while trying to initialize the \"%s\" file\n",
 		    medium->mfname);
 	    fprintf(stderr,"interact: not enough space? it's %g MB large...\n",
-		    (COMP_PRECISION)(SQUARE(medium->nmat)*
-				     medium->i_matrix_prec_size)/
+		    (COMP_PRECISION)(medium->nmat1*medium->nmat2*medium->i_matrix_prec_size)/
 		    ONE_MEGABYTE);
 	    exit(-1);
 	  }
@@ -157,10 +148,10 @@ void calc_interaction_matrix(struct med *medium,struct flt *fault,
        on file, don't change it!
     */
     // initialize some stat quantities
-    medium->imean=medium->imax=std=0.0;
+    medium->imean = medium->imax = std = 0.0;
     nzc=0;
-    for(j=0;j<medium->nrflt;j++){// loop over all rupturing faults
-      for(k=0;k<NRMODE_DEF;k++){// loop over all rupture modes
+    for(j=0;j < medium->nrflt;j++){// loop over all rupturing faults
+      for(k=0;k < medium->nrmode;k++){// loop over all rupture modes
 	// in the i.dat matrix, the i' coordinate is j*NRMODE+k
 	// and the                  j' coordinate is i*3+l
 	/* 
@@ -279,12 +270,14 @@ void calc_interaction_matrix(struct med *medium,struct flt *fault,
     fprintf(stderr,"calc_interaction_matrix: WARNING: using old I matrix in \"%s\" and \"%s\"\n",
 	    medium->mfname,medium->hfname);
     out=myopen(medium->hfname,"r");
-    if(fscanf(out,"%i %i %i %i\n",&i,&j,&k,&l)!=4)
+    if(fscanf(out,"%i %i %i %i %i\n",&i,&j,&k,&l,&m)!=5)
       READ_ERROR(medium->hfname);
-    if((i != medium->nmat)||
+    if((i != medium->nmat1)||
        (j != medium->i_matrix_prec_size)||
-       (k != medium->nrflt)||(l != NRMODE_DEF)){
-      fprintf(stderr,"calc_interaction_matrix: mismatch of either nmat,prec_size,nrflt, or NRMODE\n");
+       (k != medium->nmat2)||
+       (l != medium->nrflt)||(l != medium->nrmode)){
+      fprintf(stderr,"calc_interaction_matrix: mismatch of either nmat1 (%i),prec_size (%i), namt2 (%i), nrflt (%i), or nrmode (%i)\n",
+	      i,j,k,l,m);
       exit(-1);
     }
     if(fscanf(out,TWO_IP_FORMAT,&medium->imean,&medium->imax)!=2)
@@ -293,9 +286,9 @@ void calc_interaction_matrix(struct med *medium,struct flt *fault,
     medium->i_mat_in=myopen(medium->mfname,"r");
     if(!medium->read_int_mat_from_file){
       fprintf(stderr,"calc_interaction_matrix: reading into memory\n");
-      for(j=0;j<medium->nrflt;j++)
-	for(k=0;k<NRMODE_DEF;k++)
-	  for(i=0;i<medium->nrflt;i++)
+      for(j=0;j < medium->nrflt;j++)
+	for(k=0;k < medium->nrmode;k++)
+	  for(i=0;i < medium->nrflt;i++)
 	    for(l=0;l<3;l++)
 	      if(fread(&ICIM(medium->i,i,j,k,l),medium->i_matrix_prec_size,1,out)!=1){
 		fprintf(stderr,"calc_interaction_matrix: read error i/j/k/l %i/%i/%i/%i\n",
@@ -331,16 +324,20 @@ void calc_interaction_matrix(struct med *medium,struct flt *fault,
       fprintf(stderr,"calc_interaction_matrix: initializing sparse storage scheme from file\n");
       fprintf(stderr,"calc_interaction_matrix: cutoff: %g, %g%% of max(abs(I)): %g\n",
 	      medium->i_mat_cutoff,medium->i_mat_cutoff/medium->imax*100.0,medium->imax);
-      // use numerical recipes schemes
-      create_nrs_sparse_from_file(medium->nmat,medium->i_mat_cutoff,
+      if(medium->nmat1 != medium->nmat2){
+	fprintf(stderr,"trying to call create_nrs_sparse_from_file but nmat1 %i nmat2 %i\n",
+		medium->nmat1,medium->nmat2);
+	exit(-1);
+      }
+      // use numerical recipes schemes, has to be n by n
+      create_nrs_sparse_from_file(medium->nmat1,medium->i_mat_cutoff,
 				  &medium->is1,&medium->val,
 				  medium->i_mat_in);
       sparse_matrix_size=(int)medium->is1[medium->is1[0]-1];
       sparse_matrix_size *= (sizeof(I_MATRIX_PREC)+sizeof(unsigned int));
       fprintf(stderr,"calc_interaction_matrix: sparse storage vectors fill %g MB\n",
 	      (COMP_PRECISION)sparse_matrix_size/ONE_MEGABYTE);
-      adv=100.0*(COMP_PRECISION)sparse_matrix_size/
-	(COMP_PRECISION)(dense_matrix_size);
+      adv=100.0*(COMP_PRECISION)sparse_matrix_size/(COMP_PRECISION)(dense_matrix_size);
       fprintf(stderr,"calc_interaction_matrix: this is %g%% of dense storage\n",adv);
       if(adv>80)
 	fprintf(stderr,"calc_interaction_matrix: maybe sparse storage wasn't such a good idea\n");
@@ -348,8 +345,8 @@ void calc_interaction_matrix(struct med *medium,struct flt *fault,
       fprintf(stderr,"calc_interaction_matrix: extracting compressed storage to i2.dat\n");
       // check if the transformation worked
       out=myopen("i2.dat","w");
-      for(i=0;i<medium->nmat;i++)
-	for(j=0;j<medium->nmat;j++){
+      for(i=0;i<medium->nmat1;i++)
+	for(j=0;j<medium->nmat2;j++){
 	  iflt = get_nrs_sparse_el(i,j,medium->is1,medium->val);
 	  fwrite(&iflt,sizeof(I_MATRIX_PREC),1,out);
 	}
@@ -361,9 +358,9 @@ void calc_interaction_matrix(struct med *medium,struct flt *fault,
       write_to_screen=FALSE;
     // check for small entries
     nsmall=0;
-    for(i=0;i<medium->nrflt;i++)
-      for(j=0;j<medium->nrflt;j++)
-	for(k=0;k<NRMODE_DEF;k++){
+    for(i=0;i < medium->nrflt;i++)
+      for(j=0;j < medium->nrflt;j++)
+	for(k=0;k < medium->nrmode;k++){
 	  if(write_to_screen){
 	    /* if we only have a couple of patches, print out interaction coefficients */
 	    get_right_slip(disp,k,1.0);
@@ -385,14 +382,14 @@ void calc_interaction_matrix(struct med *medium,struct flt *fault,
 	     check if self-interaction is zero (shouldn't happen) 
 	  */
 	  if(i==j)
-	    if(fabs(ICIM(medium->i,i,i,k,k))<EPS_COMP_PREC){
+	    if(fabs(ICIM(medium->i,i,i,k,k)) < EPS_COMP_PREC){
 	      fprintf(stderr,"calc_interaction_matrix: ERROR: slip type %i on fault %i has no effect on strike type %i (%g)\n",
 		      k,i,k,ICIM(medium->i,i,i,STRIKE,STRIKE));
 	      fprintf(stderr,"calc_interaction_matrix: this is no good. maybe you tried a 3-D slip mode with 2-D patches?\n");
 	      exit(-1);
 	    }
 	  for(l=0;l<3;l++)
-	    if(fabs(ICIM(medium->i,i,j,k,l))<medium->i_mat_cutoff)
+	    if(fabs(ICIM(medium->i,i,j,k,l)) < medium->i_mat_cutoff)
 	      nsmall++;
 	}
     fprintf(stderr,"calc_interaction_matrix: %i elements (%5.2f%%) are below cutoff of %g\n",
@@ -495,12 +492,12 @@ void get_right_slip(COMP_PRECISION *disp,int dir,
 I_MATRIX_PREC ic_from_file(int i, int j, int k, int l,
 			   struct med *medium)
 {
-  return(aij_from_file(POSII(j,k),POSIJ(i,l), medium->nmat, medium->i_mat_in));
+  return(aij_from_file(POSII(j,k),POSIJ(i,l), medium->nmat2, medium->i_mat_in));
 }
 /* 
    read the interaction coefficient from a binary file 
    using i,j indices where i and j run from
-   0 .. medium->nmat-1
+   0 .. medium->nmat2-1
 */
 I_MATRIX_PREC aij_from_file(int i, int j, int n, FILE *in)
 {
@@ -546,5 +543,5 @@ int select_i_coeff_calc_mode(struct med *medium)
 // calculate the size of the I matrix
 size_t imatrix_size(struct med *medium)
 {
-  return((size_t)(SQUARE(medium->nrflt)*NRMODE_DEF*3));
+  return((size_t)(SQUARE(medium->nrflt)*medium->nrmode*3));
 }

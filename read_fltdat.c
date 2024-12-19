@@ -49,7 +49,7 @@ int read_fltdat(char *filename,struct flt *fault,struct med *medium,
   }
 
   /* 
-     read two header 
+     read two header lines
   */
   iret=getline(&line,&size_dummy,in);free(line);line=NULL;
   iret=getline(&line,&size_dummy,in);free(line);line=NULL;

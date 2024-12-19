@@ -2,7 +2,6 @@
 
   constants for the blockinvert programs
 
-  $Id: blockinvert.h,v 1.12 2004/10/05 01:10:04 becker Exp $
 
 
 */

@@ -7,7 +7,7 @@ int main(int argc, char **argv)
 {
   struct med *medium;
   char tmpstr[STRLEN];
-  int nrmode,isize,n,i,j,nsize;
+  int isize,n,i,j,nsize;
   I_MATRIX_PREC thres,thres2,*imat,tmpflt;
   my_boolean in_memory=FALSE;
   FILE *out;
@@ -21,7 +21,7 @@ int main(int argc, char **argv)
   fscanf(medium->i_mat_in,"%i %i %i %i\n",
 	 &medium->nmat,
 	 &medium->i_matrix_prec_size,
-	 &medium->nrflt,&nrmode);
+	 &medium->nrflt,&medium->nrmode);
   fscanf(medium->i_mat_in,TWO_IP_FORMAT,
 	 &medium->imean,&medium->imax);
   fclose(medium->i_mat_in);

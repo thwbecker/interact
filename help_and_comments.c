@@ -48,7 +48,7 @@ void phelp(void)
   PE("");
   fprintf(stderr,"(1) The fault geometry is input via the file \"%s\",\n    a list of fault patches.\n",
 	  GEOMETRY_FILE);
-  PE("    This file has the following (\"patch\") format for rectangular faults or point sources");
+  PE("    This file has the following (\"patch\") format for regular, rectangular (Okada) faults or point sources");
   PE("    (free format ASCII list of parameters):\n");
   PE("    x_0 y_0 z_0 strike_0 dip_0 hlength_0 hwidth_0 group_0 ...");
   PE("    x_1 y_1 z_1 strike_1 dip_1 hlength_1 hwidth_1 group_1 ...");
@@ -64,7 +64,7 @@ void phelp(void)
   PE("      note that right now, the geometrical rake has to be 90 or 0 degrees, i.e. no tilted rectangles");
   PE("      slip can, however, have a rake as given by different along-strike and along-dip values, see below");
   PE("")
-  PE("    - hlength (L) and hwidth (W) are the patch's -->HALF<-- length and half width in ");
+  PE("    - hlength (L) and hwidth (W) are the patch's *half* length and *half* width in ");
   PE("      strike and dip direction, respectively. The patch area is thus 4LW.");
   PE("");
   PE("    - group is the patch's fault group, a number that is used to define faults that consist of");
@@ -85,10 +85,23 @@ void phelp(void)
   PE("    - triangular in half-space:");
   PE("      If BOTH fault half-width and length are negative, then the patch is a triangular element.");
   PE("      In this case, x, y, z, have no meaning but will be reassigned from the centroid.");
-  PE("      strike and dip will also be recomputed from element local g and h vectors, and length and width will be sqrt(area) subsequently.");
+  PE("      strike and dip will also be recomputed from element local g and h vectors, and length and width");
+  PE("      will be sqrt(area) subsequently.");
   PE("      The next nine numbers in the input geometry line will be the coordinates of the three nodes of the");
   PE("      triangle, however. FE-style counterclockwise numbering, input is then in the format:\n");
   PE("      999 999 999 999 999 -1 -1 group_0 x_x^1 x_y^1 x_z^1 x_x^2 x_y^2 x_z^2 x_x^3 x_y^3 x_z^3\n");
+  PE("      where exponents indicate the local number of the node, and 999 are place holder values, not used.");
+  PE("");
+  PE("      WARNING: not fully tested.");
+  PE("");
+ PE("    - irregular quad in half-space:");
+  PE("      If ONLY fault half-width is negative, then the patch is an irregular quad node element.");
+  PE("      In this case, x, y, z, have no meaning but will be reassigned from the centroid.");
+  PE("      strike and dip will also be recomputed from element local g and h vectors, and length and width");
+  PE("      will be sqrt(area) subsequently.");
+  PE("      The next 12 numbers in the input geometry line will be the coordinates of the four nodes of the");
+  PE("      triangle, however. FE-style counterclockwise numbering, input is then in the format:\n");
+  PE("      999 999 999 999 999 1 -1 group_0 x_x^1 x_y^1 x_z^1 x_x^2 x_y^2 x_z^2 x_x^3 x_y^3 x_z^3 x_x^4 x_y^4 x_z^4\n");
   PE("      where exponents indicate the local number of the node, and 999 are place holder values, not used.");
   PE("");
   PE("      WARNING: This is experimental and not fully tested.");
@@ -693,7 +706,7 @@ void phelp(void)
   PE("");
   PE(" -h  prints out this help message and exits to the operating system");
   PE("");
-  PE("(C) Thorsten Becker, thwbecker@post.harvard.edu, 1999 - 2023)");
+  PE("(C) Thorsten Becker, thwbecker@post.harvard.edu, 1999 - 2024)");
   PE("    interact - boundary element code for elastic half-spaces");
   PE("    3-D quad dislocationS based on Okada (BSSA, 1992).");
 #ifdef ALLOW_NON_3DQUAD_GEOM

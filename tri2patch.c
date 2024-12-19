@@ -27,7 +27,7 @@ int main(int argc, char **argv)
     fprintf(stderr,"if mode=%i, will write triangular element format\n",
 	    TRIANGULAR);
     fprintf(stderr,"if mode=%i, will attempt to fit the best rectangular element\n",
-	    RECTANGULAR_PATCH);
+	    OKADA_PATCH);
     exit(-1);
   }else
     sscanf(argv[1],"%i",&eltype);
@@ -36,23 +36,23 @@ int main(int argc, char **argv)
 
 
   if((fault=malloc(sizeof(struct flt)))==NULL)MEMERROR("main");
-  fault[0].xt=(COMP_PRECISION *)malloc(sizeof(COMP_PRECISION)*9);
+  fault[0].xn=(COMP_PRECISION *)malloc(sizeof(COMP_PRECISION)*9);
   n=0;
   while(fscanf(stdin,NINE_CP_FORMAT,
-	       &fault[n].xt[  INT_X],&fault[n].xt[  INT_Y],&fault[n].xt[  INT_Z],
-	       &fault[n].xt[3+INT_X],&fault[n].xt[3+INT_Y],&fault[n].xt[3+INT_Z],
-	       &fault[n].xt[6+INT_X],&fault[n].xt[6+INT_Y],&fault[n].xt[6+INT_Z])==9){
+	       &fault[n].xn[  INT_X],&fault[n].xn[  INT_Y],&fault[n].xn[  INT_Z],
+	       &fault[n].xn[3+INT_X],&fault[n].xn[3+INT_Y],&fault[n].xn[3+INT_Z],
+	       &fault[n].xn[6+INT_X],&fault[n].xn[6+INT_Y],&fault[n].xn[6+INT_Z])==9){
     for(j=1,i=2;i<9;i+= 3,j++)
-      if(fault[n].xt[i] > 0.0){
+      if(fault[n].xn[i] > 0.0){
 	fprintf(stderr,"%s: rectangle %i: point %i: z coordinate (%g) should be <= 0\n",
-		argv[0],n,j,fault[n].xt[i]);
+		argv[0],n,j,fault[n].xn[i]);
 	exit(-1);
       }
     // space for next
     if((fault=realloc(fault,sizeof(struct flt)*(n+2)))==NULL)
       MEMERROR("main");
-    fault[n+1].xt=(COMP_PRECISION *)malloc(sizeof(COMP_PRECISION)*9);
-    if(!fault[n+1].xt)MEMERROR("main");
+    fault[n+1].xn=(COMP_PRECISION *)malloc(sizeof(COMP_PRECISION)*9);
+    if(!fault[n+1].xn)MEMERROR("main");
     /*  */
     // init the triangular properties
     get_tri_prop_based_on_gh((fault+n));
@@ -69,7 +69,7 @@ int main(int argc, char **argv)
       my_sincos_deg(&sin_dip,&cos_dip,(COMP_PRECISION)fault[n].dip);
       calc_quad_base_vecs(fault[n].t_strike,fault[n].normal,fault[n].t_dip,
 			  fault[n].sin_alpha,fault[n].cos_alpha,sin_dip,cos_dip);
-      fault[n].type=RECTANGULAR_PATCH;
+      fault[n].type=OKADA_PATCH;
     }
     n++;
   }

@@ -92,8 +92,7 @@ print FORTRAN style matrix to a file
 
  */
 void print_matrix_ftrn_file(A_MATRIX_PREC *a, int m, int n, 
-			    char *name, 
-			    my_boolean binary)
+			    char *name, my_boolean binary)
 {
   FILE *out;
   fprintf(stderr,"print_matrix_file: printing %i by %i matrix to %s\n",
@@ -316,25 +315,25 @@ void print_interaction_matrix(struct med *medium,struct flt *fault)
   fprintf(stderr,"print_interaction_matrix: writing to \"%s\" (header) and \"%s\" (%s precision %i by %i)\n",
 	  medium->hfname,medium->mfname,(medium->i_matrix_prec_size==4)?
 	  ("float"):("double"),
-	  medium->nmat,medium->nmat);
+	  medium->nmat1,medium->nmat2);
   // header file
   out=myopen(medium->hfname,"w");
-  fprintf(out,"%i %i %i %i\n%g %g\n",medium->nmat,
-	  (int)medium->i_matrix_prec_size,
-	  medium->nrflt,NRMODE_DEF,medium->imean,medium->imax);
+  fprintf(out,"%i %i %i %i %i\n%g %g\n",
+	  medium->nmat1,(int)medium->i_matrix_prec_size,medium->nmat2,
+	  medium->nrflt,medium->nrmode,medium->imean,medium->imax);
   fclose(out);
   // matrix itself
   out=myopen(medium->mfname,"w");
   if(!medium->use_sparse_storage){
     for(j=0;j<medium->nrflt;j++)
-      for(k=0;k<NRMODE_DEF;k++)
+      for(k=0;k<medium->nrmode;k++)
 	for(i=0;i<medium->nrflt;i++)
 	  for(l=0;l<3;l++){
 	    fwrite(&ICIM(medium->i,i,j,k,l),medium->i_matrix_prec_size,1,out);
 	  }
   }else{
     for(j=0;j<medium->nrflt;j++)
-      for(k=0;k<NRMODE_DEF;k++)
+      for(k=0;k<medium->nrmode;k++)
 	for(i=0;i<medium->nrflt;i++)
 	  for(l=0;l<3;l++){
 	    // numerical recipsed storage
@@ -347,8 +346,8 @@ void print_interaction_matrix(struct med *medium,struct flt *fault)
 }
 /* 
    
-   print the interaction matrix such that rows are for different affected faults
-   and columns are for different slipping faults
+   print the interaction matrix such that rows are for different
+   affected faults and columns are for different slipping faults
 
 
  */

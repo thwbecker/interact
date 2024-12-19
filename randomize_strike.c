@@ -259,7 +259,7 @@ int main(int argc, char **argv)
     // for now don't check for variable friction
     fault[nr_inp_flts].mu_s = STATIC_MU;
 #ifdef ALLOW_NON_3DQUAD_GEOM
-    fault[nr_inp_flts].type=RECTANGULAR_PATCH;
+    fault[nr_inp_flts].type=OKADA_PATCH;
 #endif
     if(fault[nr_inp_flts].l > maxl)
       maxl=fault[nr_inp_flts].l;
@@ -333,7 +333,7 @@ int main(int argc, char **argv)
     // save original dip angle
     dip=fault[i].dip;
 #ifdef ALLOW_NON_3DQUAD_GEOM
-    fault[i].type=RECTANGULAR_PATCH;
+    fault[i].type=OKADA_PATCH;
 #endif
     /* 
        start randomizing loop here

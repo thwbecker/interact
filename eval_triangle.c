@@ -13,9 +13,9 @@
   International, 201, 1117-1139. doi: 10.1093/gji/ggv035
 
   input is the observational point x, the triangular
-  coordinates xt, and the displacement in disp
+  coordinates xt, and the displacement in slip
 
-  disp is in strike, dip, and normal format
+  slip is in strike, dip, and normal format
 
   output is u_global (displacements) and sm_global
   (stress matrix)
@@ -42,13 +42,13 @@ void eval_triangle(COMP_PRECISION *x,struct flt *fault,
     /* input is x y z, vertices, and slip as strike, dip, normal
        displacements are output as east, north, up
     */
-    tddisphs(x,  &(fault->xt[0]),&(fault->xt[3]),&(fault->xt[6]),(slip),(slip+1),(slip+2),u);
-    //tddisphs_bird((x+0),(x+1),(x+2),&(fault->xt[0]),&(fault->xt[3]),&(fault->xt[6]),(slip),(slip+1),(slip+2),&nu,(u+0),(u+1),(u+2));
+    tddisphs(x,  &(fault->xn[0]),&(fault->xn[3]),&(fault->xn[6]),(slip),(slip+1),(slip+2),u);
+    //tddisphs_bird((x+0),(x+1),(x+2),&(fault->xn[0]),&(fault->xn[3]),&(fault->xn[6]),(slip),(slip+1),(slip+2),&nu,(u+0),(u+1),(u+2));
 #ifdef CRAZY_DEBUG
     fprintf(stderr,"eval_triangle: xt %g %g %g\t%g %g %g\t%g %g %g\tslip %g %g %g\tx %g %g %g\tu %g %g %g\n", 
-	    fault->xt[0],fault->xt[1],fault->xt[2], 
-	    fault->xt[3],fault->xt[4],fault->xt[5], 
-	    fault->xt[6],fault->xt[7],fault->xt[8], 
+	    fault->xn[0],fault->xn[1],fault->xn[2], 
+	    fault->xn[3],fault->xn[4],fault->xn[5], 
+	    fault->xn[6],fault->xn[7],fault->xn[8], 
 	    slip[0],slip[1],slip[2],x[0],x[1],x[2],
 	    u[0],u[1],u[2]);
     fprintf(stderr,"eval_triangle: u: %g %g %g\n",u[0],u[1],u[2]);
@@ -66,10 +66,10 @@ void eval_triangle(COMP_PRECISION *x,struct flt *fault,
        stress and strain are given as: Sxx, Syy, Szz, Sxy, Sxz and Syz
     */
 #ifdef USE_HBI_TDDEF
-    hbi_tdstresshs_(x,(x+1),(x+2),&(fault->xt[0]),&(fault->xt[3]),&(fault->xt[6]),slip,(slip+1),(slip+2),&mu,&lambda,
+    hbi_tdstresshs_(x,(x+1),(x+2),&(fault->xn[0]),&(fault->xn[3]),&(fault->xn[6]),slip,(slip+1),(slip+2),&mu,&lambda,
 		    (stress),(stress+1),(stress+2),(stress+3),(stress+4),(stress+5));
 #else
-    tdstresshs(x,&(fault->xt[0]),&(fault->xt[3]),&(fault->xt[6]),
+    tdstresshs(x,&(fault->xn[0]),&(fault->xn[3]),&(fault->xn[6]),
 	       (slip),(slip+1),(slip+2),stress,strain);
 #ifdef CRAZY_DEBUG
     fprintf(stderr,"eval_triangle: stress: %g %g %g %g %g %g\n",strain[0],strain[1],strain[2],strain[3],strain[4],strain[5]);
@@ -111,9 +111,9 @@ void get_tri_prop_based_on_gh(struct flt *fault)
   COMP_PRECISION dip;
   double strike,alpha;
   
-  calc_centroid_tri(fault->xt,fault->x); /* assingn centroid to x */
+  calc_centroid_tri(fault->xn,fault->x); /* assign centroid to x */
   /* F90 routine */
-  get_tdcs_base_vectors(&(fault->xt[0]),&(fault->xt[3]),&(fault->xt[6]),
+  get_tdcs_base_vectors(&(fault->xn[0]),&(fault->xn[3]),&(fault->xn[6]),
 			fault->t_strike,fault->t_dip,fault->normal,
 			&fault->area);
   fault->l = fault->w = sqrt(fault->area);

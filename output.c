@@ -175,12 +175,13 @@ void print_fault_data(char *filename,struct med *medium,struct flt *fault)
 			 fault[i].s[NORMAL],medium->cohesion);
 	val[1] = ((COMP_PRECISION)fault[i].mu_d)*fault[i].s[NORMAL];
 #ifdef ALLOW_NON_3DQUAD_GEOM
-	if((fault[i].type==TRIANGULAR)&&(rotate)){
+	if(((fault[i].type==TRIANGULAR)||(fault[i].type==IQUAD))&&(rotate)){
 	  calc_global_strike_dip_from_local((fault+i),gstrike, gnormal, gdip);
 	  /* 
 	     project to global for output 
 	  */
-	  calc_global_slip_and_traction_from_local((fault+i),fault[i].u,fault[i].s,gstrike, gnormal, gdip,
+	  calc_global_slip_and_traction_from_local((fault+i),fault[i].u,fault[i].s,
+						   gstrike, gnormal, gdip,
 						   (val+2),(val+5),FALSE);
 	}else{
 	  val[2] = fault[i].u[STRIKE];// slip values
@@ -300,7 +301,7 @@ void print_group_data_geom(char *filename,struct med *medium,
 {
   int i,j,k;
   FILE *out;
-  COMP_PRECISION val,corner[4][3],col[3],lloc,wloc;
+  COMP_PRECISION val,corner[MAX_NR_EL_VERTICES*3],col[3],lloc,wloc;
   static COMP_PRECISION stats[4][5],range[4];
   static my_boolean init[4]={FALSE,FALSE,FALSE,FALSE};
   if(mode>3){
@@ -354,10 +355,10 @@ void print_group_data_geom(char *filename,struct med *medium,
       // select color
       col[0]=val;col[1]=0.;col[2]=1.0-val;
       // output
-      calculate_corners(corner,(fault+i),&lloc,&wloc);
+      calculate_vertices(corner,(fault+i),&lloc,&wloc);
       for(j=0;j<4;j++){
 	for(k=0;k<3;k++)
-	  fprintf(out,"%g ",corner[j][k]/CHAR_FAULT_DIM);
+	  fprintf(out,"%g ",corner[j*3+k]/CHAR_FAULT_DIM);
 	fprintf(out," %g %g %g 1.0\n",
 		col[0],col[1],col[2]);
       }

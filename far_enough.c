@@ -17,18 +17,18 @@ my_boolean far_enough(struct flt *fault1,struct flt *fault2,
 		   COMP_PRECISION leeway)
 {
   my_boolean outcome;
-  COMP_PRECISION corner[4][3];
+  COMP_PRECISION corner[MAX_NR_EL_VERTICES*3];
   float a[3],b[3],c[3],d[3],e[3],f[3],g[3],h[3];
-  COMP_PRECISION corner2[4][3];
+  COMP_PRECISION corner2[MAX_NR_EL_VERTICES*3];
   int i,hit=0;
 
-  calculate_bloated_corners(corner,fault1,leeway);
-  calculate_bloated_corners(corner2,fault2,leeway);
+  calculate_bloated_vertices(corner,fault1,leeway);
+  calculate_bloated_vertices(corner2,fault2,leeway);
   for(i=0;i<3;i++){
-    a[i]=corner[0][i];b[i]=corner[1][i];
-    c[i]=corner[2][i];d[i]=corner[3][i];
-    e[i]=corner2[0][i];f[i]=corner2[1][i];
-    g[i]=corner2[2][i];h[i]=corner2[3][i];
+    a[i]=corner[0*3+i];b[i]=corner[1*3+i];
+    c[i]=corner[2*3+i];d[i]=corner[3*3+i];
+    e[i]=corner2[0*3+i];f[i]=corner2[1*3+i];
+    g[i]=corner2[2*3+i];h[i]=corner2[3*3+i];
   }
   // use four fast triangle tests (slow, but ...)
   hit += tri_tri_intersect(a,b,d,e,f,h);

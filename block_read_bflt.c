@@ -611,7 +611,7 @@ void get_bflt_intcoeff(struct bflt **fault, int iflt,
 	/* set up unity slip vector */
 	get_right_slip(disp,j,(*fault+iflt)->lfac);
 	// evaluate displacements in rotated frame
-	eval_rectangle_basic(px,(*fault+iflt)->l,
+	eval_okada_basic(px,(*fault+iflt)->l,
 			     (*fault+iflt)->w,
 			     (*fault+iflt)->dip,
 			     -(*fault+iflt)->x[INT_Z],
@@ -660,7 +660,7 @@ void get_bflt_intcoeff(struct bflt **fault, int iflt,
 	// in the appropriate component (typically unity)
 	get_right_slip(disp,j,sfac);	
 	//
-	eval_rectangle_basic(px,(*fault+iflt)->l,
+	eval_okada_basic(px,(*fault+iflt)->l,
 			     (*fault+iflt)->w,
 			     (*fault+iflt)->dip,
 			     -(*fault+iflt)->x[INT_Z],

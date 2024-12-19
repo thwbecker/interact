@@ -64,12 +64,11 @@ void divide_fault_in_patches(int flt,struct flt *fault,
   int i,j,mi,mj,irad,old_nrpatches,
     added_patches,pcnt;
   COMP_PRECISION dx[3],dy[3],sin_dip,cos_dip,
-    corner[4][3],newl,neww,tmpd1,tmpd2,newarea,
-    l,w;
+    vertex[MAX_NR_EL_VERTICES*3],newl,neww,tmpd1,tmpd2,newarea,l,w;
   double alpha;
   my_boolean randomize;
 #ifdef  ALLOW_NON_3DQUAD_GEOM
-  if(fault[flt].type != RECTANGULAR_PATCH){
+  if(fault[flt].type != OKADA_PATCH){
     fprintf(stderr,"divide_fault_in_patches: error, only set up for quads, type: %i\n",
 	    fault[flt].type);
     exit(-1);
@@ -125,13 +124,7 @@ void divide_fault_in_patches(int flt,struct flt *fault,
     }
   }
   // obtain corner points of original patch
-  calculate_corners(corner,(fault+flt),&l,&w);
-  if(verbose){
-    for(i=0;i < ncon_of_patch((fault+flt));i++)
-      fprintf(stderr,"divide_fault_in_patches: vertex %i: %11g %11g %11g\n",
-	      i+1,reformat_small(corner[i][INT_X]),
-	      reformat_small(corner[i][INT_Y]),reformat_small(corner[i][INT_Z]));
-  }
+  calculate_vertices(vertex,(fault+flt),&l,&w);
   // new patch geometry
   newl = l / (COMP_PRECISION)seg[0];
   neww = w / (COMP_PRECISION)seg[1];
@@ -175,7 +168,7 @@ void divide_fault_in_patches(int flt,struct flt *fault,
       for(i=0;i < seg[0];i++){
 	//fprintf(stderr,"%i %i\n",i,j);
 	/* calculate position of patch in fault */
-	get_flt_location((*patch + pcnt),dx,dy,&(corner[0][0]),i,j);
+	get_flt_location((*patch + pcnt),dx,dy,vertex,i,j);
 	pcnt++;
       }
     }
@@ -197,7 +190,7 @@ void divide_fault_in_patches(int flt,struct flt *fault,
 	if(hypot(tmpd1,tmpd2) > irad)
 	  continue;
 	/* calculate position of patch in fault */
-	get_flt_location((*patch + pcnt),dx,dy,&corner[0][0],i,j);
+	get_flt_location((*patch + pcnt),dx,dy,vertex,i,j);
 	pcnt++;
       }
     }

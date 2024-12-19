@@ -16,19 +16,21 @@ int main(int argc, char **argv)
   struct flt *fault;
   int mode=0,i;
   medium=(struct med *)calloc(1,sizeof(struct med));
-
-  if(argc<2)
+  medium->nrmode = NRMODE_DEF;
+  
+  if(argc < 2)
     print_help_local(argv[0]);
-  for(i=2;i<argc;i++){
+  for(i=2;i < argc;i++){
     if(strcmp(argv[i],"-h")==0 || strcmp(argv[i],"-?")==0){
       print_help_local(argv[0]);
-    }else if(strcmp(argv[i],"-r")==0){
-      mode=RED_IMAT_MODE;
+    }else if(strcmp(argv[i],"-n")==0){
+      medium->nrmode = 3;
     }else{
       fprintf(stderr,"%s: can not use parameter %s, use -h for help page\n",
 	      argv[0],argv[i]);
       exit(-1);
-    }}
+    }
+  }
   read_geometry(argv[1],&medium,&fault,TRUE,FALSE,FALSE,FALSE);
   medium->i_mat_cutoff = I_MAT_CUTOFF_DEF;
   calc_interaction_matrix(medium,fault,TRUE);
@@ -39,6 +41,7 @@ int main(int argc, char **argv)
     break;
   }
   case RED_IMAT_MODE:{
+    /* this is weird, don't use */
     print_reduced_interaction_matrix(medium,fault);
     break;
   }}
@@ -52,6 +55,6 @@ void print_help_local(char *filename)
   fprintf(stderr,"%s: these are in the same format as in the \"%s\" file\n",
 	  filename,GEOMETRY_FILE);
   fprintf(stderr,"%s: options:\n",filename);
-  fprintf(stderr,"%s: -r   computes reduced interaction matrix\n",filename);
+  fprintf(stderr,"%s: -n   allow for normal slip, else only strike and dip slip\n",filename);
   exit(-1);
 }

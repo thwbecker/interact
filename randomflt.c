@@ -126,7 +126,7 @@ int main(int argc, char **argv)
     fault[i].mu_s=STATIC_MU;
     fault[i].group=i;
 #ifdef ALLOW_NON_3DQUAD_GEOM
-    fault[i].type=RECTANGULAR_PATCH;
+    fault[i].type=OKADA_PATCH;
 #endif
     /* search for a random location that is far enough 
        from all other faults */

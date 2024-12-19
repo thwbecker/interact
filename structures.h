@@ -1,7 +1,6 @@
 /* 
    DEFINITION OF THE MEDIUM AND FAULT STRUCTURES
    and some other stuff, like the two fault group 
-   $Id: structures.h,v 1.51 2011/01/09 02:02:43 becker Exp $
 */
 
 /*
@@ -51,6 +50,8 @@ struct geog{
 struct med{
   /* nr of patches */
   int nrflt;
+  /* number of fault slip modes, strike, dip, normal */
+  int nrmode;
   /* nr of groups */
   int nrgrp;
   // fault group structures
@@ -66,7 +67,7 @@ struct med{
 			      matrix entries, and cutoff 
 			      value for sparse storage */
     i_mat_cutoff;
-  int nmat;// integer with matrix dimensions for files
+  int nmat1,nmat2;// integer with matrix dimensions for files
   size_t i_matrix_prec_size; // precision of matrix
   unsigned int *is1, *is2;// pointers for sparse storage, if wanted
   my_boolean suppress_interactions;/* no interaction but
@@ -280,12 +281,18 @@ struct flt{
 #ifdef ALLOW_NON_3DQUAD_GEOM
   MODE_TYPE type;/* 
 		    element types:
-		    0: rectangular element
-		    1: point-source 
-		    2: triangular element 
+
+		    #define OKADA_PATCH 0
+		    #define POINT_SOURCE 1
+		    #define TRIANGULAR 2
+		    #define TWO_DIM_SEGMENT_PLANE_STRAIN 3
+		    #define TWO_DIM_SEGMENT_PLANE_STRESS 4
+		    #define TWO_DIM_HALFPLANE_PLANE_STRAIN 5
+		    #define IQUAD 6
+
 		 */
-  COMP_PRECISION *xt; /* coordinates of the three nodes of
-			 the triangular element */
+  COMP_PRECISION *xn; /* coordinates of the three nodes of the
+			 triangular or irregular quad element */
 #endif
   float pos[2]; /* position in the group of patches
 		   assuming linear fault */

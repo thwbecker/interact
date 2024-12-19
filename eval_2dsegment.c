@@ -51,7 +51,7 @@ void eval_2dsegment_plane_strain(COMP_PRECISION *x,
     pfac3 = (1.0 - 2.0 * POISSON_NU),
     pfac4 = POISSON_NU;
 #ifdef DEBUG
-  COMP_PRECISION l,w,corners[4][3];
+  COMP_PRECISION l,w,corners[MAX_NR_EL_VERTICES*3];
   if(x[INT_Z] != 0.0){
     fprintf(stderr,"eval_2dsegment_plane_strain: z coordinate has to be zero: z: %g\n",
 	    x[INT_Z]);
@@ -79,11 +79,11 @@ void eval_2dsegment_plane_strain(COMP_PRECISION *x,
     // solution is infinite
     //
 #ifdef DEBUG
-    calculate_corners(corners,fault,&l,&w);
+    calculate_vertices(corners,fault,&l,&w);
     fprintf(stderr,
 	    "eval_2dsegment_plane_strain: SINGULAR: x: (%g, %g) segment: (%g, %g) to (%g, %g)\n",
-	    x_local[INT_X],x_local[INT_Y],corners[0][INT_X],corners[0][INT_Y],
-	    corners[1][INT_X],corners[1][INT_Y]);
+	    x_local[INT_X],x_local[INT_Y],corners[0*3+INT_X],corners[0*3+INT_Y],
+	    corners[1*3+INT_X],corners[1*3+INT_Y]);
 #endif
     set_stress_and_disp_nan(sm_global,u_global,mode);
   }else{
@@ -138,7 +138,7 @@ void eval_2dsegment_plane_stress(COMP_PRECISION *x,struct flt *fault,
     pfac3 = (1.0 - 2.0 * (POISSON_NU/(1.0+POISSON_NU))),
     pfac5 = POISSON_NU/(TWO_TIMES_SHEAR_MODULUS*(1.0+POISSON_NU));
 #ifdef DEBUG
-  COMP_PRECISION l,w,corners[4][3];
+  COMP_PRECISION l,w,corners[MAX_NR_EL_VERTICES*3];
   if(x[INT_Z] != 0.0){
     fprintf(stderr,"eval_2dsegment_plane_stress: z coordinate has to be zero: z: %g\n",
 	    x[INT_Z]);
@@ -152,11 +152,11 @@ void eval_2dsegment_plane_stress(COMP_PRECISION *x,struct flt *fault,
 		&c4,&c32, &c42,&y2,iret);
   if(*iret){
 #ifdef DEBUG
-    calculate_corners(corners,fault,&l,&w);
+    calculate_vertices(corners,fault,&l,&w);
     fprintf(stderr,
 	    "eval_2dsegment_plane_stress: SINGULAR: x: (%g, %g) segment: (%g, %g) to (%g, %g)\n",
-	    x_local[INT_X],x_local[INT_Y],corners[0][INT_X],corners[0][INT_Y],
-	    corners[1][INT_X],corners[1][INT_Y]);
+	    x_local[INT_X],x_local[INT_Y],corners[0*3+INT_X],corners[0*3+INT_Y],
+	    corners[1*3+INT_X],corners[1*3+INT_Y]);
 #endif
     set_stress_and_disp_nan(sm_global,u_global,mode);
   }else{
@@ -201,7 +201,7 @@ void eval_2dsegment_plane_strain_basic(COMP_PRECISION *x,
     pfac3 = (1.0 - 2.0 * POISSON_NU),
     pfac4 = POISSON_NU;
 #ifdef DEBUG
-  COMP_PRECISION l,w,corners[4][3];
+  COMP_PRECISION l,w,corners[MAX_NR_EL_VERTICES*3];
   if(x[INT_Z] != 0.0){
     fprintf(stderr,"eval_2dsegment_plane_strain_basic: z coordinate has to be zero: z: %g\n",
 	    x[INT_Z]);exit(-1);
@@ -219,11 +219,11 @@ void eval_2dsegment_plane_strain_basic(COMP_PRECISION *x,
 		&c42,&y2,iret);
   if(*iret){
 #ifdef DEBUG
-    calculate_corners(corners,fault,&l,&w);
+    calculate_vertices(corners,fault,&l,&w);
     fprintf(stderr,
 	    "eval_2dsegment_plane_strain_basic: SINGULAR: x: (%g, %g) segment: (%g, %g) to (%g, %g)\n",
-	    x[INT_X],x[INT_Y],corners[0][INT_X],corners[0][INT_Y],
-	    corners[1][INT_X],corners[1][INT_Y]);
+	    x[INT_X],x[INT_Y],corners[0*3+INT_X],corners[0*3+INT_Y],
+	    corners[1*3+INT_X],corners[1*3+INT_Y]);
 #endif
     set_stress_and_disp_nan(sm_global,u_global,GC_DISP_AND_STRESS);
   }else{
@@ -252,7 +252,7 @@ void eval_2dsegment_plane_stress_basic(COMP_PRECISION *x,
     pfac3 = (1.0 - 2.0 * (POISSON_NU/(1.0+POISSON_NU))),
     pfac5 = POISSON_NU/(TWO_TIMES_SHEAR_MODULUS*(1.0+POISSON_NU));
 #ifdef DEBUG
-  COMP_PRECISION l,w,corners[4][3];
+  COMP_PRECISION l,w,corners[MAX_NR_EL_VERTICES*3];
   if(x[INT_Z] != 0.0){
     fprintf(stderr,"eval_2dsegment: z coordinate has to be zero: z: %g\n",
 	    x[INT_Z]);exit(-1);
@@ -270,11 +270,11 @@ void eval_2dsegment_plane_stress_basic(COMP_PRECISION *x,
 		&c42,&y2,iret);
   if(*iret){
 #ifdef DEBUG
-    calculate_corners(corners,fault,&l,&w);
+    calculate_vertices(corners,fault,&l,&w);
     fprintf(stderr,
 	    "eval_2dsegment_plane_stress_basic: SINGULAR: x: (%g, %g) segment: (%g, %g) to (%g, %g)\n",
-	    x[INT_X],x[INT_Y],corners[0][INT_X],corners[0][INT_Y],corners[1][INT_X],
-	    corners[1][INT_Y]);
+	    x[INT_X],x[INT_Y],corners[0*3+INT_X],corners[0*3+INT_Y],corners[1*3+INT_X],
+	    corners[1*3+INT_Y]);
 #endif
     set_stress_and_disp_nan(sm_global,u_global,GC_DISP_AND_STRESS);
   }else{

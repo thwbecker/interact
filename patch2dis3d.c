@@ -89,7 +89,7 @@ int main(int argc, char **argv)
       exit(-1);
     }
 #ifdef ALLOW_NON_3DQUAD_GEOM
-    if(fault[i].type != RECTANGULAR_PATCH){
+    if(fault[i].type != OKADA_PATCH){
       fprintf(stderr,"%s: can only deal with rectangular patches\n",
 	      argv[0]);
       exit(-1);

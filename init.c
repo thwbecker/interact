@@ -144,8 +144,8 @@ void initialize(struct med **medium, struct flt **fault,
 #else
   (*medium)->myfault0 = 0;    (*medium)->myfaultn = (*medium)->nrflt;
 #endif
-
-
+  /*  */
+  (*medium)->nrmode = NRMODE_DEF;
   // assign the background pressure 
   (*medium)->pressure = pressure;
   // read in the background stressing factors, 

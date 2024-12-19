@@ -2,7 +2,7 @@
 #include "properties.h"
 
 //
-// reads in patch quad format and writes patch triangle format (i.e. doubles patches)
+// reads in patch regular quad format and writes patch triangle format (i.e. doubles patches)
 //
 
 
@@ -18,12 +18,12 @@ int main(int argc, char **argv)
   long int seed = -1;
   int i,j,k,l,ntflt,con[2][3];
   my_boolean left,verbose = FALSE;
-  COMP_PRECISION corner[4][3],*dummy=NULL;
+  COMP_PRECISION corner[MAX_NR_EL_VERTICES*3],*dummy=NULL;
   int assign_mode = 0;	/* 0: left 1: right 2: randomg */
   RAND_GEN(&seed);
   medium=(struct med *)calloc(1,sizeof(struct med)); 
   if(argc > 2){
-    fprintf(stderr,"%s [assign_mode, %i]\n\t reads in patch quad format from stdin and writes patch tri format to stdout\nassign_mode: 0 = left, 1 = right, 2 = random\n\n",
+    fprintf(stderr,"%s [assign_mode, %i]\n\t reads in patch Okada quad format from stdin and writes patch tri format to stdout\nassign_mode: 0 = left, 1 = right, 2 = random\n\n",
 	    argv[0],assign_mode);
     exit(-1);
   }
@@ -33,11 +33,11 @@ int main(int argc, char **argv)
   fprintf(stderr,"%s: reading patch quad format from stdin, writing patch tri  to stdout, assign_mode: %i\n",argv[0],assign_mode);
   read_geometry("stdin",&medium,&qfault,FALSE,FALSE,FALSE,verbose);
   ntflt = medium->nrflt*2;
-  tfault[0].xt = (COMP_PRECISION *)malloc(sizeof(COMP_PRECISION)*9);
+  tfault[0].xn = (COMP_PRECISION *)malloc(sizeof(COMP_PRECISION)*9);
   tfault[0].type = TRIANGULAR;
   
   for(i=0;i < medium->nrflt;i++){
-    if(qfault[i].type != RECTANGULAR_PATCH){
+    if(qfault[i].type != OKADA_PATCH){
       fprintf(stderr,"%s: patch %i is not quad on input\n",argv[0],i+1);
       exit(-1);
     }
@@ -59,7 +59,7 @@ int main(int argc, char **argv)
       exit(-1);
       break;
     }
-    calculate_bloated_corners(corner,(qfault+i),1.0);
+    calculate_bloated_vertices(corner,(qfault+i),1.0);
     if(left){
       con[0][0] = 0; con[0][1] = 1; con[0][2] = 3;
       con[1][0] = 1; con[1][1] = 2; con[1][2] = 3;
@@ -71,7 +71,7 @@ int main(int argc, char **argv)
     for(j=0;j < 2;j++){		/* one quad = two triangle */
       for(k=0;k<3;k++){		/* node loop */
 	for(l=0;l<3;l++)	/* dimension loop */
-	  tfault[0].xt[3*k+l] = corner[con[j][k]][l];
+	  tfault[0].xn[3*k+l] = corner[(con[j][k])*3+l];
       }
       get_tri_prop_based_on_gh(tfault);
 

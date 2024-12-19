@@ -225,6 +225,11 @@ singular value will be set to zero
 #define HALF_PLANE_DEF FALSE
 #define CONSTANT_TIME_STEP_DEF FALSE
 #define DEBUG_DEF FALSE
+
+
+/* element geometry */
+
+#define MAX_NR_EL_VERTICES 5	/*  */
 /* 
    indices used in programs, do not change 
    the ordering here!!!
@@ -279,19 +284,20 @@ singular value will be set to zero
 /*
   patch ('element') type
 
-  0: rectangular
+  0: regular rectangular (Okada) patch
   1: point source
-  2: triangular (not implemented yet)
+  2: triangular 
   3: 2-D segment, will automatically switch to 2-D mode
   4: like 3, but plane stress instead of plane strain
   5: like 3, but half plane (y<=0)
 */
-#define RECTANGULAR_PATCH 0
+#define OKADA_PATCH 0
 #define POINT_SOURCE 1
 #define TRIANGULAR 2
 #define TWO_DIM_SEGMENT_PLANE_STRAIN 3
 #define TWO_DIM_SEGMENT_PLANE_STRESS 4
 #define TWO_DIM_HALFPLANE_PLANE_STRAIN 5
+#define IQUAD 6
 /* 
    output modes for print_patch_geometry
 */
@@ -389,7 +395,7 @@ singular value will be set to zero
 // and if i matrix pointer is passed as ***icm
 #define ICIMP(a,i,j,k,l) ((*(*(a)+i) +j)->s[k][l])
 // reference in a medium->nmat^2 style
-#define POSII(j,k) ((j)*NRMODE_DEF+(k))
+#define POSII(j,k) ((j)*medium->nrmode+(k))
 #define POSIJ(i,l) ((i)*3+(l))
 
 // references to 3D deformation and stress fields
