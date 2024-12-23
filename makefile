@@ -1,7 +1,7 @@
 ################################################################################
 #
 #
-#  (C) Thorsten Becker, thwbecker@post.harvard.edu, 1999-2023
+#  (C) Thorsten Becker, thwbecker@post.harvard.edu, 1999-2024
 #
 #  makefile for interact and related programs
 #
@@ -140,7 +140,7 @@ include makefile.gcc
 #
 # petsc, will override some of the flags
 # comment out if not needed
-include makefile.petsc
+#include makefile.petsc
 ifndef MPILD
 MPILD = $(LD)
 endif
@@ -205,6 +205,7 @@ PATCH_IO_OBJS = $(ODIR)/divide_fault_in_patches.o $(ODIR)/sparse.o	\
 	$(ODIR)/check_interaction.o $(ODIR)/eval_2dsegment.o		\
 	$(ODIR)/eval_okada.o $(ODIR)/tdd_coeff.o $(ODIR)/rhs.o		\
 	$(ODIR)/eval_green.o $(ODIR)/eval_triangle.o			\
+	$(ODIR)/eval_iquad.o			\
 	$(ODIR)/interact.o   $(ODIR)/mysincos.o 	\
 	$(OKROUTINE) $(ODIR)/fracture_criterion.o			\
 	$(ODIR)/myopen.o  $(ODIR)/randgen.o \
@@ -348,7 +349,7 @@ analysis: $(BDIR)/mspectral
 #$(BDIR)/patch2geom : geomview, outdated
 
 converters: $(BDIR)/patch2xyz   $(BDIR)/patch2vtk $(BDIR)/patch2bc \
-	$(BDIR)/patch2corners $(BDIR)/patch2group  \
+	$(BDIR)/patch2vertices $(BDIR)/patch2group  \
 	$(BDIR)/patch2xyzvec # $(BDIR)/patch2poly3d $(BDIR)/patch2dis3d
 
 geom_converters: $(BDIR)/points2patch $(BDIR)/tri2patch  $(BDIR)/patchquad2patchtri 
@@ -497,10 +498,10 @@ $(BDIR)/patch2bc: $(ODIR)/patch2bc.o $(ODIR)/read_geometry.o $(GEN_P_INC)  \
 		$(ODIR)/patch2bc.o -o $(BDIR)/patch2bc  $(LIBS) \
 		 $(SUPERLU_LIBS) $(SLATEC_LIBS) $(PGLIBS)	  $(LDFLAGS)
 
-$(BDIR)/patch2corners:  $(ODIR)/read_geometry.o $(ODIR)/patch2corners.o \
+$(BDIR)/patch2vertices:  $(ODIR)/read_geometry.o $(ODIR)/patch2vertices.o \
 	$(GEN_P_INC)  $(LIBLIST) 
-	$(MPILD)    $(ODIR)/read_geometry.o $(ODIR)/patch2corners.o \
-		-o $(BDIR)/patch2corners  $(LIBS) $(SUPERLU_LIBS) $(SLATEC_LIBS) $(PGLIBS) $(LDFLAGS)
+	$(MPILD)    $(ODIR)/read_geometry.o $(ODIR)/patch2vertices.o \
+		-o $(BDIR)/patch2vertices  $(LIBS) $(SUPERLU_LIBS) $(SLATEC_LIBS) $(PGLIBS) $(LDFLAGS)
 
 $(BDIR)/patch2group:   $(ODIR)/patch2group.o $(GEN_P_INC)  $(LIBLIST) 
 	$(MPILD)   $(ODIR)/patch2group.o \

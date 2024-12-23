@@ -11,8 +11,7 @@
 #                  in memory, if size is larger AND NO SPARSE STORAGE is invoked
 #                  will read from file. This is so slow, it's next to impossible to work.
 #
-MACHINE_DEFINES = -DIMAT_SPARSE_LIM=8000.0 -DIMAT_SIZE_LIM=8000.1  \
-	-DSGI_SUBROUTINE_CONVENTION  -Wno-discarded-qualifiers
+MACHINE_DEFINES = -DIMAT_SPARSE_LIM=8000.0 -DIMAT_SIZE_LIM=8000.1   -Wno-discarded-qualifiers
 #
 # LINUX system dependent flags for gcc
 #
@@ -48,21 +47,20 @@ GCCWOPT = -Wall
 
 
 # fast execution options, comment those two lines if debug output is wanted
-SCARGS = -Ofast -march=native $(GCCWOPT)
-DEBUG_FLAGS=
+#SCARGS = -Ofast -march=native $(GCCWOPT)
+#DEBUG_FLAGS=
 
 # these next three lines for debugging, comment if fast execution is desired
 
-#SCARGS =  $(GCCWOPT) 
+SCARGS =  $(GCCWOPT)
+# -DSUPER_DUPER_DEBUG -DDDMALLOC
 #DEBUG_FLAGS=-DDEBUG -g -O0
 
 # other debugging options, comment in for debugging
-# -DSUPER_DUPER_DEBUG -DDDMALLOC
+
 DEBUG_LIBS = 
 #-DMEM_ALLOC_DEBUG \
 #	-DDEBUG -DSUPER_DEBUG  
-
-
 
 
 #

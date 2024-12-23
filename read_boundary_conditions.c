@@ -544,7 +544,7 @@ void read_one_step_bc(FILE *in,struct med *medium,struct flt *fault,
 	// initialize 3-D slip vectors and activation flags
 	for(i=0;i < 3;i++)
 	    slip[i] = (i == bc_code)?(bc_value):(0.0);
-#ifdef DEBUG
+#ifdef SUPER_DEBUG
 	  HEADNODE
 	    fprintf(stderr,"read_boundary_conditions:  patch %i (s: %g, d: %g) cum. rot. u: s:%g d:%g n:%g\n",
 		    patch_nr,90.0-RAD2DEGF(asin(fault[patch_nr].sin_alpha)),
@@ -562,13 +562,14 @@ void read_one_step_bc(FILE *in,struct med *medium,struct flt *fault,
 	  else
 	    sma_local[i] = FALSE;
 	}
-	if((medium->comm_size == 1)&&(init_system))	/* init system
-							 * should be
-							 * TRUE in
-							 * general */
+	if((medium->comm_size == 1)&&(init_system)){	/* init system
+							  should be
+							  TRUE in
+							  general */
+
 	  /* for serial computation, compute stress effect now */
 	  quake(sma_local,slip,patch_nr,fault,medium,TRUE,FALSE);
-	else{			/* else, just add to slip array (quake does that, too) */
+	}else{			/* else, just add to slip array (quake does that, too) */
 	  for(j=0;j<3;j++)
 	    sma[patch_nr3+j] = sma_local[j];
 	  add_b_to_a_vector(fault[patch_nr].u,slip,3);

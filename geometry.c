@@ -361,9 +361,9 @@ int node_number_of_subelement(struct flt *fault,
 {
 #ifdef ALLOW_NON_3DQUAD_GEOM
 #ifdef DEBUG
-  if((isubsel >2)||(inode>2)){
-    fprintf(stderr,"node_number_of_subelement: isubsel %i inode %i\n",
-	    isubsel,inode);
+  if((isubel >2)||(inode>2)){
+    fprintf(stderr,"node_number_of_subelement: isusel %i inode %i\n",
+	    isubel,inode);
     exit(-1);
   }
 #endif
@@ -1293,7 +1293,26 @@ void calc_deviatoric_stress(COMP_PRECISION sm[3][3],COMP_PRECISION dm[3][3],
 		   dm[INT_X][INT_Z] * dm[INT_X][INT_Z] * 2.0));
 }
 
+/* 
 
+   compute the sub-element properties 
+
+   right now, this will only give anything but the original properties
+   for an iquad made out of three triangles
+
+   	 D              C
+	 2--------------1
+         |\            /|
+	 | \    0     / |
+         |  \   xc   /  |
+	 |   \      /   |
+	 |    \    /    |
+	 | N1  \  / N2  |
+	 |      \/      |
+	 3 ---- 0 ----- 4
+	 A              B
+
+ */
 void get_sub_normal_vectors(struct flt *fault, int subel,
 			    COMP_PRECISION *strike,
 			    COMP_PRECISION *dip,
@@ -1311,23 +1330,22 @@ void get_sub_normal_vectors(struct flt *fault, int subel,
   }
 #endif
   
-  if(subel==0){			/* first iquad or regular element */
+  if(subel==0){
+    /* first iquad or regular element */
     a_equals_b_vector_3d(strike,fault->t_strike);
     a_equals_b_vector_3d(dip,fault->t_dip);
     a_equals_b_vector_3d(normal,fault->normal);
-    *area = fault->l * fault->l;
+    *area = fault->l * fault->w;
   }else{
 #ifdef ALLOW_NON_3DQUAD_GEOM
     if(fault->type==IQUAD){
-      afault.xn = (COMP_PRECISION *)
-	malloc(sizeof(COMP_PRECISION)*9);
+      afault.xn = (COMP_PRECISION *)malloc(sizeof(COMP_PRECISION)*9);
       for(j=0;j<3;j++)
 	for(l=0;l<3;l++)
 	  afault.xn[l*3+j] =
 	    fault->xn[node_number_of_subelement(fault,l,subel)*3+j];
       get_tri_prop_based_on_gh(&afault);
-      
-      a_equals_b_vector_3d(strike,afault.t_strike);
+       a_equals_b_vector_3d(strike,afault.t_strike);
       a_equals_b_vector_3d(dip,afault.t_dip);
       a_equals_b_vector_3d(normal,afault.normal);
 
@@ -1335,14 +1353,18 @@ void get_sub_normal_vectors(struct flt *fault, int subel,
 
       free(afault.xn);
     }else{
-      fprintf(stderr,"get_sub_normal_vectors: fault type %i and subel > 0\n",fault->type);
+      fprintf(stderr,"get_sub_normal_vectors: fault type %i and subel > 0, %i\n",fault->type,subel);
       exit(-1);
     }
 #else
-    printf(stderr,"get_sub_normal_vectors: only Okada and subel > 0\n",fault->type);
+    printf(stderr,"get_sub_normal_vectors: only Okada and subel > 0, %i\n",fault->type,subel);
       exit(-1);
 #endif
   }
+  /* fprintf(stderr,"s %g %g %g\n",strike[0],strike[1],strike[2]); */
+  /* fprintf(stderr,"d %g %g %g\n",dip[0],dip[1],dip[2]); */
+  /* fprintf(stderr,"n %g %g %g\n",normal[0],normal[1],normal[2]); */
+
 }
 
 

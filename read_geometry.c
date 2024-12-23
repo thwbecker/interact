@@ -276,14 +276,29 @@ void read_geometry(char *patch_filename,struct med **medium,
       (*fault+i)->l = (*fault+i)->w = sqrt(area);
       
 #ifdef DEBUG
-      if((*medium)->comm_rank == 0)
-	fprintf(stderr,"read_geometry: fault %5i is iqaud, x1: (%10.3e, %10.3e, %10.3e) x2: (%10.3e, %10.3e, %10.3e) x3: (%10.3e, %10.3e, %10.3e) x4: (%10.3e, %10.3e, %10.3e), area: %10.3e\n",
+      if((*medium)->comm_rank == 0){
+	fprintf(stderr,"read_geometry: fault %5i is iquad, x1: (%10.2e, %10.2e, %10.2e) x2: (%10.2e, %10.2e, %10.2e) x3: (%10.2e, %10.2e, %10.2e) x4: (%10.2e, %10.2e, %10.2e), area: %10.2e\n",
 		i,
 		(*fault+i)->xn[3*3+INT_X],(*fault+i)->xn[3*3+INT_Y],(*fault+i)->xn[3*3+INT_Z],
 		(*fault+i)->xn[4*3+INT_X],(*fault+i)->xn[4*3+INT_Y],(*fault+i)->xn[4*3+INT_Z],
 		(*fault+i)->xn[1*3+INT_X],(*fault+i)->xn[1*3+INT_Y],(*fault+i)->xn[1*3+INT_Z],
 		(*fault+i)->xn[2*3+INT_X],(*fault+i)->xn[2*3+INT_Y],(*fault+i)->xn[2*3+INT_Z],
 		(*fault+i)->area);
+	fprintf(stderr,"read_geometry: main triangle: angles strike: %10.2e dip: %10.2e, l: %10.2e w: %10.2e\n",
+		(*fault+i)->strike,		(*fault+i)->dip,(*fault+i)->l,(*fault+i)->w);
+	fprintf(stderr,"read_geometry: main triangle:   strike: (%10.2e, %10.2e, %10.2e) dip:  (%10.2e, %10.2e, %10.2e) normal: (%10.2e, %10.2e, %10.2e)\n",
+		(*fault+i)->t_strike[INT_X],		(*fault+i)->t_strike[INT_Y],		(*fault+i)->t_strike[INT_Z],
+		(*fault+i)->t_dip[INT_X],		(*fault+i)->t_dip[INT_Y],		(*fault+i)->t_dip[INT_Z],
+		(*fault+i)->normal[INT_X],		(*fault+i)->normal[INT_Y],		(*fault+i)->normal[INT_Z]);
+	fprintf(stderr,"read_geometry: aux1 projection: strike: (%10.2e, %10.2e, %10.2e) dip:  (%10.2e, %10.2e, %10.2e) normal: (%10.2e, %10.2e, %10.2e)\n",
+		(*fault+i)->xn[5*3+0],(*fault+i)->xn[5*3+1],(*fault+i)->xn[5*3+2],
+		(*fault+i)->xn[6*3+0],(*fault+i)->xn[6*3+1],(*fault+i)->xn[6*3+2],
+		(*fault+i)->xn[7*3+0],(*fault+i)->xn[7*3+1],(*fault+i)->xn[7*3+2]);
+	fprintf(stderr,"read_geometry: aux2 projection: strike: (%10.2e, %10.2e, %10.2e) dip:  (%10.2e, %10.2e, %10.2e) normal: (%10.2e, %10.2e, %10.2e)\n",
+		(*fault+i)->xn[8*3+0],(*fault+i)->xn[8*3+1],(*fault+i)->xn[8*3+2],
+		(*fault+i)->xn[9*3+0],(*fault+i)->xn[9*3+1],(*fault+i)->xn[9*3+2],
+		(*fault+i)->xn[10*3+0],(*fault+i)->xn[10*3+1],(*fault+i)->xn[10*3+2]);
+      }
 #endif
       nr_iquad++;
     }else if((*fault+i)->l < 0){
@@ -387,10 +402,10 @@ void read_geometry(char *patch_filename,struct med **medium,
       //fprintf(stderr,"tdq %g %g %g\n",(*fault+i)->t_dip[0],(*fault+i)->t_dip[1],(*fault+i)->t_dip[2]);
 #ifdef SUPER_DEBUG
       if((*medium)->comm_rank == 0){
-	fprintf(stderr,"fault %5i: strike: %g dip: %g sc_alpha:  %10.3e/%10.3e sc_dip: %10.3e/%10.3e\n",
+	fprintf(stderr,"fault %5i: strike: %g dip: %g sc_alpha:  %10.2e/%10.2e sc_dip: %10.2e/%10.2e\n",
 		i,90.0-alpha,(*fault+i)->dip,(*fault+i)->sin_alpha,
 		(*fault+i)->cos_alpha,sin_dip,cos_dip);
-	fprintf(stderr," vec: s: (%10.3e,%10.3e,%10.3e) d: (%10.3e,%10.3e,%10.3e) n: (%10.3e,%10.3e,%10.3e)\n",
+	fprintf(stderr," vec: s: (%10.2e,%10.2e,%10.2e) d: (%10.2e,%10.2e,%10.2e) n: (%10.2e,%10.2e,%10.2e)\n",
 		(*fault+i)->t_strike[INT_X],(*fault+i)->t_strike[INT_Y],(*fault+i)->t_strike[INT_Z],
 		(*fault+i)->t_dip[INT_X],(*fault+i)->t_dip[INT_Y],(*fault+i)->t_dip[INT_Z],
 		(*fault+i)->normal[INT_X],(*fault+i)->normal[INT_Y],(*fault+i)->normal[INT_Z]);
@@ -580,7 +595,7 @@ void read_geometry(char *patch_filename,struct med **medium,
     }
   }else{
     if((*medium)->comm_rank == 0){
-      fprintf(stderr,"read_geometry: %i 2D elements, %i points, %i triangles, %i irregular, and %i regular quads\n",
+      fprintf(stderr,"read_geometry: %i 2D elements, %i points, %i triangles, %i iquads, and %i regular quads\n",
 	      nr_2d,nr_pt_src,nr_triangle,nr_iquad,(*medium)->nrflt - nr_triangle - nr_pt_src - nr_2d - nr_iquad);
       if(nr_2d)
 	fprintf(stderr,"read_geometry: two dimensional approximation: plane %s %s\n",

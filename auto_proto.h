@@ -380,12 +380,12 @@ void flush_moment_stack(struct med *);
 void fiddle_with_limits_for_plot(struct med *, int *, unsigned char *, double *, unsigned char);
 void time_report(char *, char *, struct med *);
 /* patch2bc.c */
-/* patch2corners.c */
 /* patch2dis3d.c */
 void get_dis3d_parameters(double, double, double, double, double, double, double *, double *, double *, double *);
 /* patch2geom.c */
 /* patch2group.c */
 /* patch2poly3d.c */
+/* patch2vertices.c */
 /* patch2vtk.c */
 /* patch2xyz.c */
 /* patch2xyzvec.c */
@@ -402,7 +402,7 @@ void four1(float *, int, int);
 /* points2patch.c */
 unsigned char read_points_local(double *, int *, unsigned char, FILE *);
 /* print_patch_geometry.c */
-void print_patch_geometry_and_bc(int, struct flt *, int, double, unsigned char, FILE *, unsigned char, double *);
+int print_patch_geometry_and_bc(int, struct flt *, int, double, unsigned char, FILE *, unsigned char, double *);
 /* project_stress.c */
 /* quake.c */
 void quake(unsigned char *, double *, int, struct flt *, struct med *, unsigned char, unsigned char);

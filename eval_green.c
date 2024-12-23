@@ -25,11 +25,17 @@ void eval_green_and_project_stress_to_fault(struct flt *fault, int ireceive,
 					    int islip, COMP_PRECISION *slip,
 					    COMP_PRECISION *s)
 {
+  //#define SUPER_DUPER_DEBUG
   int iret;
-  COMP_PRECISION trac[3],sm[3][3];
+  COMP_PRECISION trac[3],sm[3][3]={{0.,0.,0.},{0.,0.,0.},{0.,0.,0.}},u[3]={0.,0.,0.};
   /* evaluate the greens function for slipping fault islip at receiver
      location centroids of fault ireceive */
-  eval_green(fault[ireceive].x,(fault+islip),slip,NULL,sm,&iret,GC_STRESS_ONLY);
+#ifdef SUPER_DUPER_DEBUG
+  fprintf(stderr,"add_quake_stress_3: slip: %10.3e %10.3e %10.3e evaluated at %10.3e %10.3e %10.3e \n",
+	  slip[0],slip[1],slip[2],fault[ireceive].x[0],fault[ireceive].x[1],fault[ireceive].x[2]);
+#endif
+
+  eval_green(fault[ireceive].x,(fault+islip),slip,u,sm,&iret,GC_STRESS_ONLY);
   if(!iret){
     /* project the stresses */
     resolve_force(fault[ireceive].normal,sm,trac); /* convert to local

@@ -114,6 +114,7 @@ void add_quake_stress(int r_flt, my_boolean *sma,
   for(i=0;i<3;i++)
     if(sma[i])
       fault[r_flt].u[i] += slip[i];
+  //fprintf(stderr,"%g %g %g\n",fault[r_flt].u[0],fault[r_flt].u[1],fault[r_flt].u[2]);
   /* 
  
      add stress contributions of rupture at fault r_flt with slip[] to all other 

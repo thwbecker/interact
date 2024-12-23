@@ -123,11 +123,14 @@ don't expect anything to work....
 #ifdef USE_SLATEC_NNLS
 #include "slatec_src.h"
 #endif
-/* for calls to external FORTRAN routines under SGI and other
- systems where we need an underscore */
-#ifdef SGI_SUBROUTINE_CONVENTION
+/* for calls to external FORTRAN routines for most systems we need an
+   underscore 
+   
+   comment this out if not needed
+
+*/
 #include "fortran_underscore_defines.h"
-#endif
+
 /*  */
 #include "constants.h"
 // function definitions
@@ -306,7 +309,7 @@ singular value will be set to zero
 #define PSXYZ_MODE 2
 #define PSXYZ_SCALAR_MODE 7
 #define BC_OUT_MODE 3
-#define CORNEROUT_MODE 4
+#define VERTEXOUT_MODE 4
 #define VEC_OUT_MODE 5
 #define XYZ_AND_VEC_MODE 6
 /* 

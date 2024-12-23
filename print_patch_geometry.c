@@ -1,6 +1,6 @@
 /*
   interact: model fault interactions using dislocations in a halfspace
-            (C) Thorsten Becker, becker@post.harvard.edu
+  (C) Thorsten Becker, thwbecker@post.harvard.edu
 
   output of patch gemeotry and other stuff to *out stream
   in various formats
@@ -11,15 +11,15 @@
 
 /* pass a single fault patch here, hence */
 /* flt_offset should normally be zero */
-void print_patch_geometry_and_bc(int flt_offset,struct flt *fault,
-				 int opmode,
-				 COMP_PRECISION stop_time,
-				 MODE_TYPE calculate_base_vecs,
-				 FILE *out,
-				 my_boolean shrink_patches,
-				 COMP_PRECISION *scalar)
+int print_patch_geometry_and_bc(int flt_offset,struct flt *fault,
+				int opmode,
+				COMP_PRECISION stop_time,
+				MODE_TYPE calculate_base_vecs,
+				FILE *out,
+				my_boolean shrink_patches,
+				COMP_PRECISION *scalar)
 {
-  int k,l,i,ncon,ielmul;
+  int k,l,i,ncon,ielmul,nvert;
   static my_boolean bc_init=FALSE;
   static int nrf,bc_code;
   COMP_PRECISION vertex[MAX_NR_EL_VERTICES*3],sin_dip,cos_dip,leeway;
@@ -218,17 +218,10 @@ void print_patch_geometry_and_bc(int flt_offset,struct flt *fault,
       fprintf(out,">\n");
     break;
   }
-  case CORNEROUT_MODE:{
-#ifdef ALLOW_NON_3DQUAD_GEOM  
-    if((fault[flt_offset].type != POINT_SOURCE)&&
-       (fault[flt_offset].type != OKADA_PATCH)&&
-       (!patch_is_2d(fault[flt_offset].type))){
-      fprintf(stderr,"print_patch_geometry: vertex out defined for rectangular, point source and 2-Dpatches only\n");
-      exit(-1);
-    }
-#endif
+  case VERTEXOUT_MODE:{
     calculate_bloated_vertices(vertex,(fault+flt_offset),leeway);
-    for(k=0;k<4;k++){
+    nvert = nvert_of_patch((fault+flt_offset));
+    for(k=0;k < nvert;k++){
       for(l=0;l<3;l++){
 	if(fabs(vertex[k*3+l]/CHAR_FAULT_DIM)>
 	   EPS_COMP_PREC)
@@ -236,8 +229,8 @@ void print_patch_geometry_and_bc(int flt_offset,struct flt *fault,
 	else
 	  fprintf(out,"0 ");
       }
+      fprintf(out,"\n");
     }
-    fprintf(out,"\n");
     break;
   }
   case BC_OUT_MODE:{
@@ -300,6 +293,7 @@ void print_patch_geometry_and_bc(int flt_offset,struct flt *fault,
 	    opmode);
     exit(-1);
   }}
+  return nvert_of_patch((fault+flt_offset));
 }
 
 
