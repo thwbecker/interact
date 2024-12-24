@@ -7,6 +7,7 @@
 
 
  */
+#define SGI_SUBROUTINE_CONVENTION
 // okada
 #define dc3d dc3d_
 #define mydc3d mydc3d_
