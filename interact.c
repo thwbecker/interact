@@ -416,7 +416,7 @@ void calc_interaction_matrix(struct med *medium,struct flt *fault,
 COMP_PRECISION interaction_coefficient(int i, int j, int k, int l,
 				       struct flt *fault,int *iret)
 {
-  COMP_PRECISION sm[3][3],disp[3],fac;
+  COMP_PRECISION disp[3],fac,sm[3][3]={{0.,0.,0.},{0.,0.,0.},{0.,0.,0.}},u[3]={0.,0.,0.};
   static COMP_PRECISION trac[3];
   static int old_indices[4]={-1,0,0,0};
   // check if we have calculated the traction vector
@@ -430,7 +430,7 @@ COMP_PRECISION interaction_coefficient(int i, int j, int k, int l,
     get_right_slip(disp,k,1.0);
     /* obtain the stress vector at fault i (centroid) when fault j
        slips with disp[] */
-    eval_green(fault[i].x,(fault+j),disp,NULL,sm,iret, GC_STRESS_ONLY);
+    eval_green(fault[i].x,(fault+j),disp,u,sm,iret, GC_STRESS_ONLY);
     if(! *iret){// if not singular,
       // obtain the traction vector for i,j,k 
       resolve_force(fault[i].normal,sm,trac);

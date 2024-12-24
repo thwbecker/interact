@@ -43,12 +43,12 @@ void eval_iquad(COMP_PRECISION *x,struct flt *fault,
 {
   COMP_PRECISION sm[3][3],u[3],slip[3];
   struct flt afault;
-  static my_boolean afault_init=FALSE;
   int j;
-  if(!afault_init){
-    afault.xn = (COMP_PRECISION *)malloc(sizeof(COMP_PRECISION)*9);
-    afault_init = TRUE;
-  }
+
+  afault.xn = (COMP_PRECISION *)malloc(sizeof(COMP_PRECISION)*9);
+  if(!afault.xn)
+    MEMERROR("eval_iquad: afault.xn");
+  
   /* main triangle */
   eval_triangle(x,fault,gslip,u,sm,giret,mode);
   //#define SUPER_DUPER_DEBUG
@@ -100,6 +100,7 @@ void eval_iquad(COMP_PRECISION *x,struct flt *fault,
   smg[0][0] += sm[0][0];  smg[0][1] += sm[0][1];  smg[0][2] += sm[0][2];
   smg[1][0] += sm[1][0];  smg[1][1] += sm[1][1];  smg[1][2] += sm[1][2];
   smg[2][0] += sm[2][0];  smg[2][1] += sm[2][1];  smg[2][2] += sm[2][2];
+  free(afault.xn);
 }
 
 

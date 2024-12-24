@@ -1,0 +1,12 @@
+#!/bin/bash
+
+
+makefault -n 20 -m 4 -z -2 -l 10 -w 2 -strike 30 -dip 70 > geom.gin
+
+cat geom.gin | patch2corners > vert.dat
+
+cat vert.dat | points2patch > geom.gout
+
+for t in gin gout;do
+    cat geom.$t | patch2vtk > $HOME/Dropbox/tmp/$t.vtk
+done
