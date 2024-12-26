@@ -34,7 +34,6 @@ void eval_green_and_project_stress_to_fault(struct flt *fault, int ireceive,
   fprintf(stderr,"add_quake_stress_3: slip: %10.3e %10.3e %10.3e evaluated at %10.3e %10.3e %10.3e \n",
 	  slip[0],slip[1],slip[2],fault[ireceive].x[0],fault[ireceive].x[1],fault[ireceive].x[2]);
 #endif
- 
   eval_green(fault[ireceive].x,(fault+islip),slip,u,sm,&iret,GC_STRESS_ONLY,(ireceive==islip)?(TRUE):(FALSE));
   if(!iret){
     /* project the stresses */
