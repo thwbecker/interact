@@ -21,6 +21,10 @@
   output is u_global (displacements) and sm_global
   (stress matrix)
 
+  ________________________________________________________________________________
+  THIS HAS NOT BEEN TESTED YET
+  ________________________________________________________________________________
+
 */
 #include "interact.h"
 #include "properties.h"
@@ -34,10 +38,29 @@ void eval_triangle_tgf(COMP_PRECISION *x,struct flt *fault,
  
   COMP_PRECISION etracel;
   const double mu = SHEAR_MODULUS,lambda = LAMBDA_CONST,two_mu = 2.0*(SHEAR_MODULUS);
-  double fstrain[9],strain0[9],u0[3],triangle[9];
+  double fstrain[9],strain0[9],u0[3],triangle[9],*dnormal,*dslip,*du,*dx;
   int numfunev,unity=1;
   int i,j,i3,j3;
   int calc_strain;
+#ifdef USE_DOUBLE_PRECISION
+  dslip = slip;
+  dnormal = fault->normal;
+  dx=x;
+  du=u;
+#else
+  dnormal=(double *)malloc(sizeof(double)*3);
+  dslip=(double *)malloc(sizeof(double)*3);
+  du=(double *)malloc(sizeof(double)*3);
+  dx=(double *)malloc(sizeof(double)*3);
+  for(i=0;i<3;i++){
+    dx[i] = (double)x[i];
+    du[i] = (double)u[i];
+    dslip[i] = (double)slip[i];
+    dnormal[i] = (double)fault->normal[i];
+  }
+#endif
+
+  
   if(mode== GC_DISP_ONLY)
     calc_strain = 0;
   else
@@ -49,10 +72,10 @@ void eval_triangle_tgf(COMP_PRECISION *x,struct flt *fault,
   }
   
   if(is_self)
-    eltst3triadirectself(&lambda, &mu, &unity, &unity, triangle, slip, fault->normal, x, u, &calc_strain, fstrain);
+    eltst3triadirectself(&lambda, &mu, &unity, &unity, triangle, dslip, dnormal, dx, du, &calc_strain, fstrain);
   else
-    eltst3triadirecttarg(&lambda, &mu, &unity, triangle, slip, fault->normal, x, u, &calc_strain, fstrain);
-  elth3triaadap(         &lambda, &mu, &unity, triangle, slip, fault->normal, x, &unity, u0, &calc_strain, strain0, &numfunev);
+    eltst3triadirecttarg(&lambda, &mu, &unity, triangle, dslip, dnormal, dx, du, &calc_strain, fstrain);
+  elth3triaadap(         &lambda, &mu, &unity, triangle, dslip, dnormal, dx, &unity, u0, &calc_strain, strain0, &numfunev);
 
   for(i=i3=0;i < 3;i++,i3+=3){
     u[i] += u0[i];
@@ -72,6 +95,9 @@ void eval_triangle_tgf(COMP_PRECISION *x,struct flt *fault,
   }
   
   *giret = 0;
+#ifndef USE_DOUBLE_PRECISION
+  free(dnormal);free(dslip);free(dx);free(du);
+#endif
 }
 
 

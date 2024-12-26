@@ -2,11 +2,12 @@ ODIR = objects
 
 #
 # TGF accuracy settings for quadrature (see readme)
-TGF_ACC_SETTINGS = -DTGF_ELHTRIAADAP_EPS=1e-12 -DTGF_ELHTRIAADAP_NQ=20 
+#TGF_ACC_SETTINGS = -DTGF_ELHTRIAADAP_EPS=1e-12 -DTGF_ELHTRIAADAP_NQ=20
+TGF_ACC_SETTINGS = -DTGF_ELHTRIAADAP_EPS=1e-6 -DTGF_ELHTRIAADAP_NQ=6
 
 FLAGS =
 
-F90FLAGS = -Wall -O3 -cpp $(TGF_ACC_SETTINGS)
+F90FLAGS = -Wall -Ofast -cpp $(TGF_ACC_SETTINGS)
 
 LIB_TGF_OBJS=$(ODIR)/mod_tgf.o $(ODIR)/el3dtria.o $(ODIR)/el3green.o $(ODIR)/el3greenh.o \
 	$(ODIR)/elh3dtria.o $(ODIR)/legewhts.o $(ODIR)/mindlinpieces.o  \
