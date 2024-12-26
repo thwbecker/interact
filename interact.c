@@ -27,7 +27,7 @@
 void calc_interaction_matrix(struct med *medium,struct flt *fault,
 			     my_boolean write_to_screen)
 {
-  COMP_PRECISION sm[3][3],disp[3]={0.,0.,0.},trac[3],adv,
+  COMP_PRECISION sm[3][3],disp[3]={0.,0.,0.},trac[3],adv,u[3],
     std,tmpflt;
   I_MATRIX_PREC iflt,s[3];
   int iret,i,j,k,l,nzc,nsmall,m,
@@ -161,7 +161,7 @@ void calc_interaction_matrix(struct med *medium,struct flt *fault,
 	get_right_slip(disp,k,1.0);
 	for(i=0;i<medium->nrflt;i++){// loop over observing faults
 	  // evaluate the 'Green's function'
-	  eval_green(fault[i].x,(fault+j),disp,NULL ,sm,&iret, GC_STRESS_ONLY);
+	  eval_green(fault[i].x,(fault+j),disp,u,sm,&iret, GC_STRESS_ONLY,TRUE);
 	  if(iret != 0){
 	    /* 
 	       Green's function is singular at this point,
@@ -430,7 +430,7 @@ COMP_PRECISION interaction_coefficient(int i, int j, int k, int l,
     get_right_slip(disp,k,1.0);
     /* obtain the stress vector at fault i (centroid) when fault j
        slips with disp[] */
-    eval_green(fault[i].x,(fault+j),disp,u,sm,iret, GC_STRESS_ONLY);
+    eval_green(fault[i].x,(fault+j),disp,u,sm,iret, GC_STRESS_ONLY,TRUE);
     if(! *iret){// if not singular,
       // obtain the traction vector for i,j,k 
       resolve_force(fault[i].normal,sm,trac);

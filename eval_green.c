@@ -34,8 +34,8 @@ void eval_green_and_project_stress_to_fault(struct flt *fault, int ireceive,
   fprintf(stderr,"add_quake_stress_3: slip: %10.3e %10.3e %10.3e evaluated at %10.3e %10.3e %10.3e \n",
 	  slip[0],slip[1],slip[2],fault[ireceive].x[0],fault[ireceive].x[1],fault[ireceive].x[2]);
 #endif
-
-  eval_green(fault[ireceive].x,(fault+islip),slip,u,sm,&iret,GC_STRESS_ONLY);
+ 
+  eval_green(fault[ireceive].x,(fault+islip),slip,u,sm,&iret,GC_STRESS_ONLY,(ireceive==islip)?(TRUE):(FALSE));
   if(!iret){
     /* project the stresses */
     resolve_force(fault[ireceive].normal,sm,trac); /* convert to local
@@ -64,13 +64,21 @@ void eval_green_and_project_stress_to_fault(struct flt *fault, int ireceive,
 
    will call point, rectangle or triangle routines from here
 
+   mode type can be GC_DISP_AND_STRES, GC_DISP_ONLY, GC_STRESS_ONLY
+   depending on asking for displacement and stress, displacement, or
+   stress only evaluation
+   
+   on_element is true when called from 
+   eval_green_and_project_stress_to_fault to evaluate on
+   centroid, for example
 */
 
 
 void eval_green(COMP_PRECISION *x,struct flt *fault,
 		COMP_PRECISION *disp,COMP_PRECISION *u_global, 
 		COMP_PRECISION sm_global[3][3],int *iret,
-		MODE_TYPE mode)	/* mode type only for triangular */
+		MODE_TYPE mode,my_boolean eval_on_itself)
+/* mode type only for triangular */
 {
 #ifdef ALLOW_NON_3DQUAD_GEOM
   switch(fault->type){
@@ -79,7 +87,11 @@ void eval_green(COMP_PRECISION *x,struct flt *fault,
     break;
   }
   case TRIANGULAR:{
-    eval_triangle(x,fault,disp,u_global,sm_global,iret,mode);
+#ifdef USE_TGF_TRIANGLE
+    eval_triangle_tgf(x,fault,disp,u_global,sm_global,iret,mode,eval_on_itself);
+#else
+    eval_triangle_nw(x,fault,disp,u_global,sm_global,iret,mode);
+#endif
     break;
   }
   case IQUAD:{

@@ -96,13 +96,16 @@
 #
 MY_PRECISION = -DUSE_DOUBLE_PRECISION
 #MY_PRECISION = 			#single
-
-#COMMON_DEFINES =  -DBINARY_PATCH_EVENT_FILE -DCHECK_CI_ONE_WAY -DNO_OPENING_MODES
-COMMON_DEFINES =  -DBINARY_PATCH_EVENT_FILE -DCHECK_CI_ONE_WAY  \
-	-DALLOW_NON_3DQUAD_GEOM
 #
 # if we want to test the HBI version of the triangular stress routine
 # -DUSE_HBI_TDDEF
+# if we want to use the TGF triangle
+# -DUSE_TGF_TRIANGLE
+#COMMON_DEFINES =  -DBINARY_PATCH_EVENT_FILE -DCHECK_CI_ONE_WAY -DNO_OPENING_MODES
+COMMON_DEFINES =  -DBINARY_PATCH_EVENT_FILE -DCHECK_CI_ONE_WAY  \
+	-DALLOW_NON_3DQUAD_GEOM -DUSE_TGF_TRIANGLE
+
+TGF_LIB = tgf/objects/libtgf.a
 #
 # noise level for random interact version. this version 
 # doesn't get compiled automatically.
@@ -204,8 +207,8 @@ PATCH_IO_OBJS = $(ODIR)/divide_fault_in_patches.o $(ODIR)/sparse.o	\
 	$(ODIR)/geometry.o $(ODIR)/fltcopy.o		\
 	$(ODIR)/check_interaction.o $(ODIR)/eval_2dsegment.o		\
 	$(ODIR)/eval_okada.o $(ODIR)/tdd_coeff.o $(ODIR)/rhs.o		\
-	$(ODIR)/eval_green.o $(ODIR)/eval_triangle.o			\
-	$(ODIR)/eval_iquad.o			\
+	$(ODIR)/eval_green.o $(ODIR)/eval_triangle_nw.o			\
+	$(ODIR)/eval_iquad.o $(ODIR)/eval_triangle_tgf.o			\
 	$(ODIR)/interact.o   $(ODIR)/mysincos.o 	\
 	$(OKROUTINE) $(ODIR)/fracture_criterion.o			\
 	$(ODIR)/myopen.o  $(ODIR)/randgen.o \
@@ -295,17 +298,17 @@ GEN_P_INC = interact.h precision_single.h precision_double.h \
 	structures.h macros.h auto_proto.h auto_proto.sgl.h fortran_proto.h \
 	filenames.h properties.h blockinvert.h constants.h
 
-LIBLIST = $(ODIR)/libpatchio.a $(ODIR)/libinput.a $(EISPACK_DIR)/libmyeis.a
+LIBLIST = $(ODIR)/libpatchio.a $(ODIR)/libinput.a $(EISPACK_DIR)/libmyeis.a $(TGF_LIB)
 
 LIBLIST_SGL = 	$(ODIR)/libpatchio.sgl.a $(ODIR)/libinput.sgl.a
 
 #
 # libraries, also linker flags
 #
-LIBS = $(MY_LIBDIR_SPEC)$(ODIR)/   -linput -lpatchio \
+LIBS = $(MY_LIBDIR_SPEC)$(ODIR)/    -linput -lpatchio  $(TGF_LIB) \
 	$(COMPUTATIONAL_LIBS) $(DEBUG_LIBS) $(MATHLIB) 
 
-LIBS_SGL = $(MY_LIBDIR_SPEC)$(ODIR)/   -linput.sgl -lpatchio.sgl \
+LIBS_SGL = $(MY_LIBDIR_SPEC)$(ODIR)/     -linput.sgl -lpatchio.sgl $(TGF_LIB) \
 	$(COMPUTATIONAL_LIBS) $(DEBUG_LIBS) $(MATHLIB) 
 
 
@@ -632,14 +635,14 @@ $(BDIR)/fstress2hor: $(GEN_P_INC)  $(LIBLIST) $(GEOPROJECT_OBJS)\
 			$(MY_LIBDIR_SPEC)$(ODIR)/ $(GEOPROJECT_OBJS)	\
 		-o  $(BDIR)/fstress2hor   -linput -lpatchio		\
 		$(GEOPROJECT_LIBS)					\
-		$(COMPUTATIONAL_LIBS) $(MATHLIB) $(DEBUG_LIBS)   $(EISPACK_LIB) $(LDFLAGS)
+		$(COMPUTATIONAL_LIBS) $(MATHLIB) $(DEBUG_LIBS)  $(TGF_LIB) $(EISPACK_LIB) $(LDFLAGS)
 
 $(BDIR)/fit_mean_stress: $(GEN_P_INC)  $(LIBLIST) $(GEOPROJECT_OBJS)\
 		$(FSTRESS2HOR_OBJS) $(ODIR)/fit_mean_stress.o
 	$(MPILD) $(FSTRESS2HOR_OBJS) $(ODIR)/fit_mean_stress.o	\
 			$(MY_LIBDIR_SPEC)$(ODIR)/ $(GEOPROJECT_OBJS)	\
 		-o  $(BDIR)/fit_mean_stress   -linput -lpatchio		\
-		$(GEOPROJECT_LIBS)					\
+		$(GEOPROJECT_LIBS)	$(TGF_LIB)				\
 		$(COMPUTATIONAL_LIBS) $(MATHLIB)   $(DEBUG_LIBS) $(EISPACK_LIB)  $(LDFLAGS) 
 
 $(BDIR)/fstress2eig: $(GEN_P_INC)  $(LIBLIST) $(GEOPROJECT_OBJS)\
@@ -648,7 +651,7 @@ $(BDIR)/fstress2eig: $(GEN_P_INC)  $(LIBLIST) $(GEOPROJECT_OBJS)\
 			$(MY_LIBDIR_SPEC)$(ODIR)/ $(GEOPROJECT_OBJS)	\
 		-o  $(BDIR)/fstress2eig   -linput -lpatchio		\
 		$(GEOPROJECT_LIBS)					\
-		$(COMPUTATIONAL_LIBS) $(MATHLIB) $(DEBUG_LIBS)   $(EISPACK_LIB) $(LDFLAGS)
+		$(COMPUTATIONAL_LIBS) $(MATHLIB) $(DEBUG_LIBS)  $(TGF_LIB) $(EISPACK_LIB) $(LDFLAGS)
 
 $(BDIR)/block_evaluate_solution: $(GEN_P_INC)  $(GEOPROJECT_OBJS) $(LIBLIST)	\
 		$(BLOCK_EVALUATE_SOLUTION_OBJS) 		\
@@ -658,7 +661,7 @@ $(BDIR)/block_evaluate_solution: $(GEN_P_INC)  $(GEOPROJECT_OBJS) $(LIBLIST)	\
 			$(MY_LIBDIR_SPEC)$(ODIR)/ $(GEOPROJECT_OBJS)	\
 		-o  $(BDIR)/block_evaluate_solution   -linput -lpatchio	\
 		$(GEOPROJECT_LIBS)					\
-		$(COMPUTATIONAL_LIBS) $(MATHLIB) $(DEBUG_LIBS)   $(EISPACK_LIB) $(LDFLAGS)
+		$(COMPUTATIONAL_LIBS) $(MATHLIB) $(DEBUG_LIBS) $(TGF_LIB)  $(EISPACK_LIB) $(LDFLAGS)
 
 $(BDIR)/block_checkflt: $(GEN_P_INC)  $(GEOPROJECT_OBJS) $(LIBLIST) \
 		$(BLOCKINVERT_SPH_OBJS) $(ODIR)/block_checkflt.o
@@ -666,7 +669,7 @@ $(BDIR)/block_checkflt: $(GEN_P_INC)  $(GEOPROJECT_OBJS) $(LIBLIST) \
 			$(MY_LIBDIR_SPEC)$(ODIR)/ $(GEOPROJECT_OBJS)			\
 		-o  $(BDIR)/block_checkflt   -linput -lpatchio		\
 		$(GEOPROJECT_LIBS) $(PETSC_LIBS)				\
-		$(COMPUTATIONAL_LIBS) $(MATHLIB) $(DEBUG_LIBS)   $(EISPACK_LIB)  $(PGLIBS) $(LDFLAGS) 
+		$(COMPUTATIONAL_LIBS) $(MATHLIB) $(DEBUG_LIBS)   $(TGF_LIB) $(EISPACK_LIB)  $(PGLIBS) $(LDFLAGS) 
 
 $(BDIR)/geo_okada: $(ODIR)/geo_okada.o $(ODIR)/coulomb_stress.o $(GEN_P_INC)  \
 	$(GEOPROJECT_OBJS) $(LIBLIST) 
@@ -704,6 +707,9 @@ auto_proto.sgl.h:
 # libraries
 #
 libraries: $(LIBLIST)
+
+tgf/objects/libtgf.a:
+	cd tgf; make ; cd -
 
 $(EISPACK_DIR)/libmyeis.a:
 	cd $(EISPACK_DIR); make ; cd -

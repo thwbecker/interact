@@ -234,7 +234,7 @@ void assemble_a_matrix_4(A_MATRIX_PREC *a,int naflt,
 #ifdef SUPER_DUPER_DEBUG
 	      if(cf != 0.0)
 		fprintf(stderr,"assemble_a_matrix: i: %i j: %i k: %i l: %i cf: %g\n",
-			nameaf[i],nameaf[k],l,j,cf);
+			nameaf[i],nameaf[k],(int)l,(int)j,cf);
 #endif
 #ifdef COMP_MODE_1
 	      // have I matrix in memory

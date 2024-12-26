@@ -143,13 +143,14 @@ int print_patch_geometry_and_bc(int flt_offset,struct flt *fault,
   */
   case PSXYZ_SCALAR_MODE:
   case PSXYZ_MODE:{
-    if(opmode == PSXYZ_SCALAR_MODE)
-      fprintf(out,"> -Z%g\n",scalar[flt_offset]);
     calculate_bloated_vertices(vertex,(fault+flt_offset),leeway);
 #ifdef ALLOW_NON_3DQUAD_GEOM
     switch(fault[flt_offset].type){
     case TWO_DIM_SEGMENT_PLANE_STRAIN:
     case TWO_DIM_SEGMENT_PLANE_STRESS:{
+      if(opmode == PSXYZ_SCALAR_MODE)
+	fprintf(out,"> -Z%g\n",scalar[flt_offset]);
+
       // draw segment with endbars
       lfac = fault[flt_offset].l * 0.2;
       for(l=0;l<3;l++)
@@ -175,6 +176,9 @@ int print_patch_geometry_and_bc(int flt_offset,struct flt *fault,
     case IQUAD:
       ielmul = number_of_subpatches((fault+flt_offset));
       for(i=0;i < ielmul;i++){
+	if(opmode == PSXYZ_SCALAR_MODE)
+	  fprintf(out,"> -Z%g\n",scalar[flt_offset]);
+
 	ncon = ncon_of_subpatch((fault+flt_offset),i);
 	for(k=0;k < ncon;k++){
 	  for(l=0;l<3;l++){
@@ -182,7 +186,7 @@ int print_patch_geometry_and_bc(int flt_offset,struct flt *fault,
 	      fprintf(out,"%g ",vertex[node_number_of_subelement((fault+flt_offset),k, i)*3+l]/CHAR_FAULT_DIM);
 	    else
 	      fprintf(out,"0.0 ");
-	}
+	  }
 	  fprintf(out,"\n");
 	}
       }
@@ -190,6 +194,8 @@ int print_patch_geometry_and_bc(int flt_offset,struct flt *fault,
     case POINT_SOURCE:
     case TRIANGULAR:
     case OKADA_PATCH:{
+      if(opmode == PSXYZ_SCALAR_MODE)
+	fprintf(out,"> -Z%g\n",scalar[flt_offset]);
       ncon = ncon_of_subpatch((fault+flt_offset),0);
       for(k=0;k < ncon;k++){
 	for(l=0;l<3;l++){
@@ -203,6 +209,8 @@ int print_patch_geometry_and_bc(int flt_offset,struct flt *fault,
       break;
     }}
 #else
+    if(opmode == PSXYZ_SCALAR_MODE)
+      fprintf(out,"> -Z%g\n",scalar[flt_offset]);
     for(k=0;k<4;k++){
       for(l=0;l<3;l++){
 	if(fabs(vertex[k*3+l]/CHAR_FAULT_DIM)>

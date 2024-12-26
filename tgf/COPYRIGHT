@@ -1,0 +1,27 @@
+!/*********************************************************************
+!*                                                                    *
+!*  CMG Multipole Mediator for Earthquake Simulators                  *
+!*                                                                    *
+!*  Developed by a collaboration between Brown University, the        *
+!*  University of California at Riverside, New York University, and   *
+!*  Invisible Software, Inc.  Funding is provided by the National     *
+!*  Science Foundation, award DMS-0934711.                            *
+!*                                                                    *
+!*  PUBLIC DOMAIN -- The software is in the public domain.  You are   *
+!*  free to use, copy, modify, and redistribute the software.         *
+!*                                                                    *
+!*  NO WARRANTY -- The software is provided "AS IS" and without       *
+!*  warranty of any kind, express or implied, including warranties    *
+!*  of merchantability and fitness for a particular purpose.          *
+!*                                                                    *
+!*  DISCLAIMER -- In no event will the NSF, Brown University, the     *
+!*  University of California at Riverside, New York University,       *
+!*  Invisible Software, or any other developer or distributor of the  *
+!*  software be liable to you for any damages arising out of the use  *
+!*  or inability to use the software (including but not limited to    *
+!*  lost profits, lost savings, lost data, inaccurate results,        *
+!*  repair costs, incidental or consequential damages, and losses     *
+!*  sustained by third parties), even if advised of the possibility   *
+!*  of such damages.                                                  *
+!*                                                                    *
+!*********************************************************************/

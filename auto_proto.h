@@ -133,7 +133,7 @@ void get_2dseg_stress(double [3][3], double *, double *, double, double, double,
 void eval_2dsegment_plane_strain_tdd(double *, struct flt *, double *, double *, double [3][3], int, int *, unsigned char);
 /* eval_green.c */
 void eval_green_and_project_stress_to_fault(struct flt *, int, int, double *, double *);
-void eval_green(double *, struct flt *, double *, double *, double [3][3], int *, unsigned char);
+void eval_green(double *, struct flt *, double *, double *, double [3][3], int *, unsigned char, unsigned char);
 void eval_green_basic(double *, struct flt *, double *, double *, double [3][3], int *);
 /* eval_iquad.c */
 void eval_iquad(double *, struct flt *, double *, double *, double [3][3], int *, unsigned char);
@@ -143,12 +143,15 @@ void eval_okada_basic(double *, double, double, double, double, double *, double
 void eval_point(double *, struct flt *, double *, double *, double [3][3], int *, unsigned char);
 void eval_point_short(double *, double *, double, double, double, double, double *, double *, double [3][3], int *, unsigned char);
 void set_stress_and_disp_nan(double [3][3], double *, unsigned char);
-/* eval_triangle.c */
-void eval_triangle(double *, struct flt *, double *, double *, double [3][3], int *, unsigned char);
-void get_tri_prop_based_on_gh(struct flt *);
 /* eval_triangle_gauss.c */
 void eval_triangle_gauss(double *, struct flt *, double *, double *, double [3][3], int *);
 void get_gauss_points(double *, double *, double *, int);
+/* eval_triangle_nw.c */
+void eval_triangle_nw(double *, struct flt *, double *, double *, double [3][3], int *, unsigned char);
+void get_tri_prop_based_on_gh(struct flt *);
+/* eval_triangle_tgf.c */
+void eval_triangle_tgf(double *, struct flt *, double *, double *, double [3][3], int *, int, unsigned char);
+void get_tri_prop_based_on_gh(struct flt *);
 /* far_enough.c */
 unsigned char far_enough(struct flt *, struct flt *, double);
 /* fit_mean_stress.c */
@@ -350,8 +353,8 @@ void sphere_project_setup(double, double, double *, double, double, double *, do
 void oblique_transform(double, double, double *, double *, double *, double *);
 /* mysincos.c */
 void my_sincos_deg(double *, double *, double);
-void my_sincos_deg_ftnd(double *, double *, double *);
-void my_sincos_ftn(double *, double *, double *);
+void my_sincos_deg_ftnd_(double *, double *, double *);
+void my_sincos_ftn_(double *, double *, double *);
 void my_sincos(double *, double *, double);
 void my_sincosd(double *, double *, double);
 void my_sincos_degd(double *, double *, double);

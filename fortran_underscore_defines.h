@@ -52,6 +52,10 @@
 #define tdstresshs tdstresshs_
 #define hbi_tdstress hbi_tdstresshs_
 #define get_tdcs_base_vectors get_tdcs_base_vectors_
+/* tgf */
+#define eltst3triadirectself eltst3triadirectself_
+#define eltst3triadirecttarg eltst3triadirecttarg_
+#define elth3triaadap elth3triaadap_
 //other
 #define my_sincos_deg_ftnd my_sincos_deg_ftnd_
 #define my_sincos_ftn my_sincos_ftn_

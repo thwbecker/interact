@@ -2,9 +2,9 @@
 
   interact: model fault interactions using dislocations in a 
             halfspace
-  (C) Thorsten Becker, becker@post.harvard.edu
+  (C) Thorsten Becker, thwbecker@post.harvard.edu
 
-
+  
   program to evaluate the displacement and stresses due to a
   triangular element using the F90 conversion of 
 
@@ -25,10 +25,10 @@
 #include "properties.h"
 
 #ifdef ALLOW_NON_3DQUAD_GEOM
-void eval_triangle(COMP_PRECISION *x,struct flt *fault,
-		   COMP_PRECISION *slip,COMP_PRECISION *u, 
-		   COMP_PRECISION sm[3][3],int *giret,
-		   MODE_TYPE mode)
+void eval_triangle_nw(COMP_PRECISION *x,struct flt *fault,
+		      COMP_PRECISION *slip,COMP_PRECISION *u, 
+		      COMP_PRECISION sm[3][3],int *giret,
+		      MODE_TYPE mode)
 {
  
   COMP_PRECISION stress[6];
@@ -45,13 +45,13 @@ void eval_triangle(COMP_PRECISION *x,struct flt *fault,
     tddisphs(x,  &(fault->xn[0]),&(fault->xn[3]),&(fault->xn[6]),(slip),(slip+1),(slip+2),u);
     //tddisphs_bird((x+0),(x+1),(x+2),&(fault->xn[0]),&(fault->xn[3]),&(fault->xn[6]),(slip),(slip+1),(slip+2),&nu,(u+0),(u+1),(u+2));
 #ifdef CRAZY_DEBUG
-    fprintf(stderr,"eval_triangle: xt %g %g %g\t%g %g %g\t%g %g %g\tslip %g %g %g\tx %g %g %g\tu %g %g %g\n", 
+    fprintf(stderr,"eval_triangle_nw: xt %g %g %g\t%g %g %g\t%g %g %g\tslip %g %g %g\tx %g %g %g\tu %g %g %g\n", 
 	    fault->xn[0],fault->xn[1],fault->xn[2], 
 	    fault->xn[3],fault->xn[4],fault->xn[5], 
 	    fault->xn[6],fault->xn[7],fault->xn[8], 
 	    slip[0],slip[1],slip[2],x[0],x[1],x[2],
 	    u[0],u[1],u[2]);
-    fprintf(stderr,"eval_triangle: u: %g %g %g\n",u[0],u[1],u[2]);
+    fprintf(stderr,"eval_triangle_nw: u: %g %g %g\n",u[0],u[1],u[2]);
 #endif
     if(!finite(u[0])||(!finite(u[1]))||(!finite(u[2]))){
       set_stress_and_disp_nan(sm,u,mode);
@@ -72,7 +72,7 @@ void eval_triangle(COMP_PRECISION *x,struct flt *fault,
     tdstresshs(x,&(fault->xn[0]),&(fault->xn[3]),&(fault->xn[6]),
 	       (slip),(slip+1),(slip+2),stress,strain);
 #ifdef CRAZY_DEBUG
-    fprintf(stderr,"eval_triangle: stress: %g %g %g %g %g %g\n",strain[0],strain[1],strain[2],strain[3],strain[4],strain[5]);
+    fprintf(stderr,"eval_triangle_nw: stress: %g %g %g %g %g %g\n",strain[0],strain[1],strain[2],strain[3],strain[4],strain[5]);
 #endif
 #endif
     if((!finite(stress[0]))||(!finite(stress[1]))||(!finite(stress[2]))||
@@ -110,10 +110,10 @@ void get_tri_prop_based_on_gh(struct flt *fault)
 {
   COMP_PRECISION dip;
   double strike,alpha;
-  
+  int i;
   calc_centroid_tri(fault->xn,fault->x); /* assign centroid to x */
   /* F90 routine */
-  get_tdcs_base_vectors(&(fault->xn[0]),&(fault->xn[3]),&(fault->xn[6]),
+  get_tdcs_base_vectors((fault->xn+0),(fault->xn+3),(fault->xn+6),
 			fault->t_strike,fault->t_dip,fault->normal,
 			&fault->area);
   fault->l = fault->w = sqrt(fault->area);

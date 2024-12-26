@@ -202,7 +202,7 @@ void calc_fields(struct med *medium,struct flt *fault,
   int i,j,k,iflt,o1,iret,p1,p2,singular_count,not_ok;
   long int nxy,nxyz;
   int nz=0;
-  my_boolean use_fault_plane = FALSE;
+  my_boolean use_fault_plane = FALSE,on_fault = FALSE;
   COMP_PRECISION dx[3],x[3],xl[3],u[3],sm[3][3],vec_1[3],vec_2[3],
     flt_mean_x[3],s1,s2,d1,d2;
   SUM_ARR_PREC *local_u,*local_s;
@@ -426,8 +426,9 @@ void calc_fields(struct med *medium,struct flt *fault,
 		//
 		// actual fault contribution is accounted for HERE
 		//
+		/* we leave on_fault FALSE by default here */
 		eval_green(xl,(fault+iflt),fault[iflt].u,u,sm,&iret,
-			   GC_DISP_AND_STRESS);
+			   GC_DISP_AND_STRESS,on_fault);
 		//fprintf(stderr,"core %i k %3i i %3i j %3i flt %3i %11g\n",medium->comm_rank,k,i,j,iflt,u[INT_X]);
 		if(!iret){
 
@@ -485,7 +486,7 @@ void calc_fields(struct med *medium,struct flt *fault,
 	  // actual fault contribution is accounted for HERE
 	  //
 	  eval_green(xl,(fault+iflt),fault[iflt].u,u,sm,&iret,
-		     GC_DISP_AND_STRESS);
+		     GC_DISP_AND_STRESS,on_fault);
 	  if(!iret){
 	    local_u[p1]   += (SUM_ARR_PREC)u[INT_X];
 	    local_u[p1+1] += (SUM_ARR_PREC)u[INT_Y];

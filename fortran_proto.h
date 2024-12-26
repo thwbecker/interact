@@ -110,3 +110,10 @@ extern void get_tdcs_base_vectors(COMP_PRECISION *,COMP_PRECISION *,COMP_PRECISI
 extern void hbi_tdstresshs(double *,double *,double *,double *,double *,double *,double *,double *,double *,
 			   double *,double *,double *,double *,double *,
 			   double *,double *,double *);
+/* 
+   TGF package
+
+*/
+extern void eltst3triadirectself(double *,double *,int *,int *,double *,double *,double *,double *,double *,int *,double *);
+extern void eltst3triadirecttarg(double *,double *,int *,double *,double *,double *,double *,double *,int *,double *);
+extern void elth3triaadap(double *,double *,int *,double *,double *,double *,double *,int *,double *,int *,double *,int *);
