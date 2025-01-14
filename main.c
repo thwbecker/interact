@@ -64,14 +64,16 @@ int main(int argc, char **argv)
   PetscCall(PetscInitialize(&argc, &argv, (char *)0, NULL));
   PetscCallMPI(MPI_Comm_size(PETSC_COMM_WORLD, &medium->comm_size));
   PetscCallMPI(MPI_Comm_rank(PETSC_COMM_WORLD, &medium->comm_rank));
+  if(medium->comm_size == 0)
+    medium->comm_size = 1;	/* fix for non MPI call? */
 #else
   medium->comm_size = 1;
 #endif
   HEADNODE{
-    fprintf(stderr,"%s: internal %s prec, A matrix %s prec\nmain: initializing on %s\n",
+    fprintf(stderr,"%s: internal %s prec, A matrix %s prec\nmain: initializing on %s ncore: %i\n",
 	    argv[0],(sizeof(COMP_PRECISION)==sizeof(double))?("double"):("single"),
 	    (sizeof(A_MATRIX_PREC)==sizeof(double))?("double"):("single"),
-	    time_out_string );
+	    time_out_string,medium->comm_size);
     fprintf(stderr,"%s: nu: %.5f mu: %.3e from properties.h, therefore lambda/mu: %.5f alpha: %.5f\n",
 	    argv[0],POISSON_NU,SHEAR_MODULUS,LAMBDA_CONST/SHEAR_MODULUS, ALPHA_CONST);
   }

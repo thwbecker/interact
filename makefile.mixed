@@ -48,13 +48,9 @@ GCCWOPT = -Wall -Wno-discarded-qualifiers
 
 
 # fast execution options, comment those two lines if debug output is wanted
-SCARGS = -Ofast -march=native $(GCCWOPT) 
-DEBUG_FLAGS=
-
-# these next three lines for debugging, comment if fast execution is desired
-
-
-
+SCARGS = $(GCCWOPT) 
+OPTIM_FLAGS=-Ofast  -march=native 
+DEBUG_FLAGS=-g -DDEBUG
 
 #
 # fortran flags
@@ -64,8 +60,7 @@ SFARGS = $(SCARGS) -ffixed-line-length-132  -fmax-errors=0 -x f77-cpp-input
 #
 # f90 is intel
 #
-SF90ARGS =  -fpp -fpie -Ofast
-#SF90ARGS =  -fpp -fpie -O3 -xHost # super slow?!
+SF90ARGS =  -fpp -fpie 
 #
 SFARGSSAVE = $(SFARGS)
 #

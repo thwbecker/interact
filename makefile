@@ -91,21 +91,20 @@
 #
 #  Example settings:
 #
-#
-# if this is set, will compile the main code to run in double precision, see precision_double.h and precisions_single.h
-#
 MY_PRECISION = -DUSE_DOUBLE_PRECISION
-#MY_PRECISION = 			#single
 #
 # if we want to test the HBI version of the triangular stress routine
 # -DUSE_HBI_TDDEF
+#
 # if we want to use the TGF triangle
 # -DUSE_TGF_TRIANGLE
+#
 #COMMON_DEFINES =  -DBINARY_PATCH_EVENT_FILE -DCHECK_CI_ONE_WAY -DNO_OPENING_MODES
 COMMON_DEFINES =  -DBINARY_PATCH_EVENT_FILE -DCHECK_CI_ONE_WAY  \
-	-DALLOW_NON_3DQUAD_GEOM -DUSE_TGF_TRIANGLE
+	-DALLOW_NON_3DQUAD_GEOM  
 
-TGF_LIB = tgf/objects/libtgf.a
+#TGF_LIB = tgf/objects/libtgf.a
+TGF_LIB = 
 #
 # noise level for random interact version. this version 
 # doesn't get compiled automatically.
@@ -122,6 +121,7 @@ BDIR = bin
 #
 # choice of Okada routine
 OKROUTINE = $(ODIR)/dc3d.o	# my modified version
+OKROUTINE_DEBUG = $(ODIR)/dc3d.dbg.o	# my modified version
 #OKROUTINE = $(ODIR)/dc3d_original_double.o	# original, changed to double
 
 # 
@@ -168,9 +168,9 @@ FLAGS = $(DEFINE_FLAGS) $(PGPLOT_INCLUDES) $(SLATEC_INCLUDES) \
 
 
 # other flags
-CFLAGS =   $(FLAGS) $(SCARGS)   $(DEBUG_FLAGS) $(MACHINE_DEFINES)
-FFLAGS =   $(FLAGS) $(SFARGS)   $(DEBUG_FLAGS) $(MACHINE_DEFINES)
-F90FLAGS = $(FLAGS) $(SF90ARGS) $(DEBUG_FLAGS) $(MACHINE_DEFINES)
+CFLAGS =   $(FLAGS) $(SCARGS)   $(MACHINE_DEFINES)
+FFLAGS =   $(FLAGS) $(SFARGS)   $(MACHINE_DEFINES)
+F90FLAGS = $(FLAGS) $(SF90ARGS) $(MACHINE_DEFINES)
 
 
 #
@@ -182,6 +182,8 @@ SMD_OBJS = $(ODIR)/solve_mode_dependend_1.o	\
 	$(ODIR)/solve_mode_dependend_2.o	\
 	$(ODIR)/solve_mode_dependend_3.o	\
 	$(ODIR)/solve_mode_dependend_4.o 
+
+SMD_OBJS_DEBUG = $(SMD_OBJS:.o=.dbg.o)
 #
 # matrix solver 
 #
@@ -190,11 +192,15 @@ MATRIX_SOLVER_OBJS = $(ODIR)/numrec_svd_routines.o $(ODIR)/nnls_lawson.o	\
 	$(ODIR)/lusolve.o $(ODIR)/sparse_solve.o \
 	$(ODIR)/ilaenv_wrapper.o
 
+MATRIX_SOLVER_OBJS_DEBUG = $(MATRIX_SOLVER_OBJS:.o=.dbg.o)
+
 #
 # triangular dislocation routines
 #
 
 TRI_GREEN_OBJS = $(ODIR)/tdstresshs.o  $(ODIR)/tddisphs.o   $(ODIR)/tdstress_hbi.o 
+
+TRI_GREEN_OBJS_DEBUG = $(TRI_GREEN_OBJS:.o=.dbg.o)
 
 # list of objects for patch i/o. these also include
 # all object files that deal with interaction coefficients
@@ -214,6 +220,7 @@ PATCH_IO_OBJS = $(ODIR)/divide_fault_in_patches.o $(ODIR)/sparse.o	\
 	$(ODIR)/myopen.o  $(ODIR)/randgen.o \
 	$(ODIR)/string_compare.o  $(TRI_GREEN_OBJS)
 
+PATCH_IO_OBJS_DEBUG = $(PATCH_IO_OBJS:.o=.dbg.o)
 PATCH_IO_OBJS_SGL = $(PATCH_IO_OBJS:.o=.sgl.o)
 #
 #
@@ -230,10 +237,17 @@ INPUT_OBJS = $(ODIR)/read_boundary_conditions.o $(ODIR)/read_fltdat.o \
 	$(ODIR)/quake.o  $(ODIR)/restart.o			\
 	$(ODIR)/coulomb_stress.o $(POBJS) 
 INPUT_OBJS_SGL = $(INPUT_OBJS:.o=.sgl.o)
+INPUT_OBJS_DEBUG = $(INPUT_OBJS:.o=.dbg.o)
+
 #
 # list of objects for the main program, interact
 INTERACT_OBJS = $(ODIR)/rupture.o $(ODIR)/adjust_time_step.o  $(ODIR)/terminate.o \
-	$(ODIR)/calc_stress.o $(MATRIX_SOLVER_OBJS) 
+	$(ODIR)/calc_stress.o $(MATRIX_SOLVER_OBJS)
+
+INTERACT_OBJS_DEBUG = $(ODIR)/rupture.dbg.o $(ODIR)/adjust_time_step.dbg.o  $(ODIR)/terminate.dbg.o \
+	$(ODIR)/calc_stress.dbg.o $(MATRIX_SOLVER_OBJS_DEBUG)
+
+
 # this is a random noise added version
 INTERACT_NOISE_OBJS = $(ODIR)/rupture.o	$(ODIR)/calc_stress.o \
 	$(ODIR)/adjust_time_step.o $(MATRIX_SOLVER_OBJS)	\
@@ -284,6 +298,7 @@ FSTRESS2HOR_OBJS = $(ODIR)/block_read_gps.sph.o $(ODIR)/svd.o $(ODIR)/numrec_svd
 # real interact and test program
 OBJ = $(ODIR)/main.o $(INTERACT_OBJS) 
 OBJ_SGL = $(OBJ:.o=.sgl.o)
+OBJ_DEBUG = $(OBJ:.o=.dbg.o)
 NOBJ = $(ODIR)/main.o $(INTERACT_NOISE_OBJS)
 # test programs
 TOBJ = $(ODIR)/test_stuff.o $(INTERACT_OBJS)
@@ -299,18 +314,20 @@ GEN_P_INC = interact.h precision_single.h precision_double.h \
 	filenames.h properties.h blockinvert.h constants.h
 
 LIBLIST = $(ODIR)/libpatchio.a $(ODIR)/libinput.a $(EISPACK_DIR)/libmyeis.a $(TGF_LIB)
-
+LIBLIST_DEBUG = $(ODIR)/libpatchio.dbg.a $(ODIR)/libinput.dbg.a $(EISPACK_DIR)/libmyeis.a $(TGF_LIB)
 LIBLIST_SGL = 	$(ODIR)/libpatchio.sgl.a $(ODIR)/libinput.sgl.a
 
 #
 # libraries, also linker flags
 #
 LIBS = $(MY_LIBDIR_SPEC)$(ODIR)/    -linput -lpatchio  $(TGF_LIB) \
-	$(COMPUTATIONAL_LIBS) $(DEBUG_LIBS) $(MATHLIB) 
+	$(COMPUTATIONAL_LIBS) $(MATHLIB) 
 
 LIBS_SGL = $(MY_LIBDIR_SPEC)$(ODIR)/     -linput.sgl -lpatchio.sgl $(TGF_LIB) \
-	$(COMPUTATIONAL_LIBS) $(DEBUG_LIBS) $(MATHLIB) 
+	$(COMPUTATIONAL_LIBS) $(MATHLIB) 
 
+LIBS_DEBUG = $(MY_LIBDIR_SPEC)$(ODIR)/     -linput.dbg -lpatchio.dbg $(TGF_LIB) \
+	$(COMPUTATIONAL_LIBS) $(MATHLIB) 
 
 #
 # list of all programs in groups
@@ -319,9 +336,9 @@ LIBS_SGL = $(MY_LIBDIR_SPEC)$(ODIR)/     -linput.sgl -lpatchio.sgl $(TGF_LIB) \
 all: obj_directories libraries main_prog \
 	tools converters geom_converters
 
-really_all: obj_directories libraries main_prog \
+really_all: obj_directories debug_libraries libraries main_prog \
 	tools converters geom_converters \
-	inoise analysis geographic_tools 
+	inoise analysis geographic_tools $(BDIR)/$(INTERACT_BINARY_NAME).dbg
 #	pgplot_progs 
 
 main_prog: $(BDIR)/$(INTERACT_BINARY_NAME) $(BDIR)/$(INTERACT_BINARY_NAME).sgl
@@ -402,6 +419,10 @@ $(BDIR)/$(INTERACT_BINARY_NAME): $(OBJ) $(GEN_P_INC) $(LIBLIST)
 $(BDIR)/$(INTERACT_BINARY_NAME).sgl: $(OBJ_SGL) $(GEN_P_INC) $(LIBLIST_SGL) 
 	$(MPILD) $(OBJ_SGL) -o $(BDIR)/$(INTERACT_BINARY_NAME).sgl \
 		$(PETSC_LIBS) $(LIBS_SGL) $(PGLIBS)  $(SUPERLU_LIBS)  $(SLATEC_LIBS)   $(LDFLAGS) 
+
+$(BDIR)/$(INTERACT_BINARY_NAME).dbg: $(OBJ_DEBUG) $(GEN_P_INC) $(LIBLIST_DEBUG) 
+	$(MPILD) $(OBJ_DEBUG) -o $(BDIR)/$(INTERACT_BINARY_NAME).dbg \
+		$(PETSC_LIBS) $(LIBS_DEBUG) $(PGLIBS)  $(SUPERLU_LIBS)  $(SLATEC_LIBS)   $(LDFLAGS) 
 
 $(BDIR)/interact_noise.$(NOISELEVEL): $(NOBJ) $(GEN_P_INC) $(LIBLIST) 
 	$(MPILD)  $(NOBJ) -o $(BDIR)/interact_noise.$(NOISELEVEL) \
@@ -626,7 +647,7 @@ $(BDIR)/blockinvert_sph: $(GEN_P_INC)  $(GEOPROJECT_OBJS) $(LIBLIST) \
 		$(MY_LIBDIR_SPEC)$(ODIR)/ $(MATHLIB)   $(GEOPROJECT_OBJS) \
 		-o  $(BDIR)/blockinvert_sph  $(LIBS)		\
 		$(PETSC_LIBS)	$(GEOPROJECT_LIBS) \
-		$(DEBUG_LIBS) $(EISPACK_LIB) $(PGLIBS) 	\
+		 $(EISPACK_LIB) $(PGLIBS) 	\
 		$(COMPUTATIONAL_LIBS)  $(SLATEC_LIBS)  $(LDFLAGS)
 
 $(BDIR)/fstress2hor: $(GEN_P_INC)  $(LIBLIST) $(GEOPROJECT_OBJS)\
@@ -635,7 +656,7 @@ $(BDIR)/fstress2hor: $(GEN_P_INC)  $(LIBLIST) $(GEOPROJECT_OBJS)\
 			$(MY_LIBDIR_SPEC)$(ODIR)/ $(GEOPROJECT_OBJS)	\
 		-o  $(BDIR)/fstress2hor   -linput -lpatchio		\
 		$(GEOPROJECT_LIBS)					\
-		$(COMPUTATIONAL_LIBS) $(MATHLIB) $(DEBUG_LIBS)  $(TGF_LIB) $(EISPACK_LIB) $(LDFLAGS)
+		$(COMPUTATIONAL_LIBS) $(MATHLIB)   $(TGF_LIB) $(EISPACK_LIB) $(LDFLAGS)
 
 $(BDIR)/fit_mean_stress: $(GEN_P_INC)  $(LIBLIST) $(GEOPROJECT_OBJS)\
 		$(FSTRESS2HOR_OBJS) $(ODIR)/fit_mean_stress.o
@@ -643,7 +664,7 @@ $(BDIR)/fit_mean_stress: $(GEN_P_INC)  $(LIBLIST) $(GEOPROJECT_OBJS)\
 			$(MY_LIBDIR_SPEC)$(ODIR)/ $(GEOPROJECT_OBJS)	\
 		-o  $(BDIR)/fit_mean_stress   -linput -lpatchio		\
 		$(GEOPROJECT_LIBS)	$(TGF_LIB)				\
-		$(COMPUTATIONAL_LIBS) $(MATHLIB)   $(DEBUG_LIBS) $(EISPACK_LIB)  $(LDFLAGS) 
+		$(COMPUTATIONAL_LIBS) $(MATHLIB)    $(EISPACK_LIB)  $(LDFLAGS) 
 
 $(BDIR)/fstress2eig: $(GEN_P_INC)  $(LIBLIST) $(GEOPROJECT_OBJS)\
 		$(FSTRESS2HOR_OBJS) $(ODIR)/fstress2eig.o
@@ -651,7 +672,7 @@ $(BDIR)/fstress2eig: $(GEN_P_INC)  $(LIBLIST) $(GEOPROJECT_OBJS)\
 			$(MY_LIBDIR_SPEC)$(ODIR)/ $(GEOPROJECT_OBJS)	\
 		-o  $(BDIR)/fstress2eig   -linput -lpatchio		\
 		$(GEOPROJECT_LIBS)					\
-		$(COMPUTATIONAL_LIBS) $(MATHLIB) $(DEBUG_LIBS)  $(TGF_LIB) $(EISPACK_LIB) $(LDFLAGS)
+		$(COMPUTATIONAL_LIBS) $(MATHLIB)   $(TGF_LIB) $(EISPACK_LIB) $(LDFLAGS)
 
 $(BDIR)/block_evaluate_solution: $(GEN_P_INC)  $(GEOPROJECT_OBJS) $(LIBLIST)	\
 		$(BLOCK_EVALUATE_SOLUTION_OBJS) 		\
@@ -661,7 +682,7 @@ $(BDIR)/block_evaluate_solution: $(GEN_P_INC)  $(GEOPROJECT_OBJS) $(LIBLIST)	\
 			$(MY_LIBDIR_SPEC)$(ODIR)/ $(GEOPROJECT_OBJS)	\
 		-o  $(BDIR)/block_evaluate_solution   -linput -lpatchio	\
 		$(GEOPROJECT_LIBS)					\
-		$(COMPUTATIONAL_LIBS) $(MATHLIB) $(DEBUG_LIBS) $(TGF_LIB)  $(EISPACK_LIB) $(LDFLAGS)
+		$(COMPUTATIONAL_LIBS) $(MATHLIB)  $(TGF_LIB)  $(EISPACK_LIB) $(LDFLAGS)
 
 $(BDIR)/block_checkflt: $(GEN_P_INC)  $(GEOPROJECT_OBJS) $(LIBLIST) \
 		$(BLOCKINVERT_SPH_OBJS) $(ODIR)/block_checkflt.o
@@ -669,13 +690,13 @@ $(BDIR)/block_checkflt: $(GEN_P_INC)  $(GEOPROJECT_OBJS) $(LIBLIST) \
 			$(MY_LIBDIR_SPEC)$(ODIR)/ $(GEOPROJECT_OBJS)			\
 		-o  $(BDIR)/block_checkflt   -linput -lpatchio		\
 		$(GEOPROJECT_LIBS) $(PETSC_LIBS)				\
-		$(COMPUTATIONAL_LIBS) $(MATHLIB) $(DEBUG_LIBS)   $(TGF_LIB) $(EISPACK_LIB)  $(PGLIBS) $(LDFLAGS) 
+		$(COMPUTATIONAL_LIBS) $(MATHLIB)    $(TGF_LIB) $(EISPACK_LIB)  $(PGLIBS) $(LDFLAGS) 
 
 $(BDIR)/geo_okada: $(ODIR)/geo_okada.o $(ODIR)/coulomb_stress.o $(GEN_P_INC)  \
 	$(GEOPROJECT_OBJS) $(LIBLIST) 
 	$(MPILD)  $(ODIR)/geo_okada.o $(MY_LIBDIR_SPEC)$(ODIR)/ $(GEOPROJECT_OBJS) \
 		-o  $(BDIR)/geo_okada  $(ODIR)/coulomb_stress.o -lpatchio \
-		$(GEOPROJECT_LIBS)	$(COMPUTATIONAL_LIBS) $(DEBUG_LIBS) $(MATHLIB)  $(LDFLAGS)
+		$(GEOPROJECT_LIBS)	$(COMPUTATIONAL_LIBS)  $(MATHLIB)  $(LDFLAGS)
 
 #
 # C function prototyper
@@ -707,6 +728,7 @@ auto_proto.sgl.h:
 # libraries
 #
 libraries: $(LIBLIST)
+debug_libraries: $(LIBLIST_DEBUG)
 
 tgf/objects/libtgf.a:
 	cd tgf; make ; cd -
@@ -732,6 +754,11 @@ $(ODIR)/libpatchio.sgl.a: $(PATCH_IO_OBJS_SGL)
 $(ODIR)/libinput.sgl.a: $(INPUT_OBJS_SGL)
 	$(AR) rv $(ODIR)/libinput.sgl.a $(INPUT_OBJS_SGL)
 
+$(ODIR)/libpatchio.dbg.a: $(PATCH_IO_OBJS_DEBUG)
+	$(AR) rv $(ODIR)/libpatchio.dbg.a $(PATCH_IO_OBJS_DEBUG)
+
+$(ODIR)/libinput.dbg.a: $(INPUT_OBJS_DEBUG)
+	$(AR) rv $(ODIR)/libinput.dbg.a $(INPUT_OBJS_DEBUG)
 
 #
 # source code
@@ -742,113 +769,132 @@ $(ODIR)/libinput.sgl.a: $(INPUT_OBJS_SGL)
 #
 #
 $(ODIR)/numrec_svd_routines.o: numrec_svd_routines.F $(GEN_P_INC)
-	$(F77) -c  $(FFLAGS) numrec_svd_routines.F $(MY_PRECISION) \
+	$(F77) -c  $(FFLAGS) numrec_svd_routines.F $(MY_PRECISION) $(OPTIM_FLAGS) \
 	-o $(ODIR)/numrec_svd_routines.o
+
+$(ODIR)/numrec_svd_routines.dbg.o: numrec_svd_routines.F $(GEN_P_INC)
+	$(F77) -c  $(FFLAGS) numrec_svd_routines.F $(MY_PRECISION) $(DEBUG_FLAGS) \
+	-o $(ODIR)/numrec_svd_routines.dbg.o
+
 $(ODIR)/numrec_svd_routines.sgl.o: numrec_svd_routines.F $(GEN_P_INC)
-	$(F77) -c  $(FFLAGS) numrec_svd_routines.F -o $(ODIR)/numrec_svd_routines.sgl.o
+	$(F77) -c  $(FFLAGS) $(OPTIM_FLAGS) numrec_svd_routines.F -o $(ODIR)/numrec_svd_routines.sgl.o
+
 #
 # other specialities
 #
 $(ODIR)/solve_mode_dependend_1.o: solve_mode_dependend.c $(GEN_P_INC)
 	$(CC) $(CFLAGS) -c solve_mode_dependend.c \
-	-DCOMP_MODE_1 $(MY_PRECISION) -o  $(ODIR)/solve_mode_dependend_1.o
+	-DCOMP_MODE_1 $(MY_PRECISION) $(OPTIM_FLAGS)  -o  $(ODIR)/solve_mode_dependend_1.o
 $(ODIR)/solve_mode_dependend_2.o: solve_mode_dependend.c $(GEN_P_INC)
 	$(CC) $(CFLAGS) -c solve_mode_dependend.c \
-	-DCOMP_MODE_2 $(MY_PRECISION) -o  $(ODIR)/solve_mode_dependend_2.o
+	-DCOMP_MODE_2 $(MY_PRECISION) $(OPTIM_FLAGS)   -o  $(ODIR)/solve_mode_dependend_2.o
 $(ODIR)/solve_mode_dependend_3.o: solve_mode_dependend.c $(GEN_P_INC)
 	$(CC) $(CFLAGS) -c solve_mode_dependend.c \
-	-DCOMP_MODE_3 $(MY_PRECISION) -o  $(ODIR)/solve_mode_dependend_3.o
+	-DCOMP_MODE_3 $(MY_PRECISION) $(OPTIM_FLAGS)  -o  $(ODIR)/solve_mode_dependend_3.o
 $(ODIR)/solve_mode_dependend_4.o: solve_mode_dependend.c $(GEN_P_INC)
 	$(CC) $(CFLAGS) -c solve_mode_dependend.c \
-	-DCOMP_MODE_4 $(MY_PRECISION) -o  $(ODIR)/solve_mode_dependend_4.o
+	-DCOMP_MODE_4 $(MY_PRECISION) $(OPTIM_FLAGS)  -o  $(ODIR)/solve_mode_dependend_4.o
+# debug
+$(ODIR)/solve_mode_dependend_1.dbg.o: solve_mode_dependend.c $(GEN_P_INC)
+	$(CC) $(CFLAGS) -c solve_mode_dependend.c \
+	-DCOMP_MODE_1 $(MY_PRECISION) $(DEBUG_FLAGS)  -o  $(ODIR)/solve_mode_dependend_1.dbg.o
+$(ODIR)/solve_mode_dependend_2.dbg.o: solve_mode_dependend.c $(GEN_P_INC)
+	$(CC) $(CFLAGS) -c solve_mode_dependend.c \
+	-DCOMP_MODE_2 $(MY_PRECISION) $(DEBUG_FLAGS)   -o  $(ODIR)/solve_mode_dependend_2.dbg.o
+$(ODIR)/solve_mode_dependend_3.dbg.o: solve_mode_dependend.c $(GEN_P_INC)
+	$(CC) $(CFLAGS) -c solve_mode_dependend.c \
+	-DCOMP_MODE_3 $(MY_PRECISION) $(DEBUG_FLAGS)  -o  $(ODIR)/solve_mode_dependend_3.dbg.o
+$(ODIR)/solve_mode_dependend_4.dbg.o: solve_mode_dependend.c $(GEN_P_INC)
+	$(CC) $(CFLAGS) -c solve_mode_dependend.c \
+	-DCOMP_MODE_4 $(MY_PRECISION) $(DEBUG_FLAGS)  -o  $(ODIR)/solve_mode_dependend_4.dbg.o
 #
 # single prec (leave out my_precision)
 $(ODIR)/solve_mode_dependend_1.sgl.o: solve_mode_dependend.c $(GEN_P_INC)
-	$(CC) $(CFLAGS) -c solve_mode_dependend.c \
+	$(CC) $(CFLAGS) $(OPTIM_FLAGS) -c solve_mode_dependend.c \
 	-DCOMP_MODE_1  -o  $(ODIR)/solve_mode_dependend_1.sgl.o
 $(ODIR)/solve_mode_dependend_2.sgl.o: solve_mode_dependend.c $(GEN_P_INC)
-	$(CC) $(CFLAGS) -c solve_mode_dependend.c \
+	$(CC) $(CFLAGS) $(OPTIM_FLAGS) -c solve_mode_dependend.c \
 	-DCOMP_MODE_2  -o  $(ODIR)/solve_mode_dependend_2.sgl.o
 $(ODIR)/solve_mode_dependend_3.sgl.o: solve_mode_dependend.c $(GEN_P_INC)
-	$(CC) $(CFLAGS) -c solve_mode_dependend.c \
+	$(CC) $(CFLAGS)  $(OPTIM_FLAGS)  -c solve_mode_dependend.c \
 	-DCOMP_MODE_3  -o  $(ODIR)/solve_mode_dependend_3.sgl.o
 $(ODIR)/solve_mode_dependend_4.sgl.o: solve_mode_dependend.c $(GEN_P_INC)
-	$(CC) $(CFLAGS) -c solve_mode_dependend.c \
+	$(CC) $(CFLAGS)  $(OPTIM_FLAGS) -c solve_mode_dependend.c \
 	-DCOMP_MODE_4  -o  $(ODIR)/solve_mode_dependend_4.sgl.o
 #
 # spherical versions of the blockinvert code
 $(ODIR)/blockinvert.sph.o:	blockinvert.c $(GEN_P_INC)
-	$(CC) $(CFLAGS) -DBLOCK_SPHERICAL -c $< $(MY_PRECISION) \
+	$(CC) $(CFLAGS) $(OPTIM_FLAGS)  -DBLOCK_SPHERICAL -c $< $(MY_PRECISION) \
 	-o  $(ODIR)/blockinvert.sph.o
 $(ODIR)/block_matrix.sph.o:	block_matrix.c $(GEN_P_INC)
-	$(CC) $(CFLAGS) -DBLOCK_SPHERICAL  -c $< $(MY_PRECISION) -o  \
+	$(CC) $(CFLAGS) $(OPTIM_FLAGS)  -DBLOCK_SPHERICAL  -c $< $(MY_PRECISION) -o  \
 	$(ODIR)/block_matrix.sph.o
 $(ODIR)/read_stress_observations.sph.o:	read_stress_observations.c $(GEN_P_INC)
-	$(CC) $(CFLAGS) -DBLOCK_SPHERICAL  -c $< $(MY_PRECISION) -o  \
+	$(CC) $(CFLAGS) $(OPTIM_FLAGS)  -DBLOCK_SPHERICAL  -c $< $(MY_PRECISION) -o  \
 	$(ODIR)/read_stress_observations.sph.o
 $(ODIR)/block_read_gps.sph.o:	block_read_gps.c $(GEN_P_INC)
-	$(CC) $(CFLAGS) -DBLOCK_SPHERICAL  -c $< $(MY_PRECISION) -o  \
+	$(CC) $(CFLAGS) $(OPTIM_FLAGS)  -DBLOCK_SPHERICAL  -c $< $(MY_PRECISION) -o  \
 	$(ODIR)/block_read_gps.sph.o
 $(ODIR)/block_output.sph.o:	block_output.c $(GEN_P_INC)
-	$(CC) $(CFLAGS) -DBLOCK_SPHERICAL  -c $< $(MY_PRECISION) -o  \
+	$(CC) $(CFLAGS) $(OPTIM_FLAGS)  -DBLOCK_SPHERICAL  -c $< $(MY_PRECISION) -o  \
 	$(ODIR)/block_output.sph.o
 $(ODIR)/block_solve.sph.o:	block_solve.c $(GEN_P_INC)
-	$(CC) $(CFLAGS) -DBLOCK_SPHERICAL  -c $< $(MY_PRECISION) -o  \
+	$(CC) $(CFLAGS) $(OPTIM_FLAGS)  -DBLOCK_SPHERICAL  -c $< $(MY_PRECISION) -o  \
 	$(ODIR)/block_solve.sph.o
 $(ODIR)/block_read_bflt.sph.o:	block_read_bflt.c $(GEN_P_INC)
-	$(CC) $(CFLAGS) -DBLOCK_SPHERICAL  -c $< $(MY_PRECISION) -o  \
+	$(CC) $(CFLAGS)  $(OPTIM_FLAGS) -DBLOCK_SPHERICAL  -c $< $(MY_PRECISION) -o  \
 	$(ODIR)/block_read_bflt.sph.o
 $(ODIR)/block_stress.sph.o:	block_stress.c $(GEN_P_INC)
-	$(CC) $(CFLAGS) -DBLOCK_SPHERICAL  -c $< $(MY_PRECISION) -o  \
+	$(CC) $(CFLAGS)  $(OPTIM_FLAGS) -DBLOCK_SPHERICAL  -c $< $(MY_PRECISION) -o  \
 	$(ODIR)/block_stress.sph.o
 $(ODIR)/block_read_euler.sph.o:	block_read_euler.c $(GEN_P_INC)
-	$(CC) $(CFLAGS) -DBLOCK_SPHERICAL  -c $< $(MY_PRECISION) -o  \
+	$(CC) $(CFLAGS)  $(OPTIM_FLAGS) -DBLOCK_SPHERICAL  -c $< $(MY_PRECISION) -o  \
 	$(ODIR)/block_read_euler.sph.o
 #
 # single
 $(ODIR)/blockinvert.sph.sgl.o:	blockinvert.c $(GEN_P_INC)
-	$(CC) $(CFLAGS) -DBLOCK_SPHERICAL -c $<  -o  $(ODIR)/blockinvert.sph.sgl.o
+	$(CC) $(CFLAGS) $(OPTIM_FLAGS)  -DBLOCK_SPHERICAL -c $<  -o  $(ODIR)/blockinvert.sph.sgl.o
 $(ODIR)/block_matrix.sph.sgl.o:	block_matrix.c $(GEN_P_INC)
 	$(CC) $(CFLAGS) -DBLOCK_SPHERICAL  -c $< -o  $(ODIR)/block_matrix.sph.sgl.o
 $(ODIR)/read_stress_observations.sph.sgl.o:	read_stress_observations.c $(GEN_P_INC)
-	$(CC) $(CFLAGS) -DBLOCK_SPHERICAL  -c $< -o  $(ODIR)/read_stress_observations.sph.sgl.o
+	$(CC) $(CFLAGS) $(OPTIM_FLAGS)  -DBLOCK_SPHERICAL  -c $< -o  $(ODIR)/read_stress_observations.sph.sgl.o
 $(ODIR)/block_read_gps.sph.sgl.o:	block_read_gps.c $(GEN_P_INC)
-	$(CC) $(CFLAGS) -DBLOCK_SPHERICAL  -c $< -o  $(ODIR)/block_read_gps.sph.sgl.o
+	$(CC) $(CFLAGS) $(OPTIM_FLAGS)  -DBLOCK_SPHERICAL  -c $< -o  $(ODIR)/block_read_gps.sph.sgl.o
 $(ODIR)/block_output.sph.sgl.o:	block_output.c $(GEN_P_INC)
-	$(CC) $(CFLAGS) -DBLOCK_SPHERICAL  -c $< -o  $(ODIR)/block_output.sph.sgl.o
+	$(CC) $(CFLAGS) $(OPTIM_FLAGS)  -DBLOCK_SPHERICAL  -c $< -o  $(ODIR)/block_output.sph.sgl.o
 $(ODIR)/block_solve.sph.sgl.o:	block_solve.c $(GEN_P_INC)
-	$(CC) $(CFLAGS) -DBLOCK_SPHERICAL  -c $< -o  $(ODIR)/block_solve.sph.sgl.o
+	$(CC) $(CFLAGS) $(OPTIM_FLAGS)  -DBLOCK_SPHERICAL  -c $< -o  $(ODIR)/block_solve.sph.sgl.o
 $(ODIR)/block_read_bflt.sph.sgl.o:	block_read_bflt.c $(GEN_P_INC)
-	$(CC) $(CFLAGS) -DBLOCK_SPHERICAL  -c $< -o  $(ODIR)/block_read_bflt.sph.sgl.o
+	$(CC) $(CFLAGS) $(OPTIM_FLAGS)  -DBLOCK_SPHERICAL  -c $< -o  $(ODIR)/block_read_bflt.sph.sgl.o
 $(ODIR)/block_stress.sph.sgl.o:	block_stress.c $(GEN_P_INC)
-	$(CC) $(CFLAGS) -DBLOCK_SPHERICAL  -c $< -o  $(ODIR)/block_stress.sph.sgl.o
+	$(CC) $(CFLAGS) $(OPTIM_FLAGS)  -DBLOCK_SPHERICAL  -c $< -o  $(ODIR)/block_stress.sph.sgl.o
 $(ODIR)/block_read_euler.sph.sgl.o:	block_read_euler.c $(GEN_P_INC)
-	$(CC) $(CFLAGS) -DBLOCK_SPHERICAL  -c $< -o  $(ODIR)/block_read_euler.sph.sgl.o
+	$(CC) $(CFLAGS) $(OPTIM_FLAGS)  -DBLOCK_SPHERICAL  -c $< -o  $(ODIR)/block_read_euler.sph.sgl.o
 
 #
 # the random noise version of coulomb stress
 $(ODIR)/coulomb_noise_stress.$(NOISELEVEL).o: coulomb_stress.c $(GEN_P_INC) noise.dat
-	$(CC) $(CFLAGS) -c coulomb_stress.c \
+	$(CC) $(CFLAGS) $(OPTIM_FLAGS)  -c coulomb_stress.c \
 	-DADD_COULOMB_STRESS_NOISE=$(NOISELEVEL) \
 	$(MY_PRECISION) -o  $(ODIR)/coulomb_noise_stress.$(NOISELEVEL).o
 
 $(ODIR)/coulomb_noise_stress.$(NOISELEVEL).sgl.o: coulomb_stress.c $(GEN_P_INC) noise.dat
-	$(CC) $(CFLAGS) -c coulomb_stress.c \
+	$(CC) $(CFLAGS) $(OPTIM_FLAGS)  -c coulomb_stress.c \
 	-DADD_COULOMB_STRESS_NOISE=$(NOISELEVEL) \
 	-o  $(ODIR)/coulomb_noise_stress.$(NOISELEVEL).sgl.o
 # 
 
 $(ODIR)/terminate.o:	terminate.c $(GEN_P_INC)
-	$(MPICC) $(CFLAGS)  $(MY_PRECISION) -c terminate.c -o $(ODIR)/terminate.o
+	$(MPICC) $(OPTIM_FLAGS)  $(CFLAGS)  $(MY_PRECISION) -c terminate.c -o $(ODIR)/terminate.o
 
 $(ODIR)/test_solvers.o:	test_solvers.c $(GEN_P_INC)
-	$(MPICC) $(CFLAGS)  $(MY_PRECISION) -c test_solvers.c -o $(ODIR)/test_solvers.o
+	$(MPICC)  $(OPTIM_FLAGS) $(CFLAGS)  $(MY_PRECISION) -c test_solvers.c -o $(ODIR)/test_solvers.o
 
 $(ODIR)/ex_dense.o:	ex_dense.c $(GEN_P_INC)
-	$(MPICC) $(CFLAGS)  $(MY_PRECISION) -c ex_dense.c -o $(ODIR)/ex_dense.o
+	$(MPICC)  $(OPTIM_FLAGS) $(CFLAGS)  $(MY_PRECISION) -c ex_dense.c -o $(ODIR)/ex_dense.o
 
 $(ODIR)/ex_dense_v2.o:	ex_dense_v2.c $(GEN_P_INC)
-	$(MPICC) $(CFLAGS)  $(MY_PRECISION) -c ex_dense_v2.c -o $(ODIR)/ex_dense_v2.o
+	$(MPICC)  $(OPTIM_FLAGS) $(CFLAGS)  $(MY_PRECISION) -c ex_dense_v2.c -o $(ODIR)/ex_dense_v2.o
 
 
 
@@ -856,26 +902,39 @@ $(ODIR)/ex_dense_v2.o:	ex_dense_v2.c $(GEN_P_INC)
 # some generic rules with normal dependencies
 #
 $(ODIR)/%.o:	%.c $(GEN_P_INC)
-	$(CC) $(CFLAGS)  $(MY_PRECISION) -c $< -o $(ODIR)/$*.o
+	$(CC) $(CFLAGS)  $(OPTIM_FLAGS)  $(MY_PRECISION) -c $< -o $(ODIR)/$*.o
 
 $(ODIR)/%.o:	%.f $(GEN_P_INC)
-	$(F77) $(FFLAGS) $(MY_PRECISION) -c $< -o $(ODIR)/$*.o
+	$(F77) $(FFLAGS) $(OPTIM_FLAGS)  $(MY_PRECISION) -c $< -o $(ODIR)/$*.o
 
 $(ODIR)/%.o:	%.F $(GEN_P_INC)
-	$(F77) $(FFLAGS) $(MY_PRECISION) -c $<  -o $(ODIR)/$*.o
+	$(F77) $(FFLAGS) $(OPTIM_FLAGS)  $(MY_PRECISION) -c $<  -o $(ODIR)/$*.o
 
 $(ODIR)/%.o:	%.f90 $(GEN_P_INC)
-	$(F90)   $(F90FLAGS) $(MY_PRECISION) -c $<  -o $(ODIR)/$*.o
+	$(F90)   $(F90FLAGS) $(OPTIM_FLAGS)  $(MY_PRECISION) -c $<  -o $(ODIR)/$*.o
+
+# debug versions
+$(ODIR)/%.dbg.o:	%.c $(GEN_P_INC)
+	$(CC) $(CFLAGS)  $(DEBUG_FLAGS)  $(MY_PRECISION) -c $< -o $(ODIR)/$*.dbg.o
+
+$(ODIR)/%.dbg.o:	%.f $(GEN_P_INC)
+	$(F77) $(FFLAGS) $(DEBUG_FLAGS)  $(MY_PRECISION) -c $< -o $(ODIR)/$*.dbg.o
+
+$(ODIR)/%.dbg.o:	%.F $(GEN_P_INC)
+	$(F77) $(FFLAGS) $(DEBUG_FLAGS)  $(MY_PRECISION) -c $<  -o $(ODIR)/$*.dbg.o
+
+$(ODIR)/%.dbg.o:	%.f90 $(GEN_P_INC)
+	$(F90)   $(F90FLAGS) $(DEBUG_FLAGS)  $(MY_PRECISION) -c $<  -o $(ODIR)/$*.dbg.o
 
 # single prec versions
 $(ODIR)/%.sgl.o:	%.c $(GEN_P_INC)
-	$(CC) $(CFLAGS) -c $< -o $(ODIR)/$*.sgl.o
+	$(CC) $(CFLAGS) $(OPTIM_FLAGS)  -c $< -o $(ODIR)/$*.sgl.o
 
 $(ODIR)/%.sgl.o:	%.f $(GEN_P_INC)
-	$(F77) $(FFLAGS) -c $< -o $(ODIR)/$*.sgl.o
+	$(F77) $(FFLAGS)  $(OPTIM_FLAGS) -c $< -o $(ODIR)/$*.sgl.o
 
 $(ODIR)/%.sgl.o:	%.F $(GEN_P_INC)
-	$(F77) $(FFLAGS) -c $<  -o $(ODIR)/$*.sgl.o
+	$(F77) $(FFLAGS)  $(OPTIM_FLAGS) -c $<  -o $(ODIR)/$*.sgl.o
 
 $(ODIR)/%.sgl.o:	%.f90 $(GEN_P_INC)
-	$(F90)  $(F90FLAGS) -c $<  -o $(ODIR)/$*.sgl.o
+	$(F90)  $(F90FLAGS)  $(OPTIM_FLAGS) -c $<  -o $(ODIR)/$*.sgl.o

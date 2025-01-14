@@ -1,7 +1,7 @@
 /*
   interact: model fault interactions using dislocations in a 
             halfspace
-  (C) Thorsten Becker, becker@eps.harvard.edu
+  (C) Thorsten Becker, thwbecker@post.harvard.edu
 
 
   main initialization routine, sets defaults and optional parameters 
@@ -36,7 +36,6 @@ void check_parameters_and_init(int argc, char **argv,
     else
       fprintf(stderr,"init: compiled on %s %s, running on %i cores\n",__DATE__,__TIME__,(*medium)->comm_size);
   }
-
   
   // initialization phase, get parameters from command
   // line options

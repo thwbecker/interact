@@ -113,7 +113,7 @@ don't expect anything to work....
  #define FLT_MIN 1.17549435E-38F
 #endif
 
-#define STRLEN 300
+#define STRLEN 650
 //
 #ifdef USE_PGPLOT
 // 

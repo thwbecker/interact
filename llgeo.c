@@ -1,9 +1,8 @@
 /*
   interact: model fault interactions using dislocations in a 
             halfspace
-  (C) Thorsten Becker, becker@eps.harvard.edu
+  (C) Thorsten Becker, thwbecker@post.harvard.edu
 
-  $Id: llgeo.c,v 1.27 2004/10/05 01:09:46 becker Exp $
 
   this file is an addition to geometry.c and holds the low level
   geometry routines

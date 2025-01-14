@@ -423,7 +423,7 @@ void add_quake_stress_4(my_boolean *sma,COMP_PRECISION *slip,
 	}
 #endif
 
-#ifdef SUPER_DUPER_DEBUG
+#ifdef SUPER_DUPER_DUPER_DEBUG
 #ifdef ALLOW_NON_3DQUAD_GEOM
       if((fault[i].type == TRIANGULAR)||(fault[i].type == IQUAD)){
 	fprintf(stderr,"add_quake_stress_3: rec %03i rup %03i slip %10.3e, %10.3e, %10.3e s/d %.2f %.2f",

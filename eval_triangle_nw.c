@@ -110,7 +110,6 @@ void get_tri_prop_based_on_gh(struct flt *fault)
 {
   COMP_PRECISION dip;
   double strike,alpha;
-  int i;
   calc_centroid_tri(fault->xn,fault->x); /* assign centroid to x */
   /* F90 routine */
   get_tdcs_base_vectors((fault->xn+0),(fault->xn+3),(fault->xn+6),
@@ -120,10 +119,7 @@ void get_tri_prop_based_on_gh(struct flt *fault)
 
   strike = atan2(fault->t_strike[INT_X],fault->t_strike[INT_Y])*RAD2DEG;  
   /*  */
-  if((fault->t_dip[INT_Z]-1) < EPS_COMP_PREC)
-    dip = 90;
-  else
-    dip = (COMP_PRECISION)asin((double)fault->t_dip[INT_Z])*RAD2DEG;
+  dip = (COMP_PRECISION)asin((double)fault->t_dip[INT_Z])*RAD2DEG;
   
   check_angles(&dip,&strike);
   /*  */

@@ -958,7 +958,7 @@ void read_one_step_bc(FILE *in,struct med *medium,struct flt *fault,
       fprintf(stderr,"read_boundary_conditions: parallel summation done\n");
     }
 #else
-    fprintf(stderr,"read_boundary_conditions: parallel logic error\n");
+    fprintf(stderr,"read_boundary_conditions: parallel logic error %i\n",medium->comm_size);
 #endif
   } /* end parallel summation of prescribed slip effect */
 

@@ -169,25 +169,29 @@ void read_geometry(char *patch_filename,struct med **medium,
       }
       /* compute all the triangular properties */
       get_tri_prop_based_on_gh((*fault+i));
-      if(0){			/* check for consistency */
+#ifdef DEBUG
+      check_fault_normal_vectors((*fault+i));
+      {			/* check for consistency */
 	/*  */
+
 	calc_global_strike_dip_from_local((*fault+i),t_strike,normal,t_dip);
 	p[0] = dotp_3d((*fault+i)->t_strike,t_strike);
 	p[1] = dotp_3d((*fault+i)->t_dip,t_dip);
 	p[2] = dotp_3d((*fault+i)->normal,normal);
-	fprintf(stderr,"tri*g: s %5.2f d %5.2f n %5.2f\n",p[0],p[1],p[2]);
 	if((p[0] < .95)||(p[1] < .95)||(p[2] < .95)){
-	  fprintf(stderr,"tri s: %5.2f %5.2f %5.2f d: %5.2f %5.2f %5.2f n: %5.2f %5.2f %5.2f qbsd: %5.2f %5.2f %5.2f d: %5.2f %5.2f %5.2f n: %5.2f %5.2f %5.2f \n",
-		  (*fault+i)->t_strike[INT_X],(*fault+i)->t_strike[INT_Y],(*fault+i)->t_strike[INT_Z],
-		  (*fault+i)->t_dip[INT_X],(*fault+i)->t_dip[INT_Y],(*fault+i)->t_dip[INT_Z],
-		  (*fault+i)->normal[INT_X],(*fault+i)->normal[INT_Y],(*fault+i)->normal[INT_Z],
-		  t_strike[INT_X],t_strike[INT_Y],t_strike[INT_Z],
-		  t_dip[INT_X],t_dip[INT_Y],t_dip[INT_Z],
-		  normal[INT_X],normal[INT_Y],normal[INT_Z]);
+	  fprintf(stderr,"tri: strike %5.2f dip %5.2f\n",(*fault+i)->strike,(*fault+i)->dip);
+	  fprintf(stderr,"tri*g: s %5.2f d %5.2f n %5.2f\n",p[0],p[1],p[2]);
+	  fprintf(stderr,"tri s: %5.2f %5.2f %5.2f (%.4e) d: %5.2f %5.2f %5.2f (%.4e) n: %5.2f %5.2f %5.2f (%.4e)\n qbsd: %5.2f %5.2f %5.2f (%.4e) d: %5.2f %5.2f %5.2f (%.4e) n: %5.2f %5.2f %5.2f (%.4e)\n",
+		  (*fault+i)->t_strike[INT_X],(*fault+i)->t_strike[INT_Y],(*fault+i)->t_strike[INT_Z],norm_3d((*fault+i)->t_strike),
+		  (*fault+i)->t_dip[INT_X],(*fault+i)->t_dip[INT_Y],(*fault+i)->t_dip[INT_Z],norm_3d((*fault+i)->t_dip),
+		  (*fault+i)->normal[INT_X],(*fault+i)->normal[INT_Y],(*fault+i)->normal[INT_Z],norm_3d((*fault+i)->normal),
+		  t_strike[INT_X],t_strike[INT_Y],t_strike[INT_Z],norm_3d(t_strike),
+		  t_dip[INT_X],t_dip[INT_Y],t_dip[INT_Z],norm_3d(t_dip),
+		  normal[INT_X],normal[INT_Y],normal[INT_Z],norm_3d(normal));
 	}
 
       }
-#ifdef DEBUG
+
       if((*medium)->comm_rank == 0)
 	fprintf(stderr,"read_geometry: fault %5i is triangular, x1: (%10.3e, %10.3e, %10.3e) x2: (%10.3e, %10.3e, %10.3e) x3: (%10.3e, %10.3e, %10.3e), area: %10.3e\n",
 		i,(*fault+i)->xn[  INT_X],(*fault+i)->xn[  INT_Y],(*fault+i)->xn[  INT_Z],
@@ -400,7 +404,8 @@ void read_geometry(char *patch_filename,struct med **medium,
 			  (*fault+i)->sin_alpha,
 			  (*fault+i)->cos_alpha,sin_dip,cos_dip);
       //fprintf(stderr,"tdq %g %g %g\n",(*fault+i)->t_dip[0],(*fault+i)->t_dip[1],(*fault+i)->t_dip[2]);
-#ifdef SUPER_DEBUG
+#ifdef SUPER_DUPER_DEBUG
+      check_fault_normal_vectors((*fault+i));
       if((*medium)->comm_rank == 0){
 	fprintf(stderr,"fault %5i: strike: %g dip: %g sc_alpha:  %10.2e/%10.2e sc_dip: %10.2e/%10.2e\n",
 		i,90.0-alpha,(*fault+i)->dip,(*fault+i)->sin_alpha,

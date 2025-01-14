@@ -656,6 +656,21 @@ void get_gh_quad_vec(COMP_PRECISION *xq,// four points in FE ordering
   }
 }
 
+void check_fault_normal_vectors(struct flt *fault)
+{
+  COMP_PRECISION normal[3],diff[3];
+  cross_product(fault->t_strike,fault->t_dip,normal);
+  c_eq_a_minus_b_3d(diff,normal,fault->normal);
+  if(norm_3d(diff)>EPS_COMP_PREC){
+    fprintf(stderr,"check_fault_normal_vectors: error, normal vector is not cross product of strike and dip\n");
+    fprintf(stderr,"s: %g %g %g (%g) d: %g %g %g (%g) n: %g %g %g (%g) np: %g %g %g (%g) \n",
+	    fault->t_strike[INT_X],fault->t_strike[INT_Y],fault->t_strike[INT_Z],norm_3d(fault->t_strike),
+	    fault->t_dip[INT_X],fault->t_dip[INT_Y],fault->t_dip[INT_Z],norm_3d(fault->t_dip),
+	    fault->normal[INT_X],fault->normal[INT_Y],fault->normal[INT_Z],norm_3d(fault->normal),
+	    normal[INT_X],normal[INT_Y],normal[INT_Z],norm_3d(normal));
+    exit(-1);
+  }
+}
 /*
   
   check if four points in FE ordering are on a plane

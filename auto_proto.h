@@ -150,8 +150,6 @@ void get_gauss_points(double *, double *, double *, int);
 void eval_triangle_nw(double *, struct flt *, double *, double *, double [3][3], int *, unsigned char);
 void get_tri_prop_based_on_gh(struct flt *);
 /* eval_triangle_tgf.c */
-void eval_triangle_tgf(double *, struct flt *, double *, double *, double [3][3], int *, int, unsigned char);
-void get_tri_prop_based_on_gh(struct flt *);
 /* far_enough.c */
 unsigned char far_enough(struct flt *, struct flt *, double);
 /* fit_mean_stress.c */
@@ -199,6 +197,7 @@ double triangle_area(double *);
 double triangle_area_gh(double *, double *);
 void get_gh_tri_vec(double *, double *, double *);
 void get_gh_quad_vec(double *, double *, double *, double *);
+void check_fault_normal_vectors(struct flt *);
 unsigned char check_planar(double *);
 void calc_group_geometry(struct med *, struct flt *, struct geog *);
 void vec_to_angles(double *, double *, double *);
