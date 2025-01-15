@@ -118,9 +118,18 @@ void get_tri_prop_based_on_gh(struct flt *fault)
   fault->l = fault->w = sqrt(fault->area);
 
   strike = atan2(fault->t_strike[INT_X],fault->t_strike[INT_Y])*RAD2DEG;  
-  /*  */
+  /*  had to fix this since sometimes t_dip would be slightly larger than unity */
+  if(fault->t_dip[INT_Z] > 1)
+    fault->t_dip[INT_Z]  = 1.;
+  if(fault->t_dip[INT_Z] < -1)
+    fault->t_dip[INT_Z]  = -1.;
   dip = (COMP_PRECISION)asin((double)fault->t_dip[INT_Z])*RAD2DEG;
-  
+#ifdef DEBUG
+  if(!finite(dip)){
+    fprintf(stderr,"get_tri_prop_based_on_gh: dip not finite z: %20.16e\n", fault->t_dip[INT_Z]);
+    exit(-1);
+  }
+#endif
   check_angles(&dip,&strike);
   /*  */
   fault->strike = (COMP_PRECISION)strike;

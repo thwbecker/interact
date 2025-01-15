@@ -25,9 +25,11 @@ void read_geometry(char *patch_filename,struct med **medium,
 {
   int i,j,k,tmpint,ic,l,off;
   FILE *in,*in2=NULL;
-  COMP_PRECISION sin_dip,cos_dip,mus_avg,mud_avg,d_mu,vertex[MAX_NR_EL_VERTICES*3],p[3],four_points[12],
+  COMP_PRECISION sin_dip,cos_dip,mus_avg,mud_avg,d_mu,vertex[MAX_NR_EL_VERTICES*3],four_points[12],
     lloc,wloc,eps_for_z = EPS_COMP_PREC * 100.0,t_strike[3],t_dip[3],normal[3],area,earea;
-
+#ifdef DEBUG
+  COMP_PRECISION p[3];
+#endif
   float wmin,wmax,lmin,lmax;
   double alpha;
   static my_boolean init=FALSE;
@@ -191,7 +193,6 @@ void read_geometry(char *patch_filename,struct med **medium,
 	}
 
       }
-
       if((*medium)->comm_rank == 0)
 	fprintf(stderr,"read_geometry: fault %5i is triangular, x1: (%10.3e, %10.3e, %10.3e) x2: (%10.3e, %10.3e, %10.3e) x3: (%10.3e, %10.3e, %10.3e), area: %10.3e\n",
 		i,(*fault+i)->xn[  INT_X],(*fault+i)->xn[  INT_Y],(*fault+i)->xn[  INT_Z],

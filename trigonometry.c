@@ -1,10 +1,8 @@
 /*
   interact: model fault interactions using dislocations in a 
             halfspace
-  (C) Thorsten Becker, becker@eps.harvard.edu
-
-  $Id: trigonometry.c,v 1.5 2003/07/10 22:21:22 becker Exp $
-
+  (C) Thorsten Becker, thwbecker@post.harvard.edu
+  
   
   trigonometric formulae for computations of distance and
   such on the surface of a spherical earth
@@ -25,11 +23,12 @@ COMP_PRECISION dist_on_sphere(COMP_PRECISION lon1,
 			      COMP_PRECISION lon2, 
 			      COMP_PRECISION lat2)
 {
-  COMP_PRECISION tmp1,tmp2;
+  COMP_PRECISION tmp1,tmp2,tmp3;
   tmp1 = sin((lat1-lat2)/2.0);
   tmp1 *= tmp1;
   tmp2 = sin((lon2-lon1)/2.0);
   tmp2 *= tmp2;
+  
   return 2.0*asin(sqrt(tmp1 + cos(lat1) * cos(lat2) * tmp2));
 }
 /* same for input in degrees */
