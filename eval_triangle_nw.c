@@ -110,6 +110,8 @@ void get_tri_prop_based_on_gh(struct flt *fault)
 {
   COMP_PRECISION dip;
   double strike,alpha;
+  /* will assign fault coordinates to centroid of first three xn
+     points */
   calc_centroid_tri(fault->xn,fault->x); /* assign centroid to x */
   /* F90 routine */
   get_tdcs_base_vectors((fault->xn+0),(fault->xn+3),(fault->xn+6),

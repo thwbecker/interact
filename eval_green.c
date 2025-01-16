@@ -1,9 +1,7 @@
 /*
   interact: model fault interactions using dislocations in a 
             halfspace
-  (C) Thorsten Becker, becker@eps.harvard.edu
-
-  $Id: eval_green.c,v 2.17 2003-03-01 23:33:59-08 becker Exp tbecker $
+  (C) Thorsten Becker, thwbecker@post.harvard.edu
 
 
   routine for selecting appropriate Greens functions routines given

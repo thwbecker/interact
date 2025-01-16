@@ -2,7 +2,7 @@
 
   interact: model fault interactions using dislocations in a 
             halfspace
-  (C) Thorsten Becker, becker@post.harvard.edu
+  (C) Thorsten Becker, thwbecker@post.harvard.edu
 
 
   this computes the displacements and stresses due an irregular quad,
@@ -67,7 +67,7 @@ void eval_iquad(COMP_PRECISION *x,struct flt *fault,
   smg[1][0]=sm[1][0];  smg[1][1]=sm[1][1];  smg[1][2]=sm[1][2];
   smg[2][0]=sm[2][0];  smg[2][1]=sm[2][1];  smg[2][2]=sm[2][2];
   for(nel=1;nel < 3;nel++){
-    /* aux triangles */
+    /* aux triangles one and two */
     for(i=0;i<3;i++){
       slip[i] = 0.;
       for(j=0;j < 3;j++){

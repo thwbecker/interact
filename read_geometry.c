@@ -1,7 +1,7 @@
 /*
   interact: model fault interactions using dislocations in a 
             halfspace
-  (C) Thorsten Becker, thwbecker@post.harvard.edu
+  (c) Thorsten Becker, thwbecker@post.harvard.edu
 
 */
 #include "properties.h"
@@ -169,7 +169,10 @@ void read_geometry(char *patch_filename,struct med **medium,
 	  exit(-1);
 	}
       }
-      /* compute all the triangular properties */
+      /* 
+	 compute all the triangular properties , basis vectors and
+	 centroid
+      */
       get_tri_prop_based_on_gh((*fault+i));
 #ifdef DEBUG
       check_fault_normal_vectors((*fault+i));
@@ -232,19 +235,19 @@ void read_geometry(char *patch_filename,struct med **medium,
 	malloc(sizeof(COMP_PRECISION)*(MAX_NR_EL_VERTICES+3*2)*3);
       if(!(*fault+i)->xn)MEMERROR("read_geometry");
       // next 12 fields are nodal coordinates, read in four points
-      for(j=0;j<12;j++)
+      for(j=0;j < 12;j++)
 	if(fscanf(in,ONE_CP_FORMAT,(four_points+j))!=1)
-	  READ_ERROR("read_geometry");
+	  READ_ERROR("read_geometry: iquad points cannot be read");
       /* check */
       for(j=0;j < 4;j++){
 	if(four_points[j*3+INT_Z] > 0){
-	  fprintf(stderr,"read_geometry: iqad patch %i node %i above ground, error\n",
-		  i,j);
+	  fprintf(stderr,"read_geometry: iquad patch %i node %i above ground, %.20e, error\n",
+		  i,j,four_points[j*3+INT_Z] );
 	  exit(-1);
 	}
       }
       
-      for(j=0;j<3;j++){
+      for(j=0;j < 3;j++){
 	/* bottom middle point */
 	(*fault+i)->xn[0*3+j] = (four_points[0*3+j] + four_points[1*3+j])/2.0;
 	(*fault+i)->xn[1*3+j] = four_points[2*3+j]; /* top right */
@@ -255,6 +258,13 @@ void read_geometry(char *patch_filename,struct med **medium,
       }
       /* compute all the triangular properties for the main triangle */
       get_tri_prop_based_on_gh((*fault+i));
+      /* see if moving the centroid helps */
+      for(j=0;j<3;j++){
+	(*fault+i)->x[j]  = 0.5* (*fault+i)->xn[0*3+j];
+	(*fault+i)->x[j] += 0.25* (*fault+i)->xn[1*3+j];
+	(*fault+i)->x[j] += 0.25* (*fault+i)->xn[2*3+j];
+      }
+      
       
       area = (*fault+i)->l * (*fault+i)->l;
 
@@ -324,7 +334,7 @@ void read_geometry(char *patch_filename,struct med **medium,
     }else{
       /*
 
-	regular, rectangular patch
+	regular, rectangular Okada type patch
 
       */
       (*fault+i)->type = OKADA_PATCH; 
