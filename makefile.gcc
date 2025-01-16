@@ -47,8 +47,8 @@ GCCWOPT = -Wall
 
 # fast execution options, default use
 OPTIM_FLAGS = -Ofast -march=native $(GCCWOPT)
-
-SCARGS =  $(GCCWOPT) -Wno-discarded-qualifiers
+CFLAGS_OTHER =  -Wno-discarded-qualifiers
+SCARGS =  $(GCCWOPT) $(CFLAGS_OTHER)
 
 # -DSUPER_DUPER_DEBUG -DDDMALLOC
 DEBUG_FLAGS=-DDEBUG -g -DSUPER_DUPER_DEBUG

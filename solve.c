@@ -31,7 +31,8 @@ int solve(struct med *medium,struct flt *fault)
   FILE *out1,*out2;
 #endif
 #ifdef USE_PETSC
-#define PETSC_HELPER_STR_LEN 256  
+#define PETSC_HELPER_STR_LEN 256
+  long int index_numbers;
   char mattype[PETSC_HELPER_STR_LEN];
   PetscBool pset = PETSC_FALSE;
   Vec         px, pr,pxout;

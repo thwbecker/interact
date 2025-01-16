@@ -6,7 +6,7 @@
   $Id: fortran_underscore_defines.h,v 1.4 2004/01/26 01:16:41 becker Exp $
 
 
- */
+*/
 #define SGI_SUBROUTINE_CONVENTION
 // okada
 #define dc3d dc3d_

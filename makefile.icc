@@ -11,8 +11,8 @@
 #                  in memory, if size is larger AND NO SPARSE STORAGE is invoked
 #                  will read from file. This is so slow, it's next to impossible to work.
 #
-MACHINE_DEFINES = -DIMAT_SPARSE_LIM=8000.0 -DIMAT_SIZE_LIM=4000.1  \
-	-DSGI_SUBROUTINE_CONVENTION  
+MACHINE_DEFINES = -DIMAT_SPARSE_LIM=8000.0 -DIMAT_SIZE_LIM=4000.1  
+
 #
 # LINUX system dependent flags for icc
 #
@@ -47,9 +47,9 @@ MATHLIBS = -llapack -lblas -lm
 GCCWOPT = -Wall 
 #-Werror
 
-
+CFLAGS_OTHER =  -Wno-discarded-qualifiers
 # fast execution options, comment those two lines if debug output is wanted
-SCARGS = $(GCCWOPT)
+SCARGS = $(GCCWOPT)  $(CFLAGS_OTHER)
 OPTIM_FLAGS = -Ofast -fPIE
 DEBUG_FLAGS=-DDEBUG -g -DSUPER_DEBUG
 

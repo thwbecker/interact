@@ -127,6 +127,7 @@ OKROUTINE_DEBUG = $(ODIR)/dc3d.dbg.o	# my modified version
 # include the machine dependent flags
 # 
 include makefile.gcc
+#include makefile.icc
 #include makefile.mixed_mkl
 #include makefile.mixed
 #include makefile.icc_frontera
@@ -142,7 +143,7 @@ include makefile.gcc
 #
 # petsc, will override some of the flags
 # comment out if not needed
-#include makefile.petsc
+include makefile.petsc
 ifndef MPILD
 MPILD = $(LD)
 endif
