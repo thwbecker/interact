@@ -2,9 +2,10 @@
 ff=${1-flt}
 gf=${2-geom.in}
 tlabel=${3-""}
-
-reg=-R-10/10/-10/10/-4/0
-scale=.3
+reg=${4-"-R-10/10/-10/10/-4/0"}
+scale=${5-.3}
+#reg=-R-2/2/-2/2/-2/0;scale=2
+adjust=${6-1}			# 0: fixed 1: adjust 2: read from file
 
 if [ ! -s $ff.dat ];then
     echo $0: slip solution $ff.dat not found
@@ -26,6 +27,7 @@ for prop in 0 1 2 10 11 12;do
     cat $gf | patch2xyz $ff.dat $prop > $tmpn.1.$prop &
 done
 wait
+pc=1
 for prop in 0 1 2 10 11 12;do
     if [ $prop -gt 2 ];then
 	lls="@~t@~"
@@ -47,21 +49,43 @@ for prop in 0 1 2 10 11 12;do
 	exit
     fi
     if [ $disp -eq 1 ];then
-	makecpt -T-1.25/1.25/.125 -Cvik > $tmpn.cpt
-	lspc=.5
+	cmp=vik
     else
-	makecpt -T-2000/2000/200 -Croma > $tmpn.cpt
-	lspc=1000
+	cmp=roma
     fi
-    
+
+    if [[ $adjust -ne 0 ]];then
+	if [[ $adjust -eq 1  || ! -s last_rms.$prop.dat ]];then
+	    rms=`grep "\-Z" $tmpn.1.$prop | gawk '{print(substr($2,3))}' | gawk -f rms.awk`
+	    echo $rms > last_rms.$prop.dat
+	else
+	    read rms < last_rms.$prop.dat
+	fi
+    else
+	if [ $disp -eq 1 ];then
+	    rms=0.75
+	else
+	    rms=250
+	fi
+    fi
+    tstring=`echo $rms | gawk '{r=$1;if(r<1e-5)r=1;printf("-T%g/%g/%g",-2.5*r,2.5*r,r*5/21)}'`
+    lspc=`echo $rms | gawk '{r=$1;if(r<1e-5)r=1;printf("%g",r);}'`
+
+    makecpt $tstring  -C$cmp > $tmpn.cpt
+
     ofile=$ff.$prop.ps
-    #psxyz $reg $proj $ann -P $tmpn.1.$prop -C$tmpn.cpt -m -L -K -W0.5 > $ofile
+    #psxyz $reg $proj $ann -P $tmpn.1.$prop -C$tmpn.cpt -m -L -K -W0.25 > $ofile
     psxyz $reg $proj $ann -P $tmpn.1.$prop -C$tmpn.cpt -m -L -K  > $ofile
-    echo 0 1.1 55 0 29 LM "$tlabel" | pstext -R0/1/0/1 -JX5 -O -Gwhite -K -N >>$ofile
-    echo 0 .9 45 0 29 LM "$label" | pstext -R0/1/0/1 -JX5 -O -Gwhite -K -N >>$ofile
+    if [ $pc = 1 ];then
+	echo 0 1.1 50 0 29 LM "$tlabel" | pstext -R0/1/0/1 -JX5 -O -Gwhite -K -N >>$ofile
+
+    fi
+	
+    echo 0 .9 40 0 29 LM "$label" | pstext -R0/1/0/1 -JX5 -O -Gwhite -K -N >>$ofile
     psscale -D1/0.5/3/.2h -E -C$tmpn.cpt -B$lspc:$label:  -O >> $ofile
     modifybb $ofile 0 &
     #gv $ofile;exit
+    ((pc=pc+1))
     fs="$fs $ofile"
 done
 wait

@@ -1,0 +1,223 @@
+#!/bin/bash
+ntests=${1-"1 2 3 4 5 6 7 8 9 10 11 12"}	# 1...8: different fault loading 9.... 11: field computations 12: line
+#ntests=${1-"11"}	# 
+#ntests=${1-"1"}
+angles=${2-"vert dip"}			# vert or dip
+#angles=${2-"vert"}			# vert or dip
+geoms=${3-"0 1 2"}			# 0: quad 1: iquad 2: triangle
+#geoms=${3-0}
+force_run=${4-1}
+#
+combine_plots=${5-0}
+
+#binary=interact.mixed
+binary=interact
+
+reg=-R-11/11/-11/11/-4/0
+rscale=.3
+
+fs=""
+for ntest in $ntests;do
+    for angle in $angles;do
+	if [ $ntest -le 8 ];then
+	    strike0=30;l0=10;w0=3		#
+	    #no=40;mo=16
+
+	    #no=60;mo=20
+	    #no=90;mo=30
+	    no=12;mo=8
+	    #no=20;mo=10
+	    #no=40;mo=20
+	    #no=4;mo=2
+	    #no=2;mo=2
+	    z=-3
+	elif [ $ntest -le 11 ];then
+	    strike0=40;
+	    #w0=3;l0=10
+	    w0=2;l0=3
+	    no=10;mo=4
+	    #no=1;mo=2
+	    z=-3
+	else
+	    strike0=0;
+	    w0=1;l0=1
+	    no=2;mo=2
+	    z=-1
+
+	fi
+	if [ $angle = "vert" ];then	# vertical
+	    strike=$strike0;dip=90
+	elif [ $angle = "dip" ];then	# dip
+	    strike=$strike0;dip=10
+	else
+	    echo $0: error $angle
+	    exit
+	fi
+	rm last_rms.*.dat 	# those are used to keep same colorscale
+	gc=1
+	for geom in $geoms;do
+	    if [[ $gc = 1 ]];then
+		adjust=1
+	    else
+		adjust=2
+	    fi
+
+	    if [ $geom = 0 ];then
+		makefault -strike $strike -dip $dip -n $no -m $mo -l $l0 -z $z -w $w0  > geom.in
+		glabel=quad
+	    elif [ $geom = 1 ];then
+		# convert quads to iquads (even though they are even geometry)
+		makefault -strike $strike -dip $dip -n $no -m $mo -l $l0 -z $z -w $w0 | \
+		    patch2vertices | points2patch 0 0 0 1 > geom.in
+		glabel=iquad
+	    elif [ $geom = 2 ];then
+		((nu=no));((mu=mo/2))
+		glabel=tri
+		makefault -strike $strike -dip $dip -n $nu -m $mu -l $l0 -z $z -w $w0  > geom.in
+		#cat geom.in | patchquad2patchtri 2 > tmp
+		#cat geom.in | patchquad2patchtri 1 > tmp
+		cat geom.in | patchquad2patchtri 0 > tmp
+		mv tmp geom.in
+		#cat geom.in
+		#exit
+	    else
+		echo $0: geom error
+		exit
+	    fi
+	    rm smlin.in 2> /dev/null
+	    if [[ $ntest -eq 1 ]];then # prescribed slip
+		bc_type=0;bc_val=1;bc_name="prescribed u@-strike@-"
+	    elif [[ $ntest -eq 2 ]];then
+		bc_type=1;bc_val=1;bc_name="prescribed u@-dip@-"
+	    elif [[ $ntest -eq 3 ]];then
+		bc_type=2;bc_val=1;bc_name="prescribed u@-normal@-"
+	    elif [[ $ntest -eq 4 ]];then # prescribed stress
+		bc_type=10;bc_val=-2e3;bc_name="prescribed @~t@~@-strike@-"
+	    elif [[ $ntest -eq 5 ]];then
+		bc_type=20;bc_val=-2e3;bc_name="prescribed @~t@~@-dip@-"
+	    elif [[ $ntest -eq 6 ]];then
+		bc_type=30;bc_val=-2e3;bc_name="prescribed @~t@~@-normal@-"
+	    elif [[ $ntest -eq 7 || $ntest = 8 ]];then
+		if [ $ntest = 7 ];then
+		    bc_type=50;bc_name="@~t@~@-strike@- = @~t@~@-dip@- = 0"
+		else
+		    bc_type=51;bc_name="@~s@~@-c@- = 0"
+		fi
+		bc_val=-1
+		    
+		cat <<EOF > smlin.in
+-1e3 0
+1.6e3 0
+0 0
+-1e3 0
+0 0  
+0 0
+EOF
+		
+	    elif [[ $ntest -eq 9 ]];then
+		bc_type=0;bc_val=1;bc_name="prescribed u@-strike@-"
+	    elif [[ $ntest -eq 10 ]];then
+		bc_type=1;bc_val=1;bc_name="prescribed u@-dip@-"
+	    elif [[ $ntest -eq 11 ]];then
+		bc_type=2;bc_val=1;bc_name="prescribed u@-normal@-"
+	    elif [[ $ntest -eq 12 ]];then
+		bc_type=0;bc_val=1
+	    else
+		echo $0: test $ntest error
+		exit
+	    fi
+	    if [ $ntest -le 8 ];then # only check fault slip
+		pf=0
+	    elif  [ $ntest -le 11 ];then # field
+		pf=1;ft=1
+	    else
+		pf=1;ft=0
+	    fi
+	    echo 1 $pf > bc.in
+	    if [ $pf -eq 1 ];then
+		if [ $ft = 1 ];then
+		    cat <<EOF >> bc.in
+-30 30 241 -30 30 241 -6 0 3
+EOF
+		else
+		    cat <<EOF >> bc.in
+-30 30 241 0 0 1 -1 -1 1
+EOF
+		fi
+
+	    fi
+	    echo
+	    echo test number $ntest
+	    echo bc_type $bc_type bc_val $bc_val
+	    echo 
+	    cat <<EOF	>> bc.in		
+-1 -1 -1 $bc_type $bc_val
+EOF
+
+
+	    oname=$angle.$geom.$ntest
+	    if [[ $force_run -eq 0 && -s  geoms/geom.$oname.in && -s flt_dat/flt.$oname.dat ]];then
+		echo $0: reusing output $oname
+	    else
+		rm flt.dat stress.out disp.out 2> /dev/null
+		#mpirun -np 4 $binary -ksp_type fgmres -pc_type none -ksp_max_it 50000 -ksp_rtol 1.0e-8
+		#mpirun -np 8 $binary 	-pc_factor_mat_solver_type scalapack -mat_type scalapack
+		$binary
+
+		mv geom.in geoms/geom.$oname.in
+		mv flt.dat flt_dat/flt.$oname.dat
+		mv bc.in bcs/bc.$oname.in
+		if [ $pf = 1 ];then
+		    mv disp.out disp_dat/disp.$oname.out
+		    mv stress.out stress_dat/stress.$oname.out
+		    mv stress.hdr stress_dat/stress.$oname.hdr
+		fi
+	    fi
+	    if [[ $bc_type = 50 || $bc_type = 51 ]];then
+		label="$bc_name, $glabel"
+	    else
+		label="$bc_name = $bc_val, $glabel elements"
+	    fi
+	    #echo $0: plotting
+	    if [ $combine_plots -eq 1 ];then
+		if [ $pf = 0 ];then
+		    ../plot_fault_solution flt_dat/flt.$oname geoms/geom.$oname.in "$label" $reg $rscale $adjust 2> /dev/null &
+		    fs="$fs  flt_dat/flt.$oname.ps"
+		else
+		    if [ $ft = 1 ];then
+			cp disp_dat/disp.$oname.out .
+			cp stress_dat/stress.$oname.out .
+			cp stress_dat/stress.$oname.hdr .
+			../plot_displacement_and_stress $oname 0 "$label"
+			rm stress.$oname.out   stress.$oname.hdr disp.$oname.out 
+		    else
+			echo 
+		    fi
+		    fs="$fs stress.$oname.ps"
+		fi
+	    else
+		if [ $pf = 0 ];then
+		    ../plot_fault_solution flt_dat/flt.$oname geoms/geom.$oname.in "$label" $reg $rscale $adjust
+		    #gv flt.$oname.ps &
+		#else
+		    #../plot_displacement_and_stress $oname "0 -3 -6" "$label"
+		    #gv stress.$oname.ps &
+		fi
+	    fi
+	    ((gc=gc+1))
+	done 			# end geometry lopp
+	if [[ $pf = 1 && $ft = 1 ]];then
+	    ./compare_solutions $ntest $angle 1
+	    ./compare_solutions $ntest $angle 2
+	fi
+
+    done
+done
+wait
+if [ $combine_plots -eq 1 ];then
+    if [ $pf = 1 ];then
+	epsmerge -par -x 1 -y 1 --orientation Portrait $fs > comb.ps
+    else
+	epsmerge -par -x 1 -y 1 --orientation Landscape $fs > comb.ps
+    fi
+fi
