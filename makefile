@@ -96,15 +96,14 @@ MY_PRECISION = -DUSE_DOUBLE_PRECISION
 # if we want to test the HBI version of the triangular stress routine
 # -DUSE_HBI_TDDEF
 #
-# if we want to use the TGF triangle
+# if we want to use the TGF triangle (NOT TESTED yet)
 # -DUSE_TGF_TRIANGLE
-#
-#COMMON_DEFINES =  -DBINARY_PATCH_EVENT_FILE -DCHECK_CI_ONE_WAY -DNO_OPENING_MODES
-COMMON_DEFINES =  -DBINARY_PATCH_EVENT_FILE -DCHECK_CI_ONE_WAY  \
-	-DALLOW_NON_3DQUAD_GEOM  
-
 #TGF_LIB = tgf/objects/libtgf.a
 TGF_LIB = 
+#
+COMMON_DEFINES =  -DBINARY_PATCH_EVENT_FILE -DCHECK_CI_ONE_WAY  \
+	-DALLOW_NON_3DQUAD_GEOM 
+
 #
 # noise level for random interact version. this version 
 # doesn't get compiled automatically.
