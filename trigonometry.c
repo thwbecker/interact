@@ -23,7 +23,7 @@ COMP_PRECISION dist_on_sphere(COMP_PRECISION lon1,
 			      COMP_PRECISION lon2, 
 			      COMP_PRECISION lat2)
 {
-  COMP_PRECISION tmp1,tmp2,tmp3;
+  COMP_PRECISION tmp1,tmp2;
   tmp1 = sin((lat1-lat2)/2.0);
   tmp1 *= tmp1;
   tmp2 = sin((lon2-lon1)/2.0);

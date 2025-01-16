@@ -213,14 +213,18 @@ void read_geometry(char *patch_filename,struct med **medium,
       /* 
 
 	 five nodes in element, we read in only four (A, B, C, D) for
-	 now, and assign base node from average from A and B
+	 now, and assign auxialiary base node from average from A and B
+	 
+	 there is a master triangle and two auxiliary ones, and the
+	 stresses are evaluated within the master triangle, weighting
+	 vertices 0, 1, and 2 by 0.5, 0.25, and 0.25, respectively
 	 
 	 D              C
 	 2--------------1
          |\            /|
 	 | \          / |
-         |  \   X    /  |
-	 |   \      /   |
+         |  \        /  |
+	 |   \  X   /   |
 	 |    \    /    |
 	 | N1  \  / N2  |
 	 |      \/      |
