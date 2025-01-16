@@ -1,7 +1,15 @@
-main: binary: interact
-main: internal double prec, A matrix double prec
-main: initializing on 2023-11-27 23:08:18
-init: compiled on Nov 27 2023 22:36:41, running in serial
+This file contains the help page that can be extracted
+from the interact program by typing "interact -h".
+This man-page type document describes the main features,
+usage, and input as well as output formats of interact.
+
+For further assistance, refer to INSTALLATION and README.md
+
+
+interact: internal double prec, A matrix double prec
+main: initializing on 2025-01-16 12:44:00 ncore: 1
+interact: nu: 0.25000 mu: 1.000e+04 from properties.h, therefore lambda/mu: 1.00000 alpha: 0.66667
+init: compiled on Jan 16 2025 12:40:06, running in serial
 
 Interact: calculate fault stresses and displacements in a half space or in 2-D
           using a boundary element approach.
@@ -16,19 +24,12 @@ When stresses (stress tensor components) or pressure are referred to, positive v
 extensional and compressional regimes, respectively (physics convention).
 
 Output is written to files and in real-time to X11 if PGPLOT support was compiled in.
-PGPlot support was compiled in. 
-
-PetSc support was compiled in, providing limited access to parallel solves for one-step problems.
-      For direct solve, use    "-pc_factor_mat_solver_type scalapack -mat_type scalapack" or
-                           "-pc_factor_mat_solver_type elemental -mat_type elemental".
-      For iterative solve "-ksp_type fgmres -pc_type none   -ksp_max_it 10000 -ksp_rtol 1.0e-8" or
-                          "-ksp_type fgmres -pc_type jacobi -ksp_max_it 10000 -ksp_rtol 1.0e-8".
-      Check the makefile for other solver options and MPI settings.
-      When running a one-step computation, will also compute stress fields in parallel.
+(No PGPlot support, X11 output unavailable. Compile with USE_PGPLOT flag set, if wanted.)
+(Petsc support not compiled in, if parallel support is desired, check makefile.)
 
 (1) The fault geometry is input via the file "geom.in",
     a list of fault patches.
-    This file has the following ("patch") format for rectangular faults or point sources
+    This file has the following ("patch") format for regular, rectangular (Okada) faults or point sources
     (free format ASCII list of parameters):
 
     x_0 y_0 z_0 strike_0 dip_0 hlength_0 hwidth_0 group_0 ...
@@ -47,7 +48,7 @@ PetSc support was compiled in, providing limited access to parallel solves for o
       note that right now, the geometrical rake has to be 90 or 0 degrees, i.e. no tilted rectangles
       slip can, however, have a rake as given by different along-strike and along-dip values, see below
 
-    - hlength (L) and hwidth (W) are the patch's -->HALF<-- length and half width in 
+    - hlength (L) and hwidth (W) are the patch's *half* length and *half* width in 
       strike and dip direction, respectively. The patch area is thus 4LW.
 
     - group is the patch's fault group, a number that is used to define faults that consist of
@@ -67,11 +68,26 @@ PetSc support was compiled in, providing limited access to parallel solves for o
     - triangular in half-space:
       If BOTH fault half-width and length are negative, then the patch is a triangular element.
       In this case, x, y, z, have no meaning but will be reassigned from the centroid.
-      strike and dip are global projection directions, and length and width will be sqrt(area) subsequently.
+      strike and dip will also be recomputed from element local g and h vectors, and length and width
+      will be sqrt(area) subsequently.
       The next nine numbers in the input geometry line will be the coordinates of the three nodes of the
       triangle, however. FE-style counterclockwise numbering, input is then in the format:
 
       999 999 999 999 999 -1 -1 group_0 x_x^1 x_y^1 x_z^1 x_x^2 x_y^2 x_z^2 x_x^3 x_y^3 x_z^3
+
+      where exponents indicate the local number of the node, and 999 are place holder values, not used.
+
+      WARNING: not fully tested.
+
+    - irregular quad in half-space:
+      If ONLY fault half-width is negative, then the patch is an irregular quad node element.
+      In this case, x, y, z, have no meaning but will be reassigned from the centroid.
+      strike and dip will also be recomputed from element local g and h vectors, and length and width
+      will be sqrt(area) subsequently.
+      The next 12 numbers in the input geometry line will be the coordinates of the four nodes of the
+      triangle, however. FE-style counterclockwise numbering, input is then in the format:
+
+      999 999 999 999 999 1 -1 group_0 x_x^1 x_y^1 x_z^1 x_x^2 x_y^2 x_z^2 x_x^3 x_y^3 x_z^3 x_x^4 x_y^4 x_z^4
 
       where exponents indicate the local number of the node, and 999 are place holder values, not used.
 
@@ -163,8 +179,7 @@ PetSc support was compiled in, providing limited access to parallel solves for o
 
      If the patches for which boundary conditions are specified are triangular,
      then the strike and dip specified in the geometry input will define global directions
-     the prescribed slipor stress values refer. The slip boundary conditions will then be converted to the triangle local
-     reference frame internally, and converted back to the global frame on output for fault properties.
+     the prescribed slip or stress values refer.
 
      The patch_number ... boundary_value line can be repeated as often as necessary (say, twice for each fault
      if the strike and dip movement modes are to be activated the same time, but not for triangles yet, for 
@@ -186,7 +201,6 @@ PetSc support was compiled in, providing limited access to parallel solves for o
     For normal: positive values of slip mean explosive source, negative implosive;
     	this corresponds to a resulting drop resp. increase in the normal component of stress.
 
-    For triangles, these are all referring to the global frame specified.
 
    (B) 10, 11, 12 or 20, 21, 22 or 30, 31, 32: stresses are specified
 
@@ -380,7 +394,7 @@ OPTIONS:
      (Meant as a experimental feature for LOADING SIMULATIONS ONLY!)
      OFF by default, if switch is set will be ON. See -ni for suppressed interactions in one step.
 
- -ni suppress all interactions between faults except the interactions of fault patches
+ -ni suppress all interactions between faults except the interactions of patches within the fault group
 
  -ct use constant time steps for the loading simulation
      OFF by default, if switch is set will be ON.
@@ -512,8 +526,6 @@ OPTIONS:
  -d  debug output, if you want extra checks, compile with -DDEBUG
      OFF by default, if switch is set will be ON.
 
- -fpetsc    force Petsc solvers even for serial runs (else LAPACK for LU)
-
  -ps Change the default 2-D elastic approximation for segments from plane-strain to plane-stress.
      OFF by default, if switch is set will be ON.
 
@@ -522,7 +534,7 @@ OPTIONS:
 
  -h  prints out this help message and exits to the operating system
 
-(C) Thorsten Becker, thwbecker@post.harvard.edu, 1999 - 2023)
+(C) Thorsten Becker, thwbecker@post.harvard.edu, 1999 - 2024)
     interact - boundary element code for elastic half-spaces
     3-D quad dislocationS based on Okada (BSSA, 1992).
     3-D triangular dislocations based on Nikkhoo and Walter (GJI, 2015).
