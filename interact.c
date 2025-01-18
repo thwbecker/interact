@@ -2,7 +2,7 @@
   interact: model fault interactions using dislocations in a 
             halfspace
 
-	    (C) Thorsten Becker, becker@eps.harvard.edu
+	    (C) Thorsten Becker, thwbecker@post.harvard.edu
 
   Okada and other dislocation routines based elastic half-space
   fault-patch interaction program

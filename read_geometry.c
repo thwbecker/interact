@@ -75,9 +75,11 @@ void read_geometry(char *patch_filename,struct med **medium,
 	fprintf(stderr,"read_geometry: WARNING: reading fault properties from \"%s\"\n",
 		FAULT_PROP_FILE);
     }else{
+#ifdef DEBUG
       if((*medium)->comm_rank == 0)
 	fprintf(stderr,"read_geometry: could not open \"%s\" for fault properties, using defaults\n",
 		FAULT_PROP_FILE);
+#endif
       read_fault_properties=FALSE;
     }
   }

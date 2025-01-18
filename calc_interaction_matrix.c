@@ -3,7 +3,6 @@
 /*
   reads in geometry file and calculates the interaction matrix
   
-  $Id: calc_interaction_matrix.c,v 1.9 2011/01/07 07:19:58 becker Exp $ 
 
 */
 #define FULL_IMAT_MODE 1
