@@ -1,5 +1,5 @@
 #include "interact.h"
-#ifdef USE_PETCS
+#ifdef USE_PETSC
 
 #include <petscksp.h>
 static char help[] = "compress an interaction matrix with PCH2OPUS.\n\n";
