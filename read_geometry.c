@@ -219,8 +219,11 @@ void read_geometry(char *patch_filename,struct med **medium,
 	 
 	 there is a master triangle (012) and two auxiliary ones (302
 	 and 041), and the stresses are evaluated within the master
-	 triangle, weighting vertices 0, 1, and 2 by 0.5, 0.25, and
-	 0.25, respectively
+	 triangle, weighting 
+
+	 vertices 0, 1, and 2 by 0.5, 0.25, and 0.25, respectively (version I), or
+	 vertices 3, 4, 1, 2 by 0.25 each (center of iquad (version II))
+
 	 
 	 D              C
 	 2--------------1
@@ -265,12 +268,24 @@ void read_geometry(char *patch_filename,struct med **medium,
       }
       /* compute all the triangular properties for the main triangle */
       get_tri_prop_based_on_gh((*fault+i));
-      /* readjust the centroid */
+#ifdef INTERACT_IQUAD_XC_VERSION_I
+      /* compute the stress evaluation point (~ centroid) */
       for(j=0;j<3;j++){
 	(*fault+i)->x[j]  = 0.5 * (*fault+i)->xn[0*3+j];
 	(*fault+i)->x[j] += 0.25* (*fault+i)->xn[1*3+j];
 	(*fault+i)->x[j] += 0.25* (*fault+i)->xn[2*3+j];
       }
+#else
+      for(j=0;j<3;j++){
+	(*fault+i)->x[j]  = 0.25 * (*fault+i)->xn[3*3+j];
+	(*fault+i)->x[j] += 0.25 * (*fault+i)->xn[4*3+j];
+	(*fault+i)->x[j] += 0.25 * (*fault+i)->xn[1*3+j];
+	(*fault+i)->x[j] += 0.25 * (*fault+i)->xn[2*3+j];
+      }
+
+#endif
+
+      
       area = (*fault+i)->l * (*fault+i)->l;
 
       for(off=5,l=1;l<3;l++){
