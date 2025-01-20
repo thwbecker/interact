@@ -268,14 +268,16 @@ void read_geometry(char *patch_filename,struct med **medium,
       }
       /* compute all the triangular properties for the main triangle */
       get_tri_prop_based_on_gh((*fault+i));
-#ifdef INTERACT_IQUAD_XC_VERSION_I
       /* compute the stress evaluation point (~ centroid) */
+      //#define INTERACT_IQUAD_XC_VERSION_I
+#ifdef INTERACT_IQUAD_XC_VERSION_I
+
       for(j=0;j<3;j++){
 	(*fault+i)->x[j]  = 0.5 * (*fault+i)->xn[0*3+j];
 	(*fault+i)->x[j] += 0.25* (*fault+i)->xn[1*3+j];
 	(*fault+i)->x[j] += 0.25* (*fault+i)->xn[2*3+j];
       }
-#else
+#else  /* center of original quads */
       for(j=0;j<3;j++){
 	(*fault+i)->x[j]  = 0.25 * (*fault+i)->xn[3*3+j];
 	(*fault+i)->x[j] += 0.25 * (*fault+i)->xn[4*3+j];

@@ -1,28 +1,7 @@
-static char help[] = "Solves a RBF kernel matrix with KSP and PCH2OPUS.\n\n";
-/* 
-   this is a symmetric H2OPUS example
+static char help[] = "compress a given dense matrix with PCH2OPUS.\n\n";
 
- */
 #include <petscksp.h>
 
-typedef struct {
-  PetscReal  sigma;
-  PetscReal *l;
-  PetscReal  lambda;
-} RBFCtx;
-
-static PetscScalar RBF(PetscInt sdim, PetscReal x[], PetscReal y[], void *ctx)
-{
-  RBFCtx    *rbfctx = (RBFCtx *)ctx;
-  PetscInt   d;
-  PetscReal  diff   = 0.0;
-  PetscReal  s      = rbfctx->sigma;
-  PetscReal *l      = rbfctx->l;
-  PetscReal  lambda = rbfctx->lambda;
-
-  for (d = 0; d < sdim; d++) diff += (x[d] - y[d]) * (x[d] - y[d]) / (l[d] * l[d]);
-  return s * s * PetscExpReal(-0.5 * diff) + (diff != 0.0 ? 0.0 : lambda);
-}
 
 int main(int argc, char **args)
 {
@@ -67,10 +46,10 @@ int main(int argc, char **args)
   PetscCall(PetscOptionsGetRealArray(NULL, NULL, "-l", fctx.l, (i = sdim, &i), NULL));
   PetscCall(PetscOptionsGetReal(NULL, NULL, "-scale", &scale, NULL));
 
-  /* Populate dense matrix for comparisons */
+  /* read dense matrix  */
   {
     PetscInt i, j;
-
+    
     PetscCall(MatCreateDense(PETSC_COMM_WORLD, n, n, PETSC_DECIDE, PETSC_DECIDE, NULL, &Ad));
     for (i = 0; i < n; i++) {
       for (j = 0; j < n; j++) PetscCall(MatSetValue(Ad, i, j, RBF(sdim, coords + i * sdim, coords + j * sdim, &fctx), INSERT_VALUES));

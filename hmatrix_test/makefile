@@ -12,11 +12,14 @@ endif
 BDIR = bin/
 ODIR = objects/
 
-
-all: $(BDIR)/ex21
+# petsc h2opus and htool examples
+all: $(BDIR)/ex21  $(BDIR)/ex82
 
 $(BDIR)/ex21: $(ODIR)/ex21.o $(GEN_P_INC) $(LIBLIST) 
 	$(MPILD) -o $(BDIR)/ex21 $(ODIR)/ex21.o $(PETSC_LIBS) $(LIBS) $(SUPERLU_LIBS)  $(SLATEC_LIBS)   $(LDFLAGS)
+$(BDIR)/ex82: $(ODIR)/ex82.o $(GEN_P_INC) $(LIBLIST) 
+	$(MPILD) -o $(BDIR)/ex82 $(ODIR)/ex82.o $(PETSC_LIBS) $(LIBS) $(SUPERLU_LIBS)  $(SLATEC_LIBS)   $(LDFLAGS)
+
 
 
 

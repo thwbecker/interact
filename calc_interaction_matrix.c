@@ -13,9 +13,9 @@ int main(int argc, char **argv)
 {
   struct med *medium;
   struct flt *fault;
-  int mode=0,i;
+  int mode=FULL_IMAT_MODE,i;
   medium=(struct med *)calloc(1,sizeof(struct med));
-  medium->nrmode = NRMODE_DEF;
+  medium->nrmode = 2;
   
   if(argc < 2)
     print_help_local(argv[0]);
@@ -24,6 +24,8 @@ int main(int argc, char **argv)
       print_help_local(argv[0]);
     }else if(strcmp(argv[i],"-n")==0){
       medium->nrmode = 3;
+    }else if(strcmp(argv[i],"-sonly")==0){
+      medium->nrmode = 1;
     }else{
       fprintf(stderr,"%s: can not use parameter %s, use -h for help page\n",
 	      argv[0],argv[i]);
@@ -36,7 +38,7 @@ int main(int argc, char **argv)
   switch(mode){
   case FULL_IMAT_MODE:{
     if(!medium->read_int_mat_from_file)
-      print_interaction_matrix(medium,fault);
+      print_interaction_matrix(medium,fault,TRUE);
     break;
   }
   case RED_IMAT_MODE:{
@@ -48,12 +50,13 @@ int main(int argc, char **argv)
 }
 void print_help_local(char *filename)
 { 
-  fprintf(stderr,"%s file.patch\n",filename);
+  fprintf(stderr,"%s file.patch [options]\n",filename);
   fprintf(stderr,"%s: computes the interaction matrix based on fault patches in file.patch\n",
 	  filename);
   fprintf(stderr,"%s: these are in the same format as in the \"%s\" file\n",
 	  filename,GEOMETRY_FILE);
   fprintf(stderr,"%s: options:\n",filename);
-  fprintf(stderr,"%s: -n   allow for normal slip, else only strike and dip slip\n",filename);
+  fprintf(stderr,"%s: -n      allow for normal slip, else only strike and dip slip\n",filename);
+  fprintf(stderr,"%s: -sonly  only strike slip\n",filename);
   exit(-1);
 }

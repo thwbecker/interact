@@ -103,6 +103,7 @@ unsigned char check_coulomb_stress_feedback(int, int, struct flt *, struct med *
 /* compare_fault.c */
 int compare_fault_length(const void *, const void *);
 int compare_fault_width(const void *, const void *);
+/* compress_interaction_matrix.c */
 /* coulomb_stress.c */
 double coulomb_stress(double, double, double, double);
 double cstress_drop(double, double, double, double);
@@ -331,7 +332,7 @@ void read_a_matrix_from_file(double *, int, int, char *, char *);
 void print_a_matrix_to_file(double *, int, int, char *, char *);
 void print_system(double *, double *, double *, int, int, FILE *);
 void print_sym3x3matrix(double [3][3], FILE *);
-void print_interaction_matrix(struct med *, struct flt *);
+void print_interaction_matrix(struct med *, struct flt *, unsigned char);
 void print_reduced_interaction_matrix(struct med *, struct flt *);
 void print_vector(double *, int, FILE *);
 void print_vector_file(double *, int, char *, char *);

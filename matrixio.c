@@ -293,7 +293,7 @@ void print_sym3x3matrix(COMP_PRECISION a[3][3], FILE *out)
   don't have to worry about C/FORTRAN conventions
 
 */
-void print_interaction_matrix(struct med *medium,struct flt *fault)
+void print_interaction_matrix(struct med *medium,struct flt *fault,my_boolean print_to_screen)
 {
   FILE *out;
   I_MATRIX_PREC tmpflt;
@@ -325,12 +325,17 @@ void print_interaction_matrix(struct med *medium,struct flt *fault)
   // matrix itself
   out=myopen(medium->mfname,"w");
   if(!medium->use_sparse_storage){
-    for(j=0;j<medium->nrflt;j++)
-      for(k=0;k<medium->nrmode;k++)
-	for(i=0;i<medium->nrflt;i++)
+    for(j=0;j<medium->nrflt;j++){
+      for(k=0;k<medium->nrmode;k++){
+	for(i=0;i<medium->nrflt;i++){
 	  for(l=0;l<3;l++){
+	    if((l==0) && print_to_screen)fprintf(stdout,"%20.10e ",ICIM(medium->i,i,j,k,l));
 	    fwrite(&ICIM(medium->i,i,j,k,l),medium->i_matrix_prec_size,1,out);
 	  }
+	}
+	if(print_to_screen)fprintf(stdout,"\n");
+      }
+    }
   }else{
     for(j=0;j<medium->nrflt;j++)
       for(k=0;k<medium->nrmode;k++)

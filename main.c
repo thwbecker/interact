@@ -4,7 +4,7 @@
 #  interact: model fault interactions using dislocations in an elastic         #
 #            medium                                                            #
 #	                                                                       #
-#    Copyright (C) Thorsten W. Becker 2000 - 2023                              #
+#    Copyright (c) Thorsten W. Becker 2000 - 2025                              #
 #                                                                              #
 #    Interact uses dc3d.f as provided by Y. Okada as in Okada (BSSA, 1992) and #
 #    linear algebra routines from SLATEC, LAPACK, and EISPACK.                 #
@@ -100,7 +100,7 @@ int main(int argc, char **argv)
       exit(-1);
     }
     if(!medium->read_int_mat_from_file && medium->save_imat)
-      print_interaction_matrix(medium,fault);   
+      print_interaction_matrix(medium,fault,FALSE);   
     // initialize the stress state of the faults based on background stress
     // and possible past activations if restart attempt
     initialize_stress_state(fault,medium,read_initial_fault_stress,a,b);
@@ -155,7 +155,7 @@ int main(int argc, char **argv)
     */
     HEADNODE{
       if(medium->int_mat_init)
-	print_interaction_matrix(medium,fault);
+	print_interaction_matrix(medium,fault,FALSE);
     }
     if((medium->naflt)||(medium->naflt_con)){
       solve(medium,fault);

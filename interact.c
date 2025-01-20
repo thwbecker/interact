@@ -370,6 +370,7 @@ void calc_interaction_matrix(struct med *medium,struct flt *fault,
 	      shear_strike  += ICIM(medium->i,i,j,m,STRIKE)*disp[m];
 	      shear_dip     += ICIM(medium->i,i,j,m,DIP)   *disp[m];
 	    }
+#ifdef DEBUG
 	    fprintf(stderr,
 		    "observ: %5i slip: %5i u_s/d/n:(%2g/%2g/%2g) s_s/d/n/C:(%12.5e/%12.5e/%12.5e/%12.5e)\n",
 		    i,j,disp[STRIKE],disp[DIP],disp[NORMAL],
@@ -377,6 +378,7 @@ void calc_interaction_matrix(struct med *medium,struct flt *fault,
 		    ICIM(medium->i,i,j,k,NORMAL),
 		    coulomb_stress(sqrt(SQUARE(shear_strike)+SQUARE(shear_dip)),(COMP_PRECISION)fault[i].mu_s,
 				   normal,medium->cohesion));
+#endif
 	  }
 	  /* 
 	     check if self-interaction is zero (shouldn't happen) 

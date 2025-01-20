@@ -1,9 +1,7 @@
 /*
   interact: model fault interactions using dislocations in a 
             halfspace
-  (C) Thorsten Becker, becker@eps.harvard.edu
-
-  $Id: init.c,v 2.51 2011/01/09 02:02:43 becker Exp $
+  (C) Thorsten Becker, thwbecker@post.harvard.edu
 
 
   main initialization routine, sets defaults and optional parameters 
