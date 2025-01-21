@@ -1,6 +1,8 @@
 #
 # flags for PETSC support
 #
+PETSC_ARCH = arch-linux-c-opt
+#PETSC_ARCH = arch-linux-c-debug
 
 PETSc.pc := $(PETSC_DIR)/$(PETSC_ARCH)/lib/pkgconfig/PETSc.pc
 
