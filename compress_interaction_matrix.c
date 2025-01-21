@@ -64,7 +64,16 @@ static PetscErrorCode GenEntries(PetscInt sdim, PetscInt M, PetscInt N,
 #endif
 /*
   reads in geometry file and calculates the interaction matrix, and
-  the compresses it
+  then compresses it, testing forward and inverse computations
+
+  can use HTOOLS Petsc options 
+
+  also
+
+  -geom_file geom.in - for the fault geometry
+  -nrandom number (default: 0) - to run a number of solves with random vectors for timing)
+  -test_forward true/false (default: true) - run matrix multiplication or inversion
+  
   
 */
 
@@ -74,13 +83,18 @@ int main(int argc, char **argv)
   struct med *medium;
   struct flt *fault;
   struct interact_ctx ictx[1];
-  double *bglobal;
+  clock_t start_time,stop_time;
+  double *bglobal,cpu_time_used;
+  KSP               ksp,ksph;
+  PC                pc,pch;
   Vec         x, xh, b, bh, bout,d;
   Mat         Ah;
   PetscReal   *coords,*avalues=NULL,*bvalues=NULL,norm[3];
   PetscInt    ndim, n, m, lm,ln,i,j,k,dn,on, *col_idx=NULL,rs,re;
+  PetscInt nrandom = 0;	/* for timing tests */
   VecScatter ctx;
-  PetscBool read_value;
+  PetscRandom rand_str;
+  PetscBool read_value,flg,test_forward=PETSC_TRUE;
   MatHtoolKernelFn *kernel = GenEntries;
   char geom_file[STRLEN]="geom.in";
   /* generate frameworks */
@@ -91,15 +105,24 @@ int main(int argc, char **argv)
      start up petsc 
   */
   PetscFunctionBegin;
+  /* set defaults, can always override */
+  PetscCall(PetscOptionsSetValue(NULL,"-mat_htool_eta","100")); /* not sure  */
+  PetscCall(PetscOptionsSetValue(NULL,"-mat_htool_epsilon","1e-3"));
+  PetscCall(PetscOptionsSetValue(NULL,"-mat_htool_compressor","SVD"));
+  /* start up Petsc proper */
   PetscCall(PetscInitialize(&argc, &argv, (char *)0, NULL));
   PetscCallMPI(MPI_Comm_size(PETSC_COMM_WORLD, &medium->comm_size));
   PetscCallMPI(MPI_Comm_rank(PETSC_COMM_WORLD, &medium->comm_rank));
+  PetscCall(PetscRandomCreate(PETSC_COMM_WORLD, &rand_str));
+  PetscCall(PetscRandomSetFromOptions(rand_str));
   /* 
      
      read in geometry
 
   */
   PetscCall(PetscOptionsGetString(NULL, NULL, "-geom_file", geom_file, STRLEN,&read_value));
+  PetscCall(PetscOptionsGetInt(NULL, NULL, "-nrandom", &nrandom,&read_value));
+  PetscCall(PetscOptionsGetBool(NULL, NULL, "-test_forward", &test_forward,&read_value));
   HEADNODE{
     if(read_value)
       fprintf(stderr,"%s: reading geometry from %s as set by -geom_file\n",argv[0],geom_file);
@@ -140,7 +163,9 @@ int main(int argc, char **argv)
   for (i=0; i < n; i++) 
     col_idx[i] = i;
 
-  /* assemble dense matrix */
+  /* 
+     assemble dense matrix 
+  */
   fprintf(stderr,"%s: core %03i/%03i: assigning dense row %5i to %5i\n",
 	  argv[0],medium->comm_rank,medium->comm_size,medium->rs,medium->re);
   for(j=medium->rs;j <  medium->re;j++){// rupturing faults for this CPU
@@ -155,7 +180,9 @@ int main(int argc, char **argv)
     MatView(medium->pA,PETSC_VIEWER_STDOUT_WORLD);
 
 
-  /* hirarchical version */
+  /* 
+     hirarchical version 
+  */
   PetscCall(MatCreate(PETSC_COMM_WORLD, &Ah));
   PetscCall(MatSetSizes(Ah, PETSC_DECIDE, PETSC_DECIDE, m, n));  
   PetscCall(MatSetType(Ah,MATHTOOL));
@@ -180,62 +207,154 @@ int main(int argc, char **argv)
   MatView(Ah,PETSC_VIEWER_STDOUT_WORLD);
   
   
-  /* test matrix multiplication */
   PetscCall(MatCreateVecs(medium->pA, &x, &b));/* For A x = b: x -> left, b -> right */
   PetscCall(MatCreateVecs(Ah, &xh, &bh));/* For A x = b: x -> left, b -> right */
-  PetscCall(VecSet(x, 1.0));
-  PetscCall(VecSet(xh,1.0));
-  /* do we need those? */
-  PetscCall(VecAssemblyBegin(x));PetscCall(VecAssemblyEnd(x));
-  PetscCall(VecAssemblyBegin(xh));PetscCall(VecAssemblyEnd(xh));
+  if(test_forward){
+    
+    /* 
+       test matrix multiplication 
+       b = A x
+    */
+    PetscCall(VecSet(x, 1.0));
+    PetscCall(VecSet(xh,1.0));
+    /* do we need those? */
+    PetscCall(VecAssemblyBegin(x));PetscCall(VecAssemblyEnd(x));
+    PetscCall(VecAssemblyBegin(xh));PetscCall(VecAssemblyEnd(xh));
+    
+    
+    start_time = clock();
+    /* dense solver */
+    PetscCall(MatMult(medium->pA, x, b));
+    for(i=0;i<nrandom;i++){
+      PetscCall(VecSetRandom(x,rand_str));
+      PetscCall(MatMult(medium->pA, x, b));
+    }
+    stop_time = clock();  
+    cpu_time_used = ((double)stop_time-start_time)/CLOCKS_PER_SEC;
+    fprintf(stderr,"%s: it took %20.3fs for %05i dense solves\n",argv[0],cpu_time_used,nrandom+1);
+    if((m<20)&&(nrandom==0))
+      VecView(b,PETSC_VIEWER_STDOUT_WORLD);
+    start_time = clock();
+    /* H matrix solve */
+    PetscCall(MatMult(Ah, xh, bh));
+    for(i=0;i<nrandom;i++){
+      PetscCall(VecSetRandom(xh,rand_str));
+      PetscCall(MatMult(Ah, xh, bh));
+    }
+    stop_time = clock();
+    cpu_time_used = ((double)stop_time-start_time)/CLOCKS_PER_SEC;
+    fprintf(stderr,"%s: it took %20.3fs for %05i htool solves\n",argv[0],cpu_time_used,nrandom+1);
+    
+    if((m<20)&&(nrandom==0))
+      VecView(bh,PETSC_VIEWER_STDOUT_WORLD);
 
- 
+    if(nrandom==0){
+      /* compute difference */
+      PetscCall(VecDuplicate(b, &d));PetscCall(VecCopy(b, d));
+  
+      PetscCall(VecAXPY(d,-1.0,bh));
+      PetscCall(VecNorm(b,NORM_2,norm));
+      PetscCall(VecNorm(bh,NORM_2,(norm+1)));
+      PetscCall(VecNorm(d,NORM_2,(norm+2)));
+      fprintf(stdout,"%s: |b| = %20.10e |b_h| = %20.10e |b-b_h|/|b| = %20.10e\n",argv[0],norm[0],norm[1],norm[2]/norm[0]);
+      
+      /* get b values */
+      PetscCall(VecScatterCreateToZero(b,&ctx,&bout));
+      PetscCall(VecScatterBegin(ctx,b,bout,INSERT_VALUES,SCATTER_FORWARD));
+      PetscCall(VecScatterEnd(ctx,b,bout,INSERT_VALUES,SCATTER_FORWARD));
+      HEADNODE{
+	PetscCall(VecGetArray(bout,&bvalues));
+	for(i=0;i<m;i++)
+	  bglobal[i] = bvalues[i];
+	PetscCall(VecRestoreArray(bout,&bvalues));
+      }
+      MPI_Bcast(bglobal,m,MPI_DOUBLE,0, MPI_COMM_WORLD);
+      PetscCall(VecScatterDestroy(&ctx));
+      PetscCall(VecDestroy(&bout));
+      HEADNODE{
+	//  for(i=0;i<m;i++)
+	//fprintf(stdout,"%20.10e\n",bglobal[i]);
+      }
+    }
+  }else{
+    /* 
+       test inverse  x = A^-1 b
+    */
+    /* make constext for solver */
+    /* dense */
+    PetscCall(KSPCreate(PETSC_COMM_WORLD, &ksp));
+    PetscCall(KSPSetOperators(ksp, medium->pA, medium->pA));
+    PetscCall(KSPSetFromOptions(ksp));
+    PetscCall(KSPGetPC(ksp, &pc));
+    /* H */
+    PetscCall(KSPCreate(PETSC_COMM_WORLD, &ksph));
+    PetscCall(KSPSetOperators(ksph, Ah, Ah));
+    PetscCall(KSPSetFromOptions(ksph));
+    PetscCall(KSPGetPC(ksph, &pch));
+    PetscCall(PetscObjectTypeCompare((PetscObject)pch, PCHPDDM, &flg));
+    /*  */
+    
+    PetscCall(VecSet(b, 1.0));
+    PetscCall(VecSet(bh,1.0));
+    /* do we need those? */
+    PetscCall(VecAssemblyBegin(b));PetscCall(VecAssemblyEnd(b));
+    PetscCall(VecAssemblyBegin(bh));PetscCall(VecAssemblyEnd(bh));
+    /* 
 
-  /* dense solver */
-  PetscCall(MatMult(medium->pA, x, b));
-  if(m<20)
-    VecView(b,PETSC_VIEWER_STDOUT_WORLD);
-  /* H matrix solve */
-  PetscCall(MatMult(Ah, xh, bh));
-  if(m<20)
-    VecView(bh,PETSC_VIEWER_STDOUT_WORLD);
+       dense solver 
 
-  /* compute difference */
-  PetscCall(VecDuplicate(b, &d));PetscCall(VecCopy(b, d));
+    */
+    start_time = clock();
+    PetscCall(KSPSolve(ksp, b, x));
+    for(i=0;i<nrandom;i++){	/* random trials */
+      PetscCall(VecSetRandom(b,rand_str));
+      PetscCall(KSPSolve(ksp, b, x));
+    }
+    stop_time = clock();  
+    cpu_time_used = ((double)stop_time-start_time)/CLOCKS_PER_SEC;
+    fprintf(stderr,"%s: it took %20.3fs for %05i dense inverse solves\n",argv[0],cpu_time_used,nrandom+1);
+    if((m<20)&&(nrandom==0))
+      VecView(x,PETSC_VIEWER_STDOUT_WORLD);
+    /* 
+
+       H matrix solve 
+    */
+    start_time = clock();
+    PetscCall(KSPSolve(ksph, bh, xh));
+    for(i=0;i<nrandom;i++){
+      PetscCall(VecSetRandom(bh,rand_str));
+      PetscCall(KSPSolve(ksph, bh, xh));
+    }
+    stop_time = clock();
+    cpu_time_used = ((double)stop_time-start_time)/CLOCKS_PER_SEC;
+    fprintf(stderr,"%s: it took %20.3fs for %05i htool inverse solves\n",argv[0],cpu_time_used,nrandom+1);
+    
+    if((m<20)&&(nrandom==0))
+      VecView(xh,PETSC_VIEWER_STDOUT_WORLD);
+
+    if(nrandom==0){
+      /* compute difference */
+      PetscCall(VecDuplicate(x, &d));PetscCall(VecCopy(x, d));
   
-  PetscCall(VecAXPY(d,-1.0,bh));
-  PetscCall(VecNorm(b,NORM_2,norm));
-  PetscCall(VecNorm(bh,NORM_2,(norm+1)));
-  PetscCall(VecNorm(d,NORM_2,(norm+2)));
-  fprintf(stdout,"%s: |b| = %20.10e |b_h| = %20.10e |b-b_h| = %20.10e\n",argv[0],norm[0],norm[1],norm[2]);
-  
-  
-  
-  /* get b values */
-  PetscCall(VecScatterCreateToZero(b,&ctx,&bout));
-  PetscCall(VecScatterBegin(ctx,b,bout,INSERT_VALUES,SCATTER_FORWARD));
-  PetscCall(VecScatterEnd(ctx,b,bout,INSERT_VALUES,SCATTER_FORWARD));
-  HEADNODE{
-    PetscCall(VecGetArray(bout,&bvalues));
-    for(i=0;i<m;i++)
-      bglobal[i] = bvalues[i];
-    PetscCall(VecRestoreArray(bout,&bvalues));
+      PetscCall(VecAXPY(d,-1.0,xh));
+      PetscCall(VecNorm(x,NORM_2,norm));
+      PetscCall(VecNorm(xh,NORM_2,(norm+1)));
+      PetscCall(VecNorm(d,NORM_2,(norm+2)));
+      fprintf(stdout,"%s: |x| = %20.10e |x_h| = %20.10e |x-x_h|/|x| = %20.10e\n",argv[0],norm[0],norm[1],norm[2]/norm[0]);
+      
+      
+    }
+
   }
-  MPI_Bcast(bglobal,m,MPI_DOUBLE,0, MPI_COMM_WORLD);
-  PetscCall(VecScatterDestroy(&ctx));
-  PetscCall(VecDestroy(&bout));
-  HEADNODE{
-    //  for(i=0;i<m;i++)
-    //fprintf(stdout,"%20.10e\n",bglobal[i]);
-  }
-  
   
  
   PetscCall(VecDestroy(&x));
   PetscCall(VecDestroy(&b));
   PetscCall(VecDestroy(&xh));
   PetscCall(VecDestroy(&bh));
-  PetscCall(VecDestroy(&d));
+  if(nrandom==0){
+    PetscCall(VecDestroy(&d));
+  }
   free(coords);free(bglobal);
   PetscCall(MatDestroy(&medium->pA));
   PetscCall(MatDestroy(&Ah));
