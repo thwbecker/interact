@@ -316,6 +316,8 @@ void print_interaction_matrix(struct med *medium,struct flt *fault,my_boolean pr
 	  medium->hfname,medium->mfname,(medium->i_matrix_prec_size==4)?
 	  ("float"):("double"),
 	  medium->nmat1,medium->nmat2);
+  if(print_to_screen)
+    fprintf(stderr,"print_interaction_matrix: writing shear traction component to stdout\n");
   // header file
   out=myopen(medium->hfname,"w");
   fprintf(out,"%i %i %i %i %i\n%g %g\n",

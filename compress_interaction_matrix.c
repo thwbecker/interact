@@ -7,15 +7,19 @@ struct interact_ctx{
   struct flt *fault;
   struct med *medium;
 };
+static PetscErrorCode GenEntries(PetscInt , PetscInt , PetscInt ,
+				 const PetscInt *, const PetscInt *, PetscScalar *, void *);
 
 /* 
-   generate interaction matrix entries
+   generate interaction matrix entries in a way suitable for petsc/htools
+
    sdim dimension
    M local m
    N local n 
-   J[M] array with global indices 
-   K[N] array with global indices 
+   J[M] array with global indices for sources
+   K[N] array with global indices for receivers
 
+   this is modified from the ex82.c petsc example
  */
 static PetscErrorCode GenEntries(PetscInt sdim, PetscInt M, PetscInt N,
 				 const PetscInt *J, const PetscInt *K, PetscScalar *ptr, void *kernel_ctx)
@@ -71,42 +75,52 @@ int main(int argc, char **argv)
   struct flt *fault;
   struct interact_ctx ictx[1];
   double *bglobal;
-  Vec         x, b, u, d,bout;
+  Vec         x, xh, b, bh, bout,d;
   Mat         Ah;
-  KSP         ksp;
-  PetscReal   norm, eta, rtol,*coords,*avalues=NULL,*bvalues=NULL;
-  PetscInt    basisord, leafsize, ndim, n, m, lm,ln,i,j,k, maxrank,dn,on, *col_idx=NULL;
+  PetscReal   *coords,*avalues=NULL,*bvalues=NULL,norm[3];
+  PetscInt    ndim, n, m, lm,ln,i,j,k,dn,on, *col_idx=NULL,rs,re;
   VecScatter ctx;
-  if(argc<2){
-    fprintf(stderr,"%s geom.in\n",argv[0]);
-    exit(-1);
-  }
-  medium=(struct med *)calloc(1,sizeof(struct med));
+  PetscBool read_value;
+  MatHtoolKernelFn *kernel = GenEntries;
+  char geom_file[STRLEN]="geom.in";
+  /* generate frameworks */
+  medium=(struct med *)calloc(1,sizeof(struct med)); /* make one zero medium structure */
   ictx->medium = medium;
-  PetscFunctionBeginUser;
+  ndim = 3;
+  /* 
+     start up petsc 
+  */
+  PetscFunctionBegin;
   PetscCall(PetscInitialize(&argc, &argv, (char *)0, NULL));
   PetscCallMPI(MPI_Comm_size(PETSC_COMM_WORLD, &medium->comm_size));
   PetscCallMPI(MPI_Comm_rank(PETSC_COMM_WORLD, &medium->comm_rank));
+  /* 
+     
+     read in geometry
 
-
-  ndim = 3;
-  rtol = 1e-5;
+  */
+  PetscCall(PetscOptionsGetString(NULL, NULL, "-geom_file", geom_file, STRLEN,&read_value));
+  HEADNODE{
+    if(read_value)
+      fprintf(stderr,"%s: reading geometry from %s as set by -geom_file\n",argv[0],geom_file);
+    else
+      fprintf(stderr,"%s: reading geometry from default, %s\n",argv[0],geom_file);
+  }
+  read_geometry(geom_file,&medium,&fault,TRUE,FALSE,FALSE,FALSE);
   
-  eta = 0.6;
-  PetscCall(PetscOptionsGetReal(NULL, NULL, "-eta", &eta, NULL));
-  leafsize = 32;
-  PetscCall(PetscOptionsGetInt(NULL, NULL, "-leafsize", &leafsize, NULL));
-  basisord = 16;
-  PetscCall(PetscOptionsGetInt(NULL, NULL, "-basisord", &basisord, NULL));
-
-  read_geometry(argv[1],&medium,&fault,TRUE,FALSE,FALSE,FALSE);
   ictx->fault = fault;
-  
   m = n = medium->nrflt;
   coords = (PetscReal *)malloc(sizeof(PetscReal)*ndim*n);
   bglobal = (double *)malloc(sizeof(double)*m);
-
-  /* parallel version */
+  HEADNODE{
+    fprintf(stderr,"%s: computing %i by %i matrix\n",argv[0], m,n);
+    
+  }
+  for(i=0;i<m;i++)		/* all sources or receiveer coordinates  */
+    for(k=0;k<3;k++)
+      coords[i*ndim+k] = fault[i].x[k];
+ 
+  /* dense matrix setup */
   PetscCall(MatCreate(PETSC_COMM_WORLD, &medium->pA));
   PetscCall(MatSetSizes(medium->pA, PETSC_DECIDE, PETSC_DECIDE, m, n));
   PetscCall(MatSetType(medium->pA, MATDENSE));
@@ -116,29 +130,19 @@ int main(int argc, char **argv)
   PetscCall(MatSeqAIJSetPreallocation(medium->pA, n, NULL));
   PetscCall(MatMPIAIJSetPreallocation(medium->pA, dn, NULL, on, NULL));
   PetscCall(MatGetOwnershipRange(medium->pA, &medium->rs, &medium->re));
+
   /*  */
   medium->rn = medium->re  - medium->rs; /* number of local elements */
-  fprintf(stderr,"%s: core %i: dn %i on %i n %i rs %i re %i \n",argv[0],medium->comm_rank,dn,on,n,medium->rs,medium->re);
-
-  /* serial version */
-  //PetscCall(MatCreateDense(PETSC_COMM_WORLD, n, n, PETSC_DECIDE, PETSC_DECIDE, NULL, &Ad));
-
-
-  HEADNODE{
-    fprintf(stderr,"%s computing %i by %i matrix\n",argv[0], medium->nrflt, medium->nrflt);
-    fprintf(stderr,"%s: core %03i/%03i: assigning row %5i to %5i\n",
-	    argv[0],medium->comm_rank,medium->comm_size,medium->rs,medium->re);
-  }
+  //fprintf(stderr,"%s: core %i: dn %i on %i n %i rs %i re %i \n",argv[0],medium->comm_rank,dn,on,n,medium->rs,medium->re);
   /*  */
   PetscCall(PetscCalloc(m*sizeof(PetscScalar), &avalues));
   PetscCall(PetscCalloc(n*sizeof(PetscInt), &col_idx));
   for (i=0; i < n; i++) 
     col_idx[i] = i;
 
-  for(i=0;i<m;i++)		/* all sources or receiveers  */
-    for(k=0;k<3;k++)
-      coords[i*ndim+k] = fault[i].x[k];
-  
+  /* assemble dense matrix */
+  fprintf(stderr,"%s: core %03i/%03i: assigning dense row %5i to %5i\n",
+	  argv[0],medium->comm_rank,medium->comm_size,medium->rs,medium->re);
   for(j=medium->rs;j <  medium->re;j++){// rupturing faults for this CPU
     GenEntries(ndim,1,n,&j, col_idx, avalues,ictx);
     PetscCall(MatSetValues(medium->pA, 1, &j, n, col_idx,avalues, INSERT_VALUES));
@@ -147,25 +151,67 @@ int main(int argc, char **argv)
   PetscCall(PetscFree(col_idx));
   PetscCall(MatAssemblyBegin(medium->pA, MAT_FINAL_ASSEMBLY));
   PetscCall(MatAssemblyEnd(medium->pA, MAT_FINAL_ASSEMBLY));
+  if(n<20)
+    MatView(medium->pA,PETSC_VIEWER_STDOUT_WORLD);
 
-  MatView(medium->pA,PETSC_VIEWER_STDOUT_WORLD);
 
-  /* hierarhical version */
-  //PetscCall(MatCreateHtoolFromKernel(PETSC_COMM_WORLD, m, m, m, n, ndim, coords, coords, kernel,ictx, &A));
+  /* hirarchical version */
+  PetscCall(MatCreate(PETSC_COMM_WORLD, &Ah));
+  PetscCall(MatSetSizes(Ah, PETSC_DECIDE, PETSC_DECIDE, m, n));  
+  PetscCall(MatSetType(Ah,MATHTOOL));
+  PetscCall(MatSetUp(Ah));
+  PetscCall(MatGetLocalSize(Ah, &lm, &ln));
+  dn = ln;on = n - ln;
+  PetscCall(MatSeqAIJSetPreallocation(Ah, n, NULL));
+  PetscCall(MatMPIAIJSetPreallocation(Ah, dn, NULL, on, NULL));
+  PetscCall(MatGetOwnershipRange(Ah, &rs, &re));
+  
+  fprintf(stderr,"%s: core %03i/%03i: assigning htool row %5i to %5i\n",argv[0],medium->comm_rank,medium->comm_size,rs,re);
+    
+  PetscCall(MatCreateHtoolFromKernel(PETSC_COMM_WORLD,PETSC_DECIDE,PETSC_DECIDE, m, n, ndim,(coords+rs), coords, kernel,ictx, &Ah));
+    
+  //PetscCall(MatCreateHtoolFromKernel(PETSC_COMM_WORLD, m, n, m, n, ndim, coords, coords, kernel,ictx, &Ah));
+  PetscCall(MatSetOption(Ah, MAT_SYMMETRIC, PETSC_FALSE));
+  PetscCall(MatSetFromOptions(Ah));
+    
+  PetscCall(MatAssemblyBegin(Ah, MAT_FINAL_ASSEMBLY));
+  PetscCall(MatAssemblyEnd(Ah, MAT_FINAL_ASSEMBLY));
+  /* get info on H matrix */
+  MatView(Ah,PETSC_VIEWER_STDOUT_WORLD);
   
   
-  
+  /* test matrix multiplication */
   PetscCall(MatCreateVecs(medium->pA, &x, &b));/* For A x = b: x -> left, b -> right */
-  for (i = medium->rs; i < medium->re; i++) {
-    PetscCall(VecSetValue(x, (PetscInt)i, (PetscScalar)(1.0), INSERT_VALUES));
-  }
-  PetscCall(VecAssemblyBegin(x));
-  PetscCall(VecAssemblyEnd(x));
-  
-  /* solver */
+  PetscCall(MatCreateVecs(Ah, &xh, &bh));/* For A x = b: x -> left, b -> right */
+  PetscCall(VecSet(x, 1.0));
+  PetscCall(VecSet(xh,1.0));
+  /* do we need those? */
+  PetscCall(VecAssemblyBegin(x));PetscCall(VecAssemblyEnd(x));
+  PetscCall(VecAssemblyBegin(xh));PetscCall(VecAssemblyEnd(xh));
+
+ 
+
+  /* dense solver */
   PetscCall(MatMult(medium->pA, x, b));
-  VecView(b,PETSC_VIEWER_STDOUT_WORLD);
-  /* distribute */
+  if(m<20)
+    VecView(b,PETSC_VIEWER_STDOUT_WORLD);
+  /* H matrix solve */
+  PetscCall(MatMult(Ah, xh, bh));
+  if(m<20)
+    VecView(bh,PETSC_VIEWER_STDOUT_WORLD);
+
+  /* compute difference */
+  PetscCall(VecDuplicate(b, &d));PetscCall(VecCopy(b, d));
+  
+  PetscCall(VecAXPY(d,-1.0,bh));
+  PetscCall(VecNorm(b,NORM_2,norm));
+  PetscCall(VecNorm(bh,NORM_2,(norm+1)));
+  PetscCall(VecNorm(d,NORM_2,(norm+2)));
+  fprintf(stdout,"%s: |b| = %20.10e |b_h| = %20.10e |b-b_h| = %20.10e\n",argv[0],norm[0],norm[1],norm[2]);
+  
+  
+  
+  /* get b values */
   PetscCall(VecScatterCreateToZero(b,&ctx,&bout));
   PetscCall(VecScatterBegin(ctx,b,bout,INSERT_VALUES,SCATTER_FORWARD));
   PetscCall(VecScatterEnd(ctx,b,bout,INSERT_VALUES,SCATTER_FORWARD));
@@ -183,16 +229,16 @@ int main(int argc, char **argv)
     //fprintf(stdout,"%20.10e\n",bglobal[i]);
   }
   
-  //PetscCall(MatAssemblyBegin(A, MAT_FINAL_ASSEMBLY));
-  //PetscCall(MatAssemblyEnd(A, MAT_FINAL_ASSEMBLY));
-
+  
  
   PetscCall(VecDestroy(&x));
   PetscCall(VecDestroy(&b));
-  
+  PetscCall(VecDestroy(&xh));
+  PetscCall(VecDestroy(&bh));
+  PetscCall(VecDestroy(&d));
   free(coords);free(bglobal);
   PetscCall(MatDestroy(&medium->pA));
-  //PetscCall(MatDestroy(&A));
+  PetscCall(MatDestroy(&Ah));
   PetscCall(PetscFinalize());
 #else
   fprintf(stderr,"%s only petsc version implemented, but not compiled as such\n",argv[0]);
