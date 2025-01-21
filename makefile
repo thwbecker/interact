@@ -337,7 +337,7 @@ all: obj_directories libraries main_prog \
 	tools converters geom_converters
 
 really_all: obj_directories debug_libraries libraries main_prog \
-	tools converters geom_converters \
+	tools converters geom_converters $(BDIR)/compress_interaction_matrix.dbg \
 	inoise analysis geographic_tools $(BDIR)/$(INTERACT_BINARY_NAME).dbg
 #	pgplot_progs 
 
@@ -350,7 +350,7 @@ tools: misc_tools random_geom_tools random_prop_tools
 misc_tools: $(BDIR)/makefault $(BDIR)/calc_interaction_matrix $(BDIR)/calc_design_matrix \
 		$(BDIR)/project_stress $(BDIR)/calc_eigen_from_cart_stress \
 	$(BDIR)/check_feedback $(BDIR)/fit_simple_stress_from_cart \
-	$(BDIR)/calc_cart_from_eigen_stress \
+	$(BDIR)/calc_cart_from_eigen_stress $(BDIR)/compress_interaction_matrix \
 	$(BDIR)/sort_events $(BDIR)/generate_slipdia
 
 random_geom_tools:  $(BDIR)/randomflt  $(BDIR)/generate_random_2d \
@@ -560,6 +560,16 @@ $(BDIR)/calc_interaction_matrix: $(ODIR)/coulomb_stress.o \
 	$(ODIR)/calc_interaction_matrix.o  \
 	-o $(BDIR)/calc_interaction_matrix $(LIBS) $(SUPERLU_LIBS) \
 		$(PGLIBS) $(SLATEC_LIBS)  $(LDFLAGS)
+
+$(BDIR)/compress_interaction_matrix: $(ODIR)/compress_interaction_matrix.o $(ODIR)/coulomb_stress.o $(GEN_P_INC) $(LIBLIST) 
+	$(MPILD)   $(ODIR)/compress_interaction_matrix.o   $(ODIR)/coulomb_stress.o \
+	-o $(BDIR)/compress_interaction_matrix $(LIBS) $(SUPERLU_LIBS) \
+			$(PETSC_LIBS) $(PGLIBS) $(SLATEC_LIBS)  $(LDFLAGS)
+
+$(BDIR)/compress_interaction_matrix.dbg: $(ODIR)/compress_interaction_matrix.dbg.o $(ODIR)/coulomb_stress.dbg.o $(GEN_P_INC) $(LIBLIST) 
+	$(MPILD)   $(ODIR)/compress_interaction_matrix.dbg.o   $(ODIR)/coulomb_stress.dbg.o \
+	-o $(BDIR)/compress_interaction_matrix.dbg $(LIBS) $(SUPERLU_LIBS) \
+			$(PETSC_LIBS) $(PGLIBS) $(SLATEC_LIBS)  $(LDFLAGS)
 
 $(BDIR)/calc_design_matrix: $(ODIR)/calc_design_matrix.o  \
 	$(ODIR)/coulomb_stress.o $(GEN_P_INC) \
