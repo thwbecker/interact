@@ -6,6 +6,7 @@
 struct interact_ctx{
   struct flt *fault;
   struct med *medium;
+  int src_slip_mode,rec_stress_mode;
 };
 static PetscErrorCode GenEntries(PetscInt , PetscInt , PetscInt ,
 				 const PetscInt *, const PetscInt *, PetscScalar *, void *);
@@ -25,31 +26,30 @@ static PetscErrorCode GenEntries(PetscInt sdim, PetscInt M, PetscInt N,
 				 const PetscInt *J, const PetscInt *K, PetscScalar *ptr, void *kernel_ctx)
 {
   PetscInt  j, k;
-  struct flt *fault;
   COMP_PRECISION slip[3],disp[3],stress[3][3],trac[3],sval;
-  int iret;
+  int iret,rec_stress_mode,src_slip_mode;
   struct interact_ctx *ictx;
   ictx = (struct interact_ctx *)kernel_ctx;
-  fault = ictx->fault;
-  
+
 #if !PetscDefined(HAVE_OPENMP)
   PetscFunctionBeginUser;
 #endif
-  get_right_slip(slip,0,1.0);	/* strike motion */
+  get_right_slip(slip,ictx->src_slip_mode,1.0);	/* strike motion */
   for (j = 0; j < M; j++) {
     for (k = 0; k < N; k++) {
-      
-      eval_green(fault[K[k]].x,(fault+J[j]),slip,disp,stress,&iret, GC_STRESS_ONLY,TRUE);
+      eval_green(ictx->fault[K[k]].x,(ictx->fault+J[j]),slip,disp,stress,&iret, GC_STRESS_ONLY,TRUE);
       if(iret != 0){
 	fprintf(stderr,"get_entries: WARNING: i=%3i j=%3i singular\n",j,k);
 	//s[STRIKE]=s[DIP]=s[NORMAL]=0.0;
 	sval = 0.0;
       }else{
-	resolve_force(fault[K[k]].normal,stress,trac);
-	sval = dotp_3d(trac,fault[K[k]].t_strike);
-	//s[STRIKE]=(I_MATRIX_PREC)dotp_3d(trac,fault[i].t_strike);
-	//s[DIP]=(I_MATRIX_PREC)dotp_3d(trac,fault[i].t_dip);
-	//s[NORMAL]=(I_MATRIX_PREC)dotp_3d(trac,fault[i].normal);
+	resolve_force(ictx->fault[K[k]].normal,stress,trac);
+	if(ictx->rec_stress_mode == STRIKE)
+	  sval = dotp_3d(trac,ictx->fault[K[k]].t_strike);
+	else if(ictx->rec_stress_mode == DIP)
+	  sval = dotp_3d(trac,ictx->fault[K[k]].t_dip);
+	else
+	  sval = dotp_3d(trac,ictx->fault[K[k]].normal);
       }
       ptr[j + M * k] = sval;
     }
@@ -100,6 +100,8 @@ int main(int argc, char **argv)
   /* generate frameworks */
   medium=(struct med *)calloc(1,sizeof(struct med)); /* make one zero medium structure */
   ictx->medium = medium;
+  ictx->src_slip_mode = STRIKE;
+  ictx->rec_stress_mode = STRIKE;
   ndim = 3;
   /* 
      start up petsc 
@@ -286,6 +288,7 @@ int main(int argc, char **argv)
     PetscCall(KSPSetOperators(ksp, medium->pA, medium->pA));
     PetscCall(KSPSetFromOptions(ksp));
     PetscCall(KSPGetPC(ksp, &pc));
+    PetscCall(PCSetType(pc, PCLU));
     /* H */
     PetscCall(KSPCreate(PETSC_COMM_WORLD, &ksph));
     PetscCall(KSPSetOperators(ksph, Ah, Ah));
