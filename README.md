@@ -24,7 +24,7 @@ If you use `interact` please cite the following
 >    pages = {NG62A-0925}
 >  }
 
-Copyright (C) Thorsten W. Becker 2000 - 2023
+Copyright (C) Thorsten W. Becker 2000 - 2025
 
 thwbecker@post.harvard.edu
 
