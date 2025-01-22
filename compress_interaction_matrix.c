@@ -1,67 +1,11 @@
 #include "interact.h"
 #ifdef USE_PETSC
-
 #include <petscksp.h>
-
-struct interact_ctx{
-  struct flt *fault;
-  struct med *medium;
-  int src_slip_mode,rec_stress_mode;
-};
-static PetscErrorCode GenEntries(PetscInt , PetscInt , PetscInt ,
+/* this function is in interact.c */
+PetscErrorCode GenEntries(PetscInt , PetscInt , PetscInt ,
 				 const PetscInt *, const PetscInt *, PetscScalar *, void *);
-
-/* 
-   generate interaction matrix entries in a way suitable for petsc/htools
-
-   sdim dimension
-   M local m
-   N local n 
-   J[M] array with global indices for sources
-   K[N] array with global indices for receivers
-
-   this is modified from the ex82.c petsc example
- */
-static PetscErrorCode GenEntries(PetscInt sdim, PetscInt M, PetscInt N,
-				 const PetscInt *J, const PetscInt *K, PetscScalar *ptr, void *kernel_ctx)
-{
-  PetscInt  j, k;
-  COMP_PRECISION slip[3],disp[3],stress[3][3],trac[3],sval;
-  int iret,rec_stress_mode,src_slip_mode;
-  struct interact_ctx *ictx;
-  ictx = (struct interact_ctx *)kernel_ctx;
-
-#if !PetscDefined(HAVE_OPENMP)
-  PetscFunctionBeginUser;
 #endif
-  get_right_slip(slip,ictx->src_slip_mode,1.0);	/* strike motion */
-  for (j = 0; j < M; j++) {
-    for (k = 0; k < N; k++) {
-      eval_green(ictx->fault[K[k]].x,(ictx->fault+J[j]),slip,disp,stress,&iret, GC_STRESS_ONLY,TRUE);
-      if(iret != 0){
-	fprintf(stderr,"get_entries: WARNING: i=%3i j=%3i singular\n",j,k);
-	//s[STRIKE]=s[DIP]=s[NORMAL]=0.0;
-	sval = 0.0;
-      }else{
-	resolve_force(ictx->fault[K[k]].normal,stress,trac);
-	if(ictx->rec_stress_mode == STRIKE)
-	  sval = dotp_3d(trac,ictx->fault[K[k]].t_strike);
-	else if(ictx->rec_stress_mode == DIP)
-	  sval = dotp_3d(trac,ictx->fault[K[k]].t_dip);
-	else
-	  sval = dotp_3d(trac,ictx->fault[K[k]].normal);
-      }
-      ptr[j + M * k] = sval;
-    }
-  }
-#if !PetscDefined(HAVE_OPENMP)
-  PetscFunctionReturn(PETSC_SUCCESS);
-#else
-  return 0;
-#endif
-}
 
-#endif
 /*
   reads in geometry file and calculates the interaction matrix, and
   then compresses it, testing forward and inverse computations
@@ -88,13 +32,14 @@ int main(int argc, char **argv)
   KSP               ksp,ksph;
   PC                pc,pch;
   Vec         x, xh, b, bh, bout,d;
-  Mat         Ah;
+  Mat         Ah,Ah_dense;
   PetscReal   *coords,*avalues=NULL,*bvalues=NULL,norm[3];
   PetscInt    ndim, n, m, lm,ln,i,j,k,dn,on, *col_idx=NULL,rs,re;
   PetscInt nrandom = 0;	/* for timing tests */
   VecScatter ctx;
   PetscRandom rand_str;
   PetscBool read_value,flg,test_forward=PETSC_TRUE;
+  /* defined in interact.c */
   MatHtoolKernelFn *kernel = GenEntries;
   char geom_file[STRLEN]="geom.in";
   /* generate frameworks */
@@ -178,10 +123,13 @@ int main(int argc, char **argv)
   PetscCall(PetscFree(col_idx));
   PetscCall(MatAssemblyBegin(medium->pA, MAT_FINAL_ASSEMBLY));
   PetscCall(MatAssemblyEnd(medium->pA, MAT_FINAL_ASSEMBLY));
-  if(n<20)
-    MatView(medium->pA,PETSC_VIEWER_STDOUT_WORLD);
-
-
+  if(n<20){
+    HEADNODE
+      fprintf(stderr,"%s: dense matrix:\n",argv[0]);
+    
+    PetscCall(MatView(medium->pA,PETSC_VIEWER_STDOUT_WORLD));
+  }
+ 
   /* 
      hirarchical version 
   */
@@ -197,9 +145,9 @@ int main(int argc, char **argv)
   
   fprintf(stderr,"%s: core %03i/%03i: assigning htool row %5i to %5i\n",argv[0],medium->comm_rank,medium->comm_size,rs,re);
     
-  PetscCall(MatCreateHtoolFromKernel(PETSC_COMM_WORLD,PETSC_DECIDE,PETSC_DECIDE, m, n, ndim,(coords+rs), coords, kernel,ictx, &Ah));
+  //PetscCall(MatCreateHtoolFromKernel(PETSC_COMM_WORLD,PETSC_DECIDE,PETSC_DECIDE, m, n, ndim,(coords+rs), coords, kernel,ictx, &Ah));
+  PetscCall(MatCreateHtoolFromKernel(PETSC_COMM_WORLD,lm,ln, m, n, ndim,(coords+rs), (coords+re), kernel,ictx, &Ah));
     
-  //PetscCall(MatCreateHtoolFromKernel(PETSC_COMM_WORLD, m, n, m, n, ndim, coords, coords, kernel,ictx, &Ah));
   PetscCall(MatSetOption(Ah, MAT_SYMMETRIC, PETSC_FALSE));
   PetscCall(MatSetFromOptions(Ah));
     
@@ -207,8 +155,13 @@ int main(int argc, char **argv)
   PetscCall(MatAssemblyEnd(Ah, MAT_FINAL_ASSEMBLY));
   /* get info on H matrix */
   MatView(Ah,PETSC_VIEWER_STDOUT_WORLD);
-  
-  
+  if(n<20){
+    HEADNODE
+      fprintf(stderr,"%s: H matrix converted back to dense:\n",argv[0]);
+    
+    PetscCall(MatConvert(Ah,MATDENSE,MAT_INITIAL_MATRIX,&Ah_dense));
+    MatView(Ah_dense,PETSC_VIEWER_STDOUT_WORLD);
+  }
   PetscCall(MatCreateVecs(medium->pA, &x, &b));/* For A x = b: x -> left, b -> right */
   PetscCall(MatCreateVecs(Ah, &xh, &bh));/* For A x = b: x -> left, b -> right */
   if(test_forward){
@@ -233,7 +186,8 @@ int main(int argc, char **argv)
     }
     stop_time = clock();  
     cpu_time_used = ((double)stop_time-start_time)/CLOCKS_PER_SEC;
-    fprintf(stderr,"%s: it took %20.3fs for %05i dense solves\n",argv[0],cpu_time_used,nrandom+1);
+    HEADNODE
+      fprintf(stderr,"%s: it took %20.3fs for %05i dense solves\n",argv[0],cpu_time_used,nrandom+1);
     if((m<20)&&(nrandom==0))
       VecView(b,PETSC_VIEWER_STDOUT_WORLD);
     start_time = clock();
@@ -245,7 +199,8 @@ int main(int argc, char **argv)
     }
     stop_time = clock();
     cpu_time_used = ((double)stop_time-start_time)/CLOCKS_PER_SEC;
-    fprintf(stderr,"%s: it took %20.3fs for %05i htool solves\n",argv[0],cpu_time_used,nrandom+1);
+    HEADNODE
+      fprintf(stderr,"%s: it took %20.3fs for %05i htool solves\n",argv[0],cpu_time_used,nrandom+1);
     
     if((m<20)&&(nrandom==0))
       VecView(bh,PETSC_VIEWER_STDOUT_WORLD);
@@ -258,7 +213,8 @@ int main(int argc, char **argv)
       PetscCall(VecNorm(b,NORM_2,norm));
       PetscCall(VecNorm(bh,NORM_2,(norm+1)));
       PetscCall(VecNorm(d,NORM_2,(norm+2)));
-      fprintf(stdout,"%s: |b| = %20.10e |b_h| = %20.10e |b-b_h|/|b| = %20.10e\n",argv[0],norm[0],norm[1],norm[2]/norm[0]);
+      HEADNODE
+	fprintf(stdout,"%s: |b| = %20.10e |b_h| = %20.10e |b-b_h|/|b| = %20.10e\n",argv[0],norm[0],norm[1],norm[2]/norm[0]);
       
       /* get b values */
       PetscCall(VecScatterCreateToZero(b,&ctx,&bout));
@@ -315,7 +271,8 @@ int main(int argc, char **argv)
     }
     stop_time = clock();  
     cpu_time_used = ((double)stop_time-start_time)/CLOCKS_PER_SEC;
-    fprintf(stderr,"%s: it took %20.3fs for %05i dense inverse solves\n",argv[0],cpu_time_used,nrandom+1);
+    HEADNODE
+      fprintf(stderr,"%s: it took %20.3fs for %05i dense inverse solves\n",argv[0],cpu_time_used,nrandom+1);
     if((m<20)&&(nrandom==0))
       VecView(x,PETSC_VIEWER_STDOUT_WORLD);
     /* 
@@ -330,7 +287,8 @@ int main(int argc, char **argv)
     }
     stop_time = clock();
     cpu_time_used = ((double)stop_time-start_time)/CLOCKS_PER_SEC;
-    fprintf(stderr,"%s: it took %20.3fs for %05i htool inverse solves\n",argv[0],cpu_time_used,nrandom+1);
+    HEADNODE
+      fprintf(stderr,"%s: it took %20.3fs for %05i htool inverse solves\n",argv[0],cpu_time_used,nrandom+1);
     
     if((m<20)&&(nrandom==0))
       VecView(xh,PETSC_VIEWER_STDOUT_WORLD);
@@ -343,9 +301,8 @@ int main(int argc, char **argv)
       PetscCall(VecNorm(x,NORM_2,norm));
       PetscCall(VecNorm(xh,NORM_2,(norm+1)));
       PetscCall(VecNorm(d,NORM_2,(norm+2)));
-      fprintf(stdout,"%s: |x| = %20.10e |x_h| = %20.10e |x-x_h|/|x| = %20.10e\n",argv[0],norm[0],norm[1],norm[2]/norm[0]);
-      
-      
+      HEADNODE
+	fprintf(stdout,"%s: |x| = %20.10e |x_h| = %20.10e |x-x_h|/|x| = %20.10e\n",argv[0],norm[0],norm[1],norm[2]/norm[0]);
     }
 
   }
@@ -358,6 +315,8 @@ int main(int argc, char **argv)
   if(nrandom==0){
     PetscCall(VecDestroy(&d));
   }
+  if(n<20)
+    PetscCall(MatDestroy(&Ah_dense));
   free(coords);free(bglobal);
   PetscCall(MatDestroy(&medium->pA));
   PetscCall(MatDestroy(&Ah));

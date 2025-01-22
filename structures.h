@@ -239,7 +239,6 @@ struct med{
   my_boolean force_petsc;
   unsigned int myfault0,myfaultn;
 #ifdef USE_PETSC
-
   PetscMPIInt comm_size, comm_rank;
   PetscInt    rs, re, rn;
   Mat         pA;
@@ -369,6 +368,12 @@ struct slist{
 typedef	int tPointi[SEGSEG_DIM];   /* Type integer point */
 typedef	double tPointd[SEGSEG_DIM];   /* Type double point */
 
+/* if we need to pack everything */
+struct interact_ctx{
+  struct flt *fault;
+  struct med *medium;
+  int src_slip_mode,rec_stress_mode;
+};
 
 /* the structures for blockinvert type programs */
 #include "blockinvert_structures.h"
