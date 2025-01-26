@@ -412,6 +412,11 @@ singular value will be set to zero
 #include "myprojectsimple.h"
 extern void GMT_end(int, char **);
 #endif
+#ifndef GMT_LONG
+#define GMT_LONG long
+#endif
+
+
 //
 // FORTRAN (underscore defines have been taken care of above)
 //

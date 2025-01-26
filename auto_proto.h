@@ -400,6 +400,7 @@ void fasper(float *, float *, int, float, float, float *, float *, int, int *, i
 void spread(float, float *, int, float, int);
 void realft(float *, int, int);
 void four1(float *, int, int);
+/* petsc_simple_solve.c */
 /* plotevents.c */
 /* plotting.c */
 /* points2patch.c */

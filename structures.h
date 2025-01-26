@@ -241,8 +241,9 @@ struct med{
 #ifdef USE_PETSC
   PetscMPIInt comm_size, comm_rank;
   PetscInt    rs, re, rn;
-  Mat         pA;
+  Mat         pA,Is,In;
   Vec         pb;
+  PetscBool   use_h;
 #else
   unsigned int comm_size,comm_rank;
 #endif

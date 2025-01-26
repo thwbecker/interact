@@ -29,6 +29,7 @@ int main(int argc, char **argv)
   struct interact_ctx ictx[1];
   clock_t start_time,stop_time;
   double *bglobal,cpu_time_used;
+  MatHtoolKernelFn *kernel = GenEntries;
   KSP               ksp,ksph;
   PC                pc,pch;
   Vec         x, xh, b, bh, bout,d;
@@ -39,14 +40,13 @@ int main(int argc, char **argv)
   VecScatter ctx;
   PetscRandom rand_str;
   PetscBool read_value,flg,test_forward=PETSC_TRUE;
-  /* defined in interact.c */
-  MatHtoolKernelFn *kernel = GenEntries;
+
   char geom_file[STRLEN]="geom.in";
   /* generate frameworks */
   medium=(struct med *)calloc(1,sizeof(struct med)); /* make one zero medium structure */
   ictx->medium = medium;
   ictx->src_slip_mode = STRIKE;
-  ictx->rec_stress_mode = STRIKE;
+  
   ndim = 3;
   /* 
      start up petsc 
@@ -152,8 +152,9 @@ int main(int argc, char **argv)
   
   fprintf(stderr,"%s: core %03i/%03i: assigning htool row %5i to %5i\n",argv[0],medium->comm_rank,medium->comm_size,rs,re);
     
-  //PetscCall(MatCreateHtoolFromKernel(PETSC_COMM_WORLD,PETSC_DECIDE,PETSC_DECIDE, m, n, ndim,(coords+rs), coords, kernel,ictx, &Ah));
-  PetscCall(MatCreateHtoolFromKernel(PETSC_COMM_WORLD,lm,ln, m, n, ndim,(coords+rs), (coords+re), kernel,ictx, &Ah));
+
+  PetscCall(MatCreateHtoolFromKernel(PETSC_COMM_WORLD,lm,ln, m, n,
+				     ndim,(coords+rs), (coords+re), kernel,ictx, &Ah));
     
   PetscCall(MatSetOption(Ah, MAT_SYMMETRIC, PETSC_FALSE));
   PetscCall(MatSetFromOptions(Ah));

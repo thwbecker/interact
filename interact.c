@@ -27,11 +27,7 @@
 #ifdef USE_PETSC
 #include <petscksp.h>
 PetscErrorCode GenEntries(PetscInt , PetscInt , PetscInt ,const PetscInt *, const PetscInt *, PetscScalar *, void *);
-#endif
 
-
-
-#ifdef USE_PETSC
 /* 
    generate interaction matrix entries in a way suitable for petsc/htools
 

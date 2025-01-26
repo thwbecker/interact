@@ -349,7 +349,7 @@ tools: misc_tools random_geom_tools random_prop_tools
 
 misc_tools: $(BDIR)/makefault $(BDIR)/calc_interaction_matrix $(BDIR)/calc_design_matrix \
 		$(BDIR)/project_stress $(BDIR)/calc_eigen_from_cart_stress \
-	$(BDIR)/check_feedback $(BDIR)/fit_simple_stress_from_cart \
+	$(BDIR)/check_feedback $(BDIR)/fit_simple_stress_from_cart  $(BDIR)/petsc_simple_solve \
 	$(BDIR)/calc_cart_from_eigen_stress $(BDIR)/compress_interaction_matrix \
 	$(BDIR)/sort_events $(BDIR)/generate_slipdia
 
@@ -561,13 +561,19 @@ $(BDIR)/calc_interaction_matrix: $(ODIR)/coulomb_stress.o \
 	-o $(BDIR)/calc_interaction_matrix $(LIBS) $(SUPERLU_LIBS) \
 		$(PGLIBS) $(SLATEC_LIBS)  $(LDFLAGS)
 
-$(BDIR)/compress_interaction_matrix: $(ODIR)/compress_interaction_matrix.o $(ODIR)/coulomb_stress.o $(GEN_P_INC) $(LIBLIST) 
-	$(MPILD)   $(ODIR)/compress_interaction_matrix.o   $(ODIR)/coulomb_stress.o \
+$(BDIR)/compress_interaction_matrix: $(ODIR)/compress_interaction_matrix.o $(ODIR)/coulomb_stress.o $(ODIR)/interact.o $(GEN_P_INC) $(LIBLIST) 
+	$(MPILD)   $(ODIR)/compress_interaction_matrix.o   $(ODIR)/coulomb_stress.o $(ODIR)/interact.o  \
 	-o $(BDIR)/compress_interaction_matrix $(LIBS) $(SUPERLU_LIBS) \
 			$(PETSC_LIBS) $(PGLIBS) $(SLATEC_LIBS)  $(LDFLAGS)
 
-$(BDIR)/compress_interaction_matrix.dbg: $(ODIR)/compress_interaction_matrix.dbg.o $(ODIR)/coulomb_stress.dbg.o $(GEN_P_INC) $(LIBLIST) 
-	$(MPILD)   $(ODIR)/compress_interaction_matrix.dbg.o   $(ODIR)/coulomb_stress.dbg.o \
+$(BDIR)/petsc_simple_solve: $(ODIR)/petsc_simple_solve.o $(ODIR)/coulomb_stress.o $(ODIR)/interact.o  $(ODIR)/petsc_interact.o \
+	$(GEN_P_INC) $(LIBLIST) 
+	$(MPILD)   $(ODIR)/petsc_simple_solve.o $(ODIR)/petsc_interact.o  $(ODIR)/coulomb_stress.o $(ODIR)/interact.o  \
+	-o $(BDIR)/petsc_simple_solve $(LIBS) $(SUPERLU_LIBS) \
+			$(PETSC_LIBS) $(PGLIBS) $(SLATEC_LIBS)  $(LDFLAGS)
+
+$(BDIR)/compress_interaction_matrix.dbg: $(ODIR)/compress_interaction_matrix.dbg.o $(ODIR)/coulomb_stress.dbg.o  $(ODIR)/interact.dbg.o $(GEN_P_INC) $(LIBLIST) 
+	$(MPILD)   $(ODIR)/compress_interaction_matrix.dbg.o   $(ODIR)/coulomb_stress.dbg.o $(ODIR)/interact.dbg.o \
 	-o $(BDIR)/compress_interaction_matrix.dbg $(LIBS) $(SUPERLU_LIBS) \
 			$(PETSC_LIBS) $(PGLIBS) $(SLATEC_LIBS)  $(LDFLAGS)
 
