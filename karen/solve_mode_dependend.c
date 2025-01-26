@@ -1,1 +1,0 @@
-../solve_mode_dependend.c

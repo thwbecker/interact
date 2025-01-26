@@ -1,1 +1,0 @@
-../fracture_criterion.c
