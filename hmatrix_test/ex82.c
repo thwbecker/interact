@@ -2,7 +2,8 @@
 
 static char help[] = "Solves a linear system using PCHPDDM and MATHTOOL.\n\n";
 
-static PetscErrorCode GenEntries(PetscInt sdim, PetscInt M, PetscInt N, const PetscInt *J, const PetscInt *K, PetscScalar *ptr, void *ctx)
+static PetscErrorCode GenEntries(PetscInt sdim, PetscInt M, PetscInt N,
+				 const PetscInt *J, const PetscInt *K, PetscScalar *ptr, void *ctx)
 {
   PetscInt  d, j, k;
   PetscReal diff = 0.0, *coords = (PetscReal *)(ctx);
@@ -13,7 +14,8 @@ static PetscErrorCode GenEntries(PetscInt sdim, PetscInt M, PetscInt N, const Pe
   for (j = 0; j < M; j++) {
     for (k = 0; k < N; k++) {
       diff = 0.0;
-      for (d = 0; d < sdim; d++) diff += (coords[J[j] * sdim + d] - coords[K[k] * sdim + d]) * (coords[J[j] * sdim + d] - coords[K[k] * sdim + d]);
+      for (d = 0; d < sdim; d++) diff += (coords[J[j] * sdim + d] - coords[K[k] * sdim + d]) *
+				   (coords[J[j] * sdim + d] - coords[K[k] * sdim + d]);
       ptr[j + M * k] = 1.0 / (1.0e-2 + PetscSqrtReal(diff));
     }
   }
@@ -30,7 +32,7 @@ int main(int argc, char **argv)
   PC                pc;
   Vec               b, x;
   Mat               A;
-  PetscInt          m = 100, dim = 3, M, begin = 0, n = 0, overlap = 1;
+  PetscInt          m = 100, dim = 3, M, begin = 0, overlap = 1;
   PetscMPIInt       size;
   PetscReal        *coords, *gcoords;
   MatHtoolKernelFn *kernel = GenEntries;
@@ -53,7 +55,9 @@ int main(int argc, char **argv)
   PetscCallMPI(MPI_Exscan(&m, &begin, 1, MPIU_INT, MPI_SUM, PETSC_COMM_WORLD));
   PetscCall(PetscArraycpy(gcoords + begin * dim, coords, m * dim));
   PetscCallMPI(MPIU_Allreduce(MPI_IN_PLACE, gcoords, M * dim, MPIU_REAL, MPI_SUM, PETSC_COMM_WORLD));
+
   PetscCall(MatCreateHtoolFromKernel(PETSC_COMM_WORLD, m, m, M, M, dim, coords, coords, kernel, gcoords, &A));
+
   PetscCall(MatSetOption(A, MAT_SYMMETRIC, sym));
   PetscCall(MatSetFromOptions(A));
   PetscCall(MatAssemblyBegin(A, MAT_FINAL_ASSEMBLY));
