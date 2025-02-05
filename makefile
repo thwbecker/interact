@@ -1,7 +1,7 @@
 ################################################################################
 #
 #
-#  (C) Thorsten Becker, thwbecker@post.harvard.edu, 1999-2024
+#  (C) Thorsten Becker, thwbecker@post.harvard.edu, 1999-2025
 #
 #  makefile for interact and related programs
 #
@@ -84,11 +84,16 @@
 #                            for this to work, you will have to have  $(PETSC_DIR) and $(PETSC_ARCH) defined
 #
 # to run in parallel for example
+#
 #  mpirun -np 8 interact -pc_factor_mat_solver_type scalapack -mat_type scalapack
 # to debug:
 # mpirun -np 1 valgrind --tool=memcheck -q --num-callers=20 --log-file=pmia.%p.log interact -fpetsc -malloc=off
 #
+# ____________________________________________________________________________________________________
 #
+# 		              NOTE: CERTAIN PROGRAMS USE petsc_settings.yaml FOR DEFAULTS 
+# ____________________________________________________________________________________________________
+
 #  Example settings:
 #
 MY_PRECISION = -DUSE_DOUBLE_PRECISION
@@ -348,7 +353,7 @@ inoise: noisefile $(BDIR)/interact_noise.$(NOISELEVEL)
 tools: misc_tools random_geom_tools random_prop_tools
 
 misc_tools: $(BDIR)/makefault $(BDIR)/calc_interaction_matrix $(BDIR)/calc_design_matrix \
-		$(BDIR)/project_stress $(BDIR)/calc_eigen_from_cart_stress \
+		$(BDIR)/project_stress $(BDIR)/calc_eigen_from_cart_stress   \
 	$(BDIR)/check_feedback $(BDIR)/fit_simple_stress_from_cart  $(BDIR)/petsc_simple_solve \
 	$(BDIR)/calc_cart_from_eigen_stress $(BDIR)/compress_interaction_matrix \
 	$(BDIR)/sort_events $(BDIR)/generate_slipdia
@@ -561,8 +566,9 @@ $(BDIR)/calc_interaction_matrix: $(ODIR)/coulomb_stress.o \
 	-o $(BDIR)/calc_interaction_matrix $(LIBS) $(SUPERLU_LIBS) \
 		$(PGLIBS) $(SLATEC_LIBS)  $(LDFLAGS)
 
-$(BDIR)/compress_interaction_matrix: $(ODIR)/compress_interaction_matrix.o $(ODIR)/coulomb_stress.o $(ODIR)/interact.o $(GEN_P_INC) $(LIBLIST) 
-	$(MPILD)   $(ODIR)/compress_interaction_matrix.o   $(ODIR)/coulomb_stress.o $(ODIR)/interact.o  \
+$(BDIR)/compress_interaction_matrix: $(ODIR)/compress_interaction_matrix.o $(ODIR)/coulomb_stress.o \
+	$(ODIR)/interact.o $(GEN_P_INC) $(LIBLIST) 
+	$(MPILD)   $(ODIR)/compress_interaction_matrix.o    $(ODIR)/petsc_interact.o $(ODIR)/coulomb_stress.o $(ODIR)/interact.o  \
 	-o $(BDIR)/compress_interaction_matrix $(LIBS) $(SUPERLU_LIBS) \
 			$(PETSC_LIBS) $(PGLIBS) $(SLATEC_LIBS)  $(LDFLAGS)
 
@@ -572,8 +578,10 @@ $(BDIR)/petsc_simple_solve: $(ODIR)/petsc_simple_solve.o $(ODIR)/coulomb_stress.
 	-o $(BDIR)/petsc_simple_solve $(LIBS) $(SUPERLU_LIBS) \
 			$(PETSC_LIBS) $(PGLIBS) $(SLATEC_LIBS)  $(LDFLAGS)
 
-$(BDIR)/compress_interaction_matrix.dbg: $(ODIR)/compress_interaction_matrix.dbg.o $(ODIR)/coulomb_stress.dbg.o  $(ODIR)/interact.dbg.o $(GEN_P_INC) $(LIBLIST) 
-	$(MPILD)   $(ODIR)/compress_interaction_matrix.dbg.o   $(ODIR)/coulomb_stress.dbg.o $(ODIR)/interact.dbg.o \
+$(BDIR)/compress_interaction_matrix.dbg: $(ODIR)/compress_interaction_matrix.dbg.o $(ODIR)/coulomb_stress.dbg.o  \
+	$(ODIR)/interact.dbg.o $(ODIR)/petsc_interact.dbg.o $(GEN_P_INC) $(LIBLIST) 
+	$(MPILD)   $(ODIR)/compress_interaction_matrix.dbg.o  $(ODIR)/petsc_interact.dbg.o \
+	$(ODIR)/coulomb_stress.dbg.o $(ODIR)/interact.dbg.o \
 	-o $(BDIR)/compress_interaction_matrix.dbg $(LIBS) $(SUPERLU_LIBS) \
 			$(PETSC_LIBS) $(PGLIBS) $(SLATEC_LIBS)  $(LDFLAGS)
 

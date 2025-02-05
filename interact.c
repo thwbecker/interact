@@ -25,8 +25,7 @@
 */
 #include "interact.h"
 #ifdef USE_PETSC
-#include <petscksp.h>
-PetscErrorCode GenEntries(PetscInt , PetscInt , PetscInt ,const PetscInt *, const PetscInt *, PetscScalar *, void *);
+#include "petsc_prototypes.h"
 
 /* 
    generate interaction matrix entries in a way suitable for petsc/htools
@@ -39,24 +38,27 @@ PetscErrorCode GenEntries(PetscInt , PetscInt , PetscInt ,const PetscInt *, cons
 
    this is modified from the ex82.c petsc example
  */
-PetscErrorCode GenEntries(PetscInt sdim, PetscInt M, PetscInt N,
-			  const PetscInt *J, const PetscInt *K, PetscScalar *ptr, void *kernel_ctx)
+PetscErrorCode GenKEntries(PetscInt sdim, PetscInt M, PetscInt N,
+			   const PetscInt *J, const PetscInt *K, PetscScalar *ptr,
+			   void *kernel_ctx)
 {
   PetscInt  j, k;
   COMP_PRECISION slip[3],disp[3],stress[3][3],trac[3],sval;
   int iret;
   struct interact_ctx *ictx;
   ictx = (struct interact_ctx *)kernel_ctx;
+
 #if !PetscDefined(HAVE_OPENMP)
   PetscFunctionBeginUser;
 #endif
+  
+  //fprintf(stderr,"GenKentries: slip %i rec %i\n",ictx->src_slip_mode,ictx->rec_stress_mode);
   get_right_slip(slip,ictx->src_slip_mode,1.0);	/* strike motion */
   for (j = 0; j < M; j++) {
     for (k = 0; k < N; k++) {
       eval_green(ictx->fault[K[k]].x,(ictx->fault+J[j]),slip,disp,stress,&iret, GC_STRESS_ONLY,TRUE);
       if(iret != 0){
-	fprintf(stderr,"get_entries: WARNING: i=%3i j=%3i singular\n",j,k);
-	//s[STRIKE]=s[DIP]=s[NORMAL]=0.0;
+	fprintf(stderr,"GenKentries: WARNING: i=%3i j=%3i singular\n",j,k);
 	sval = 0.0;
       }else{
 	resolve_force(ictx->fault[K[k]].normal,stress,trac);
@@ -64,9 +66,14 @@ PetscErrorCode GenEntries(PetscInt sdim, PetscInt M, PetscInt N,
 	  sval = dotp_3d(trac,ictx->fault[K[k]].t_strike);
 	else if(ictx->rec_stress_mode == DIP)
 	  sval = dotp_3d(trac,ictx->fault[K[k]].t_dip);
-	else
+	else if(ictx->rec_stress_mode == NORMAL)
 	  sval = dotp_3d(trac,ictx->fault[K[k]].normal);
+	else{
+	  fprintf(stderr,"GenKentries: receive mode %i undefined\n",ictx->rec_stress_mode);
+	  exit(-1);
+	}
       }
+      //if(ictx->rec_stress_mode == STRIKE)fprintf(stderr,"GenKEntries: j %i M %i k %i val %g\n",j,M,k,sval);
       ptr[j + M * k] = sval;
     }
   }

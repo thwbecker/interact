@@ -244,6 +244,7 @@ void read_stress_fac(unsigned char, float *, float *, float, struct med *);
 int read_moment_file(float **, float **, float *, float *, int *, unsigned char);
 int read_patch_event_file(float *, int *, int *, float *, float *, FILE *, struct med *);
 int write_patch_event_file(float, int, int, float, float *, FILE *);
+void read_rsf(char *, struct med *, struct flt *);
 /* interact.c */
 void calc_interaction_matrix(struct med *, struct flt *, unsigned char);
 float interaction_coefficient(int, int, int, int, struct flt *, int *);
@@ -400,6 +401,7 @@ void fasper(float *, float *, int, float, float, float *, float *, int, int *, i
 void spread(float, float *, int, float, int);
 void realft(float *, int, int);
 void four1(float *, int, int);
+/* petsc_interact.c */
 /* petsc_simple_solve.c */
 /* plotevents.c */
 /* plotting.c */
@@ -447,6 +449,7 @@ void adjust_medium_for_restart(struct med *, struct flt *);
 void init_equation_system(struct med *, struct flt *);
 void add_to_active_fault_list(int, int **, int *, unsigned char **);
 void add_to_right_hand_side(float, float **, float **, int *);
+/* rsf_solve.c */
 /* rupture.c */
 unsigned char activate_faults(struct flt *, struct med *);
 void fault_criterion(int, struct flt *, struct med *);

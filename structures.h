@@ -98,7 +98,7 @@ struct med{
 			   activation
 			*/
   short int solver_mode; // type of solver used for A x = b system
-  A_MATRIX_PREC *b,*xsol,*b_con,*xsol_con; /* b (rhs) and x (solution) 
+  A_MATRIX_PREC *rhs_b,*xsol,*rhs_b_con,*xsol_con; /* b (rhs) and x (solution) 
 					      vectors of system */
 
   // switch that activates all patches along a fault
@@ -158,9 +158,13 @@ struct med{
   /* 
      timing and printing issues 
   */
+#ifdef USE_PETSC
+  PetscReal time,dt0,dt,stop_time,time_to_failure;
+  PetscReal print_interval,slip_line_dt,old_moment_time,slip_line_time;
+#else
   COMP_PRECISION time,dt0,dt,stop_time,time_to_failure;
-  COMP_PRECISION print_interval,slip_line_dt,
-    old_moment_time,slip_line_time;
+  COMP_PRECISION print_interval,slip_line_dt,old_moment_time,slip_line_time;
+#endif
   int nr_timesteps;
   /*
     material properties that don't change within the medium
@@ -208,6 +212,7 @@ struct med{
 
     re-used arrays for spatial correlation calculations
     spcorr_interval is the time interval between updates
+
   */
   float *cr_w1,*cr_w2,*cr_w3;
   COMP_PRECISION *cr_xr,*cr_r,spcorr_interval;
@@ -215,6 +220,7 @@ struct med{
 
   /* for SVD */
   COMP_PRECISION wcutoff;
+  /*  */
   /* 
      for PGPLOTTING X WINDOWS OUTPUT 
   */
@@ -234,6 +240,8 @@ struct med{
   COMP_PRECISION x_scroll_time,x_scroll_interval,
     x_scroll_inc;
 #endif
+  /* RSF stuff */
+  COMP_PRECISION f0,shear_mod_over_2cs_si,dc,b,v0,vpl;
   COMP_PRECISION nan;		/* remember to initialize  */
   /*  */
   my_boolean force_petsc;
@@ -241,8 +249,7 @@ struct med{
 #ifdef USE_PETSC
   PetscMPIInt comm_size, comm_rank;
   PetscInt    rs, re, rn;
-  Mat         pA,Is,In;
-  Vec         pb;
+  Mat         Is,In;
   PetscBool   use_h;
 #else
   unsigned int comm_size,comm_rank;
@@ -267,11 +274,12 @@ struct flt{
 			 direction */
   COMP_PRECISION s[3];/* strike, normal and 
 			 dip stress */
-  COMP_PRECISION sinc[3]; /* assuming that the background
-			     stress increases linearly,
-			     these are the increments in
-			     strike, dip, and normal 
+  COMP_PRECISION sinc[3]; /* assuming that the background stress
+			     increases linearly, these are the
+			     increments in strike, dip, and normal
 			     direction,s=a*t+b
+
+			     for RSF, [2] are shear and normal
 			  */
   COMP_PRECISION x[3]; /* 
 			  location of center of patch or point
@@ -319,11 +327,11 @@ struct flt{
     t_strike[3],t_dip[3]; /* normal and tangential 
 			     (strike and dip direction) 
 			     unit vectors */
-  float mu_d,mu_s; /* 
-		      dynamic and static friction 
-		      coefficients
-		   */
-  COMP_PRECISION f_initial,taud;// initial f ratio and stress drop
+  COMP_PRECISION mu_d,mu_s; /* 
+			       dynamic and static friction coefficients, or a and b
+			    */
+  COMP_PRECISION f_initial,taud;/* initial f ratio and stress drop
+				 */
   COMP_PRECISION cf[2];// coulomb correction for normal stress
 #ifdef LATENCY
   float last_activation_time;/* last time of slip for 
@@ -369,11 +377,18 @@ struct slist{
 typedef	int tPointi[SEGSEG_DIM];   /* Type integer point */
 typedef	double tPointd[SEGSEG_DIM];   /* Type double point */
 
-/* if we need to pack everything */
+
+/*
+  parameters needed by the derivative function or if we need other
+  stuff to pack everything
+*/
 struct interact_ctx{
   struct flt *fault;
   struct med *medium;
   int src_slip_mode,rec_stress_mode;
+#ifdef USE_PETSC
+  Vec slip_rate;
+#endif
 };
 
 /* the structures for blockinvert type programs */

@@ -1,9 +1,8 @@
 /*
   interact: model fault interactions using dislocations in a 
             halfspace
-  (C) Thorsten Becker, becker@eps.harvard.edu
+	    (c) Thorsten Becker, thbecker@post.harvard.edu
 
-  $Id: input.c,v 1.5 2003/01/05 00:53:21 tbecker Exp $
 
   
   some input routines, see also matrixio.c
@@ -93,4 +92,22 @@ int  write_patch_event_file(float time, int nriter, int aflt, float mom,
 		slip[STRIKE],slip[DIP],slip[NORMAL],mom);
 #endif
   return cnt;
+}
+/* read in rate state friction parameyets */
+void read_rsf(char *filename, struct med *medium, struct flt *fault)
+{
+  int i;
+  COMP_PRECISION loc;
+  FILE *in;
+  
+  for(i=0;i < medium->nrflt;i++){
+    fault[i].mu_d = medium->b;	/* mu_d = b */
+    loc = sqrt(fault[i].pos[0]*fault[i].pos[0]+fault[i].pos[1]*fault[i].pos[1]);
+    if(loc < 0.8)
+      fault[i].mu_s = (3./4.) * fault[i].mu_d; /* mu_s = a = 4/3 b, a-b = -1/3 a */
+    else
+      fault[i].mu_s = (3./2.) * fault[i].mu_d; /* mu_s = a = 3/2 b, a-b =  1/3 a */
+    /*  */
+    fprintf(stderr,"loc %g a %g b %g a-b %g\n",loc,fault[i].mu_s,fault[i].mu_d,fault[i].mu_s-fault[i].mu_d);
+  }
 }

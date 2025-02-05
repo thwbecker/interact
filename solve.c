@@ -35,7 +35,7 @@ int solve(struct med *medium,struct flt *fault)
   long int index_numbers;
   char mattype[PETSC_HELPER_STR_LEN];
   PetscBool pset = PETSC_FALSE;
-  Vec         px, pr,pxout;
+  Vec         pr,pxout,x,pbs;
   KSP         pksp;
   PC          ppc;
   PetscInt    i, m, n;
@@ -60,10 +60,10 @@ int solve(struct med *medium,struct flt *fault)
   HEADNODE
     if(medium->debug){
       print_equations(medium->naflt,medium->sma,medium->nameaf,
-		      medium->b,medium->nreq,"ucstr.",
+		      medium->rhs_b,medium->nreq,"ucstr.",
 		      fault);
       print_equations(medium->naflt_con,medium->sma_con,
-		      medium->nameaf_con,medium->b_con,
+		      medium->nameaf_con,medium->rhs_b_con,
 		      medium->nreq_con," cstr.",fault);
     }
   /* 
@@ -147,9 +147,9 @@ int solve(struct med *medium,struct flt *fault)
     }
     // now b part of A'
     for(i=0;i < medium->nreq;i++)
-      a[nm+i]=medium->b[i];
+      a[nm+i]=medium->rhs_b[i];
     for(j=0,i=medium->nreq;i < n;i++,j++)
-      a[nm+i]=medium->b_con[j];
+      a[nm+i]=medium->rhs_b_con[j];
     if(medium->debug){
       fprintf(stderr,"slatec_nnls: attempting to solve %i times (%i+1) system\n",
 	      m,n);
@@ -258,21 +258,22 @@ int solve(struct med *medium,struct flt *fault)
 	}
       }
       /* set up A matrix */
-      PetscCall(MatCreate(PETSC_COMM_WORLD, &(medium->pA)));
-      PetscCall(MatSetSizes(medium->pA, PETSC_DECIDE, PETSC_DECIDE, m, n));
-      PetscCall(MatSetType(medium->pA, MATDENSE));
-      /*PetscCall(MatSetFromOptions(medium->pA));*//* Always assemble into MATDENSE format */
-      PetscCall(MatSetUp(medium->pA));
+      PetscCall(MatCreate(PETSC_COMM_WORLD, &(medium->Is)));
+      PetscCall(MatSetSizes(medium->Is, PETSC_DECIDE, PETSC_DECIDE, m, n));
+      PetscCall(MatSetType(medium->Is, MATDENSE));
+      PetscCall(MatSetFromOptions(medium->Is));
+      PetscCall(MatSetUp(medium->Is));
       /* preallocate */
-      PetscCall(MatGetLocalSize(medium->pA, &lm, &ln));
-      dn = ln;on = n - ln;
+      PetscCall(MatGetLocalSize(medium->Is, &lm, &ln));
+      dn = ln;
+      on = n - ln;
 
-      PetscCall(MatSeqAIJSetPreallocation(medium->pA, n, NULL));
-      PetscCall(MatMPIAIJSetPreallocation(medium->pA, dn, NULL, on, NULL));
+      PetscCall(MatSeqAIJSetPreallocation(medium->Is, n, NULL));
+      PetscCall(MatMPIAIJSetPreallocation(medium->Is, dn, NULL, on, NULL));
       /* 
 	 parallel assembly 
       */
-      PetscCall(MatGetOwnershipRange(medium->pA, &medium->rs, &medium->re));
+      PetscCall(MatGetOwnershipRange(medium->Is, &medium->rs, &medium->re));
       medium->rn = medium->re  - medium->rs; /* number of local elements */
       
 #ifdef DEBUG
@@ -287,28 +288,27 @@ int solve(struct med *medium,struct flt *fault)
 	Always call MatAssemblyBegin(A, MAT_FINAL_ASSEMBLY).
 	MatAssemblyBegin() is collective and must be called on all ranks.
       */
-      PetscCall(MatAssemblyBegin(medium->pA, MAT_FINAL_ASSEMBLY));
-      PetscCall(MatAssemblyEnd(medium->pA, MAT_FINAL_ASSEMBLY));
-     
+      PetscCall(MatAssemblyBegin(medium->Is, MAT_FINAL_ASSEMBLY));
+      PetscCall(MatAssemblyEnd(medium->Is, MAT_FINAL_ASSEMBLY));
+
       /* Convert MATDENSE to another format required by solver package */
       PetscCall(PetscOptionsGetString(NULL, NULL, "-mat_type", mattype, PETSC_HELPER_STR_LEN, &pset));
       if (pset) { /* Convert MATDENSE to desired format */
-	PetscCall(MatConvert(medium->pA, mattype, MAT_INPLACE_MATRIX, &medium->pA));
+	PetscCall(MatConvert(medium->Is, mattype, MAT_INPLACE_MATRIX, &medium->Is));
       }
 
-      //MatView(pA,PETSC_VIEWER_STDOUT_WORLD);
-  
-      PetscCall(MatCreateVecs(medium->pA, &medium->pb, &px)); /* For A x = b: x -> left, b -> right */
+      PetscCall(MatCreateVecs(medium->Is, &pbs, &x)); 
+      
       /* 
 	 insert right hand side 
       */
       for (i = medium->rs; i < medium->re; i++) {
-	PetscCall(VecSetValue(medium->pb, (PetscInt)i, (PetscScalar)(medium->b[i]), INSERT_VALUES));
+	PetscCall(VecSetValue(pbs, (PetscInt)i,(PetscScalar)(medium->rhs_b[i]), INSERT_VALUES));
       }
-      PetscCall(VecAssemblyBegin(medium->pb));
-      PetscCall(VecAssemblyEnd(medium->pb));
+      PetscCall(VecAssemblyBegin(pbs));
+      PetscCall(VecAssemblyEnd(pbs));
 
-      //PetscCall(VecView(medium->pb,PETSC_VIEWER_STDOUT_WORLD));
+      //PetscCall(VecView(pbs,PETSC_VIEWER_STDOUT_WORLD));
       HEADNODE
 	time_report("solve","parallel assembly done",medium);
 
@@ -316,7 +316,7 @@ int solve(struct med *medium,struct flt *fault)
 	 solver
       */
       PetscCall(KSPCreate(PETSC_COMM_WORLD, &pksp));
-      PetscCall(KSPSetOperators(pksp, medium->pA, medium->pA));
+      PetscCall(KSPSetOperators(pksp, medium->Is, medium->Is));
       PetscCall(KSPSetType(pksp, KSPPREONLY));
       PetscCall(KSPGetPC(pksp, &ppc));
       PetscCall(PCSetType(ppc, PCLU));
@@ -324,17 +324,17 @@ int solve(struct med *medium,struct flt *fault)
       PetscCall(PCFactorSetMatSolverType(ppc, MATSOLVERPETSC));
       PetscCall(KSPSetFromOptions(pksp));
       /* solve step */
-      PetscCall(KSPSolve(pksp, medium->pb, px));
+      PetscCall(KSPSolve(pksp, pbs, x));
       if(medium->debug)
 	PetscCall(KSPView(pksp, PETSC_VIEWER_STDERR_WORLD));
     
       /* 
 	 distribute to zero node
       */
-      PetscCall(VecScatterCreateToZero(px,&ctx,&pxout));
+      PetscCall(VecScatterCreateToZero(x,&ctx,&pxout));
       // scatter as many times as you need
-      PetscCall(VecScatterBegin(ctx,px,pxout,INSERT_VALUES,SCATTER_FORWARD));
-      PetscCall(VecScatterEnd(ctx,px,pxout,INSERT_VALUES,SCATTER_FORWARD));
+      PetscCall(VecScatterBegin(ctx,x,pxout,INSERT_VALUES,SCATTER_FORWARD));
+      PetscCall(VecScatterEnd(ctx,x,pxout,INSERT_VALUES,SCATTER_FORWARD));
       /* assign to x solution vector */
       HEADNODE{
 	PetscCall(VecGetArray(pxout,&values));
@@ -355,18 +355,18 @@ int solve(struct med *medium,struct flt *fault)
       PetscCall(VecDestroy(&pxout));
  
       if(medium->debug){
-	PetscCall(VecDuplicate(px, &pr));
+	PetscCall(VecDuplicate(x, &pr));
 	/* check residual */
-	PetscCall(MatMult(medium->pA, px, pr)); /* r = A x */
-	PetscCall(VecAXPY(pr, -1.0, medium->pb)); /* r <- r - b */
+	PetscCall(MatMult(medium->Is, x, pr)); /* r = A x */
+	PetscCall(VecAXPY(pr, -1.0, pbs)); /* r <- r - b */
 	PetscCall(VecNorm(pr, NORM_2, &norm));
 	PetscCall(PetscPrintf(PETSC_COMM_WORLD, "Norm of residual %1.10e\n", (double)norm));
 	PetscCall(VecDestroy(&pr));
       }
       
-      PetscCall(VecDestroy(&px));
-      PetscCall(VecDestroy(&medium->pb));
-      PetscCall(MatDestroy(&medium->pA));
+      PetscCall(VecDestroy(&x));
+      PetscCall(VecDestroy(&pbs));
+      PetscCall(MatDestroy(&medium->Is));
       PetscCall(KSPDestroy(&pksp));
       /* 
 	 petsc done 
@@ -409,7 +409,7 @@ int solve(struct med *medium,struct flt *fault)
       if(medium->save_amat){// write A in binary to file
 	print_a_matrix_to_file(a,medium->nreq,medium->nreq,
 			       A_MATRIX_FILE,"unconstrained A");
-	print_vector_file(medium->b,medium->nreq,B_VECTOR_FILE,"b vector");
+	print_vector_file(medium->rhs_b,medium->nreq,B_VECTOR_FILE,"b vector");
       }
       if(medium->debug)
 	if((medium->op_mode == ONE_STEP_CALCULATION)&&(!medium->save_amat))
@@ -449,21 +449,21 @@ int solve(struct med *medium,struct flt *fault)
       //
       switch(medium->solver_mode){
       case LU_SOLVER:// should be pretty fast 
-	lu_driver(a,medium->xsol,medium->b,
+	lu_driver(a,medium->xsol,medium->rhs_b,
 		  medium->nreq,medium->nreq,medium);
 	free(a);
 	break;
       case SVD_SOLVER:// gives least-squares solution in case A is singular
 	
 #ifdef USE_NUMREC_SVD
-	svd_driver_numrec(a,medium->xsol,medium->b,medium->nreq,
+	svd_driver_numrec(a,medium->xsol,medium->rhs_b,medium->nreq,
 			  medium->nreq,&wcutoff,
 			  medium->op_mode,&wmax,FALSE,
 			  &sv,&dummyp,izero,
 			  FALSE,0,FALSE,TRUE,medium->debug);
 	free(dummyp);
 #else
-	svd_driver_lapack(a,medium->xsol,medium->b,medium->nreq,
+	svd_driver_lapack(a,medium->xsol,medium->rhs_b,medium->nreq,
 			  medium->nreq,&wcutoff,
 			  medium->op_mode,&wmax,&sv,izero,TRUE,medium->debug);
 #endif
@@ -517,7 +517,8 @@ int solve(struct med *medium,struct flt *fault)
 	//
 	// solve CCS sparse system
 	//
-	sparse_driver(medium->is1, medium->is2,medium->val, medium->xsol, medium->b,
+	sparse_driver(medium->is1, medium->is2,medium->val,
+		      medium->xsol, medium->rhs_b,
 		      medium->nreq,medium);
 	// free sparse matrix pointers
 	free(medium->is1);free(medium->is2);free(medium->val);
@@ -573,7 +574,7 @@ int solve(struct med *medium,struct flt *fault)
       fprintf(stderr,"solve: solving constrained system using NNLS, n: %i\n",
 	      medium->nreq_con);
     /* call NNLS */
-    nnls_driver_i(a,medium->xsol_con,medium->b_con,
+    nnls_driver_i(a,medium->xsol_con,medium->rhs_b_con,
 		  medium->nreq_con,medium->nreq_con);
     free(a);
   }
@@ -805,7 +806,7 @@ int par_assemble_a_matrix(int naflt,my_boolean *sma,int nreq,int *nameaf,
 	in_range = ((eqc1 >= medium->rs)&&(eqc1 < medium->re))?(TRUE):(FALSE);
 	if(in_range){
 #ifdef DEBUG
-	  for(eqc2=0;eqc2<nreq;eqc2++)
+	  for(eqc2=0;eqc2 < nreq;eqc2++)
 	    assigned[eqc2] = FALSE;
 #endif
 
@@ -857,7 +858,7 @@ int par_assemble_a_matrix(int naflt,my_boolean *sma,int nreq,int *nameaf,
 #ifdef DEBUG
 		assigned[eqc2] = TRUE;
 #endif
-	   	//PetscCall(MatSetValue(medium->pA, eqc1, eqc2, avalues[eqc2], ADD_VALUES));
+	   	//PetscCall(MatSetValue(medium->Is, eqc1, eqc2, avalues[eqc2], ADD_VALUES));
 	      	/* end value work part */
 		eqc2++;
 	      }
@@ -878,7 +879,7 @@ int par_assemble_a_matrix(int naflt,my_boolean *sma,int nreq,int *nameaf,
 	  fprintf(stderr,"row eqc1 %6i eqc2 %6i nreq %6i amin %12g amax %12g\n",eqc1,eqc2,nreq,amin,amax);
 	  
 #endif 
-	  PetscCall(MatSetValues(medium->pA, 1, &eqc1, nreq, col_idx,avalues, INSERT_VALUES));
+	  PetscCall(MatSetValues(medium->Is, 1, &eqc1, nreq, col_idx,avalues, INSERT_VALUES));
 	}
 	eqc1++; 
       }

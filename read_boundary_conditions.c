@@ -24,6 +24,7 @@ void read_boundary_conditions(struct med *medium,
 {
   FILE *in;
   int patch_nr,bc_code,n=0,inc,start_patch,stop_patch,i,j;
+  COMP_PRECISION tmp1,tmp2,tmp3;
   my_boolean printevery;
   in=fopen(BC_FILE,"r");
   if(in != NULL){
@@ -56,8 +57,8 @@ void read_boundary_conditions(struct med *medium,
       HEADNODE
 	fprintf(stderr,"read_boundary_conditions: simulating loading\n");
       /* timing issues */
-      i = fscanf(in,THREE_CP_FORMAT,&medium->dt0,&medium->print_interval,
-	     &medium->stop_time);
+      i = fscanf(in,THREE_CP_FORMAT,&tmp1,&tmp2,&tmp3);
+      medium->dt0 = tmp1;medium->print_interval=tmp2;medium->stop_time=tmp3;
       if(!medium->variable_time_step){
 	HEADNODE
 	  fprintf(stderr,"read_boundary_conditions: until time %g in fixed steps of %g\n",
@@ -997,7 +998,7 @@ void read_one_step_bc(FILE *in,struct med *medium,struct flt *fault,
 	    // the x vector is in here just so that it gets resized at the same time
 	    // as b
 	    //
-	    add_to_right_hand_side(rhs[i3+j],&medium->b,&medium->xsol,
+	    add_to_right_hand_side(rhs[i3+j],&medium->rhs_b,&medium->xsol,
 				   &medium->nreq);
 	    added_to_uncon=TRUE;/* have to increment fault contraint counter */
 	  }
@@ -1044,10 +1045,10 @@ void read_one_step_bc(FILE *in,struct med *medium,struct flt *fault,
 		 assign negative b for constrained, 'anormal' modes 
 	      */
 	      // add to RHS and resize b and x
-	      add_to_right_hand_side(-rhs[i3+j],&medium->b_con,
+	      add_to_right_hand_side(-rhs[i3+j],&medium->rhs_b_con,
 				     &medium->xsol_con,&medium->nreq_con);
 	    else
-	      add_to_right_hand_side( rhs[i3+j],&medium->b_con,
+	      add_to_right_hand_side( rhs[i3+j],&medium->rhs_b_con,
 				      &medium->xsol_con,&medium->nreq_con);
 	    // have to increment counter
 	    added_to_con=TRUE;

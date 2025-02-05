@@ -1,7 +1,7 @@
 /*
   interact: model fault interactions using dislocations in a 
             halfspace
-  (C) Thorsten Becker, becker@eps.harvard.edu
+  (C) Thorsten Becker, thwbecker@post.harvard.edu
 
   $Id: rupture.c,v 2.25 2002/10/08 19:24:44 tbecker Exp $
 
@@ -229,7 +229,7 @@ void fault_criterion(int flt,struct flt *fault,struct med *medium)
       /* add an equation for each active slipping mode*/
       for(i=0;i<3;i++){
 	if(medium->sma[ip+i]){// add to RHS and grow b and xsol
-	  add_to_right_hand_side(tstress_drop[i],&medium->b,&medium->xsol,
+	  add_to_right_hand_side(tstress_drop[i],&medium->rhs_b,&medium->xsol,
 				 &medium->nreq);
 	}
       }
@@ -254,10 +254,10 @@ void fault_criterion(int flt,struct flt *fault,struct med *medium)
 	     fault[flt].mode[0]==DIP_SLIP_DOWNWARD || 
 	     fault[flt].mode[0]==COULOMB_DIP_SLIP_DOWNWARD ||
 	     fault[flt].mode[0]==NORMAL_SLIP_INWARD)
-	    add_to_right_hand_side(-tstress_drop[i],&medium->b_con,
+	    add_to_right_hand_side(-tstress_drop[i],&medium->rhs_b_con,
 				   &medium->xsol_con,&medium->nreq_con);
 	  else
-	    add_to_right_hand_side(tstress_drop[i],&medium->b_con,
+	    add_to_right_hand_side(tstress_drop[i],&medium->rhs_b_con,
 				   &medium->xsol_con,&medium->nreq_con);
 	}
       add_to_active_fault_list(flt,&medium->nameaf_con,&medium->naflt_con,

@@ -512,7 +512,7 @@ void read_geometry(char *patch_filename,struct med **medium,
 	 frictional properties, static and dynamic 
 	 either read from file (-f switch)
       */
-      if(fscanf(in2,"%f %f",&(*fault+i)->mu_s,&(*fault+i)->mu_d)!=2){
+      if(fscanf(in2,TWO_CP_FORMAT,&(*fault+i)->mu_s,&(*fault+i)->mu_d)!=2){
 	if((*medium)->comm_rank == 0){
 	  fprintf(stderr,"read_geometry: read error: properties file: %s\n",
 		  FAULT_PROP_FILE);

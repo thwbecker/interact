@@ -1,6 +1,6 @@
 /*
   interact: model fault interactions using dislocations in a halfspace
-            (C) Thorsten Becker, becker@post.harvard.edu
+            (C) Thorsten Becker, thwbecker@post.harvard.edu
 
 
   

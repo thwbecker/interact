@@ -20,7 +20,7 @@ void init_equation_system(struct med *medium,struct flt *fault)
     // some point?
     free(medium->sma);free(medium->sma_con);
     free(medium->nameaf);free(medium->nameaf_con);
-    free(medium->b);free(medium->b_con);
+    free(medium->rhs_b);free(medium->rhs_b_con);
     free(medium->xsol);free(medium->xsol_con);
   }
   medium->sma=(my_boolean *)malloc(3*sizeof(my_boolean));
@@ -31,13 +31,13 @@ void init_equation_system(struct med *medium,struct flt *fault)
   }
   medium->nameaf=(int *)calloc(1,sizeof(int));
   medium->nameaf_con =(int *)calloc(1,sizeof(int)); 
-  medium->b=(A_MATRIX_PREC *)calloc(1,sizeof(A_MATRIX_PREC));
+  medium->rhs_b=(A_MATRIX_PREC *)calloc(1,sizeof(A_MATRIX_PREC));
   medium->xsol=(A_MATRIX_PREC *)calloc(1,sizeof(A_MATRIX_PREC));
-  medium->b_con=(A_MATRIX_PREC *)calloc(1,sizeof(A_MATRIX_PREC));
+  medium->rhs_b_con=(A_MATRIX_PREC *)calloc(1,sizeof(A_MATRIX_PREC));
   medium->xsol_con=(A_MATRIX_PREC *)calloc(1,sizeof(A_MATRIX_PREC));
   if(medium->debug)
     if((!medium->sma)||(!medium->sma_con)||(!medium->nameaf)||
-       (!medium->nameaf_con)||(!medium->b)||(!medium->b_con)||
+       (!medium->nameaf_con)||(!medium->rhs_b)||(!medium->rhs_b_con)||
        (!medium->xsol)||!(medium->xsol_con))
       MEMERROR("solve: init_equation_system:");
   // reset all fault activation flags
