@@ -346,7 +346,7 @@ really_all: obj_directories debug_libraries libraries main_prog \
 	inoise analysis geographic_tools $(BDIR)/$(INTERACT_BINARY_NAME).dbg
 #	pgplot_progs 
 
-main_prog: $(BDIR)/$(INTERACT_BINARY_NAME) $(BDIR)/$(INTERACT_BINARY_NAME).sgl
+main_prog: $(BDIR)/$(INTERACT_BINARY_NAME) $(BDIR)/$(INTERACT_BINARY_NAME).sgl $(BDIR)/rsf_solve
 
 inoise: noisefile $(BDIR)/interact_noise.$(NOISELEVEL)
 
@@ -576,6 +576,12 @@ $(BDIR)/petsc_simple_solve: $(ODIR)/petsc_simple_solve.o $(ODIR)/coulomb_stress.
 	$(GEN_P_INC) $(LIBLIST) 
 	$(MPILD)   $(ODIR)/petsc_simple_solve.o $(ODIR)/petsc_interact.o  $(ODIR)/coulomb_stress.o $(ODIR)/interact.o  \
 	-o $(BDIR)/petsc_simple_solve $(LIBS) $(SUPERLU_LIBS) \
+			$(PETSC_LIBS) $(PGLIBS) $(SLATEC_LIBS)  $(LDFLAGS)
+
+$(BDIR)/rsf_solve: $(ODIR)/rsf_solve.o $(ODIR)/coulomb_stress.o $(ODIR)/interact.o  $(ODIR)/petsc_interact.o \
+	$(GEN_P_INC) $(LIBLIST) 
+	$(MPILD)   $(ODIR)/rsf_solve.o $(ODIR)/petsc_interact.o  $(ODIR)/coulomb_stress.o $(ODIR)/interact.o  \
+	-o $(BDIR)/rsf_solve $(LIBS) $(SUPERLU_LIBS) \
 			$(PETSC_LIBS) $(PGLIBS) $(SLATEC_LIBS)  $(LDFLAGS)
 
 $(BDIR)/compress_interaction_matrix.dbg: $(ODIR)/compress_interaction_matrix.dbg.o $(ODIR)/coulomb_stress.dbg.o  \
