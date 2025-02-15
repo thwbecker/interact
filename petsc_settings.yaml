@@ -2,7 +2,7 @@
 mat_htool_eta: 1000
 mat_htool_epsilon: 1e-4
 mat_htool_compressor: SVD
-mat_htool_clustering: PCAGeometric
+mat_htool_clustering: PCARegular
 
 ksp_type: fgmres
 pc_type: jacobi
