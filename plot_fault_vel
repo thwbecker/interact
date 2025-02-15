@@ -1,0 +1,32 @@
+#!/bin/bash
+
+makecpt -T-12/0/0.5 -Q -Croma > tmp.cpt
+
+scale=1e-4
+reg=-R-30e3/30e3/-30e3/30e3
+regz=$reg/-25e3/0
+
+proj="-Jx$scale/$scale -Jz$scale  -E130/30"
+
+
+files=`ls tmp_rsf/vel-*-gmt | gawk -F- '{print($(NF-1),$0)}' | sort -g | gawk '{print($2)}'`
+
+fs="";fs_gif=""
+for f in $files;do
+    tstep=`echo $f | gawk -F- '{print ( $(NF-1 ) )}' | sort -g`
+    time=`echo $f  | gawk -F- 'BEGIN{}{printf("%.6f",$(NF-2))}'`
+    echo $f $tstep $time
+    ann=-Ba25e3f5e3:"x [m]":/a25e3f5e3:"y [m]":/a10e3f2e3:"z [m]"::."$time yr":WESNZ+
+
+    ofile=tmp.flt.$tstep.ps
+    ofile_gif=tmp.flt.$tstep.gif
+    psxyz $f "$ann"  -L  $proj $regz -m -W0.5 -Ctmp.cpt -P -K > $ofile
+    psscale -D5/-.5/5/.2h -E -Ctmp.cpt -O -Q  >> $ofile
+    modifybb $ofile
+    /usr/bin/convert -density 150 -background white -flatten $ofile $ofile_gif &
+    fs_gif="$ofile_gif"
+    fs="$fs $ofile"
+done
+gifsicle --colors 256 $fs_gif > rsf_mov.gif
+rm $fs
+

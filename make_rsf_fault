@@ -1,0 +1,30 @@
+#!/bin/bash
+
+
+#makefault -l 25e3 -w 10e3 -z -10e3 -n 100 -m 40 > geom.in
+makefault -l 25e3 -w 10e3 -z -10e3 -n 25 -m 10 > geom.in
+#makefault -l 25e3 -w 10e3 -z -10e3 -n 50 -m 20 > geom.in
+
+gawk '{y=$2;z=$3;b=0.02;if((sqrt(y*y)<22e3)&&(z>-17e3)&&(z<-3e3))a=0.01;else a=0.03;print(a,b)}' geom.in > rsf.dat
+reg=-R-30e3/30e3/-30e3/30e3
+regz=$reg/-25e3/0
+
+gawk '{print($1-$2)}' rsf.dat > tmp.dat
+cat geom.in | patch2xyz tmp.dat 0 0 1 > tmp.gmt
+
+scale=1e-4
+
+proj="-Jx$scale/$scale -Jz$scale  -E130/30"
+
+ann=-Ba25e3f5e3:"x":/a25e3f5e3:"y":/a5e3f2e3:"z":WESNZ+
+
+makecpt -T-0.015/0.015/0.0015 -Cvik > tmp.cpt
+ofile=flt.ps
+psxyz tmp.gmt -L $ann $proj $regz -m -W0.5 -Ctmp.cpt -P -K > $ofile
+psscale -D5/-.5/5/.2h -Ctmp.cpt -B0.005/:"a-b": -O >> $ofile
+modifybb $ofile
+
+
+
+
+rm tmp.gmt tmp.dat
