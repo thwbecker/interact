@@ -301,10 +301,10 @@ FSTRESS2HOR_OBJS = $(ODIR)/block_read_gps.sph.o $(ODIR)/svd.o $(ODIR)/numrec_svd
 
 #
 # real interact and test program
-OBJ = $(ODIR)/main.o $(INTERACT_OBJS) 
+OBJ = $(ODIR)/regular_interact_main.o $(INTERACT_OBJS) 
 OBJ_SGL = $(OBJ:.o=.sgl.o)
 OBJ_DEBUG = $(OBJ:.o=.dbg.o)
-NOBJ = $(ODIR)/main.o $(INTERACT_NOISE_OBJS)
+NOBJ = $(ODIR)/regular_interact_main.o $(INTERACT_NOISE_OBJS)
 # test programs
 TOBJ = $(ODIR)/test_stuff.o $(INTERACT_OBJS)
 T2OBJ = $(ODIR)/test_triangle_stress.o $(INTERACT_OBJS) 
@@ -739,7 +739,8 @@ auto_proto.h:
 	touch auto_proto.h;\
 	cproto  $(DEFINE_FLAGS)  $(GEOPROJECT_INCLUDES) \
 		$(PGPLOT_DEFINES) $(PGPLOT_INCLUDES) $(MY_PRECISION) \
-		$(SLATEC_INCLUDES)  $(SUPERLU_INCLUDES)  -f2 -q *.c 2> /dev/null | grep -v "void main("  | grep -v "int main(" > tmp.h; \
+		$(SLATEC_INCLUDES)  $(SUPERLU_INCLUDES)  -f2 -q *.c 2> /dev/null | \
+		grep -v "void main("  | grep -v "int main(" > tmp.h; \
 		mv tmp.h auto_proto.h
 
 
