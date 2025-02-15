@@ -93,21 +93,26 @@ int  write_patch_event_file(float time, int nriter, int aflt, float mom,
 #endif
   return cnt;
 }
-/* read in rate state friction parameyets */
+/* 
+   read in rate state friction parameters 
+*/
 void read_rsf(char *filename, struct med *medium, struct flt *fault)
 {
   int i;
   FILE *in;
-  
-  for(i=0;i < medium->nrflt;i++){
-    /*  */
-    fault[i].mu_d = medium->b;	/* mu_d = b */
-    if((fabs(fault[i].pos[0])<1.8)&&(fabs(fault[i].pos[1])<.8))
-      fault[i].mu_s =  0.01;
-    else
-      fault[i].mu_s =  0.03;
-    /*  */
-    //fprintf(stderr,"loc %g %g a %g b %g a-b %g a/b %g\n",fault[i].pos[0],fault[i].pos[1],
-    //fault[i].mu_s,fault[i].mu_d,fault[i].mu_s-fault[i].mu_d,fault[i].mu_s/fault[i].mu_d);
+  COMP_PRECISION aavg,bavg;
+  in = myopen(filename,"r");
+  aavg=bavg=0;
+  for(i=0;i < medium->nrflt;i++){ /* read a and b */
+    if(fscanf(in,TWO_CP_FORMAT,&(fault[i].mu_s),&(fault[i].mu_d))!=2){
+      fprintf(stderr,"read_rsf: error reading a b for patch %i\n",i);
+      exit(-1);
+    }
+    aavg += fault[i].mu_s;
+    bavg += fault[i].mu_d;
   }
+  fclose(in);
+  aavg /= (COMP_PRECISION)medium->nrflt;
+  bavg /= (COMP_PRECISION)medium->nrflt;
+  fprintf(stderr,"read_rsf: read a and b values, on averag %g and %g\n",aavg,bavg);
 }

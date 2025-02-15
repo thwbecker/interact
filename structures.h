@@ -241,7 +241,7 @@ struct med{
     x_scroll_inc;
 #endif
   /* RSF stuff */
-  COMP_PRECISION f0,shear_mod_over_2cs_si,dc,b,v0,vpl;
+  COMP_PRECISION f0,shear_mod_over_2cs_si,dc,v0,vpl,vmin;
   COMP_PRECISION nan;		/* remember to initialize  */
   /*  */
   my_boolean force_petsc;
@@ -386,9 +386,6 @@ struct interact_ctx{
   struct flt *fault;
   struct med *medium;
   int src_slip_mode,rec_stress_mode;
-#ifdef USE_PETSC
-  Vec slip_rate;
-#endif
 };
 
 /* the structures for blockinvert type programs */

@@ -309,6 +309,7 @@ singular value will be set to zero
 #define GEOMVIEW_MODE 1
 #define PSXYZ_MODE 2
 #define PSXYZ_SCALAR_MODE 7
+#define PSXYZ_STRIKE_DISP_OUT_MODE 8
 #define BC_OUT_MODE 3
 #define VERTEXOUT_MODE 4
 #define VEC_OUT_MODE 5

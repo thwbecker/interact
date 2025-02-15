@@ -166,8 +166,8 @@ void print_fault_data(char *filename,struct med *medium,struct flt *fault)
   /* 
      loop through faults and sort by group
   */
-  for(grp=0;grp<medium->nrgrp;grp++)
-    for(i=0;i<medium->nrflt;i++){
+  for(grp=0;grp < medium->nrgrp;grp++)
+    for(i=0;i < medium->nrflt;i++){
       if(fault[i].group == grp){
 	calc_absolute_shear_stress(&abs_tau,i,fault);
 	val[0] = // Coulomb stress

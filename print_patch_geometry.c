@@ -142,6 +142,7 @@ int print_patch_geometry_and_bc(int flt_offset,struct flt *fault,
 
   */
   case PSXYZ_SCALAR_MODE:
+  case PSXYZ_STRIKE_DISP_OUT_MODE:
   case PSXYZ_MODE:{
     calculate_bloated_vertices(vertex,(fault+flt_offset),leeway);
 #ifdef ALLOW_NON_3DQUAD_GEOM
@@ -149,8 +150,9 @@ int print_patch_geometry_and_bc(int flt_offset,struct flt *fault,
     case TWO_DIM_SEGMENT_PLANE_STRAIN:
     case TWO_DIM_SEGMENT_PLANE_STRESS:{
       if(opmode == PSXYZ_SCALAR_MODE)
-	fprintf(out,"> -Z%g\n",scalar[flt_offset]);
-
+	fprintf(out,"> -Z%e\n",scalar[flt_offset]);
+      else if(opmode == PSXYZ_STRIKE_DISP_OUT_MODE)
+	fprintf(out,"> -Z%e\n",fault[flt_offset].u[STRIKE]);
       // draw segment with endbars
       lfac = fault[flt_offset].l * 0.2;
       for(l=0;l<3;l++)
@@ -177,8 +179,9 @@ int print_patch_geometry_and_bc(int flt_offset,struct flt *fault,
       ielmul = number_of_subpatches((fault+flt_offset));
       for(i=0;i < ielmul;i++){
 	if(opmode == PSXYZ_SCALAR_MODE)
-	  fprintf(out,"> -Z%g\n",scalar[flt_offset]);
-
+	  fprintf(out,"> -Z%e\n",scalar[flt_offset]);
+	else if(opmode == PSXYZ_STRIKE_DISP_OUT_MODE)
+	  fprintf(out,"> -Z%e\n",fault[flt_offset].u[STRIKE]);
 	ncon = ncon_of_subpatch((fault+flt_offset),i);
 	for(k=0;k < ncon;k++){
 	  for(l=0;l<3;l++){
@@ -195,7 +198,9 @@ int print_patch_geometry_and_bc(int flt_offset,struct flt *fault,
     case TRIANGULAR:
     case OKADA_PATCH:{
       if(opmode == PSXYZ_SCALAR_MODE)
-	fprintf(out,"> -Z%g\n",scalar[flt_offset]);
+	fprintf(out,"> -Z%e\n",scalar[flt_offset]);
+      else if(opmode == PSXYZ_STRIKE_DISP_OUT_MODE)
+	fprintf(out,"> -Z%e\n",fault[flt_offset].u[STRIKE]);
       ncon = ncon_of_subpatch((fault+flt_offset),0);
       for(k=0;k < ncon;k++){
 	for(l=0;l<3;l++){
@@ -210,7 +215,9 @@ int print_patch_geometry_and_bc(int flt_offset,struct flt *fault,
     }}
 #else
     if(opmode == PSXYZ_SCALAR_MODE)
-      fprintf(out,"> -Z%g\n",scalar[flt_offset]);
+      fprintf(out,"> -Z%e\n",scalar[flt_offset]);
+    else if(opmode == PSXYZ_STRIKE_DISP_OUT_MODE)
+      fprintf(out,"> -Z%e\n",fault[flt_offset].u[STRIKE]);
     for(k=0;k<4;k++){
       for(l=0;l<3;l++){
 	if(fabs(vertex[k*3+l]/CHAR_FAULT_DIM)>
@@ -222,7 +229,7 @@ int print_patch_geometry_and_bc(int flt_offset,struct flt *fault,
       fprintf(out,"\n");
     }
 #endif
-    if(opmode != PSXYZ_SCALAR_MODE)
+    if((opmode != PSXYZ_SCALAR_MODE)&&(opmode !=  PSXYZ_STRIKE_DISP_OUT_MODE))
       fprintf(out,">\n");
     break;
   }
