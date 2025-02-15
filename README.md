@@ -2,11 +2,14 @@
 
 `interact` uses `dc3d.f` as provided by Y. Okada as in Okada (BSSA,
 1992), has .f90 code converted from Nikkhoo and Walter (GJI,2015),
-linear algebra routines from SLATEC, LAPACK, and EISPACK. Might
-contain other copyrighted material by others (e.g. Numerical
+linear algebra routines from SLATEC, LAPACK, and EISPACK, and Petsc
+interface.
+
+Might contain other copyrighted material by others (e.g. Numerical
 Recipes). Petsc implementation based on Dave May's examples and
 assistance, and .m to .f90 conversion for slip inspired by code by
-P. Bird.
+P. Bird. Parts of the code can be compiled against Petsc which is used
+to implement parallelism.
 
 See files `INSTALLATION`, `README.md`, and `help.txt` for
 documentation and `COPYRIGHT` and `COPYING` for the license and
@@ -24,7 +27,7 @@ If you use `interact` please cite the following
 >    pages = {NG62A-0925}
 >  }
 
-Copyright (C) Thorsten W. Becker 2000 - 2025
+Copyright (c) Thorsten Becker 2000 - 2025
 
 thwbecker@post.harvard.edu
 
@@ -716,7 +719,7 @@ OPTIONS:
 
 * -h  prints out this help message and exits to the operating system
 
-(C) Thorsten Becker, thwbecker@post.harvard.edu, 1999 - 2023)
+(c) Thorsten Becker, thwbecker@post.harvard.edu, 1999 - 2025)
     interact - boundary element code for elastic half-spaces
     3-D quad dislocationS based on Okada (BSSA, 1992).
     3-D triangular dislocations based on Nikkhoo and Walter (GJI, 2015).
