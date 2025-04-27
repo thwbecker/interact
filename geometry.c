@@ -983,9 +983,9 @@ void calc_tri_bary_coord(COMP_PRECISION *xt, COMP_PRECISION *xc,
     exit(-1);
   }
 #endif
-  xc[INT_X] = (xt[  +INT_X] + xt[3+INT_X] + xt[6+INT_X])/n1;
-  xc[INT_Y] = (xt[  +INT_Y] + xt[3+INT_Y] + xt[6+INT_Y])/n2;
-  xc[INT_Z] = (xt[  +INT_Z] + xt[3+INT_Z] + xt[6+INT_Z])/n3;
+  xc[INT_X] = xt[ +INT_X]/n1 + xt[3+INT_X]/n2 + xt[6+INT_X]/n3;
+  xc[INT_Y] = xt[ +INT_Y]/n1 + xt[3+INT_Y]/n2 + xt[6+INT_Y]/n3;
+  xc[INT_Z] = xt[ +INT_Z]/n1 + xt[3+INT_Z]/n2 + xt[6+INT_Z]/n3;
 
 }
 //

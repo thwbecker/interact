@@ -639,6 +639,9 @@ void read_geometry(char *patch_filename,struct med **medium,
     if((*medium)->comm_rank == 0){
       fprintf(stderr,"read_geometry: %i 2D elements, %i points, %i triangles, %i iquads, and %i regular quads\n",
 	      nr_2d,nr_pt_src,nr_triangle,nr_iquad,(*medium)->nrflt - nr_triangle - nr_pt_src - nr_2d - nr_iquad);
+      if(nr_triangle)
+	fprintf(stderr,"read_geometry:  triangle integration mode %i (default: %i)\n",(*medium)->tri_eval_mode,
+		TRI_EVAL_DEF);
       if(nr_2d)
 	fprintf(stderr,"read_geometry: two dimensional approximation: plane %s %s\n",
 		((*medium)->twod_approx_is_plane_stress)?("stress"):("strain"),

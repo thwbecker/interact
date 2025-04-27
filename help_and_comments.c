@@ -595,7 +595,7 @@ void phelp(void)
 	  name_boolean(CHECK_FOR_INTERACTION_FEEDBACK_DEF),
 	  name_boolean(TOGV(CHECK_FOR_INTERACTION_FEEDBACK_DEF)));
   PE("");
-  fprintf(stderr," -tev int_val\t triangle evaluation mode, 0: centroid, 1: M244, 2: M236, 3: Hybrid (default: %i)\n",(int)TRI_EVAL_DEF);
+  fprintf(stderr," -tv int_val\t triangle evaluation mode, 0: centroid, 1: M244, 2: M236, 3: Hybrid (default: %i)\n",(int)TRI_EVAL_DEF);
   PE("");
   
   fprintf(stderr," -si saves the interaction (I) matrix during a loading simulation,\n");

@@ -409,7 +409,7 @@ void init_parameters(char **argv, int argc, my_boolean *read_fault_properties,
 		     MODE_TYPE *tri_eval_mode,
 		     int rank)
 {
-  int i;
+  int i,itmp;
   my_boolean warned = FALSE;
   /* 
      assign default values 
@@ -527,9 +527,14 @@ void init_parameters(char **argv, int argc, my_boolean *read_fault_properties,
     }else if(strcmp(argv[i],"-wc")==0){// SVD wmax
       advance_argument(&i,argc,argv);
       sscanf(argv[i],ONE_CP_FORMAT,wcutoff);
-    }else if(strcmp(argv[i],"-tev")==0){// tri eval mode
+    }else if(strcmp(argv[i],"-tv")==0){// tri eval mode
       advance_argument(&i,argc,argv);
-      sscanf(argv[i],"%hhu",tri_eval_mode);
+      sscanf(argv[i],"%i",&itmp);
+      if((itmp < 0) || (itmp >TRIANGULAR_HYBR -TRIANGULAR )){
+	fprintf(stderr,"init_parameters: tri eval mode %i out of bounds\n",itmp);
+	exit(-1);
+      }
+      *tri_eval_mode = (MODE_TYPE)itmp;
     }else if(strcmp(argv[i],"-fpetsc")==0){// 
       toggle(force_petsc);
     }else{
