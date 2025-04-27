@@ -42,7 +42,7 @@ int print_patch_geometry_and_bc(int flt_offset,struct flt *fault,
 
      */
 #ifdef ALLOW_NON_3DQUAD_GEOM
-    if((fault[flt_offset].type != TRIANGULAR)&&(fault[flt_offset].type != IQUAD)){
+    if((!is_triangular(fault[flt_offset].type))&&(fault[flt_offset].type != IQUAD)){
       // normal (rectangular, 2-D, or point source)
       alpha=90.0-(double)fault[flt_offset].strike;
       my_sincos_degd(&fault[flt_offset].sin_alpha,&fault[flt_offset].cos_alpha,alpha);
@@ -90,6 +90,9 @@ int print_patch_geometry_and_bc(int flt_offset,struct flt *fault,
 	      fault[flt_offset].l,fault[flt_offset].w,fault[flt_offset].group);
       break;
     }
+    case TRIANGULAR_M244:
+    case TRIANGULAR_M236:
+    case TRIANGULAR_HYBR:
     case TRIANGULAR:{// xt has to be assigned and allocated before
       fprintf(out,"%19.12e %19.12e %19.12e %10.6f %10.6f %19.12e %19.12e %6i ",
 	      fault[flt_offset].x[INT_X],	      fault[flt_offset].x[INT_Y],	      fault[flt_offset].x[INT_Z],
@@ -195,6 +198,9 @@ int print_patch_geometry_and_bc(int flt_offset,struct flt *fault,
       }
       break;
     case POINT_SOURCE:
+    case TRIANGULAR_M244:
+    case TRIANGULAR_M236:
+    case TRIANGULAR_HYBR:
     case TRIANGULAR:
     case OKADA_PATCH:{
       if(opmode == PSXYZ_SCALAR_MODE)

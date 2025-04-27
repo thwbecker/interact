@@ -166,6 +166,12 @@ struct med{
   COMP_PRECISION print_interval,slip_line_dt,old_moment_time,slip_line_time;
 #endif
   int nr_timesteps;
+  /* triangle mode type */
+  MODE_TYPE tri_eval_mode;    /* 0: single centroid
+				 1: M244 
+				 2: M236
+				 3: Hybrid
+			      */
   /*
     material properties that don't change within the medium
   */
@@ -299,6 +305,7 @@ struct flt{
 		    #define IQUAD 6
 
 		 */
+  
   COMP_PRECISION *xn; /* coordinates of the three nodes of the
 			 triangular or irregular quad element */
 #endif

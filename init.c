@@ -23,9 +23,11 @@ void check_parameters_and_init(int argc, char **argv,
   my_boolean read_fault_properties,suppress_interactions,whole_fault_mode,
     read_stress_relation_factors,use_slip_files,whole_fault_deactivations,
     use_sparse_storage,use_old_imat,use_old_amat,save_imat,save_amat,
-    check_for_interaction_feedback,keep_slipping,attempt_restart,suppress_nan_output,
+    check_for_interaction_feedback,keep_slipping,attempt_restart,
+    suppress_nan_output,
     twod_approx_is_plane_stress,print_plane_coord,half_plane,
     variable_time_step,debug,no_interactions,force_petsc;
+  MODE_TYPE tri_eval_mode;  
   short int solver_mode;
   COMP_PRECISION pressure,med_cohesion,min_stress_drop,wcutoff;
   I_MATRIX_PREC i_mat_cutoff;
@@ -52,7 +54,7 @@ void check_parameters_and_init(int argc, char **argv,
 		  &suppress_nan_output,&pressure,
 		  &twod_approx_is_plane_stress,&print_plane_coord,
 		  &half_plane,&variable_time_step,&debug,&wcutoff,
-		  &no_interactions,&force_petsc,
+		  &no_interactions,&force_petsc,&tri_eval_mode,
 		  (*medium)->comm_rank);
   // load files, etc
   initialize(medium,fault,read_fault_properties,max_nr_flt_files,
@@ -63,7 +65,7 @@ void check_parameters_and_init(int argc, char **argv,
 	     keep_slipping,attempt_restart,solver_mode,suppress_nan_output,
 	     pressure,twod_approx_is_plane_stress,
 	     print_plane_coord,half_plane,variable_time_step,debug,TRUE,wcutoff,
-	     no_interactions,force_petsc);
+	     no_interactions,force_petsc,tri_eval_mode);
 }
 /*
 
@@ -95,7 +97,8 @@ void initialize(struct med **medium, struct flt **fault,
 		my_boolean print_plane_coord,my_boolean half_plane,
 		my_boolean variable_time_step,my_boolean debug,
 		my_boolean init_system,COMP_PRECISION wcutoff,
-		my_boolean no_interactions,my_boolean force_petsc)
+		my_boolean no_interactions,my_boolean force_petsc,
+		MODE_TYPE tri_eval_mode)
 {
 #ifdef USE_PETSC
   int fchunk;
@@ -107,12 +110,16 @@ void initialize(struct med **medium, struct flt **fault,
   // first, need the FAULT GEOMETRY, and calculate the position of patches
   // also, allocate space and initialize the medium structure
   //
+  /* for triangle stresses */
+  (*medium)->tri_eval_mode = tri_eval_mode;
+
   /* all nodes need to know geometry */
   read_geometry(GEOMETRY_FILE,medium,fault,read_fault_properties,
 		twod_approx_is_plane_stress,half_plane,TRUE);
   if((*medium)->comm_rank==0)
     fprintf(stderr,"initialize: all stress values are based on a shear modulus of %g\n",
 	    SHEAR_MODULUS);
+
   /* assign faults to processors */
 #ifdef USE_PETSC
   if((*medium)->comm_size == 1){
@@ -399,6 +406,7 @@ void init_parameters(char **argv, int argc, my_boolean *read_fault_properties,
 		     COMP_PRECISION *wcutoff,
 		     my_boolean *no_interactions,
 		     my_boolean *force_petsc,
+		     MODE_TYPE *tri_eval_mode,
 		     int rank)
 {
   int i;
@@ -417,6 +425,7 @@ void init_parameters(char **argv, int argc, my_boolean *read_fault_properties,
   *whole_fault_deactivations = WHOLE_FAULT_DEACTIVATIONS_DEF;
   *use_sparse_storage = USE_SPARSE_STORAGE_DEF;
   *min_stress_drop = 0.0;
+  *tri_eval_mode = TRI_EVAL_DEF;
   *i_mat_cutoff = I_MAT_CUTOFF_DEF;
   *use_old_imat = USE_OLD_IMAT_DEF;
   *save_imat = SAVE_IMAT_DEF;
@@ -518,6 +527,9 @@ void init_parameters(char **argv, int argc, my_boolean *read_fault_properties,
     }else if(strcmp(argv[i],"-wc")==0){// SVD wmax
       advance_argument(&i,argc,argv);
       sscanf(argv[i],ONE_CP_FORMAT,wcutoff);
+    }else if(strcmp(argv[i],"-tev")==0){// tri eval mode
+      advance_argument(&i,argc,argv);
+      sscanf(argv[i],"%hhu",tri_eval_mode);
     }else if(strcmp(argv[i],"-fpetsc")==0){// 
       toggle(force_petsc);
     }else{

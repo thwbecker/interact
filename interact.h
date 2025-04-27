@@ -289,19 +289,25 @@ singular value will be set to zero
   patch ('element') type
 
   0: regular rectangular (Okada) patch
-  1: point source
-  2: triangular 
-  3: 2-D segment, will automatically switch to 2-D mode
-  4: like 3, but plane stress instead of plane strain
-  5: like 3, but half plane (y<=0)
+  10: point source
+  20: triangular (+1, +2, +3 for different modes
+  
+  30: 2-D segment, will automatically switch to 2-D mode
+  40: like 3, but plane stress instead of plane strain
+  50: like 3, but half plane (y<=0)
 */
 #define OKADA_PATCH 0
-#define POINT_SOURCE 1
-#define TRIANGULAR 2
-#define TWO_DIM_SEGMENT_PLANE_STRAIN 3
-#define TWO_DIM_SEGMENT_PLANE_STRESS 4
-#define TWO_DIM_HALFPLANE_PLANE_STRAIN 5
-#define IQUAD 6
+#define POINT_SOURCE 10
+
+#define TRIANGULAR 20
+#define TRIANGULAR_M244 21
+#define TRIANGULAR_M236 22
+#define TRIANGULAR_HYBR 23
+
+#define TWO_DIM_SEGMENT_PLANE_STRAIN 30
+#define TWO_DIM_SEGMENT_PLANE_STRESS 40
+#define TWO_DIM_HALFPLANE_PLANE_STRAIN 50
+#define IQUAD 60
 /* 
    output modes for print_patch_geometry
 */
@@ -364,6 +370,10 @@ singular value will be set to zero
 #define I_MAT_ON_FILE 1
 #define CALC_I_COEFF_NOW 2
 #define SPARSE_I_MAT 3
+/* 
+   triangle evaluation mode default
+*/
+#define TRI_EVAL_DEF 0
 /*
   
   solver modes for the unconstrained 

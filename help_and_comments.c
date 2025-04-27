@@ -595,6 +595,9 @@ void phelp(void)
 	  name_boolean(CHECK_FOR_INTERACTION_FEEDBACK_DEF),
 	  name_boolean(TOGV(CHECK_FOR_INTERACTION_FEEDBACK_DEF)));
   PE("");
+  fprintf(stderr," -tev int_val\t triangle evaluation mode, 0: centroid, 1: M244, 2: M236, 3: Hybrid (default: %i)\n",(int)TRI_EVAL_DEF);
+  PE("");
+  
   fprintf(stderr," -si saves the interaction (I) matrix during a loading simulation,\n");
   fprintf(stderr,"     if I is written to a file during runtime and not held in memory.\n     Else, \"%s\" and \"%s.hdr\" will be deleted.\n",
 	  INTERACTION_MATRIX_FILE,INTERACTION_MATRIX_FILE);
@@ -706,7 +709,7 @@ void phelp(void)
   PE("");
   PE(" -h  prints out this help message and exits to the operating system");
   PE("");
-  PE("(C) Thorsten Becker, thwbecker@post.harvard.edu, 1999 - 2024)");
+  PE("(C) Thorsten Becker, thwbecker@post.harvard.edu, 1999 - 2025)");
   PE("    interact - boundary element code for elastic half-spaces");
   PE("    3-D quad dislocationS based on Okada (BSSA, 1992).");
 #ifdef ALLOW_NON_3DQUAD_GEOM

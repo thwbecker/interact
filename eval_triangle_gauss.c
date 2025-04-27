@@ -8,7 +8,7 @@
   program to evaluate the displacement and stresses due
   to a triangular element by Gauss integration
 
-  unclear if this ever worked or could work?!
+  UNCLEAR IF THIS EVER WORKED OR COULD WORK?!
 
   input is the observational point x, the triangular
   coordinates xt, and the displacement in disp
@@ -27,6 +27,8 @@ void eval_triangle_gauss(COMP_PRECISION *x,struct flt *fault,
 			 COMP_PRECISION *disp,COMP_PRECISION *u_global, 
 			 COMP_PRECISION sm_global[3][3],int *giret)
 {
+  fprintf(stderr,"eval_triangle_gauss: unclear if this function works or should be called. Exiting\n");
+  exit(-1);
   //
   // can be 1, 3, 7, or 13, for slip
   //

@@ -121,6 +121,35 @@ COMP_PRECISION tensor3d_norm(COMP_PRECISION x[3][3])
   return((COMP_PRECISION)sqrt(sum));
     
 }
+void zero_3x3_matrix(COMP_PRECISION x[3][3])
+{
+  int i,j;
+  for(i=0;i<3;i++)
+    for(j=0;j<3;j++)
+      x[i][j]=0.0;
+}
+void scale_3x3_matrix(COMP_PRECISION x[3][3],COMP_PRECISION scale)
+{
+  int i,j;
+  for(i=0;i < 3;i++)
+    for(j=0;j < 3;j++)
+      x[i][j] *= scale;
+}
+void add_ay_to_3x3_matrix(COMP_PRECISION x[3][3],
+			  COMP_PRECISION y[3][3],COMP_PRECISION a)
+{
+  int i,j;
+  for(i=0;i<3;i++)
+    for(j=0;j<3;j++)
+      x[i][j] += a*y[i][j];
+}
+void add_y_to_3x3_matrix(COMP_PRECISION x[3][3],COMP_PRECISION y[3][3])
+{
+  int i,j;
+  for(i=0;i<3;i++)
+    for(j=0;j<3;j++)
+      x[i][j] += y[i][j];
+}
 
 /* 
    Euclidian norm of vector difference in 3D

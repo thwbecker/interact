@@ -56,7 +56,8 @@ PetscErrorCode GenKEntries(PetscInt sdim, PetscInt M, PetscInt N,
   get_right_slip(slip,ictx->src_slip_mode,1.0);	/* strike motion */
   for (j = 0; j < M; j++) {
     for (k = 0; k < N; k++) {
-      eval_green(ictx->fault[K[k]].x,(ictx->fault+J[j]),slip,disp,stress,&iret, GC_STRESS_ONLY,TRUE);
+      eval_green(ictx->fault[K[k]].x,(ictx->fault+J[j]),slip,disp,stress,&iret,
+		 GC_STRESS_ONLY,TRUE);
       if(iret != 0){
 	fprintf(stderr,"GenKentries: WARNING: i=%3i j=%3i singular\n",j,k);
 	sval = 0.0;
@@ -482,7 +483,8 @@ void calc_interaction_matrix(struct med *medium,struct flt *fault,
 COMP_PRECISION interaction_coefficient(int i, int j, int k, int l,
 				       struct flt *fault,int *iret)
 {
-  COMP_PRECISION disp[3],fac,sm[3][3]={{0.,0.,0.},{0.,0.,0.},{0.,0.,0.}},u[3]={0.,0.,0.};
+  COMP_PRECISION disp[3],fac,
+    sm[3][3]={{0.,0.,0.},{0.,0.,0.},{0.,0.,0.}},u[3]={0.,0.,0.};
   static COMP_PRECISION trac[3];
   static int old_indices[4]={-1,0,0,0};
   // check if we have calculated the traction vector

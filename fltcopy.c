@@ -1,7 +1,7 @@
 /*
   interact: model fault interactions using dislocations in a 
             halfspace
-  (C) Thorsten Becker, becker@eps.harvard.edu
+	    (C) Thorsten Becker, thwbecker@post.harvard.edu
 
   $Id: fltcopy.c,v 2.7 2002/10/08 19:24:44 tbecker Exp $
 */
@@ -29,7 +29,7 @@ void fltcp(struct flt *a, struct flt *b)
 
 #ifdef ALLOW_NON_3DQUAD_GEOM
   b->type = a->type;
-  if(a->type == TRIANGULAR){
+  if(is_triangular(a->type)){
     a_equals_b_vector(b->xn,a->xn,9);
   }
   if(a->type == IQUAD){

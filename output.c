@@ -175,7 +175,7 @@ void print_fault_data(char *filename,struct med *medium,struct flt *fault)
 			 fault[i].s[NORMAL],medium->cohesion);
 	val[1] = ((COMP_PRECISION)fault[i].mu_d)*fault[i].s[NORMAL];
 #ifdef ALLOW_NON_3DQUAD_GEOM
-	if(((fault[i].type==TRIANGULAR)||(fault[i].type==IQUAD))&&(rotate)){
+	if(((is_triangular(fault[i].type))||(fault[i].type==IQUAD))&&(rotate)){
 	  calc_global_strike_dip_from_local((fault+i),gstrike, gnormal, gdip);
 	  /* 
 	     project to global for output 

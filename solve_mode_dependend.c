@@ -1,7 +1,7 @@
 /*
   interact: model fault interactions using dislocations in a 
             halfspace
-  (C) Thorsten Becker, becker@eps.harvard.edu
+  (C) Thorsten Becker, thwbecker@post.harvard.edu
 
   $Id: solve_mode_dependend.c,v 1.28 2003/01/07 02:52:29 tbecker Exp $
 */
@@ -425,7 +425,7 @@ void add_quake_stress_4(my_boolean *sma,COMP_PRECISION *slip,
 
 #ifdef SUPER_DUPER_DUPER_DEBUG
 #ifdef ALLOW_NON_3DQUAD_GEOM
-      if((fault[i].type == TRIANGULAR)||(fault[i].type == IQUAD)){
+      if((is_triangular(fault[i].type))||(fault[i].type == IQUAD)){
 	fprintf(stderr,"add_quake_stress_3: rec %03i rup %03i slip %10.3e, %10.3e, %10.3e s/d %.2f %.2f",
 		i,r_flt,slip[STRIKE],slip[DIP],slip[NORMAL],fault[i].strike,fault[i].dip);
 	calc_global_strike_dip_from_local((fault+i),gstrike,gnormal,gdip);

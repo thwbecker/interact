@@ -135,6 +135,8 @@ void eval_2dsegment_plane_strain_tdd(float *, struct flt *, float *, float *, fl
 /* eval_green.c */
 void eval_green_and_project_stress_to_fault(struct flt *, int, int, float *, float *);
 void eval_green(float *, struct flt *, float *, float *, float [3][3], int *, unsigned char, unsigned char);
+void eval_triangle_general(float *, struct flt *, float *, float *, float [3][3], int *, unsigned char, unsigned char);
+void eval_tri_multi_point(float *, struct flt *, float *, float *, float [3][3], int *, unsigned char, unsigned char, unsigned char);
 void eval_green_basic(float *, struct flt *, float *, float *, float [3][3], int *);
 /* eval_iquad.c */
 void eval_iquad(float *, struct flt *, float *, float *, float [3][3], int *, unsigned char);
@@ -210,6 +212,7 @@ void check_angles(float *, double *);
 void fix_azimuth(double *);
 void globalx(float *, float, float, float *);
 void calc_centroid_tri(float *, float *);
+void calc_tri_bary_coord(float *, float *, float, float, float);
 void calc_mean_quad_coord(float *, float *);
 void calc_centroid_quad(float *, float *);
 unsigned char patch_is_2d(unsigned char);
@@ -221,6 +224,7 @@ void get_local_x_on_plane(float *, float *, float *, float *, float *);
 void get_fault_plane_basevec(float *, float *, float *, struct flt *, struct med *);
 void calc_deviatoric_stress(float [3][3], float [3][3], float *, float *);
 void get_sub_normal_vectors(struct flt *, int, float *, float *, float *, float *);
+unsigned char is_triangular(unsigned char);
 void calc_global_strike_dip_from_local(struct flt *, float *, float *, float *);
 void calc_global_slip_and_traction_from_local(struct flt *, float *, float *, float *, float *, float *, float *, float *, unsigned char);
 /* geoproject.c */
@@ -233,9 +237,9 @@ char *comment_on_code(short int);
 char *comment_on_code_bc(short int, float);
 /* init.c */
 void check_parameters_and_init(int, char **, struct med **, struct flt **, unsigned char *, float *, float *);
-void initialize(struct med **, struct flt **, unsigned char, int, unsigned char, unsigned char, float, float *, float *, unsigned char, unsigned char, unsigned char, float, unsigned char, float, unsigned char, unsigned char, unsigned char, unsigned char, unsigned char, unsigned char, unsigned char, short int, unsigned char, float, unsigned char, unsigned char, unsigned char, unsigned char, unsigned char, unsigned char, float, unsigned char, unsigned char);
+void initialize(struct med **, struct flt **, unsigned char, int, unsigned char, unsigned char, float, float *, float *, unsigned char, unsigned char, unsigned char, float, unsigned char, float, unsigned char, unsigned char, unsigned char, unsigned char, unsigned char, unsigned char, unsigned char, short int, unsigned char, float, unsigned char, unsigned char, unsigned char, unsigned char, unsigned char, unsigned char, float, unsigned char, unsigned char, unsigned char);
 void init_files(struct med **, struct flt **);
-void init_parameters(char **, int, unsigned char *, unsigned char *, unsigned char *, unsigned char *, float *, int *, unsigned char *, unsigned char *, unsigned char *, float *, unsigned char *, float *, unsigned char *, unsigned char *, unsigned char *, unsigned char *, unsigned char *, unsigned char *, unsigned char *, short int *, unsigned char *, float *, unsigned char *, unsigned char *, unsigned char *, unsigned char *, unsigned char *, float *, unsigned char *, unsigned char *, int);
+void init_parameters(char **, int, unsigned char *, unsigned char *, unsigned char *, unsigned char *, float *, int *, unsigned char *, unsigned char *, unsigned char *, float *, unsigned char *, float *, unsigned char *, unsigned char *, unsigned char *, unsigned char *, unsigned char *, unsigned char *, unsigned char *, short int *, unsigned char *, float *, unsigned char *, unsigned char *, unsigned char *, unsigned char *, unsigned char *, float *, unsigned char *, unsigned char *, unsigned char *, int);
 void advance_argument(int *, int, char **);
 char *name_boolean(unsigned char);
 unsigned char toggle(unsigned char *);
@@ -268,6 +272,10 @@ void rotate_vec2d(float *, float *, double, double);
 void rotate_mat(float [3][3], float [3][3], float [3][3]);
 void rotate_mat_z(float [3][3], float [3][3], double, double);
 float tensor3d_norm(float [3][3]);
+void zero_3x3_matrix(float [3][3]);
+void scale_3x3_matrix(float [3][3], float);
+void add_ay_to_3x3_matrix(float [3][3], float [3][3], float);
+void add_y_to_3x3_matrix(float [3][3], float [3][3]);
 float distance_3d(float *, float *);
 float distance(float *, float *, int);
 float distance_float(float *, float *, int);
@@ -321,7 +329,6 @@ int countzero_vec(float *, int);
 float reformat_small(float);
 /* lusolve.c */
 void lu_driver(float *, float *, float *, int, int, struct med *);
-/* main.c */
 /* makefault.c */
 /* matrixio.c */
 void print_matrix_ftrn(float *, int, int, FILE *, unsigned char);
@@ -443,6 +450,7 @@ int read_fltdat(char *, struct flt *, struct med *, unsigned char);
 void read_geometry(char *, struct med **, struct flt **, unsigned char, unsigned char, unsigned char, unsigned char);
 /* read_stress_observations.c */
 void read_stress_observations(struct bmd *, float *, float, unsigned char, float **, float, unsigned char);
+/* regular_interact_main.c */
 /* restart.c */
 void adjust_medium_for_restart(struct med *, struct flt *);
 /* rhs.c */

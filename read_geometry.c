@@ -576,7 +576,7 @@ void read_geometry(char *patch_filename,struct med **medium,
   *fault=(struct flt *)
     realloc(*fault,sizeof(struct flt)*(*medium)->nrflt);
   //
-  // determine the number of groups that were assigned
+  // determine the number of groups that were assigned and modify triangular evaluation
   //
   for((*medium)->nrgrp=i=0;i<(*medium)->nrflt;i++){
     if((*fault+i)->group > (*medium)->nrflt-1){
@@ -587,6 +587,10 @@ void read_geometry(char *patch_filename,struct med **medium,
     }
     if((*fault+i)->group+1 > (*medium)->nrgrp)
       (*medium)->nrgrp=(*fault+i)->group+1;
+#ifdef ALLOW_NON_3DQUAD_GEOM
+    if((*fault+i)->type == TRIANGULAR)
+      (*fault+i)->type += (*medium)->tri_eval_mode;
+#endif
   }
   if(verbose)
   fprintf(stderr,"read_geometry: working with %i group(s) of patches\n",

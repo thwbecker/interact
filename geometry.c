@@ -190,7 +190,7 @@ void calculate_vertices(COMP_PRECISION *vertex,
   }else if(fault->type == POINT_SOURCE){ /* point source */
     calculate_point_source_vertices(vertex,fault,1.0,l,w);
     *l = *w = NAN;
-  }else if(fault->type == TRIANGULAR){
+  }else if(is_triangular(fault->type)){
     calculate_tri_vertices(vertex,fault,1.0);
     *l = *w = NAN;
   }else if(fault->type == IQUAD){
@@ -222,7 +222,7 @@ void calculate_bloated_vertices(COMP_PRECISION *vertex,
     calculate_seg_vertices(vertex,fault,leeway);
   else if(fault->type == OKADA_PATCH)
     calculate_quad_vertices(vertex,fault,leeway);
-  else if(fault->type == TRIANGULAR)
+  else if(is_triangular(fault->type))
     calculate_tri_vertices(vertex,fault,leeway);
   else if(fault->type == IQUAD)
     calculate_iquad_vertices(vertex,fault,leeway);
@@ -253,7 +253,7 @@ int nvert_of_patch(struct flt *fault)
     nvert = 4;
   else if(fault->type == IQUAD)
     nvert = 5;
-  else if(fault->type == TRIANGULAR)
+  else if(is_triangular(fault->type))
     nvert = 3;
   else if(fault->type == POINT_SOURCE)
     nvert = 1;
@@ -283,7 +283,7 @@ int ncon_of_subpatch(struct flt *fault, int nsubel)
     return 4;
   else if(fault->type == IQUAD)
     return 3;
-  else if(fault->type == TRIANGULAR)
+  else if(is_triangular(fault->type))
     return 3;
   else if(fault->type == POINT_SOURCE)
     return 1;
@@ -330,7 +330,7 @@ int vtk_type_of_patch(struct flt *fault, int nsubel)
     return 9;			     /* vtk quad */
   else if(fault->type == IQUAD)
     return 5;			     /* vtk three triangles approximation */
-  else if(fault->type == TRIANGULAR) /*  */
+  else if(is_triangular(fault->type)) /*  */
     return 5;			     /* vtk tri */
   else if(fault->type == POINT_SOURCE)
     return 1;			/* vertex */
@@ -744,7 +744,7 @@ void calc_group_geometry(struct med *medium,struct flt *fault,
     
     add_b_to_a_vector_3d(grp[igrp].center,fault[i].x);
 #ifdef ALLOW_NON_3DQUAD_GEOM
-    if(fault[i].type == TRIANGULAR){
+    if(is_triangular(fault[i].type)){
       /* 
 	 compute appropriate projection vectors 
 
@@ -970,9 +970,23 @@ void globalx(COMP_PRECISION *xt, COMP_PRECISION g,COMP_PRECISION h,
 // output is xc
 void calc_centroid_tri(COMP_PRECISION *xt,COMP_PRECISION *xc)
 {
-  xc[INT_X] = (xt[  +INT_X] + xt[3+INT_X] + xt[6+INT_X])/3.0;
-  xc[INT_Y] = (xt[  +INT_Y] + xt[3+INT_Y] + xt[6+INT_Y])/3.0;
-  xc[INT_Z] = (xt[  +INT_Z] + xt[3+INT_Z] + xt[6+INT_Z])/3.0;
+  calc_tri_bary_coord(xt,xc,3.,3.,3.);
+}
+/* calc baycentric coordinates with 1/n1 + 1/n2 + 1/n3 = 1 */
+void calc_tri_bary_coord(COMP_PRECISION *xt, COMP_PRECISION *xc,
+			 COMP_PRECISION n1,COMP_PRECISION n2,
+			 COMP_PRECISION n3)
+{
+#ifdef DEBUG
+  if(fabs(1/n1+1/n2+1/n3-1.0)>EPS_COMP_PREC){
+    fprintf(stderr,"calc_tri_bary_coord: coordinates don't add up 1/%g+1/%g+1/%g = %e\n",n1,n2,n3,1/n1+1/n2+1/n3);
+    exit(-1);
+  }
+#endif
+  xc[INT_X] = (xt[  +INT_X] + xt[3+INT_X] + xt[6+INT_X])/n1;
+  xc[INT_Y] = (xt[  +INT_Y] + xt[3+INT_Y] + xt[6+INT_Y])/n2;
+  xc[INT_Z] = (xt[  +INT_Z] + xt[3+INT_Z] + xt[6+INT_Z])/n3;
+
 }
 //
 // determines the mean coordinates of a rectangular element
@@ -1360,7 +1374,7 @@ void get_sub_normal_vectors(struct flt *fault, int subel,
 	  afault.xn[l*3+j] =
 	    fault->xn[node_number_of_subelement(fault,l,subel)*3+j];
       get_tri_prop_based_on_gh(&afault);
-       a_equals_b_vector_3d(strike,afault.t_strike);
+      a_equals_b_vector_3d(strike,afault.t_strike);
       a_equals_b_vector_3d(dip,afault.t_dip);
       a_equals_b_vector_3d(normal,afault.normal);
 
@@ -1385,6 +1399,20 @@ void get_sub_normal_vectors(struct flt *fault, int subel,
 
 #ifdef ALLOW_NON_3DQUAD_GEOM
 
+my_boolean is_triangular(MODE_TYPE mode)
+{
+  switch(mode){
+  case TRIANGULAR:
+  case TRIANGULAR_M244:
+  case TRIANGULAR_M236:
+  case TRIANGULAR_HYBR:
+    return TRUE;
+    break;
+  default:
+    return FALSE;
+    break;
+  }
+}
 
 
 
@@ -1399,7 +1427,7 @@ void calc_global_strike_dip_from_local(struct flt *fault,
 {
   COMP_PRECISION global_dip_rad,sin_global_dip_rad,cos_global_dip_rad;
 #ifdef DEBUG
-  if(fault->type != TRIANGULAR){
+  if(!is_triangular(fault->type)){
     fprintf(stderr,"calc_global_strike_dip_from_local: called for a non triangular patch?!\n");
     exit(-1);
   }
@@ -1428,7 +1456,7 @@ void calc_global_slip_and_traction_from_local(struct flt *fault,COMP_PRECISION *
   int j;
   COMP_PRECISION lslip[3],ltrac[3];
 #ifdef DEBUG
-  if(fault->type != TRIANGULAR){
+  if(!is_triangular(fault->type)){
     fprintf(stderr,"calc_global_strike_dip_from_local: called for a non triangular patch?!\n");
     exit(-1);
   }

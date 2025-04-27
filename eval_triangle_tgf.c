@@ -30,7 +30,7 @@
 #include "properties.h"
 
 #ifdef ALLOW_NON_3DQUAD_GEOM
-#ifdef USE_TGF_TRIANGLE
+#ifdef INT_USE_TGF_TRIANGLE
 void eval_triangle_tgf(COMP_PRECISION *x,struct flt *fault,
 		       COMP_PRECISION *slip,COMP_PRECISION *u, 
 		       COMP_PRECISION sm[3][3],int *giret,int mode, my_boolean is_self)
