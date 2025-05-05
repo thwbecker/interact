@@ -970,7 +970,12 @@ void globalx(COMP_PRECISION *xt, COMP_PRECISION g,COMP_PRECISION h,
 // output is xc
 void calc_centroid_tri(COMP_PRECISION *xt,COMP_PRECISION *xc)
 {
-  calc_tri_bary_coord(xt,xc,3.,3.,3.);
+  //calc_tri_bary_coord(xt,xc,3.,3.,3.);
+  /* faster */
+  xc[INT_X] = (xt[ +INT_X] + xt[3+INT_X] + xt[6+INT_X])/3.;
+  xc[INT_Y] = (xt[ +INT_Y] + xt[3+INT_Y] + xt[6+INT_Y])/3.;
+  xc[INT_Z] = (xt[ +INT_Z] + xt[3+INT_Z] + xt[6+INT_Z])/3.;
+
 }
 /* calc baycentric coordinates with 1/n1 + 1/n2 + 1/n3 = 1 */
 void calc_tri_bary_coord(COMP_PRECISION *xt, COMP_PRECISION *xc,
@@ -978,7 +983,7 @@ void calc_tri_bary_coord(COMP_PRECISION *xt, COMP_PRECISION *xc,
 			 COMP_PRECISION n3)
 {
 #ifdef DEBUG
-  if(fabs(1/n1+1/n2+1/n3-1.0)>EPS_COMP_PREC){
+  if(fabs(1./n1+1./n2+1./n3-1.0)>EPS_COMP_PREC){
     fprintf(stderr,"calc_tri_bary_coord: coordinates don't add up 1/%g+1/%g+1/%g = %e\n",n1,n2,n3,1/n1+1/n2+1/n3);
     exit(-1);
   }
