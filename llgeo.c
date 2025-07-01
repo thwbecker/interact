@@ -135,6 +135,7 @@ void scale_3x3_matrix(COMP_PRECISION x[3][3],COMP_PRECISION scale)
     for(j=0;j < 3;j++)
       x[i][j] *= scale;
 }
+/* x = x + ay */
 void add_ay_to_3x3_matrix(COMP_PRECISION x[3][3],
 			  COMP_PRECISION y[3][3],COMP_PRECISION a)
 {
@@ -143,6 +144,7 @@ void add_ay_to_3x3_matrix(COMP_PRECISION x[3][3],
     for(j=0;j<3;j++)
       x[i][j] += a*y[i][j];
 }
+/* x = x+y */
 void add_y_to_3x3_matrix(COMP_PRECISION x[3][3],COMP_PRECISION y[3][3])
 {
   int i,j;

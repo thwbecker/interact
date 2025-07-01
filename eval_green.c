@@ -178,11 +178,6 @@ void eval_tri_multi_point(COMP_PRECISION *x,struct flt *fault,
     /* evaluate at centroid */
     eval_triangle_general(x,fault,slip,u,sm_loc,giret,mode,eval_on_itself); 
     if(fault_type == TRIANGULAR_M244){
-#define INT_EG_MY_SIMPLE_TRI_TEST
-#ifdef INT_EG_MY_SIMPLE_TRI_TEST
-      add_ay_to_3x3_matrix(sm_global,sm_loc,1);
-#else
-      
       /* implements eq. 28 of Noda */
       //resolve_force(fault->normal,sm_loc,trac);fprintf(stderr,"%g %g %g\t%g %g %g\t%g\n",x[0],x[1],x[2],trac[0],trac[1],trac[2],-two_times_sqrt3);
       add_ay_to_3x3_matrix(sm_global,sm_loc,-two_times_sqrt3);
@@ -190,20 +185,20 @@ void eval_tri_multi_point(COMP_PRECISION *x,struct flt *fault,
       calc_tri_bary_coord(fault->xn,xl,2.,4.,4.);
       eval_triangle_general(xl,fault,slip,u,sm_loc,giret,mode,eval_on_itself); 
       //resolve_force(fault->normal,sm_loc,trac);fprintf(stderr,"%g %g %g\t%g %g %g\t%g\n",xl[0],xl[1],xl[2],trac[0],trac[1],trac[2],1.0);
-      add_y_to_3x3_matrix(sm_global,sm_loc);
+      add_ay_to_3x3_matrix(sm_global,sm_loc,1);
       /* */
       calc_tri_bary_coord(fault->xn,xl,4.,2.,4.);
       eval_triangle_general(xl,fault,slip,u,sm_loc,giret,mode,eval_on_itself);
       //resolve_force(fault->normal,sm_loc,trac);fprintf(stderr,"%g %g %g\t%g %g %g\t%g\n",xl[0],xl[1],xl[2],trac[0],trac[1],trac[2],1.0);
-      add_y_to_3x3_matrix(sm_global,sm_loc);
+      add_ay_to_3x3_matrix(sm_global,sm_loc,1);
       /* */
       calc_tri_bary_coord(fault->xn,xl,4.,4.,2.);
       eval_triangle_general(xl,fault,slip,u,sm_loc,giret,mode,eval_on_itself);
       //resolve_force(fault->normal,sm_loc,trac);fprintf(stderr,"%g %g %g\t%g %g %g\t%g\n",xl[0],xl[1],xl[2],trac[0],trac[1],trac[2],1.0);
-      add_y_to_3x3_matrix(sm_global,sm_loc);
+      add_ay_to_3x3_matrix(sm_global,sm_loc,1);
       /*  */
       scale_3x3_matrix(sm_global,inv_three_minus_two_times_sqrt3);
-#endif
+
     }else if(fault_type == TRIANGULAR_M236){
       /* implementa eq. 31 of Noda */
       add_ay_to_3x3_matrix(sm_global,sm_loc,4.0);

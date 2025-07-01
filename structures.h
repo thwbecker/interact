@@ -344,8 +344,8 @@ struct flt{
   float last_activation_time;/* last time of slip for 
 				latency operation mode */
 #endif
-  unsigned int group; /* fault patch can have a 
-			 group assigned */
+  int group; /* fault patch can have a 
+		group assigned */
   MODE_TYPE mode[3];/* 
 		     activational mode in each direction
 		  */
