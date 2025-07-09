@@ -177,6 +177,7 @@ int calc_absolute_shear_stress(float *, int, struct flt *);
 /* generate_slipdia.c */
 /* geo_okada.c */
 /* geometry.c */
+float patch_area(struct flt *);
 void calc_lhemi_proj(float, float, float *);
 void resolve_force(float *, float [3][3], float *);
 void calc_quad_base_vecs(float *, float *, float *, float, float, float, float);
@@ -390,6 +391,7 @@ void print_solutions(int, int *, struct flt *, struct med *, char *);
 void flush_moment_stack(struct med *);
 void fiddle_with_limits_for_plot(struct med *, int *, unsigned char *, float *, unsigned char);
 void time_report(char *, char *, struct med *);
+/* patch2area.c */
 /* patch2bc.c */
 /* patch2dis3d.c */
 void get_dis3d_parameters(float, float, float, float, float, float, float *, float *, float *, float *);

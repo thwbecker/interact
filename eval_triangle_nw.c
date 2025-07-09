@@ -115,8 +115,10 @@ void get_tri_prop_based_on_gh(struct flt *fault)
   calc_centroid_tri(fault->xn,fault->x); /* assign centroid to x */
   /* F90 routine */
   get_tdcs_base_vectors((fault->xn+0),(fault->xn+3),(fault->xn+6),
-			fault->t_strike,fault->t_dip,fault->normal,
-			&fault->area);
+			(fault->t_strike),(fault->t_dip),(fault->normal),
+			&(fault->area));
+  //fprintf(stderr,"get_tri_prop_based_on_gh: area %g\n",fault->area);
+  /* both l and w are assigned as sqrt(area) */
   fault->l = fault->w = sqrt(fault->area);
 
   strike = atan2(fault->t_strike[INT_X],fault->t_strike[INT_Y])*RAD2DEG;  

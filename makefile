@@ -375,7 +375,7 @@ analysis: $(BDIR)/mspectral
 #$(BDIR)/patch2geom : geomview, outdated
 
 converters: $(BDIR)/patch2xyz   $(BDIR)/patch2vtk $(BDIR)/patch2bc \
-	$(BDIR)/patch2vertices $(BDIR)/patch2group  \
+	$(BDIR)/patch2vertices $(BDIR)/patch2group $(BDIR)/patch2area  \
 	$(BDIR)/patch2xyzvec # $(BDIR)/patch2poly3d $(BDIR)/patch2dis3d
 
 geom_converters: $(BDIR)/points2patch $(BDIR)/tri2patch  $(BDIR)/patchquad2patchtri 
@@ -464,7 +464,13 @@ $(BDIR)/patch2xyz: $(ODIR)/patch2xyz.o $(GEN_P_INC) $(ODIR)/read_geometry.o \
 		$(ODIR)/libpatchio.a $(ODIR)/patch2xyz.o \
 		-o $(BDIR)/patch2xyz  $(LIBS) $(SUPERLU_LIBS) $(SLATEC_LIBS) $(PGLIBS)  $(LDFLAGS) 
 
-$(BDIR)/patch2xyzvec: $(ODIR)/patch2xyzvec.o $(GEN_P_INC) \
+$(BDIR)/patch2area: $(ODIR)/patch2area.o $(GEN_P_INC) $(ODIR)/read_geometry.o \
+	 $(LIBLIST) 
+	$(MPILD)  $(ODIR)/read_geometry.o \
+		$(ODIR)/libpatchio.a $(ODIR)/patch2area.o \
+		-o $(BDIR)/patch2area  $(LIBS) $(SUPERLU_LIBS) $(SLATEC_LIBS) $(PGLIBS)  $(LDFLAGS) 
+
+(BDIR)/patch2xyzvec: $(ODIR)/patch2xyzvec.o $(GEN_P_INC) \
 	$(ODIR)/read_geometry.o $(LIBLIST) 
 	$(MPILD)  $(ODIR)/read_geometry.o \
 		$(ODIR)/libpatchio.a $(ODIR)/patch2xyzvec.o \
@@ -569,7 +575,8 @@ $(BDIR)/calc_interaction_matrix: $(ODIR)/coulomb_stress.o \
 
 $(BDIR)/compress_interaction_matrix: $(ODIR)/compress_interaction_matrix.o $(ODIR)/coulomb_stress.o \
 	$(ODIR)/interact.o $(GEN_P_INC) $(LIBLIST) 
-	$(MPILD)   $(ODIR)/compress_interaction_matrix.o    $(ODIR)/petsc_interact.o $(ODIR)/coulomb_stress.o $(ODIR)/interact.o  \
+	$(MPILD)   $(ODIR)/compress_interaction_matrix.o \
+	$(ODIR)/petsc_interact.o $(ODIR)/coulomb_stress.o $(ODIR)/interact.o  \
 	-o $(BDIR)/compress_interaction_matrix $(LIBS) $(SUPERLU_LIBS) \
 			$(PETSC_LIBS) $(PGLIBS) $(SLATEC_LIBS)  $(LDFLAGS)
 
@@ -738,7 +745,8 @@ proto: 	auto_proto.h auto_proto.sgl.h
 auto_proto.h: 
 	rm -f auto_proto.h 2> /dev/null;\
 	touch auto_proto.h;\
-	cproto  $(DEFINE_FLAGS)  $(GEOPROJECT_INCLUDES) \
+#	cproto  $(DEFINE_FLAGS)  $(GEOPROJECT_INCLUDES) $(PETSC_INCLUDES) \
+	cproto  $(DEFINE_FLAGS)  $(GEOPROJECT_INCLUDES)  \
 		$(PGPLOT_DEFINES) $(PGPLOT_INCLUDES) $(MY_PRECISION) \
 		$(SLATEC_INCLUDES)  $(SUPERLU_INCLUDES)  -f2 -q *.c 2> /dev/null | \
 		grep -v "void main("  | grep -v "int main(" > tmp.h; \
@@ -749,7 +757,8 @@ auto_proto.h:
 auto_proto.sgl.h: 
 	rm -f auto_proto.sgl.h 2> /dev/null;\
 	touch auto_proto.sgl.h;\
-	cproto  $(DEFINE_FLAGS)  $(GEOPROJECT_INCLUDES) \
+#	cproto  $(DEFINE_FLAGS)  $(GEOPROJECT_INCLUDES)  $(PETSC_INCLUDES) \
+	cproto  $(DEFINE_FLAGS)  $(GEOPROJECT_INCLUDES)  \
 		$(PGPLOT_DEFINES) $(PGPLOT_INCLUDES)  \
 		$(SLATEC_INCLUDES)  $(SUPERLU_INCLUDES)  -f2 -q *.c 2> /dev/null  | \
 		grep -v "void main("  | grep -v "int main(" > tmp.h;\

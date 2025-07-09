@@ -189,7 +189,7 @@ int print_patch_geometry_and_bc(int flt_offset,struct flt *fault,
 	for(k=0;k < ncon;k++){
 	  for(l=0;l<3;l++){
 	    if(fabs(vertex[node_number_of_subelement((fault+flt_offset),k, i)*3+l]/CHAR_FAULT_DIM) > EPS_COMP_PREC)
-	      fprintf(out,"%g ",vertex[node_number_of_subelement((fault+flt_offset),k, i)*3+l]/CHAR_FAULT_DIM);
+	      fprintf(out,"%20.15e ",vertex[node_number_of_subelement((fault+flt_offset),k, i)*3+l]/CHAR_FAULT_DIM);
 	    else
 	      fprintf(out,"0.0 ");
 	  }
@@ -229,7 +229,7 @@ int print_patch_geometry_and_bc(int flt_offset,struct flt *fault,
       for(l=0;l<3;l++){
 	if(fabs(vertex[k*3+l]/CHAR_FAULT_DIM)>
 	   EPS_COMP_PREC)
-	  fprintf(out,"%g ",vertex[k*3+l]/CHAR_FAULT_DIM);
+	  fprintf(out,"%20.15e ",vertex[k*3+l]/CHAR_FAULT_DIM);
 	else
 	  fprintf(out,"0.0 ");
       }
@@ -247,7 +247,7 @@ int print_patch_geometry_and_bc(int flt_offset,struct flt *fault,
       for(l=0;l<3;l++){
 	if(fabs(vertex[k*3+l]/CHAR_FAULT_DIM)>
 	   EPS_COMP_PREC)
-	  fprintf(out,"%g ",vertex[k*3+l]/CHAR_FAULT_DIM);
+	  fprintf(out,"%20.15e ",vertex[k*3+l]/CHAR_FAULT_DIM);
 	else
 	  fprintf(out,"0 ");
       }

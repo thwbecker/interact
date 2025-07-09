@@ -2,7 +2,7 @@
 #include "properties.h"
 //
 // reads in sets of three points in 3-D and converts to triangle patch format
-//
+// (there is also patchquad2patchtri which converts quads to regular triangles)
 
 #define TRI2P_IOMODE_TRI 20
 #define TRI2P_IOMODE_TRI_GROUP 21
@@ -21,7 +21,7 @@ int main(int argc, char **argv)
   COMP_PRECISION *dummy=NULL;
   my_boolean read_group=FALSE;
   int i,j,opmode=PATCH_OUT_MODE,n,mode,eltype,grp_min,grp_max,itmp;
-  COMP_PRECISION sin_dip,cos_dip;
+  COMP_PRECISION sin_dip,cos_dip,vertex[12],wnew,lnew,area[3];
 #ifdef SUPER_DEBUG
   COMP_PRECISION xc[3];
 #endif
@@ -106,22 +106,34 @@ int main(int argc, char **argv)
     
     // init the triangular properties
     get_tri_prop_based_on_gh((fault+n));
-    /* do some checks */
-#ifdef SUPER_DEBUG
-    for(i=0;i<3;i++){
-      xc[i]=fault[n].xn[i];
-      xc[i]+=fault[n].xn[i+3];
-      xc[i]+=fault[n].xn[i+6];
-      xc[i]/=3.;
-    }
-    fprintf(stderr,"%i %g %g %g\t%g %g %g\n",n,xc[0],xc[1],xc[2],fault[n].x[0],fault[n].x[1],fault[n].x[2]);
-#endif
-    fault[n].type = eltype;    
+    //
+    area[0] = fault[n].w*fault[n].l;
+    //fprintf(stderr," %g %g\n",fault[n].w,fault[n].l);
+    fault[n].type = eltype;
+    
+    
     if(eltype != TRIANGULAR){
-      // convert to rectangular
-      // L=W=sqrt(A/4)
-      fault[n].l=sqrt(fault[n].w/4.0);
-      fault[n].w=fault[n].l;
+      // convert to rectangular, both L and W from get_tri_prop... are sqrt(area)
+      fault[n].w=fault[n].l=fault[n].l/2.0;
+      calculate_quad_vertices(vertex,(fault+n),1.0);
+      if( (vertex[2*3+INT_Z]>0)||(vertex[3*3+INT_Z]>0)){
+	if(fault[n].dip < EPS_COMP_PREC){
+	  fprintf(stderr,"%s: above ground at height %g and zc %g, but zero dip, ERROR\n",
+		  argv[0],vertex[2*3+INT_Z],fault[n].x[INT_Z]);
+	  exit(-1);
+	}
+	area[1] = 4.*fault[n].w * fault[n].l;
+	wnew = -fault[n].x[INT_Z]/sin(DEG2RAD*fault[n].dip)*0.999;
+	lnew = (area[1]/(2.*wnew))/2.;
+	area[2] = 4.*wnew*lnew;
+	fprintf(stderr,"%s: above ground at height %g and zc %g, correcting w from %g to %g, l from %g to %g, new aspect %g, a %g %g %g\n",
+		argv[0],vertex[2*3+INT_Z],fault[n].x[INT_Z],fault[n].w,wnew,fault[n].l,lnew,lnew/wnew,
+		area[0],area[1],area[2]);
+
+	fault[n].l = lnew;
+	fault[n].w = wnew;
+
+      }
       /* recompute */
       my_sincos_deg(&sin_dip,&cos_dip,(COMP_PRECISION)fault[n].dip);
       calc_quad_base_vecs(fault[n].t_strike,fault[n].normal,fault[n].t_dip,

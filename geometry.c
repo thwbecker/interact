@@ -8,6 +8,43 @@
 #include "interact.h"
 #include "properties.h"
 
+/* recomputes patch area (should be stored) */
+COMP_PRECISION patch_area(struct flt *fault)
+{
+#ifdef ALLOW_NON_3DQUAD_GEOM
+  COMP_PRECISION area;
+  struct flt afault[1];
+  int subel,j,l;
+  if(patch_is_2d(fault->type)){	/* 2D */
+    return NAN;
+  }else if(fault->type == OKADA_PATCH){ /* quad */
+    return fault->l*fault->w*4;
+  }else if(fault->type == POINT_SOURCE){ /* point source */
+    return fault->area;			 /* use whatever is stored */
+  }else if(is_triangular(fault->type)){
+    return triangle_area(fault->xn);
+  }else if(fault->type == IQUAD){
+    afault->xn = (COMP_PRECISION *)malloc(sizeof(COMP_PRECISION)*9);
+    area = 0;
+    for(subel=0;subel<3;subel++){
+      for(j=0;j<3;j++)
+	for(l=0;l<3;l++)
+	  afault->xn[l*3+j] =
+	    fault->xn[node_number_of_subelement(fault,l,subel)*3+j];
+      get_tri_prop_based_on_gh(afault);
+      area += afault->area;
+    }
+    free(afault->xn);
+    return area;
+  }else{
+    fprintf(stderr,"patch_area: error, element type %i is not implemented\n",
+	    fault->type);
+    exit(-1);
+  }
+#else
+  return fault->l*fault->w*4;
+#endif
+}
 
 /*
 
@@ -356,8 +393,7 @@ int number_of_subpatches(struct flt *fault)
 #endif
 }
 
-int node_number_of_subelement(struct flt *fault,
-			      int inode, int isubel)
+int node_number_of_subelement(struct flt *fault,int inode, int isubel)
 {
 #ifdef ALLOW_NON_3DQUAD_GEOM
 #ifdef DEBUG

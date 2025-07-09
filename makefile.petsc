@@ -1,8 +1,17 @@
 #
 # flags for PETSC support
 #
-PETSC_ARCH = arch-linux-c-opt
+# the 32 bit versions work with Htools
+#PETSC_ARCH = arch-linux-c-opt
+#PETSC_HTOOL_USED=-DUSE_PETSC_HMAT
 #PETSC_ARCH = arch-linux-c-debug
+#PETSC_HTOOL_USED=-DUSE_PETSC_HMAT
+#
+# the 64 bit integer evrsion does not
+PETSC_ARCH = arch-linux-c-opt64
+PETSC_HTOOL_USED=
+
+
 
 PETSc.pc := $(PETSC_DIR)/$(PETSC_ARCH)/lib/pkgconfig/PETSc.pc
 
@@ -24,7 +33,7 @@ PETSC_LDIR += $(patsubst -L%, $(shell pkg-config --variable=ldflag_rpath $(PACKA
 PETSC_LIBADD := $(shell pkg-config --libs-only-l $(PACKAGES)) -lm
 
 
-PETSC_INCLUDES = -I$(PETSC_DIR)/include/ $(CPPFLAGS) -DUSE_PETSC
+PETSC_INCLUDES = -I$(PETSC_DIR)/include/ $(CPPFLAGS) -DUSE_PETSC $(PETSC_HTOOL_USED)
 #
 #
 PETSC_LIBS = -L$(PETSC_DIR)/lib/  $(PETSC_LDIR) $(PETSC_LIBADD)  # -L/disk/rh_usr_local/intel/oneapi/mpi/latest/lib/

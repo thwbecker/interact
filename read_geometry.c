@@ -173,7 +173,7 @@ void read_geometry(char *patch_filename,struct med **medium,
       }
       /* 
 	 compute all the triangular properties , basis vectors and
-	 centroid
+	 centroid, and area
       */
       get_tri_prop_based_on_gh((*fault+i));
 #ifdef DEBUG
@@ -268,6 +268,7 @@ void read_geometry(char *patch_filename,struct med **medium,
       }
       /* compute all the triangular properties for the main triangle */
       get_tri_prop_based_on_gh((*fault+i));
+      area = (*fault+i)->area;	/* sum this up */
       /* compute the stress evaluation point (~ centroid) */
       //#define INTERACT_IQUAD_XC_VERSION_I
 #ifdef INTERACT_IQUAD_XC_VERSION_I
@@ -284,12 +285,7 @@ void read_geometry(char *patch_filename,struct med **medium,
 	(*fault+i)->x[j] += 0.25 * (*fault+i)->xn[1*3+j];
 	(*fault+i)->x[j] += 0.25 * (*fault+i)->xn[2*3+j];
       }
-
 #endif
-
-      
-      area = (*fault+i)->l * (*fault+i)->l;
-
       for(off=5,l=1;l<3;l++){
 	/* compute auxiliary triagnle one and two */
 	get_sub_normal_vectors((*fault+i),l,t_strike,t_dip, normal,&earea);
@@ -309,7 +305,7 @@ void read_geometry(char *patch_filename,struct med **medium,
 	off++;
 	area += earea;
       }
-    
+      (*fault+i)->area = area;
       (*fault+i)->l = (*fault+i)->w = sqrt(area);
       
 #ifdef DEBUG
@@ -397,10 +393,13 @@ void read_geometry(char *patch_filename,struct med **medium,
 	(*medium)->xmax[j] = (*fault+i)->x[j];
     }
 #ifdef ALLOW_NON_3DQUAD_GEOM
-    if( ( (*fault+i)->type != TRIANGULAR) || ( (*fault+i)->type != IQUAD) ){
+    if( ( (*fault+i)->type != TRIANGULAR) && ( (*fault+i)->type != IQUAD) ){
 #endif
       // check for illegal angles
       check_fault_angles((*fault+i));
+
+      if((*fault+i)->type==OKADA_PATCH)
+	(*fault+i)->area = 4.*(*fault+i)->l*(*fault+i)->w;
       
       if((*fault+i)->l > lmax)lmax=(*fault+i)->l;
       if((*fault+i)->l < lmin)lmin=(*fault+i)->l;
@@ -408,7 +407,6 @@ void read_geometry(char *patch_filename,struct med **medium,
       if((*fault+i)->w < wmin)wmin=(*fault+i)->w;
       (*medium)->wmean += (*fault+i)->w;
       (*medium)->lmean += (*fault+i)->l;
-      (*fault+i)->area = (*fault+i)->l * (*fault+i)->w * 4.0;
       /*
 	strike is defined as degrees clockwise from north (azimuth)
 	we need the angle alpha, which is 
@@ -546,6 +544,9 @@ void read_geometry(char *patch_filename,struct med **medium,
       (*fault+i)->sinc[ic] = 0.0;
     }
     (*fault+i)->mode[0] = INACTIVE;
+    /* check area */
+    //fprintf(stderr,"patch %i area %g area2 %g\n",i,(*fault+i)->area,patch_area((*fault+i)));
+
     /* 
        add one more fault to the fault structure array 
     */
@@ -553,7 +554,9 @@ void read_geometry(char *patch_filename,struct med **medium,
     if((*fault=(struct flt *)
 	realloc(*fault,sizeof(struct flt)*(i+1)))==NULL)
       MEMERROR("read_geometry: 4:");
-  }
+    
+
+  } /* end main loop */
   /* 
      end fault input loop
   */
