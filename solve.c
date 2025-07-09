@@ -243,18 +243,26 @@ int solve(struct med *medium,struct flt *fault)
       m = n = medium->nreq;
       HEADNODE{
 	index_numbers = (long int)m*(long int)m;
-	if(index_numbers/medium->comm_size > INT_MAX){
-	  /* PetSc is not compiled with 64 bit indexing by default,
-	     this can cause a core dump 
-	     
-	     --with-64-bit-indices=yes
-	     
-	     can change that
-	     
-	  */
-	  fprintf(stderr,"solve: WARNING: %.3f G ints on %i cores, above 32b-int limit by %.1f%%\n",
-		  (double)index_numbers/1e9,medium->comm_size,
-		  ((double)index_numbers/(double)medium->comm_size)/(double)INT_MAX*100);
+	if(sizeof(PetscInt) == sizeof(int)){
+	  if(index_numbers/medium->comm_size > INT_MAX){
+	    /* PetSc is not compiled with 64 bit indexing by default,
+	       this can cause a core dump 
+	       
+	       --with-64-bit-indices=yes
+	       
+	       can change that
+	       
+	    */
+	    fprintf(stderr,"solve: WARNING: %.3f G ints on %i cores, above 32b-int limit by %.1f%%\n",
+		    (double)index_numbers/1e9,medium->comm_size,
+		    ((double)index_numbers/(double)medium->comm_size)/(double)INT_MAX*100);
+	  }
+	}else{
+	  if(index_numbers/medium->comm_size > LONG_MAX){
+	    fprintf(stderr,"solve: WARNING: %.3f G ints on %i cores, above 64b-int limit by %.1f%%\n",
+		    (double)index_numbers/1e9,medium->comm_size,
+		    ((double)index_numbers/(double)medium->comm_size)/(double)LONG_MAX*100);
+	  }
 	}
       }
       /* set up A matrix */
@@ -278,7 +286,7 @@ int solve(struct med *medium,struct flt *fault)
       
 #ifdef DEBUG
       fprintf(stderr,"solve: core %i: dn %i on %i n %i rs %i re %i \n",
-	      medium->comm_rank,dn,on,n,medium->rs,medium->re);
+	      (int)medium->comm_rank,(int)dn,(int)on,(int)n,(int)medium->rs,(int)medium->re);
 #endif
       
       /* assemble A */
@@ -386,10 +394,10 @@ int solve(struct med *medium,struct flt *fault)
 	isize  = (long int)((double)isize/10);
 	for(i=1;i<10;i++){
 	  if((a=(A_MATRIX_PREC *)malloc((size_t)(isize*(long int)i)))==NULL){
-	    fprintf(stderr,"solve: failing at %i %g MB\n",i,((double)isize)/(double)(ONE_MEGABYTE));
+	    fprintf(stderr,"solve: failing at %li %g MB\n",(long int)i,((double)isize)/(double)(ONE_MEGABYTE));
 	    exit(-1);
 	  }else{
-	    fprintf(stderr,"solve: OK at %i/10\n",i);
+	    fprintf(stderr,"solve: OK at %li/10\n",(long int)i);
 	    free(a);
 	  }
 	}
@@ -772,7 +780,7 @@ int par_assemble_a_matrix(int naflt,my_boolean *sma,int nreq,int *nameaf,
   PetscScalar amin,amax;
   
   fprintf(stderr,"par_assemble_a_matrix: core %03i/%03i: assigning row %5i to %5i\n",
-	  medium->comm_rank,medium->comm_size,medium->rs,medium->re);
+	  (int)medium->comm_rank,(int)medium->comm_size,(int)medium->rs,(int)medium->re);
 
 #endif
 
@@ -830,7 +838,7 @@ int par_assemble_a_matrix(int naflt,my_boolean *sma,int nreq,int *nameaf,
 #ifdef DEBUG
 		if(eqc2 >= nreq){
 		  fprintf(stderr,"par_assemble_a_matrix: core %i: eqc2 %i out of bounds, nreq %i\n",
-			  medium->comm_rank,eqc2,nreq);
+			  (int)medium->comm_rank,(int)eqc2,(int)nreq);
 		  fprintf(stderr,"par_assemble_a_matrix: i: %i j: %i k: %i l: %i naflt: %i\n",
 			  (int)nameaf[i],(int)nameaf[k],(int)l,(int)j,naflt);
 		  exit(-1);
@@ -872,11 +880,11 @@ int par_assemble_a_matrix(int naflt,my_boolean *sma,int nreq,int *nameaf,
 	    if(avalues[eqc2]> amax)
 	      amax = avalues[eqc2];
 	    if(!assigned[eqc2])
-	      fprintf(stderr,"%06i out of %06i unassigned?!\n",eqc2,nreq);
+	      fprintf(stderr,"%06i out of %06i unassigned?!\n",(int)eqc2,(int)nreq);
 	    if(!finite(avalues[eqc2]))
-	      fprintf(stderr,"%06i out of %06i not finite\n",eqc2,nreq);
+	      fprintf(stderr,"%06i out of %06i not finite\n",(int)eqc2,(int)nreq);
 	  }
-	  fprintf(stderr,"row eqc1 %6i eqc2 %6i nreq %6i amin %12g amax %12g\n",eqc1,eqc2,nreq,amin,amax);
+	  fprintf(stderr,"row eqc1 %6i eqc2 %6i nreq %6i amin %12g amax %12g\n",(int)eqc1,(int)eqc2,(int)nreq,amin,amax);
 	  
 #endif 
 	  PetscCall(MatSetValues(medium->Is, 1, &eqc1, nreq, col_idx,avalues, INSERT_VALUES));

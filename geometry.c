@@ -401,7 +401,7 @@ int node_number_of_subelement(struct flt *fault,
   from lower left
 
   3 --- 2
-  |     |
+  |        |
   0 --- 1 
 
  */
@@ -410,6 +410,8 @@ void calculate_quad_vertices(COMP_PRECISION *vertex,struct flt *fault,
 {
   int i;
   COMP_PRECISION sx,dx;
+  //fprintf(stderr,"%g %g %g\t%g %g %g\t%g %g %g\t%g %g %g\n",fault->x[0], fault->x[1], fault->x[2],fault->t_strike[0],	  fault->t_strike[1],	  fault->t_strike[2],fault->t_dip[0],	  fault->t_dip[1],	  fault->t_dip[2],fault->l,fault->w, leeway);
+	  
   for(i=0;i < 3;i++){
     sx = fault->t_strike[i] * (COMP_PRECISION)fault->l * leeway;
     dx = fault->t_dip[i]    * (COMP_PRECISION)fault->w * leeway;
@@ -422,6 +424,7 @@ void calculate_quad_vertices(COMP_PRECISION *vertex,struct flt *fault,
     // upper left
     vertex[3*3+i]=fault->x[i]-sx+dx;
   }
+  //for(i=0;i<4;i++)fprintf(stderr,"%i %g %g %g\n",i,vertex[i*3+0],vertex[i*3+1],vertex[i*3+2]);
 }
 #ifdef ALLOW_NON_3DQUAD_GEOM
 

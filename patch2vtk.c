@@ -66,7 +66,7 @@ int main(int argc, char **argv)
     for(j=0;j < nvert;j++){
       for(k=0;k < 3;k++)
 	if(fabs(vertex[j*3+k]/CHAR_FAULT_DIM) > EPS_COMP_PREC)
-	  printf("%g ",vertex[j*3+k]/CHAR_FAULT_DIM);
+	  printf("%20.15e ",vertex[j*3+k]/CHAR_FAULT_DIM);
 	else
 	  printf("0.0 ");
       printf("\t");

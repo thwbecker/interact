@@ -59,7 +59,7 @@ PetscErrorCode GenKEntries(PetscInt sdim, PetscInt M, PetscInt N,
       eval_green(ictx->fault[K[k]].x,(ictx->fault+J[j]),slip,disp,stress,&iret,
 		 GC_STRESS_ONLY,TRUE);
       if(iret != 0){
-	fprintf(stderr,"GenKentries: WARNING: i=%3i j=%3i singular\n",j,k);
+	fprintf(stderr,"GenKentries: WARNING: i=%3li j=%3li singular\n",j,k);
 	sval = 0.0;
       }else{
 	resolve_force(ictx->fault[K[k]].normal,stress,trac);

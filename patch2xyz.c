@@ -14,7 +14,7 @@ int main(int argc, char **argv)
   int opmode=PSXYZ_MODE;
   COMP_PRECISION *scalar=NULL,min,max,*tmp_scalar=NULL;
   my_boolean shrink_patches=FALSE,read_slip = FALSE,
-    attempt_read_slip = FALSE,verbose = FALSE;
+    attempt_read_slip = FALSE,verbose = TRUE;
   int use_scalar = 0;
   FILE *in;
   medium=(struct med *)calloc(1,sizeof(struct med)); 
@@ -136,6 +136,7 @@ int main(int argc, char **argv)
   }
   if(read_slip)
     opmode = PSXYZ_SCALAR_MODE;
+  fprintf(stderr,"%s: printing %i patches to stdout\n",argv[0],medium->nrflt);
   for(i=0;i < medium->nrflt;i++){
     print_patch_geometry_and_bc(0,(fault+i),opmode,0.0,TRUE,stdout,
 				shrink_patches,(scalar+i));

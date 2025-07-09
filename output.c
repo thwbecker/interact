@@ -624,7 +624,7 @@ void print_equations(int naflt,my_boolean *sma,
     for(j=0;j<3;j++)
       if(sma[i*3+j]){
 	fprintf(stderr,
-		"%s: eq %3i/%3i flt %5i/g:%5i m: %1i o_s: %12.4e sd: %12.4e target_s: %12.4e o_slip: %12.4e\n",
+		"%s: eq %3i/%3i flt %8i/g:%5i m: %1i o_s: %12.4e sd: %12.4e target_s: %12.4e o_slip: %12.4e\n",
 		title, eqc1, nreq, nameaf[i], fault[nameaf[i]].group, j,
 		fault[nameaf[i]].s[j], b[eqc1], b[eqc1]+fault[nameaf[i]].s[j],
 		fault[nameaf[i]].u[j]);

@@ -1,6 +1,6 @@
 #include "interact.h"
 #include <libgen.h>
-#ifdef USE_PETSC
+#ifdef USE_PETSC_HMAT
 #include "petsc_prototypes.h"
 
 
@@ -23,7 +23,7 @@
 
 int main(int argc, char **argv)
 {
-#ifdef USE_PETSC
+#ifdef USE_PETSC_HMAT
   struct med *medium;
   struct flt *fault;
   KSP               ksp;

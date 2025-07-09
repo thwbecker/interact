@@ -1,5 +1,5 @@
 #include "interact.h"
-#ifdef USE_PETSC
+#ifdef USE_PETSC_HMAT
 
 /* this function is in interact.c */
 #include "petsc_prototypes.h"
@@ -26,7 +26,7 @@
 
 int main(int argc, char **argv)
 {
-#ifdef USE_PETSC
+#ifdef USE_PETSC_HMAT
   struct med *medium;
   struct flt *fault;
   struct interact_ctx ictx[1];
@@ -352,7 +352,7 @@ int main(int argc, char **argv)
   PetscCall(MatDestroy(&medium->In));
   PetscCall(PetscFinalize());
 #else
-  fprintf(stderr,"%s only petsc version implemented, but not compiled as such\n",argv[0]);
+  fprintf(stderr,"%s only petsc H matrix version implemented, but not compiled as such\n",argv[0]);
 #endif
   exit(0);
 

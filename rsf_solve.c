@@ -3,13 +3,15 @@
 /*
   
 */
-#ifdef USE_PETSC
+#ifdef USE_PETSC_HMAT
 #include "petsc_prototypes.h"
+#endif
 
 #define INT_RSF_DIM 4		/* ψ1,τ1,σ1,u(slip) */
 
 int main(int argc,char **argv)
 {
+#ifdef USE_PETSC_HMAT
 
   TS ts; /* timestepping context */
   PetscReal *values = NULL;
@@ -301,12 +303,12 @@ int main(int argc,char **argv)
   PetscCall(PetscFinalize());
 
 #else
-  fprintf(stderr,"%s only petsc version implemented, but not compiled as such\n",argv[0]);
+  fprintf(stderr,"%s only petsc H matrix version implemented, but not compiled as such\n",argv[0]);
 #endif
   exit(0);
 }
 
-#ifdef USE_PETSC
+#ifdef USE_PETSC_HMAT
 /* 
    compute time-derivative for state vector, state, shear, normal stress for each n patch
    x = (ψ1,τ1,σ1,s1,ψ2,τ2,σ2,s2,ψ3,τ3,σ3,s3,....) INT_RSF_DIM*n

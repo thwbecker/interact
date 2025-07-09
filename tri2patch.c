@@ -22,6 +22,9 @@ int main(int argc, char **argv)
   my_boolean read_group=FALSE;
   int i,j,opmode=PATCH_OUT_MODE,n,mode,eltype,grp_min,grp_max,itmp;
   COMP_PRECISION sin_dip,cos_dip;
+#ifdef SUPER_DEBUG
+  COMP_PRECISION xc[3];
+#endif
   medium=(struct med *)calloc(1,sizeof(struct med));
   if(argc!=2){
     fprintf(stderr,"%s mode\n\tread in three 3-D points per line from stdin\n",
@@ -58,8 +61,8 @@ int main(int argc, char **argv)
     fprintf(stderr,"%s: mode %i undefined\n",argv[0],mode);
     exit(-1);
   }
-  fprintf(stderr,"%s: reading set of nine %s points from %s, writing patch format %i to stdout\n",
-	  argv[0],"stdin",read_group?"+1 for group":"",eltype);
+  fprintf(stderr,"%s: reading set of nine %s points from %s, writing %s patch format %i to stdout\n",
+	  argv[0],"stdin",(eltype==OKADA_PATCH)?"quad":"tri",read_group?"+1 for group":"",eltype);
   
 
   if((fault=malloc(sizeof(struct flt)))==NULL)MEMERROR("main");
@@ -89,7 +92,6 @@ int main(int argc, char **argv)
     }
     if(fault[n].group < grp_min)
       grp_min = fault[n].group;
-
     for(j=1,i=2;i<9;i+= 3,j++)
       if(fault[n].xn[i] > 0.0){
 	fprintf(stderr,"%s: rectangle %i: point %i: z coordinate (%g) should be <= 0\n",
@@ -101,12 +103,19 @@ int main(int argc, char **argv)
       MEMERROR("main");
     fault[n+1].xn=(COMP_PRECISION *)malloc(sizeof(COMP_PRECISION)*9);
     if(!fault[n+1].xn)MEMERROR("main");
-    /*  */
+    
     // init the triangular properties
     get_tri_prop_based_on_gh((fault+n));
-
-
-    
+    /* do some checks */
+#ifdef SUPER_DEBUG
+    for(i=0;i<3;i++){
+      xc[i]=fault[n].xn[i];
+      xc[i]+=fault[n].xn[i+3];
+      xc[i]+=fault[n].xn[i+6];
+      xc[i]/=3.;
+    }
+    fprintf(stderr,"%i %g %g %g\t%g %g %g\n",n,xc[0],xc[1],xc[2],fault[n].x[0],fault[n].x[1],fault[n].x[2]);
+#endif
     fault[n].type = eltype;    
     if(eltype != TRIANGULAR){
       // convert to rectangular

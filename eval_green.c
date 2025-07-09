@@ -167,7 +167,7 @@ void eval_tri_multi_point(COMP_PRECISION *x,struct flt *fault,
 						   else could use
 						   fault->type */
 {
-  COMP_PRECISION sm_loc[3][3],xl[3],trac[3];
+  COMP_PRECISION sm_loc[3][3],xl[3];//trac[3];
   const COMP_PRECISION two_times_sqrt3 = 2.0*sqrt(3.0),
     inv_three_minus_two_times_sqrt3 = 1.0/(3.0 - two_times_sqrt3);
   

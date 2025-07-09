@@ -199,7 +199,7 @@ void read_geometry(char *patch_filename,struct med **medium,
 
       }
       if((*medium)->comm_rank == 0)
-	fprintf(stderr,"read_geometry: fault %5i is triangular, x1: (%10.3e, %10.3e, %10.3e) x2: (%10.3e, %10.3e, %10.3e) x3: (%10.3e, %10.3e, %10.3e), area: %10.3e\n",
+	fprintf(stderr,"read_geometry: fault %8i is triangular, x1: (%10.3e, %10.3e, %10.3e) x2: (%10.3e, %10.3e, %10.3e) x3: (%10.3e, %10.3e, %10.3e), area: %10.3e\n",
 		i,(*fault+i)->xn[  INT_X],(*fault+i)->xn[  INT_Y],(*fault+i)->xn[  INT_Z],
 		(*fault+i)->xn[3+INT_X],(*fault+i)->xn[3+INT_Y],(*fault+i)->xn[3+INT_Z],
 		(*fault+i)->xn[6+INT_X],(*fault+i)->xn[6+INT_Y],(*fault+i)->xn[6+INT_Z],
@@ -314,7 +314,7 @@ void read_geometry(char *patch_filename,struct med **medium,
       
 #ifdef DEBUG
       if((*medium)->comm_rank == 0){
-	fprintf(stderr,"read_geometry: fault %5i is iquad, x1: (%10.2e, %10.2e, %10.2e) x2: (%10.2e, %10.2e, %10.2e) x3: (%10.2e, %10.2e, %10.2e) x4: (%10.2e, %10.2e, %10.2e), area: %10.2e\n",
+	fprintf(stderr,"read_geometry: fault %8i is iquad, x1: (%10.2e, %10.2e, %10.2e) x2: (%10.2e, %10.2e, %10.2e) x3: (%10.2e, %10.2e, %10.2e) x4: (%10.2e, %10.2e, %10.2e), area: %10.2e\n",
 		i,
 		(*fault+i)->xn[3*3+INT_X],(*fault+i)->xn[3*3+INT_Y],(*fault+i)->xn[3*3+INT_Z],
 		(*fault+i)->xn[4*3+INT_X],(*fault+i)->xn[4*3+INT_Y],(*fault+i)->xn[4*3+INT_Z],
@@ -440,7 +440,7 @@ void read_geometry(char *patch_filename,struct med **medium,
 #ifdef SUPER_DUPER_DEBUG
       check_fault_normal_vectors((*fault+i));
       if((*medium)->comm_rank == 0){
-	fprintf(stderr,"fault %5i: strike: %g dip: %g sc_alpha:  %10.2e/%10.2e sc_dip: %10.2e/%10.2e\n",
+	fprintf(stderr,"fault %8i: strike: %g dip: %g sc_alpha:  %10.2e/%10.2e sc_dip: %10.2e/%10.2e\n",
 		i,90.0-alpha,(*fault+i)->dip,(*fault+i)->sin_alpha,
 		(*fault+i)->cos_alpha,sin_dip,cos_dip);
 	fprintf(stderr," vec: s: (%10.2e,%10.2e,%10.2e) d: (%10.2e,%10.2e,%10.2e) n: (%10.2e,%10.2e,%10.2e)\n",
@@ -653,7 +653,8 @@ void read_geometry(char *patch_filename,struct med **medium,
   // determine the position of each patch in a group local coordinate system
   // and initialize the group structure
   calculate_position_of_patch(*medium,*fault);
-  
+  if(verbose)
+    fprintf(stderr,"read_geometry: done\n");
   (*medium)->geometry_init = TRUE;
   init = TRUE;
 }
