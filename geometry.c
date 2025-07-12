@@ -437,7 +437,7 @@ int node_number_of_subelement(struct flt *fault,int inode, int isubel)
   from lower left
 
   3 --- 2
-  |        |
+  |     |
   0 --- 1 
 
  */

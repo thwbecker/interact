@@ -511,7 +511,7 @@ void print_singular_values(double *, int, FILE *);
 void indexx(int, double *, int *);
 void reduce_a_matrix(double **, int, int, int);
 /* terminate.c */
-void terminate(struct med *, struct flt *);
+int terminate(struct med *, struct flt *);
 /* test_optimize.c */
 /* test_solvers.c */
 double mat_value(int, int, int);

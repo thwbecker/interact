@@ -19,7 +19,7 @@
 
  */
 
-void terminate(struct med *medium, struct flt *fault)
+int terminate(struct med *medium, struct flt *fault)
 {
   int i;
   char tmpstr[STRLEN];

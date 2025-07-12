@@ -126,17 +126,17 @@ void assemble_ap_matrix_4(A_MATRIX_PREC *a,int naflt,int naflt_con,
 		  ICIM(medium->i,namef1tmp,namef2tmp,l,NORMAL) * cf;
 #elif defined COMP_MODE_2
 	      a[eqc2m+eqc1] = (A_MATRIX_PREC)
-		ic_from_file(namef1tmp,namef2tmp,l,j,medium);
+		ic_from_file(namef1tmp,namef2tmp,(int)l,(int)j,medium);
 	      if(cf != 0.0){
-		itmp=(A_MATRIX_PREC)ic_from_file(namef1tmp,namef2tmp,l,NORMAL,medium);
+		itmp=(A_MATRIX_PREC)ic_from_file(namef1tmp,namef2tmp,(int)l,NORMAL,medium);
 		a[eqc2m+eqc1] +=  (A_MATRIX_PREC) itmp * cf;
 	      }
 #elif defined COMP_MODE_3
 	      // need to calculate interaction coefficient right here
 	      a[eqc2m+eqc1] = (A_MATRIX_PREC)
-		interaction_coefficient(namef1tmp,namef2tmp,l,j,fault,&iret);
+		interaction_coefficient(namef1tmp,namef2tmp,(int)l,(int)j,fault,&iret);
 	      if(cf != 0.0){
-		itmp=(A_MATRIX_PREC)interaction_coefficient(namef1tmp,namef2tmp,l,
+		itmp=(A_MATRIX_PREC)interaction_coefficient(namef1tmp,namef2tmp,(int)l,
 							    NORMAL,fault,&iret);
 		if(iret){
 		  fprintf(stderr,"assemble_ap_matrix_3: WARNING: encountered iret: i/j/k/l: %i/%i/%i/%i\n",
@@ -246,9 +246,9 @@ void assemble_a_matrix_4(A_MATRIX_PREC *a,int naflt,
 #elif defined COMP_MODE_2
 	      // need to read it from file
 	      a[eqc2nreq+eqc1] = (A_MATRIX_PREC)
-		ic_from_file(nameaf[i],nameaf[k],l,j,medium);
+		ic_from_file(nameaf[i],nameaf[k],(int)l,(int)j,medium);
 	      if(cf != 0.0){// correct 
-		itmp=(A_MATRIX_PREC)ic_from_file(nameaf[i],nameaf[k],l,NORMAL,medium);
+		itmp=(A_MATRIX_PREC)ic_from_file(nameaf[i],nameaf[k],(int)l,NORMAL,medium);
 		a[eqc2nreq+eqc1] +=  (A_MATRIX_PREC) itmp * cf;
 	      }
 #elif defined COMP_MODE_3
@@ -256,9 +256,9 @@ void assemble_a_matrix_4(A_MATRIX_PREC *a,int naflt,
 	      // calculate interaction coefficients right now
 	      //
 	      a[eqc2nreq+eqc1] = (A_MATRIX_PREC)
-		interaction_coefficient(nameaf[i],nameaf[k],l,j,fault,&iret);
+		interaction_coefficient(nameaf[i],nameaf[k],(int)l,(int)j,fault,&iret);
 	       if(cf != 0.0){	/* coulomb addition */
-		 itmp=(A_MATRIX_PREC)interaction_coefficient(nameaf[i],nameaf[k],l,NORMAL,fault,&iret);
+		 itmp=(A_MATRIX_PREC)interaction_coefficient(nameaf[i],nameaf[k],(int)l,NORMAL,fault,&iret);
 		 if(iret){
 		   fprintf(stderr,"assemble_a_matrix_3: WARNING: encountered iret: i/j/k/l: %i/%i/%i/%i\n",
 			   nameaf[i],nameaf[k],(int)l,(int)j);
@@ -275,11 +275,11 @@ void assemble_a_matrix_4(A_MATRIX_PREC *a,int naflt,
 	      // have I matrix in numerical recipes 
 	      // sparse matrix storage
 	      a[eqc2nreq+eqc1] = (A_MATRIX_PREC)
-		get_nrs_sparse_el(POSII(nameaf[k],l),POSIJ(nameaf[i],j),
+		get_nrs_sparse_el((int)POSII(nameaf[(int)k],(int)l),(int)POSIJ(nameaf[(int)i],(int)j),
 				  medium->is1,medium->val);
 	      if(cf != 0.0){
-		itmp=(A_MATRIX_PREC)get_nrs_sparse_el(POSII(nameaf[k],l),
-						      POSIJ(nameaf[i],NORMAL),
+		itmp=(A_MATRIX_PREC)get_nrs_sparse_el((int)POSII(nameaf[(int)k],(int)l),
+						      POSIJ(nameaf[(int)i],NORMAL),
 						      medium->is1,medium->val);
 		a[eqc2nreq+eqc1] +=  (A_MATRIX_PREC) itmp * cf;
 	      }
@@ -396,7 +396,7 @@ void add_quake_stress_4(my_boolean *sma,COMP_PRECISION *slip,
 			  possible slip dirs. */
 	if(sma[j]){
 	  for(k=0;k<3;k++){
-	    iadbl = interaction_coefficient(i,r_flt,j,k,fault,&iret);
+	    iadbl = interaction_coefficient(i,r_flt,(int)j,(int)k,fault,&iret);
 	    // if so, make sure that cutoff values are consistent
 	    if(fabs(iadbl) < medium->i_mat_cutoff){
 	      iadbl = 0.0;

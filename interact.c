@@ -59,7 +59,7 @@ PetscErrorCode GenKEntries(PetscInt sdim, PetscInt M, PetscInt N,
       eval_green(ictx->fault[K[k]].x,(ictx->fault+J[j]),slip,disp,stress,&iret,
 		 GC_STRESS_ONLY,TRUE);
       if(iret != 0){
-	fprintf(stderr,"GenKentries: WARNING: i=%3li j=%3li singular\n",j,k);
+	fprintf(stderr,"GenKentries: WARNING: i=%3i j=%3i singular\n",(int)j,(int)k);
 	sval = 0.0;
       }else{
 	resolve_force(ictx->fault[K[k]].normal,stress,trac);
@@ -557,8 +557,7 @@ void get_right_slip(COMP_PRECISION *disp,int dir,
    read the interaction coefficient from a binary file 
    using the normal i,j,k,l indices
 */
-I_MATRIX_PREC ic_from_file(int i, int j, int k, int l,
-			   struct med *medium)
+I_MATRIX_PREC ic_from_file(int i, int j, int k, int l,struct med *medium)
 {
   return(aij_from_file(POSII(j,k),POSIJ(i,l), medium->nmat2, medium->i_mat_in));
 }

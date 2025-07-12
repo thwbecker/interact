@@ -115,7 +115,7 @@ int main(int argc, char **argv)
 	  u[STRIKE] += projected_slip_major_to_minor_patch((fault+i),k,STRIKE,l) * fault[i].u[k];
 	  u[DIP] +=    projected_slip_major_to_minor_patch((fault+i),k,DIP,   l) * fault[i].u[k];
 	}
-	printf("%g\n",sqrt(u[STRIKE]*u[STRIKE] + u[DIP]*u[DIP]));
+	printf("%e\n",sqrt(u[STRIKE]*u[STRIKE] + u[DIP]*u[DIP]));
       }
     }
       
@@ -128,7 +128,7 @@ int main(int argc, char **argv)
 	u[STRIKE]=0.;
 	for(k=0;k<3;k++)
 	  u[STRIKE] += projected_slip_major_to_minor_patch((fault+i),k, STRIKE,l) * fault[i].u[k];
-	printf("%g\n",u[STRIKE]);
+	printf("%e\n",u[STRIKE]);
       }
     }
  
@@ -140,7 +140,7 @@ int main(int argc, char **argv)
 	u[DIP]=0.;
 	for(k=0;k<3;k++)
 	  u[DIP] += projected_slip_major_to_minor_patch((fault+i),k,DIP,l) * fault[i].u[k];
-	printf("%g\n",u[DIP]);
+	printf("%e\n",u[DIP]);
       }
     }
 
@@ -160,7 +160,7 @@ int main(int argc, char **argv)
 	    u[j] += normal[j]   * fault[i].u[k]*projected_slip_major_to_minor_patch((fault+i),k,NORMAL,l) ;
 	  }
 	}
-	printf("%g %g %g\n",u[INT_X],u[INT_Y],u[INT_Z]);
+	printf("%e %e %e\n",u[INT_X],u[INT_Y],u[INT_Z]);
       }
     }
   }

@@ -81,12 +81,14 @@ int main(int argc, char **argv)
   }
   if(argc > 2)
     sscanf(argv[2],ONE_CP_FORMAT,&dx);
-  if(argc > 3)
+  if(argc > 3){
     sscanf(argv[3],"%i",&i);
-  use_code = (my_boolean)i;
-  if(argc > 4)
+    use_code = (my_boolean)i;
+  }
+  if(argc > 4){
     sscanf(argv[4],"%i",&i);
-  iquad = (my_boolean)i;
+    iquad = (my_boolean)i;
+  }
   
   fprintf(stderr,"%s: reading points from %s, writing patch to stdout,",
 	  argv[0],"stdin");
@@ -125,17 +127,20 @@ int main(int argc, char **argv)
 	      x[2*3+INT_X],	      x[2*3+INT_Y],	      x[2*3+INT_Z],
 	      x[3*3+INT_X],	      x[3*3+INT_Y],	      x[3*3+INT_Z]);
       nrpatches++;
+      medium->nrflt++;
     }else{
       points2patch(fault,x,adjust_area);
-      //fprintf(stderr,"%s: set of points: %i code: %i\n",argv[0],medium->nrflt,fault[0].group);
+      medium->nrflt++;      
+      fprintf(stderr,"%s: set of points: %i code: %i\n",argv[0],medium->nrflt,fault[0].group);
       /* hack for now */
       seg[0] = 1 + fault[0].l/dx;
       seg[1] = 1 + fault[0].w/dx;
       /* subdivide */
       divide_fault_in_patches(0,fault,&patch,&nrpatches,
 			      seg,FALSE,TRUE,0,0,&seed,FALSE);
+
     }
-    medium->nrflt++;
+
   }
   if(!iquad){
     for(i=0;i<nrpatches;i++){
@@ -152,15 +157,19 @@ int main(int argc, char **argv)
 my_boolean read_points_local(COMP_PRECISION *x,int *code, my_boolean read_code, FILE *in)
 {
   my_boolean ok=FALSE;
-  int i,c=0;
+  int i=0,c=0;
   if(read_code){
-    for(i=0;i<4;i++)
-      c+= fscanf(stdin,THREE_CPI_FORMAT,&x[INT_X+i*3],&x[INT_Y+i*3],&x[INT_Z+i*3],code);
+    while((fscanf(stdin,THREE_CPI_FORMAT,(x+INT_X+i*3),(x+INT_Y+i*3),(x+INT_Z+i*3),code)==4)&&(c<16)){
+      c+=4;i++;
+    }
     if(c == 16)
       ok = TRUE;
   }else{
-    for(i=0;i<4;i++)
-      c+= fscanf(stdin,THREE_CP_FORMAT,&x[INT_X+i*3],&x[INT_Y+i*3],&x[INT_Z+i*3]);
+    while((fscanf(stdin,THREE_CP_FORMAT,(x+INT_X+i*3),(x+INT_Y+i*3),(x+INT_Z+i*3))==3)&&(c<12)){
+
+      i++;c+=3;
+      //fprintf(stderr,"%i %i\n",i,c);
+    }
     if(c == 12)
       ok = TRUE;
   }
