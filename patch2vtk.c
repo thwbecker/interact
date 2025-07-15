@@ -15,6 +15,7 @@ int main(int argc, char **argv)
     attempt_read_slip=FALSE,
     read_slip;
   COMP_PRECISION leeway,vertex[MAX_NR_EL_VERTICES*3],u[3],t_strike[3],t_dip[3],normal[3],area;
+  COMP_PRECISION sscale = 1.;
   medium=(struct med *)calloc(1,sizeof(struct med));
   
   if(argc > 1)
@@ -23,15 +24,18 @@ int main(int argc, char **argv)
     sscanf(argv[2],"%i",&i);
     shrink_patches = (my_boolean)i;
   }
-  if(argc > 4){
-    fprintf(stderr,"%s [flt.dat] [shrink_patches, 0] \n\t reads in patch format from stdin and writes VTK format to stdout\n",
-	    argv[0]);
+  if(argc > 3){
+    sscanf(argv[3],ONE_CP_FORMAT,&sscale);
+  }
+  if((argc > 4)||((argc>1) && (strcmp(argv[1],"-h")==0))){
+    fprintf(stderr,"%s [flt.dat] [shrink_patches, %i] [scale_dim, %g]\n\t reads in patch format from stdin and writes VTK format to stdout\n",
+	    argv[0],shrink_patches,sscale);
     fprintf(stderr,"if an argument is given, will assume it is a flt.dat type output file and assign values for coloring\n");
     fprintf(stderr,"if shrink_patches is set, will make patches smaller for plotting\n");
     exit(-1);
   }
-  fprintf(stderr,"%s: reading patch format from stdin, writing VTK to stdout. shrink: %i \n",
-	  argv[0],shrink_patches);
+  fprintf(stderr,"%s: reading patch format from stdin, writing VTK to stdout. shrink: %i scale: %g\n",
+	  argv[0],shrink_patches,sscale);
   
   read_geometry("stdin",&medium,&fault,FALSE,FALSE,FALSE,verbose);
   if(attempt_read_slip)
@@ -66,7 +70,7 @@ int main(int argc, char **argv)
     for(j=0;j < nvert;j++){
       for(k=0;k < 3;k++)
 	if(fabs(vertex[j*3+k]/CHAR_FAULT_DIM) > EPS_COMP_PREC)
-	  printf("%20.15e ",vertex[j*3+k]/CHAR_FAULT_DIM);
+	  printf("%20.15e ",vertex[j*3+k]/CHAR_FAULT_DIM*sscale);
 	else
 	  printf("0.0 ");
       printf("\t");
@@ -115,7 +119,7 @@ int main(int argc, char **argv)
 	  u[STRIKE] += projected_slip_major_to_minor_patch((fault+i),k,STRIKE,l) * fault[i].u[k];
 	  u[DIP] +=    projected_slip_major_to_minor_patch((fault+i),k,DIP,   l) * fault[i].u[k];
 	}
-	printf("%e\n",sqrt(u[STRIKE]*u[STRIKE] + u[DIP]*u[DIP]));
+	printf("%e\n",sqrt(u[STRIKE]*u[STRIKE] + u[DIP]*u[DIP])*sscale);
       }
     }
       
@@ -128,7 +132,7 @@ int main(int argc, char **argv)
 	u[STRIKE]=0.;
 	for(k=0;k<3;k++)
 	  u[STRIKE] += projected_slip_major_to_minor_patch((fault+i),k, STRIKE,l) * fault[i].u[k];
-	printf("%e\n",u[STRIKE]);
+	printf("%e\n",u[STRIKE]*sscale);
       }
     }
  
@@ -140,7 +144,7 @@ int main(int argc, char **argv)
 	u[DIP]=0.;
 	for(k=0;k<3;k++)
 	  u[DIP] += projected_slip_major_to_minor_patch((fault+i),k,DIP,l) * fault[i].u[k];
-	printf("%e\n",u[DIP]);
+	printf("%e\n",u[DIP]*sscale);
       }
     }
 
@@ -160,7 +164,7 @@ int main(int argc, char **argv)
 	    u[j] += normal[j]   * fault[i].u[k]*projected_slip_major_to_minor_patch((fault+i),k,NORMAL,l) ;
 	  }
 	}
-	printf("%e %e %e\n",u[INT_X],u[INT_Y],u[INT_Z]);
+	printf("%e %e %e\n",u[INT_X]*sscale,u[INT_Y]*sscale,u[INT_Z]*sscale);
       }
     }
   }
