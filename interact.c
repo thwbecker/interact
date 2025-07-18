@@ -53,6 +53,7 @@ PetscScalar GenKEntries_h2opus(PetscInt sdim, PetscReal x[], PetscReal y[], void
   }
   KDTreeFindNearest(ictx->medium->kdtree,target_x,&nearest_x,&sep_x);
   KDTreeFindNearest(ictx->medium->kdtree,target_y,&nearest_y,&sep_y);
+  /*  */
   i = nearest_x->index;
   j = nearest_y->index;
   /*  */

@@ -26,6 +26,8 @@
    mode 0: shear stress
    mode 1: normal stress
 
+   scale: scale factor 
+
    hmatrix can be 0 (dense), 1 HTOOLS or 2 HOPUS
 */
 
@@ -153,12 +155,12 @@ PetscErrorCode calc_petsc_Isn_matrices(struct med *medium, struct flt *fault,
  #ifdef USE_PETSC_HMAT
  } 
 #endif
- PetscCall(MatSetOption(*this_mat, MAT_SYMMETRIC, PETSC_FALSE));
+  PetscCall(MatSetOption(*this_mat, MAT_SYMMETRIC, PETSC_FALSE));
   PetscCall(MatSetFromOptions(*this_mat));
   PetscCall(MatAssemblyBegin(*this_mat, MAT_FINAL_ASSEMBLY));
   PetscCall(MatAssemblyEnd(*this_mat, MAT_FINAL_ASSEMBLY));
   /* 
-     done, now scale 
+     done, now scale (CHECK IF IMPLEMENTED)
   */
   PetscCall(MatScale(*this_mat,scale));
     

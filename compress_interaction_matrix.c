@@ -51,9 +51,16 @@ int main(int argc, char **argv)
   VecScatter ctx;
   PetscRandom rand_str;
   PetscBool read_value,flg,test_forward=PETSC_TRUE,use_h2opus=PETSC_FALSE;
-  PetscBool make_matrix_externally=PETSC_TRUE; /* make matrices here on in external routine (for testing) */
+  PetscBool make_matrix_externally=PETSC_FALSE; /* make matrices here on in external routine (for testing) */
   
   char geom_file[STRLEN]="geom.in";
+  /* IMPORTANT */
+  PetscFunctionBeginUser;
+
+  /* start up Petsc proper */
+  PetscCall(PetscInitialize(&argc, &argv, (char *)0, NULL));
+
+  
   /* generate frameworks */
   medium=(struct med *)calloc(1,sizeof(struct med)); /* make one zero medium structure */
   ictx->medium = medium;
@@ -64,11 +71,13 @@ int main(int argc, char **argv)
   /* 
      start up petsc 
   */
-  PetscFunctionBegin;
+
+  
   /* set defaults, can always override */
   PetscCall(PetscOptionsGetBool(NULL, NULL, "-use_h2opus", &use_h2opus,&read_value));
   if(use_h2opus){
     /*  */
+    fprintf(stderr,"%s: setting up for H2OPUS\n",argv[0]);
     medium->use_hmatrix = 2;
     
     medium->h2opus_eta = 0.6;	/*  */
@@ -79,6 +88,9 @@ int main(int argc, char **argv)
     PetscCall(PetscOptionsGetInt(NULL, NULL, "-basisord", &medium->h2opus_basisord, NULL));
 
   }else{
+
+    fprintf(stderr,"%s: setting up for HTOOLS\n",argv[0]);
+	
     medium->use_hmatrix = 1;
     /* how do I get those assigned internally? */
     /* HTOOLS */
@@ -88,11 +100,8 @@ int main(int argc, char **argv)
     PetscCall(PetscOptionsSetValue(NULL,"-pc_type","none"));
   }
 
-
   
-  /* start up Petsc proper */
-  PetscCall(PetscInitialize(&argc, &argv, (char *)0, NULL));
- 
+
   PetscCallMPI(MPI_Comm_size(PETSC_COMM_WORLD, &medium->comm_size));
   PetscCallMPI(MPI_Comm_rank(PETSC_COMM_WORLD, &medium->comm_rank));
   PetscCall(PetscRandomCreate(PETSC_COMM_WORLD, &rand_str));
@@ -120,6 +129,7 @@ int main(int argc, char **argv)
   m = n = medium->nrflt;
   /*  */
   bglobal = (double *)malloc(sizeof(double)*m);
+
   
   if(!make_matrix_externally){
 
@@ -166,6 +176,7 @@ int main(int argc, char **argv)
     
     PetscCall(MatAssemblyBegin(medium->Is, MAT_FINAL_ASSEMBLY));
     PetscCall(MatAssemblyEnd(medium->Is, MAT_FINAL_ASSEMBLY));
+
     if(medium->use_hmatrix){	/* for all, get coordinates */
       /* 
 	 hirarchical version, using medium->In
@@ -175,10 +186,11 @@ int main(int argc, char **argv)
 	for(k=0;k < ndim;k++)
 	  coords[i*ndim+k] = fault[i].x[k];
     }
-    if(medium->use_hmatrix ==2){
+    if(medium->use_hmatrix == 2){
       /* H2OPUS setup */
       PetscPrintf(PETSC_COMM_WORLD,"%s: kdtree setup for H2OPUS %i nodes\n",argv[0],m);
-      PetscTime(&t0); 
+      PetscTime(&t0);
+      /*  */
       KDTreeCreate(ndim,&medium->kdtree);
       KDTreeSetPoints(medium->kdtree,medium->nrflt);
     
@@ -199,7 +211,7 @@ int main(int argc, char **argv)
     
     PetscCall(MatCreate(PETSC_COMM_WORLD, &medium->In));
     PetscCall(MatSetSizes(medium->In, PETSC_DECIDE, PETSC_DECIDE, m, n));  
-
+    
     if(medium->use_hmatrix==1)
       PetscCall(MatSetType(medium->In,MATHTOOL));
     else
@@ -218,16 +230,13 @@ int main(int argc, char **argv)
     if(medium->use_hmatrix==1){
       PetscCall(MatCreateHtoolFromKernel(PETSC_COMM_WORLD,lm,ln, m, n,
 					 ndim,(coords+rs), (coords+re), htools_kernel, ictx, &medium->In));
-      PetscCall(MatSetOption(medium->In, MAT_SYMMETRIC, PETSC_FALSE));
     }else{
       PetscCall(MatCreateH2OpusFromKernel(PETSC_COMM_WORLD, lm, ln, m, n,
 					  ndim, (coords+rs), PETSC_FALSE, h2opus_kernel,ictx,
 					  medium->h2opus_eta, medium->h2opus_leafsize,
 					  medium->h2opus_basisord, &medium->In));
-
-      PetscCall(MatSetOption(medium->In, MAT_SYMMETRIC, PETSC_TRUE));
     }
-      
+    PetscCall(MatSetOption(medium->In, MAT_SYMMETRIC, PETSC_FALSE));      
     
 
     PetscCall(MatSetFromOptions(medium->In));
@@ -237,8 +246,8 @@ int main(int argc, char **argv)
     free(coords);
   }else{
     /* use external routines */
-    calc_petsc_Isn_matrices(medium, fault,PETSC_FALSE,1.0,0,&medium->Is);
-    calc_petsc_Isn_matrices(medium, fault,PETSC_TRUE, 1.0,0,&medium->In);
+    calc_petsc_Isn_matrices(medium, fault,0,1.0,0,&medium->Is); /* dense */
+    calc_petsc_Isn_matrices(medium, fault,1,1.0,0,&medium->In); /* Htools */
   }
   /* dense */
   if(n<20){
