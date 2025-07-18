@@ -473,7 +473,7 @@ $(BDIR)/patch2area: $(ODIR)/patch2area.o $(GEN_P_INC) $(ODIR)/read_geometry.o \
 		$(ODIR)/libpatchio.a $(ODIR)/patch2area.o \
 		-o $(BDIR)/patch2area  $(LIBS) $(SUPERLU_LIBS) $(SLATEC_LIBS) $(PGLIBS)  $(LDFLAGS) 
 
-(BDIR)/patch2xyzvec: $(ODIR)/patch2xyzvec.o $(GEN_P_INC) \
+$(BDIR)/patch2xyzvec: $(ODIR)/patch2xyzvec.o $(GEN_P_INC) \
 	$(ODIR)/read_geometry.o $(LIBLIST) 
 	$(MPILD)  $(ODIR)/read_geometry.o \
 		$(ODIR)/libpatchio.a $(ODIR)/patch2xyzvec.o \

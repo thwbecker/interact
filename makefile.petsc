@@ -1,15 +1,17 @@
 #
 # flags for PETSC support
 #
-# the 32 bit versions work with Htools
-#PETSC_ARCH = arch-linux-c-opt
-#PETSC_HTOOL_USED=-DUSE_PETSC_HMAT
+# the 32 bit versions work with Htools and H2OPUS
+#
+PETSC_ARCH = arch-linux-c-opt
+PETSC_HTOOL_USED=-DUSE_PETSC_HMAT
+#
 #PETSC_ARCH = arch-linux-c-debug
 #PETSC_HTOOL_USED=-DUSE_PETSC_HMAT
 #
 # the 64 bit integer evrsion does not
-PETSC_ARCH = arch-linux-c-opt64
-PETSC_HTOOL_USED=
+#PETSC_ARCH = arch-linux-c-opt64
+#PETSC_HTOOL_USED=
 
 
 
