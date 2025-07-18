@@ -24,11 +24,62 @@
 
 */
 #include "interact.h"
+
 #ifdef USE_PETSC
+#ifdef USE_PETSC_HMAT
 #include "petsc_prototypes.h"
+/* 
+   generate interaction matrix entries in a way suitable for petsc H2OPUS
+
+   sdim dimension - modified from ex21-kdtree
+   
+
+  
+*/
+PetscScalar GenKEntries_h2opus(PetscInt sdim, PetscReal x[], PetscReal y[], void *kernel_ctx)
+{
+  PetscInt   d, i, j;
+  int iret;
+  double     target_x[3],target_y[3], sep_x,sep_y;
+  PetscScalar sval;
+  COMP_PRECISION slip[3],disp[3],stress[3][3],trac[3];
+  kd_node    nearest_x,nearest_y;
+  struct interact_ctx *ictx;
+  ictx = (struct interact_ctx *)kernel_ctx;
+  /* find the nearest indices */
+  for (d=0; d<sdim; d++) {
+    target_x[d] = x[d];
+    target_y[d] = y[d];
+  }
+  KDTreeFindNearest(ictx->medium->kdtree,target_x,&nearest_x,&sep_x);
+  KDTreeFindNearest(ictx->medium->kdtree,target_y,&nearest_y,&sep_y);
+  i = nearest_x->index;
+  j = nearest_y->index;
+  /*  */
+
+  get_right_slip(slip,ictx->src_slip_mode,1.0);	/* strike motion */
+  eval_green(ictx->fault[i].x,(ictx->fault+j),slip,disp,stress,&iret,GC_STRESS_ONLY,TRUE);
+  if(iret != 0){
+    fprintf(stderr,"GenKentries_h2opus: WARNING: i=%3i j=%3i singular\n",(int)i,(int)j);
+    sval = 0.0;
+  }else{
+    resolve_force(ictx->fault[i].normal,stress,trac);
+    if(ictx->rec_stress_mode == STRIKE)
+      sval = dotp_3d(trac,ictx->fault[i].t_strike);
+    else if(ictx->rec_stress_mode == DIP)
+      sval = dotp_3d(trac,ictx->fault[i].t_dip);
+    else if(ictx->rec_stress_mode == NORMAL)
+      sval = dotp_3d(trac,ictx->fault[i].normal);
+    else{
+      fprintf(stderr,"GenKentries_h2opus: receive mode %i undefined\n",ictx->rec_stress_mode);
+      exit(-1);
+    }
+  }
+  return sval;
+}
 
 /* 
-   generate interaction matrix entries in a way suitable for petsc/htools
+   generate interaction matrix entries in a way suitable for petsc HTOOLS
 
    sdim dimension
    M local m
@@ -38,9 +89,9 @@
 
    this is modified from the ex82.c petsc example
  */
-PetscErrorCode GenKEntries(PetscInt sdim, PetscInt M, PetscInt N,
-			   const PetscInt *J, const PetscInt *K, PetscScalar *ptr,
-			   void *kernel_ctx)
+PetscErrorCode GenKEntries_htools(PetscInt sdim, PetscInt M, PetscInt N,
+				  const PetscInt *J, const PetscInt *K, PetscScalar *ptr,
+				  void *kernel_ctx)
 {
   PetscInt  j, k;
   COMP_PRECISION slip[3],disp[3],stress[3][3],trac[3],sval;
@@ -59,7 +110,7 @@ PetscErrorCode GenKEntries(PetscInt sdim, PetscInt M, PetscInt N,
       eval_green(ictx->fault[K[k]].x,(ictx->fault+J[j]),slip,disp,stress,&iret,
 		 GC_STRESS_ONLY,TRUE);
       if(iret != 0){
-	fprintf(stderr,"GenKentries: WARNING: i=%3i j=%3i singular\n",(int)j,(int)k);
+	fprintf(stderr,"GenKentries_htools: WARNING: i=%3i j=%3i singular\n",(int)j,(int)k);
 	sval = 0.0;
       }else{
 	resolve_force(ictx->fault[K[k]].normal,stress,trac);
@@ -70,7 +121,7 @@ PetscErrorCode GenKEntries(PetscInt sdim, PetscInt M, PetscInt N,
 	else if(ictx->rec_stress_mode == NORMAL)
 	  sval = dotp_3d(trac,ictx->fault[K[k]].normal);
 	else{
-	  fprintf(stderr,"GenKentries: receive mode %i undefined\n",ictx->rec_stress_mode);
+	  fprintf(stderr,"GenKentries_htools: receive mode %i undefined\n",ictx->rec_stress_mode);
 	  exit(-1);
 	}
       }
@@ -84,9 +135,9 @@ PetscErrorCode GenKEntries(PetscInt sdim, PetscInt M, PetscInt N,
   return 0;
 #endif
 }
+
 #endif
-
-
+#endif
 
 
 void calc_interaction_matrix(struct med *medium,struct flt *fault,

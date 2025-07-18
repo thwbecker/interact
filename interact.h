@@ -416,8 +416,15 @@ singular value will be set to zero
 // references to 3D deformation and stress fields
 #define POSS(i, j, k, l) (((k * nxy)+(i * medium->n[INT_Y])+(j))*6+(l))
 #define POSU(i, j, k, l) (((k * nxy)+(i * medium->n[INT_Y])+(j))*3+(l))
+#ifdef USE_PETSC_HMAT
+#include "kdtree.h"
+#endif
 // the fault and medium structures
 #include "structures.h"
+
+
+
+
 #ifdef USE_GEOPROJECT
 // geographic projection routines
 #include "myprojectsimple.h"

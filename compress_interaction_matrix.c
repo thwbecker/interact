@@ -4,6 +4,9 @@
 /* this function is in interact.c */
 #include "petsc_prototypes.h"
 
+
+#include "kdtree.h"		/* for H2OPUS */
+
 #endif
 
 /*
@@ -13,13 +16,14 @@
   reads in geometry file and calculates the interaction matrix, and
   then compresses it, testing forward and inverse computations
 
-  can use HTOOLS Petsc options 
+  can use HTOOLS and H2OPUS Petsc options 
 
   also
 
   -geom_file geom.in - for the fault geometry
   -nrandom number (default: 0) - to run a number of solves with random vectors for timing)
   -test_forward true/false (default: true) - run matrix multiplication or inversion
+  -use_h2opus if set, use that package, else, use htools
   
   
 */
@@ -30,9 +34,13 @@ int main(int argc, char **argv)
   struct med *medium;
   struct flt *fault;
   struct interact_ctx ictx[1];
+  /* timing */
   clock_t start_time,stop_time;
+  PetscLogDouble t0,t1;
+
   double *bglobal,cpu_time_used;
-  MatHtoolKernelFn *kernel = GenKEntries;
+  MatHtoolKernelFn *htools_kernel = GenKEntries_htools;
+  MatH2OpusKernelFn *h2opus_kernel = GenKEntries_h2opus;
   KSP               ksp,ksph;
   PC                pc,pch;
   Vec         x, xh, b, bh, bout,d;
@@ -42,9 +50,9 @@ int main(int argc, char **argv)
   PetscInt nrandom = 0;	/* for timing tests */
   VecScatter ctx;
   PetscRandom rand_str;
-  PetscBool read_value,flg,test_forward=PETSC_TRUE;
+  PetscBool read_value,flg,test_forward=PETSC_TRUE,use_h2opus=PETSC_FALSE;
   PetscBool make_matrix_externally=PETSC_TRUE; /* make matrices here on in external routine (for testing) */
-
+  
   char geom_file[STRLEN]="geom.in";
   /* generate frameworks */
   medium=(struct med *)calloc(1,sizeof(struct med)); /* make one zero medium structure */
@@ -58,10 +66,30 @@ int main(int argc, char **argv)
   */
   PetscFunctionBegin;
   /* set defaults, can always override */
-  PetscCall(PetscOptionsSetValue(NULL,"-mat_htool_eta","100")); /* not sure  */
-  PetscCall(PetscOptionsSetValue(NULL,"-mat_htool_epsilon","1e-3"));
-  PetscCall(PetscOptionsSetValue(NULL,"-mat_htool_compressor","SVD"));
-  PetscCall(PetscOptionsSetValue(NULL,"-pc_type","none"));
+  PetscCall(PetscOptionsGetBool(NULL, NULL, "-use_h2opus", &use_h2opus,&read_value));
+  if(use_h2opus){
+    /*  */
+    medium->use_hmatrix = 2;
+    
+    medium->h2opus_eta = 0.6;	/*  */
+    PetscCall(PetscOptionsGetReal(NULL, NULL, "-eta", &medium->h2opus_eta, NULL));
+    medium->h2opus_leafsize = 32;
+    PetscCall(PetscOptionsGetInt(NULL, NULL, "-leafsize", &medium->h2opus_leafsize, NULL));
+    medium->h2opus_basisord = 8;
+    PetscCall(PetscOptionsGetInt(NULL, NULL, "-basisord", &medium->h2opus_basisord, NULL));
+
+  }else{
+    medium->use_hmatrix = 1;
+    /* how do I get those assigned internally? */
+    /* HTOOLS */
+    PetscCall(PetscOptionsSetValue(NULL,"-mat_htool_eta","100")); /* not sure  */
+    PetscCall(PetscOptionsSetValue(NULL,"-mat_htool_epsilon","1e-3"));
+    PetscCall(PetscOptionsSetValue(NULL,"-mat_htool_compressor","SVD"));
+    PetscCall(PetscOptionsSetValue(NULL,"-pc_type","none"));
+  }
+
+
+  
   /* start up Petsc proper */
   PetscCall(PetscInitialize(&argc, &argv, (char *)0, NULL));
  
@@ -75,8 +103,10 @@ int main(int argc, char **argv)
 
   */
   PetscCall(PetscOptionsGetString(NULL, NULL, "-geom_file", geom_file, STRLEN,&read_value));
+  /* options */
   PetscCall(PetscOptionsGetInt(NULL, NULL, "-nrandom", &nrandom,&read_value));
   PetscCall(PetscOptionsGetBool(NULL, NULL, "-test_forward", &test_forward,&read_value));
+
   HEADNODE{
     if(read_value)
       fprintf(stderr,"%s: reading geometry from %s as set by -geom_file\n",argv[0],geom_file);
@@ -86,7 +116,9 @@ int main(int argc, char **argv)
   read_geometry(geom_file,&medium,&fault,TRUE,FALSE,FALSE,FALSE);
   
   ictx->fault = fault;
+  /*  */
   m = n = medium->nrflt;
+  /*  */
   bglobal = (double *)malloc(sizeof(double)*m);
   
   if(!make_matrix_externally){
@@ -126,7 +158,7 @@ int main(int argc, char **argv)
     fprintf(stderr,"%s: core %03i/%03i: assigning dense row %5i to %5i\n",
 	    argv[0],medium->comm_rank,medium->comm_size,medium->rs,medium->re);
     for(j=medium->rs;j <  medium->re;j++){// rupturing faults for this CPU
-      GenKEntries(ndim,1,n,&j, col_idx, avalues,ictx);
+      GenKEntries_htools(ndim,1,n,&j, col_idx, avalues,ictx);
       PetscCall(MatSetValues(medium->Is, 1, &j, n, col_idx,avalues, INSERT_VALUES));
     }
     PetscCall(PetscFree(avalues));
@@ -134,19 +166,45 @@ int main(int argc, char **argv)
     
     PetscCall(MatAssemblyBegin(medium->Is, MAT_FINAL_ASSEMBLY));
     PetscCall(MatAssemblyEnd(medium->Is, MAT_FINAL_ASSEMBLY));
+    if(medium->use_hmatrix){	/* for all, get coordinates */
+      /* 
+	 hirarchical version, using medium->In
+      */
+      coords = (PetscReal *)malloc(sizeof(PetscReal)*ndim*medium->nrflt);
+      for(i=0;i < medium->nrflt;i++)		/* all sources or receiveer coordinates  */
+	for(k=0;k < ndim;k++)
+	  coords[i*ndim+k] = fault[i].x[k];
+    }
+    if(medium->use_hmatrix ==2){
+      /* H2OPUS setup */
+      PetscPrintf(PETSC_COMM_WORLD,"%s: kdtree setup for H2OPUS %i nodes\n",argv[0],m);
+      PetscTime(&t0); 
+      KDTreeCreate(ndim,&medium->kdtree);
+      KDTreeSetPoints(medium->kdtree,medium->nrflt);
     
-    /* 
-       hirarchical version, using medium->In
-    */
-    coords = (PetscReal *)malloc(sizeof(PetscReal)*ndim*m);
-    for(i=0;i < m;i++)		/* all sources or receiveer coordinates  */
-      for(k=0;k < ndim;k++)
-	coords[i*ndim+k] = fault[i].x[k];
+      KDTreeGetPoints(medium->kdtree,&m,&medium->kd_nodes);
+      for (i=0; i < medium->nrflt; i++) {
+	medium->kd_nodes[i].index = i;
+	for (k=0; k < ndim; k++) { /* speed up later, could use fault
+				      structure itself for sort */
+	  medium->kd_nodes[i].x[k] = (double)fault[i].x[k];
+	}
+      }
+      KDTreeSetup(medium->kdtree);
+      PetscTime(&t1);
+      PetscPrintf(PETSC_COMM_WORLD,"%s: kdtree setup for H2OPUS done: %1.4e sec (%i)\n",argv[0],t1-t0,medium->nrflt);
+    }
+    /* here, we're using the normal stress interaction matrix for the
+       H version of Is */
     
- 
     PetscCall(MatCreate(PETSC_COMM_WORLD, &medium->In));
     PetscCall(MatSetSizes(medium->In, PETSC_DECIDE, PETSC_DECIDE, m, n));  
-    PetscCall(MatSetType(medium->In,MATHTOOL));
+
+    if(medium->use_hmatrix==1)
+      PetscCall(MatSetType(medium->In,MATHTOOL));
+    else
+      PetscCall(MatSetType(medium->In,MATH2OPUS));
+    /*  */
     PetscCall(MatSetUp(medium->In));
     PetscCall(MatGetLocalSize(medium->In, &lm, &ln));
     dn = ln;on = n - ln;
@@ -154,13 +212,24 @@ int main(int argc, char **argv)
     PetscCall(MatMPIAIJSetPreallocation(medium->In, dn, NULL, on, NULL));
     PetscCall(MatGetOwnershipRange(medium->In, &rs, &re));
     
-    fprintf(stderr,"%s: core %03i/%03i: assigning htool row %5i to %5i, lm %i ln %i m %i n %i\n",
-	    argv[0],medium->comm_rank,medium->comm_size,rs,re,lm,ln,m,n);
+    fprintf(stderr,"%s: core %03i/%03i: assigning %s row %5i to %5i, lm %i ln %i m %i n %i\n",
+	    argv[0],medium->comm_rank,medium->comm_size,(medium->use_hmatrix==1)?"HTOOLS":"H2OPUS",
+	    rs,re,lm,ln,m,n);
+    if(medium->use_hmatrix==1){
+      PetscCall(MatCreateHtoolFromKernel(PETSC_COMM_WORLD,lm,ln, m, n,
+					 ndim,(coords+rs), (coords+re), htools_kernel, ictx, &medium->In));
+      PetscCall(MatSetOption(medium->In, MAT_SYMMETRIC, PETSC_FALSE));
+    }else{
+      PetscCall(MatCreateH2OpusFromKernel(PETSC_COMM_WORLD, lm, ln, m, n,
+					  ndim, (coords+rs), PETSC_FALSE, h2opus_kernel,ictx,
+					  medium->h2opus_eta, medium->h2opus_leafsize,
+					  medium->h2opus_basisord, &medium->In));
+
+      PetscCall(MatSetOption(medium->In, MAT_SYMMETRIC, PETSC_TRUE));
+    }
+      
     
-    PetscCall(MatCreateHtoolFromKernel(PETSC_COMM_WORLD,lm,ln, m, n,
-				       ndim,(coords+rs), (coords+re), kernel,ictx, &medium->In));
-    
-    PetscCall(MatSetOption(medium->In, MAT_SYMMETRIC, PETSC_FALSE));
+
     PetscCall(MatSetFromOptions(medium->In));
     
     PetscCall(MatAssemblyBegin(medium->In, MAT_FINAL_ASSEMBLY));
@@ -229,7 +298,7 @@ int main(int argc, char **argv)
     stop_time = clock();
     cpu_time_used = ((double)stop_time-start_time)/CLOCKS_PER_SEC;
     HEADNODE
-      fprintf(stderr,"%s: it took %20.3fs for %05i htool solves\n",argv[0],cpu_time_used,nrandom+1);
+      fprintf(stderr,"%s: it took %20.3fs for %05i H-matrix(%i) solves\n",argv[0],cpu_time_used,nrandom+1,medium->use_hmatrix);
     
     if((m<20)&&(nrandom==0))
       VecView(bh,PETSC_VIEWER_STDOUT_WORLD);
@@ -320,7 +389,8 @@ int main(int argc, char **argv)
       stop_time = clock();
       cpu_time_used = ((double)stop_time-start_time)/CLOCKS_PER_SEC;
       HEADNODE
-	fprintf(stderr,"%s: it took %20.3fs for %05i htool inverse solves\n",argv[0],cpu_time_used,nrandom+1);
+	fprintf(stderr,"%s: it took %20.3fs for %05i Hmatrix(%i) inverse solves\n",
+		argv[0],cpu_time_used,nrandom+1,medium->use_hmatrix);
       
       if((m<20)&&(nrandom==0))
 	VecView(xh,PETSC_VIEWER_STDOUT_WORLD);
@@ -345,9 +415,10 @@ int main(int argc, char **argv)
   PetscCall(VecDestroy(&b));
  
   PetscCall(VecDestroy(&bh));
-  
-  
   free(bglobal);
+  if(medium->use_hmatrix==2)	/* free the KD tree */
+    KDTreeDestroy(&medium->kdtree);
+
   PetscCall(MatDestroy(&medium->Is));
   PetscCall(MatDestroy(&medium->In));
   PetscCall(PetscFinalize());

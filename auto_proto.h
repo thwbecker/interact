@@ -258,6 +258,7 @@ double ic_from_file(int, int, int, int, struct med *);
 double aij_from_file(int, int, int, FILE *);
 int select_i_coeff_calc_mode(struct med *);
 size_t imatrix_size(struct med *);
+/* kdtree.c */
 /* levmarq_numrec.c */
 void mrqmin(double *, double *, int, double *, int *, int, double **, double **, double *, double *, struct bmd *, unsigned char, double, unsigned char, unsigned char, unsigned char, unsigned char, double, double *, unsigned char, struct prj);
 void print_lm_progress(double, double, double, double, int, int, double *, double, int, char **, int, int, unsigned char, unsigned char);

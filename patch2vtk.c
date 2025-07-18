@@ -13,8 +13,9 @@ int main(int argc, char **argv)
   my_boolean shrink_patches=FALSE,
     verbose=FALSE,
     attempt_read_slip=FALSE,
+    remove_centroid=FALSE,
     read_slip;
-  COMP_PRECISION leeway,vertex[MAX_NR_EL_VERTICES*3],u[3],t_strike[3],t_dip[3],normal[3],area;
+  COMP_PRECISION leeway,vertex[MAX_NR_EL_VERTICES*3],u[3],t_strike[3],t_dip[3],normal[3],area,xc[3],xout;
   COMP_PRECISION sscale = 1.;
   medium=(struct med *)calloc(1,sizeof(struct med));
   
@@ -27,15 +28,19 @@ int main(int argc, char **argv)
   if(argc > 3){
     sscanf(argv[3],ONE_CP_FORMAT,&sscale);
   }
-  if((argc > 4)||((argc>1) && (strcmp(argv[1],"-h")==0))){
-    fprintf(stderr,"%s [flt.dat] [shrink_patches, %i] [scale_dim, %g]\n\t reads in patch format from stdin and writes VTK format to stdout\n",
-	    argv[0],shrink_patches,sscale);
+  if(argc > 4){
+    sscanf(argv[4],"%i",&i);
+    remove_centroid = (my_boolean)i;
+  }
+  if((argc > 5)||((argc>1) && (strcmp(argv[1],"-h")==0))){
+    fprintf(stderr,"%s [flt.dat] [shrink_patches, %i] [scale_dim, %g] [remove_centroid, %i]\n\t reads in patch format from stdin and writes VTK format to stdout\n",
+	    argv[0],shrink_patches,sscale,remove_centroid);
     fprintf(stderr,"if an argument is given, will assume it is a flt.dat type output file and assign values for coloring\n");
     fprintf(stderr,"if shrink_patches is set, will make patches smaller for plotting\n");
     exit(-1);
   }
-  fprintf(stderr,"%s: reading patch format from stdin, writing VTK to stdout. shrink: %i scale: %g\n",
-	  argv[0],shrink_patches,sscale);
+  fprintf(stderr,"%s: reading patch format from stdin, writing VTK to stdout. shrink: %i scale: %g remove_cetroid: %i\n",
+	  argv[0],shrink_patches,sscale,remove_centroid);
   
   read_geometry("stdin",&medium,&fault,FALSE,FALSE,FALSE,verbose);
   if(attempt_read_slip)
@@ -50,34 +55,49 @@ int main(int argc, char **argv)
   /* 
      count all nodes  
   */
-  for(nel=tncon=tnvert=i=0;i < medium->nrflt;i++){
-    tnvert += nvert_of_patch((fault+i));
+  for(xc[0]=xc[1]=xc[2]=0.,nel=tncon=tnvert=i=0;i < medium->nrflt;i++){
+    nvert = nvert_of_patch((fault+i));
+    tnvert += nvert;
     ielmul = number_of_subpatches((fault+i));
     nel += ielmul;
     for(l=0;l < ielmul;l++)
       tncon += ncon_of_subpatch((fault+i),l);
+    calculate_bloated_vertices(vertex,(fault+i),leeway);
+    for(j=0;j < nvert;j++)
+      for(k=0;k < 3;k++)
+	xc[k] += vertex[j*3+k]/CHAR_FAULT_DIM*sscale;
   }
-    
+  for(k=0;k<3;k++)
+    xc[k]/=(COMP_PRECISION)tnvert;
+  if(remove_centroid){
+    fprintf(stderr,"%s: vertex centroid at: %e %e %e, removing\n",argv[0],xc[0],xc[1],xc[2]);
+  }else{
+    fprintf(stderr,"%s: vertex centroid at: %e %e %e\n",argv[0],xc[0],xc[1],xc[2]);
+    xc[0]=xc[1]=xc[2]=0;
+  }
   printf("# vtk DataFile Version 2.0\n");
   printf("from patch2vtk\n");
   printf("ASCII\n");
   printf("DATASET UNSTRUCTURED_GRID\n");
-  
+
   printf("POINTS %i float\n",tnvert);
   for(i=0;i < medium->nrflt;i++){
     nvert = nvert_of_patch((fault+i));
     calculate_bloated_vertices(vertex,(fault+i),leeway);
     for(j=0;j < nvert;j++){
-      for(k=0;k < 3;k++)
-	if(fabs(vertex[j*3+k]/CHAR_FAULT_DIM) > EPS_COMP_PREC)
-	  printf("%20.15e ",vertex[j*3+k]/CHAR_FAULT_DIM*sscale);
+      for(k=0;k < 3;k++){
+	xout = vertex[j*3+k]/CHAR_FAULT_DIM*sscale - xc[k];
+	if(fabs(xout) > EPS_COMP_PREC)
+	  printf("%20.15e ",xout);
 	else
 	  printf("0.0 ");
+      }
       printf("\t");
     }
     printf("\n");
   }
-
+ 
+ 
   printf("CELLS %i %i\n",nel,tncon+nel);
   for(i=k=0;i<medium->nrflt;i++){
     ielmul = number_of_subpatches((fault+i));

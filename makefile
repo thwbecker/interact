@@ -2,6 +2,9 @@
 #
 #
 #  (C) Thorsten Becker, thwbecker@post.harvard.edu, 1999-2025
+#	with contributions from Dave May, and using a range of other source codes
+# 	including from Okada and Nikoo & Walter - see the respective source files
+# 	for detailed references.
 #
 #  makefile for interact and related programs
 #
@@ -221,7 +224,7 @@ PATCH_IO_OBJS = $(ODIR)/divide_fault_in_patches.o $(ODIR)/sparse.o	\
 	$(ODIR)/eval_okada.o $(ODIR)/tdd_coeff.o $(ODIR)/rhs.o		\
 	$(ODIR)/eval_green.o $(ODIR)/eval_triangle_nw.o			\
 	$(ODIR)/eval_iquad.o $(ODIR)/eval_triangle_tgf.o			\
-	$(ODIR)/interact.o   $(ODIR)/mysincos.o 	\
+	$(ODIR)/interact.o  $(ODIR)/kdtree.o   $(ODIR)/mysincos.o 	\
 	$(OKROUTINE) $(ODIR)/fracture_criterion.o			\
 	$(ODIR)/myopen.o  $(ODIR)/randgen.o \
 	$(ODIR)/string_compare.o  $(TRI_GREEN_OBJS)
@@ -574,28 +577,30 @@ $(BDIR)/calc_interaction_matrix: $(ODIR)/coulomb_stress.o \
 		$(PGLIBS) $(SLATEC_LIBS)  $(LDFLAGS)
 
 $(BDIR)/compress_interaction_matrix: $(ODIR)/compress_interaction_matrix.o $(ODIR)/coulomb_stress.o \
-	$(ODIR)/interact.o $(GEN_P_INC) $(LIBLIST) 
+	$(ODIR)/interact.o 	$(ODIR)/petsc_interact.o $(GEN_P_INC)  $(LIBLIST) 
 	$(MPILD)   $(ODIR)/compress_interaction_matrix.o \
-	$(ODIR)/petsc_interact.o $(ODIR)/coulomb_stress.o $(ODIR)/interact.o  \
+	$(ODIR)/petsc_interact.o 	$(ODIR)/coulomb_stress.o $(ODIR)/interact.o  \
 	-o $(BDIR)/compress_interaction_matrix $(LIBS) $(SUPERLU_LIBS) \
 			$(PETSC_LIBS) $(PGLIBS) $(SLATEC_LIBS)  $(LDFLAGS)
 
-$(BDIR)/petsc_simple_solve: $(ODIR)/petsc_simple_solve.o $(ODIR)/coulomb_stress.o $(ODIR)/interact.o  $(ODIR)/petsc_interact.o \
-	$(GEN_P_INC) $(LIBLIST) 
-	$(MPILD)   $(ODIR)/petsc_simple_solve.o $(ODIR)/petsc_interact.o  $(ODIR)/coulomb_stress.o $(ODIR)/interact.o  \
+$(BDIR)/petsc_simple_solve: $(ODIR)/petsc_simple_solve.o $(ODIR)/coulomb_stress.o $(ODIR)/interact.o    \
+	$(ODIR)/petsc_interact.o $(GEN_P_INC) $(LIBLIST) 
+	$(MPILD)   $(ODIR)/petsc_simple_solve.o $(ODIR)/petsc_interact.o    \
+	$(ODIR)/coulomb_stress.o $(ODIR)/interact.o  \
 	-o $(BDIR)/petsc_simple_solve $(LIBS) $(SUPERLU_LIBS) \
 			$(PETSC_LIBS) $(PGLIBS) $(SLATEC_LIBS)  $(LDFLAGS)
 
-$(BDIR)/rsf_solve: $(ODIR)/rsf_solve.o $(ODIR)/coulomb_stress.o $(ODIR)/interact.o  $(ODIR)/petsc_interact.o \
+$(BDIR)/rsf_solve: $(ODIR)/rsf_solve.o $(ODIR)/coulomb_stress.o   $(ODIR)/interact.o  $(ODIR)/petsc_interact.o \
 	$(GEN_P_INC) $(LIBLIST) 
-	$(MPILD)   $(ODIR)/rsf_solve.o $(ODIR)/petsc_interact.o  $(ODIR)/coulomb_stress.o $(ODIR)/interact.o  \
+	$(MPILD)   $(ODIR)/rsf_solve.o $(ODIR)/petsc_interact.o   $(ODIR)/coulomb_stress.o $(ODIR)/interact.o  \
 	-o $(BDIR)/rsf_solve $(LIBS) $(SUPERLU_LIBS) \
 			$(PETSC_LIBS) $(PGLIBS) $(SLATEC_LIBS)  $(LDFLAGS)
 
-$(BDIR)/compress_interaction_matrix.dbg: $(ODIR)/compress_interaction_matrix.dbg.o $(ODIR)/coulomb_stress.dbg.o  \
+$(BDIR)/compress_interaction_matrix.dbg: $(ODIR)/compress_interaction_matrix.dbg.o   \
+	$(ODIR)/coulomb_stress.dbg.o  \
 	$(ODIR)/interact.dbg.o $(ODIR)/petsc_interact.dbg.o $(GEN_P_INC) $(LIBLIST) 
 	$(MPILD)   $(ODIR)/compress_interaction_matrix.dbg.o  $(ODIR)/petsc_interact.dbg.o \
-	$(ODIR)/coulomb_stress.dbg.o $(ODIR)/interact.dbg.o \
+	$(ODIR)/coulomb_stress.dbg.o $(ODIR)/interact.dbg.o  \
 	-o $(BDIR)/compress_interaction_matrix.dbg $(LIBS) $(SUPERLU_LIBS) \
 			$(PETSC_LIBS) $(PGLIBS) $(SLATEC_LIBS)  $(LDFLAGS)
 

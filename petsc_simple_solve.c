@@ -17,7 +17,7 @@
 
   -geom_file geom.in - for the fault geometry
   -test_forward true/false
-  -use_h true/false
+  -use_hmatrix 0,1,2
   
 */
 
@@ -32,10 +32,9 @@ int main(int argc, char **argv)
   PetscScalar *values=NULL;
   PetscInt    n, m, i,modes=1;
   Mat Idense;
+  PetscBool read_value,flg,test_forward=PETSC_TRUE;
+  PetscInt use_hmatrix=0;
 
- 
-  
-  PetscBool read_value,flg,test_forward=PETSC_TRUE,use_h=PETSC_FALSE;
   VecScatter ctx;
   /* input file name */
   char geom_file[STRLEN]="geom.in",fault_file[STRLEN]="flt.dat";
@@ -58,7 +57,7 @@ int main(int argc, char **argv)
      options for this code
 
   */
-  PetscCall(PetscOptionsGetBool(NULL, NULL, "-use_h", &use_h,&read_value)); /* H matrix or dense */
+  PetscCall(PetscOptionsGetInt(NULL, NULL, "-use_h", &use_hmatrix,&read_value)); /* H matrix or dense 0,1,2*/
   PetscCall(PetscOptionsGetString(NULL, NULL, "-geom_file", geom_file, STRLEN,&read_value)); /* geometry file */
   PetscCall(PetscOptionsGetBool(NULL, NULL, "-test_forward", &test_forward,&read_value)); /* read in true/false */
 
@@ -78,15 +77,15 @@ int main(int argc, char **argv)
   /* 
      compute interaction matrices 
   */
-  calc_petsc_Isn_matrices(medium, fault,use_h,1.0,0,&medium->Is);
-  calc_petsc_Isn_matrices(medium, fault,use_h,1.0,1,&medium->In);
+  calc_petsc_Isn_matrices(medium, fault,use_hmatrix,1.0,0,&medium->Is);
+  calc_petsc_Isn_matrices(medium, fault,use_hmatrix,1.0,1,&medium->In);
   /* 
      display 
   */
-  if((n<20)||(medium->use_h)){
+  if((n<20)||(medium->use_hmatrix)){
     /*  */
     PetscCall(MatView(medium->Is,PETSC_VIEWER_STDOUT_WORLD));
-    if(medium->use_h && (n<20)){
+    if(medium->use_hmatrix && (n<20)){
       PetscCall(MatConvert(medium->Is, MATDENSE, MAT_INITIAL_MATRIX, &Idense));
       PetscCall(MatView(Idense,PETSC_VIEWER_STDOUT_WORLD));
       PetscCall(MatDestroy(&Idense));
@@ -125,10 +124,12 @@ int main(int argc, char **argv)
     
     /* make constext for solver */
     PetscCall(KSPCreate(PETSC_COMM_WORLD, &ksp));
-    if(medium->use_h)
+
+    if(medium->use_hmatrix==1)
       PetscCall(KSPSetOptionsPrefix(ksp,"htool_"));
+
     PetscCall(KSPSetOperators(ksp, medium->Is, medium->Is));
-    if(medium->use_h){
+    if(medium->use_hmatrix){
       PetscCall(KSPSetFromOptions(ksp));
       PetscCall(KSPGetPC(ksp, &pc));
       PetscCall(PetscObjectTypeCompare((PetscObject)pc, PCHPDDM, &flg));

@@ -22,12 +22,12 @@ int main(int argc,char **argv)
   Vec stress_rate,xout,x,F,islip_rate_vec;
   FILE *fout1,*fout2;
   struct med *medium;struct flt *fault;
-  PetscInt m,i,n,j,field_out,ierr;
+  PetscInt m,i,n,j,field_out,ierr,use_hmatrix=1;
   PetscRandom prand;
   PetscReal state,slip,sum[3],patch_l,stable_l,rand_fac,dummy[3],vmean,vstd,vmin,vmax,smean;
   struct interact_ctx par[1]; /* user-defined work context */
   char geom_file[STRLEN]="geom.in",rsf_file[STRLEN]="rsf.dat";
-  PetscBool read_value,use_h = PETSC_TRUE,warned = PETSC_FALSE;
+  PetscBool read_value,warned = PETSC_FALSE;
   char *home_dir = getenv("HOME");char par_file[STRLEN],vel_file[STRLEN];
   snprintf(par_file,STRLEN,"%s/progs/src/interact/petsc_settings.yaml",home_dir);
   /* set up structure */
@@ -64,8 +64,10 @@ int main(int argc,char **argv)
   }
   //fprintf(stderr,"%s: running on %i cores, I am core %i\n",argv[0],medium->comm_size,medium->comm_rank);
 
-  /* options for this code */
-  PetscCall(PetscOptionsGetBool(NULL, NULL, "-use_h", &use_h,&read_value)); /* H matrix or dense */
+  /* options for this code: 0 dense 1 htools 2 h2opus */
+  PetscCall(PetscOptionsGetInt(NULL, NULL, "-use_hmatrix", &use_hmatrix,&read_value)); /* 0, 1,2 : H matrix or dense */
+
+    
   PetscCall(PetscOptionsGetString(NULL, NULL, "-geom_file", geom_file, STRLEN,&read_value));
   PetscCall(PetscOptionsGetString(NULL, NULL, "-rsf_file", rsf_file, STRLEN,&read_value));
   /* input parameter */
@@ -89,9 +91,9 @@ int main(int argc,char **argv)
   /* 
      create and calculate interaction matrices 
   */
-  calc_petsc_Isn_matrices(medium,fault,use_h,shear_modulus_si/SHEAR_MODULUS,0,&medium->Is); /* shear stress */
-  calc_petsc_Isn_matrices(medium,fault,use_h,shear_modulus_si/SHEAR_MODULUS,1,&medium->In); /* normal stress */
-  if(medium->use_h)
+  calc_petsc_Isn_matrices(medium,fault,use_hmatrix,shear_modulus_si/SHEAR_MODULUS,0,&medium->Is); /* shear stress */
+  calc_petsc_Isn_matrices(medium,fault,use_hmatrix,shear_modulus_si/SHEAR_MODULUS,1,&medium->In); /* normal stress */
+  if(use_hmatrix)
     PetscCall(MatView(medium->Is,PETSC_VIEWER_STDOUT_WORLD));
   
   /* make slip and shear and normal stressing vectors */
