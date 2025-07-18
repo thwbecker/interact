@@ -1,5 +1,8 @@
 static char help[] = "Solves a RBF kernel matrix with KSP and PCH2OPUS.\n\n";
-
+/*
+ Dave May modified ex21 using KDTREE
+ 
+*/
 #include <petscksp.h>
 
 /* ------ */
