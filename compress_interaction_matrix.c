@@ -52,6 +52,8 @@ int main(int argc, char **argv)
   PetscRandom rand_str;
   PetscBool read_value,flg,test_forward=PETSC_TRUE,use_h2opus=PETSC_FALSE;
   PetscBool make_matrix_externally=PETSC_FALSE; /* make matrices here on in external routine (for testing) */
+  double     target_x[3], sep_x;
+  kd_node    nearest_x;
   
   char geom_file[STRLEN]="geom.in";
   /* IMPORTANT */
@@ -165,7 +167,7 @@ int main(int argc, char **argv)
     /* 
        assemble dense matrix 
     */
-    fprintf(stderr,"%s: core %03i/%03i: assigning dense row %5i to %5i\n",
+    fprintf(stderr,"%s: core %03i/%03i: assigning dense  row %5i to %5i\n",
 	    argv[0],medium->comm_rank,medium->comm_size,medium->rs,medium->re);
     for(j=medium->rs;j <  medium->re;j++){// rupturing faults for this CPU
       GenKEntries_htools(ndim,1,n,&j, col_idx, avalues,ictx);
@@ -199,12 +201,26 @@ int main(int argc, char **argv)
 	medium->kd_nodes[i].index = i;
 	for (k=0; k < ndim; k++) { /* speed up later, could use fault
 				      structure itself for sort */
-	  medium->kd_nodes[i].x[k] = (double)fault[i].x[k];
+	  medium->kd_nodes[i].x[k] = coords[i*ndim+k];
 	}
       }
       KDTreeSetup(medium->kdtree);
       PetscTime(&t1);
-      PetscPrintf(PETSC_COMM_WORLD,"%s: kdtree setup for H2OPUS done: %1.4e sec (%i)\n",argv[0],t1-t0,medium->nrflt);
+      PetscPrintf(PETSC_COMM_WORLD,"%s: kdtree setup for H2OPUS done: %1.4e sec (%i)\n",
+		  argv[0],t1-t0,medium->nrflt);
+
+      /* check if nodal locations are found */
+      for (i=0; i < medium->nrflt; i++){
+	for(j=0;j<ndim;j++)
+	  target_x[j] = fault[i].x[j];
+	KDTreeFindNearest(medium->kdtree,target_x,&nearest_x,&sep_x);
+	if((nearest_x->index != i)||(sep_x > EPS_COMP_PREC)){
+	  fprintf(stderr,"KD error: orig index %i - found index %i - sep: %g\n",i,nearest_x->index,sep_x);
+	  exit(-1);
+	}
+      }
+
+      
     }
     /* here, we're using the normal stress interaction matrix for the
        H version of Is */
@@ -227,7 +243,7 @@ int main(int argc, char **argv)
     fprintf(stderr,"%s: core %03i/%03i: assigning %s row %5i to %5i, lm %i ln %i m %i n %i\n",
 	    argv[0],medium->comm_rank,medium->comm_size,(medium->use_hmatrix==1)?"HTOOLS":"H2OPUS",
 	    rs,re,lm,ln,m,n);
-    if(medium->use_hmatrix==1){
+    if(medium->use_hmatrix == 1){
       PetscCall(MatCreateHtoolFromKernel(PETSC_COMM_WORLD,lm,ln, m, n,
 					 ndim,(coords+rs), (coords+re), htools_kernel, ictx, &medium->In));
     }else{

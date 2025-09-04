@@ -47,15 +47,15 @@ PetscScalar GenKEntries_h2opus(PetscInt sdim, PetscReal x[], PetscReal y[], void
   struct interact_ctx *ictx;
   ictx = (struct interact_ctx *)kernel_ctx;
   /* find the nearest indices */
-  for (d=0; d<sdim; d++) {
+  for (d=0; d < sdim; d++) {
     target_x[d] = x[d];
     target_y[d] = y[d];
   }
   KDTreeFindNearest(ictx->medium->kdtree,target_x,&nearest_x,&sep_x);
   KDTreeFindNearest(ictx->medium->kdtree,target_y,&nearest_y,&sep_y);
   /*  */
-  i = nearest_x->index;
-  j = nearest_y->index;
+  i = nearest_x->index;j = nearest_y->index;
+  //j = nearest_x->index;i = nearest_y->index;
   /*  */
 
   get_right_slip(slip,ictx->src_slip_mode,1.0);	/* strike motion */
@@ -78,6 +78,7 @@ PetscScalar GenKEntries_h2opus(PetscInt sdim, PetscReal x[], PetscReal y[], void
   }
   return sval;
 }
+#endif
 
 /* 
    generate interaction matrix entries in a way suitable for petsc HTOOLS
@@ -137,7 +138,7 @@ PetscErrorCode GenKEntries_htools(PetscInt sdim, PetscInt M, PetscInt N,
 #endif
 }
 
-#endif
+
 #endif
 
 

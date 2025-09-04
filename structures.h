@@ -256,8 +256,9 @@ struct med{
   PetscMPIInt comm_size, comm_rank;
   PetscInt    rs, re, rn;
   Mat         Is,In;
-#ifdef USE_PETSC_HMAT
   PetscInt use_hmatrix;		/* 0,1,2 */
+  
+#ifdef USE_PETSC_HMAT
   PetscReal h2opus_eta;		/* 0.6 */
   PetscInt  h2opus_leafsize;	/* 32 */
   PetscInt  h2opus_basisord;	/* 8 */
