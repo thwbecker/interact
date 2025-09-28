@@ -29,7 +29,6 @@ module m_HACApK_calc_entry_ij
      integer :: nd,lp61
      real*8,pointer :: ao(:)
      ! user defined
-     integer :: n,ndim
      real*8 :: scale
      real*8,pointer :: xcol(:),ycol(:),zcol(:)
   

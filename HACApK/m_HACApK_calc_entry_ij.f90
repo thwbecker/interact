@@ -29,7 +29,7 @@ module m_HACApK_calc_entry_ij
      integer :: nd,lp61
      real*8,pointer :: ao(:)
      ! user defined
-     integer :: n,ndim
+     integer :: ndim
      real*8 :: scale
      real*8,pointer :: xcol(:),ycol(:),zcol(:)
   
@@ -40,6 +40,7 @@ module m_HACApK_calc_entry_ij
 contains
   !***HACApK_entry_ij
   real*8 function HACApK_entry_ij(i, j, st_bemv)
+    implicit none
     type(st_HACApK_calc_entry), intent(in) :: st_bemv
     integer, intent(in) :: i,j
     !
