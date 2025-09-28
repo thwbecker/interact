@@ -50,8 +50,7 @@ contains
     dist2=dist2+(st_bemv%ycol(i)-st_bemv%ycol(j))**2
     dist2=dist2+(st_bemv%zcol(i)-st_bemv%zcol(j))**2
     
-    
-    HACApK_entry_ij= exp(dist2/st_bemv%scale)
+    HACApK_entry_ij= 1.0d0/(1d-12 + dist2/st_bemv%scale)**0.5 ! made up kernel
     
     
     
