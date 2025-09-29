@@ -39,11 +39,11 @@ module m_HACApK_calc_entry_ij
 contains
   !***HACApK_entry_ij
   real*8 function HACApK_entry_ij(i, j, st_bemv)
+    implicit none
     type(st_HACApK_calc_entry), intent(in) :: st_bemv
     integer, intent(in) :: i,j
     !
     real*8 dist2
-    integer k
 
     dist2=      (st_bemv%xcol(i)-st_bemv%xcol(j))**2
     dist2=dist2+(st_bemv%ycol(i)-st_bemv%ycol(j))**2
