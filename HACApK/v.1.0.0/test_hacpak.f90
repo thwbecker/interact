@@ -1,4 +1,8 @@
 program Example_Using_HACApK
+  !
+  ! works  as serial  binary, with  mpirun -np  1, but  not with  more
+  ! processors
+  !
   use m_HACApK_base
   use m_HACApK_solve
   use m_HACApK_use
@@ -45,8 +49,6 @@ program Example_Using_HACApK
   coord(:,2)=st_bemv%ycol(:)
   coord(:,3)=st_bemv%zcol(:)
 
-  
-  
   ztol=1.0e-6
 
   print *,'making H '
@@ -86,11 +88,12 @@ program Example_Using_HACApK
   xd = bd
   ! check dens solution
   print *,'dense solve solution error:',norm2(bsave-matmul(mdens_backup,xd))
-  ! print solution
-  do i=1,st_bemv%nd
-     print *,i,' H ',xh(i),' D ',xd(i),' diff ',abs(xh(i)-xd(i))
-  enddo
-
+  if(st_bemv%nd.lt.30)then
+     ! print solution
+     do i=1,st_bemv%nd
+        print *,i,' H ',xh(i),' D ',xd(i),' diff ',abs(xh(i)-xd(i))
+     enddo
+  endif
   print *,'H vs dense solve x error:',norm2(xd-xh)
   print *
 
@@ -103,15 +106,19 @@ program Example_Using_HACApK
   bd = matmul(mdens_backup,xd) ! dense b = Ax 
   !
   xh=xd
-  ! non distributed version
+  ! version 1
   lrtrn = HACApK_adot_pmt_lfmtx_hyp(st_leafmtxp,st_bemv,st_ctl,bh,xh)
+  ! version 2
+  !lrtrn = HACApK_adot_pmt_lfmtx_p(st_leafmtxp,st_bemv,st_ctl,bh,xh)
   !
   !
   !
-  do i=1,st_bemv%nd
-     print *,i,' H ',bh(i),' D ',bd(i), ' diff ',abs(bh(i)-bd(i))
-  enddo
 
+  if(st_bemv%nd.lt.30)then
+     do i=1,st_bemv%nd
+        print *,i,' H ',bh(i),' D ',bd(i), ' diff ',abs(bh(i)-bd(i))
+     enddo
+  endif
   print *,'H vs dense multiplication b error', norm2(bh-bd)
   
 
