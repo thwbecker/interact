@@ -3,7 +3,7 @@ program Example_Using_HACApK
   use m_HACApK_solve
   use m_HACApK_use
   implicit none
-!  include 'mpif.h'
+  include 'mpif.h'
   type(st_HACApK_lcontrol) :: st_ctl
   type(st_HACApK_leafmtxp) :: st_leafmtxp
   type(st_HACApK_calc_entry) :: st_bemv
@@ -15,26 +15,29 @@ program Example_Using_HACApK
   integer ierr,icomm,info
   integer,dimension(:),allocatable :: ipiv
 
-  !call MPI_Init (ierr);icomm = MPI_COMM_WORLD
+  call MPI_Init (ierr);icomm = MPI_COMM_WORLD
   call random_seed()
   !
   !
   st_bemv%nd = 20                        ! number of points
 
   print *,'initializing'
-  !lrtrn = HACApK_init(st_bemv%nd,st_ctl,st_bemv,icomm)
-  lrtrn = HACApK_init(st_bemv%nd,st_ctl,st_bemv)
+  lrtrn = HACApK_init(st_bemv%nd,st_ctl,st_bemv,icomm)
+  !lrtrn = HACApK_init(st_bemv%nd,st_ctl,st_bemv)
   
  
   
   print *,'allocating'
-  allocate(st_bemv%xcol(st_bemv%nd),st_bemv%ycol(st_bemv%nd),st_bemv%zcol(st_bemv%nd))
+  allocate(st_bemv%xcol(st_bemv%nd),st_bemv%ycol(st_bemv%nd),&
+       st_bemv%zcol(st_bemv%nd))
   allocate(coord(st_bemv%nd,3))
-  allocate(xd(st_bemv%nd),xh(st_bemv%nd),bh(st_bemv%nd),bd(st_bemv%nd),bsave(st_bemv%nd))
-  allocate(mdens(st_bemv%nd,st_bemv%nd),mdens_backup(st_bemv%nd,st_bemv%nd),ipiv(st_bemv%nd))
+  allocate(xd(st_bemv%nd),xh(st_bemv%nd),bh(st_bemv%nd),&
+       bd(st_bemv%nd),bsave(st_bemv%nd))
+  allocate(mdens(st_bemv%nd,st_bemv%nd),&
+       mdens_backup(st_bemv%nd,st_bemv%nd),ipiv(st_bemv%nd))
 
 
-  st_bemv%scale = 1.d0
+  st_bemv%scale = 1.d0          !for the kernel
   
   
   call random_number(st_bemv%xcol)
@@ -45,10 +48,11 @@ program Example_Using_HACApK
   coord(:,2)=st_bemv%ycol(:)
   coord(:,3)=st_bemv%zcol(:)
 
-  
+  !
+  !
+  !
   
   ztol=1.0e-6
-
   print *,'making H '
   lrtrn=HACApK_generate(st_leafmtxp,st_bemv,st_ctl,coord,ztol)
 
@@ -119,5 +123,5 @@ program Example_Using_HACApK
   lrtrn=HACApK_free_leafmtxp(st_leafmtxp)
   lrtrn=HACApK_finalize(st_ctl)
   
-  !call MPI_Finalize (ierr)
+  call MPI_Finalize (ierr)
 end program
