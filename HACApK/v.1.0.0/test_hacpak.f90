@@ -28,7 +28,8 @@ program Example_Using_HACApK
   print *,'initializing'
   lrtrn = HACApK_init(st_bemv%nd,st_ctl,st_bemv,icomm)
   !lrtrn = HACApK_init(st_bemv%nd,st_ctl,st_bemv)
-  
+
+  st_ctl%param(61)=1            ! matrix normalization
  
   
   print *,'allocating'
@@ -108,7 +109,7 @@ program Example_Using_HACApK
   xh=xd
   ! version 1
   lrtrn = HACApK_adot_pmt_lfmtx_hyp(st_leafmtxp,st_bemv,st_ctl,bh,xh)
-  ! version 2
+  ! version 2 
   !lrtrn = HACApK_adot_pmt_lfmtx_p(st_leafmtxp,st_bemv,st_ctl,bh,xh)
   !
   !
