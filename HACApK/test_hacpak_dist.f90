@@ -16,7 +16,7 @@ program Example_Using_HACApK
   type(st_HACApK_LHp) :: st_LHp
   real(8),allocatable::wws(:)
   !
-  real*8,dimension(:,:),allocatable :: coord,mdens,mdens_backup
+  real*8,dimension(:,:),allocatable :: coord,mdens
   real*8,dimension(:),allocatable :: xd,xh,bd,bh,bsave
   real*8 :: ztol
   integer i,j,ni,ind,ng,nl
@@ -51,7 +51,7 @@ program Example_Using_HACApK
   allocate(xd(ng),xh(ng),bh(ng),bd(ng),bsave(ng))
   
   if(mpi_rank == 0)then
-     allocate(mdens(ng,ng),mdens_backup(ng,ng),ipiv(ng))
+     allocate(mdens(ng,ng),ipiv(ng))
   endif
 
 
@@ -71,7 +71,8 @@ program Example_Using_HACApK
   call MPI_BARRIER(MPI_COMM_WORLD,ierr)
   ztol=1.0e-6
   lrtrn=HACApK_generate(st_leafmtxp,st_bemv,st_ctl,coord,ztol)
-
+  st_ctl%param(61)=1            ! matrix normalization
+  
   if(imode.eq.2)then
      lrtrn=HACApK_construct_LH(st_LHp,st_leafmtxp,st_bemv,st_ctl,coord,ztol)
      allocate(wws(st_leafmtxp%ndlfs))
@@ -87,48 +88,14 @@ program Example_Using_HACApK
      print *,'making dense matrix' ! only do on lead node
      do i=1,ng
         do j=1,ng
-           mdens_backup(i,j) = HACApK_entry_ij(i, j, st_bemv)
-           !print *,i,j, mdens_backup(i,j)
+           mdens(i,j) = HACApK_entry_ij(i, j, st_bemv)
+           !print *,i,j, mdens(i,j)
         enddo
      enddo
   endif
   
-  !
-  !
-  ! RHS
-  !call random_number(bsave)
-  bsave = 1.d3
-  !
-  ! x = A\b
-  !
-  print *,'solve H'
-  xh = 0.d0                     ! initial guess
-  bh = bsave
-  lrtrn=HACApK_gensolv(st_leafmtxp,st_bemv,st_ctl,coord,bh,xh,ztol)
-  !
-  !
-  if(mpi_rank == 0)then
-     print *,'dense solve'
-     mdens = mdens_backup 
-     bd = bsave
-     !print *,dsol
-     ! mdens will get overwritten
-     call dgesv(ng,1,mdens,ng,ipiv,bd,ng,info)
-     xd = bd
-     ! check dens solution
-     print *,'dense solve solution error:',norm2(bsave-matmul(mdens_backup,xd))
-     ! send to all nodes
-     call MPI_Bcast(xd,ng,MPI_REAL8,0,MPI_COMM_WORLD)
-  endif
-  if(ng.lt.30)then
-     ! print solution
-     do i=1,ng
-        print *,i,' H ',xh(i),' D ',xd(i),' diff ',abs(xh(i)-xd(i))
-     enddo
-  endif
-  if(mpi_rank == 0)print *,'H vs dense solve x error:',norm2(xd-xh)
-  
-  
+ 
+
   !
   ! multiply b = A x
   !
@@ -137,7 +104,7 @@ program Example_Using_HACApK
   if(mpi_rank == 0)then
      ! multiply dense
 
-     bd = matmul(mdens_backup,xd) ! dense b = Ax
+     bd = matmul(mdens,xd) ! dense b = Ax
      !call MPI_Bcast(bd,ng,MPI_REAL8,0,MPI_COMM_WORLD)
      print *,'dense bd norm ',norm2(bd)
   endif
