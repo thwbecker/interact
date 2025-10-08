@@ -20,7 +20,7 @@ program Example_Using_HACApK
   integer,dimension(:),allocatable :: ipiv
 
   call MPI_Init (ierr);icomm = MPI_COMM_WORLD
-  call random_seed()
+  
   !
   !
   st_bemv%nd = 20                        ! number of points
@@ -41,11 +41,8 @@ program Example_Using_HACApK
 
   st_bemv%scale = 1.d0
   
-  
-  call random_number(st_bemv%xcol)
-  call random_number(st_bemv%ycol)
-  call random_number(st_bemv%zcol)
-  ! why can't we just use the full coord structure?
+  call chacapk_assign_random_coord(st_bemv%xcol,st_bemv%ycol,st_bemv%zcol,st_bemv%nd)
+  !
   coord(:,1)=st_bemv%xcol(:)
   coord(:,2)=st_bemv%ycol(:)
   coord(:,3)=st_bemv%zcol(:)
@@ -54,16 +51,16 @@ program Example_Using_HACApK
 
   print *,'making H '
   lrtrn=HACApK_generate(st_leafmtxp,st_bemv,st_ctl,coord,ztol)
-
   
   !
   print *,'making dense matrix'
   do i=1,st_bemv%nd
      do j=1,st_bemv%nd
         mdens_backup(i,j) = HACApK_entry_ij(i, j, st_bemv)
-        !print *,i,j, mdens_backup(i,j)
+        !print *,i,j, coord(i,:),coord(j,:),mdens_backup(i,j)
      enddo
-  enddo 
+  enddo
+  !stop
 
   
   !
