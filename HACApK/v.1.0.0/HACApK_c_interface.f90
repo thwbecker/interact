@@ -15,7 +15,7 @@ MODULE hacapk_c_interface
      type(st_HACApK_leafmtxp) :: st_leafmtxp
      type(st_HACApK_calc_entry) :: st_bemv
      integer(c_int) :: ndim
-     logical hmat_init, coord_init, init, kernel_init
+     logical hmat_init, coord_init, init
   END TYPE hacapk_chandle_struct
 
   ! A pointer to our custom type, used as the opaque handle.
@@ -26,10 +26,14 @@ CONTAINS
   !
   ! make the structure and allocate arrays for nd by nd problem
   !
-  function cinit_hacapk_struct(nd)  result(c_pointer) BIND(C, name='cinit_hacapk_struct')
+  function cinit_hacapk_struct(nd, c_kernel_par)  result(c_pointer) &
+       BIND(C, name='cinit_hacapk_struct')
     include 'mpif.h'
     type(c_ptr) :: c_pointer   !output is c pointer
+    !
     integer(c_int), value, intent(in) :: nd
+    type(c_ptr),value, intent(in) :: c_kernel_par   !output is c pointer
+    
     integer lrtrn
     
     allocate(hacapk_int_handle)
@@ -51,13 +55,16 @@ CONTAINS
     !
     hacapk_int_handle%st_ctl%param(61) = 1            ! matrix normalization
     !
+    ! for C kernel parameters
+    hacapk_int_handle%st_bemv%ckernel_par = c_kernel_par
     hacapk_int_handle%init = .true.
     !print *,'initialized hacapk internal structure with n ',hacapk_int_handle%ndim, hacapk_int_handle%init 
     c_pointer = c_loc(hacapk_int_handle)
   END function cinit_hacapk_struct
 
   ! free arrays
-  SUBROUTINE cdeallocate_hacapk_struct(c_pointer) BIND(C, name='cdeallocate_hacapk_struct')
+  SUBROUTINE cdeallocate_hacapk_struct(c_pointer) &
+       BIND(C, name='cdeallocate_hacapk_struct')
     TYPE(C_PTR), value, INTENT(IN) :: c_pointer
     TYPE(hacapk_chandle_struct), POINTER :: lf_struct
     integer lrtrn
@@ -81,7 +88,8 @@ CONTAINS
   !
   ! assign coordinates, x,y,z, have to be nd dimensional vectors
   !
-  SUBROUTINE cset_hacapk_struct_coord(c_pointer, x,y,z) BIND(C, name='cset_hacapk_struct_coord')
+  SUBROUTINE cset_hacapk_struct_coord(c_pointer, x,y,z) &
+       BIND(C, name='cset_hacapk_struct_coord')
     TYPE(C_PTR), value, INTENT(in) :: c_pointer
     real(c_double), INTENT(IN) :: x(*),y(*),z(*)
     !
@@ -104,6 +112,37 @@ CONTAINS
   END SUBROUTINE cset_hacapk_struct_coord
 
   !
+  ! get pointer to coordinates, dim = 0,1,2
+  !
+  function cget_hacapk_struct_coordp(c_gen_pointer, dim) &
+       result(c_coord_pointer) BIND(C, name='cget_hacapk_struct_coordp')
+    TYPE(C_PTR), value, INTENT(in) :: c_gen_pointer
+    integer(c_int), value, intent(in) :: dim
+    type(c_ptr) :: c_coord_pointer   !output is c pointer
+    !
+    TYPE(hacapk_chandle_struct), POINTER :: lf_struct
+    call c_f_pointer(c_gen_pointer, lf_struct) ! Associate the C handle with a Fortran pointer.
+    if(.not.lf_struct%init)then
+       print *,'cget_hacapk_struct_coord: structure not initilized'
+       stop
+    end if
+    if(.not.lf_struct%coord_init)then
+       print *,'cget_hacapk_struct_hmat: coord not initialized'
+       stop
+    endif
+    if(dim.eq.0)then
+       c_coord_pointer = c_loc(lf_struct%st_bemv%xcol)
+    else if(dim.eq.1)then
+       c_coord_pointer = c_loc(lf_struct%st_bemv%ycol)
+    else if(dim.eq.2)then
+       c_coord_pointer = c_loc(lf_struct%st_bemv%zcol)
+    else
+       print *,'cget_hacapk_struct_coordp: dimension error ',dim
+       stop
+    endif
+  END function cget_hacapk_struct_coordp
+
+  !
   ! generate the H matrix with kernel provided
   !
   SUBROUTINE cmake_hacapk_struct_hmat(c_pointer, ztol) BIND(C, name='cmake_hacapk_struct_hmat')
@@ -112,24 +151,22 @@ CONTAINS
     !
     REAL*8, dimension(:,:),allocatable :: coord
     TYPE(hacapk_chandle_struct), POINTER :: lf_struct
-    integer lrtrn,i
+    integer lrtrn,i,n
 
     CALL C_F_POINTER(c_pointer, lf_struct)
     if(.not.lf_struct%coord_init)then
        print *,'cmake_hacapk_struct_hmat: coord not initialized'
        stop
     endif
-    allocate(coord(lf_struct%st_bemv%nd,3))
-    do i=1,lf_struct%st_bemv%nd
+    n = lf_struct%st_bemv%nd
+    allocate(coord(n,3))
+    do i=1,n
        coord(i,1) = lf_struct%st_bemv%xcol(i)
        coord(i,2) = lf_struct%st_bemv%ycol(i)
        coord(i,3) = lf_struct%st_bemv%zcol(i)
        !print *,i,coord(i,:)
     enddo
-    if(.not.lf_struct%kernel_init)then
-       print *,'cmake_hacapk_struct_hmat: kernel parameters not initialized'
-       stop
-    endif
+    !
     !
     lrtrn=HACApK_generate(lf_struct%st_leafmtxp, lf_struct%st_bemv, lf_struct%st_ctl, coord, ztol)
     if(lrtrn.gt.0)then
@@ -153,33 +190,17 @@ CONTAINS
     TYPE(hacapk_chandle_struct), POINTER :: lf_struct
     integer :: i,j
     CALL C_F_POINTER(c_pointer, lf_struct)
-    if(.not.lf_struct%kernel_init)then
-       print *,'chacapk_assemble_dense_mat: kernel parameters not initialized'
-       stop
-    endif
+
     do i=1,n
        do j=1,n
           Ad(i,j) = HACApK_entry_ij(i, j, lf_struct%st_bemv)
           !print *,i,j,lf_struct%st_bemv%xcol(i),lf_struct%st_bemv%ycol(i),lf_struct%st_bemv%zcol(i),&
-          !lf_struct%st_bemv%xcol(j),lf_struct%st_bemv%ycol(j),lf_struct%st_bemv%zcol(j),Ad(i,j)
+          !     lf_struct%st_bemv%xcol(j),lf_struct%st_bemv%ycol(j),lf_struct%st_bemv%zcol(j),Ad(i,j)
        enddo
     enddo
     
   END SUBROUTINE chacapk_assemble_dense_mat
 
-
-  subroutine chacapk_set_kernel_par(c_pointer, kscale) BIND(C, name='chacapk_set_kernel_par')
-    TYPE(C_PTR), value, INTENT(in) :: c_pointer
-    real(c_double), value, INTENT(IN) :: kscale
-    !
-    TYPE(hacapk_chandle_struct), POINTER :: lf_struct
-    call c_f_pointer(c_pointer, lf_struct) ! Associate the C handle with a Fortran pointer.
-    !
-    ! set kernel parameters
-    !
-    lf_struct%st_bemv%scale = kscale
-    lf_struct%kernel_init = .true. 
-  END SUBROUTINE chacapk_set_kernel_par
 
 
   !

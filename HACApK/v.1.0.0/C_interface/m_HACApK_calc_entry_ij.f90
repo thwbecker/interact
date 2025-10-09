@@ -23,35 +23,48 @@
 !                                                                     *
 !=====================================================================*
 module m_HACApK_calc_entry_ij
+  use, intrinsic :: iso_c_binding, only: c_ptr, c_int, c_double
+  implicit none
 
+  !
+  ! this is an example of how to use a C function
+  !
+
+  
 !*** type :: st_HACApK_calc_entry
   type :: st_HACApK_calc_entry
+     ! has to be here
      integer :: nd,lp61
      real*8,pointer :: ao(:)
+     !
      ! user defined
-     real*8 :: scale
+     type(c_ptr) :: ckernel_par
      real*8,pointer :: xcol(:),ycol(:),zcol(:)
   
   end type st_HACApK_calc_entry
 
+  ! change here and in C code as well as header
+  interface
+     function ckernel_func(i,j,kp) bind(c, name='ckernel_func')
+       import :: c_ptr, c_int, c_double 
+       integer(c_int), value, intent(in) :: i,j !input, pass by value
+       type(c_ptr), value, intent(in) :: kp     !input, holds all parameters
+       real(c_double) :: ckernel_func           !output is a real*8
+     end function ckernel_func
+  end interface
+  
   public :: HACApK_entry_ij
 
 contains
+  !
   !***HACApK_entry_ij
+  !
   real*8 function HACApK_entry_ij(i, j, st_bemv)
     implicit none
     type(st_HACApK_calc_entry), intent(in) :: st_bemv
     integer, intent(in) :: i,j
-    !
-    real*8 dist2
-
-    dist2=      (st_bemv%xcol(i)-st_bemv%xcol(j))**2
-    dist2=dist2+(st_bemv%ycol(i)-st_bemv%ycol(j))**2
-    dist2=dist2+(st_bemv%zcol(i)-st_bemv%zcol(j))**2
-    
-    HACApK_entry_ij= 1.0d0/(1.d-2 + dist2/st_bemv%scale) ! made up kernel
-    
-    
+    ! call C function with pointer as part of st_bemv structure
+    HACApK_entry_ij = ckernel_func(i-1, j-1, st_bemv%ckernel_par)
     
   end function HACApK_entry_ij
 

@@ -2,10 +2,12 @@ program Example_Using_HACApK
   !
   ! works  as serial  binary, with  mpirun -np  1, but  not with  more
   ! processors
-  use hacapk_c_interface
-!  use m_HACApK_base
-!  use m_HACApK_solve
-!  use m_HACApK_use
+  use hacapk_testing_routines
+
+  use m_HACApK_base
+  use m_HACApK_solve
+  use m_HACApK_use
+
   implicit none
   include 'mpif.h'
   type(st_HACApK_lcontrol) :: st_ctl
@@ -41,7 +43,7 @@ program Example_Using_HACApK
 
   st_bemv%scale = 1.d0
   
-  call chacapk_assign_random_coord(st_bemv%xcol,st_bemv%ycol,st_bemv%zcol,st_bemv%nd)
+  call hacapk_assign_random_coord(st_bemv%xcol,st_bemv%ycol,st_bemv%zcol,st_bemv%nd)
   !
   coord(:,1)=st_bemv%xcol(:)
   coord(:,2)=st_bemv%ycol(:)

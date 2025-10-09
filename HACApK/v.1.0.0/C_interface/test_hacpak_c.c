@@ -6,18 +6,64 @@ double vdiff(double *, double *, int );
 void axmult_nbyn(double *, double *, int , double *);
 
 
-int main(int argc, char **argv) {
+
+/* kernel parameters */
+struct ckernel_par{
+  /* specific parameters */
+  double scale;
+  /* this has to exist */
+  void *hacapk_struct;
+};
+
+/* 
+
+   general interface function, use this list of variables or change
+   here, in HACApK_c_interface.h, and m_HACApK_calc_entry_ij.f90
+
+   NOTE: indices ik and jk are C style, 0...N-1
+
+*/
+double ckernel_func(int ik, int jk, void *parp)
+{
+  struct ckernel_par *par;
+  double *x,*y,*z;
+  double dist2,tmp,val;
+
+  par = (struct ckernel_par *)parp;
+  x = (double *)cget_hacapk_struct_coordp(par->hacapk_struct,0);
+  y = (double *)cget_hacapk_struct_coordp(par->hacapk_struct,1);
+  z = (double *)cget_hacapk_struct_coordp(par->hacapk_struct,2);
+  /* stupid example */
+  tmp=x[ik]-x[jk];dist2 =tmp*tmp;
+  tmp=y[ik]-y[jk];dist2+=tmp*tmp;
+  tmp=z[ik]-z[jk];dist2+=tmp*tmp;
   
-  void *hacapk_struct = NULL;
+  val =  1./(1.e-2 + dist2/par->scale); /* made up */
+
+  //printf("%05i %05i %15.4e\n",ik,jk,val);
+  return val;
+}
+
+int main(int argc, char **argv)
+{
+  struct ckernel_par par[1];
   int n,i,j,ierr;
   double *x,*y,*z,ztol,*xvh,*bvh,*xvd,*bvd,*Ad;
+
+  par->hacapk_struct = NULL;
+  
   ierr = MPI_Init(&argc,&argv);
   /* dimensions */
   n = 20;
+
+  /* set kernel parameters */
+  par->scale = 1.0;
+
   //
-  // Allocate  structure
-  hacapk_struct = cinit_hacapk_struct(n);
-  if(!hacapk_struct){
+  // Allocate  structure and assign C kernel parameters structure
+  //
+  par->hacapk_struct = cinit_hacapk_struct(n,(void *)par);
+  if(!par->hacapk_struct){
     fprintf(stderr,"init failed with N = %i\n",n);
     exit(-1);
   }
@@ -27,27 +73,33 @@ int main(int argc, char **argv) {
   x = (double *)malloc(sizeof(double)*n);if(!x){fprintf(stderr,"mem error\n");exit(-1);}
   y = (double *)malloc(sizeof(double)*n);if(!y){fprintf(stderr,"mem error\n");exit(-1);}
   z = (double *)malloc(sizeof(double)*n);if(!z){fprintf(stderr,"mem error\n");exit(-1);}
-  chacapk_assign_random_coord(x,y,z,&n); /* initialize randomly */
+  hacapk_assign_random_coord(x,y,z,&n); /* initialize randomly */
   printf("random init done\n");
 
   /* 
      init coordinates 
   */
-  cset_hacapk_struct_coord(hacapk_struct, x,y,z);
+  cset_hacapk_struct_coord(par->hacapk_struct, x,y,z);
   printf("coord done\n");
-  /*  */
-  chacapk_set_kernel_par(hacapk_struct,1.0); /* set kernel parameters */
 
+  
   /* make an H matrix */
   ztol = 1e-6;
-  cmake_hacapk_struct_hmat(hacapk_struct, ztol);
+  cmake_hacapk_struct_hmat(par->hacapk_struct, ztol);
 
 
   /* generate a dense matrix using same kernel */
   Ad = (double *)malloc(sizeof(double)*n*n);if(!Ad){fprintf(stderr,"mem error\n");exit(-1);}
-  chacapk_assemble_dense_mat(hacapk_struct,Ad,n); 
+  chacapk_assemble_dense_mat(par->hacapk_struct,Ad,n); 
   printf("dense matrix assembled\n");
-  //for(i=0;i<n;i++)for(j=0;j<n;j++)printf("%i %i %g\n",i,j,Ad[j*n+i]);
+  if(0){			/* check different kernel computations  */
+    for(i=0;i<n;i++){
+      for(j=0;j<n;j++){
+	printf("%5i %5i %12.5e %12.5e - %12.5e\n",i,j,Ad[j*n+i], ckernel_func(i,j,(void *)par),
+	       fabs(Ad[j*n+i]-ckernel_func(i,j,(void *)par)));
+      }
+    }
+  }
 
   xvh = (double *)malloc(sizeof(double)*n);if(!xvh){fprintf(stderr,"mem error\n");exit(-1);}
   bvh = (double *)malloc(sizeof(double)*n);if(!bvh){fprintf(stderr,"mem error\n");exit(-1);}
@@ -58,7 +110,7 @@ int main(int argc, char **argv) {
     bvh[i] = bvd[i] = 1e3;
   }
   /* inverse solve H matrix version */
-  chacapk_solve_Ab_H(hacapk_struct, bvh, xvh, ztol);
+  chacapk_solve_Ab_H(par->hacapk_struct, bvh, xvh, ztol);
   /* inverse solve dense version */
   chacapk_solve_dense(Ad, n, bvd, xvd);
   if(n<30){
@@ -73,7 +125,7 @@ int main(int argc, char **argv) {
   for(i=0;i<n;i++){
     xvh[i] = xvd[i] = 1.;
   }
-  chacapk_mult_Ax_H(hacapk_struct, xvh, bvh);
+  chacapk_mult_Ax_H(par->hacapk_struct, xvh, bvh);
   axmult_nbyn(Ad,xvd,n,bvd);
   if(n<30){
     // print solution
@@ -88,7 +140,7 @@ int main(int argc, char **argv) {
   
   free(x);free(y);free(z);
   // Deallocate structure
-  cdeallocate_hacapk_struct(hacapk_struct);
+  cdeallocate_hacapk_struct(par->hacapk_struct);
 
   return 0;
 }
