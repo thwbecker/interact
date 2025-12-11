@@ -72,8 +72,12 @@ int main(int argc,char **argv)
   /* 
      solver control 
   */
-  atol = 1e-4;
-  rtol = 1e-12;
+  PetscOptionsGetReal(NULL, NULL, "-atol", &atol, &flag_set);
+  if(!flag_set)
+    atol = 1e-2;
+  PetscOptionsGetReal(NULL, NULL, "-rtol", &rtol, &flag_set);
+  if(!flag_set)
+    rtol = 1e-5;
   /* 
      output control 
   */
@@ -122,18 +126,22 @@ int main(int argc,char **argv)
   /*
     use runge kutta
   */
-  //PetscCall(TSSetType(ts,TSRK));
-  PetscCall(TSSetType(ts,TSARKIMEX));
+  PetscCall(TSSetType(ts,TSRK));
+  //PetscCall(TSSetType(ts,TSARKIMEX));
+
+  PetscCall(TSSetFromOptions(ts));
+
+  
   /*  */
   PetscCall(TSSetTolerances(ts, atol, NULL, rtol, NULL));
   PetscCall(TSGetAdapt(ts,&adapt));
-  //PetscCall(TSAdaptSetStepLimits(adapt,1e-15, dt_monitor));
+  PetscCall(TSAdaptSetStepLimits(adapt,1e-15, dt_monitor));
   /*
     Set the initial time and the initial timestep given above.
   */
   PetscCall(TSSetTime(ts,t_init));	/* initial time */
   PetscCall(TSSetTimeStep(ts,1e-2)); /* initial timestep */
-  PetscCall(TSSetFromOptions(ts));
+
   
   /* allow for rough final time (else might have hard time finding
      exaxt state */

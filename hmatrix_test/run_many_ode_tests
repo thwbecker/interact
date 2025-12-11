@@ -1,32 +1,24 @@
 #!/bin/bash
+ks=${1-"0.88 0.86 0.856 0.8552 0.8525"}
 
-reg=-R-2/3/-2/0.2/-2/0.5
-xscale=1;yscale=2;zscale=1.5
-proj="-Jx$xscale/$yscale -Jz$zscale  -E130/30"
-
-
-
-fs=""
-for k in 0.88 0.86 0.856 0.8552 0.8525;do
-    ann=-Ba1f.1:"x":/a1f.1:"y":/a1f.1:"z":WESNZ:."k = $k":
-    kf=`echo $k | gawk '{printf("state.%020.16f.dat",$1)}'`
-    if [ ! -s $kf ];then
-	bin/ode_solve_test -knd $k
-    else
-	echo $0: reusing $kf
+for k in $ks;do
+    kf=`echo $k | awk '{printf("state.%020.16f.dat",$1)}'`
+    #sopt=""
+    sopt="-atol 1e-5 -rtol 1e-8"
+    # default, works
+    popt="$sopt"
+    #
+    # 8vr, does not  work
+    #popt="-ts_type rk -ts_rk_type 8vr $sopt"
+    #
+    # with inf norm, does not work
+    #popt="-ts_type rk -ts_rk_type 8vr  -ts_adapt_wnormtype infinity $sopt"
+    rm  $kf > /dev/null
+    bin/ode_solve_test $popt 	    -knd $k
+    if [[ ! -s $kf || `wc -l $kf | awk '{print($1)}'` -lt 1000 ]];then
+	echo $0: solver error for $k
+	exit
     fi
-
-   
-    ofile=tmp.$k.ps
-    psbasemap $reg "$ann" $proj -K -P > $ofile
-    gawk '{if($1>1e4)print($2,$3,$4)}' $kf | \
-	psxyz $reg $proj -W0.5,blue -O >>$ofile
-    modifybb $ofile
-    #gv $ofile;exit
-    fs="$fs $ofile"
-    
 done
-epsmerge -par -x 2 -y 3 $fs > comp.ps
-modifybb comp.ps 1
-rm $fs 
+
 
