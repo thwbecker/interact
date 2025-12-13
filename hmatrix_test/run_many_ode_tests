@@ -1,23 +1,28 @@
 #!/bin/bash
 ks=${1-"0.88 0.86 0.856 0.8552 0.8525"}
+force=${2-0}
 
 for k in $ks;do
-    kf=`echo $k | awk '{printf("state.%020.16f.dat",$1)}'`
-    #sopt=""
-    sopt="-atol 1e-5 -rtol 1e-8"
+    kf=`echo $k | awk '{printf("state.%020.15f.dat",$1)}'`
+    sopt=""
+    #sopt="-atol 1e-12 -rtol 1e-12"
+  
     # default, works
+    #popt="-ts_monitor -ts_adopt_monitor $sopt"
     popt="$sopt"
-    #
-    # 8vr, does not  work
-    #popt="-ts_type rk -ts_rk_type 8vr $sopt"
-    #
-    # with inf norm, does not work
-    #popt="-ts_type rk -ts_rk_type 8vr  -ts_adapt_wnormtype infinity $sopt"
-    rm  $kf > /dev/null
-    bin/ode_solve_test $popt 	    -knd $k
-    if [[ ! -s $kf || `wc -l $kf | awk '{print($1)}'` -lt 1000 ]];then
-	echo $0: solver error for $k
-	exit
+
+    echo
+    echo $k
+    echo
+    #rm  $kf > /dev/null
+    if [[ ! -s $kf || $force -eq 1 ]];then
+	bin/ode_solve_test $popt -knd $k
+	if [[ ! -s $kf || `wc -l $kf | awk '{print($1)}'` -lt 1000 ]];then
+	    echo $0: solver error for $k
+	    exit
+	fi
+    else
+	echo $0: not running because $kf exists
     fi
 done
 

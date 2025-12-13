@@ -23,6 +23,7 @@ struct AppCtx{
   PetscReal old_time;
   PetscReal dt_monitor,adx_monitor,rdx_monitor;
   FILE *fout_monitor;
+  char fname[PETSC_MAX_PATH_LEN];
   Vec Xold;
 };
 /*
@@ -38,10 +39,14 @@ int main(int argc,char **argv)
 {
 #ifdef USE_PETSC
   TS ts; /* timestepping context */
-  Vec x; /* solution, residual vectors */
+  Vec X; /* solution, residual vectors */
   PetscReal t_final,time,t_init,atol,rtol;
   PetscReal kcr1,kcr2,adx_monitor,rdx_monitor,dt_monitor;
   PetscBool flag_set;
+  /* for init */
+  PetscInt  *ind,i,imode;
+  PetscReal *xinit;
+  /*  */
   TSAdapt        adapt;
   struct AppCtx par[1]; /* user-defined work context */
 
@@ -50,7 +55,9 @@ int main(int argc,char **argv)
   PetscCallMPI(MPI_Comm_size(PETSC_COMM_WORLD, &par->medium->comm_size));
   PetscCallMPI(MPI_Comm_rank(PETSC_COMM_WORLD, &par->medium->comm_rank));
   /*  
+
       control parmater: non dimensional stiffness
+
   */
   PetscOptionsGetReal(NULL, NULL, "-knd", &par->knd, &flag_set);
   if(!flag_set){
@@ -65,19 +72,21 @@ int main(int argc,char **argv)
     LHEADNODE
       fprintf(stderr,"%s: command line override nd stiffness of %g\n",argv[0],par->knd);
   }
-  /*  */
-  PetscOptionsGetReal(NULL, NULL, "-t_finel", &t_final, &flag_set);
+  /* 
+     other parameters for solution
+  */
+  PetscOptionsGetReal(NULL, NULL, "-t_final", &t_final, &flag_set);
   if(!flag_set)
     t_final=1e5;			/* stop time */
   /* 
-     solver control 
+     solver control, absolute and relative tolerance
   */
   PetscOptionsGetReal(NULL, NULL, "-atol", &atol, &flag_set);
   if(!flag_set)
-    atol = 1e-2;
+    atol = 1e-8;
   PetscOptionsGetReal(NULL, NULL, "-rtol", &rtol, &flag_set);
   if(!flag_set)
-    rtol = 1e-5;
+    rtol = 1e-10;
   /* 
      output control 
   */
@@ -86,7 +95,7 @@ int main(int argc,char **argv)
   rdx_monitor = 1e-4;		/* relative */
 
   /* 
-     parameters
+     model parameters
   */
   /* dimensions */
   par->n = 3;
@@ -99,48 +108,80 @@ int main(int argc,char **argv)
   kcr2=(kcr1+par->r*(2.*par->b1+(par->b2-1.)*(2.+par->r))+
 	sqrt(4.*par->r*par->r*(kcr1+par->b2)+pow(kcr1+par->r*par->r*(par->b2-1.),2)))/(2.+2.*par->r);
   par->k = par->knd * kcr2;	/* set actual stiffness */
-
+  
   /*  */
-  PetscCall(VecCreate(PETSC_COMM_WORLD,&x));
-  PetscCall(VecSetSizes(x,PETSC_DECIDE,par->n));
-  PetscCall(VecSetFromOptions(x));
-  PetscCall(VecAssemblyBegin(x));
-  PetscCall(VecAssemblyEnd(x));
+  PetscCall(VecCreate(PETSC_COMM_WORLD,&X));
+  PetscCall(VecSetSizes(X,PETSC_DECIDE,par->n));
+  PetscCall(VecSetFromOptions(X));
+  PetscCall(VecAssemblyBegin(X));
+  PetscCall(VecAssemblyEnd(X));
   /* initial condition */
-  PetscCall(VecSet(x, 0.001));
+  imode = 1;
+  switch(imode){
+  case 0:			/* fixed eps */
+    PetscCall(VecSet(X, 1e-3));
+    break;
+  case 1:			/* random eps */
+    PetscCall(VecSetRandom(X, NULL));
+    PetscCall(VecScale(X, 1e-5));
+    break;
+  default:			/* 0,0,eps */
+    xinit = (PetscReal *)calloc(par->n,sizeof(PetscReal));
+    ind = (PetscInt *)malloc(sizeof(PetscInt)*par->n);
+    for(i=0;i<par->n;i++)ind[i]=i;
+    /* starting conditions */
+    xinit[0]=0;xinit[1]=0;xinit[2]=1e-7;
+    PetscCall(VecSetValues(X, par->n,ind, xinit, INSERT_VALUES));
+    free(xinit);free(ind);
+    break;
+  }
+  /*  */
+  PetscCall(VecAssemblyBegin(X));
+  PetscCall(VecAssemblyEnd(X));
+  
+  /*  */
   fprintf(stderr,"%s: initializing vector with\n",argv[0]);
-  PetscCall(VecView(x, PETSC_VIEWER_STDERR_SELF));
+  PetscCall(VecView(X, PETSC_VIEWER_STDERR_SELF));
   
   /*
     Create timestepper context
   */
   PetscCall(TSCreate(PETSC_COMM_WORLD,&ts));
   PetscCall(TSSetProblemType(ts,TS_NONLINEAR)); /* can be linear? */
-  PetscCall(TSSetSolution(ts,x));
+  PetscCall(TSSetSolution(ts,X));
   PetscCall(TSSetRHSFunction(ts, NULL, RHSFunction,&par));
   /*  */
-  t_init = 0;
+  t_init = 0;			/* start time */
   
-  /* init my control environment for output */
-  init_monitor(par,dt_monitor,adx_monitor,rdx_monitor,t_init,x);
+  /* 
+     init my control environment for output 
+  */
+  init_monitor(par,dt_monitor,adx_monitor,rdx_monitor,t_init,X);
   /*
-    use runge kutta
+    use runge kutta or ARKIMEX
   */
   PetscCall(TSSetType(ts,TSRK));
+  PetscCall(TSRKSetType(ts, TSRK6VR));
   //PetscCall(TSSetType(ts,TSARKIMEX));
+  PetscCall(TSSetMaxStepRejections(ts,1e5));
 
+  /* 
+      alllow override
+  */
   PetscCall(TSSetFromOptions(ts));
-
-  
   /*  */
   PetscCall(TSSetTolerances(ts, atol, NULL, rtol, NULL));
+
+  //TSSetType(ts, TSGLEE);
   PetscCall(TSGetAdapt(ts,&adapt));
-  PetscCall(TSAdaptSetStepLimits(adapt,1e-15, dt_monitor));
+  //TSAdaptSetType(adapt, TSADAPTGLEE);
+  
+  //PetscCall(TSAdaptSetStepLimits(adapt,1e-20, dt_monitor));
   /*
     Set the initial time and the initial timestep given above.
   */
   PetscCall(TSSetTime(ts,t_init));	/* initial time */
-  PetscCall(TSSetTimeStep(ts,1e-2)); /* initial timestep */
+  PetscCall(TSSetTimeStep(ts,1e-5)); /* initial timestep */
 
   
   /* allow for rough final time (else might have hard time finding
@@ -151,7 +192,7 @@ int main(int argc,char **argv)
   PetscCall(TSMonitorSet(ts, myMonitor, (void *)par, NULL));
   
   PetscCall(TSSetMaxTime(ts,t_final));
-  PetscCall(TSSolve(ts, x));
+  PetscCall(TSSolve(ts, X));	  /* do the solve */
   PetscCall(TSGetTime(ts,&time)); /* get the current time */
   LHEADNODE
     fprintf(stderr,"done at t %g x ",time);
@@ -160,7 +201,7 @@ int main(int argc,char **argv)
   PetscCall(TSView(ts, PETSC_VIEWER_STDOUT_SELF));
 
   /*Free the data structures constructed above*/
-  PetscCall(VecDestroy(&x));
+  PetscCall(VecDestroy(&X));
   PetscCall(TSDestroy(&ts));
   PetscCall(PetscFinalize());
   exit(0); 
@@ -178,7 +219,7 @@ static PetscErrorCode init_monitor(void *ctx, PetscReal dt_monitor, PetscReal ad
 				   PetscReal rdx_monitor,PetscReal t_init, Vec X0)
 {
   struct AppCtx *par;
-  char fname[PETSC_MAX_PATH_LEN];
+
   PetscFunctionBeginUser;
   par = (struct AppCtx *)ctx;
   par->dt_monitor = dt_monitor;			
@@ -187,9 +228,9 @@ static PetscErrorCode init_monitor(void *ctx, PetscReal dt_monitor, PetscReal ad
   par->old_time = t_init;
   
   LHEADNODE{
-    snprintf(fname,PETSC_MAX_PATH_LEN,"state.%020.16f.dat",par->knd);
-    par->fout_monitor = fopen(fname,"w");
-    fprintf(stderr,"writing state to %s\n",fname);
+    snprintf(par->fname,PETSC_MAX_PATH_LEN,"state.%020.15f.dat",par->knd);
+    par->fout_monitor = fopen(par->fname,"w");
+    fprintf(stderr,"writing state to %s, init at t %g\n",par->fname,t_init);
   }
   PetscCall(VecDuplicate(X0, &par->Xold));
   PetscCall(VecCopy(X0,par->Xold));
@@ -203,6 +244,7 @@ static PetscErrorCode finalize_monitor(void *ctx)
   par = (struct AppCtx *)ctx;
   LHEADNODE{
     fclose(par->fout_monitor);	/* what else? */
+    fprintf(stderr,"closing state file %s at time %g\n",par->fname,par->old_time);
   }
   PetscCall(VecDestroy(&par->Xold));
   PetscFunctionReturn(PETSC_SUCCESS);
@@ -262,6 +304,11 @@ static PetscErrorCode RHSFunction(TS ts,PetscReal time,Vec X,
   PetscCall(VecGetArray(F,&f));
   
   expx = PetscExpReal(x[0]);
+  if(!finite(expx)){
+    fprintf(stderr,"RHSFunction: Exp function out of bounds for %e, bye bye\n",x[0]);
+    finalize_monitor(ptr);
+    exit(-1);
+  }
   /* 
      rate state friction with two state variables from Becker (2000) 
   */
@@ -269,9 +316,13 @@ static PetscErrorCode RHSFunction(TS ts,PetscReal time,Vec X,
   f[1] =  (1.0 - expx) * par->k;
   f[2] = -expx * par->r * (par->b2 * x[0] + x[2]);
   f[0] = expx * ((par->b1 - 1.0) * x[0] + x[1] - x[2]) + f[1] -  f[2];
-
+  //fprintf(stderr,"%15e %15e %15e\n",f[0],f[1],f[2]);
   PetscCall(VecRestoreArrayRead(X,&x));
   PetscCall(VecRestoreArray(F,&f));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
+
+
+
+
 #endif
