@@ -16,11 +16,11 @@
   function (could be separate, but why not (?))
 */
 struct AppCtx{
-  int n,nevent;
+  int n,nevent,imode;
   PetscReal b1,b2,r,k,knd;
   struct med medium[1];
   /*  */
-  PetscReal old_time,event_tmin,t_final;
+  PetscReal old_time,event_tmin,t_final,monitor_tmin;
   PetscReal dt_monitor,adx_monitor,rdx_monitor;
   PetscBool track_events,log_state;
   FILE *fout_monitor,*fout_event;
@@ -34,7 +34,7 @@ User-defined routines
 static PetscErrorCode RHSFunction(TS,PetscReal,Vec,Vec,void*);
 static PetscErrorCode myMonitor(TS , PetscInt , PetscReal , Vec , void *);
 static PetscErrorCode init_monitor_and_event(void *, PetscReal ,
-					     PetscReal ,  PetscReal ,PetscReal,
+					     PetscReal ,  PetscReal ,PetscReal,PetscReal,
 					     PetscReal , Vec , PetscBool,
 					     PetscBool);
 static PetscErrorCode finalize_monitor_and_event(void *);
@@ -83,24 +83,25 @@ int main(int argc,char **argv)
 #ifdef USE_PETSC
   TS ts; /* timestepping context */
   Vec X; /* solution, residual vectors */
-  PetscReal time,t_init,atol,rtol;
+  PetscReal time,t_init,atol,rtol,eps,monitor_tmin,event_tmin;
   PetscReal kcr1,kcr2,adx_monitor,rdx_monitor,dt_monitor;
   PetscBool flag_set,track_events,log_state;
   /* for init */
-  PetscInt  *ind,i,imode;
+  PetscInt  *ind,i;
   PetscReal *xinit;
   /*  */
   TSAdapt        adapt;
   /*  */
   PetscInt event_direction[1] = {0};      // both ways
   PetscBool event_terminate[1] = {PETSC_FALSE};  // don't stop
-  
+  PetscRandom rctx;
   struct AppCtx par[1]; /* user-defined work context */
 
   PetscFunctionBegin;
   PetscInitialize(&argc,&argv,NULL,NULL);
   PetscCallMPI(MPI_Comm_size(PETSC_COMM_WORLD, &par->medium->comm_size));
   PetscCallMPI(MPI_Comm_rank(PETSC_COMM_WORLD, &par->medium->comm_rank));
+  PetscCall(PetscRandomCreate(PETSC_COMM_WORLD, &rctx));
   /*  
 
       control parmater: non dimensional stiffness
@@ -130,15 +131,35 @@ int main(int argc,char **argv)
   */
   PetscOptionsGetReal(NULL, NULL, "-atol", &atol, &flag_set);
   if(!flag_set)
-    atol = 1e-9;
+    atol = 1e-10;
   PetscOptionsGetReal(NULL, NULL, "-rtol", &rtol, &flag_set);
   if(!flag_set)
     rtol = 1e-12;
+  PetscOptionsGetInt(NULL, NULL, "-imode", &par->imode, &flag_set);
+  if(!flag_set)
+    par->imode = 1;			/* 0: all eps 1,2,3: component eps >4 random */
+  PetscOptionsGetReal(NULL, NULL, "-eps", &eps, &flag_set);
+  if(!flag_set)
+    eps = 1e-5;			/* for initial condition */
   /* 
      output control 
   */
-  //log_state = PETSC_TRUE;
-  log_state = PETSC_FALSE;
+  PetscOptionsGetBool(NULL, NULL, "-log_state", &log_state, &flag_set);
+  if(!flag_set){
+    //log_state = PETSC_TRUE;
+    log_state = PETSC_FALSE;
+  }
+  /*  */
+  t_init = 0;			/* start time */
+  
+  PetscOptionsGetReal(NULL, NULL, "-monitor_tmin", &monitor_tmin, &flag_set);
+  if(!flag_set)
+    monitor_tmin = t_init;
+
+  PetscOptionsGetReal(NULL, NULL, "-event_tmin", &event_tmin, &flag_set);
+  if(!flag_set)
+    event_tmin = 0.9 * par->t_final;
+
   track_events = PETSC_TRUE;	/* track zero crossings? */
   //track_events = PETSC_FALSE;	
 
@@ -156,6 +177,7 @@ int main(int argc,char **argv)
   par->b1=1.0;
   par->b2=0.84;
   par->r=0.048;
+  //par->r=0.05;
   /* non dim stiffnesses */
   kcr1 = par->b1 - 1.0;
   kcr2=(kcr1+par->r*(2.*par->b1+(par->b2-1.)*(2.+par->r))+
@@ -170,30 +192,33 @@ int main(int argc,char **argv)
   PetscCall(VecAssemblyBegin(X));
   PetscCall(VecAssemblyEnd(X));
   /* initial condition */
-  imode = 1;
-  switch(imode){
+
+  switch(par->imode){
   case 0:			/* fixed eps */
-    PetscCall(VecSet(X, 1e-3));
+    PetscCall(VecSet(X, eps));
     break;
-  case 1:			/* random eps */
-    PetscCall(VecSetRandom(X, NULL));
-    PetscCall(VecScale(X, 1e-5));
-    break;
-  default:			/* 0,0,eps */
+  case 1:
+  case 2:
+  case 3:
     xinit = (PetscReal *)calloc(par->n,sizeof(PetscReal));
     ind = (PetscInt *)malloc(sizeof(PetscInt)*par->n);
     for(i=0;i<par->n;i++)ind[i]=i;
-    /* starting conditions */
-    xinit[0]=0;xinit[1]=0;xinit[2]=1e-7;
+    xinit[par->imode-1] = eps;
     PetscCall(VecSetValues(X, par->n,ind, xinit, INSERT_VALUES));
     free(xinit);free(ind);
+    break;
+  default:
+    PetscCall(PetscRandomSetSeed(rctx, par->imode));
+    PetscCall(PetscRandomSeed(rctx)); 
+    PetscCall(VecSetRandom(X, rctx));
+    PetscCall(VecScale(X,eps));
     break;
   }
   /*  */
   PetscCall(VecAssemblyBegin(X));
   PetscCall(VecAssemblyEnd(X));
 
-  if(0){
+  if(1){
     /*  */
     fprintf(stderr,"%s: initializing vector with\n",argv[0]);
     PetscCall(VecView(X, PETSC_VIEWER_STDERR_SELF));
@@ -208,23 +233,22 @@ int main(int argc,char **argv)
 
   
 
-  /*  */
-  t_init = 0;			/* start time */
   
   /* 
      init my control environment for output 
   */
-  init_monitor_and_event(par,dt_monitor,adx_monitor,rdx_monitor,par->t_final*.9,
-			 t_init,X,log_state,track_events);
+  init_monitor_and_event(par,dt_monitor,adx_monitor,rdx_monitor,monitor_tmin,
+			 event_tmin,t_init,X,log_state,track_events);
   
   PetscCall(TSSetRHSFunction(ts, NULL, RHSFunction,&par));
   /*
     use runge kutta or ARKIMEX
   */
   PetscCall(TSSetType(ts,TSRK));
-  PetscCall(TSRKSetType(ts, TSRK6VR));
-  //PetscCall(TSSetType(ts,TSARKIMEX));
-  PetscCall(TSSetMaxStepRejections(ts,1e5));
+  //PetscCall(TSRKSetType(ts, TSRK6VR));
+  PetscCall(TSRKSetType(ts, TSRK8VR));
+
+  PetscCall(TSSetMaxStepRejections(ts,1e8));
   PetscCall(TSSetTime(ts,t_init));	/* initial time */
   /* 
       alllow override
@@ -269,7 +293,7 @@ int main(int argc,char **argv)
 
   /*Free the data structures constructed above*/
   PetscCall(VecDestroy(&X));
-  PetscCall(TSDestroy(&ts));
+  PetscCall(TSDestroy(&ts));PetscCall(PetscRandomDestroy(&rctx));
   PetscCall(PetscFinalize());
   exit(0); 
 #else
@@ -283,7 +307,7 @@ int main(int argc,char **argv)
 
 /* set output checks */
 static PetscErrorCode init_monitor_and_event(void *ctx, PetscReal dt_monitor, PetscReal adx_monitor,
-					     PetscReal rdx_monitor,PetscReal event_tmin,
+					     PetscReal rdx_monitor,PetscReal monitor_tmin,PetscReal event_tmin,
 					     PetscReal t_init, Vec X0,PetscBool log_state,PetscBool track_events)
 {
   struct AppCtx *par;
@@ -293,6 +317,7 @@ static PetscErrorCode init_monitor_and_event(void *ctx, PetscReal dt_monitor, Pe
   par->dt_monitor = dt_monitor;			
   par->adx_monitor = adx_monitor;
   par->rdx_monitor = rdx_monitor;
+  par->monitor_tmin = monitor_tmin;
   par->old_time = t_init;
   par->event_tmin = event_tmin;
   par->log_state    = log_state;
@@ -300,14 +325,15 @@ static PetscErrorCode init_monitor_and_event(void *ctx, PetscReal dt_monitor, Pe
   par->nevent=0;
   LHEADNODE{
     if(par->log_state){
-      snprintf(par->fname_monitor,PETSC_MAX_PATH_LEN,"state.%020.15f.dat",par->knd);
+      snprintf(par->fname_monitor,PETSC_MAX_PATH_LEN,"state.%020.15f.%i.dat",par->knd,par->imode);
       par->fout_monitor = fopen(par->fname_monitor,"w");
-      fprintf(stderr,"writing state to %s, init at t %g\n",par->fname_monitor,t_init);
+      fprintf(stderr,"writing state to %s, init at t %g, starting monitor at %g%% of t_f\n",
+	      par->fname_monitor,t_init,par->monitor_tmin/par->t_final*100);
     }
     if(par->track_events){
       snprintf(par->fname_event,PETSC_MAX_PATH_LEN,"zero.%020.15f.dat",par->knd);
       par->fout_event = fopen(par->fname_event,"w");
-      fprintf(stderr,"writing events to %s, init at t %g, after time/t_final %g%%\n",par->fname_event,t_init,
+      fprintf(stderr,"writing events to %s, init at t %g, logging after %g%% of t_f\n",par->fname_event,t_init,
 	      par->event_tmin/par->t_final*100);
     }
   }
@@ -356,37 +382,36 @@ static PetscErrorCode myMonitor(TS ts, PetscInt step, PetscReal t,
   par = (struct AppCtx *)ctx;
   if (step < 0)
     PetscFunctionReturn(PETSC_SUCCESS); /* negative one is used to indicate an interpolated solution */
-
-
-  PetscCall(VecNorm(X, NORM_2, &x_norm));
-
-  PetscCall(VecDuplicate(X, &DX));	/* make room (do it every time?) */
-  PetscCall(VecWAXPY(DX, -1.0, X, par->Xold)); /* dx = x-x_old */
-  PetscCall(VecNorm(DX, NORM_2, &dx_norm));
-  if(x_norm > 1e-15){
-    if(dx_norm/x_norm > par->rdx_monitor)
-      rdx_bail = PETSC_TRUE;
-  }
-  if(rdx_bail || (dx_norm > par->adx_monitor) || (fabs(t-par->old_time) > par->dt_monitor)){
-    PetscCall(VecGetArrayRead(X,&x));
-    LHEADNODE{
-      /* could get n from par->n */
-      PetscCall(VecGetSize(X,&n));
-      /* output */
-      fprintf(par->fout_monitor,"%20.15e\t ",t);
-      for(i=0;i < n;i++)
-	fprintf(par->fout_monitor,"%20.10e ",x[i]);
-      fprintf(par->fout_monitor,"\n");
+  if(t >= par->monitor_tmin){
+    
+    PetscCall(VecNorm(X, NORM_2, &x_norm));
+    
+    PetscCall(VecDuplicate(X, &DX));	/* make room (do it every time?) */
+    PetscCall(VecWAXPY(DX, -1.0, X, par->Xold)); /* dx = x-x_old */
+    PetscCall(VecNorm(DX, NORM_2, &dx_norm));
+    if(x_norm > 1e-15){
+      if(dx_norm/x_norm > par->rdx_monitor)
+	rdx_bail = PETSC_TRUE;
     }
-    PetscCall(VecRestoreArrayRead(X,&x));
+    if(rdx_bail || (dx_norm > par->adx_monitor) || (fabs(t-par->old_time) > par->dt_monitor)){
+      PetscCall(VecGetArrayRead(X,&x));
+      LHEADNODE{
+	/* could get n from par->n */
+	PetscCall(VecGetSize(X,&n));
+	/* output */
+	fprintf(par->fout_monitor,"%20.15e\t ",t);
+	for(i=0;i < n;i++)
+	  fprintf(par->fout_monitor,"%20.10e ",x[i]);
+	fprintf(par->fout_monitor,"\n");
+      }
+      PetscCall(VecRestoreArrayRead(X,&x));
+    }
+    /* store old state */
+    par->old_time = t;
+    PetscCall(VecCopy(X,par->Xold));
+    /* free space */
+    PetscCall(VecDestroy(&DX));
   }
-  /* store old state */
-  par->old_time = t;
-  PetscCall(VecCopy(X,par->Xold));
-  /* free space */
-  PetscCall(VecDestroy(&DX));
-  
-  
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 

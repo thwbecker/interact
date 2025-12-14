@@ -1,0 +1,43 @@
+#!/bin/bash
+k=${1-1}
+
+
+cwd=`pwd`
+tmpd=`mktemp -d`
+trap "rm -r $tmpd" EXIT
+
+lfile=$cwd/px0log.dat
+
+gawk -v k=$k '{if($1==k)print($0)}' $lfile > $tmpd/tmp
+
+
+if [ `lc $tmpd/tmp` -eq 0 ];then
+    cd $tmpd
+    popt=""
+    f=`echo $k | gawk '{printf("zero.%020.15f.dat",$1)}'`
+    imode=0;eps=1e-5
+    while [ $imode -lt 10 ];do
+	rm $f tmp.new 2> /dev/null
+	$cwd/bin/ode_solve_test $popt -t_final 1e5  -event_tmin .99e5 -eps $eps -imode $imode -knd $k > /dev/null 2> /dev/null
+	if [  -s $f ];then
+	    gawk '{printf("%.4f\n",$3)}' $f  | sort -g | uniq | gawk -v k=$k -v i=$imode '{print(k,$1,i)}' > tmp.new
+	    imode=20
+	else
+	    ((imode=imode+1))
+	    echo $k trying imode $imode now > "/dev/stderr"
+	    if [ $imode -gt 7 ];then
+		eps=1e-2
+	    fi
+	fi
+	
+    done
+    if [ ! -s $f ];then
+	echo $k NaN NaN 
+    else
+	cat tmp.new 
+    fi
+    rm tmp.new 2> /dev/null
+else
+    echo $0: $k already in log file > "/dev/stderr"
+    cat $tmpd/tmp
+fi
