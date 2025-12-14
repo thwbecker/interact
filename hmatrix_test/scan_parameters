@@ -16,26 +16,34 @@ fi
 
 lfile=px0log.dat
 if [ $run -ne 0 ];then
-    ks=`gawk -v k1=$kstart -v k2=$kstop -v ki=$kinc 'BEGIN{for(k=k1;k <= k2;k += ki)print(k)}'`
-    if [ $run -eq 2 ];then
-	rm $lfile 2> /dev/null
-	echo $0: replacing with $ks
-    else
-	echo $0: adding $ks
-    fi
-    j=0
-    for k in $ks;do
-	(find_intersect $k  > tmp.k.$$.$k.dat )&
-	if [ $j -ge $ncore ];then
-	    wait
-	    j=0
+    gawk -v k1=$kstart -v k2=$kstop -v ki=$kinc 'BEGIN{for(k=k1;k <= k2;k += ki)print(k)}' | sort -g > $tmpn.knew
+    gawk '{print($1)}' $lfile | sort -g > $tmpn.kold
+    comm -23  $tmpn.knew $tmpn.kold > $tmpn.kcomp
+    if [ `lc $tmpn.kcomp` -gt 0 ];then
+	kcomp=`cat $tmpn.kcomp`
+	echo $0: detected those new ones to compute: $kcomp
+	if [ $run -eq 2 ];then
+	    rm $lfile 2> /dev/null
+	    echo $0: replacing with $ks
+	else
+	    echo $0: adding $ks
 	fi
-	((j=j+1))
-    done
-    wait
-    cat tmp.k.$$.*.dat >> $lfile
-    rm tmp.k.$$.*.dat 
-    sort -g $lfile | uniq > tmp.dat ; mv tmp.dat $lfile
+	j=0
+	for k in $kcomp;do
+	    (find_intersect $k 1 > tmp.k.$$.$k.dat )&
+	    if [ $j -ge $ncore ];then
+		wait
+		j=0
+	    fi
+	    ((j=j+1))
+	done
+	wait
+	cat tmp.k.$$.*.dat >> $lfile
+	rm tmp.k.$$.*.dat 
+	sort -g $lfile | uniq > tmp.dat ; mv tmp.dat $lfile
+    else
+	echo $0: no new entries found
+    fi
 fi
 if [ $plot -eq 1 ];then
     proj=-JX-7/4

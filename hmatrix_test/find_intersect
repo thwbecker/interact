@@ -1,17 +1,18 @@
 #!/bin/bash
-k=${1-1}
-
+k=${1-1}			# non d k to compute
+skip_check=${2-0}
 
 cwd=`pwd`
 tmpd=`mktemp -d`
 trap "rm -r $tmpd" EXIT
 
 lfile=$cwd/px0log.dat
+if [ $skip_check -ne 0 ];then
+    gawk -v k=$k '{if($1==k)print($0)}' $lfile > $tmpd/tmp
+fi
 
-gawk -v k=$k '{if($1==k)print($0)}' $lfile > $tmpd/tmp
 
-
-if [ `lc $tmpd/tmp` -eq 0 ];then
+if [[ $skip_check -eq 1 || `lc $tmpd/tmp` -eq 0 ]];then
     cd $tmpd
     popt=""
     f=`echo $k | gawk '{printf("zero.%020.15f.dat",$1)}'`
