@@ -1,12 +1,19 @@
 #!/bin/bash
-ks=${1-"0.88 0.86 0.856 0.8552 0.8525"}
-force=${2-0}
+#
+# run a bunch of ODE solver tests to make plots of attractors
+#
+
+ks=${1-"0.93312950 0.86164850 0.85621575 0.85522170 0.85501330 0.85496885 0.85495935 0.85495730 0.8525"}
+imode=${2-0}			# init mode
+force=${3-0}			# make new ?
+
 
 for k in $ks;do
-    kf=`echo $k | awk '{printf("state.%020.15f.dat",$1)}'`
-    sopt=""
-    #sopt="-atol 1e-12 -rtol 1e-12"
-  
+    kf=`echo $k | awk -v imode=$imode '{printf("state.%020.15f.%i.dat",$1,imode)}'`
+    #sopt=""
+    sopt="-log_state  -atol 1e-15 -rtol 1e-16"
+    sopt="$sopt -t_final 1e7  -monitor_tmin .999e7"
+    sopt="$sopt -imode $imode"
     # default, works
     #popt="-ts_monitor -ts_adopt_monitor $sopt"
     popt="$sopt"
@@ -18,7 +25,7 @@ for k in $ks;do
     if [[ ! -s $kf || $force -eq 1 ]];then
 	bin/ode_solve_test $popt -knd $k
 	if [[ ! -s $kf || `wc -l $kf | awk '{print($1)}'` -lt 1000 ]];then
-	    echo $0: solver error for $k
+	    echo $0: solver error for $k could not find $kf `wc -l $kf`
 	    exit
 	fi
     else

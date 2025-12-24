@@ -1,9 +1,13 @@
 #!/bin/bash
-run=${1-0}			# 1: add 2: replace
-plot=${2-0}
-kstart=${3-.85}
-kstop=${4-1.}
-kinc=${5-0.001}
+#
+# scan parameters to find intersections
+#
+kstart=${1-.85}
+kstop=${2-1.}
+kinc=${3-0.001}
+imode=${4-0}			# init mode
+
+run=${5-1}			# 1: add 2: replace
 
 tmpn=`mktemp`
 trap "rm -f $tmpn*" EXIT
@@ -15,63 +19,42 @@ else
 fi
 
 lfile=px0log.dat
-if [ $run -ne 0 ];then
-    gawk -v k1=$kstart -v k2=$kstop -v ki=$kinc 'BEGIN{for(k=k1;k <= k2;k += ki)print(k)}' | sort -g > $tmpn.knew
-    gawk '{print($1)}' $lfile | sort -g > $tmpn.kold
-    comm -23  $tmpn.knew $tmpn.kold > $tmpn.kcomp
-    if [ `lc $tmpn.kcomp` -gt 0 ];then
-	kcomp=`cat $tmpn.kcomp`
-	echo $0: detected those new ones to compute: $kcomp
-	if [ $run -eq 2 ];then
-	    rm $lfile 2> /dev/null
-	    echo $0: replacing with $ks
-	else
-	    echo $0: adding $ks
-	fi
-	j=0
-	for k in $kcomp;do
-	    (find_intersect $k 1 > tmp.k.$$.$k.dat )&
-	    if [ $j -ge $ncore ];then
-		wait
-		j=0
-	    fi
-	    ((j=j+1))
-	done
-	wait
-	cat tmp.k.$$.*.dat >> $lfile
-	rm tmp.k.$$.*.dat 
-	sort -g $lfile | uniq > tmp.dat ; mv tmp.dat $lfile
+
+
+gawk -v k1=$kstart -v k2=$kstop -v ki=$kinc 'BEGIN{for(k=k1;k <= k2;k += ki)printf("%10.8f\n",k)}' | sort -g > $tmpn.knew
+if [ -s $lfile ];then
+    gawk -v i=$imode '{if($3==i)print($1)}' $lfile | sort -g > $tmpn.kold
+    if [ `lc $tmpn.kold` -gt 0 ];then
+	comm -23  $tmpn.knew $tmpn.kold > $tmpn.kcomp
     else
-	echo $0: no new entries found
+	cp $tmpn.knew $tmpn.kcomp
     fi
+else
+    cp $tmpn.knew $tmpn.kcomp
 fi
-if [ $plot -eq 1 ];then
-    proj=-JX-7/4
-    fs=""
-    for i in 1 2 3;do
-	ofile=px0k.$i.ps
-	if [ $i = 1 ];then
-	    reg=-R0.85/1./-2.5/0.5
-	    ann=-Ba0.02f0.002:"@~k@~'":/a0.5f0.1:y:
-	    gs=0.0025
-	elif [ $i = 2 ];then
-	    reg=-R0.8515/.867/-2.5/0.5
-	    ann=-Ba0.002f0.0005:"@~k@~'":/a0.5f0.1:y:
-	    gs=0.005
-	else
-	    reg=-R0.8515/0.8555/-2.2/-0.8
-	    ann=-Ba0.001f0.0001:"@~k@~'":/a0.2f.05:y:
-	    gs=0.01
+if [ `lc $tmpn.kcomp` -gt 0 ];then
+    kcomp=`cat $tmpn.kcomp`
+    echo $0: detected those new ones to compute: $kcomp
+    if [ $run -eq 2 ];then
+	rm $lfile 2> /dev/null
+	echo $0: replacing with $ks
+    else
+	echo $0: adding $ks
+    fi
+    j=0
+    for k in $kcomp;do
+	(find_intersect $k 1 $imode > tmp.k.$$.$k.dat )&
+	if [ $j -ge $ncore ];then
+	    wait
+	    j=0
 	fi
-	psbasemap $reg $proj -K -P $ann > $ofile
-	psxy -Sc$gs -Gblue $reg $proj $lfile -O >> $ofile
-	modifybb $ofile 0
-	fs="$fs $ofile"
+	((j=j+1))
     done
-    epsmerge -y 3 -par $fs > px0k.ps
-    modifybb px0k.ps 1
-    rm $fs
-
+    wait
+    cat tmp.k.$$.*.dat >> $lfile
+    rm tmp.k.$$.*.dat 
+    sort -g $lfile | uniq > tmp.dat ; mv tmp.dat $lfile
+else
+    echo $0: no new entries found
 fi
-
 

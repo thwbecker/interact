@@ -1,15 +1,26 @@
 #!/bin/bash
-ks="0.88 0.86 0.856 0.8552 0.8525"
-reg=-R-2/3/-2/0.2/-2/0.5
-xscale=1;yscale=2;zscale=1.5
+#           2          4           8          16         32       64        128          256    attr
+#ks=${1-"0.93312950 0.86164850 0.85621575 0.85522170 0.85501330 0.85496885 0.85495935 0.85495730 0.8525"}
+
+#
+ks=${1-"0.93312950 0.86164850 0.85621575 0.85522170 0.85501330 0.85496885 0.85495935 0.8525"}
+imode=${2-0}
+
+reg=-R-1.84/2.9/-2/0.15/-1.7/0
+
+reg2=-R0/2/-2.1/0.2
+
+xscale=1.5;yscale=2.5;zscale=2.5
 proj="-Jx$xscale/$yscale -Jz$zscale  -E130/30"
 
+proj2=-JX9/4
+ann2=-Ba.25f.025:"t [10@+3@+]":/a.5f.1:"y":
 
 
 fs=""
 for k in $ks;do
-    ann=-Ba1f.1:"x":/a1f.1:"y":/a1f.1:"z":WESNZ:."k = $k":
-    kf=`echo $k | gawk '{printf("state.%020.15f.dat",$1)}'`
+    ann=-Ba1f.1:"x":/a.5f.05:"y":/a.5f.05:"z":WESNZ:."@[k = $k@[":
+    kf=`echo $k | awk -v imode=$imode '{printf("state.%020.15f.%i.dat",$1,imode)}'`
     if [ ! -s $kf ];then
 	echo $0: error, $kf not found
 	exit
@@ -19,15 +30,20 @@ for k in $ks;do
 
    
     ofile=tmp.$k.ps
-    psbasemap $reg "$ann" $proj -K -P > $ofile
+    psbasemap $reg "$ann" $proj -K -P -Y6 > $ofile
     gawk '{if($1>1e4)print($2,$3,$4)}' $kf | \
-	psxyz $reg $proj -W0.5,blue -O >>$ofile
+	psxyz $reg $proj -W0.5,blue -N -O -K >> $ofile
+
+    psbasemap $reg2 "$ann2" $proj2 -K -O -Y-4.75 >> $ofile
+    gawk '{if(NR==1)x=$1;printf("%.12e %e\n",($1-x)/1e3,$3)}' $kf | \
+	psxy $reg2 $proj2 -W0.5,blue -O >>$ofile
+    
     modifybb $ofile
     #gv $ofile;exit
     fs="$fs $ofile"
     
 done
-epsmerge -par -x 2 -y 3 $fs > comp.ps
+epsmerge -par -x 4 -y 2 --orientation Landscape $fs > comp.ps
 modifybb comp.ps 1
 rm $fs 
 

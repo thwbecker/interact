@@ -1,0 +1,80 @@
+#!/bin/bash
+
+tmpn=`mktemp`
+trap "rm -f $tmpn*" EXIT
+#   2     4        8         16         32       64       128          256        512
+ks="1 0.866259 0.857038 0.85539350 0.85504990 0.85497670 0.85496100 0.85495770 0.85495690"
+# Feigenbaum number
+echo $ks | awk '{n=NF;for(i=1;i<=n;i++)k[i]=$i;}END{
+for(i=2;i<n;i++)
+print(i,(k[i]-k[i-1])/(k[i+1]-k[i]));
+}'
+# mid values
+
+echo $ks | awk '{n=NF;for(i=1;i<=n;i++)k[i]=$i;}END{
+     p=1;
+     for(i=2;i<=n;i++)
+          printf("//par->knd = %10.8f; // %i orbit\n",
+	  (k[i-1]+k[i])/2,p*=2);
+}'
+exit
+lfile=px0log.dat
+
+
+proj=-JX-7/6
+fs=""
+for i in 1 2 3 4;do
+    ofile=px0k.$i.ps
+    if [ $i = 1 ];then
+	ymin=-2.5;ymax=0.2
+	reg=-R0.85/1.0005/$ymin/$ymax
+	ann=-Ba0.02f0.002:"@~k@~'":/a0.5f0.1:y:
+	gs=0.0025
+    elif [ $i = 2 ];then
+	#ymin=-2.5;ymax=0.3
+	ymin=-2.2;ymax=0.2
+	#reg=-R0.8515/.8669/$ymin/$ymax
+	reg=-R0.8516/.858/$ymin/$ymax
+	ann=-Ba0.001f0.0001:"@~k@~'":/a0.5f0.05:y:
+	gs=0.0025
+    elif [ $i = 3 ];then
+	ymin=-2.2;ymax=-0.8
+	reg=-R0.8516/0.8555/$ymin/$ymax
+	ann=-Ba0.001f0.0001:"@~k@~'":/a0.2f.025:y:
+	gs=0.0025
+    else
+	ymin=-1.645;ymax=-1.565
+	#	reg=-R0.8548/0.8552/$ymin/$ymax
+	#reg=-R0.8548/0.855/$ymin/$ymax
+	reg=-R0.8549/0.85498/$ymin/$ymax
+	ann=-Ba0.00001f0.000001:"@~k@~'":/a0.01f.002:y:
+	gs=0.0025
+    fi
+    psbasemap $reg $proj -K -P $ann > $ofile
+
+    if [[ $i -ge 1 ]];then
+	for k in $ks;do
+	    cat <<EOF | psxy $reg $proj -O -K -W.25,gray >> $ofile
+$k $ymin
+$k $ymax
+EOF
+	done
+    fi
+    for imode in `seq 10 -1 0`;do
+	((c=imode+1))
+	col=`platecolor $c`
+	echo $imode $c $col
+	gawk -v i=$imode '{if($3==i)print($1,$2)}' $lfile | psxy -Sc$gs -G$col $reg $proj -O -K >> $ofile
+    done
+    psbasemap $reg $proj -O $ann >> $ofile
+    modifybb $ofile 0
+    fs="$fs $ofile"
+done
+epsmerge -y 2 -x 2 --orientation Landscape -par $fs > px0k.ps
+psconvert -Tg -A+m0.1 px0k.ps
+#modifybb px0k.ps 1
+rm $fs px0k.ps
+
+
+
+

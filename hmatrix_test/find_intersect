@@ -1,13 +1,14 @@
 #!/bin/bash
 k=${1-1}			# non d k to compute
-skip_check=${2-0}
+skip_check=${2-1}
+init=${3-0}			# imode init
 
 cwd=`pwd`
 tmpd=`mktemp -d`
 trap "rm -r $tmpd" EXIT
 
 lfile=$cwd/px0log.dat
-if [ $skip_check -ne 0 ];then
+if [[ -s $lfile ||  $skip_check -eq 0 ]];then
     gawk -v k=$k '{if($1==k)print($0)}' $lfile > $tmpd/tmp
 fi
 
@@ -16,12 +17,14 @@ if [[ $skip_check -eq 1 || `lc $tmpd/tmp` -eq 0 ]];then
     cd $tmpd
     popt=""
     f=`echo $k | gawk '{printf("zero.%020.15f.dat",$1)}'`
-    imode=0;eps=1e-5
+    imode=$init;eps=1e-5
     while [ $imode -lt 10 ];do
 	rm $f tmp.new 2> /dev/null
-	$cwd/bin/ode_solve_test $popt -t_final 1e5  -event_tmin .99e5 -eps $eps -imode $imode -knd $k > /dev/null 2> /dev/null
+	#$cwd/bin/ode_solve_test $popt -t_final 1e5  -log_events -event_tmin .99e5 -eps $eps -atol 1e-12 -rtol 1e-14 -imode $imode -knd $k > /dev/null 2> /dev/null
+	#$cwd/bin/ode_solve_test $popt -t_final 1e5  -log_events -event_tmin .99e5 -eps $eps -atol 1e-15 -rtol 1e-15 -imode $imode -knd $k #> /dev/null 2> /dev/null
+	$cwd/bin/ode_solve_test $popt -t_final 1e7 -log_events -event_tmin .999e7 -eps $eps -atol 1e-15 -rtol 1e-16 -imode $imode -knd $k > /dev/null 2> /dev/null
 	if [  -s $f ];then
-	    gawk '{printf("%.4f\n",$3)}' $f  | sort -g | uniq | gawk -v k=$k -v i=$imode '{print(k,$1,i)}' > tmp.new
+	    gawk '{printf("%9.6f\n",$3)}' $f  | sort -g | uniq | gawk -v k=$k -v i=$imode '{printf("%10.8f %9.6f %i\n",k,$1,i)}' > tmp.new
 	    imode=20
 	else
 	    ((imode=imode+1))

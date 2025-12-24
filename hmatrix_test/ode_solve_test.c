@@ -5,15 +5,15 @@
   solving ordinary differential equations originally based on
   https://www.cs.usask.ca/~spiteri/CMPT851/notes/PETSc.pdf
 
-  this examples solves a 3-D rate state friction example
-  
+  this examples solves a 3-D rate state friction example, see Becker
+  (2000)
 */
 #ifdef USE_PETSC
 
 #include "petscts.h"
 /*
-  parameters needed by the derivative function, and the monitor
-  function (could be separate, but why not (?))
+  parameters needed by the derivative function, and the monitor/event
+  functions
 */
 struct AppCtx{
   int n,nevent,imode;
@@ -77,7 +77,31 @@ static PetscErrorCode RHSFunction(TS ts,PetscReal time,Vec X,
 }
 
 #endif
+/* 
 
+   flags:
+
+   -knd	           non-dim stiffness (see below)
+
+   -t_final        final time
+
+   -atol           absolute and relative tolerance
+   -rtol
+   
+   -imode          initial condition type
+   -eps            initial condition offset
+   
+   -log_state      save x-y-z state over time
+   -monitor_tmin   start printing state at 
+
+   
+   -log_events     log x=0 crossings and print y values
+   -event_tmin     start loggin at tmin
+
+
+   
+
+ */
 int main(int argc,char **argv)
 {
 #ifdef USE_PETSC
@@ -109,6 +133,22 @@ int main(int argc,char **argv)
   */
   PetscOptionsGetReal(NULL, NULL, "-knd", &par->knd, &flag_set);
   if(!flag_set){
+    /* 
+       these are the bifurcation values
+
+       #   2     4        8         16         32       64       128          256        512
+       ks="1 0.866259 0.857038 0.85539350 0.85504990 0.85497670 0.85496100 0.85495770 0.85495690"
+       
+    */
+
+    //par->knd = 0.93312950; // 2 orbit
+    //par->knd = 0.86164850; // 4 orbit
+    //par->knd = 0.85621575; // 8 orbit
+    //par->knd = 0.85522170; // 16 orbit
+    //par->knd = 0.85501330; // 32 orbit
+    //par->knd = 0.85496885; // 64 orbit
+    //par->knd = 0.85495935; // 128 orbit
+    //par->knd = 0.85495730; // 256 orbit
     //par->knd = 0.88; % 2 orbit
     par->knd = 0.86;// % 4 
     //par->knd = 0.856; //% 8 
@@ -159,9 +199,12 @@ int main(int argc,char **argv)
   PetscOptionsGetReal(NULL, NULL, "-event_tmin", &event_tmin, &flag_set);
   if(!flag_set)
     event_tmin = 0.9 * par->t_final;
-
-  track_events = PETSC_TRUE;	/* track zero crossings? */
-  //track_events = PETSC_FALSE;	
+  
+  PetscOptionsGetBool(NULL, NULL, "-log_events", &track_events, &flag_set);
+  if(!flag_set){
+    //track_events = PETSC_TRUE;	/* track zero crossings? */
+    track_events = PETSC_FALSE;
+  }
 
   /* state monitoring */
   dt_monitor = 5;	
@@ -177,7 +220,6 @@ int main(int argc,char **argv)
   par->b1=1.0;
   par->b2=0.84;
   par->r=0.048;
-  //par->r=0.05;
   /* non dim stiffnesses */
   kcr1 = par->b1 - 1.0;
   kcr2=(kcr1+par->r*(2.*par->b1+(par->b2-1.)*(2.+par->r))+
@@ -248,7 +290,7 @@ int main(int argc,char **argv)
   //PetscCall(TSRKSetType(ts, TSRK6VR));
   PetscCall(TSRKSetType(ts, TSRK8VR));
 
-  PetscCall(TSSetMaxStepRejections(ts,1e8));
+  PetscCall(TSSetMaxStepRejections(ts,1e9));
   PetscCall(TSSetTime(ts,t_init));	/* initial time */
   /* 
       alllow override
@@ -261,7 +303,7 @@ int main(int argc,char **argv)
   PetscCall(TSGetAdapt(ts,&adapt));
   //TSAdaptSetType(adapt, TSADAPTGLEE);
   
-  //PetscCall(TSAdaptSetStepLimits(adapt,1e-20, dt_monitor));
+  PetscCall(TSAdaptSetStepLimits(adapt,1e-20, dt_monitor));
   /*
     Set the initial time and the initial timestep given above.
   */
