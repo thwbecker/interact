@@ -1,0 +1,13 @@
+#!/bin/bash
+# build up many solutions
+imode=${1-1} # init mode, 0: {e,e,e} 1,2,3: {e,0,0}, {0,e,0}, {0,0,e} 4: period sol 5, 6, 7... random eps
+use_exp_solve=${2-1}
+eps=${3-4.5e-4}			# 
+
+
+
+
+./scan_parameters 0.85    1.01     0.0001    $imode $eps $use_exp_solve 
+./scan_parameters 0.85    0.858    0.00001   $imode $eps $use_exp_solve 
+./scan_parameters 0.8540  0.8555   0.000001  $imode $eps $use_exp_solve 
+./scan_parameters 0.85498 0.85549  0.0000001 $imode $eps $use_exp_solve 

@@ -1,4 +1,5 @@
 #include "../interact.h"
+#include <quadmath.h>
 #define LHEADNODE if(par->medium->comm_rank==0)
 /*
 
@@ -10,6 +11,7 @@
 */
 #ifdef USE_PETSC
 
+
 #include "petscts.h"
 /*
   parameters needed by the derivative function, and the monitor/event
@@ -19,59 +21,65 @@ struct AppCtx{
   int n,nevent,imode;
   PetscReal b1,b2,r,k,knd;
   struct med medium[1];
-  /*  */
-  PetscReal old_time,event_tmin,t_final,monitor_tmin;
-  PetscReal dt_monitor,adx_monitor,rdx_monitor;
+  PetscReal old_time,event_tmin,t_final,monitor_tmin,dt_monitor,adx_monitor,rdx_monitor;
   PetscBool track_events,log_state;
   FILE *fout_monitor,*fout_event;
-  char fname_monitor[PETSC_MAX_PATH_LEN];
-  char fname_event[PETSC_MAX_PATH_LEN];
+  char fname_monitor[PETSC_MAX_PATH_LEN],fname_event[PETSC_MAX_PATH_LEN];
   Vec Xold;
 };
 /*
 User-defined routines
 */
-static PetscErrorCode RHSFunction(TS,PetscReal,Vec,Vec,void*);
+static PetscErrorCode RHSFunction3D(TS,PetscReal,Vec,Vec,void*);
+static PetscErrorCode RHSFunction4D(TS,PetscReal,Vec,Vec,void*);
 static PetscErrorCode myMonitor(TS , PetscInt , PetscReal , Vec , void *);
-static PetscErrorCode init_monitor_and_event(void *, PetscReal ,
-					     PetscReal ,  PetscReal ,PetscReal,PetscReal,
-					     PetscReal , Vec , PetscBool,
-					     PetscBool);
+static PetscErrorCode init_monitor_and_event(void *, PetscReal ,PetscReal ,  PetscReal ,PetscReal,PetscReal,PetscReal , Vec , PetscBool,PetscBool);
 static PetscErrorCode finalize_monitor_and_event(void *);
-static PetscErrorCode myEventFunction(TS, PetscReal , Vec ,PetscScalar *,
-				      void *);
-
-static PetscErrorCode myPostEventFunction(TS , PetscInt ,PetscInt [], 
-					  PetscReal, Vec,PetscBool ,
-					  void *);
-
-
+static PetscErrorCode myEventFunction(TS, PetscReal , Vec ,PetscScalar *,void *);
+static PetscErrorCode myPostEventFunction(TS , PetscInt ,PetscInt [], PetscReal, Vec,PetscBool ,void *);
 /* 
-   two state variable RHS ODE 
+   two state variable RHS ODE - x = log(v/v0), y = (tau-tau0)/a, z = b2 log(v0*theta2/dc2), steady state = {0,0,0}
 */
-static PetscErrorCode RHSFunction(TS ts,PetscReal time,Vec X,
-				  Vec F,void *ptr)
+static PetscErrorCode RHSFunction3D(TS ts,PetscReal time,Vec X,Vec F,void *ptr)
 {
-  PetscScalar *f,expx;
+  PetscScalar *f;
   const PetscScalar *x;
   struct AppCtx *par;
+  PetscScalar expx;
   PetscFunctionBeginUser;
   par = (struct AppCtx *)ptr;
   PetscCall(VecGetArrayRead(X,&x));PetscCall(VecGetArray(F,&f));
   expx = PetscExpReal(x[0]);
   if(!finite(expx)){
-    fprintf(stderr,"RHSFunction: exp eval out of bounds for %e at time %g for x %e, %e, %e - bye bye\n",
+    fprintf(stderr,"RHSFunction3D: exp eval out of bounds for %e at time %g for x %e, %e, %e - bye bye\n",
 	    x[0],time,x[0],x[1],x[2]);
-    finalize_monitor_and_event(ptr);
-    exit(-1);
-  }
-  /* 
-     rate state friction with two state variables from Becker (2000) 
-  */
+    finalize_monitor_and_event(ptr);exit(-1);
+  } /* keep this order, we are using f[1] and f[2] for f[0]! */
   f[1] =  (1.0 - expx) * par->k;
   f[2] = -expx * par->r * (par->b2 * x[0] + x[2]);
   f[0] = expx * ((par->b1 - 1.0) * x[0] + x[1] - x[2]) + f[1] -  f[2];
-  //fprintf(stderr,"%15e %15e %15e\n",f[0],f[1],f[2]);
+  PetscCall(VecRestoreArrayRead(X,&x));PetscCall(VecRestoreArray(F,&f));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+static PetscErrorCode RHSFunction4D(TS ts,PetscReal time,Vec X,Vec F,void *ptr) /* 4D
+										   version
+										   with
+										   exponential
+										   solve */
+{
+  PetscScalar *f;
+  const PetscScalar *x;
+  struct AppCtx *par;
+  PetscFunctionBeginUser;
+  par = (struct AppCtx *)ptr;
+  PetscCall(VecGetArrayRead(X,&x));PetscCall(VecGetArray(F,&f));
+  /* 
+     
+  */  
+  f[1] =  (1.0 - x[3]) * par->k;
+  f[2] = -x[3] * par->r * (par->b2 * x[0] + x[2]);
+  f[0] =  x[3] * ((par->b1 - 1.0) * x[0] + x[1] - x[2]) + f[1] -  f[2];
+  f[3] = f[0] * x[3]; // x[3] = exp(x), \dot{x[3]} = x[3] \dot{x} 
   PetscCall(VecRestoreArrayRead(X,&x));PetscCall(VecRestoreArray(F,&f));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -98,6 +106,7 @@ static PetscErrorCode RHSFunction(TS ts,PetscReal time,Vec X,
    -log_events     log x=0 crossings and print y values
    -event_tmin     start loggin at tmin
 
+   -use_exp_solve  solve exp(x) as 4th variable
 
    
 
@@ -109,7 +118,7 @@ int main(int argc,char **argv)
   Vec X; /* solution, residual vectors */
   PetscReal time,t_init,atol,rtol,eps,monitor_tmin,event_tmin;
   PetscReal kcr1,kcr2,adx_monitor,rdx_monitor,dt_monitor;
-  PetscBool flag_set,track_events,log_state;
+  PetscBool flag_set,track_events,log_state,use_exp_solve;
   /* for init */
   PetscInt  *ind,i;
   PetscReal *xinit;
@@ -120,7 +129,8 @@ int main(int argc,char **argv)
   PetscBool event_terminate[1] = {PETSC_FALSE};  // don't stop
   PetscRandom rctx;
   struct AppCtx par[1]; /* user-defined work context */
-
+  PetscInt lind;
+  PetscReal lval;
   PetscFunctionBegin;
   PetscInitialize(&argc,&argv,NULL,NULL);
   PetscCallMPI(MPI_Comm_size(PETSC_COMM_WORLD, &par->medium->comm_size));
@@ -171,16 +181,20 @@ int main(int argc,char **argv)
   */
   PetscOptionsGetReal(NULL, NULL, "-atol", &atol, &flag_set);
   if(!flag_set)
-    atol = 1e-10;
+    atol = 1e-12;
   PetscOptionsGetReal(NULL, NULL, "-rtol", &rtol, &flag_set);
   if(!flag_set)
-    rtol = 1e-12;
+    rtol = 1e-10;
   PetscOptionsGetInt(NULL, NULL, "-imode", &par->imode, &flag_set);
   if(!flag_set)
     par->imode = 1;			/* 0: all eps 1,2,3: component eps >4 random */
   PetscOptionsGetReal(NULL, NULL, "-eps", &eps, &flag_set);
   if(!flag_set)
-    eps = 1e-5;			/* for initial condition */
+    eps = 8e-4;			/* for initial condition */
+  PetscOptionsGetBool(NULL, NULL, "-use_exp_solve", &use_exp_solve, &flag_set);
+  if(!flag_set){
+    use_exp_solve = PETSC_FALSE;
+  }
   /* 
      output control 
   */
@@ -215,7 +229,10 @@ int main(int argc,char **argv)
      model parameters
   */
   /* dimensions */
-  par->n = 3;
+  if(use_exp_solve)
+    par->n = 4;
+  else
+    par->n = 3;
   /*  */
   par->b1=1.0;
   par->b2=0.84;
@@ -239,22 +256,35 @@ int main(int argc,char **argv)
   case 0:			/* fixed eps */
     PetscCall(VecSet(X, eps));
     break;
-  case 1:
+  case 1:			/* 1,2,3: directional eps, x, y, and z */
   case 2:
   case 3:
+  case 4:			/* period eight solution */
     xinit = (PetscReal *)calloc(par->n,sizeof(PetscReal));
     ind = (PetscInt *)malloc(sizeof(PetscInt)*par->n);
     for(i=0;i<par->n;i++)ind[i]=i;
-    xinit[par->imode-1] = eps;
+    if(par->imode == 4){	/* period eight solution at k = 0.856 */
+      xinit[0] =  5.7204819276e-02;
+      xinit[1] = -9.7929914607e-01;
+      xinit[2] = -6.8611467656e-01;        
+    }else{
+      xinit[par->imode-1] = eps;
+    }
     PetscCall(VecSetValues(X, par->n,ind, xinit, INSERT_VALUES));
-    free(xinit);free(ind);
+    free(xinit);free(ind);    
     break;
-  default:
+  default:			/* 5.... different random seeds */
     PetscCall(PetscRandomSetSeed(rctx, par->imode));
     PetscCall(PetscRandomSeed(rctx)); 
     PetscCall(VecSetRandom(X, rctx));
     PetscCall(VecScale(X,eps));
     break;
+  }
+  if(use_exp_solve){		/* override x[3] to make sure it's exp(x[0]) */
+    lind=0;
+    PetscCall(VecGetValues(X, 1, &lind, &lval));
+    lval = (PetscReal)expq(( __float128)lval);				       /* quad prec */
+    PetscCall(VecSetValue(X, 3, lval, INSERT_VALUES)); /* init x[3] with exp(x[0]) */
   }
   /*  */
   PetscCall(VecAssemblyBegin(X));
@@ -273,22 +303,22 @@ int main(int argc,char **argv)
   PetscCall(TSSetProblemType(ts,TS_NONLINEAR)); /* can be linear? */
   PetscCall(TSSetSolution(ts,X));
 
-  
-
-  
   /* 
      init my control environment for output 
   */
   init_monitor_and_event(par,dt_monitor,adx_monitor,rdx_monitor,monitor_tmin,
 			 event_tmin,t_init,X,log_state,track_events);
-  
-  PetscCall(TSSetRHSFunction(ts, NULL, RHSFunction,&par));
+  if(use_exp_solve)
+    PetscCall(TSSetRHSFunction(ts, NULL, RHSFunction4D,&par));
+  else
+    PetscCall(TSSetRHSFunction(ts, NULL, RHSFunction3D,&par));
   /*
     use runge kutta or ARKIMEX
   */
   PetscCall(TSSetType(ts,TSRK));
-  //PetscCall(TSRKSetType(ts, TSRK6VR));
-  PetscCall(TSRKSetType(ts, TSRK8VR));
+  //TSRKSetType(ts, TSRK5DP);	/* dormand-prince (ode145) */
+  PetscCall(TSRKSetType(ts, TSRK6VR)); /* 6th order RK */
+  PetscCall(TSRKSetType(ts, TSRK8VR)); /* 8th order RK */
 
   PetscCall(TSSetMaxStepRejections(ts,1e9));
   PetscCall(TSSetTime(ts,t_init));	/* initial time */
@@ -303,7 +333,7 @@ int main(int argc,char **argv)
   PetscCall(TSGetAdapt(ts,&adapt));
   //TSAdaptSetType(adapt, TSADAPTGLEE);
   
-  PetscCall(TSAdaptSetStepLimits(adapt,1e-20, dt_monitor));
+  PetscCall(TSAdaptSetStepLimits(adapt,1e-16, dt_monitor));
   /*
     Set the initial time and the initial timestep given above.
   */

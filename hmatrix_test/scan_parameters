@@ -2,18 +2,22 @@
 #
 # scan parameters to find intersections
 #
-kstart=${1-.85}
-kstop=${2-1.}
-kinc=${3-0.001}
-imode=${4-0}			# init mode
-
-run=${5-1}			# 1: add 2: replace
+# double range is 0.857664 0.857728
+#
+kstart=${1-.851}
+kstop=${2-1.001}
+kinc=${3-0.0001}
+imode=${4-0}			# init mode, 0: {e,e,e} 1,2,3: {e,0,0}, {0,e,0}, {0,0,e} 4: period sol 5, 6, 7... random eps
+eps=${5-4.5e-4}			# for init
+use_exp_solve=${6-0}
+cpu_lim=${7-64}			# limit to how many cores?
+run=${8-1}			# 1: add 2: replace
 
 tmpn=`mktemp`
 trap "rm -f $tmpn*" EXIT
 
-if [ $NR_CPUS -gt 64 ];then
-    ncore=64
+if [ $NR_CPUS -gt $cpu_lim ];then
+    ncore=$cpu_lim
 else
     ncore=$NR_CPUS
 fi
@@ -22,8 +26,9 @@ lfile=px0log.dat
 
 
 gawk -v k1=$kstart -v k2=$kstop -v ki=$kinc 'BEGIN{for(k=k1;k <= k2;k += ki)printf("%10.8f\n",k)}' | sort -g > $tmpn.knew
+
 if [ -s $lfile ];then
-    gawk -v i=$imode '{if($3==i)print($1)}' $lfile | sort -g > $tmpn.kold
+    gawk -v i=$imode -v eps=$epse '{if($3==i)if($4==eps)print($1)}' $lfile | sort -g > $tmpn.kold
     if [ `lc $tmpn.kold` -gt 0 ];then
 	comm -23  $tmpn.knew $tmpn.kold > $tmpn.kcomp
     else
@@ -43,7 +48,7 @@ if [ `lc $tmpn.kcomp` -gt 0 ];then
     fi
     j=0
     for k in $kcomp;do
-	(find_intersect $k 1 $imode > tmp.k.$$.$k.dat )&
+	(find_intersect $k 1 $imode $eps $use_exp_solve > $tmpn.k.$$.$k.dat )&
 	if [ $j -ge $ncore ];then
 	    wait
 	    j=0
@@ -51,9 +56,9 @@ if [ `lc $tmpn.kcomp` -gt 0 ];then
 	((j=j+1))
     done
     wait
-    cat tmp.k.$$.*.dat >> $lfile
-    rm tmp.k.$$.*.dat 
-    sort -g $lfile | uniq > tmp.dat ; mv tmp.dat $lfile
+    cat $tmpn.k.$$.*.dat $lfile >> $tmpn.lfile
+    rm $tmpn.k.$$.*.dat 
+    sort -g $tmpn.lfile | uniq > $tmpn.dat ; cp $tmpn.dat $lfile
 else
     echo $0: no new entries found
 fi
