@@ -43,10 +43,37 @@
 */
 static PetscBool rsf_limit_sigma = PETSC_FALSE;
 static PetscReal rsf_min_sigma = 1e6, rsf_max_sigma = 300e6; /* Pa */
-/* monitor output */
-static FILE *rsf_monitor_out = NULL;
-static PetscReal rsf_monitor_last_time = -1;
-/* context access for the domain check */
+/* 
+   context for the monitor and event functions, following the layout
+   in hmatrix_test/ode_solve_test.c; the RHS keeps using the plain
+   interact_ctx which is shared with the matrix assembly routines
+*/
+struct rsf_out_ctx{
+  struct interact_ctx *par;	/* fault geometry and medium */
+  /* change/time triggered state monitor */
+  PetscReal old_time,dt_monitor,adx_monitor,rdx_monitor,monitor_tmin;
+  Vec Xold;
+  FILE *fout_monitor;
+  /* periodic full-field output (stats line, velocity snapshots) */
+  PetscReal next_print_time;
+  int field_out;
+  VecScatter gather;
+  Vec gathered;
+  FILE *fout_stats;
+  /* slip velocity threshold crossing events */
+  PetscBool track_events,slipping;
+  PetscReal vel_event,vel_event_hyst,event_tmin;
+  int nevent;
+  FILE *fout_event;
+};
+static PetscErrorCode rsf_init_monitor_and_event(struct rsf_out_ctx *,struct interact_ctx *,
+						 PetscReal,PetscReal,PetscReal,PetscReal,
+						 PetscReal,PetscReal,PetscReal,PetscBool,
+						 PetscReal,Vec,PetscReal);
+static PetscErrorCode rsf_finalize_monitor_and_event(struct rsf_out_ctx *);
+static PetscErrorCode rsf_event_function(TS,PetscReal,Vec,PetscScalar *,void *);
+static PetscErrorCode rsf_post_event(TS,PetscInt,PetscInt[],PetscReal,Vec,PetscBool,void *);
+/* context access for the domain check, whose callback has no user pointer */
 static struct interact_ctx *rsf_par_static = NULL;
 #endif
 
@@ -63,16 +90,20 @@ int main(int argc,char **argv)
   /*  */
   VecScatter ctx;
   Vec xout,x,vatol,islip_rate_vec,stress_rate;
-  FILE *fout1=NULL,*fout2;
   struct med *medium;struct flt *fault;
-  PetscInt m,i,n,j,field_out,ierr,use_hmatrix=0;
+  PetscInt m,i,n,j,use_hmatrix=0;
   PetscRandom prand;
-  PetscReal state,slip,sum[3],patch_l,stable_l,rand_fac,dummy[3],vmean,vstd,vmin,vmax,smean;
+  PetscReal state,patch_l,stable_l,rand_fac,dummy[3];
   PetscReal sigma_init,tau_init,vel_init,rtol,atol_slip,dt_init,dt_max,rand_amp,tmp;
+  PetscReal dt_monitor,rdx_monitor,adx_monitor,monitor_tmin,vel_event,vel_event_hyst,event_tmin;
+  PetscBool track_events;
+  PetscInt event_direction[1] = {0}; /* detect both crossing directions */
+  PetscBool event_terminate[1] = {PETSC_FALSE};
+  struct rsf_out_ctx uc[1];
   struct interact_ctx par[1]; /* user-defined work context */
   char geom_file[STRLEN]="geom.in",rsf_file[STRLEN]="rsf.dat";
   PetscBool read_value,warned = PETSC_FALSE,flg;
-  char *home_dir = getenv("HOME");char par_file[STRLEN],vel_file[STRLEN];
+  char *home_dir = getenv("HOME");char par_file[STRLEN];
   snprintf(par_file,STRLEN,"%s/progs/src/interact/petsc_settings.yaml",(home_dir)?(home_dir):("."));
   /* set up structure */
   par->medium=(struct med *)calloc(1,sizeof(struct med));
@@ -153,6 +184,32 @@ int main(int argc,char **argv)
   tmp = medium->slip_line_dt/sec_per_year;
   PetscCall(PetscOptionsGetReal(NULL,NULL,"-slip_line_dt_yr",&tmp,NULL));
   medium->slip_line_dt = tmp * sec_per_year;
+  /* 
+     monitor and event controls, cf. hmatrix_test/ode_solve_test.c:
+     the state monitor logs when the relative or absolute state change
+     since the last logged state exceeds the limits, or at least every
+     dt_monitor; events are slip velocity threshold crossings located
+     by the TS event handler
+  */
+  dt_monitor = 5.0;		/* [yr], also caps the step size */
+  rdx_monitor = 1e-4;		/* relative state change trigger */
+  adx_monitor = 0.0;		/* absolute state change trigger, <= 0: off */
+  monitor_tmin = 0.0;		/* [yr] suppress monitor output before */
+  vel_event = 1e-3;		/* [m/s] event velocity threshold, cf. HBI velth */
+  vel_event_hyst = 0.5;		/* arrest at vel_event * hyst, debounces spurious
+				   crossings from interpolant oscillation during
+				   the rapid coseismic acceleration */
+  event_tmin = 0.0;		/* [yr] suppress event output before */
+  track_events = PETSC_TRUE;
+  PetscCall(PetscOptionsGetReal(NULL,NULL,"-dt_monitor_yr",&dt_monitor,NULL));
+  PetscCall(PetscOptionsGetReal(NULL,NULL,"-rdx_monitor",&rdx_monitor,NULL));
+  PetscCall(PetscOptionsGetReal(NULL,NULL,"-adx_monitor",&adx_monitor,NULL));
+  PetscCall(PetscOptionsGetReal(NULL,NULL,"-monitor_tmin_yr",&monitor_tmin,NULL));
+  PetscCall(PetscOptionsGetReal(NULL,NULL,"-vel_event",&vel_event,NULL));
+  PetscCall(PetscOptionsGetReal(NULL,NULL,"-vel_event_hyst",&vel_event_hyst,NULL));
+  PetscCall(PetscOptionsGetReal(NULL,NULL,"-event_tmin_yr",&event_tmin,NULL));
+  PetscCall(PetscOptionsGetBool(NULL,NULL,"-track_events",&track_events,NULL));
+  dt_monitor *= sec_per_year;monitor_tmin *= sec_per_year;event_tmin *= sec_per_year;
 
   /* get the geometry */
   read_geometry(geom_file,&medium,&par->fault,TRUE,FALSE,FALSE,FALSE);
@@ -305,8 +362,9 @@ int main(int argc,char **argv)
      the interseismic -> coseismic dt collapse */
   PetscCall(TSSetMaxStepRejections(ts,-1));
   PetscCall(TSSetMaxSNESFailures(ts,-1)); /* domain errors count as solver failures */
-  /* output times should not constrain the natural step size selection */
-  PetscCall(TSSetExactFinalTime(ts,TS_EXACTFINALTIME_INTERPOLATE));
+  /* output times should not constrain the natural step size selection,
+     allow rough final time as in ode_solve_test.c */
+  PetscCall(TSSetExactFinalTime(ts,TS_EXACTFINALTIME_STEPOVER));
   /* HBI rkqs uses a pure relative infinity norm error measure */
   PetscCall(TSSetTolerances(ts,0.0,vatol,rtol,NULL));
   PetscCall(PetscOptionsHasName(NULL,NULL,"-ts_adapt_wnormtype",&flg));
@@ -315,7 +373,9 @@ int main(int argc,char **argv)
   /* HBI rkqs: step growth limited to 2x, shrink to >= 0.5x */
   PetscCall(TSGetAdapt(ts,&adapt));
   PetscCall(TSAdaptSetClip(adapt,0.5,2.0));
-  PetscCall(TSAdaptSetStepLimits(adapt,0.0,dt_max));
+  /* cap the step at the monitor interval, cf. ode_solve_test.c, so
+     the change-triggered monitor cannot be stepped over */
+  PetscCall(TSAdaptSetStepLimits(adapt,0.0,(dt_max < dt_monitor)?(dt_max):(dt_monitor)));
   /* 
      reject steps whose stages leave the physical domain (overflow,
      non-positive normal stress); the equivalent of HBI rkqs' NaN/Inf
@@ -325,88 +385,36 @@ int main(int argc,char **argv)
   rsf_par_static = par;
   PetscCall(TSSetFunctionDomainError(ts,rsf_domain_check));
   PetscCall(TSSetFromOptions(ts));
-  /* per-step monitor, comparable to HBI's monitor.dat */
-  HEADNODE{
-    rsf_monitor_out = fopen("rsf_monitor.dat","w");
-    fprintf(rsf_monitor_out,"# step time[s] time[yr] dt[s] log10(max|v|[m/s]) mean_slip[m] mean_mu max_sigma[Pa] min_sigma[Pa]\n");
+  /* 
+     set up the change/time triggered state monitor, the periodic
+     field output, and the velocity threshold event tracker,
+     cf. hmatrix_test/ode_solve_test.c
+  */
+  PetscCall(rsf_init_monitor_and_event(uc,par,dt_monitor,adx_monitor,rdx_monitor,
+				       monitor_tmin,event_tmin,vel_event,vel_event_hyst,
+				       track_events,medium->time,x,vel_init));
+  PetscCall(TSMonitorSet(ts,rsf_TS_Monitor,(void *)uc,NULL));
+  if(track_events){
+    PetscCall(TSSetEventHandler(ts,1,event_direction,event_terminate,
+				rsf_event_function,rsf_post_event,(void *)uc));
+    /* locate the crossing to within 0.01 in log10(v) */
+    PetscCall(TSSetEventTolerances(ts,1e-2,NULL));
   }
-  PetscCall(TSMonitorSet(ts,rsf_TS_Monitor,par,NULL));
+  /* 
+     single TSSolve to the stop time
 
-  field_out = 0;
-  HEADNODE{
-    fout1 = fopen("rsf_stats.dat","w");
-    fprintf(fout1,"# time[yr] mean_vel std_vel min_vel max_vel mean_slip\n");
-  }
-  /* for sending to head node */
-  PetscCall(VecScatterCreateToZero(x,&ctx,&xout));		/* solution vector */
-  while(medium->time < medium->stop_time){	/* advance until next output */
-    PetscCall(TSSetMaxTime(ts,(medium->time + medium->print_interval))); /* advance solution to next output time */
-    PetscCall(TSSolve(ts, x));
-    PetscCall(TSGetSolveTime(ts,&(medium->time))); /* get the current time */
-    /* 
-       distribute to zero node - collective on all ranks!
-    */
-    PetscCall(VecScatterBegin(ctx,x,xout,INSERT_VALUES,SCATTER_FORWARD));
-    PetscCall(VecScatterEnd(ctx,x,xout,INSERT_VALUES,SCATTER_FORWARD));
-    HEADNODE{
-      PetscCall(VecGetArray(xout,&values));
-      /* all patches loop */
-      for(sum[0]=sum[1]=sum[2]=0.,vmin=1e20,vmax=-1e20,
-	    i=0,j=0;i < n;i++,j += INT_RSF_DIM){
-	state = values[j];
-	fault[i].s[STRIKE] = values[j+1]; /* shear stress */
-	fault[i].s[NORMAL] = values[j+2]; /* normal stress */
-	slip = values[j+3];
-	/* velocity */
-	fault[i].u[STRIKE] = vel_from_rsf(fault[i].s[STRIKE],fault[i].s[NORMAL],
-					  state,fault[i].mu_s,medium->v0,dummy,(dummy+1),(dummy+2),medium);
-	/* compute average slip rate */
-	if(fault[i].u[STRIKE] < vmin)
-	  vmin = fault[i].u[STRIKE];
-	if(fault[i].u[STRIKE] > vmax)
-	  vmax = fault[i].u[STRIKE];
-	sum[0] += fault[i].u[STRIKE];
-	sum[1] += fault[i].u[STRIKE] * fault[i].u[STRIKE];
-	sum[2] += slip;				     /* mean slip */
-      }
-      /* output */
-      vstd = sqrt(((COMP_PRECISION)n * sum[1] - sum[0] * sum[0]) / ((COMP_PRECISION)(n*(n-1))));
-      vmean = sum[0]/(COMP_PRECISION)n;
-      smean = sum[2]/(COMP_PRECISION)n;
-      /* print some stats
-	 
-	 time[yr] mean_vel std_vel min_vel max_vel mean_slip 
-      */
-      fprintf(fout1,"%.8f %e %e %e %e %e\n",medium->time/sec_per_year,vmean,vstd,vmin,vmax,smean);
-      /* some more output */
-      if(medium->time - medium->slip_line_time > medium->slip_line_dt){
-	if(!field_out){
-	  ierr = system("mkdir -p tmp_rsf");
-	  if(ierr){
-	    fprintf(stderr,"%s: error making output directory\n",argv[0]);
-	    exit(-1);
-	  }
-	}
-	/* 
-	   print slip rate field to file 
-	*/
-	snprintf(vel_file,STRLEN,"tmp_rsf/vel-%012.5e-%06i-gmt",medium->time/sec_per_year,field_out);
-	fout2 = fopen(vel_file,"w");
-	for(i=0;i < n;i++)
-	  print_patch_geometry_and_bc(i,fault,PSXYZ_STRIKE_DISP_OUT_MODE,medium->time,FALSE,fout2,FALSE,dummy);
-	fclose(fout2);
-	field_out++;
-	medium->slip_line_time = medium->time;
-      }
-      PetscCall(VecRestoreArray(xout,&values));
-    }
-  }
-  HEADNODE{
-    fclose(fout1);
-    if(rsf_monitor_out)
-      fclose(rsf_monitor_out);
-  }
-  PetscCall(VecScatterDestroy(&ctx));
+     NOTE: do NOT chop the integration into output intervals with
+     repeated TSSolve calls and TS_EXACTFINALTIME_INTERPOLATE - each
+     restart resumes from the interpolated rather than the true
+     trajectory state, which introduces a systematic, tolerance-
+     independent drift (verified against a reference integration);
+     all output is instead handled in the monitor at accepted steps
+     and by the event handler
+  */
+  PetscCall(TSSetMaxTime(ts,medium->stop_time));
+  PetscCall(TSSolve(ts, x));
+  PetscCall(TSGetSolveTime(ts,&(medium->time)));
+  PetscCall(rsf_finalize_monitor_and_event(uc));
   
   /*View information about the time-stepping method and the solution at the end time.*/
   PetscCall(TSView(ts, PETSC_VIEWER_STDOUT_WORLD));
@@ -418,7 +426,6 @@ int main(int argc,char **argv)
   PetscCall(VecDestroy(&medium->rsf_sigma_dot));
   PetscCall(VecDestroy(&x));
   PetscCall(VecDestroy(&vatol));
-  PetscCall(VecDestroy(&xout));
 
   /*  */
   PetscCall(TSDestroy(&ts)); 
@@ -565,52 +572,268 @@ PetscErrorCode rsf_domain_check(TS ts,PetscReal time,Vec X,PetscBool *accept)
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 /* 
-   per accepted time step monitor, output comparable to HBI's
-   monitor.dat: max slip velocity, mean slip, mean friction, normal
-   stress extrema
+   monitoring function, cf. myMonitor in hmatrix_test/ode_solve_test.c:
+   logs the global state summary (max slip velocity, mean slip, mean
+   friction, normal stress extrema) when the relative or absolute
+   change of the state vector since the last logged state exceeds the
+   limits, or when more than dt_monitor has elapsed; also handles the
+   periodic full-field output (stats line and velocity snapshots);
+   unlike ode_solve_test.c the reference state is only updated on
+   output, so the criteria decimate relative to accepted steps
 */
 PetscErrorCode rsf_TS_Monitor(TS ts,PetscInt step,PetscReal time,Vec X,void *ptr)
 {
   const PetscScalar *x;
   struct med *medium;struct flt *fault;
-  struct interact_ctx *par;
+  struct rsf_out_ctx *uc;
+  Vec DX;
   PetscInt i,j;
-  PetscReal v,lsum[2],gsum[2],lminmax[3],gminmax[3],dt,d1,d2,d3;
+  PetscBool bail;
+  PetscReal v,lsum[2],gsum[2],lminmax[3],gminmax[3],dt,d1,d2,d3,dx_norm,x_norm;
   const PetscReal sec_per_year = 365.25*24.*60.*60.;
   PetscFunctionBeginUser;
-  par = (struct interact_ctx *)ptr;medium = par->medium;fault = par->fault;
-  if(time == rsf_monitor_last_time) /* skip repeat calls at interpolated output times */
+  uc = (struct rsf_out_ctx *)ptr;
+  medium = uc->par->medium;fault = uc->par->fault;
+  if(step < 0)	      /* negative indicates an interpolated solution */
     PetscFunctionReturn(PETSC_SUCCESS);
-  rsf_monitor_last_time = time;
-  PetscCall(TSGetTimeStep(ts,&dt));
-  PetscCall(VecGetArrayRead(X,&x));
-  lsum[0]=lsum[1]=0.0;
-  lminmax[0] = -1e30;		/* max |v| */
-  lminmax[1] = -1e30;		/* max sigma */
-  lminmax[2] = -1e30;		/* -min sigma */
-  for (i = medium->rs, j=0; i < medium->re; i++, j+=INT_RSF_DIM) {
-    v = vel_from_rsf(x[j+1],x[j+2],x[j],fault[i].mu_s,medium->v0,
-		     &d1,&d2,&d3,medium);
-    v = fabs(v);
-    if(v > lminmax[0])lminmax[0] = v;
-    if( x[j+2] > lminmax[1])lminmax[1] =  x[j+2];
-    if(-x[j+2] > lminmax[2])lminmax[2] = -x[j+2];
-    lsum[0] += x[j+3];		/* slip */
-    lsum[1] += x[j+1]/x[j+2];	/* mu */
+  if(time >= uc->monitor_tmin){
+    /* change since the last logged state */
+    PetscCall(VecNorm(X,NORM_2,&x_norm));
+    PetscCall(VecDuplicate(X,&DX));
+    PetscCall(VecWAXPY(DX,-1.0,X,uc->Xold)); /* dx = x_old - x */
+    PetscCall(VecNorm(DX,NORM_2,&dx_norm));
+    PetscCall(VecDestroy(&DX));
+    bail = PETSC_FALSE;
+    if((x_norm > 1e-15) && (dx_norm/x_norm > uc->rdx_monitor))
+      bail = PETSC_TRUE;
+    if((uc->adx_monitor > 0) && (dx_norm > uc->adx_monitor))
+      bail = PETSC_TRUE;
+    if(fabs(time - uc->old_time) > uc->dt_monitor)
+      bail = PETSC_TRUE;
+    if(bail){
+      PetscCall(TSGetTimeStep(ts,&dt));
+      PetscCall(VecGetArrayRead(X,&x));
+      lsum[0]=lsum[1]=0.0;
+      lminmax[0] = -1e30;		/* max |v| */
+      lminmax[1] = -1e30;		/* max sigma */
+      lminmax[2] = -1e30;		/* -min sigma */
+      for (i = medium->rs, j=0; i < medium->re; i++, j+=INT_RSF_DIM) {
+	v = vel_from_rsf(x[j+1],x[j+2],x[j],fault[i].mu_s,medium->v0,
+			 &d1,&d2,&d3,medium);
+	v = fabs(v);
+	if(v > lminmax[0])lminmax[0] = v;
+	if( x[j+2] > lminmax[1])lminmax[1] =  x[j+2];
+	if(-x[j+2] > lminmax[2])lminmax[2] = -x[j+2];
+	lsum[0] += x[j+3];		/* slip */
+	lsum[1] += x[j+1]/x[j+2];	/* mu */
+      }
+      PetscCall(VecRestoreArrayRead(X,&x));
+      PetscCallMPI(MPI_Reduce(lsum,gsum,2,MPIU_REAL,MPI_SUM,0,PETSC_COMM_WORLD));
+      PetscCallMPI(MPI_Reduce(lminmax,gminmax,3,MPIU_REAL,MPI_MAX,0,PETSC_COMM_WORLD));
+      if((medium->comm_rank == 0) && uc->fout_monitor){
+	fprintf(uc->fout_monitor,"%9i %20.8e %17.10f %15.8e %12.7f %15.8e %10.6f %15.8e %15.8e\n",
+		(int)step,time,time/sec_per_year,dt,
+		log10(gminmax[0]),gsum[0]/(PetscReal)medium->nrflt,
+		gsum[1]/(PetscReal)medium->nrflt,
+		gminmax[1],-gminmax[2]);
+      }
+      /* store last logged state */
+      uc->old_time = time;
+      PetscCall(VecCopy(X,uc->Xold));
+    }
   }
-  PetscCall(VecRestoreArrayRead(X,&x));
-  PetscCallMPI(MPI_Reduce(lsum,gsum,2,MPIU_REAL,MPI_SUM,0,PETSC_COMM_WORLD));
-  PetscCallMPI(MPI_Reduce(lminmax,gminmax,3,MPIU_REAL,MPI_MAX,0,PETSC_COMM_WORLD));
-  if((medium->comm_rank == 0) && rsf_monitor_out){
-    fprintf(rsf_monitor_out,"%9i %20.8e %17.10f %15.8e %12.7f %15.8e %10.6f %15.8e %15.8e\n",
-	    (int)step,time,time/sec_per_year,dt,
-	    log10(gminmax[0]),gsum[0]/(PetscReal)medium->nrflt,
-	    gsum[1]/(PetscReal)medium->nrflt,
-	    gminmax[1],-gminmax[2]);
+  /* 
+     periodic full-field output (stats line and, less frequently,
+     velocity snapshots); the decision is identical on all ranks
+     and the scatter is collective
+  */
+  if(time >= uc->next_print_time){
+    while(uc->next_print_time <= time) /* may cross several intervals in one step */
+      uc->next_print_time += medium->print_interval;
+    PetscCall(VecScatterBegin(uc->gather,X,uc->gathered,INSERT_VALUES,SCATTER_FORWARD));
+    PetscCall(VecScatterEnd(uc->gather,X,uc->gathered,INSERT_VALUES,SCATTER_FORWARD));
+    if(medium->comm_rank == 0){
+      PetscScalar *values;
+      PetscReal sum[3],vmin,vmax,vmean,vstd,smean,du1,du2,du3;
+      FILE *fout2;
+      char vel_file[STRLEN];
+      int n = medium->nrflt,ierr2;
+      PetscCall(VecGetArray(uc->gathered,&values));
+      for(sum[0]=sum[1]=sum[2]=0.,vmin=1e20,vmax=-1e20,
+	    i=0,j=0;i < n;i++,j += INT_RSF_DIM){
+	fault[i].s[STRIKE] = values[j+1]; /* shear stress */
+	fault[i].s[NORMAL] = values[j+2]; /* normal stress */
+	fault[i].u[STRIKE] = vel_from_rsf(values[j+1],values[j+2],values[j],fault[i].mu_s,
+					  medium->v0,&du1,&du2,&du3,medium);
+	if(fault[i].u[STRIKE] < vmin)vmin = fault[i].u[STRIKE];
+	if(fault[i].u[STRIKE] > vmax)vmax = fault[i].u[STRIKE];
+	sum[0] += fault[i].u[STRIKE];
+	sum[1] += fault[i].u[STRIKE] * fault[i].u[STRIKE];
+	sum[2] += values[j+3];				     /* slip */
+      }
+      vstd = (n > 1)?(sqrt(((PetscReal)n * sum[1] - sum[0]*sum[0])/((PetscReal)n*(PetscReal)(n-1)))):(0.0);
+      vmean = sum[0]/(PetscReal)n;
+      smean = sum[2]/(PetscReal)n;
+      if(uc->fout_stats)
+	fprintf(uc->fout_stats,"%.8f %e %e %e %e %e\n",time/sec_per_year,vmean,vstd,vmin,vmax,smean);
+      if(time - medium->slip_line_time > medium->slip_line_dt){
+	if(!uc->field_out){
+	  ierr2 = system("mkdir -p tmp_rsf");
+	  if(ierr2)
+	    fprintf(stderr,"rsf_TS_Monitor: WARNING: error making tmp_rsf output directory\n");
+	}
+	snprintf(vel_file,STRLEN,"tmp_rsf/vel-%012.5e-%06i-gmt",time/sec_per_year,uc->field_out);
+	fout2 = fopen(vel_file,"w");
+	if(fout2){
+	  for(i=0;i < n;i++)
+	    print_patch_geometry_and_bc(i,fault,PSXYZ_STRIKE_DISP_OUT_MODE,time,FALSE,fout2,FALSE,&du1);
+	  fclose(fout2);
+	}
+	uc->field_out++;
+	medium->slip_line_time = time;
+      }
+      PetscCall(VecRestoreArray(uc->gathered,&values));
+    }
   }
   PetscFunctionReturn(PETSC_SUCCESS);
 }
-
+/* 
+   event function, cf. myEventFunction in ode_solve_test.c: locate
+   crossings of the maximum slip velocity through the vel_event
+   threshold (in log space); evaluated collectively
+*/
+static PetscErrorCode rsf_event_function(TS ts,PetscReal t,Vec X,PetscScalar *fvalue,void *ctx)
+{
+  const PetscScalar *x;
+  struct rsf_out_ctx *uc;
+  struct med *medium;struct flt *fault;
+  PetscInt i,j;
+  PetscReal v,lvmax,gvmax,d1,d2,d3;
+  PetscFunctionBeginUser;
+  uc = (struct rsf_out_ctx *)ctx;
+  medium = uc->par->medium;fault = uc->par->fault;
+  lvmax = 0.0;
+  PetscCall(VecGetArrayRead(X,&x));
+  for (i = medium->rs, j=0; i < medium->re; i++, j+=INT_RSF_DIM) {
+    v = fabs(vel_from_rsf(x[j+1],x[j+2],x[j],fault[i].mu_s,medium->v0,&d1,&d2,&d3,medium));
+    if(v > lvmax)lvmax = v;
+  }
+  PetscCall(VecRestoreArrayRead(X,&x));
+  PetscCallMPI(MPI_Allreduce(&lvmax,&gvmax,1,MPIU_REAL,MPI_MAX,PETSC_COMM_WORLD));
+  /* hysteresis: once slipping, arrest only below vel_event * hyst,
+     which debounces phantom crossings from dense-output oscillation
+     through the near-singular coseismic acceleration */
+  fvalue[0] = log10((gvmax > 1e-300)?(gvmax):(1e-300)) -
+    log10(uc->vel_event * ((uc->slipping)?(uc->vel_event_hyst):(1.0)));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+/* 
+   log the event, cf. myPostEventFunction in ode_solve_test.c: write
+   time, onset/arrest flag, and the global state summary
+*/
+static PetscErrorCode rsf_post_event(TS ts,PetscInt nevents,PetscInt event_list[],
+				     PetscReal t,Vec X,PetscBool forwardsolve,void *ctx)
+{
+  const PetscScalar *x;
+  struct rsf_out_ctx *uc;
+  struct med *medium;struct flt *fault;
+  PetscInt i,j;
+  PetscReal v,lsum[2],gsum[2],lvmax,gvmax,d1,d2,d3;
+  const PetscReal sec_per_year = 365.25*24.*60.*60.;
+  PetscFunctionBeginUser;
+  uc = (struct rsf_out_ctx *)ctx;
+  medium = uc->par->medium;fault = uc->par->fault;
+  uc->slipping = (uc->slipping)?(PETSC_FALSE):(PETSC_TRUE); /* threshold crossed */
+  if(t >= uc->event_tmin){
+    lsum[0]=lsum[1]=0.0;lvmax = 0.0;
+    PetscCall(VecGetArrayRead(X,&x));
+    for (i = medium->rs, j=0; i < medium->re; i++, j+=INT_RSF_DIM) {
+      v = fabs(vel_from_rsf(x[j+1],x[j+2],x[j],fault[i].mu_s,medium->v0,&d1,&d2,&d3,medium));
+      if(v > lvmax)lvmax = v;
+      lsum[0] += x[j+3];	/* slip */
+      lsum[1] += x[j+1]/x[j+2];	/* mu */
+    }
+    PetscCall(VecRestoreArrayRead(X,&x));
+    PetscCallMPI(MPI_Allreduce(&lvmax,&gvmax,1,MPIU_REAL,MPI_MAX,PETSC_COMM_WORLD));
+    PetscCallMPI(MPI_Reduce(lsum,gsum,2,MPIU_REAL,MPI_SUM,0,PETSC_COMM_WORLD));
+    uc->nevent++;
+    if((medium->comm_rank == 0) && uc->fout_event){
+      fprintf(uc->fout_event,"%20.8e %17.10f %2i %12.7f %15.8e %10.6f\n",
+	      t,t/sec_per_year,(uc->slipping)?(1):(-1),
+	      log10((gvmax > 1e-300)?(gvmax):(1e-300)),
+	      gsum[0]/(PetscReal)medium->nrflt,gsum[1]/(PetscReal)medium->nrflt);
+      fflush(uc->fout_event);
+    }
+  }
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+/* 
+   set up the monitor and event tracking environment,
+   cf. init_monitor_and_event in ode_solve_test.c
+*/
+static PetscErrorCode rsf_init_monitor_and_event(struct rsf_out_ctx *uc,struct interact_ctx *par,
+						 PetscReal dt_monitor,PetscReal adx_monitor,
+						 PetscReal rdx_monitor,PetscReal monitor_tmin,
+						 PetscReal event_tmin,PetscReal vel_event,
+						 PetscReal vel_event_hyst,PetscBool track_events,
+						 PetscReal t_init,Vec X0,PetscReal vel_init)
+{
+  struct med *medium;
+  PetscFunctionBeginUser;
+  medium = par->medium;
+  uc->par = par;
+  uc->dt_monitor = dt_monitor;
+  uc->adx_monitor = adx_monitor;
+  uc->rdx_monitor = rdx_monitor;
+  uc->monitor_tmin = monitor_tmin;
+  uc->event_tmin = event_tmin;
+  uc->vel_event = vel_event;
+  uc->vel_event_hyst = vel_event_hyst;
+  uc->track_events = track_events;
+  uc->slipping = (vel_init > vel_event)?(PETSC_TRUE):(PETSC_FALSE);
+  uc->nevent = 0;
+  uc->field_out = 0;
+  uc->next_print_time = t_init;	/* fields at start, then every print_interval */
+  /* force the first monitor call to log */
+  uc->old_time = t_init - 2.0*dt_monitor;
+  uc->fout_monitor = uc->fout_stats = uc->fout_event = NULL;
+  if(medium->comm_rank == 0){
+    uc->fout_monitor = fopen("rsf_monitor.dat","w");
+    fprintf(uc->fout_monitor,"# step time[s] time[yr] dt[s] log10(max|v|[m/s]) mean_slip[m] mean_mu max_sigma[Pa] min_sigma[Pa]\n");
+    uc->fout_stats = fopen("rsf_stats.dat","w");
+    fprintf(uc->fout_stats,"# time[yr] mean_vel std_vel min_vel max_vel mean_slip\n");
+    if(uc->track_events){
+      uc->fout_event = fopen("rsf_events.dat","w");
+      fprintf(uc->fout_event,"# time[s] time[yr] onset(1)/arrest(-1) log10(max|v|[m/s]) mean_slip[m] mean_mu, |v| threshold %.3e m/s\n",
+	      uc->vel_event);
+    }
+  }
+  PetscCall(VecDuplicate(X0,&uc->Xold));
+  PetscCall(VecCopy(X0,uc->Xold));
+  /* gather context for the full-field output */
+  PetscCall(VecScatterCreateToZero(X0,&uc->gather,&uc->gathered));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+/* close output files and free work space, cf. ode_solve_test.c */
+static PetscErrorCode rsf_finalize_monitor_and_event(struct rsf_out_ctx *uc)
+{
+  struct med *medium;
+  PetscFunctionBeginUser;
+  medium = uc->par->medium;
+  if(medium->comm_rank == 0){
+    if(uc->fout_monitor)fclose(uc->fout_monitor);
+    if(uc->fout_stats)fclose(uc->fout_stats);
+    if(uc->fout_event){
+      fclose(uc->fout_event);
+      fprintf(stderr,"rsf_finalize_monitor_and_event: tracked %i events (|v| through %.3e m/s)\n",
+	      uc->nevent,uc->vel_event);
+    }
+  }
+  PetscCall(VecDestroy(&uc->Xold));
+  PetscCall(VecScatterDestroy(&uc->gather));
+  PetscCall(VecDestroy(&uc->gathered));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
 /* 
    compute the sliding velocity from tau, sigma, and state
 
