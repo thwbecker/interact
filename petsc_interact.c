@@ -126,7 +126,10 @@ PetscErrorCode calc_petsc_Isn_matrices(struct med *medium, struct flt *fault,
     */
     fprintf(stderr,"calc_petsc_Isn_matrices: core %03i/%03i: assigning HTOOL  row %5i to %5i, lm %i ln %i m %i n %i\n",
 	    medium->comm_rank,medium->comm_size,medium->rs,medium->re,lm,ln,m,n);
-    PetscCall(MatCreateHtoolFromKernel(PETSC_COMM_WORLD,lm,ln, m, n,ndim,(coords+medium->rs), (coords+medium->re),
+    /* target (row) and source (column) coordinates are the LOCAL
+       portions, each ndim entries per point (for our square matrices,
+       row and column layouts coincide) */
+    PetscCall(MatCreateHtoolFromKernel(PETSC_COMM_WORLD,lm,ln, m, n,ndim,(coords+medium->rs*ndim), (coords+medium->rs*ndim),
 				       kernel,(void *)ictx, this_mat));
  }else if(medium->use_hmatrix==2){
     /* 
@@ -137,10 +140,10 @@ PetscErrorCode calc_petsc_Isn_matrices(struct med *medium, struct flt *fault,
     fprintf(stderr,"calc_petsc_Isn_matrices: core %03i/%03i: assigning H2OPUS row %5i to %5i, lm %i ln %i m %i n %i\n",
 	    medium->comm_rank,medium->comm_size,medium->rs,medium->re,lm,ln,m,n);
 
-    PetscCall(MatCreateH2OpusFromKernel(PETSC_COMM_WORLD, lm, ln, m, n,ndim, (coords+medium->rs),
+    PetscCall(MatCreateH2OpusFromKernel(PETSC_COMM_WORLD, lm, ln, m, n,ndim, (coords+medium->rs*ndim),
 					PETSC_FALSE, h2opus_kernel,(void *)ictx,
 					medium->h2opus_eta, medium->h2opus_leafsize,
-					medium->h2opus_basisord, &medium->In));
+					medium->h2opus_basisord, this_mat));
   
   }else{
 #endif

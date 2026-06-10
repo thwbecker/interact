@@ -256,6 +256,9 @@ struct med{
   PetscMPIInt comm_size, comm_rank;
   PetscInt    rs, re, rn;
   Mat         Is,In;
+  /* preallocated work vectors for the RSF ODE right hand side
+     (created once in rsf_solve, layout matching Is/In rows) */
+  Vec         rsf_vel, rsf_tau_dot, rsf_sigma_dot;
   PetscInt use_hmatrix;		/* 0,1,2 */
   
 #ifdef USE_PETSC_HMAT

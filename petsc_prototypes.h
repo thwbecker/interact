@@ -2,6 +2,8 @@
 #include "petscts.h"
 
 PetscErrorCode rsf_ODE_RHSFunction(TS, PetscReal, Vec, Vec, void*);
+PetscErrorCode rsf_TS_Monitor(TS, PetscInt, PetscReal, Vec, void*);
+PetscErrorCode rsf_domain_check(TS, PetscReal, Vec, PetscBool*);
 
 /* kernel function */
 

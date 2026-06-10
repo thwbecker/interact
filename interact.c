@@ -107,21 +107,33 @@ PetscErrorCode GenKEntries_htools(PetscInt sdim, PetscInt M, PetscInt N,
   
   //fprintf(stderr,"GenKentries: slip %i rec %i\n",ictx->src_slip_mode,ictx->rec_stress_mode);
   get_right_slip(slip,ictx->src_slip_mode,1.0);	/* strike motion */
+  /* 
+     NOTE on convention: for MatMult(A, slip) = stress semantics (and
+     consistent with the MATHTOOL convention where the J/row indices
+     correspond to the target coordinates), rows J have to be the
+     RECEIVERS and columns K the SOURCES, i.e. 
+
+     A[J[j]][K[k]] = stress at patch J[j] due to unit slip on patch K[k]
+
+     (this was transposed before, which only shows up for non-planar
+     or otherwise non-symmetric geometries since the collocation
+     matrix is approximately symmetric for planar faults)
+  */
   for (j = 0; j < M; j++) {
     for (k = 0; k < N; k++) {
-      eval_green(ictx->fault[K[k]].x,(ictx->fault+J[j]),slip,disp,stress,&iret,
-		 GC_STRESS_ONLY,TRUE);
+      eval_green(ictx->fault[J[j]].x,(ictx->fault+K[k]),slip,disp,stress,&iret,
+		 GC_STRESS_ONLY,(J[j]==K[k])?(TRUE):(FALSE));
       if(iret != 0){
 	fprintf(stderr,"GenKentries_htools: WARNING: i=%3i j=%3i singular\n",(int)j,(int)k);
 	sval = 0.0;
       }else{
-	resolve_force(ictx->fault[K[k]].normal,stress,trac);
+	resolve_force(ictx->fault[J[j]].normal,stress,trac);
 	if(ictx->rec_stress_mode == STRIKE)
-	  sval = dotp_3d(trac,ictx->fault[K[k]].t_strike);
+	  sval = dotp_3d(trac,ictx->fault[J[j]].t_strike);
 	else if(ictx->rec_stress_mode == DIP)
-	  sval = dotp_3d(trac,ictx->fault[K[k]].t_dip);
+	  sval = dotp_3d(trac,ictx->fault[J[j]].t_dip);
 	else if(ictx->rec_stress_mode == NORMAL)
-	  sval = dotp_3d(trac,ictx->fault[K[k]].normal);
+	  sval = dotp_3d(trac,ictx->fault[J[j]].normal);
 	else{
 	  fprintf(stderr,"GenKentries_htools: receive mode %i undefined\n",ictx->rec_stress_mode);
 	  exit(-1);
