@@ -432,7 +432,7 @@ int main(int argc,char **argv)
   PetscCall(PetscFinalize());
 
 #else
-  fprintf(stderr,"%s only petsc version implemented, but not compiled as such\n",argv[0]);
+  fprintf(stderr,"%s only PETSC version implemented, but not compiled as such\n",argv[0]);
 #endif
   exit(0);
 }
