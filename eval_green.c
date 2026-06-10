@@ -32,7 +32,7 @@ void eval_green_and_project_stress_to_fault(struct flt *fault, int ireceive,
   fprintf(stderr,"add_quake_stress_3: slip: %10.3e %10.3e %10.3e evaluated at %10.3e %10.3e %10.3e \n",
 	  slip[0],slip[1],slip[2],fault[ireceive].x[0],fault[ireceive].x[1],fault[ireceive].x[2]);
 #endif
-  eval_green(fault[ireceive].x,(fault+islip),slip,u,sm,&iret,GC_STRESS_ONLY,(ireceive==islip)?(TRUE):(FALSE));
+  eval_green_at_receiver(fault,ireceive,islip,slip,u,sm,&iret,GC_STRESS_ONLY);
   if(!iret){
     /* project the stresses */
     resolve_force(fault[ireceive].normal,sm,trac); /* convert to local
@@ -85,31 +85,30 @@ void eval_green(COMP_PRECISION *x,struct flt *fault,
 /* mode type only for triangular */
 {
 #ifdef ALLOW_NON_3DQUAD_GEOM
-  COMP_PRECISION sm_loc[3][3];
-  const COMP_PRECISION alpha = -4.1; /* best fit from Noda */
   switch(fault->type){
   case POINT_SOURCE:{
     eval_point(x,fault,disp,u_global,sm_global,iret,mode);
     break;
   }
-    /* distinguish different triangular modes */
-  case TRIANGULAR:{
-    /* simple, centroid point */
-    eval_triangle_general(x,fault,disp,u_global,sm_global,iret,mode,eval_on_itself);
-    break;
-  }
-  case TRIANGULAR_M236:		/* two Noda evaluation patches */
-  case TRIANGULAR_M244:{
-    eval_tri_multi_point(x,fault,disp,u_global,sm_global,iret,mode,eval_on_itself,fault->type);
-    break;
-  }
+    /* 
+       all triangular modes: single (collocation) point evaluation at
+       the requested location x
+
+       NOTE: the Noda (2025) multi-point evaluations (M236, M244,
+       HYBR) are a property of the RECEIVER element, not of the
+       source, and are therefore handled in eval_green_at_receiver()
+       which is used for all fault-on-fault evaluations; the mixture
+       has to be applied to the contributions of ALL sources (the
+       artifact it cancels stems from the neighboring elements, cf.
+       Noda's eqs. 9-11 where the focal element does not contribute),
+       so it cannot be implemented here where only the source element
+       is known
+    */
+  case TRIANGULAR:
+  case TRIANGULAR_M236:
+  case TRIANGULAR_M244:
   case TRIANGULAR_HYBR:{
-    /* Noda eq. 38 */
-    zero_3x3_matrix(sm_global);
-    eval_tri_multi_point(x,fault,disp,u_global,sm_loc,iret,mode,eval_on_itself,TRIANGULAR_M244);
-    add_ay_to_3x3_matrix(sm_global,sm_loc,alpha);
-    eval_tri_multi_point(x,fault,disp,u_global,sm_loc,iret,mode,eval_on_itself,TRIANGULAR_M236);
-    add_ay_to_3x3_matrix(sm_global,sm_loc,(1.-alpha));
+    eval_triangle_general(x,fault,disp,u_global,sm_global,iret,mode,eval_on_itself);
     break;
   }
   case IQUAD:{
@@ -156,77 +155,107 @@ void eval_triangle_general(COMP_PRECISION *x,struct flt *fault,
   eval_triangle_nw(x,fault,slip,u,sm,giret,mode);
 #endif
 }
-/* multi-point evaluation */
-void eval_tri_multi_point(COMP_PRECISION *x,struct flt *fault,
-			  COMP_PRECISION *slip,COMP_PRECISION *u, 
-			  COMP_PRECISION sm_global[3][3],int *giret,
-			  MODE_TYPE mode, my_boolean eval_on_itself,
-			  MODE_TYPE fault_type) /* this is passed
-						   because hybrid
-						   calls this twice,
-						   else could use
-						   fault->type */
-{
-  COMP_PRECISION sm_loc[3][3],xl[3];//trac[3];
-  const COMP_PRECISION two_times_sqrt3 = 2.0*sqrt(3.0),
-    inv_three_minus_two_times_sqrt3 = 1.0/(3.0 - two_times_sqrt3);
-  
-  if(!eval_on_itself){
-    eval_triangle_general(x,fault,slip,u,sm_global,giret,mode,eval_on_itself);
-  }else{
-    zero_3x3_matrix(sm_global);
-    /* evaluate at centroid */
-    eval_triangle_general(x,fault,slip,u,sm_loc,giret,mode,eval_on_itself); 
-    if(fault_type == TRIANGULAR_M244){
-      /* implements eq. 28 of Noda */
-      //resolve_force(fault->normal,sm_loc,trac);fprintf(stderr,"%g %g %g\t%g %g %g\t%g\n",x[0],x[1],x[2],trac[0],trac[1],trac[2],-two_times_sqrt3);
-      add_ay_to_3x3_matrix(sm_global,sm_loc,-two_times_sqrt3);
-      /* */
-      calc_tri_bary_coord(fault->xn,xl,2.,4.,4.);
-      eval_triangle_general(xl,fault,slip,u,sm_loc,giret,mode,eval_on_itself); 
-      //resolve_force(fault->normal,sm_loc,trac);fprintf(stderr,"%g %g %g\t%g %g %g\t%g\n",xl[0],xl[1],xl[2],trac[0],trac[1],trac[2],1.0);
-      add_ay_to_3x3_matrix(sm_global,sm_loc,1);
-      /* */
-      calc_tri_bary_coord(fault->xn,xl,4.,2.,4.);
-      eval_triangle_general(xl,fault,slip,u,sm_loc,giret,mode,eval_on_itself);
-      //resolve_force(fault->normal,sm_loc,trac);fprintf(stderr,"%g %g %g\t%g %g %g\t%g\n",xl[0],xl[1],xl[2],trac[0],trac[1],trac[2],1.0);
-      add_ay_to_3x3_matrix(sm_global,sm_loc,1);
-      /* */
-      calc_tri_bary_coord(fault->xn,xl,4.,4.,2.);
-      eval_triangle_general(xl,fault,slip,u,sm_loc,giret,mode,eval_on_itself);
-      //resolve_force(fault->normal,sm_loc,trac);fprintf(stderr,"%g %g %g\t%g %g %g\t%g\n",xl[0],xl[1],xl[2],trac[0],trac[1],trac[2],1.0);
-      add_ay_to_3x3_matrix(sm_global,sm_loc,1);
-      /*  */
-      scale_3x3_matrix(sm_global,inv_three_minus_two_times_sqrt3);
+/* 
+   Noda (2025, EPS) multi-point receiver evaluation machinery.
 
-    }else if(fault_type == TRIANGULAR_M236){
-      /* implementa eq. 31 of Noda */
-      add_ay_to_3x3_matrix(sm_global,sm_loc,4.0);
-      /* */
-      calc_tri_bary_coord(fault->xn,xl,2.,3.,6.);
-      eval_triangle_general(xl,fault,slip,u,sm_loc,giret,mode,eval_on_itself); 
-      add_ay_to_3x3_matrix(sm_global,sm_loc,-1.);
-      /* */
-      calc_tri_bary_coord(fault->xn,xl,3.,6.,2.);
-      eval_triangle_general(xl,fault,slip,u,sm_loc,giret,mode,eval_on_itself); 
-      add_ay_to_3x3_matrix(sm_global,sm_loc,-1.);
-      /* */
-      calc_tri_bary_coord(fault->xn,xl,6.,2.,3.);
-      eval_triangle_general(xl,fault,slip,u,sm_loc,giret,mode,eval_on_itself); 
-      add_ay_to_3x3_matrix(sm_global,sm_loc,-1);
-    }else{
-      fprintf(stderr,"eval_tri_points: should only call with 244 or 236 fault type\n");
-      exit(-1);
-    }
+   get_noda_points() returns the number of evaluation points (4 for
+   M236/M244, 7 for HYBR), their normalized locations eta (such that
+   the evaluation point is sum_i xn_i/eta_i, cf. calc_tri_bary_coord),
+   and the mixing weights w; returns 0 if the receiver type does not
+   use multi-point evaluation
+*/
+static int get_noda_points(int rtype,COMP_PRECISION eta[7][3],COMP_PRECISION w[7])
+{
+  const COMP_PRECISION alpha = -4.1;	/* HYB mixing parameter, Noda eq. 38 */
+  const COMP_PRECISION two_sqrt3 = 2.0*sqrt(3.0),
+    fac = 1.0/(3.0 - 2.0*sqrt(3.0));
+  static const COMP_PRECISION eta236[4][3]={{3.,3.,3.},{2.,3.,6.},{3.,6.,2.},{6.,2.,3.}};
+  static const COMP_PRECISION eta244[4][3]={{3.,3.,3.},{2.,4.,4.},{4.,2.,4.},{4.,4.,2.}};
+  int i,j,n;
+  switch(rtype){
+  case TRIANGULAR_M236:{	/* Noda eq. 31 */
+    for(i=0;i<4;i++)
+      for(j=0;j<3;j++)
+	eta[i][j] = eta236[i][j];
+    w[0] = 4.0;w[1] = w[2] = w[3] = -1.0;
+    n = 4;
+    break;
   }
+  case TRIANGULAR_M244:{	/* Noda eq. 28 */
+    for(i=0;i<4;i++)
+      for(j=0;j<3;j++)
+	eta[i][j] = eta244[i][j];
+    w[0] = -two_sqrt3 * fac;w[1] = w[2] = w[3] = fac;
+    n = 4;
+    break;
+  }
+  case TRIANGULAR_HYBR:{	/* Noda eq. 38, sharing the centroid */
+    for(j=0;j<3;j++){
+      eta[0][j] = eta244[0][j];	          /* centroid */
+      for(i=1;i<4;i++){
+	eta[i  ][j] = eta244[i][j];
+	eta[3+i][j] = eta236[i][j];
+      }
+    }
+    w[0] = alpha * (-two_sqrt3 * fac) + (1.0-alpha) * 4.0;
+    w[1] = w[2] = w[3] = alpha * fac;
+    w[4] = w[5] = w[6] = (1.0-alpha) * (-1.0);
+    n = 7;
+    break;
+  }
+  default:
+    n = 0;
+    break;
+  }
+  return n;
+}
+#endif
+
+/* 
+   evaluate the Greens function (stress and, depending on mode,
+   displacement) of source fault isrc at the receiver fault irec
+
+   for regular patch types, this evaluates at the receiver centroid,
+   as before; for the Noda (2025) triangular multi-point types (M236,
+   M244, HYBR) of the RECEIVER, the source contribution is evaluated
+   at the receiver's multiple interior points and mixed with the Noda
+   weights - this has to be done for ALL sources (not only the
+   self-interaction) for the artifact cancellation to work, since the
+   element-scale oscillation stems from the neighboring elements
+
+   all fault-on-fault evaluations should go through this function
+*/
+void eval_green_at_receiver(struct flt *fault,int irec,int isrc,
+			    COMP_PRECISION *slip,COMP_PRECISION *u,
+			    COMP_PRECISION sm_global[3][3],int *iret,
+			    MODE_TYPE mode)
+{
+#ifdef ALLOW_NON_3DQUAD_GEOM
+  COMP_PRECISION eta[7][3],w[7],xl[3],u_loc[3],sm_loc[3][3];
+  int np,p,i;
+  np = get_noda_points((int)fault[irec].type,eta,w);
+  if(np){
+    zero_3x3_matrix(sm_global);
+    u[INT_X] = u[INT_Y] = u[INT_Z] = 0.0;
+    for(p=0;p < np;p++){
+      calc_tri_bary_coord(fault[irec].xn,xl,eta[p][0],eta[p][1],eta[p][2]);
+      eval_green(xl,(fault+isrc),slip,u_loc,sm_loc,iret,mode,
+		 (irec==isrc)?(TRUE):(FALSE));
+      if(*iret)
+	return;			/* singular evaluation */
+      add_ay_to_3x3_matrix(sm_global,sm_loc,w[p]);
+      for(i=0;i<3;i++)
+	u[i] += w[p] * u_loc[i];
+    }
+  }else{
+#endif
+    eval_green(fault[irec].x,(fault+isrc),slip,u,sm_global,iret,mode,
+	       (irec==isrc)?(TRUE):(FALSE));
+#ifdef ALLOW_NON_3DQUAD_GEOM
+  }
+#endif
 }
 
-
-
-
-
-
-#endif
 
 /* 
    same as above but assume that the faults coordinates

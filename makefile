@@ -1,21 +1,24 @@
 ################################################################################
 #
 #
-#  (C) Thorsten Becker, thwbecker@post.harvard.edu, 1999-2025
-#	with contributions from Dave May, and using a range of other source codes
-# 	including from Okada and Nikoo & Walter - see the respective source files
-# 	for detailed references.
+#  (C) Thorsten Becker, thwbecker@post.harvard.edu, 1999-2026 with
+#	contributions from Dave May, and using a range of other source
+#	codes including from Okada and Nikoo & Walter - see the
+#	respective source files for detailed references.
+# 	As of 05/2026, some additions by Claude Code. 
 #
 #  makefile for interact and related programs
 #
 #
 #################################################################################
 #
-# read through this makefile to make changes adjusting to your environment
-# (especially the PGPLOT support has to be adapted or commented out. so far
-# the sun makefiles have no PGPLOT, the SGI and LINUX files have PGPLOT support). 
+# read through this makefile to make changes adjusting to your
+# environment (especially the PGPLOT support has to be adapted or
+# commented out. so far the sun makefiles have no PGPLOT, the SGI and
+# LINUX files have PGPLOT support).
 #
-# Then type "make" and "interact -h" after succesful compilation for the help page.
+# Then type "make" and "interact -h" after succesful compilation for
+# the help page.
 #
 # 
 # for calc_eigen_from_cart_stress you need EISPACK in the modified
@@ -68,11 +71,15 @@
 #                            If this is not set, you will have to specify the flags
 #                            for the inclusion of LAPACK in the makefile.gcc files.
 #
-#  -DUSE_GEOPROJECT          use geoproject and produce code that allows for I/O - Flag should be set in makefile.geoproject
-#                            using geographic coordinates and projections. for this to
-#                            work, you will have to have GMT (www.gmt.soest.hawaii.edu)
-#                            installed - THIS USES GMT < VERSION 5 - this is set in makefile.geoproject
-# 			     which is commented out by default
+#  -DUSE_GEOPROJECT use geoproject and produce code that allows for
+#                            I/O - Flag should be set in
+#                            makefile.geoproject using geographic
+#                            coordinates and projections. for this to
+#                            work, you will have to have GMT
+#                            (www.gmt.soest.hawaii.edu) installed -
+#                            THIS USES GMT < VERSION 5 - this is set
+#                            in makefile.geoproject which is commented
+#                            out by default
 # 		             
 #
 #
@@ -345,10 +352,10 @@ LIBS_DEBUG = $(MY_LIBDIR_SPEC)$(ODIR)/     -linput.dbg -lpatchio.dbg $(TGF_LIB) 
 all: obj_directories libraries main_prog \
 	tools converters geom_converters
 
-really_all: obj_directories debug_libraries libraries main_prog \
+really_all: obj_directories debug_libraries libraries main_prog test \
 	tools converters geom_converters $(BDIR)/compress_interaction_matrix.dbg \
 	inoise analysis geographic_tools $(BDIR)/$(INTERACT_BINARY_NAME).dbg
-#	pgplot_progs 
+#	pgplot_progs block_tools
 
 main_prog: $(BDIR)/$(INTERACT_BINARY_NAME) $(BDIR)/$(INTERACT_BINARY_NAME).sgl $(BDIR)/rsf_solve
 
@@ -369,10 +376,9 @@ random_prop_tools: $(BDIR)/create_random_stress_file \
 	$(BDIR)/create_random_mu_file $(BDIR)/calc_stress_stat
 
 
-geographic_tools: $(BDIR)/blockinvert_sph $(BDIR)/geo_okada  \
-	$(BDIR)/block_checkflt $(BDIR)/block_evaluate_solution \
-	$(BDIR)/fstress2hor	$(BDIR)/fstress2eig \
-	$(BDIR)/fit_mean_stress
+block_tools: $(BDIR)/block_checkflt $(BDIR)/block_evaluate_solution 
+
+geographic_tools: $(BDIR)/fstress2hor	$(BDIR)/fstress2eig $(BDIR)/fit_mean_stress
 
 analysis: $(BDIR)/mspectral
 #$(BDIR)/patch2geom : geomview, outdated
@@ -383,7 +389,8 @@ converters: $(BDIR)/patch2xyz   $(BDIR)/patch2vtk $(BDIR)/patch2bc \
 
 geom_converters: $(BDIR)/points2patch $(BDIR)/tri2patch  $(BDIR)/patchquad2patchtri 
 
-test:    $(ODIR)/test_stuff  $(ODIR)/test_triangle_stress
+#test:    $(ODIR)/test_stuff  $(ODIR)/test_triangle_stress $(ODIR)/test_triangle_stress $(ODIR)/noda_crack_test
+test:    $(ODIR)/test_stuff   $(ODIR)/noda_crack_test
 
 matrix_test_progs: $(BDIR)/test_sparse $(BDIR)/test_optimize $(BDIR)/test_solvers \
 	$(BDIR)/ex_dense
@@ -439,12 +446,12 @@ $(BDIR)/interact_noise.$(NOISELEVEL): $(NOBJ) $(GEN_P_INC) $(LIBLIST)
 
 
 $(ODIR)/test_stuff: $(TOBJ) $(GEN_P_INC)  $(LIBLIST)  
-	$(LD) $(LDFLAGS) $(TOBJ) -o $(BDIR)/test_stuff \
-	$(LIBS) $(PGLIBS)  $(SUPERLU_LIBS)  $(SLATEC_LIBS) 
+	$(MPILD) $(LDFLAGS) $(TOBJ) -o $(BDIR)/test_stuff \
+	$(LIBS) $(PETSC_LIBS)  $(PGLIBS)  $(SUPERLU_LIBS)  $(SLATEC_LIBS) 
 
 $(ODIR)/test_triangle_stress: $(T2OBJ) $(GEN_P_INC)  $(LIBLIST)  $(TRI_GREEN_OBJS)
-	$(LD) $(LDFLAGS) $(T2OBJ) $(TRI_GREEN_OBJS) -o $(BDIR)/test_triangle_stress \
-	$(LIBS) $(PGLIBS)  $(SUPERLU_LIBS)  $(SLATEC_LIBS)  $(LDFLAGS)
+	$(MPILD) $(LDFLAGS) $(T2OBJ) $(TRI_GREEN_OBJS) -o $(BDIR)/test_triangle_stress \
+	  $(TRI_GREEN_OBJS) $(PETSC_LIBS) $(LIBS) $(PGLIBS)  $(SUPERLU_LIBS)  $(SLATEC_LIBS)  $(LDFLAGS)
 
 $(BDIR)/randomflt: $(RANDOMFLT_OBJS)  $(GEN_P_INC)  $(LIBLIST) 
 	$(MPILD) $(RANDOMFLT_OBJS) \
@@ -805,6 +812,15 @@ $(ODIR)/libpatchio.dbg.a: $(PATCH_IO_OBJS_DEBUG)
 
 $(ODIR)/libinput.dbg.a: $(INPUT_OBJS_DEBUG)
 	$(AR) rv $(ODIR)/libinput.dbg.a $(INPUT_OBJS_DEBUG)
+
+#
+# Noda multi-point receiver evaluation test (Eshelby crack)
+#
+T3OBJ = $(ODIR)/noda_crack_test.o $(INTERACT_OBJS)
+$(ODIR)/noda_crack_test: $(T3OBJ) $(GEN_P_INC)  $(LIBLIST)  $(TRI_GREEN_OBJS)
+	$(MPILD) $(LDFLAGS) $(T3OBJ) $(TRI_GREEN_OBJS) -o $(BDIR)/noda_crack_test \
+	$(PETSC_LIBS) $(LIBS) $(PGLIBS)  $(SUPERLU_LIBS)  $(SLATEC_LIBS)  $(LDFLAGS)
+
 
 #
 # source code

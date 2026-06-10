@@ -133,10 +133,10 @@ void get_2dseg_disp(float *, float *, float *, float, float, float, float, float
 void get_2dseg_stress(float [3][3], float *, float *, float, float, float, float);
 void eval_2dsegment_plane_strain_tdd(float *, struct flt *, float *, float *, float [3][3], int, int *, unsigned char);
 /* eval_green.c */
+void eval_green_at_receiver(struct flt *, int, int, float *, float *, float (*)[3], int *, MODE_TYPE);
 void eval_green_and_project_stress_to_fault(struct flt *, int, int, float *, float *);
 void eval_green(float *, struct flt *, float *, float *, float [3][3], int *, unsigned char, unsigned char);
 void eval_triangle_general(float *, struct flt *, float *, float *, float [3][3], int *, unsigned char, unsigned char);
-void eval_tri_multi_point(float *, struct flt *, float *, float *, float [3][3], int *, unsigned char, unsigned char, unsigned char);
 void eval_green_basic(float *, struct flt *, float *, float *, float [3][3], int *);
 /* eval_iquad.c */
 void eval_iquad(float *, struct flt *, float *, float *, float [3][3], int *, unsigned char);
