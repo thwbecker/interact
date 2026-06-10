@@ -146,8 +146,8 @@ void eval_green(COMP_PRECISION *x,struct flt *fault,
 #ifdef ALLOW_NON_3DQUAD_GEOM
 void eval_triangle_general(COMP_PRECISION *x,struct flt *fault,
 			   COMP_PRECISION *slip,COMP_PRECISION *u, 
-			   COMP_PRECISION sm[3][3],int *giret,MODE_TYPE mode,
-			   my_boolean is_self)
+			   COMP_PRECISION sm[3][3],int *giret,
+			   MODE_TYPE mode,my_boolean is_self)
 {
 #ifdef INT_USE_TGF_TRIANGLE
   fprintf(stderr,"eval_triangle_tgf: WARNING: not tested well\n");
@@ -168,8 +168,7 @@ void eval_triangle_general(COMP_PRECISION *x,struct flt *fault,
 static int get_noda_points(int rtype,COMP_PRECISION eta[7][3],COMP_PRECISION w[7])
 {
   const COMP_PRECISION alpha = -4.1;	/* HYB mixing parameter, Noda eq. 38 */
-  const COMP_PRECISION two_sqrt3 = 2.0*sqrt(3.0),
-    fac = 1.0/(3.0 - 2.0*sqrt(3.0));
+  const COMP_PRECISION two_sqrt3 = 2.0*sqrt(3.0),fac = 1.0/(3.0 - 2.0*sqrt(3.0));
   static const COMP_PRECISION eta236[4][3]={{3.,3.,3.},{2.,3.,6.},{3.,6.,2.},{6.,2.,3.}};
   static const COMP_PRECISION eta244[4][3]={{3.,3.,3.},{2.,4.,4.},{4.,2.,4.},{4.,4.,2.}};
   int i,j,n;
@@ -237,7 +236,7 @@ void eval_green_at_receiver(struct flt *fault,int irec,int isrc,
   COMP_PRECISION eta[7][3],w[7],xl[3],u_loc[3],sm_loc[3][3];
   int np,p,i;
   
-  switch(fault->type){
+  switch(fault[irec].type){
   case TRIANGULAR_M236:		/* triangular mixing types */
   case TRIANGULAR_M244:
   case TRIANGULAR_HYBR:
