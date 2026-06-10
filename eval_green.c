@@ -61,13 +61,13 @@ void eval_green_and_project_stress_to_fault(struct flt *fault, int ireceive,
 
    will call point, rectangle or triangle routines from here
 
-   mode type can be GC_DISP_AND_STRES, GC_DISP_ONLY, GC_STRESS_ONLY
+   mode type can be GC_DISP_AND_STRESS, GC_DISP_ONLY, GC_STRESS_ONLY
    depending on asking for displacement and stress, displacement, or
    stress only evaluation
    
-   on_element is true when called from 
-   eval_green_and_project_stress_to_fault to evaluate on
-   centroid, for example
+   on_element is true when called from
+   eval_green_and_project_stress_to_fault to evaluate on centroid, for
+   example
 
 
    the M236, M244, and HYBR evaluations are taken from 
@@ -75,6 +75,7 @@ void eval_green_and_project_stress_to_fault(struct flt *fault, int ireceive,
    Noda, H., Inconsistency of a single-point evaluation of traction on
    a fault discretized with 2 triangular elements and several improved
    methods, GJI, 2025.
+
 */
 
 
@@ -161,7 +162,7 @@ void eval_triangle_general(COMP_PRECISION *x,struct flt *fault,
    get_noda_points() returns the number of evaluation points (4 for
    M236/M244, 7 for HYBR), their normalized locations eta (such that
    the evaluation point is sum_i xn_i/eta_i, cf. calc_tri_bary_coord),
-   and the mixing weights w; returns 0 if the receiver type does not
+   and the mixing weights w; returns 1 if the receiver type does not
    use multi-point evaluation
 */
 static int get_noda_points(int rtype,COMP_PRECISION eta[7][3],COMP_PRECISION w[7])
@@ -203,8 +204,10 @@ static int get_noda_points(int rtype,COMP_PRECISION eta[7][3],COMP_PRECISION w[7
     n = 7;
     break;
   }
-  default:
-    n = 0;
+  default:			/* default, no weighting */
+    n = 1;
+    w[0] = 1.0;
+    eta[0][0] = eta[0][1] = eta[0][2] = 3.0;
     break;
   }
   return n;
@@ -233,29 +236,38 @@ void eval_green_at_receiver(struct flt *fault,int irec,int isrc,
 #ifdef ALLOW_NON_3DQUAD_GEOM
   COMP_PRECISION eta[7][3],w[7],xl[3],u_loc[3],sm_loc[3][3];
   int np,p,i;
-  np = get_noda_points((int)fault[irec].type,eta,w);
-  if(np){
-    zero_3x3_matrix(sm_global);
-    u[INT_X] = u[INT_Y] = u[INT_Z] = 0.0;
-    for(p=0;p < np;p++){
-      calc_tri_bary_coord(fault[irec].xn,xl,eta[p][0],eta[p][1],eta[p][2]);
-      eval_green(xl,(fault+isrc),slip,u_loc,sm_loc,iret,mode,
-		 (irec==isrc)?(TRUE):(FALSE));
-      if(*iret)
-	return;			/* singular evaluation */
-      add_ay_to_3x3_matrix(sm_global,sm_loc,w[p]);
-      for(i=0;i<3;i++)
-	u[i] += w[p] * u_loc[i];
+  
+  switch(fault->type){
+  case TRIANGULAR_M236:		/* triangular mixing types */
+  case TRIANGULAR_M244:
+  case TRIANGULAR_HYBR:
+    np = get_noda_points((int)fault[irec].type,eta,w);
+    if(np){
+      zero_3x3_matrix(sm_global);u[INT_X] = u[INT_Y] = u[INT_Z] = 0.0;
+      for(p=0;p < np;p++){
+	calc_tri_bary_coord(fault[irec].xn,xl,eta[p][0],eta[p][1],eta[p][2]);
+	eval_green(xl,(fault+isrc),slip,u_loc,sm_loc,iret,mode,
+		   (irec==isrc)?(TRUE):(FALSE));
+	if(*iret)
+	  return;			/* singular evaluation */
+	if(mode != GC_DISP_ONLY)
+	  add_ay_to_3x3_matrix(sm_global,sm_loc,w[p]);
+	if(mode !=  GC_STRESS_ONLY){
+	  for(i=0;i<3;i++)
+	    u[i] += w[p] * u_loc[i];
+	}
+      }
     }
-  }else{
-#endif
+    break;
+  default:
     eval_green(fault[irec].x,(fault+isrc),slip,u,sm_global,iret,mode,
 	       (irec==isrc)?(TRUE):(FALSE));
-#ifdef ALLOW_NON_3DQUAD_GEOM
   }
+#else
+  eval_green(fault[irec].x,(fault+isrc),slip,u,sm_global,iret,mode,
+	     (irec==isrc)?(TRUE):(FALSE));
 #endif
 }
-
 
 /* 
    same as above but assume that the faults coordinates
