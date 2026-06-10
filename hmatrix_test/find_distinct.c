@@ -7,7 +7,7 @@
    mainly Claude code generated but tested quite a bit, seems to work
 
  */
-#define TOLERANCE 1e-5
+#define TOLERANCE 1e-5		/* for y values */
 #define INITIAL_CAPACITY 1000
 #define MAX_LINE_LENGTH 1024
 
@@ -65,19 +65,11 @@ int compare_entries(const void *a, const void *b) {
 }
 
 int main(int argc, char *argv[]) {
-  int iflag = 0;  // Default value for n filter
-  
-  if (argc < 2 || argc > 3) {
-    fprintf(stderr, "Usage: %s <filename> [iflag]\n", argv[0]);
-    fprintf(stderr, "  iflag: integer value to filter on (default: %i)\n",
-	    iflag);
+  if (argc < 2 || argc > 2) {
+    fprintf(stderr, "Usage: %s <filename>\n", argv[0]);
     return 1;
   }
   
-  // Parse optional iflag argument
-  if (argc == 3) {
-    iflag = atoi(argv[2]);
-  }
   
   FILE *fp = fopen(argv[1], "r");
   if (!fp) {
@@ -101,7 +93,7 @@ int main(int argc, char *argv[]) {
     char y_str[64];
     
     // Parse the line - read y as string first to check for NaN
-    if (sscanf(line, "%lf %s %d", &k, y_str, &n) == 3) {
+    if (sscanf(line, "%lf %s", &k, y_str) == 2) {
       // Check if y_str is "NaN", "nan", or similar
       if (strcasecmp(y_str, "nan") == 0 || 
 	  strcasecmp(y_str, "NaN") == 0 ||
@@ -120,10 +112,7 @@ int main(int argc, char *argv[]) {
 	continue;
       }
       
-      // Only add entries where n == iflag
-      if (n == iflag) {
-	add_entry(&entries, k, y);
-      }
+      add_entry(&entries, k, y);
     }
   }
   fclose(fp);
@@ -133,7 +122,7 @@ int main(int argc, char *argv[]) {
   }
   
   if (entries.size == 0) {
-    printf("No entries with n == %d found\n", iflag);
+    printf("No entries  found\n");
     free_array(&entries);
     return 0;
   }
@@ -167,7 +156,7 @@ int main(int argc, char *argv[]) {
       j++;
     }
     
-    printf("%10.8f %d\n", current_k, distinct_y_count);
+    printf("%10.8e %d\n", current_k, distinct_y_count);
     i = j;
   }
   

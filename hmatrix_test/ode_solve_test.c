@@ -187,7 +187,7 @@ int main(int argc,char **argv)
     rtol = 1e-10;
   PetscOptionsGetInt(NULL, NULL, "-imode", &par->imode, &flag_set);
   if(!flag_set)
-    par->imode = 1;			/* 0: all eps 1,2,3: component eps >4 random */
+    par->imode = 1;			/* 0: all eps 1,2,3: component 4: from orbit eps >5 random */
   PetscOptionsGetReal(NULL, NULL, "-eps", &eps, &flag_set);
   if(!flag_set)
     eps = 8e-4;			/* for initial condition */

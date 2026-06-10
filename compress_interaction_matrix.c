@@ -11,19 +11,23 @@
 
 /*
   
-  this function serves to test dense and H matrix forward and inverse operations
+  this function serves to test dense and H matrix forward and inverse
+  operations
   
   reads in geometry file and calculates the interaction matrix, and
   then compresses it, testing forward and inverse computations
 
-  can use HTOOLS and H2OPUS Petsc options 
+  can use HTOOLS Petsc, H2OPUS  Petsc, and HACApK options 
 
   also
 
   -geom_file geom.in - for the fault geometry
   -nrandom number (default: 0) - to run a number of solves with random vectors for timing)
   -test_forward true/false (default: true) - run matrix multiplication or inversion
-  -use_h2opus if set, use that package, else, use htools
+
+  use_hmatrix: 1  HTOOLS
+               2  H2OPUS
+	       3  HACApK
   
   
 */
@@ -50,7 +54,7 @@ int main(int argc, char **argv)
   PetscInt nrandom = 0;	/* for timing tests */
   VecScatter ctx;
   PetscRandom rand_str;
-  PetscBool read_value,flg,test_forward=PETSC_TRUE,use_h2opus=PETSC_FALSE;
+  PetscBool read_value,flg,test_forward=PETSC_TRUE;
   PetscBool make_matrix_externally=PETSC_FALSE; /* make matrices here on in external routine (for testing) */
   double     target_x[3], sep_x;
   kd_node    nearest_x;
@@ -73,14 +77,17 @@ int main(int argc, char **argv)
   /* 
      start up petsc 
   */
-
+  medium->use_hmatrix = 1;
   
   /* set defaults, can always override */
-  PetscCall(PetscOptionsGetBool(NULL, NULL, "-use_h2opus", &use_h2opus,&read_value));
-  if(use_h2opus){
+  PetscCall(PetscOptionsGetInt(NULL, NULL, "-use_hmatrix", &medium->use_hmatrix,&read_value));
+  if(medium->use_hmatrix == 3){
+    /*  */
+    fprintf(stderr,"%s: setting up for HACApK\n",argv[0]);
+    
+  }else if(medium->use_hmatrix == 2){
     /*  */
     fprintf(stderr,"%s: setting up for H2OPUS\n",argv[0]);
-    medium->use_hmatrix = 2;
     
     medium->h2opus_eta = 0.6;	/*  */
     PetscCall(PetscOptionsGetReal(NULL, NULL, "-eta", &medium->h2opus_eta, NULL));
@@ -89,17 +96,19 @@ int main(int argc, char **argv)
     medium->h2opus_basisord = 8;
     PetscCall(PetscOptionsGetInt(NULL, NULL, "-basisord", &medium->h2opus_basisord, NULL));
 
-  }else{
-
+  }else if(medium->use_hmatrix == 1){
+    
     fprintf(stderr,"%s: setting up for HTOOLS\n",argv[0]);
 	
-    medium->use_hmatrix = 1;
+    
     /* how do I get those assigned internally? */
     /* HTOOLS */
     PetscCall(PetscOptionsSetValue(NULL,"-mat_htool_eta","100")); /* not sure  */
     PetscCall(PetscOptionsSetValue(NULL,"-mat_htool_epsilon","1e-3"));
     PetscCall(PetscOptionsSetValue(NULL,"-mat_htool_compressor","SVD"));
     PetscCall(PetscOptionsSetValue(NULL,"-pc_type","none"));
+  }else{
+    fprintf(stderr,"default use_hmatrix %i\n",medium->use_hmatrix);
   }
 
   
@@ -262,8 +271,8 @@ int main(int argc, char **argv)
     free(coords);
   }else{
     /* use external routines */
-    calc_petsc_Isn_matrices(medium, fault,0,1.0,0,&medium->Is); /* dense */
-    calc_petsc_Isn_matrices(medium, fault,1,1.0,0,&medium->In); /* Htools */
+    calc_petsc_Isn_matrices(medium, fault,0,                  1.0,0,&medium->Is); /* dense */
+    calc_petsc_Isn_matrices(medium, fault,medium->use_hmatrix,1.0,0,&medium->In); /* Htools or HACApK */
   }
   /* dense */
   if(n<20){

@@ -32,7 +32,8 @@
 */
 
 PetscErrorCode calc_petsc_Isn_matrices(struct med *medium, struct flt *fault,
-				       PetscInt use_hmatrix,PetscReal scale, int mode, Mat *this_mat)
+				       PetscInt use_hmatrix,PetscReal scale, int mode,
+				       Mat *this_mat)
 {
   /* context */
   struct interact_ctx ictx[1];
