@@ -34,7 +34,23 @@ CONTAINS
     integer(c_int), value, intent(in) :: nd
     type(c_ptr),value, intent(in) :: c_kernel_par   !output is c pointer
     
-    integer lrtrn
+    integer lrtrn,ierr
+    logical mpi_is_init
+    !
+    ! HACApK_init calls MPI_Comm_size/rank on MPI_COMM_WORLD; make
+    ! sure MPI is actually initialized (it is not if, e.g., PETSc was
+    ! built without MPI). NOTE: if MPI_Comm_size still fails after
+    ! this, the likely cause is that libhacapk was compiled with a
+    ! DIFFERENT MPI implementation than the one that initialized MPI
+    ! (e.g. PETSc with --download-mpich vs system OpenMPI mpifort) -
+    ! rebuild this library with the matching mpifort, e.g.
+    ! $PETSC_DIR/$PETSC_ARCH/bin/mpifort
+    !
+    call MPI_Initialized(mpi_is_init, ierr)
+    if(.not.mpi_is_init)then
+       print *,'cinit_hacapk_struct: WARNING: MPI not initialized, calling MPI_Init'
+       call MPI_Init(ierr)
+    endif
     
     allocate(hacapk_int_handle)
     

@@ -353,7 +353,7 @@ all: obj_directories libraries main_prog \
 	tools converters geom_converters
 
 really_all: obj_directories debug_libraries libraries main_prog test \
-	tools converters geom_converters $(BDIR)/compress_interaction_matrix.dbg \
+	tools converters geom_converters  \
 	inoise analysis geographic_tools $(BDIR)/$(INTERACT_BINARY_NAME).dbg
 #	pgplot_progs block_tools
 
@@ -603,13 +603,6 @@ $(BDIR)/rsf_solve: $(ODIR)/rsf_solve.o $(ODIR)/coulomb_stress.o   $(ODIR)/intera
 	-o $(BDIR)/rsf_solve $(LIBS) $(SUPERLU_LIBS) \
 			$(PETSC_LIBS) $(PGLIBS) $(SLATEC_LIBS)  $(LDFLAGS)
 
-$(BDIR)/compress_interaction_matrix.dbg: $(ODIR)/compress_interaction_matrix.dbg.o   \
-	$(ODIR)/coulomb_stress.dbg.o  \
-	$(ODIR)/interact.dbg.o $(ODIR)/petsc_interact.dbg.o $(GEN_P_INC) $(LIBLIST) 
-	$(MPILD)   $(ODIR)/compress_interaction_matrix.dbg.o  $(ODIR)/petsc_interact.dbg.o \
-	$(ODIR)/coulomb_stress.dbg.o $(ODIR)/interact.dbg.o  \
-	-o $(BDIR)/compress_interaction_matrix.dbg $(LIBS) $(SUPERLU_LIBS) \
-			$(PETSC_LIBS) $(PGLIBS) $(SLATEC_LIBS)  $(LDFLAGS)
 
 $(BDIR)/calc_design_matrix: $(ODIR)/calc_design_matrix.o  \
 	$(ODIR)/coulomb_stress.o $(GEN_P_INC) \

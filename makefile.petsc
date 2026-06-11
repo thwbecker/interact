@@ -50,5 +50,9 @@ PETSC_LIBS = -L$(PETSC_DIR)/lib/  $(PETSC_LDIR) $(PETSC_LIBADD)  # -L/disk/rh_us
 
 MPICC = $(shell pkg-config --variable=ccompiler $(PACKAGES))
 MPILD =  $(shell pkg-config --variable=fcompiler $(PACKAGES))
+# fallback if PETSc was built without fortran (--with-fc=0): fcompiler is empty
+ifeq ($(strip $(MPILD)),)
+MPILD = mpif77
+endif
 
 

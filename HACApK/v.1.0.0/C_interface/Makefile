@@ -4,9 +4,11 @@
 #Sherlock (intel MPI)
 #F90 = mpiifort -O3 -qopenmp -heap-arrays -ip -g -traceback
 
-CC=mpicc
-F90=mpifort
-F77=mpif77
+MPIDIR=$(HOME)/progs/src/petsc/build/bin/
+
+CC=$(MPIDIR)/mpicc
+F90=$(MPIDIR)/mpifort
+F77=$(MPIDIR)/mpif77
 LD=$(F90)
 
 OPT = -O3 -march=native -fno-strict-aliasing
@@ -44,5 +46,5 @@ $(ODIR)/%.o: %.c HACApK_c_interface.h
 
 
 clean:
-	rm -f $(OBJS)/*.o *.mod 
+	rm -f $(ODIR)/*.o *.mod 
 
