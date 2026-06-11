@@ -1,15 +1,7 @@
-This file contains the help page that can be extracted
-from the interact program by typing "interact -h".
-This man-page type document describes the main features,
-usage, and input as well as output formats of interact.
-
-For further assistance, refer to INSTALLATION and README.md
-
-
 interact: internal double prec, A matrix double prec
-main: initializing on 2025-07-15 11:10:14 ncore: 1
+main: initializing on 2026-06-11 00:07:18 ncore: 1
 interact: nu: 0.25000 mu: 1.000e+04 from properties.h, therefore lambda/mu: 1.00000 alpha: 0.66667
-init: compiled on Jul 12 2025 15:41:17, running in serial
+init: compiled on Jun 11 2026 00:04:39, running in serial
 
 Interact: calculate fault stresses and displacements in a half space or in 2-D
           using a boundary element approach.
@@ -476,7 +468,7 @@ OPTIONS:
      This may be useful for loading simulations.
      OFF by default, if switch is set will be ON.
 
- -tv int_val	 triangle evaluation mode, 0: centroid, 1: M244, 2: M236, 3: Hybrid (default: 0)
+ -tv int_val	 triangle evaluation mode, 0: centroid, 1: M244, 2: M236, 3: Hybrid, 4: split(hybrid/triangular) (default: 0)
 
  -si saves the interaction (I) matrix during a loading simulation,
      if I is written to a file during runtime and not held in memory.
@@ -545,10 +537,11 @@ OPTIONS:
 
  -h  prints out this help message and exits to the operating system
 
-(C) Thorsten Becker, thwbecker@post.harvard.edu, 1999 - 2025)
+(C) Thorsten Becker, thwbecker@post.harvard.edu, 1999 - 2026)
     interact - boundary element code for elastic half-spaces
     3-D quad dislocationS based on Okada (BSSA, 1992).
     3-D triangular dislocations based on Nikkhoo and Walter (GJI, 2015).
+    Triangular dislocations integration modifications based on Noda (EPS, 2015).
     2-D segment slip solution from Crouch and Starfield (1973).
     May include routines based on copyrighted software of others.
     Distributed under the GNU public license, see "COPYING".

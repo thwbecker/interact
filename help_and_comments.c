@@ -709,11 +709,12 @@ void phelp(void)
   PE("");
   PE(" -h  prints out this help message and exits to the operating system");
   PE("");
-  PE("(C) Thorsten Becker, thwbecker@post.harvard.edu, 1999 - 2025)");
+  PE("(C) Thorsten Becker, thwbecker@post.harvard.edu, 1999 - 2026)");
   PE("    interact - boundary element code for elastic half-spaces");
   PE("    3-D quad dislocationS based on Okada (BSSA, 1992).");
 #ifdef ALLOW_NON_3DQUAD_GEOM
   PE("    3-D triangular dislocations based on Nikkhoo and Walter (GJI, 2015).");
+  PE("    Triangular dislocations integration modifications based on Noda (EPS, 2015).");
   PE("    2-D segment slip solution from Crouch and Starfield (1973).");
 #endif
 

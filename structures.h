@@ -170,8 +170,8 @@ struct med{
   MODE_TYPE tri_eval_mode;    /* 
 				 0: (default) plain centroid evaluation (CTR) for all triangular
 				 patches, in operators and evaluations alike
-				 1: Noda M236 multi-point evaluation used throughout
-				 2: Noda M244 multi-point evaluation used throughout
+				 1: Noda M244 multi-point evaluation used throughout
+				 2: Noda M236 multi-point evaluation used throughout
 				 3: Noda HYB  multi-point evaluation used throughout
 				 4: split scheme: single-point (CTR) when assembling operators that
 				 are solved for slip (multi_point_eval == FALSE at the call

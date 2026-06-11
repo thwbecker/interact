@@ -290,7 +290,7 @@ singular value will be set to zero
 
   0: regular rectangular (Okada) patch
   10: point source
-  20: triangular (+1, +2, +3 for different modes
+  20: triangular (+1, +2, +3, +4 for different modes
   
   30: 2-D segment, will automatically switch to 2-D mode
   40: like 3, but plane stress instead of plane strain
@@ -303,7 +303,7 @@ singular value will be set to zero
 #define TRIANGULAR_M244 21
 #define TRIANGULAR_M236 22
 #define TRIANGULAR_HYBR 23
-#define TRIANGULAR_MIXED 24
+#define TRIANGULAR_MIXED 24	/* this cannot go higher than 29! */
 
 #define TWO_DIM_SEGMENT_PLANE_STRAIN 30
 #define TWO_DIM_SEGMENT_PLANE_STRESS 40
