@@ -42,7 +42,7 @@ the opmode flag determines the output format, see interact.h
 
 */
 
-my_boolean read_points_local(COMP_PRECISION *,int *, my_boolean , FILE *);
+
 
 int main(int argc, char **argv)
 {
@@ -96,11 +96,11 @@ int main(int argc, char **argv)
     fprintf(stderr," adjusting area");
   else
     fprintf(stderr," area unadjusted");
-  fprintf(stderr,", spacing %g, use code: %i\n",dx,use_code);
+  fprintf(stderr,", spacing %g, use code %i, iquad: %i\n",dx,use_code,iquad);
 
   medium->nrflt=0;
   nrpatches=0;
-  while(read_points_local(x,&code, use_code, stdin)){
+  while(read_points_local(x,&code, use_code, stdin)==4){
     for(i=0;i<4;i++)
       if(x[i*3+INT_Z] > 0.0){
 	fprintf(stderr,"%s: rectangle %i: point %i: z should be <= 0 (%g, %g, %g)\n",
@@ -114,9 +114,9 @@ int main(int argc, char **argv)
     if(iquad){
       for(i=0;i<3;i++){
 	xc[i]=0;
-	for(j=0;j<4;j++)
+	for(j=0;j <4;j++)
 	  xc[i] += x[j*3+i];
-	xc[i]/=4.0;
+	xc[i] /= 4.0;
       }
       /* pass through */
       fprintf(stdout,"%19.12e %19.12e %19.12e %10.6f %10.6f %19.12e %19.12e %6i ",
@@ -154,26 +154,23 @@ int main(int argc, char **argv)
 	  argv[0],medium->nrflt,nrpatches,(int)iquad);
   exit(0);
 }
-my_boolean read_points_local(COMP_PRECISION *x,int *code, my_boolean read_code, FILE *in)
-{
-  my_boolean ok=FALSE;
-  int i=0,c=0;
-  if(read_code){
-    while((fscanf(stdin,THREE_CPI_FORMAT,(x+INT_X+i*3),(x+INT_Y+i*3),(x+INT_Z+i*3),code)==4)&&(c<16)){
-      c+=4;i++;
-    }
-    if(c == 16)
-      ok = TRUE;
-  }else{
-    while((fscanf(stdin,THREE_CP_FORMAT,(x+INT_X+i*3),(x+INT_Y+i*3),(x+INT_Z+i*3))==3)&&(c<12)){
 
-      i++;c+=3;
-      //fprintf(stderr,"%i %i\n",i,c);
+int read_points_local(COMP_PRECISION *x,int *code, my_boolean read_code, FILE *in)
+{
+  int i,j;
+  for(i=0;i<4;i++){
+    for(j=0;j < 3;j++){
+      if(fscanf(in,ONE_CP_FORMAT,(x+i*3+j))!=1){
+	return FALSE;
+      }
     }
-    if(c == 12)
-      ok = TRUE;
+    if(read_code){
+      if(fscanf(in,"%i",code)!=1){
+	return FALSE;
+      }
+    }
   }
-  return ok;
+  return i;
 }
 
 

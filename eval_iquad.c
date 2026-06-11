@@ -28,6 +28,7 @@
  output is u_global (displacements) and sm_global
  (stress matrix)
 
+ this is motivated by work by T. Hori and colleagues
 
 
 */

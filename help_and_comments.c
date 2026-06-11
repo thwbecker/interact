@@ -94,7 +94,7 @@ void phelp(void)
   PE("");
   PE("      WARNING: not fully tested.");
   PE("");
- PE("    - irregular quad in half-space:");
+  PE("    - irregular quad in half-space:");
   PE("      If ONLY fault half-width is negative, then the patch is an irregular quad node element.");
   PE("      In this case, x, y, z, have no meaning but will be reassigned from the centroid.");
   PE("      strike and dip will also be recomputed from element local g and h vectors, and length and width");

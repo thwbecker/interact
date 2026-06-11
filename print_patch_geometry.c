@@ -160,22 +160,22 @@ int print_patch_geometry_and_bc(int flt_offset,struct flt *fault,
       lfac = fault[flt_offset].l * 0.2;
       for(l=0;l<3;l++)
 	x[l] = vertex[0*3+l] + fault[flt_offset].normal[l] * lfac;
-      fprintf(out,"%20.15e %20.15e %20.15e\n",x[INT_X]/CHAR_FAULT_DIM,x[INT_Y]/CHAR_FAULT_DIM,x[INT_Z]/CHAR_FAULT_DIM);
+      fprintf(out,"%22.15e %22.15e %22.15e\n",x[INT_X]/CHAR_FAULT_DIM,x[INT_Y]/CHAR_FAULT_DIM,x[INT_Z]/CHAR_FAULT_DIM);
       for(l=0;l<3;l++)
 	x[l] = vertex[0*3+l] - fault[flt_offset].normal[l] * lfac;
-      fprintf(out,"%20.15e %20.15e %20.15e\n",x[INT_X]/CHAR_FAULT_DIM,x[INT_Y]/CHAR_FAULT_DIM,x[INT_Z]/CHAR_FAULT_DIM);
+      fprintf(out,"%22.15e %22.15e %22.15e\n",x[INT_X]/CHAR_FAULT_DIM,x[INT_Y]/CHAR_FAULT_DIM,x[INT_Z]/CHAR_FAULT_DIM);
       for(l=0;l<3;l++)
 	x[l] = vertex[0*3+l];
-      fprintf(out,"%20.15e %20.15e %20.15e\n",x[INT_X]/CHAR_FAULT_DIM,x[INT_Y]/CHAR_FAULT_DIM,x[INT_Z]/CHAR_FAULT_DIM);
+      fprintf(out,"%22.15e %22.15e %22.15e\n",x[INT_X]/CHAR_FAULT_DIM,x[INT_Y]/CHAR_FAULT_DIM,x[INT_Z]/CHAR_FAULT_DIM);
       for(l=0;l<3;l++)
 	x[l] = vertex[1*3+l];
-      fprintf(out,"%20.15e %20.15e %20.15e\n",x[INT_X]/CHAR_FAULT_DIM,x[INT_Y]/CHAR_FAULT_DIM,x[INT_Z]/CHAR_FAULT_DIM);
+      fprintf(out,"%22.15e %22.15e %22.15e\n",x[INT_X]/CHAR_FAULT_DIM,x[INT_Y]/CHAR_FAULT_DIM,x[INT_Z]/CHAR_FAULT_DIM);
       for(l=0;l<3;l++)
 	x[l] = vertex[1*3+l] + fault[flt_offset].normal[l] * lfac;
-      fprintf(out,"%20.15e %20.15e %20.15e\n",x[INT_X]/CHAR_FAULT_DIM,x[INT_Y]/CHAR_FAULT_DIM,x[INT_Z]/CHAR_FAULT_DIM);
+      fprintf(out,"%22.15e %22.15e %22.15e\n",x[INT_X]/CHAR_FAULT_DIM,x[INT_Y]/CHAR_FAULT_DIM,x[INT_Z]/CHAR_FAULT_DIM);
       for(l=0;l<3;l++)
 	x[l] = vertex[1*3+l] - fault[flt_offset].normal[l] * lfac;
-      fprintf(out,"%20.15e %20.15e %20.15e\n",x[INT_X]/CHAR_FAULT_DIM,x[INT_Y]/CHAR_FAULT_DIM,x[INT_Z]/CHAR_FAULT_DIM);
+      fprintf(out,"%22.15e %22.15e %22.15e\n",x[INT_X]/CHAR_FAULT_DIM,x[INT_Y]/CHAR_FAULT_DIM,x[INT_Z]/CHAR_FAULT_DIM);
       break;
     }
     case IQUAD:
@@ -189,7 +189,7 @@ int print_patch_geometry_and_bc(int flt_offset,struct flt *fault,
 	for(k=0;k < ncon;k++){
 	  for(l=0;l<3;l++){
 	    if(fabs(vertex[node_number_of_subelement((fault+flt_offset),k, i)*3+l]/CHAR_FAULT_DIM) > EPS_COMP_PREC)
-	      fprintf(out,"%20.15e ",vertex[node_number_of_subelement((fault+flt_offset),k, i)*3+l]/CHAR_FAULT_DIM);
+	      fprintf(out,"%22.15e ",vertex[node_number_of_subelement((fault+flt_offset),k, i)*3+l]/CHAR_FAULT_DIM);
 	    else
 	      fprintf(out,"0.0 ");
 	  }
@@ -209,10 +209,10 @@ int print_patch_geometry_and_bc(int flt_offset,struct flt *fault,
 	fprintf(out,"> -Z%e\n",fault[flt_offset].u[STRIKE]);
       ncon = ncon_of_subpatch((fault+flt_offset),0);
       for(k=0;k < ncon;k++){
-	//fprintf(stderr,"%i/%i %20.15e %20.15e %20.15e\n",k,ncon,vertex[k*3+0],vertex[k*3+1],vertex[k*3+2]);
+	//fprintf(stderr,"%i/%i %22.15e %22.15e %22.15e\n",k,ncon,vertex[k*3+0],vertex[k*3+1],vertex[k*3+2]);
 	for(l=0;l<3;l++){
 	  if(fabs(vertex[k*3+l]/CHAR_FAULT_DIM) > EPS_COMP_PREC)
-	    fprintf(out,"%20.15e ",vertex[k*3+l]/CHAR_FAULT_DIM);
+	    fprintf(out,"%22.15e ",vertex[k*3+l]/CHAR_FAULT_DIM);
 	  else
 	    fprintf(out,"0.0 ");
 	}
@@ -229,7 +229,7 @@ int print_patch_geometry_and_bc(int flt_offset,struct flt *fault,
       for(l=0;l<3;l++){
 	if(fabs(vertex[k*3+l]/CHAR_FAULT_DIM)>
 	   EPS_COMP_PREC)
-	  fprintf(out,"%20.15e ",vertex[k*3+l]/CHAR_FAULT_DIM);
+	  fprintf(out,"%22.15e ",vertex[k*3+l]/CHAR_FAULT_DIM);
 	else
 	  fprintf(out,"0.0 ");
       }
@@ -247,9 +247,9 @@ int print_patch_geometry_and_bc(int flt_offset,struct flt *fault,
       for(l=0;l<3;l++){
 	if(fabs(vertex[k*3+l]/CHAR_FAULT_DIM)>
 	   EPS_COMP_PREC)
-	  fprintf(out,"%20.15e ",vertex[k*3+l]/CHAR_FAULT_DIM);
+	  fprintf(out,"%22.15e ",vertex[k*3+l]/CHAR_FAULT_DIM);
 	else
-	  fprintf(out,"0 ");
+	  fprintf(out,"%22.15e ",0.);
       }
       fprintf(out,"\n");
     }

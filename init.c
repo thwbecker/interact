@@ -530,7 +530,7 @@ void init_parameters(char **argv, int argc, my_boolean *read_fault_properties,
     }else if(strcmp(argv[i],"-tv")==0){// tri eval mode
       advance_argument(&i,argc,argv);
       sscanf(argv[i],"%i",&itmp);
-      if((itmp < 0) || (itmp >TRIANGULAR_HYBR -TRIANGULAR )){
+      if((itmp < 0) || (itmp > TRIANGULAR_HYBR - TRIANGULAR )){
 	fprintf(stderr,"init_parameters: tri eval mode %i out of bounds\n",itmp);
 	exit(-1);
       }

@@ -670,7 +670,7 @@ void flush_moment_stack(struct med *medium)
   for(i=0;i<medium->nrgrp;i++)
     if(medium->fault_group[i].moment != 0.0){
       fprintf(medium->cevents_out,
-	      "%20.15e %5i %10.3e %10.3e\t%10.3e %10.3e %10.3e\t%10.3e %10.3e %10.3e\t%10.3e %10.3e %10.3e\n",
+	      "%22.15e %5i %10.3e %10.3e\t%10.3e %10.3e %10.3e\t%10.3e %10.3e %10.3e\t%10.3e %10.3e %10.3e\n",
 	      medium->old_moment_time,i,// time of old group activation
 	      medium->fault_group[i].moment,// temporaty group moment release
 	      medium->total_moment,// total moment at old time
@@ -688,7 +688,7 @@ void flush_moment_stack(struct med *medium)
 	      medium->fault_group[i].cent[INT_Z]/medium->fault_group[i].sarea);
       if(medium->debug)
 	fprintf(stderr,
-		"event: %20.15e %5i %10.3e %10.3e %10.3e %10.3e %10.3e %10.3e %10.3e %10.3e %10.3e %10.3e\n",
+		"event: %22.15e %5i %10.3e %10.3e %10.3e %10.3e %10.3e %10.3e %10.3e %10.3e %10.3e %10.3e\n",
 		medium->old_moment_time,i,// time of old group activation
 		medium->fault_group[i].moment,// temporary group moment release
 		// weighted slip according to current slip area

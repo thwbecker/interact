@@ -416,7 +416,7 @@ void four1(float *, int, int);
 /* plotevents.c */
 /* plotting.c */
 /* points2patch.c */
-unsigned char read_points_local(float *, int *, unsigned char, FILE *);
+int read_points_local(float *, int *, unsigned char, FILE *);
 /* print_patch_geometry.c */
 int print_patch_geometry_and_bc(int, struct flt *, int, float, unsigned char, FILE *, unsigned char, float *);
 /* project_stress.c */
