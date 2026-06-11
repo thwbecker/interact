@@ -19,6 +19,7 @@
 #ifdef USE_PETSC
 #include "petsc_prototypes.h"
 
+
 /* 
    
    compute fixed slip interaction matrices
@@ -57,13 +58,29 @@ PetscErrorCode calc_petsc_Isn_matrices(struct med *medium, struct flt *fault,
   m = n = medium->nrflt;
 #ifdef USE_PETSC_HMAT
   if(medium->use_hmatrix == 1){	/* htools */
+    /* 
+       production default from compress_interaction_matrix testing
+       (June 2026): sympartialACA and eta=10 (both PETSc defaults) are
+       the reliable, quasi-linear-assembly choice; epsilon 1e-6
+       reproduces dense event onsets to ~5e-4 s in two-fault
+       quasi-dynamic cycles (1e-4 shifts onsets by O(100 s) and can
+       restructure rupture sequences). only applied if not given on
+       the command line
+    */
+    {
+      PetscBool eflg;
+      PetscCall(PetscOptionsHasName(NULL,NULL,"-mat_htool_epsilon",&eflg));
+      if(!eflg)
+	PetscCall(PetscOptionsSetValue(NULL,"-mat_htool_epsilon","1e-6"));
+    }
     coords = (PetscReal *)realloc(coords,sizeof(PetscReal)*ndim*m);
     for(i=0;i < m;i++)		/* all sources or receiveer coordinates  */
       for(k=0;k < ndim;k++)
 	coords[i*ndim+k] = fault[i].x[k];
 
   }else if(medium->use_hmatrix == 2){	/* H2OPUS */
-    fprintf(stderr,"calc_petsc_Isn_matrices: H2OPUS not implemented yet\n");
+    fprintf(stderr,"calc_petsc_Isn_matrices: H2OPUS not implemented (and WARNING: h2opus sampling-based\n");
+    fprintf(stderr,"calc_petsc_Isn_matrices: construction assumes a SYMMETRIC operator, see compress_interaction_matrix)\n");
     exit(-1);
   }else{
 #else
@@ -140,10 +157,15 @@ PetscErrorCode calc_petsc_Isn_matrices(struct med *medium, struct flt *fault,
     fprintf(stderr,"calc_petsc_Isn_matrices: core %03i/%03i: assigning H2OPUS row %5i to %5i, lm %i ln %i m %i n %i\n",
 	    medium->comm_rank,medium->comm_size,medium->rs,medium->re,lm,ln,m,n);
 
+#if defined(PETSC_HAVE_H2OPUS)
     PetscCall(MatCreateH2OpusFromKernel(PETSC_COMM_WORLD, lm, ln, m, n,ndim, (coords+medium->rs*ndim),
 					PETSC_FALSE, h2opus_kernel,(void *)ictx,
 					medium->h2opus_eta, medium->h2opus_leafsize,
 					medium->h2opus_basisord, this_mat));
+#else
+    fprintf(stderr,"calc_petsc_Isn_matrices: H2OPUS requested but PETSc was built without h2opus\n");
+    exit(-1);
+#endif
   
   }else{
 #endif

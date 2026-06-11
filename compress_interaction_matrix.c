@@ -29,7 +29,67 @@
                2  H2OPUS
 	       3  HACApK
   
-  
+  notes from accuracy and performance testing (June 2026; two vertical
+  fault groups offset in x, strike-stress operator, half-space Okada,
+  regular makefault grids, N = 400 / 1600 / 6400 patches):
+
+  HTOOL (-use_hmatrix 1):
+  - index-based kernel interface, exact fit for patch-pair Green's
+    functions
+  - forward matvec error tracks -mat_htool_epsilon faithfully, e.g. at
+    N=400: 8.4e-5 (eps 1e-3), 4.7e-6 (1e-4), 3.6e-10 (1e-6), 1e-15
+    (1e-8); at eps 1e-8 the compression ratio reaches 1, i.e. the H
+    matrix degenerates to dense
+  - sympartialACA (PETSc default) vs SVD compressor: ACA errors are
+    2-10x looser at the same epsilon with similar compression but much
+    cheaper assembly of large admissible blocks (quasi-linear vs
+    O(N^2): at N=10000 and matched ~1e-4 error, ACA assembly 19 s vs
+    fullACA 116 s, SVD worse still)
+  - IMPORTANT eta caveat for sympartialACA: large eta admits big,
+    marginally separated blocks on which partial pivoting can
+    mis-converge (the strike-stress kernel's quadrant sign structure
+    produces near-zero pivot rows); at N=10000, eps 3e-5 gave 3.1e-4
+    error with eta=100 but 8.8e-6 with eta=10 at the same assembly
+    cost. use eta=10 (the PETSc default) with sympartialACA and
+    choose eps ~3x below the error target as safety factor; verify
+    with one run of this tool per new geometry class
+  - compression ratio / matvec speedup vs dense (ACA, eps 1e-6 / 1e-3):
+      N=1600: 1.7-3.1x / 1.9-4.7x
+      N=6400: 3.8-8.7x / 3.5-8.2x
+    roughly doubling per 4x in N, consistent with O(N log N)
+    asymptotics; recommended config (sympartialACA, eta 10, eps 3e-5)
+    at N=10000: error 8.8e-6, assembly 19 s, matvec speedup 5.1x
+  - unpreconditioned KSP solve agrees with dense LU to ~2e-6 relative
+    but is slower at these N (HPDDM / hierarchical preconditioning
+    would be needed if inverse solves ever matter)
+
+  H2OPUS (-use_hmatrix 2):
+  - has NO index interface: MatCreateH2OpusFromKernel evaluates the
+    kernel by Chebyshev interpolation at arbitrary points inside the
+    cluster bounding boxes, which is incompatible with patch-pair
+    Green's functions - the kdtree nearest-patch mapping yields a
+    piecewise constant surrogate whose polynomial interpolation has
+    O(1) errors in all admissible blocks (~57% matvec error)
+  - construction therefore uses MatCreateH2OpusFromMat (HARA, i.e.
+    hierarchical randomized sampling of the assembled dense operator),
+    which in this h2opus version is only implemented for SYMMETRIC
+    matrices: the H matrix approximates (K+K^T)/2, and the measured
+    operator asymmetry |K-K^T|_F/|K|_F ~ 4-8e-4 sets an irreducible
+    error floor
+  - measured matvec error 2.3-2.6e-3 at N=400-6400; needs
+    -mat_h2opus_maxrank >= 256 for N >= 1600 (the default 64 truncates
+    blocks and gave 3.3e-2 error at N=1600 with WORSE memory use than
+    maxrank 256)
+  - matvec speedup vs dense: 1.2x (N=1600), 3.9x (N=6400)
+
+  conclusion: HTOOL is the production choice for the non-symmetric
+  interaction operator; H2OPUS is usable for symmetric problems or
+  rough exploration. for quasi-dynamic rsf_solve earthquake cycles,
+  operator errors at the 1e-4 level already shift event onsets by
+  O(100 s) and can restructure two-fault rupture sequences, so the
+  h2opus ~2.5e-3 symmetrization floor is not production-viable there,
+  while htool at eps 1e-6 reproduces dense event onsets to ~5e-4 s
+
 */
 
 int main(int argc, char **argv)
@@ -88,6 +148,10 @@ int main(int argc, char **argv)
   }else if(medium->use_hmatrix == 2){
     /*  */
     fprintf(stderr,"%s: setting up for H2OPUS\n",argv[0]);
+    fprintf(stderr,"%s: WARNING: H2OPUS construction ASSUMES A SYMMETRIC OPERATOR (not mutable:\n",argv[0]);
+    fprintf(stderr,"%s: WARNING: this h2opus only implements sampling-based construction for symmetric\n",argv[0]);
+    fprintf(stderr,"%s: WARNING: matrices); the H matrix approximates (K+K^T)/2, and the operator\n",argv[0]);
+    fprintf(stderr,"%s: WARNING: asymmetry printed below sets an irreducible error floor\n",argv[0]);
     
     medium->h2opus_eta = 0.6;	/*  */
     PetscCall(PetscOptionsGetReal(NULL, NULL, "-eta", &medium->h2opus_eta, NULL));
@@ -103,10 +167,15 @@ int main(int argc, char **argv)
     
     /* how do I get those assigned internally? */
     /* HTOOLS */
-    PetscCall(PetscOptionsSetValue(NULL,"-mat_htool_eta","100")); /* not sure  */
-    PetscCall(PetscOptionsSetValue(NULL,"-mat_htool_epsilon","1e-3"));
-    PetscCall(PetscOptionsSetValue(NULL,"-mat_htool_compressor","SVD"));
-    PetscCall(PetscOptionsSetValue(NULL,"-pc_type","none"));
+    /* defaults, only applied if not given on the command line */
+    PetscCall(PetscOptionsHasName(NULL,NULL,"-mat_htool_eta",&flg));
+    if(!flg)PetscCall(PetscOptionsSetValue(NULL,"-mat_htool_eta","100")); /* not sure  */
+    PetscCall(PetscOptionsHasName(NULL,NULL,"-mat_htool_epsilon",&flg));
+    if(!flg)PetscCall(PetscOptionsSetValue(NULL,"-mat_htool_epsilon","1e-3"));
+    PetscCall(PetscOptionsHasName(NULL,NULL,"-mat_htool_compressor",&flg));
+    if(!flg)PetscCall(PetscOptionsSetValue(NULL,"-mat_htool_compressor","SVD"));
+    PetscCall(PetscOptionsHasName(NULL,NULL,"-pc_type",&flg));
+    if(!flg)PetscCall(PetscOptionsSetValue(NULL,"-pc_type","none"));
   }else{
     fprintf(stderr,"default use_hmatrix %i\n",medium->use_hmatrix);
   }
@@ -178,6 +247,7 @@ int main(int argc, char **argv)
     */
     fprintf(stderr,"%s: core %03i/%03i: assigning dense  row %5i to %5i\n",
 	    argv[0],medium->comm_rank,medium->comm_size,medium->rs,medium->re);
+    PetscTime(&t0);
     for(j=medium->rs;j <  medium->re;j++){// rupturing faults for this CPU
       GenKEntries_htools(ndim,1,n,&j, col_idx, avalues,ictx);
       PetscCall(MatSetValues(medium->Is, 1, &j, n, col_idx,avalues, INSERT_VALUES));
@@ -187,6 +257,9 @@ int main(int argc, char **argv)
     
     PetscCall(MatAssemblyBegin(medium->Is, MAT_FINAL_ASSEMBLY));
     PetscCall(MatAssemblyEnd(medium->Is, MAT_FINAL_ASSEMBLY));
+    PetscTime(&t1);
+    HEADNODE
+      fprintf(stderr,"%s: dense assembly took %12.4f s\n",argv[0],t1-t0);
 
     if(medium->use_hmatrix){	/* for all, get coordinates */
       /* 
@@ -234,6 +307,7 @@ int main(int argc, char **argv)
     /* here, we're using the normal stress interaction matrix for the
        H version of Is */
     
+    PetscTime(&t0);
     PetscCall(MatCreate(PETSC_COMM_WORLD, &medium->In));
     PetscCall(MatSetSizes(medium->In, PETSC_DECIDE, PETSC_DECIDE, m, n));  
     
@@ -254,20 +328,62 @@ int main(int argc, char **argv)
 	    rs,re,lm,ln,m,n);
     if(medium->use_hmatrix == 1){
       PetscCall(MatCreateHtoolFromKernel(PETSC_COMM_WORLD,lm,ln, m, n,
-					 ndim,(coords+rs), (coords+re), htools_kernel, ictx, &medium->In));
+					 ndim,(coords+rs*ndim), (coords+rs*ndim), htools_kernel, ictx, &medium->In));
     }else{
-      PetscCall(MatCreateH2OpusFromKernel(PETSC_COMM_WORLD, lm, ln, m, n,
-					  ndim, (coords+rs), PETSC_FALSE, h2opus_kernel,ictx,
-					  medium->h2opus_eta, medium->h2opus_leafsize,
-					  medium->h2opus_basisord, &medium->In));
+#if defined(PETSC_HAVE_H2OPUS)
+      /* 
+	 construct the H2 matrix by hierarchical randomized sampling of
+	 the assembled dense operator (HARA), rather than from the
+	 kernel callback: the FromKernel interface evaluates the kernel
+	 by Chebyshev interpolation at arbitrary points within cluster
+	 bounding boxes, which is incompatible with patch-pair Green's
+	 functions that are only defined at element centers (the nearest
+	 neighbor mapping yields a piecewise constant surrogate whose
+	 polynomial interpolation has O(1) errors in all admissible
+	 blocks); sampling-based construction only requires matrix
+	 vector products and reproduces the true BEM operator to
+	 -mat_h2opus_rtol (default 1e-4)
+      */
+      PetscCall(MatCreateH2OpusFromMat(medium->Is, ndim, coords, PETSC_FALSE,
+				       medium->h2opus_eta, medium->h2opus_leafsize,
+				       PETSC_DECIDE, PETSC_DECIDE, PETSC_DECIDE,
+				       &medium->In));
+#else
+      fprintf(stderr,"%s: H2OPUS requested but PETSc was built without h2opus\n",argv[0]);
+      exit(-1);
+#endif
     }
-    PetscCall(MatSetOption(medium->In, MAT_SYMMETRIC, PETSC_FALSE));      
+    if(medium->use_hmatrix == 2){
+      /* 
+	 this version of h2opus only implements sampling-based
+	 construction for symmetric matrices (hlru_sym assertion); the
+	 result therefore approximates the symmetrized operator
+	 (K+K^T)/2 - check the printed operator asymmetry to judge the
+	 error this introduces
+      */
+      Mat KT;
+      PetscReal nrmK,nrmD;
+      PetscCall(MatTranspose(medium->Is,MAT_INITIAL_MATRIX,&KT));
+      PetscCall(MatNorm(medium->Is,NORM_FROBENIUS,&nrmK));
+      PetscCall(MatAXPY(KT,-1.0,medium->Is,SAME_NONZERO_PATTERN));
+      PetscCall(MatNorm(KT,NORM_FROBENIUS,&nrmD));
+      HEADNODE
+	fprintf(stderr,"%s: operator asymmetry |K-K^T|_F/|K|_F = %.6e (h2opus approximates the symmetrized operator)\n",
+		argv[0],(double)(nrmD/nrmK));
+      PetscCall(MatDestroy(&KT));
+      PetscCall(MatSetOption(medium->In, MAT_SYMMETRIC, PETSC_TRUE));
+    }else{
+      PetscCall(MatSetOption(medium->In, MAT_SYMMETRIC, PETSC_FALSE));
+    }
     
 
     PetscCall(MatSetFromOptions(medium->In));
     
     PetscCall(MatAssemblyBegin(medium->In, MAT_FINAL_ASSEMBLY));
     PetscCall(MatAssemblyEnd(medium->In, MAT_FINAL_ASSEMBLY));
+    PetscTime(&t1);
+    HEADNODE
+      fprintf(stderr,"%s: H matrix assembly took %12.4f s\n",argv[0],t1-t0);
     free(coords);
   }else{
     /* use external routines */
@@ -337,7 +453,14 @@ int main(int argc, char **argv)
     if((m<20)&&(nrandom==0))
       VecView(bh,PETSC_VIEWER_STDOUT_WORLD);
 
-    if(nrandom==0){
+    if(1){			/* accuracy of the x=1 product (random
+				   loops above are pure timing and leave
+				   b, bh from their last random x, so
+				   recompute with x=1 here) */
+      PetscCall(VecSet(x, 1.0));
+      PetscCall(VecSet(xh,1.0));
+      PetscCall(MatMult(medium->Is, x, b));
+      PetscCall(MatMult(medium->In, xh, bh));
       /* compute difference */
       PetscCall(VecDuplicate(b, &d));PetscCall(VecCopy(b, d));
   

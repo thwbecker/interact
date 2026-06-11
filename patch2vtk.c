@@ -11,7 +11,7 @@ int main(int argc, char **argv)
   struct med *medium;
   int i,j,k,l,ncon,tncon,ielmul,nvert,nel,tnvert;
   my_boolean shrink_patches=FALSE,
-    verbose=FALSE,
+    verbose=TRUE,
     attempt_read_slip=FALSE,
     remove_centroid=FALSE,
     read_slip;

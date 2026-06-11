@@ -125,12 +125,18 @@ static kd_node kdtr_find_median(kd_node start, kd_node end, int idx, int dim)
     }
     kdtr_swap(store, end - 1, dim);
 
-    /* median has duplicate values */
-    if (store->x[idx] == md->x[idx])
-    return md;
+    /* 
+       positional check: the pivot has been placed at store with the
+       partition invariant satisfied; the original value-based
+       duplicate check (store->x == md->x -> return md) returned a
+       node that could violate the partition ordering when coordinate
+       values are duplicated (as on regular grids), corrupting the
+       tree and breaking nearest neighbor searches
+    */
+    if (store == md) return md;
 
     if (store > md) end = store;
-    else            start = store;
+    else            start = store + 1;
   }
 }
 
