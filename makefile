@@ -588,7 +588,7 @@ $(BDIR)/compress_interaction_matrix: $(ODIR)/compress_interaction_matrix.o $(ODI
 	$(MPILD)   $(ODIR)/compress_interaction_matrix.o \
 	$(ODIR)/petsc_interact.o 	$(ODIR)/coulomb_stress.o $(ODIR)/interact.o  \
 	-o $(BDIR)/compress_interaction_matrix $(LIBS) $(SUPERLU_LIBS) \
-			$(PETSC_LIBS) $(PGLIBS) $(SLATEC_LIBS)  $(LDFLAGS)
+			$(PETSC_LIBS) $(HACAPK_LIBS) $(PGLIBS) $(SLATEC_LIBS)  $(LDFLAGS)
 
 $(BDIR)/petsc_simple_solve: $(ODIR)/petsc_simple_solve.o $(ODIR)/coulomb_stress.o $(ODIR)/interact.o    \
 	$(ODIR)/petsc_interact.o $(GEN_P_INC) $(LIBLIST) 

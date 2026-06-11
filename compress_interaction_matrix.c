@@ -92,6 +92,64 @@
 
 */
 
+
+#ifdef USE_HACAPK
+/* 
+   HACApK support via the C interface in HACApK/v.1.0.0/C_interface:
+   index-based kernel (a natural fit for patch-pair Green's functions,
+   unlike interpolation-based approaches), wrapped as a PETSc MATSHELL
+   so all comparison and timing machinery works unchanged.
+   build the library there first (make in that directory, or ar the
+   objects into libhacapk.a) and set HACAPK_DEFINES/HACAPK_LIBS, see
+   makefile.petsc
+*/
+extern void *cinit_hacapk_struct(int, void *);
+extern void cdeallocate_hacapk_struct(void *);
+extern void cset_hacapk_struct_coord(void *, double *, double *, double *);
+extern void cmake_hacapk_struct_hmat(void *, double);
+extern void chacapk_mult_Ax_H(void *, double *, double *);
+/* 
+   entry callback, called from m_HACApK_calc_entry_ij.f90 with 0-based
+   indices: A[i][j] = rec_stress_mode stress at receiver patch i due to
+   unit src_slip_mode slip on source patch j, identical to the dense
+   fill and the htool kernel
+*/
+double ckernel_func(int i, int j, void *par)
+{
+  struct interact_ctx *ictx = (struct interact_ctx *)par;
+  COMP_PRECISION slip[3],disp[3],stress[3][3],trac[3],sval;
+  int iret;
+  get_right_slip(slip,ictx->src_slip_mode,1.0);
+  eval_green_at_receiver(ictx->fault,i,j,slip,disp,stress,&iret,
+			 GC_STRESS_ONLY,FALSE); /* operator assembly: single-point */
+  if(iret != 0)
+    return 0.0;
+  resolve_force(ictx->fault[i].normal,stress,trac);
+  if(ictx->rec_stress_mode == STRIKE)
+    sval = dotp_3d(trac,ictx->fault[i].t_strike);
+  else if(ictx->rec_stress_mode == DIP)
+    sval = dotp_3d(trac,ictx->fault[i].t_dip);
+  else
+    sval = dotp_3d(trac,ictx->fault[i].normal);
+  return (double)sval;
+}
+/* MATSHELL multiply: y = A x through the HACApK H matrix */
+static PetscErrorCode MatMult_HACApK(Mat A, Vec x, Vec y)
+{
+  void *handle;
+  const PetscScalar *xa;
+  PetscScalar *ya;
+  PetscFunctionBeginUser;
+  PetscCall(MatShellGetContext(A,&handle));
+  PetscCall(VecGetArrayRead(x,&xa));
+  PetscCall(VecGetArray(y,&ya));
+  chacapk_mult_Ax_H(handle,(double *)xa,(double *)ya);
+  PetscCall(VecRestoreArrayRead(x,&xa));
+  PetscCall(VecRestoreArray(y,&ya));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+#endif
+
 int main(int argc, char **argv)
 {
 #ifdef USE_PETSC_HMAT
@@ -308,6 +366,35 @@ int main(int argc, char **argv)
        H version of Is */
     
     PetscTime(&t0);
+    if(medium->use_hmatrix == 3){	/* HACApK via MATSHELL */
+#ifdef USE_HACAPK
+      double *xc,*yc,*zc;
+      void *hacapk_handle;
+      PetscReal hacapk_ztol = 1.0e-4;
+      int ic;
+      PetscCall(PetscOptionsGetReal(NULL,NULL,"-hacapk_ztol",&hacapk_ztol,NULL));
+      xc = (double *)malloc(sizeof(double)*m);
+      yc = (double *)malloc(sizeof(double)*m);
+      zc = (double *)malloc(sizeof(double)*m);
+      for(ic=0;ic < m;ic++){
+	xc[ic] = (double)ictx->fault[ic].x[INT_X];
+	yc[ic] = (double)ictx->fault[ic].x[INT_Y];
+	zc[ic] = (double)ictx->fault[ic].x[INT_Z];
+      }
+      hacapk_handle = cinit_hacapk_struct((int)m,(void *)ictx);
+      cset_hacapk_struct_coord(hacapk_handle,xc,yc,zc);
+      fprintf(stderr,"%s: core %03i/%03i: assigning HACApK m %i n %i ztol %g\n",
+	      argv[0],medium->comm_rank,medium->comm_size,m,n,(double)hacapk_ztol);
+      cmake_hacapk_struct_hmat(hacapk_handle,(double)hacapk_ztol);
+      PetscCall(MatCreateShell(PETSC_COMM_WORLD,PETSC_DECIDE,PETSC_DECIDE,m,n,
+			       hacapk_handle,&medium->In));
+      PetscCall(MatShellSetOperation(medium->In,MATOP_MULT,(void (*)(void))MatMult_HACApK));
+      free(xc);free(yc);free(zc);
+#else
+      fprintf(stderr,"%s: HACApK requested but not compiled in (set HACAPK_DEFINES/HACAPK_LIBS in makefile.petsc)\n",argv[0]);
+      exit(-1);
+#endif
+    }else{
     PetscCall(MatCreate(PETSC_COMM_WORLD, &medium->In));
     PetscCall(MatSetSizes(medium->In, PETSC_DECIDE, PETSC_DECIDE, m, n));  
     
@@ -353,6 +440,7 @@ int main(int argc, char **argv)
       exit(-1);
 #endif
     }
+    }				/* end htool/h2opus (non-HACApK) construction */
     if(medium->use_hmatrix == 2){
       /* 
 	 this version of h2opus only implements sampling-based

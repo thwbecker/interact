@@ -6,45 +6,43 @@
 
 CC=mpicc
 F90=mpifort
-
-#OPT = -O3 -march=native -fno-strict-aliasing
-OPT = -g
-
-CFLAGSE = $(OPT)
-F90FLAGS=-cpp -fbacktrace -fallow-argument-mismatch -ffree-form -ffree-line-length-none $(OPT) -fopenmp
-
 F77=mpif77
-F77FLAGS = $(OPT) -fopenmp
+LD=$(F90)
 
+OPT = -O3 -march=native -fno-strict-aliasing
+#OPT = -g
+
+CFLAGS = $(OPT)
+F90FLAGS=-cpp -fbacktrace -fallow-argument-mismatch -ffree-form -ffree-line-length-none $(OPT) -fopenmp
+F77FLAGS = $(OPT) -fopenmp
 LDFLAGS= -fopenmp -llapack
 
 #F90FLAGS = $(OPTFLAG)
 #LDFLAGS = -mkl=parallel
 
-LD=$(F90)
+ODIR=objects/
+
+HACAPACK_OBJS= $(ODIR)/m_HACApK_calc_entry_ij.o $(ODIR)/HACApK_lib.o $(ODIR)/m_HACApK_base.o \
+	$(ODIR)/m_HACApK_solve.o $(ODIR)/m_HACApK_use.o \
+	$(ODIR)/HACApK_c_interface.o $(ODIR)/HACApK_testing_routines.o
 
 
-OBJS= m_HACApK_calc_entry_ij.o HACApK_lib.o m_HACApK_base.o   m_HACApK_solve.o \
-	m_HACApK_use.o HACApK_c_interface.o HACApK_testing_routines.o
+all: libhacapk.a test_hacpak_c
 
-
-all: test_hacpak_c
-
-.SUFFIXES: .o .f90
+libhacapk.a: $(HACAPACK_OBJS)
+	$(AR) rv libhacapk.a $(HACAPACK_OBJS)
 
 # C interface
-test_hacpak_c: $(OBJS) test_hacpak_c.o 
-	$(LD) -o $@ $(OBJS) test_hacpak_c.o  $(LDFLAGS)
+test_hacpak_c: $(OBJS) libhacapk.a $(ODIR)/test_hacpak_c.o 
+	$(LD) -o $@ $(OBJS) $(ODIR)/test_hacpak_c.o -L. -lhacapk $(LDFLAGS)
 
-.f90.o: *.f90
-	$(F90) -c $< $(F90FLAGS)
+$(ODIR)/%.o: %.f90 HACApK_c_interface.h
+	$(F90) -c $< $(F90FLAGS)  -o $(ODIR)/$*.o
 
-.c.o: *.c HACApK_c_interface.h
-	$(CC) -c $< $(CFLAGS)
+$(ODIR)/%.o: %.c HACApK_c_interface.h
+	$(CC) -c $< $(CFLAGS)  -o $(ODIR)/$*.o
 
 
 clean:
-	rm -f *.o *.mod $(TARGET)
+	rm -f $(OBJS)/*.o *.mod 
 
-rmod:
-	rm -f m_*.o *.mod
