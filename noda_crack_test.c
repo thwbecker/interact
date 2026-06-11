@@ -19,7 +19,7 @@ int main(int argc, char **argv)
     smax,dt,e[4],e09[4],u[3],sm[3][3],dummy[2];
   COMP_PRECISION *sval;
   int q = 3,nx,nz,i,j,k,n,nf,n09,iret;
-  char *tname[4]={"-tv 0 (CTR)","-tv 1 (M236)","-tv 2 (M244)","-tv 3 (HYB)"};
+  char *tname[4]={"-tv 0 (CTR)","-tv 1 (M244)","-tv 2 (M236)","-tv 3 (HYB)"};
   if(argc > 1)
     sscanf(argv[1],"%i",&q);
   dx = pow(2.0,-(COMP_PRECISION)q);
