@@ -117,6 +117,32 @@ dense matvec scales N^2, the H backends ~N log N.
   floor (~2.5e-3 in the matvec). Needs `-mat_h2opus_maxrank 256` for
   N >= 1600 (the default 64 truncates and *wastes* memory). Fine for
   symmetric problems; not for this operator.
+## Serial vs parallel testing
+
+Run the same command serially and under MPI and compare the printed
+relative error and timings; the dense baseline is rebuilt (distributed)
+in every run, so each invocation is self-checking:
+
+    # serial reference
+    compress_interaction_matrix -geom_file geom.in -use_hmatrix 1 -nrandom 300
+    # same thing on 2 and 4 ranks
+    mpirun -np 2 compress_interaction_matrix -geom_file geom.in -use_hmatrix 1 -nrandom 300
+    mpirun -np 4 compress_interaction_matrix -geom_file geom.in -use_hmatrix 1 -nrandom 300
+
+    # HACApK: error should be BIT-IDENTICAL across np (deterministic construction)
+    mpirun -np 2 compress_interaction_matrix -geom_file geom.in -use_hmatrix 3 -hacapk_ztol 1e-5
+    mpirun -np 4 compress_interaction_matrix -geom_file geom.in -use_hmatrix 3 -hacapk_ztol 1e-5
+
+    # H2OPUS: serial only; at np>1 the tool exits with a clear message
+    mpirun -np 2 compress_interaction_matrix -geom_file geom.in -use_hmatrix 2
+
+What to expect: HTOOL errors stay within the epsilon class but differ
+per rank count (the block partition changes); HACApK errors are
+bit-identical to serial; the inverse test (-test_forward false) also
+runs in parallel through the same KSP machinery. On a machine with
+fewer cores than ranks add `--oversubscribe` (OpenMPI); correctness
+can be tested that way, timing cannot.
+
 ## MPI parallel status (tested serial, np=2, np=4 at N=400)
 
 | backend | parallel `b = Ax` | notes |
