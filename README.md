@@ -249,40 +249,37 @@ ________________________________________________________________________________
 
 Output from interact -h follows (run code for updated versions!)
 ________________________________________________________________________________
-main: binary: interact
-main: compiled for double precision on Apr  9 2023 at 19:29:33, initializing
-init: version: $Id: init.c,v 2.51 2011/01/09 02:02:43 becker Exp $
-init: compiled on Apr  9 2023 19:29:28
+interact: internal double prec, A matrix double prec
+main: initializing on 2026-06-11 14:40:15 ncore: 1
+interact: nu: 0.25000 mu: 1.000e+04 from properties.h, therefore lambda/mu: 1.00000 alpha: 0.66667
+init: compiled on Jun 11 2026 10:06:56, running in serial
 
 Interact: calculate fault stresses and displacements in a half space or in 2-D
           using a boundary element approach.
 
-Program reads in fault patch geometries (usually rectangular) and either solves
+Program reads in patch dividing a fault geometry and either solves
 for stresses and/or displacements in a one-step problem for various boundary
-conditions (sign-constrained or unconstrained), or for a simulated loading
+conditions (sign (i.e. direction) constrained or unconstrained), or for a simulated loading
 cycle where each patch follows a frictional constitutive law (e.g. Navier-Coulomb)
-and repetitive rupture is allowed during continuous `plate-tectonic` loading.
+and repetitive rupture is allowed during continuous "plate-tectonic" loading.
 
-WHEN STRESSES (STRESS TENSOR COMPONENTS) OR PRESSURE ARE REFERRED TO,
-POSITIVE VALUES MEAN EXTENSIONAL AND COMPRESSIONAL REGIMES,
-RESPECTIVELY (PHYSICS CONVENTION).
+When stresses (stress tensor components) or pressure are referred to, positive values mean
+extensional and compressional regimes, respectively (physics convention).
 
 Output is written to files and in real-time to X11 if PGPLOT support was compiled in.
-(PGPlot support was compiled in.)
+(No PGPlot support, X11 output unavailable. Compile with USE_PGPLOT flag set, if wanted.)
 
 PetSc support was compiled in, providing limited access to parallel solves for one-step problems.
-      For LU solve, use    "-pc_factor_mat_solver_type scalapack -mat_type scalapack" or
+      For direct solve, use    "-pc_factor_mat_solver_type scalapack -mat_type scalapack" or
                            "-pc_factor_mat_solver_type elemental -mat_type elemental".
       For iterative solve "-ksp_type fgmres -pc_type none   -ksp_max_it 10000 -ksp_rtol 1.0e-8" or
                           "-ksp_type fgmres -pc_type jacobi -ksp_max_it 10000 -ksp_rtol 1.0e-8".
       Check the makefile for other solver options and MPI settings.
-	  When running a one-step computation, will also compute stress fields in parallel.
+      When running a one-step computation, will also compute stress fields in parallel.
 
-
-
-(1) The fault geometry is input via the file `geom.in`,
+(1) The fault geometry is input via the file "geom.in",
     a list of fault patches.
-    This file has the following (`patch`) format for rectangular faults or point sources
+    This file has the following ("patch") format for regular, rectangular (Okada) faults or point sources
     (free format ASCII list of parameters):
 
     x_0 y_0 z_0 strike_0 dip_0 hlength_0 hwidth_0 group_0 ...
@@ -301,13 +298,61 @@ PetSc support was compiled in, providing limited access to parallel solves for o
       note that right now, the geometrical rake has to be 90 or 0 degrees, i.e. no tilted rectangles
       slip can, however, have a rake as given by different along-strike and along-dip values, see below
 
-    - hlength (L) and hwidth (W) are the patch's -->HALF<-- length and half width in 
+    - hlength (L) and hwidth (W) are the patch's *half* length and *half* width in 
       strike and dip direction, respectively. The patch area is thus 4LW.
 
     - group is the patch's fault group, a number that is used to define faults that consist of
       several patches (discretizing fault planes by rectangular elements) (0 <= group <= N-1))
     - ... at the end mean possible additional input, see below.
-    If you would like to use the 2-D mode, point sources or triangles, recompile with ALLOW_NON_3DQUAD_GEOM flag set.
+
+    Since the "ALLOW_NON_3DQUAD_GEOM" flag was used during runtime, the program can deal with
+    some additional patch geometries besides rectangular. Those are selected as follows:
+
+    - point source in half-space
+      If ONLY fault half-length is set to a negative value, a point source will be assumed instead
+      of a rectangular fault patch. In this case, width should be set to the `fault' area
+      and half-length is equivalent to -aspect_ratio, where aspect_ratio is some equivalent L/W.
+
+      WARNING: Not properly tested yet.
+
+    - triangular in half-space:
+      If BOTH fault half-width and length are negative, then the patch is a triangular element.
+      In this case, x, y, z, have no meaning but will be reassigned from the centroid.
+      strike and dip will also be recomputed from element local g and h vectors, and length and width
+      will be sqrt(area) subsequently.
+      The next nine numbers in the input geometry line will be the coordinates of the three nodes of the
+      triangle, however. FE-style counterclockwise numbering, input is then in the format:
+
+      999 999 999 999 999 -1 -1 group_0 x_x^1 x_y^1 x_z^1 x_x^2 x_y^2 x_z^2 x_x^3 x_y^3 x_z^3
+
+      where exponents indicate the local number of the node, and 999 are place holder values, not used.
+
+      WARNING: not fully tested.
+
+    - irregular quad in half-space:
+      If ONLY fault half-width is negative, then the patch is an irregular quad node element.
+      In this case, x, y, z, have no meaning but will be reassigned from the centroid.
+      strike and dip will also be recomputed from element local g and h vectors, and length and width
+      will be sqrt(area) subsequently.
+      The next 12 numbers in the input geometry line will be the coordinates of the four nodes of the
+      triangle, however. FE-style counterclockwise numbering, input is then in the format:
+
+      999 999 999 999 999 1 -1 group_0 x_x^1 x_y^1 x_z^1 x_x^2 x_y^2 x_z^2 x_x^3 x_y^3 x_z^3 x_x^4 x_y^4 x_z^4
+
+      where exponents indicate the local number of the node, and 999 are place holder values, not used.
+
+      WARNING: This is experimental and not fully tested.
+
+    - segments in two dimensions in the x-y plane
+      If fault half-width is zero, then dip should be 90, z=0, and program will run in 2-D mode.
+      In this case, all z coordinates should still be specified (e.g. in the grid output requests)
+      but z should be set to zero. Computation is plane-strain unless changed by -ps.
+      For plane stress, all output values of u[Z] (displacements into stress free direction) are
+      given as strains e_zz.
+      Calculations are performed in a full plane by default, can be changed with the -hp option.
+
+    If all your patches are rectangular in 3-D, you could recompile
+    without the ALLOW_NON_3DQUAD_GEOM set to save memory and enhance speed.
 
 
     Examples:
@@ -317,13 +362,21 @@ PetSc support was compiled in, providing limited access to parallel solves for o
     for a rectangular, vertical fault patch centered at depth -1, striking 30 degrees from North
     with length 8 and width 4, patch group number is 0.
 
+    0 0 -1 30 90 -1 32 0
+
+    is the same kind of fault, only as a point source. Note that 32 is the fault area from above.
+
+    999 999 999 999 999 -1 -1 0   2.0 3.4641 0  -2.0 -3.4641 0  0 0 -4
+
+    would be for a triangular element with roughly the same geometry.
+
     Please note that there are various programs to convert to and from the above patch format,
     e.g. patch2xyz to go to GMT style xyz coordinates for the edges of each patch,
     patch2vtk to go from patch format to (paraview) VTK format, or
     points2patch to convert a set of four points in FE ordering to the above patch format.
 
 
-(2) Boundary conditions and the operational mode are input via the `bc.in` file
+(2) Boundary conditions and the operational mode are input via the "bc.in" file
     which has the following format (free format ASCII list of parameters):
 
     operational_mode:
@@ -353,9 +406,9 @@ PetSc support was compiled in, providing limited access to parallel solves for o
          rotated systems, e.g. for -2, x will go along strike, and y along the normal direction
          with respect to the average fault patch geometry, with origin in the center of the fault
          group. HOWEVER, the displacements and stresses will still be given in the old system!
-         If the -pc switch is set, the global coordinates will be printed to `plane.xyz`
+         If the -pc switch is set, the global coordinates will be printed to "plane.xyz"
 
-      If print_bulk_fields is set to 2, the program will read the output locations from file `oloc.dat`
+      If print_bulk_fields is set to 2, the program will read the output locations from file "oloc.dat"
       This file has the x, y, and z coordinates in ASCII as an unformatted list.
 
 
@@ -366,16 +419,21 @@ PetSc support was compiled in, providing limited access to parallel solves for o
 
       If patch_number < 0, then the line should instead read
 
-       -increment start_fault stop_fault boundary_code boundary_value ... ...
+       -increment start_fault stop_fault boundary_code boundary_value
 
       and boundary code boundary_code will be assigned with value
       boundary_value from start_fault to stop_fault with increments increment.
 
       If start_fault < 0 and stop_fault < 0, will select all patches.
 
-     The patch_number ... boundary_value line can be repeated as often as necessary (say, twice for each fault
-     if the strike and dip movement modes are to be activated the same time).
 
+     If the patches for which boundary conditions are specified are triangular,
+     then the strike and dip specified in the geometry input will define global directions
+     the prescribed slip or stress values refer.
+
+     The patch_number ... boundary_value line can be repeated as often as necessary (say, twice for each fault
+     if the strike and dip movement modes are to be activated the same time, but not for triangles yet, for 
+     which specifying either strike or dip stress will enforce the other shear component to be zero.)
 
    Possible boundary conditions (as indicated by their integer codes) are:
 
@@ -427,12 +485,14 @@ PetSc support was compiled in, providing limited access to parallel solves for o
     the resolved background stresses since those are only used to initialize the problem
     as boundary conditions. I.e. add the resolved background shear stress to the shear stress
     specified in flt.dat stress to get shear stress free conditions for the 50 case, for example.
-    For debugging, the resolved shear, dip, and normal stresses for each patch will be written to `rstress.dat`.
+    For debugging, the resolved shear, dip, and normal stresses for each patch will be written to "rstress.dat".
 
     Mixed boundary conditions: If you want to mix specified slip boundary conditions with stress
     boundary conditions, slip has to be completely specified first such that subsequent stress conditions
     can take the stress changes induced by the slip into account.
 
+    WARNING: Stress boundary conditions will NOT work for point sources, and are
+    unreliable for triangular sources right now.
 
     Example:
     1 1
@@ -453,7 +513,7 @@ PetSc support was compiled in, providing limited access to parallel solves for o
    program's prediction of the next rupture time or change in shear stress sign.
    The max step is given by print_interval to ensure frequent
    enough output to the flt.*.dat files.
-   The minimum time step was set to 1e-15.
+   The minimum time step was set to 1.42857e-16.
    Time has to monotonously increase from zero.
 
    If X windows output is chosen, the next line (two numbers) should read
@@ -507,7 +567,7 @@ PetSc support was compiled in, providing limited access to parallel solves for o
 
 PARAMETERS:
 
- Elastic and frictional law properties are hard-coded and should be set in the `properties.h` file.
+ Elastic and frictional law properties are hard-coded and should be set in the "properties.h" file.
  Whenever you want to change those, you will have to recompile the program. This was done to improve
  the execution speed, assuming that material properties will not change between different model runs.
 
@@ -524,23 +584,23 @@ PARAMETERS:
 
  The following parameters can be set to non-default values on the command line:
 
-* -c  value      sets the cohesion term of the friction law to value, by default: 5
+ -c  value      sets the cohesion term of the friction law to value, by default: 5
                 If the cohesion=0 at all times, recompile with NO_COHESION set
                 to improve speed. (Stress drop is set to 1, which is 0.0001 times mu).
 
-* -pr value      set the background pressure to value `value`.
+ -pr value      set the background pressure to value "value".
                 The background pressure amplitude is 10 by default, both for one-step and loading
                 simulations. The pressure is constant with depth (see properties.h).
 
-* -ms value      set minimum stress drop to value `value`. (Characteristic stress drops are
+ -ms value      set minimum stress drop to value "value". (Characteristic stress drops are
                 set to 1.) The minimum stress drop is zero by default, ie.
                 allowing stress drops of all sizes (loading simulation).
 
-* -ei value      set matrix cutoff value for sparse storage of I or A in absolute values
+ -ei value      set matrix cutoff value for sparse storage of I or A in absolute values
                              (5.000000e-05 by default.)
                 (only used if I matrix is stored as sparse, see -nd option, or for sparse Ax=b solver.)
 
-* -wc value      will use value as the maximum fraction of singular value for an SVD solution (default: 7.00e-15)
+ -wc value      will use value as the maximum fraction of singular value for an SVD solution (default: 1.00e-15)
 
 
 
@@ -551,7 +611,7 @@ OPTIONS:
  Please read carefully which switches are ON by default. If those
  active switches are selected, they will be switched OFF instead.
 
-* -s  read in initial stress values for each fault from file `fsi.in`, format:
+ -s  read in initial stress values for each fault from file "fsi.in", format:
 
      s_strike^0 s_dip^0 s_normal^0
      s_strike^1 s_dip^1 s_normal^1
@@ -561,13 +621,13 @@ OPTIONS:
      tensor resolved on the fault slip directions. All values are ADDED to the
      homogeneous background stress as set in the program, ie. use all zeros for normal
      initial stress state. (loading simulation)
-  --> WARNING: This option will only work for the loading simulation mode, for one-step calculations
+ --> WARNING: This option will only work for the loading simulation mode, for one-step calculations
      specify fault stresses as individual boundary conditions, or use -l to get a resolved background
      stress.
 
      ON by default, if switch is set will be OFF.
 
-* -f  read in fault properties from file `fp.in`, so far only parameters for the friction law
+ -f  read in fault properties from file "fp.in", so far only parameters for the friction law
      are supported. Format:
 
      mu_static^0 mu_dynamic^0
@@ -578,51 +638,51 @@ OPTIONS:
      Coulomb.
      ON by default, if switch is set will be OFF.
 
-* -i  suppress all interactions between fault patches except the self-effect of slip on any
+ -i  suppress all interactions between fault patches except the self-effect of slip on any
      patches within the group that the patch belongs to and the effect of slip
      on the number 0 master group (this should be the main fault).
      (Meant as a experimental feature for LOADING SIMULATIONS ONLY!)
      OFF by default, if switch is set will be ON. See -ni for suppressed interactions in one step.
 
-* -ni suppress all interactions between faults except the interactions of fault patches
+ -ni suppress all interactions between faults except the interactions of patches within the fault group
 
-* -ct use constant time steps for the loading simulation
+ -ct use constant time steps for the loading simulation
      OFF by default, if switch is set will be ON.
 
-* -b  suppress output of all fault stress and slip data. Normally,
+ -b  suppress output of all fault stress and slip data. Normally,
      individual output files for each
      group of faults are generated when the number of groups is smaller than 50.
      If -b is set, this maximum number will be set to zero.
 
-* -p  prints information about the cumulative slip of every patch in a group to the
+ -p  prints information about the cumulative slip of every patch in a group to the
      slipline.*.dat files if the fault files are used (see -b). (loading simulation)
      OFF by default, if switch is set will be ON.
 
-* -w  whole fault activation mode (loading simulation)
+ -w  whole fault activation mode (loading simulation)
      If set, one patch will activate all patches in the group for sliding.
      Also, if one patch is switched off because of low normal stress, all
      patches in the group will be switched off as well (*unless* -v is set).
      OFF by default, if switch is set will be ON.
 
-* -k  keep slipping mode (loading simulation)
+ -k  keep slipping mode (loading simulation)
      If set, the first critical patches can trigger slip on other patches.
      If so, the initial patches will keep slipping, and the solution is obtained
      at each iteration until no more triggering takes place. If not set, slip
      on triggering patches is exhaustive, and iteration checks for triggering step
      by step (faster, since old solution doesn't have to be removed from stress
      field). The exhaustive method is affected by tiny differences in critical stress!
-     If keep slipping, critical stress is -7.000000e-15, else -7.000000e-15.
+     If keep slipping, critical stress is -1.000000e-15, else -1.000000e-15.
      ON by default, if switch is set will be OFF.
 
-* -v  whole fault deactivation mode (loading simulation)
+ -v  whole fault deactivation mode (loading simulation)
      If set (and -w is *not* set), the deactivation (low compressive normal stress) of a patch
      will lead to a deactivation of the whole fault group.
      If -w is on (whole fault activation mode), this is the default. If you use -v in this
      case, the whole fault de-activations will be suppressed.
      OFF by default, if switch is set will be ON.
 
-* -l  reads a/b factors for the linear background loading stress relationship.
-     If set, the file `smlin.in` is read, it should hold 6 pairs of a_i b_i factors
+ -l  reads a/b factors for the linear background loading stress relationship.
+     If set, the file "smlin.in" is read, it should hold 6 pairs of a_i b_i factors
      where the *non-hydrostatic* background stress at time t is given by s_i=a_i+b_i*t
      s_i = {s_xx, s_xy, s_xz, s_yy, s_yz, s_zz}, so that the format is
 
@@ -634,7 +694,7 @@ OPTIONS:
      To these factors, a depth independent hydrostatic pressure of 10
      will be added. You can change the amplitude of the pressure (e.g. to zero) with -pr.
 
-     If no factors are read in (if `smlin.in` is not found), the code will use simple shear loading 
+     If no factors are read in (if "smlin.in" is not found), the code will use simple shear loading 
      with b_xy=1 plus the depth independent hydrostatic pressure of 10.
 
      (Modify pressure amp. with -pr). If you want to specify resolved background
@@ -643,7 +703,7 @@ OPTIONS:
 
      ON by default, if switch is set will be OFF.
 
-* -nd switches to sparse matrix I storage, no matter what the I matrix size is.
+ -nd switches to sparse matrix I storage, no matter what the I matrix size is.
      By default, the program goes from dense to sparse only if the
      matrix is bigger than 8000 MB.
      The sparse matrix storage implies that matrix elements whose absolute
@@ -655,26 +715,28 @@ OPTIONS:
      note that sparse here refers to only the storage mode of the I matrix,
      not the solution method of A.x=b. (see -ss).
 
-* -ci checks the interaction matrix for positive Coulomb stress feedback loops, once calculated
+ -ci checks the interaction matrix for positive Coulomb stress feedback loops, once calculated
      This may be useful for loading simulations.
      OFF by default, if switch is set will be ON.
 
-* -si saves the interaction (I) matrix during a loading simulation,
+ -tv int_val	 triangle evaluation mode, 0: centroid, 1: M244, 2: M236, 3: Hybrid, 4: split(hybrid/triangular) (default: 0)
+
+ -si saves the interaction (I) matrix during a loading simulation,
      if I is written to a file during runtime and not held in memory.
-     Else, `/tmp/i` and `/tmp/i.hdr` will be deleted.
+     Else, "/tmp/i" and "/tmp/i.hdr" will be deleted.
      OFF by default, if switch is set will be ON.
 
-* -oi reads old interaction (I) matrix from files `/tmp/i.dat` and `/tmp/i.hdr`.
+ -oi reads old interaction (I) matrix from files "/tmp/i.dat" and "/tmp/i.hdr".
      Saves time when the geometry
      does not change between subsequent model runs (this is not automatically checked!)
      (Make sure to use -si if you want to keep the matrix.)
      OFF by default, if switch is set will be ON.
 
-* -sa saves the A x = b A matrix to `a.dat` and `a.dat.hdr` during a one-step calculation.
+ -sa saves the A x = b A matrix to "a.dat" and "a.dat.hdr" during a one-step calculation.
      Binary format, with dimensions (n x m) and precision (p, in bytes) in the header file as n p m
      OFF by default, if switch is set will be ON.
 
-* -oa reads A matrix from files `a.dat` and `a.dat.hdr` during a one-step calculation.
+ -oa reads A matrix from files "a.dat" and "a.dat.hdr" during a one-step calculation.
      Saves time when A
      does not change between subsequent model runs (this is not automatically checked!)
      (Make sure to use -sa if you want to keep the matrix.)
@@ -684,45 +746,53 @@ OPTIONS:
      by the boundary conditions, and not only b as one might think!
      OFF by default, if switch is set will be ON.
 
-* -r  attempts to restart a loading simulation model run based on previous results
+ -r  attempts to restart a loading simulation model run based on previous results
      WARNING: all result files will be overwritten NOT appended, so save before.
-     For this to work, `geom.in` and `bc.in` (and possibly `fsi.in` and `fp.in`
+     For this to work, "geom.in" and "bc.in" (and possibly "fsi.in" and "fp.in"
      should not be substantially changed.
 
-     Slip events from the previous run in the format as in the output file `events.bin` will be read in
-     from the restart event file `restart.events.bin`
+     Slip events from the previous run in the format as in the output file "events.bin" will be read in
+     from the restart event file "restart.events.bin"
 
-* -sn will print NaN values in displacement and stress outputs of the one-step calculation.
+ -sn will print NaN values in displacement and stress outputs of the one-step calculation.
      Normally, those locations (end patch/segments) yielding one or more inf values in the
      stress matrix or the displacement vector will be omitted during output.
      OFF by default, if switch is set will be ON.
 
-* -pc will print the global coordinates if fault-local planes are chosen for bulk stress
-     and displacement output (-1 or -2 for o in zmin zmax o), writes xyz to `plane.xyz`
+ -pc will print the global coordinates if fault-local planes are chosen for bulk stress
+     and displacement output (-1 or -2 for o in zmin zmax o), writes xyz to "plane.xyz"
      ON by default, if switch is set will be OFF.
 
-* -sv uses SVD solver for the unconstrained A x = b system.
+ -sv uses SVD solver for the unconstrained A x = b system.
      This approach should reliably find the least-squares minimum norm solution
      if the A matrix is singular.
      Note that LU can be orders of magnitude faster than SVD but use caution.
      If non-negative solutions are sought (as for specified slip directions),
      the program will automatically default back to the NNLS solver.
 
-* -sl uses LU solver for the unconstrained A x = b system (default).
+ -sl uses LU solver for the unconstrained A x = b system (default).
      LU can be orders of magnitude faster than SVD, but use caution.
      If non-negative solutions are sought (as for specified slip directions),
      the program will automatically default back to the NNLS solver.
 
-* -d  run in debug mode
+ -d  debug output, if you want extra checks, compile with -DDEBUG
      OFF by default, if switch is set will be ON.
 
+ -fpetsc    force Petsc solvers even for serial runs (else LAPACK for LU)
 
-* -h  prints out this help message and exits to the operating system
+ -ps Change the default 2-D elastic approximation for segments from plane-strain to plane-stress.
+     OFF by default, if switch is set will be ON.
 
-(c) Thorsten Becker, thwbecker@post.harvard.edu, 1999 - 2025)
+ -hp run a 2-D plane strain calculation in a half-plane (y<=0) instead of plane
+     OFF by default, if switch is set will be ON.
+
+ -h  prints out this help message and exits to the operating system
+
+(C) Thorsten Becker, thwbecker@post.harvard.edu, 1999 - 2026)
     interact - boundary element code for elastic half-spaces
     3-D quad dislocationS based on Okada (BSSA, 1992).
     3-D triangular dislocations based on Nikkhoo and Walter (GJI, 2015).
+    Triangular dislocations integration modifications based on Noda (EPS, 2025).
     2-D segment slip solution from Crouch and Starfield (1973).
     May include routines based on copyrighted software of others.
     Distributed under the GNU public license, see "COPYING".
