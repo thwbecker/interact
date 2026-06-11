@@ -134,17 +134,36 @@ double ckernel_func(int i, int j, void *par)
   return (double)sval;
 }
 /* MATSHELL multiply: y = A x through the HACApK H matrix */
+/* 
+   HACApK's adot expects the GLOBAL x vector on each rank and leaves
+   the GLOBAL result on each rank (ring exchange + permutation inside
+   HACApK_adot_pmt_lfmtx_p), while PETSc vectors are distributed:
+   scatter x to a full-length local copy first, then copy back the
+   locally owned slice of the result
+*/
+typedef struct{
+  void *handle;			/* HACApK opaque handle */
+  Vec xall;			/* full-length local copy of x */
+  VecScatter scat;		/* distributed x -> xall */
+  double *ball;			/* full-length result work array */
+  PetscInt rs,re;		/* local ownership range */
+} hacapk_shell_ctx;
 static PetscErrorCode MatMult_HACApK(Mat A, Vec x, Vec y)
 {
-  void *handle;
+  hacapk_shell_ctx *hctx;
   const PetscScalar *xa;
   PetscScalar *ya;
+  PetscInt i;
   PetscFunctionBeginUser;
-  PetscCall(MatShellGetContext(A,&handle));
-  PetscCall(VecGetArrayRead(x,&xa));
+  PetscCall(MatShellGetContext(A,&hctx));
+  PetscCall(VecScatterBegin(hctx->scat,x,hctx->xall,INSERT_VALUES,SCATTER_FORWARD));
+  PetscCall(VecScatterEnd(hctx->scat,x,hctx->xall,INSERT_VALUES,SCATTER_FORWARD));
+  PetscCall(VecGetArrayRead(hctx->xall,&xa));
+  chacapk_mult_Ax_H(hctx->handle,(double *)xa,hctx->ball);
+  PetscCall(VecRestoreArrayRead(hctx->xall,&xa));
   PetscCall(VecGetArray(y,&ya));
-  chacapk_mult_Ax_H(handle,(double *)xa,(double *)ya);
-  PetscCall(VecRestoreArrayRead(x,&xa));
+  for(i=hctx->rs;i < hctx->re;i++)
+    ya[i-hctx->rs] = (PetscScalar)hctx->ball[i];
   PetscCall(VecRestoreArray(y,&ya));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -209,6 +228,18 @@ int main(int argc, char **argv)
     fprintf(stderr,"%s: WARNING: this h2opus only implements sampling-based construction for symmetric\n",argv[0]);
     fprintf(stderr,"%s: WARNING: matrices); the H matrix approximates (K+K^T)/2, and the operator\n",argv[0]);
     fprintf(stderr,"%s: WARNING: asymmetry printed below sets an irreducible error floor\n",argv[0]);
+    {				/* this runs before medium->comm_size is set */
+      PetscMPIInt h2opus_csize;
+      PetscCallMPI(MPI_Comm_size(PETSC_COMM_WORLD,&h2opus_csize));
+      if(h2opus_csize > 1){
+	PetscMPIInt h2opus_crank;
+	PetscCallMPI(MPI_Comm_rank(PETSC_COMM_WORLD,&h2opus_crank));
+	if(h2opus_crank == 0)
+	  fprintf(stderr,"%s: H2OPUS sampling-based construction (MatCreateH2OpusFromMat) is not\n%s: supported in parallel in this PETSc/h2opus version - run serially\n",
+		  argv[0],argv[0]);
+	exit(-1);
+      }
+    }
     
     medium->h2opus_eta = 0.6;	/*  */
     PetscCall(PetscOptionsGetReal(NULL, NULL, "-eta", &medium->h2opus_eta, NULL));
@@ -385,9 +416,20 @@ int main(int argc, char **argv)
       fprintf(stderr,"%s: core %03i/%03i: assigning HACApK m %i n %i ztol %g\n",
 	      argv[0],medium->comm_rank,medium->comm_size,m,n,(double)hacapk_ztol);
       cmake_hacapk_struct_hmat(hacapk_handle,(double)hacapk_ztol);
-      PetscCall(MatCreateShell(PETSC_COMM_WORLD,PETSC_DECIDE,PETSC_DECIDE,m,n,
-			       hacapk_handle,&medium->In));
-      PetscCall(MatShellSetOperation(medium->In,MATOP_MULT,(void (*)(void))MatMult_HACApK));
+      {
+	hacapk_shell_ctx *hctx;
+	Vec xd;
+	hctx = (hacapk_shell_ctx *)malloc(sizeof(hacapk_shell_ctx));
+	hctx->handle = hacapk_handle;
+	hctx->ball = (double *)malloc(sizeof(double)*m);
+	PetscCall(MatCreateShell(PETSC_COMM_WORLD,PETSC_DECIDE,PETSC_DECIDE,m,n,
+				 (void *)hctx,&medium->In));
+	PetscCall(MatShellSetOperation(medium->In,MATOP_MULT,(void (*)(void))MatMult_HACApK));
+	PetscCall(MatCreateVecs(medium->In,&xd,NULL));
+	PetscCall(VecScatterCreateToAll(xd,&hctx->scat,&hctx->xall));
+	PetscCall(VecGetOwnershipRange(xd,&hctx->rs,&hctx->re));
+	PetscCall(VecDestroy(&xd));
+      }
       free(xc);free(yc);free(zc);
 #else
       fprintf(stderr,"%s: HACApK requested but not compiled in (set HACAPK_DEFINES/HACAPK_LIBS in makefile.petsc)\n",argv[0]);
