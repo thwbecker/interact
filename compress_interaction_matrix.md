@@ -20,7 +20,7 @@ dense operator.
 | dense | (always built) | PETSc |
 | HTOOL | 1 (default) | PETSc configured `--download-htool`, compile with `-DUSE_PETSC_HMAT` (`PETSC_HTOOL_USED` in `makefile.petsc`) |
 | H2OPUS | 2 | PETSc configured `--download-h2opus --download-thrust` (CPU), same define |
-| HACApK | 3 | `cd HACApK/v.1.0.0/C_interface; make; ar rcs libhacapk.a m_*.o HACApK_*.o`, then `HACAPK_DEFINES = -DUSE_HACAPK` and `HACAPK_LIBS` in `makefile.petsc`. **Build the library with `-O3`** (`OPT` in its Makefile): the unoptimized build has a ~13x slower matvec. |
+| HACApK | 3 | `cd HACApK/v.1.0.0/C_interface; make; ar rcs libhacapk.a m_*.o HACApK_*.o`, then `HACAPK_DEFINES = -DUSE_HACAPK` and `HACAPK_LIBS` in `makefile.petsc`. **Build the library with `-O3`** (`OPT` in its Makefile): the unoptimized build has a ~13x slower matvec. **The library MUST be compiled with the same MPI implementation as PETSc** (otherwise `HACApK_init` fails with `MPI_Comm_size failed`): use the wrappers PETSc reports, `pkg-config --variable=fcompiler PETSc`, or `$PETSC_DIR/$PETSC_ARCH/bin/mpifort` for `--download-mpich` builds. |
 
 PETSc example configure for everything at once:
 
