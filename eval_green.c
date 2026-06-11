@@ -110,8 +110,9 @@ void eval_green(COMP_PRECISION *x,struct flt *fault,
   case TRIANGULAR:
   case TRIANGULAR_M236:
   case TRIANGULAR_M244:
-  case TRIANGULAR_HYBR:{
-    eval_triangle_general(x,fault,disp,u_global,sm_global,iret,mode,eval_on_itself);
+  case TRIANGULAR_HYBR:
+  case TRIANGULAR_MIXED:{
+     eval_triangle_general(x,fault,disp,u_global,sm_global,iret,mode,eval_on_itself);
     break;
   }
   case IQUAD:{
@@ -167,38 +168,9 @@ void eval_triangle_general(COMP_PRECISION *x,struct flt *fault,
    and the mixing weights w; returns 1 if the receiver type does not
    use multi-point evaluation
 */
-/* 
-   run-level evaluation scheme for triangular patches, set once at
-   startup via the -tv command line option (or -tv PETSc option):
 
-   0: (default) plain centroid evaluation (CTR) for all triangular
-      patches, in operators and evaluations alike
-   1: Noda M236 multi-point evaluation used throughout
-   2: Noda M244 multi-point evaluation used throughout
-   3: Noda HYB  multi-point evaluation used throughout
-   4: split scheme: single-point (CTR) when assembling operators that
-      are solved for slip (multi_point_eval == FALSE at the call
-      site), HYB multi-point when evaluating stress for given slip
-      (multi_point_eval == TRUE); this combines a stable, invertible
-      operator with the most accurate traction evaluation and is the
-      recommended production setting
 
-   this is a configuration constant after initialization, not runtime
-   state: it is set once before any evaluations and never toggled
-*/
-static int tri_eval_mode = 0;
-void set_tri_eval_mode(int mode)
-{
-  if((mode < 0)||(mode > 4)){
-    fprintf(stderr,"set_tri_eval_mode: error: -tv mode %i out of range 0...4\n",mode);
-    exit(-1);
-  }
-  tri_eval_mode = mode;
-}
-int get_tri_eval_mode(void)
-{
-  return tri_eval_mode;
-}
+
 static int get_noda_points(int rtype,COMP_PRECISION eta[7][3],COMP_PRECISION w[7])
 {
   const COMP_PRECISION alpha = -4.1;	/* HYB mixing parameter, Noda eq. 38 */
@@ -287,27 +259,11 @@ void eval_green_at_receiver(struct flt *fault,int irec,int isrc,
 #ifdef ALLOW_NON_3DQUAD_GEOM
   COMP_PRECISION eta[7][3],w[7],xl[3],u_loc[3],sm_loc[3][3];
   int np,p,i,rtype;
-  rtype = (int)fault[irec].type;
-  if(is_triangular(fault[irec].type)){
-    /* the run-level -tv scheme governs how all triangular patches
-       are evaluated, see comment at set_tri_eval_mode() */
-    switch(tri_eval_mode){
-    case 0:			/* default: centroid only */
-      rtype = TRIANGULAR;
-      break;
-    case 1:
-      rtype = TRIANGULAR_M236;
-      break;
-    case 2:
-      rtype = TRIANGULAR_M244;
-      break;
-    case 3:
-      rtype = TRIANGULAR_HYBR;
-      break;
-    case 4:			/* split: stable operator, accurate evaluation */
-      rtype = (multi_point_eval)?(TRIANGULAR_HYBR):(TRIANGULAR);
-      break;
-    }
+
+  if(fault[irec].type == TRIANGULAR_MIXED){ /*  */
+    rtype = (multi_point_eval)?(TRIANGULAR_HYBR):(TRIANGULAR);
+  }else{
+    rtype = (int)fault[irec].type;
   }
   switch(rtype){
   case TRIANGULAR_M236:		/* triangular mixing types */

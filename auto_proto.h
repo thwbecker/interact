@@ -136,8 +136,6 @@ void eval_2dsegment_plane_strain_tdd(double *, struct flt *, double *, double *,
 void eval_green_and_project_stress_to_fault(struct flt *, int, int, double *, double *, unsigned char);
 void eval_green(double *, struct flt *, double *, double *, double [3][3], int *, unsigned char, unsigned char);
 void eval_triangle_general(double *, struct flt *, double *, double *, double [3][3], int *, unsigned char, unsigned char);
-void set_tri_eval_mode(int);
-int get_tri_eval_mode(void);
 void eval_green_at_receiver(struct flt *, int, int, double *, double *, double [3][3], int *, unsigned char, unsigned char);
 void eval_green_basic(double *, struct flt *, double *, double *, double [3][3], int *);
 /* eval_iquad.c */

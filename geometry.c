@@ -1450,6 +1450,7 @@ my_boolean is_triangular(MODE_TYPE mode)
   case TRIANGULAR_M244:
   case TRIANGULAR_M236:
   case TRIANGULAR_HYBR:
+  case TRIANGULAR_MIXED:
     return TRUE;
     break;
   default:

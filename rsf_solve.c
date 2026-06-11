@@ -212,7 +212,7 @@ int main(int argc,char **argv)
   {				/* triangular patch evaluation scheme, cf. -tv of interact */
     PetscInt tvmode = 0;
     PetscCall(PetscOptionsGetInt(NULL,NULL,"-tv",&tvmode,NULL));
-    set_tri_eval_mode((int)tvmode);
+    medium->tri_eval_mode = (MODE_TYPE)tvmode;
   }
   dt_monitor *= sec_per_year;monitor_tmin *= sec_per_year;event_tmin *= sec_per_year;
 

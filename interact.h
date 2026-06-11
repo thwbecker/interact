@@ -303,6 +303,7 @@ singular value will be set to zero
 #define TRIANGULAR_M244 21
 #define TRIANGULAR_M236 22
 #define TRIANGULAR_HYBR 23
+#define TRIANGULAR_MIXED 24
 
 #define TWO_DIM_SEGMENT_PLANE_STRAIN 30
 #define TWO_DIM_SEGMENT_PLANE_STRESS 40
@@ -416,9 +417,7 @@ singular value will be set to zero
 // references to 3D deformation and stress fields
 #define POSS(i, j, k, l) (((k * nxy)+(i * medium->n[INT_Y])+(j))*6+(l))
 #define POSU(i, j, k, l) (((k * nxy)+(i * medium->n[INT_Y])+(j))*3+(l))
-#ifdef USE_PETSC_HMAT
 #include "kdtree.h"
-#endif
 // the fault and medium structures
 #include "structures.h"
 

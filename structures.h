@@ -167,10 +167,19 @@ struct med{
 #endif
   int nr_timesteps;
   /* triangle mode type */
-  MODE_TYPE tri_eval_mode;    /* 0: single centroid
-				 1: M244 
-				 2: M236
-				 3: Hybrid
+  MODE_TYPE tri_eval_mode;    /* 
+				 0: (default) plain centroid evaluation (CTR) for all triangular
+				 patches, in operators and evaluations alike
+				 1: Noda M236 multi-point evaluation used throughout
+				 2: Noda M244 multi-point evaluation used throughout
+				 3: Noda HYB  multi-point evaluation used throughout
+				 4: split scheme: single-point (CTR) when assembling operators that
+				 are solved for slip (multi_point_eval == FALSE at the call
+				 site), HYB multi-point when evaluating stress for given slip
+				 (multi_point_eval == TRUE); this combines a stable, invertible
+				 operator with the most accurate traction evaluation and is the
+				 recommended production setting
+
 			      */
   /*
     material properties that don't change within the medium

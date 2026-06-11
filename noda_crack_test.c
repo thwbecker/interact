@@ -70,12 +70,10 @@ int main(int argc, char **argv)
   fprintf(stderr,"noda_crack_test: q=%i dx=1/%i nf=%i normal[y]=%g/%g t_strike[x]=%g/%g\n",
 	  q,(int)(1.0/dx),nf,fault[0].normal[INT_Y],fault[1].normal[INT_Y],
 	  fault[0].t_strike[INT_X],fault[1].t_strike[INT_X]);
-  /* all patches are plain triangles; the -tv scheme selects the method */
-  for(i=0;i < nf;i++)
-    fault[i].type = TRIANGULAR;
   /* loop over evaluation schemes via the run-level flag */
   for(k=0;k < 4;k++){
-    set_tri_eval_mode(k);
+    for(i=0;i < nf;i++)
+      fault[i].type = TRIANGULAR + k;
     e[k] = e09[k] = 0.0;n09 = 0;
     for(i=0;i < nf;i++){	/* receivers */
       s[0]=s[1]=s[2]=0.0;
@@ -100,7 +98,8 @@ int main(int argc, char **argv)
      (multi_point_eval FALSE) must reproduce CTR, evaluation calls
      (multi_point_eval TRUE) must reproduce HYB
   */
-  set_tri_eval_mode(4);
+  for(i=0;i < nf;i++)
+    fault[i].type = TRIANGULAR + 4;
   for(k=0;k < 2;k++){		/* k=0: FALSE (operator), k=1: TRUE (evaluation) */
     dummy[k] = 0.0;
     for(i=0;i < nf;i++){
