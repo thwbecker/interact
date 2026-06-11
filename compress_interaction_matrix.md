@@ -117,6 +117,15 @@ dense matvec scales N^2, the H backends ~N log N.
   floor (~2.5e-3 in the matvec). Needs `-mat_h2opus_maxrank 256` for
   N >= 1600 (the default 64 truncates and *wastes* memory). Fine for
   symmetric problems; not for this operator.
+## MPI parallel status (tested serial, np=2, np=4 at N=400)
+
+| backend | parallel `b = Ax` | notes |
+|---|---|---|
+| dense | works | distributed rows, exercised as the baseline in every run |
+| HTOOL | works | error stays in the eps class but differs per np (different block partition): 8.4e-5 / 1.1e-4 / 5.5e-5 at np=1/2/4, eps 1e-3 |
+| H2OPUS | **serial only** | `MatCreateH2OpusFromMat` sampling unsupported in parallel in this PETSc/h2opus; the tool exits with a clear message at np>1 |
+| HACApK | works | **bit-identical to serial at np=2 and np=4** (1.16e-7 at ztol 1e-5): deterministic construction, only the leaf work distribution changes. the MATSHELL gathers x to all ranks (HACApK's adot needs global vectors and returns the global result on each rank) |
+
 - Context for the error target: in quasi-dynamic `rsf_solve` cycles,
   operator errors ~1e-4 shift event onsets by O(100 s) and can
   restructure two-fault rupture sequences; ~1e-6 reproduces dense

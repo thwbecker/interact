@@ -162,12 +162,11 @@ int main(int argc, char **argv)
 
   double *bglobal,cpu_time_used;
   MatHtoolKernelFn *htools_kernel = GenKEntries_htools;
-  MatH2OpusKernelFn *h2opus_kernel = GenKEntries_h2opus;
   KSP               ksp,ksph;
   PC                pc,pch;
   Vec         x, xh, b, bh, bout,d;
   Mat         Ah_dense;
-  PetscReal   *coords,*avalues=NULL,*bvalues=NULL,norm[3];
+  PetscReal   *coords=NULL,*avalues=NULL,*bvalues=NULL,norm[3];
   PetscInt    ndim, n, m, lm,ln,i,j,k,dn,on, *col_idx=NULL,rs,re;
   PetscInt nrandom = 0;	/* for timing tests */
   VecScatter ctx;
@@ -569,7 +568,7 @@ int main(int argc, char **argv)
 	  bglobal[i] = bvalues[i];
 	PetscCall(VecRestoreArray(bout,&bvalues));
       }
-      MPI_Bcast(bglobal,m,MPI_DOUBLE,0, MPI_COMM_WORLD);
+      PetscCallMPI(MPI_Bcast(bglobal,m,MPI_DOUBLE,0, MPI_COMM_WORLD));
       PetscCall(VecScatterDestroy(&ctx));
       PetscCall(VecDestroy(&bout));
       HEADNODE{
