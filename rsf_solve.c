@@ -209,6 +209,11 @@ int main(int argc,char **argv)
   PetscCall(PetscOptionsGetReal(NULL,NULL,"-vel_event_hyst",&vel_event_hyst,NULL));
   PetscCall(PetscOptionsGetReal(NULL,NULL,"-event_tmin_yr",&event_tmin,NULL));
   PetscCall(PetscOptionsGetBool(NULL,NULL,"-track_events",&track_events,NULL));
+  {				/* triangular patch evaluation scheme, cf. -tv of interact */
+    PetscInt tvmode = 0;
+    PetscCall(PetscOptionsGetInt(NULL,NULL,"-tv",&tvmode,NULL));
+    set_tri_eval_mode((int)tvmode);
+  }
   dt_monitor *= sec_per_year;monitor_tmin *= sec_per_year;event_tmin *= sec_per_year;
 
   /* get the geometry */
@@ -432,7 +437,7 @@ int main(int argc,char **argv)
   PetscCall(PetscFinalize());
 
 #else
-  fprintf(stderr,"%s only PETSC version implemented, but not compiled as such\n",argv[0]);
+  fprintf(stderr,"%s only petsc version implemented, but not compiled as such\n",argv[0]);
 #endif
   exit(0);
 }

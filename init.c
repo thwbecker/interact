@@ -511,6 +511,12 @@ void init_parameters(char **argv, int argc, my_boolean *read_fault_properties,
       }
       exit(-1);
 #endif
+    }else if(strcmp(argv[i],"-tv")==0){// triangular patch evaluation scheme
+      advance_argument(&i,argc,argv);
+      set_tri_eval_mode(atoi(argv[i]));
+      if(rank == 0)
+	fprintf(stderr,"check_parameters_and_init: triangular evaluation scheme -tv %i (0: CTR 1: M236 2: M244 3: HYB 4: CTR operator/HYB eval)\n",
+		get_tri_eval_mode());
     }else if(strcmp(argv[i],"-ms")==0){// minimum stress drop
       advance_argument(&i,argc,argv);
       sscanf(argv[i],ONE_CP_FORMAT,min_stress_drop);
@@ -530,7 +536,7 @@ void init_parameters(char **argv, int argc, my_boolean *read_fault_properties,
     }else if(strcmp(argv[i],"-tv")==0){// tri eval mode
       advance_argument(&i,argc,argv);
       sscanf(argv[i],"%i",&itmp);
-      if((itmp < 0) || (itmp > TRIANGULAR_HYBR - TRIANGULAR )){
+      if((itmp < 0) || (itmp >TRIANGULAR_HYBR -TRIANGULAR )){
 	fprintf(stderr,"init_parameters: tri eval mode %i out of bounds\n",itmp);
 	exit(-1);
       }

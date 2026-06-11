@@ -133,10 +133,12 @@ void get_2dseg_disp(double *, double *, double *, double, double, double, double
 void get_2dseg_stress(double [3][3], double *, double *, double, double, double, double);
 void eval_2dsegment_plane_strain_tdd(double *, struct flt *, double *, double *, double [3][3], int, int *, unsigned char);
 /* eval_green.c */
-void eval_green_at_receiver(struct flt *, int, int, double *, double *, double [3][3], int *, MODE_TYPE);
-void eval_green_and_project_stress_to_fault(struct flt *, int, int, double *, double *);
+void eval_green_and_project_stress_to_fault(struct flt *, int, int, double *, double *, unsigned char);
 void eval_green(double *, struct flt *, double *, double *, double [3][3], int *, unsigned char, unsigned char);
 void eval_triangle_general(double *, struct flt *, double *, double *, double [3][3], int *, unsigned char, unsigned char);
+void set_tri_eval_mode(int);
+int get_tri_eval_mode(void);
+void eval_green_at_receiver(struct flt *, int, int, double *, double *, double [3][3], int *, unsigned char, unsigned char);
 void eval_green_basic(double *, struct flt *, double *, double *, double [3][3], int *);
 /* eval_iquad.c */
 void eval_iquad(double *, struct flt *, double *, double *, double [3][3], int *, unsigned char);
@@ -259,6 +261,16 @@ double aij_from_file(int, int, int, FILE *);
 int select_i_coeff_calc_mode(struct med *);
 size_t imatrix_size(struct med *);
 /* kdtree.c */
+void kdtr_node_init(kd_node);
+void KDTreeCreate(int, KDTree *);
+void KDTreeDestroy(KDTree *);
+void KDTreeReset(KDTree);
+void KDTreeView(KDTree);
+void KDTreeSetPoints(KDTree, int);
+void KDTreeGetPoints(KDTree, int *, kd_node *);
+void KDTreeInsertPoint(KDTree, double []);
+void KDTreeSetup(KDTree);
+void KDTreeFindNearest(KDTree, double [], kd_node *, double *);
 /* levmarq_numrec.c */
 void mrqmin(double *, double *, int, double *, int *, int, double **, double **, double *, double *, struct bmd *, unsigned char, double, unsigned char, unsigned char, unsigned char, unsigned char, double, double *, unsigned char, struct prj);
 void print_lm_progress(double, double, double, double, int, int, double *, double, int, char **, int, int, unsigned char, unsigned char);
@@ -370,6 +382,7 @@ void my_sincosd(double *, double *, double);
 void my_sincos_degd(double *, double *, double);
 /* nnls.c */
 void nnls_driver_i(double *, double *, double *, int, int);
+/* noda_crack_test.c */
 /* optimize.c */
 void optimize(struct flt *, struct med *);
 double distsq(struct flt *, struct flt *);

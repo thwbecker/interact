@@ -21,7 +21,8 @@
 
 void eval_green_and_project_stress_to_fault(struct flt *fault, int ireceive,
 					    int islip, COMP_PRECISION *slip,
-					    COMP_PRECISION *s)
+					    COMP_PRECISION *s,
+					    my_boolean multi_point_eval)
 {
   //#define SUPER_DUPER_DEBUG
   int iret;
@@ -32,7 +33,8 @@ void eval_green_and_project_stress_to_fault(struct flt *fault, int ireceive,
   fprintf(stderr,"add_quake_stress_3: slip: %10.3e %10.3e %10.3e evaluated at %10.3e %10.3e %10.3e \n",
 	  slip[0],slip[1],slip[2],fault[ireceive].x[0],fault[ireceive].x[1],fault[ireceive].x[2]);
 #endif
-  eval_green_at_receiver(fault,ireceive,islip,slip,u,sm,&iret,GC_STRESS_ONLY);
+  eval_green_at_receiver(fault,ireceive,islip,slip,u,sm,&iret,GC_STRESS_ONLY,
+			 multi_point_eval);
   if(!iret){
     /* project the stresses */
     resolve_force(fault[ireceive].normal,sm,trac); /* convert to local
@@ -165,6 +167,38 @@ void eval_triangle_general(COMP_PRECISION *x,struct flt *fault,
    and the mixing weights w; returns 1 if the receiver type does not
    use multi-point evaluation
 */
+/* 
+   run-level evaluation scheme for triangular patches, set once at
+   startup via the -tv command line option (or -tv PETSc option):
+
+   0: (default) plain centroid evaluation (CTR) for all triangular
+      patches, in operators and evaluations alike
+   1: Noda M236 multi-point evaluation used throughout
+   2: Noda M244 multi-point evaluation used throughout
+   3: Noda HYB  multi-point evaluation used throughout
+   4: split scheme: single-point (CTR) when assembling operators that
+      are solved for slip (multi_point_eval == FALSE at the call
+      site), HYB multi-point when evaluating stress for given slip
+      (multi_point_eval == TRUE); this combines a stable, invertible
+      operator with the most accurate traction evaluation and is the
+      recommended production setting
+
+   this is a configuration constant after initialization, not runtime
+   state: it is set once before any evaluations and never toggled
+*/
+static int tri_eval_mode = 0;
+void set_tri_eval_mode(int mode)
+{
+  if((mode < 0)||(mode > 4)){
+    fprintf(stderr,"set_tri_eval_mode: error: -tv mode %i out of range 0...4\n",mode);
+    exit(-1);
+  }
+  tri_eval_mode = mode;
+}
+int get_tri_eval_mode(void)
+{
+  return tri_eval_mode;
+}
 static int get_noda_points(int rtype,COMP_PRECISION eta[7][3],COMP_PRECISION w[7])
 {
   const COMP_PRECISION alpha = -4.1;	/* HYB mixing parameter, Noda eq. 38 */
@@ -230,17 +264,56 @@ static int get_noda_points(int rtype,COMP_PRECISION eta[7][3],COMP_PRECISION w[7
 void eval_green_at_receiver(struct flt *fault,int irec,int isrc,
 			    COMP_PRECISION *slip,COMP_PRECISION *u,
 			    COMP_PRECISION sm_global[3][3],int *iret,
-			    MODE_TYPE mode)
+			    MODE_TYPE mode,my_boolean multi_point_eval)
 {
+  /* 
+     multi_point_eval selects whether the Noda multi-point receiver
+     types (M236, M244, HYBR) are honored (TRUE) or evaluated at the
+     single centroid like plain TRIANGULAR (FALSE); it has no effect
+     on other patch types
+
+     callers must pass FALSE when assembling an interaction operator
+     that will be solved/inverted for slip (or whose stresses feed a
+     solve, such as right hand side contributions of prescribed-slip
+     faults): the multi-point mixtures are by construction insensitive
+     to element-scale slip modes, which makes such operators
+     near-singular and leads to checkerboard contamination of the slip
+     and, via cross-coupling, systematic stress biases
+
+     callers should pass TRUE when evaluating stress for GIVEN slip
+     (forward calculations and post-solution output), where the
+     multi-point types provide the most accurate traction
+  */
 #ifdef ALLOW_NON_3DQUAD_GEOM
   COMP_PRECISION eta[7][3],w[7],xl[3],u_loc[3],sm_loc[3][3];
-  int np,p,i;
-  
-  switch(fault[irec].type){
+  int np,p,i,rtype;
+  rtype = (int)fault[irec].type;
+  if(is_triangular(fault[irec].type)){
+    /* the run-level -tv scheme governs how all triangular patches
+       are evaluated, see comment at set_tri_eval_mode() */
+    switch(tri_eval_mode){
+    case 0:			/* default: centroid only */
+      rtype = TRIANGULAR;
+      break;
+    case 1:
+      rtype = TRIANGULAR_M236;
+      break;
+    case 2:
+      rtype = TRIANGULAR_M244;
+      break;
+    case 3:
+      rtype = TRIANGULAR_HYBR;
+      break;
+    case 4:			/* split: stable operator, accurate evaluation */
+      rtype = (multi_point_eval)?(TRIANGULAR_HYBR):(TRIANGULAR);
+      break;
+    }
+  }
+  switch(rtype){
   case TRIANGULAR_M236:		/* triangular mixing types */
   case TRIANGULAR_M244:
   case TRIANGULAR_HYBR:
-    np = get_noda_points((int)fault[irec].type,eta,w);
+    np = get_noda_points(rtype,eta,w);
     if(np){
       zero_3x3_matrix(sm_global);u[INT_X] = u[INT_Y] = u[INT_Z] = 0.0;
       for(p=0;p < np;p++){

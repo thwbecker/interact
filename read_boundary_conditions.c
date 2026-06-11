@@ -929,7 +929,9 @@ void read_one_step_bc(FILE *in,struct med *medium,struct flt *fault,
 	for(j=j3=0;j <  medium->nrflt;j++,j3+=3){ /* j = receiving,
 						    loop through
 						    all */
-	  eval_green_and_project_stress_to_fault(fault,j,i, fault[i].u,(fstress+j3));
+	  /* enters the right hand side of the solve system: must be
+	     consistent with the single-point solution operator */
+	  eval_green_and_project_stress_to_fault(fault,j,i, fault[i].u,(fstress+j3),FALSE);
 	}
       }
     }

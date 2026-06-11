@@ -16,11 +16,10 @@ int main(int argc, char **argv)
 {
   struct flt *fault;
   COMP_PRECISION dx,h,z0,x0,zp0,zp1,xoff,r,cen[2],disp[3],s[3],
-    smax,dt,e[4],e09[4],u[3],sm[3][3];
+    smax,dt,e[4],e09[4],u[3],sm[3][3],dummy[2];
   COMP_PRECISION *sval;
-  int q = 3,nx,nz,i,j,k,n,nf,n09,iret,types[4]={TRIANGULAR,TRIANGULAR_M236,
-						TRIANGULAR_M244,TRIANGULAR_HYBR};
-  char *tname[4]={"CTR (centroid)","M236","M244","HYB (a=-4.1)"};
+  int q = 3,nx,nz,i,j,k,n,nf,n09,iret;
+  char *tname[4]={"-tv 0 (CTR)","-tv 1 (M236)","-tv 2 (M244)","-tv 3 (HYB)"};
   if(argc > 1)
     sscanf(argv[1],"%i",&q);
   dx = pow(2.0,-(COMP_PRECISION)q);
@@ -71,16 +70,18 @@ int main(int argc, char **argv)
   fprintf(stderr,"noda_crack_test: q=%i dx=1/%i nf=%i normal[y]=%g/%g t_strike[x]=%g/%g\n",
 	  q,(int)(1.0/dx),nf,fault[0].normal[INT_Y],fault[1].normal[INT_Y],
 	  fault[0].t_strike[INT_X],fault[1].t_strike[INT_X]);
-  /* loop over evaluation methods (receiver types) */
+  /* all patches are plain triangles; the -tv scheme selects the method */
+  for(i=0;i < nf;i++)
+    fault[i].type = TRIANGULAR;
+  /* loop over evaluation schemes via the run-level flag */
   for(k=0;k < 4;k++){
-    for(i=0;i < nf;i++)
-      fault[i].type = types[k];
+    set_tri_eval_mode(k);
     e[k] = e09[k] = 0.0;n09 = 0;
     for(i=0;i < nf;i++){	/* receivers */
       s[0]=s[1]=s[2]=0.0;
       for(j=0;j < nf;j++){	/* sources */
 	disp[STRIKE] = sval[j];disp[DIP] = disp[NORMAL] = 0.0;
-	eval_green_and_project_stress_to_fault(fault,i,j,disp,s);
+	eval_green_and_project_stress_to_fault(fault,i,j,disp,s,TRUE);
       }
       dt = fabs(s[STRIKE] + 1.0); /* analytic: -1 */
       e[k] += dt;
@@ -94,5 +95,27 @@ int main(int argc, char **argv)
     fprintf(stdout,"q=%i N=%5i %16s  E = %10.5f  E0.9 = %10.5f\n",
 	    q,nf,tname[k],e[k],e09[k]);
   }
+  /* 
+     verify -tv 4 (split scheme): operator assembly calls
+     (multi_point_eval FALSE) must reproduce CTR, evaluation calls
+     (multi_point_eval TRUE) must reproduce HYB
+  */
+  set_tri_eval_mode(4);
+  for(k=0;k < 2;k++){		/* k=0: FALSE (operator), k=1: TRUE (evaluation) */
+    dummy[k] = 0.0;
+    for(i=0;i < nf;i++){
+      s[0]=s[1]=s[2]=0.0;
+      for(j=0;j < nf;j++){
+	disp[STRIKE] = sval[j];disp[DIP] = disp[NORMAL] = 0.0;
+	eval_green_and_project_stress_to_fault(fault,i,j,disp,s,(k)?(TRUE):(FALSE));
+      }
+      dummy[k] += fabs(s[STRIKE] + 1.0);
+    }
+    dummy[k] /= (COMP_PRECISION)nf;
+  }
+  fprintf(stdout,"-tv 4 operator path:    E = %10.5f  (must equal CTR E = %10.5f): %s\n",
+	  dummy[0],e[0],(fabs(dummy[0]-e[0]) < 1e-12)?("PASS"):("FAIL"));
+  fprintf(stdout,"-tv 4 evaluation path:  E = %10.5f  (must equal HYB E = %10.5f): %s\n",
+	  dummy[1],e[3],(fabs(dummy[1]-e[3]) < 1e-12)?("PASS"):("FAIL"));
   return 0;
 }
