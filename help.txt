@@ -7,9 +7,9 @@ For further assistance, refer to INSTALLATION and README.md
 
 
 interact: internal double prec, A matrix double prec
-main: initializing on 2025-01-16 12:44:00 ncore: 1
+main: initializing on 2025-07-15 11:10:14 ncore: 1
 interact: nu: 0.25000 mu: 1.000e+04 from properties.h, therefore lambda/mu: 1.00000 alpha: 0.66667
-init: compiled on Jan 16 2025 12:40:06, running in serial
+init: compiled on Jul 12 2025 15:41:17, running in serial
 
 Interact: calculate fault stresses and displacements in a half space or in 2-D
           using a boundary element approach.
@@ -25,7 +25,14 @@ extensional and compressional regimes, respectively (physics convention).
 
 Output is written to files and in real-time to X11 if PGPLOT support was compiled in.
 (No PGPlot support, X11 output unavailable. Compile with USE_PGPLOT flag set, if wanted.)
-(Petsc support not compiled in, if parallel support is desired, check makefile.)
+
+PetSc support was compiled in, providing limited access to parallel solves for one-step problems.
+      For direct solve, use    "-pc_factor_mat_solver_type scalapack -mat_type scalapack" or
+                           "-pc_factor_mat_solver_type elemental -mat_type elemental".
+      For iterative solve "-ksp_type fgmres -pc_type none   -ksp_max_it 10000 -ksp_rtol 1.0e-8" or
+                          "-ksp_type fgmres -pc_type jacobi -ksp_max_it 10000 -ksp_rtol 1.0e-8".
+      Check the makefile for other solver options and MPI settings.
+      When running a one-step computation, will also compute stress fields in parallel.
 
 (1) The fault geometry is input via the file "geom.in",
     a list of fault patches.
@@ -469,6 +476,8 @@ OPTIONS:
      This may be useful for loading simulations.
      OFF by default, if switch is set will be ON.
 
+ -tv int_val	 triangle evaluation mode, 0: centroid, 1: M244, 2: M236, 3: Hybrid (default: 0)
+
  -si saves the interaction (I) matrix during a loading simulation,
      if I is written to a file during runtime and not held in memory.
      Else, "/tmp/i" and "/tmp/i.hdr" will be deleted.
@@ -526,6 +535,8 @@ OPTIONS:
  -d  debug output, if you want extra checks, compile with -DDEBUG
      OFF by default, if switch is set will be ON.
 
+ -fpetsc    force Petsc solvers even for serial runs (else LAPACK for LU)
+
  -ps Change the default 2-D elastic approximation for segments from plane-strain to plane-stress.
      OFF by default, if switch is set will be ON.
 
@@ -534,7 +545,7 @@ OPTIONS:
 
  -h  prints out this help message and exits to the operating system
 
-(C) Thorsten Becker, thwbecker@post.harvard.edu, 1999 - 2024)
+(C) Thorsten Becker, thwbecker@post.harvard.edu, 1999 - 2025)
     interact - boundary element code for elastic half-spaces
     3-D quad dislocationS based on Okada (BSSA, 1992).
     3-D triangular dislocations based on Nikkhoo and Walter (GJI, 2015).

@@ -2,14 +2,14 @@
 # flags for PETSC support
 #
 # the 32 bit versions work with Htools and H2OPUS
-#
 PETSC_ARCH = arch-linux-c-opt
 PETSC_HTOOL_USED=-DUSE_PETSC_HMAT
 #
+# debug 32 bit version
 #PETSC_ARCH = arch-linux-c-debug
 #PETSC_HTOOL_USED=-DUSE_PETSC_HMAT
 #
-# the 64 bit integer evrsion does not
+# the 64 bit integer evrsion does not have H matrices
 #PETSC_ARCH = arch-linux-c-opt64
 #PETSC_HTOOL_USED=
 
@@ -40,6 +40,6 @@ PETSC_INCLUDES = -I$(PETSC_DIR)/include/ $(CPPFLAGS) -DUSE_PETSC $(PETSC_HTOOL_U
 #
 PETSC_LIBS = -L$(PETSC_DIR)/lib/  $(PETSC_LDIR) $(PETSC_LIBADD)  # -L/disk/rh_usr_local/intel/oneapi/mpi/latest/lib/
 
-MPICC = mpicc
-MPILD = mpif77
+MPICC = $(shell pkg-config --variable=ccompiler $(PACKAGES))
+MPILD =  $(shell pkg-config --variable=fcompiler $(PACKAGES))
 
