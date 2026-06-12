@@ -127,8 +127,12 @@ behind HTOOL, comm-bound beyond ~16 ranks (gather + ring exchange);
 its error is bit-identical across all rank counts and machines.
 hmmvp's threaded CONSTRUCTION scales well (19x at 48 - enabled by the
 THREADPRIVATE dc3d.F kernel) but its threaded matvec does not scale
-on this hardware; use it serial/few-threaded, for the global
-tolerance semantics and the future file-based workflow. Sweet spot
+on this hardware (verified including OMP_PROC_BIND=close /
+OMP_PLACES=cores pinning, which stabilizes the variance but produces
+no speedup over serial: the per-call fork/join plus static block
+partition is comparable to the ~26 ms of work); use it
+serial/few-threaded, for the global tolerance semantics and the
+future file-based MpiHmat workflow. Sweet spot
 for matvec-dominated production (earthquake cycles): HTOOL at ~16-24
 ranks. For assembly-dominated or frequently re-assembled workloads:
 HACApK.
