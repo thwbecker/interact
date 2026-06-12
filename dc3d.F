@@ -64,6 +64,7 @@ C*****   UXZ,UYZ,UZZ : Z-DERIVATIVE
 C*****   IRET        : RETURN CODE  ( =0....NORMAL,   =1....SINGULAR )  
 C                                                                       
       COMMON /C1/DUMMY(8),R,dummy2(15)
+!$OMP THREADPRIVATE(/C1/)
       DIMENSION  U(12),DUA(12),DUB(12),DUC(12)                          
       DATA  F0/0.D0/                                                    
 C-----                                                                  
@@ -166,8 +167,10 @@ C***** OUTPUT
 C*****   U(12) : DISPLACEMENT AND THEIR DERIVATIVES                     
 C                                                                       
       COMMON /C0/ALP1,ALP2,ALP3,ALP4,ALP5,SD,CD,SDSD,CDCD,SDCD,S2D,C2D  
+!$OMP THREADPRIVATE(/C0/)
       COMMON /C1/P,Q,S,T,XY,X2,Y2,D2,R,R2,R3,R5,QR,QRX,A3,A5,B3,C3,     
      *           UY,VY,WY,UZ,VZ,WZ                                      
+!$OMP THREADPRIVATE(/C1/)
       DATA F0,F1,F3/0.D0,1.D0,3.D0/                                     
       DATA PI2/6.283185307179586D0/                                     
 C-----                                                                  
@@ -292,8 +295,10 @@ C***** OUTPUT
 C*****   U(12) : DISPLACEMENT AND THEIR DERIVATIVES                     
 C                                                                       
       COMMON /C0/ALP1,ALP2,ALP3,ALP4,ALP5,SD,CD,SDSD,CDCD,SDCD,S2D,C2D  
+!$OMP THREADPRIVATE(/C0/)
       COMMON /C1/P,Q,S,T,XY,X2,Y2,D2,R,R2,R3,R5,QR,QRX,A3,A5,B3,C3,     
      *           UY,VY,WY,UZ,VZ,WZ                                      
+!$OMP THREADPRIVATE(/C1/)
       DATA F0,F1,F2,F3,F4,F5,F8,F9                                      
      *        /0.D0,1.D0,2.D0,3.D0,4.D0,5.D0,8.D0,9.D0/                 
       DATA PI2/6.283185307179586D0/                                     
@@ -434,8 +439,10 @@ C***** OUTPUT
 C*****   U(12) : DISPLACEMENT AND THEIR DERIVATIVES                     
 C                                                                       
       COMMON /C0/ALP1,ALP2,ALP3,ALP4,ALP5,SD,CD,SDSD,CDCD,SDCD,S2D,C2D  
+!$OMP THREADPRIVATE(/C0/)
       COMMON /C1/P,Q,S,T,XY,X2,Y2,D2,R,R2,R3,R5,QR,QRX,A3,A5,B3,C3,
      &     dummy(6)
+!$OMP THREADPRIVATE(/C1/)
       DATA F0,F1,F2,F3,F5,F7,F10,F15                                    
      *        /0.D0,1.D0,2.D0,3.D0,5.D0,7.D0,10.D0,15.D0/               
       DATA PI2/6.283185307179586D0/                                     
@@ -596,6 +603,7 @@ C*****   UXZ,UYZ,UZZ : Z-DERIVATIVE
 C*****   IRET        : RETURN CODE  ( =0....NORMAL,   =1....SINGULAR )  
 C                                                                       
       COMMON /C0/DUMMY(5),SD,CD,dummy2(5)
+!$OMP THREADPRIVATE(/C0/)
       DIMENSION  XI(2),ET(2),KXI(2),KET(2)                              
       DIMENSION  U(12),DU(12),DUA(12),DUB(12),DUC(12)                   
       DATA  F0,EPS/ 0.D0, EPS_DC3D_PREC /                                       
@@ -809,8 +817,10 @@ C***** OUTPUT
 C*****   U(12) : DISPLACEMENT AND THEIR DERIVATIVES                     
 C                                                                       
       COMMON /C0/ALP1,ALP2,ALP3,ALP4,ALP5,SD,CD,SDSD,CDCD,SDCD,S2D,C2D  
+!$OMP THREADPRIVATE(/C0/)
       COMMON /C2/XI2,ET2,Q2,R,R2,R3,R5,Y,D,TT,ALX,ALE,X11,Y11,X32,Y32,  
      *           EY,EZ,FY,FZ,GY,GZ,HY,HZ                                
+!$OMP THREADPRIVATE(/C2/)
       DATA F0,F2,PI2/0.D0,2.D0,6.283185307179586477D0/   
 C-----                                                                  
       DO 111  I=1,12                                                    
@@ -903,8 +913,10 @@ C***** OUTPUT
 C*****   U(12) : DISPLACEMENT AND THEIR DERIVATIVES                     
 C                                                                       
       COMMON /C0/ALP1,ALP2,ALP3,ALP4,ALP5,SD,CD,SDSD,CDCD,SDCD,S2D,C2D  
+!$OMP THREADPRIVATE(/C0/)
       COMMON /C2/XI2,ET2,Q2,R,R2,R3,R5,Y,D,TT,ALX,ALE,X11,Y11,X32,Y32,  
      *           EY,EZ,FY,FZ,GY,GZ,HY,HZ                                
+!$OMP THREADPRIVATE(/C2/)
       DATA  F0,F1,F2,PI2/0.D0,1.D0,2.D0,6.283185307179586D0/            
       real*8 tmpd1,tmpd2
 C-----                                                                  
@@ -1031,8 +1043,10 @@ C***** OUTPUT
 C*****   U(12) : DISPLACEMENT AND THEIR DERIVATIVES                     
 C                                                                       
       COMMON /C0/ALP1,ALP2,ALP3,ALP4,ALP5,SD,CD,SDSD,CDCD,SDCD,S2D,C2D  
+!$OMP THREADPRIVATE(/C0/)
       COMMON /C2/XI2,ET2,Q2,R,R2,R3,R5,Y,D,TT,ALX,ALE,X11,Y11,X32,Y32,  
      *           EY,EZ,FY,FZ,GY,GZ,HY,HZ                                
+!$OMP THREADPRIVATE(/C2/)
       DATA F0,F1,F2,F3,PI2/0.D0,1.D0,2.D0,3.D0,6.283185307179586D0/     
 C-----                                                                  
       C=D+Z                                                             
@@ -1144,6 +1158,7 @@ C*****   DIP   : DIP-ANGLE (DEGREE)
 C### CAUTION ### IF COS(DIP) IS SUFFICIENTLY SMALL, IT IS SET TO ZERO   
 C                                                                       
       COMMON /C0/ALP1,ALP2,ALP3,ALP4,ALP5,SD,CD,SDSD,CDCD,SDCD,S2D,C2D  
+!$OMP THREADPRIVATE(/C0/)
       DATA F0,F1,F2/0.0D0,1.0D0,2.0D0/             
       DATA EPS/EPS_DC3D_PREC/                                                
 C-----                                                                  
@@ -1181,8 +1196,10 @@ C*****   X,Y,D : STATION COORDINATES IN FAULT SYSTEM
 C### CAUTION ### IF X,Y,D ARE SUFFICIENTLY SMALL, THEY ARE SET TO ZERO  
 C                                                                       
       COMMON /C0/DUMMY(5),SD,CD,dummy2(5)
+!$OMP THREADPRIVATE(/C0/)
       COMMON /C1/P,Q,S,T,XY,X2,Y2,D2,R,R2,R3,R5,QR,QRX,A3,A5,B3,C3,     
      *           UY,VY,WY,UZ,VZ,WZ                                      
+!$OMP THREADPRIVATE(/C1/)
       DATA  F0,F1,F3,F5,EPS/0.D0,1.D0,3.D0,5.D0,EPS_DC3D_PREC/               
 C-----                                                                  
       IF(DABS(X).LT.EPS) X=F0                                           
@@ -1238,6 +1255,7 @@ C### CAUTION ### IF XI,ET,Q ARE SUFFICIENTLY SMALL, THEY ARE SET TO ZER0
 C                                                                       
       COMMON /C2/XI2,ET2,Q2,R,R2,R3,R5,Y,D,TT,ALX,ALE,X11,Y11,X32,Y32,  
      *           EY,EZ,FY,FZ,GY,GZ,HY,HZ                                
+!$OMP THREADPRIVATE(/C2/)
       DATA  F0,F1,F2,EPS/0.D0,1.D0,2.D0,EPS_DC3D_PREC/                       
 C-----                                                                  
       IF(DABS(XI).LT.EPS) XI=F0                                         
@@ -1293,3 +1311,16 @@ C-----
       HZ=Y*Q*X32+XI*Q*Y32*CD                                            
       RETURN                                                            
       END                                                               
+C
+C     returns 1 if dc3d was compiled with OpenMP support, i.e. the
+C     THREADPRIVATE directives are active and the routines are thread
+C     safe; returns 0 if compiled without -fopenmp (directives
+C     ignored, COMMON blocks shared: serial and MPI use remain safe,
+C     but THREADED kernel calls would corrupt results - callers that
+C     thread must check this)
+C
+      INTEGER FUNCTION DC3DTS()
+      DC3DTS=0
+!$    DC3DTS=1
+      RETURN
+      END

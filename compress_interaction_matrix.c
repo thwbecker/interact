@@ -467,6 +467,11 @@ int main(int argc, char **argv)
       fprintf(stderr,"%s: core %03i/%03i: assigning hmmvp m %i n %i tol %g (whole-matrix rel Frobenius) eta %g nthreads %i\n",
 	      argv[0],medium->comm_rank,medium->comm_size,m,n,(double)hmmvp_tol,
 	      (double)hmmvp_eta,hmmvp_nthreads);
+      if((hmmvp_nthreads > 1) && (dc3dts_() == 0)){
+	fprintf(stderr,"%s: -hmmvp_nthreads %i requested but dc3d.F was compiled WITHOUT\n%s: -fopenmp: the THREADPRIVATE directives are inactive and threaded kernel\n%s: calls would corrupt the matrix - rebuild with -fopenmp in FFLAGS/LDFLAGS\n",
+		argv[0],hmmvp_nthreads,argv[0],argv[0]);
+	exit(-1);
+      }
       hmmvp_handle = chmmvp_compress_in_memory((int)m,xc,yc,zc,(double)hmmvp_tol,
 					       (double)hmmvp_eta,hmmvp_nthreads,
 					       (void *)ictx);

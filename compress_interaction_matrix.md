@@ -20,8 +20,8 @@ dense operator.
 | dense | (always built) | PETSc |
 | HTOOL | 1 (default) | PETSc configured `--download-htool`, compile with `-DUSE_PETSC_HMAT` (`PETSC_HTOOL_USED` in `makefile.petsc`) |
 | H2OPUS | 2 | PETSc configured `--download-h2opus --download-thrust` (CPU), same define |
-| HACApK | 3 | `cd HACApK/v.1.0.0/C_interface; make; ar rcs libhacapk.a m_*.o HACApK_*.o`, then `HACAPK_DEFINES = -DUSE_HACAPK` and `HACAPK_LIBS` in `makefile.petsc`. **Build the library with `-O3`** (`OPT` in its Makefile): the unoptimized build has a ~13x slower matvec. **The library MUST be compiled with the same MPI implementation as PETSc** (otherwise `HACApK_init` fails with `MPI_Comm_size failed`): use the wrappers PETSc reports, `pkg-config --variable=fcompiler PETSc`, or `$PETSC_DIR/$PETSC_ARCH/bin/mpifort` for `--download-mpich` builds. |
 | hmmvp | 4 | clone https://github.com/ambrad/hmmvp ; create make.inc (CPP/BLAS/LAPACK), add `-std=c++14` to `opt`, `mode = omp`, `mkdir lib bin`, `make`; set `HMMVP_DIR/HMMVP_DEFINES/HMMVP_INC/HMMVP_LIBS` in `makefile.petsc` (links the C++ shim `hmmvp_c_shim.cpp`). EPL-1.0 licensed. |
+| HACApK | 3 | `cd HACApK/v.1.0.0/C_interface; make; ar rcs libhacapk.a m_*.o HACApK_*.o`, then `HACAPK_DEFINES = -DUSE_HACAPK` and `HACAPK_LIBS` in `makefile.petsc`. **Build the library with `-O3`** (`OPT` in its Makefile): the unoptimized build has a ~13x slower matvec. **The library MUST be compiled with the same MPI implementation as PETSc** (otherwise `HACApK_init` fails with `MPI_Comm_size failed`): use the wrappers PETSc reports, `pkg-config --variable=fcompiler PETSc`, or `$PETSC_DIR/$PETSC_ARCH/bin/mpifort` for `--download-mpich` builds. |
 
 PETSc example configure for everything at once:
 
@@ -127,7 +127,16 @@ dense matvec scales N^2, the H backends ~N log N.
   (dd3 commented out) and has no DC3D0 point source, so interact's
   THREADPRIVATE dc3d.F is the more general implementation at
   identical speed. triangular element routines remain unaudited for
-  thread safety.
+  thread safety. building WITHOUT -fopenmp remains fully safe for
+  serial and pure-MPI use (COMMON blocks are per process; MPI ranks
+  never shared them) and costs nothing; a runtime sentinel
+  (DC3DTS() in dc3d.F, true only when the THREADPRIVATE directives
+  are active) lets threaded callers verify the build: the tool
+  refuses -hmmvp_nthreads > 1 with a clear message instead of
+  silently corrupting if dc3d.F was compiled without the flag.
+  measured THREADPRIVATE overhead on 5e5 kernel calls: < 1 percent
+  (0.713 / 0.719 / 0.722 s for original / directives-inactive /
+  directives-active builds, identical checksums).
 - **HACApK (`-use_hmatrix 3`) is the best fit for this operator**:
   index-based kernel interface, robust default ACA (no reliability
   tuning needed; `param(61)=1` normalization is set by the interface),
