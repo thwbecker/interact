@@ -50,9 +50,13 @@ public:
        COMMON blocks) and hmmvp's threaded compression calls this
        concurrently. the mutex costs construction the kernel-call
        parallelism (ACA algebra still threads); the MVP never calls
-       the kernel and threads freely
+       the kernel and threads freely. NOTE: dc3d.F now carries
+       THREADPRIVATE COMMON blocks (compile with -fopenmp), making
+       the rectangular Okada chain thread safe - the mutex is
+       therefore DISABLED; re-enable it if unaudited element types
+       (e.g. triangles) are used with threading:
+       std::lock_guard<std::mutex> lock(kmutex);
     */
-    std::lock_guard<std::mutex> lock(kmutex);
     for (std::size_t ic = 0; ic < cs.size(); ic++)
       for (std::size_t ir = 0; ir < rs.size(); ir++)
 	*B++ = ckernel_func((int)rs[ir] - 1, (int)cs[ic] - 1, kctx);
