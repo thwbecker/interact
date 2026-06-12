@@ -104,6 +104,35 @@ KSP/MATSHELL path, H2OPUS 8.1e-4 (floor, see below).
 Speedups grow with N (HTOOL matvec: 1.7x at N=1600, 3.5-8x at 6400);
 dense matvec scales N^2, the H backends ~N log N.
 
+## Measured parallel scaling (48-core machine, N=14400, 100 matvecs)
+
+| cores | HTOOL asm / mv_H | HACApK asm / mv_H | hmmvp asm / mv_H |
+|---|---|---|---|
+| 1 | 554 s / 38.5 ms | 20.3 s / 17.3 ms | 22.5 s / 26.1 ms |
+| 8 | 59 s / 6.7 ms | 3.5 s / 2.5 ms | 4.0 s / 23 ms |
+| 16 | 23 s / 1.3 ms | 1.6 s / 1.4 ms | 2.7 s / 29 ms |
+| 24 | **13.5 s / 0.52 ms** | 1.3 s / 1.3 ms | 2.0 s / 44 ms |
+| 48 | 6.1 s / 0.78 ms | **0.9 s** / 1.2 ms | 1.2 s / 78 ms |
+
+(per-matvec ms; HTOOL/HACApK via MPI ranks, hmmvp via OpenMP threads;
+OPENBLAS_NUM_THREADS=1 throughout - threaded BLAS nested inside
+block-level parallelism thrashes catastrophically.)
+
+Conclusions: HTOOL's matvec is the parallel winner (~0.5 ms at 24
+ranks, 13x faster than 24-rank dense; its expensive reliable-config
+assembly scales superlinearly, 91x on 48 ranks, and amortizes after
+~25k matvecs - a fraction of one earthquake cycle run). HACApK wins
+assembly outright (sub-second at 48 ranks) with matvecs a factor ~2
+behind HTOOL, comm-bound beyond ~16 ranks (gather + ring exchange);
+its error is bit-identical across all rank counts and machines.
+hmmvp's threaded CONSTRUCTION scales well (19x at 48 - enabled by the
+THREADPRIVATE dc3d.F kernel) but its threaded matvec does not scale
+on this hardware; use it serial/few-threaded, for the global
+tolerance semantics and the future file-based workflow. Sweet spot
+for matvec-dominated production (earthquake cycles): HTOOL at ~16-24
+ranks. For assembly-dominated or frequently re-assembled workloads:
+HACApK.
+
 ## Recommended settings
 
 - **hmmvp (`-use_hmatrix 4`)**: matches HACApK on assembly and matvec
