@@ -52,10 +52,9 @@ run_one(){ # $1 command prefix, $2 use_hmatrix, $3 options, $4 label, $5 cores
 }
 
 echo "# N=$N nrandom=$NRANDOM cores: $CORES  ($(date))" | tee $OUT
-# pin OpenMP to 1 thread for the MPI backends: interact's Green's
-# function chain is not thread safe (Okada dc3d COMMON blocks), and
-# HACApK's construction has OpenMP regions that would otherwise call
-# it concurrently with the ambient (large) default thread count
+# pin OpenMP to 1 thread for the MPI backends so ranks x threads do
+# not oversubscribe (the Okada kernel itself is now thread safe via
+# THREADPRIVATE dc3d.F, compiled with -fopenmp)
 export OMP_NUM_THREADS=1
 for P in $CORES; do
     run_one "$MPIRUN -np $P"  1 "$HTOOL_OPTS"  "HTOOL"  $P

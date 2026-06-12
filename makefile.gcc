@@ -33,7 +33,7 @@ MY_LIBDIR_SPEC = -L
 
 # LINKER FLAGS (without -lm, that get's added later)
 # gcc
-LDFLAGS = 
+LDFLAGS = -fopenmp
 
 # X 11 only needed for PGPLOT
 X11LIBDIR = /usr/lib/x86_64-linux-gnu/

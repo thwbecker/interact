@@ -36,7 +36,7 @@ USE_IPO =
 
 # LINKER FLAGS (without -lm, that get's added later)
 # gcc
-LDFLAGS =  -nofor-main -L/disk/rh_usr_local/intel/oneapi/mpi/latest/lib/
+LDFLAGS =  -qopenmp -nofor-main -L/disk/rh_usr_local/intel/oneapi/mpi/latest/lib/
 
 # X 11 only needed for PGPLOT
 X11LIBDIR = /usr/lib/x86_64-linux-gnu/

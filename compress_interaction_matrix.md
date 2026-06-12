@@ -20,8 +20,8 @@ dense operator.
 | dense | (always built) | PETSc |
 | HTOOL | 1 (default) | PETSc configured `--download-htool`, compile with `-DUSE_PETSC_HMAT` (`PETSC_HTOOL_USED` in `makefile.petsc`) |
 | H2OPUS | 2 | PETSc configured `--download-h2opus --download-thrust` (CPU), same define |
-| hmmvp | 4 | clone https://github.com/ambrad/hmmvp ; create make.inc (CPP/BLAS/LAPACK), add `-std=c++14` to `opt`, `mode = omp`, `mkdir lib bin`, `make`; set `HMMVP_DIR/HMMVP_DEFINES/HMMVP_INC/HMMVP_LIBS` in `makefile.petsc` (links the C++ shim `hmmvp_c_shim.cpp`). EPL-1.0 licensed. |
 | HACApK | 3 | `cd HACApK/v.1.0.0/C_interface; make; ar rcs libhacapk.a m_*.o HACApK_*.o`, then `HACAPK_DEFINES = -DUSE_HACAPK` and `HACAPK_LIBS` in `makefile.petsc`. **Build the library with `-O3`** (`OPT` in its Makefile): the unoptimized build has a ~13x slower matvec. **The library MUST be compiled with the same MPI implementation as PETSc** (otherwise `HACApK_init` fails with `MPI_Comm_size failed`): use the wrappers PETSc reports, `pkg-config --variable=fcompiler PETSc`, or `$PETSC_DIR/$PETSC_ARCH/bin/mpifort` for `--download-mpich` builds. |
+| hmmvp | 4 | clone https://github.com/ambrad/hmmvp ; create make.inc (CPP/BLAS/LAPACK), add `-std=c++14` to `opt`, `mode = omp`, `mkdir lib bin`, `make`; set `HMMVP_DIR/HMMVP_DEFINES/HMMVP_INC/HMMVP_LIBS` in `makefile.petsc` (links the C++ shim `hmmvp_c_shim.cpp`). EPL-1.0 licensed. |
 
 PETSc example configure for everything at once:
 
@@ -113,13 +113,21 @@ dense matvec scales N^2, the H backends ~N log N.
   matvec (-hmmvp_nthreads). Its native compress-to-file/load workflow
   (CompressToFile/NewHmat) is the natural basis for the planned
   save/reload option. -hmmvp_eta (default 3) is the admissibility.
-  THREAD SAFETY: interact's Green's function chain is not thread safe
-  (the Okada dc3d routines use COMMON blocks); the shim therefore
-  serializes kernel calls during threaded compression (a mutex), so
-  -hmmvp_nthreads accelerates the compression algebra and the matvec
-  but not the kernel evaluations. for the same reason keep
-  OMP_NUM_THREADS=1 for any backend whose CONSTRUCTION may thread
-  kernel calls (e.g. HACApK built with OpenMP).
+  THREAD SAFETY: dc3d.F now carries !$OMP THREADPRIVATE COMMON blocks,
+  making the rectangular Okada kernel chain thread safe - PROVIDED
+  dc3d.F is compiled with -fopenmp (FFLAGS) and binaries link with
+  -fopenmp (LDFLAGS); without the flag the directives are comments
+  and concurrent kernel calls silently corrupt entries (use
+  ifort/-qopenmp equivalents on other compilers). serial results are
+  bit-identical to the original. validated: hmmvp threaded
+  compression without any kernel mutex gives serial-class errors at
+  1/2/4 threads, and interact's dc3d agrees with HBI's f90 rewrite
+  (mod_okada) to 3e-16 over 216 test configurations for strike and
+  dip slip - HBI's version omits the tensile (opening) terms
+  (dd3 commented out) and has no DC3D0 point source, so interact's
+  THREADPRIVATE dc3d.F is the more general implementation at
+  identical speed. triangular element routines remain unaudited for
+  thread safety.
 - **HACApK (`-use_hmatrix 3`) is the best fit for this operator**:
   index-based kernel interface, robust default ACA (no reliability
   tuning needed; `param(61)=1` normalization is set by the interface),

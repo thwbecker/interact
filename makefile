@@ -185,7 +185,7 @@ FLAGS = $(DEFINE_FLAGS) $(PGPLOT_INCLUDES) $(SLATEC_INCLUDES) \
 
 # other flags
 CFLAGS =   $(FLAGS) $(SCARGS)   $(MACHINE_DEFINES)
-FFLAGS =   $(FLAGS) $(SFARGS)   $(MACHINE_DEFINES)
+FFLAGS =   $(FLAGS) $(SFARGS)   $(MACHINE_DEFINES) -fopenmp
 F90FLAGS = $(FLAGS) $(SF90ARGS) $(MACHINE_DEFINES)
 
 
@@ -584,8 +584,7 @@ $(BDIR)/calc_interaction_matrix: $(ODIR)/coulomb_stress.o \
 		$(PGLIBS) $(SLATEC_LIBS)  $(LDFLAGS)
 
 $(ODIR)/hmmvp_c_shim.o: hmmvp_c_shim.cpp
-	$(MPICXX) -O3 -std=c++14 -fPIC $(HMMVP_INC) -c hmmvp_c_shim.cpp \
-	-o $(ODIR)/hmmvp_c_shim.o
+	mpicxx -std=c++14 -O2 -fPIC $(HMMVP_INC) -c hmmvp_c_shim.cpp -o $(ODIR)/hmmvp_c_shim.o
 
 $(BDIR)/compress_interaction_matrix: $(ODIR)/compress_interaction_matrix.o $(ODIR)/coulomb_stress.o $(HMMVP_OBJS) \
 	$(ODIR)/interact.o 	$(ODIR)/petsc_interact.o $(GEN_P_INC)  $(LIBLIST) 
