@@ -62,6 +62,8 @@ echo "# N=$N nrandom=$NRANDOM cores: $CORES  ($(date))" | tee $OUT
 export OMP_NUM_THREADS=1
 export OPENBLAS_NUM_THREADS=1
 export MKL_NUM_THREADS=1
+export OMP_PROC_BIND=close
+export OMP_PLACES=cores 
 for P in $CORES; do
     run_one "$MPIRUN -np $P"  1 "$HTOOL_OPTS"  "HTOOL"  $P
 done

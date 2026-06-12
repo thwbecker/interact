@@ -1,4 +1,4 @@
-# N=14400 nrandom=100 cores: 1 2 4 8 16 24 48  (Fri Jun 12 11:35:58 AM CDT 2026)
+# N=14400 nrandom=100 cores: 1 2 4 8 16 24 48  (Fri Jun 12 01:09:56 PM CDT 2026)
 HTOOL    14400     1  err 6.60e-07   asm    554.5 s  mv_dense    7.557 s  mv_H    3.852 s
 HTOOL    14400     2  err 6.57e-07   asm    271.0 s  mv_dense    5.186 s  mv_H    1.238 s
 HTOOL    14400     4  err 7.92e-07   asm    140.4 s  mv_dense    2.620 s  mv_H    0.892 s
@@ -13,10 +13,10 @@ HACApK   14400     8  err 1.32e-05   asm      3.5 s  mv_dense    1.752 s  mv_H  
 HACApK   14400    16  err 1.32e-05   asm      1.6 s  mv_dense    0.822 s  mv_H    0.136 s
 HACApK   14400    24  err 1.32e-05   asm      1.3 s  mv_dense    0.670 s  mv_H    0.131 s
 HACApK   14400    48  err 1.32e-05   asm      0.9 s  mv_dense    0.670 s  mv_H    0.120 s
-hmmvp    14400     1  err 3.87e-05   asm     22.5 s  mv_dense    7.608 s  mv_H    2.613 s
-hmmvp    14400     2  err 3.87e-05   asm     11.9 s  mv_dense    8.269 s  mv_H    3.615 s
-hmmvp    14400     4  err 3.87e-05   asm      6.7 s  mv_dense    8.923 s  mv_H    4.269 s
-hmmvp    14400     8  err 3.87e-05   asm      4.0 s  mv_dense    8.860 s  mv_H    2.346 s
-hmmvp    14400    16  err 3.87e-05   asm      2.7 s  mv_dense    8.972 s  mv_H    2.866 s
-hmmvp    14400    24  err 3.87e-05   asm      2.0 s  mv_dense    8.536 s  mv_H    4.435 s
-hmmvp    14400    48  err 3.87e-05   asm      1.2 s  mv_dense    8.621 s  mv_H    7.832 s
+hmmvp    14400     1  err 3.87e-05   asm     22.7 s  mv_dense    7.756 s  mv_H    2.623 s
+hmmvp    14400     2  err 3.87e-05   asm     12.2 s  mv_dense    8.437 s  mv_H    2.867 s
+hmmvp    14400     4  err 3.87e-05   asm      6.8 s  mv_dense    8.262 s  mv_H    2.750 s
+hmmvp    14400     8  err 3.87e-05   asm      4.0 s  mv_dense    8.085 s  mv_H    3.483 s
+hmmvp    14400    16  err 3.87e-05   asm      2.7 s  mv_dense    8.076 s  mv_H    2.887 s
+hmmvp    14400    24  err 3.87e-05   asm      2.0 s  mv_dense    8.073 s  mv_H    3.778 s
+hmmvp    14400    48  err 3.87e-05   asm      1.2 s  mv_dense    7.879 s  mv_H    6.912 s
