@@ -43,16 +43,33 @@ HACAPK_LIBS = -L./HACApK/v.1.0.0/C_interface -lhacapk -lgfortran -fopenmp -llapa
 #HACAPK_DEFINES =
 #HACAPK_LIBS =
 
-PETSC_INCLUDES = -I$(PETSC_DIR)/include/ $(CPPFLAGS) -DUSE_PETSC $(PETSC_HTOOL_USED) $(HACAPK_DEFINES)
+#
+# optional hmmvp support for compress_interaction_matrix
+# (https://github.com/ambrad/hmmvp, build there with -std=c++14 in
+# opt, mode=omp, and mkdir lib bin; see compress_interaction_matrix.md)
+HMMVP_DIR = $(HOME)/progs/src/hmmvp
+HMMVP_DEFINES = -DUSE_HMMVP
+HMMVP_INC = -I$(HMMVP_DIR) -I$(HMMVP_DIR)/hmmvp/include -I$(HMMVP_DIR)/util/include
+HMMVP_LIBS = -L$(HMMVP_DIR)/lib -lhmmvp_omp -lstdc++ -fopenmp -llapack -lblas
+HMMVP_OBJS = $(ODIR)/hmmvp_c_shim.o
+#HMMVP_DEFINES =
+#HMMVP_LIBS =
+#HMMVP_OBJS =
+
+
+
+PETSC_INCLUDES = -I$(PETSC_DIR)/include/ $(CPPFLAGS) -DUSE_PETSC $(PETSC_HTOOL_USED) $(HACAPK_DEFINES) $(HMMVP_DEFINES)
 #
 #
 PETSC_LIBS = -L$(PETSC_DIR)/lib/  $(PETSC_LDIR) $(PETSC_LIBADD)  # -L/disk/rh_usr_local/intel/oneapi/mpi/latest/lib/
 
 MPICC = $(shell pkg-config --variable=ccompiler $(PACKAGES))
+MPICXX = $(shell pkg-config --variable=cxxcompiler $(PACKAGES))
 MPILD =  $(shell pkg-config --variable=fcompiler $(PACKAGES))
+
+
 # fallback if PETSc was built without fortran (--with-fc=0): fcompiler is empty
 ifeq ($(strip $(MPILD)),)
 MPILD = mpif77
 endif
-
 

@@ -583,12 +583,16 @@ $(BDIR)/calc_interaction_matrix: $(ODIR)/coulomb_stress.o \
 	-o $(BDIR)/calc_interaction_matrix $(LIBS) $(SUPERLU_LIBS) \
 		$(PGLIBS) $(SLATEC_LIBS)  $(LDFLAGS)
 
-$(BDIR)/compress_interaction_matrix: $(ODIR)/compress_interaction_matrix.o $(ODIR)/coulomb_stress.o \
+$(ODIR)/hmmvp_c_shim.o: hmmvp_c_shim.cpp
+	$(MPICXX) -O3 -std=c++14 -fPIC $(HMMVP_INC) -c hmmvp_c_shim.cpp \
+	-o $(ODIR)/hmmvp_c_shim.o
+
+$(BDIR)/compress_interaction_matrix: $(ODIR)/compress_interaction_matrix.o $(ODIR)/coulomb_stress.o $(HMMVP_OBJS) \
 	$(ODIR)/interact.o 	$(ODIR)/petsc_interact.o $(GEN_P_INC)  $(LIBLIST) 
 	$(MPILD)   $(ODIR)/compress_interaction_matrix.o \
 	$(ODIR)/petsc_interact.o 	$(ODIR)/coulomb_stress.o $(ODIR)/interact.o  \
-	-o $(BDIR)/compress_interaction_matrix $(LIBS) $(SUPERLU_LIBS) \
-			$(PETSC_LIBS) $(HACAPK_LIBS) $(PGLIBS) $(SLATEC_LIBS)  $(LDFLAGS)
+	-o $(BDIR)/compress_interaction_matrix $(HMMVP_OBJS) $(LIBS) $(SUPERLU_LIBS) \
+			$(PETSC_LIBS) $(HACAPK_LIBS) $(HMMVP_LIBS) $(PGLIBS) $(SLATEC_LIBS)  $(LDFLAGS)
 
 $(BDIR)/petsc_simple_solve: $(ODIR)/petsc_simple_solve.o $(ODIR)/coulomb_stress.o $(ODIR)/interact.o    \
 	$(ODIR)/petsc_interact.o $(GEN_P_INC) $(LIBLIST) 

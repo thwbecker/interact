@@ -93,6 +93,21 @@
 */
 
 
+#if defined(USE_HACAPK) || defined(USE_HMMVP)
+/* 
+   shared MATSHELL context for H matrix libraries whose matvec
+   operates on GLOBAL vectors (HACApK, hmmvp): scatter the
+   distributed x to a full-length local copy, multiply, copy back the
+   locally owned slice of the (global) result
+*/
+typedef struct{
+  void *handle;			/* opaque library handle */
+  Vec xall;			/* full-length local copy of x */
+  VecScatter scat;		/* distributed x -> xall */
+  double *ball;			/* full-length result work array */
+  PetscInt rs,re;		/* local ownership range */
+} hacapk_shell_ctx;
+#endif
 #ifdef USE_HACAPK
 /* 
    HACApK support via the C interface in HACApK/v.1.0.0/C_interface:
@@ -141,13 +156,6 @@ double ckernel_func(int i, int j, void *par)
    scatter x to a full-length local copy first, then copy back the
    locally owned slice of the result
 */
-typedef struct{
-  void *handle;			/* HACApK opaque handle */
-  Vec xall;			/* full-length local copy of x */
-  VecScatter scat;		/* distributed x -> xall */
-  double *ball;			/* full-length result work array */
-  PetscInt rs,re;		/* local ownership range */
-} hacapk_shell_ctx;
 static PetscErrorCode MatMult_HACApK(Mat A, Vec x, Vec y)
 {
   hacapk_shell_ctx *hctx;
@@ -160,6 +168,44 @@ static PetscErrorCode MatMult_HACApK(Mat A, Vec x, Vec y)
   PetscCall(VecScatterEnd(hctx->scat,x,hctx->xall,INSERT_VALUES,SCATTER_FORWARD));
   PetscCall(VecGetArrayRead(hctx->xall,&xa));
   chacapk_mult_Ax_H(hctx->handle,(double *)xa,hctx->ball);
+  PetscCall(VecRestoreArrayRead(hctx->xall,&xa));
+  PetscCall(VecGetArray(y,&ya));
+  for(i=hctx->rs;i < hctx->re;i++)
+    ya[i-hctx->rs] = (PetscScalar)hctx->ball[i];
+  PetscCall(VecRestoreArray(y,&ya));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+#endif
+
+#ifdef USE_HMMVP
+/* 
+   hmmvp (A.M. Bradley) support via hmmvp_c_shim.cpp: index-based
+   block kernel (same ckernel_func as HACApK), in-memory compression
+   with a WHOLE-MATRIX relative Frobenius tolerance -hmmvp_tol
+   (||B-A||_F <= tol ||B||_F, i.e. tol bounds exactly the error this
+   tool measures), OpenMP-threaded construction and matvec. wrapped
+   as a MATSHELL like HACApK; the Mvp needs global vectors, so the
+   same scatter-to-all context is used (at np>1 every rank holds the
+   full H matrix and computes the full product - correct but
+   redundant; intended for serial/threaded use)
+*/
+extern void *chmmvp_compress_in_memory(int, double *, double *, double *,
+				       double, double, int, void *);
+extern void chmmvp_mvp(void *, double *, double *);
+extern void chmmvp_get_info(void *, int *, int *, long *);
+extern void chmmvp_delete(void *);
+static PetscErrorCode MatMult_hmmvp(Mat A, Vec x, Vec y)
+{
+  hacapk_shell_ctx *hctx;	/* same context layout as HACApK */
+  const PetscScalar *xa;
+  PetscScalar *ya;
+  PetscInt i;
+  PetscFunctionBeginUser;
+  PetscCall(MatShellGetContext(A,&hctx));
+  PetscCall(VecScatterBegin(hctx->scat,x,hctx->xall,INSERT_VALUES,SCATTER_FORWARD));
+  PetscCall(VecScatterEnd(hctx->scat,x,hctx->xall,INSERT_VALUES,SCATTER_FORWARD));
+  PetscCall(VecGetArrayRead(hctx->xall,&xa));
+  chmmvp_mvp(hctx->handle,(double *)xa,hctx->ball);
   PetscCall(VecRestoreArrayRead(hctx->xall,&xa));
   PetscCall(VecGetArray(y,&ya));
   for(i=hctx->rs;i < hctx->re;i++)
@@ -217,7 +263,10 @@ int main(int argc, char **argv)
   
   /* set defaults, can always override */
   PetscCall(PetscOptionsGetInt(NULL, NULL, "-use_hmatrix", &medium->use_hmatrix,&read_value));
-  if(medium->use_hmatrix == 3){
+  if(medium->use_hmatrix == 4){
+    /*  */
+    fprintf(stderr,"%s: setting up for hmmvp\n",argv[0]);
+  }else if(medium->use_hmatrix == 3){
     /*  */
     fprintf(stderr,"%s: setting up for HACApK\n",argv[0]);
     
@@ -396,7 +445,60 @@ int main(int argc, char **argv)
        H version of Is */
     
     PetscTime(&t0);
-    if(medium->use_hmatrix == 3){	/* HACApK via MATSHELL */
+    if(medium->use_hmatrix == 4){	/* hmmvp via MATSHELL */
+#ifdef USE_HMMVP
+      double *xc,*yc,*zc;
+      void *hmmvp_handle;
+      PetscReal hmmvp_tol = 1.0e-5, hmmvp_eta = 3.0;
+      int ic,hmmvp_nthreads = 1;
+      long hmmvp_nnz;
+      int hmm,hmn;
+      PetscCall(PetscOptionsGetReal(NULL,NULL,"-hmmvp_tol",&hmmvp_tol,NULL));
+      PetscCall(PetscOptionsGetReal(NULL,NULL,"-hmmvp_eta",&hmmvp_eta,NULL));
+      PetscCall(PetscOptionsGetInt(NULL,NULL,"-hmmvp_nthreads",&hmmvp_nthreads,NULL));
+      xc = (double *)malloc(sizeof(double)*m);
+      yc = (double *)malloc(sizeof(double)*m);
+      zc = (double *)malloc(sizeof(double)*m);
+      for(ic=0;ic < m;ic++){
+	xc[ic] = (double)ictx->fault[ic].x[INT_X];
+	yc[ic] = (double)ictx->fault[ic].x[INT_Y];
+	zc[ic] = (double)ictx->fault[ic].x[INT_Z];
+      }
+      fprintf(stderr,"%s: core %03i/%03i: assigning hmmvp m %i n %i tol %g (whole-matrix rel Frobenius) eta %g nthreads %i\n",
+	      argv[0],medium->comm_rank,medium->comm_size,m,n,(double)hmmvp_tol,
+	      (double)hmmvp_eta,hmmvp_nthreads);
+      hmmvp_handle = chmmvp_compress_in_memory((int)m,xc,yc,zc,(double)hmmvp_tol,
+					       (double)hmmvp_eta,hmmvp_nthreads,
+					       (void *)ictx);
+      if(!hmmvp_handle){
+	fprintf(stderr,"%s: hmmvp compression failed\n",argv[0]);
+	exit(-1);
+      }
+      chmmvp_get_info(hmmvp_handle,&hmm,&hmn,&hmmvp_nnz);
+      HEADNODE
+	fprintf(stderr,"%s: hmmvp %i by %i, %ld stored scalars, compression ratio %.5g\n",
+		argv[0],hmm,hmn,hmmvp_nnz,
+		(double)((double)m*(double)n/(double)hmmvp_nnz));
+      {
+	hacapk_shell_ctx *hctx;
+	Vec xd;
+	hctx = (hacapk_shell_ctx *)malloc(sizeof(hacapk_shell_ctx));
+	hctx->handle = hmmvp_handle;
+	hctx->ball = (double *)malloc(sizeof(double)*m);
+	PetscCall(MatCreateShell(PETSC_COMM_WORLD,PETSC_DECIDE,PETSC_DECIDE,m,n,
+				 (void *)hctx,&medium->In));
+	PetscCall(MatShellSetOperation(medium->In,MATOP_MULT,(void (*)(void))MatMult_hmmvp));
+	PetscCall(MatCreateVecs(medium->In,&xd,NULL));
+	PetscCall(VecScatterCreateToAll(xd,&hctx->scat,&hctx->xall));
+	PetscCall(VecGetOwnershipRange(xd,&hctx->rs,&hctx->re));
+	PetscCall(VecDestroy(&xd));
+      }
+      free(xc);free(yc);free(zc);
+#else
+      fprintf(stderr,"%s: hmmvp requested but not compiled in (set HMMVP_DEFINES/HMMVP_LIBS/HMMVP_DIR in makefile.petsc)\n",argv[0]);
+      exit(-1);
+#endif
+    }else if(medium->use_hmatrix == 3){	/* HACApK via MATSHELL */
 #ifdef USE_HACAPK
       double *xc,*yc,*zc;
       void *hacapk_handle;

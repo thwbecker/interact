@@ -20,6 +20,7 @@ dense operator.
 | dense | (always built) | PETSc |
 | HTOOL | 1 (default) | PETSc configured `--download-htool`, compile with `-DUSE_PETSC_HMAT` (`PETSC_HTOOL_USED` in `makefile.petsc`) |
 | H2OPUS | 2 | PETSc configured `--download-h2opus --download-thrust` (CPU), same define |
+| hmmvp | 4 | clone https://github.com/ambrad/hmmvp ; create make.inc (CPP/BLAS/LAPACK), add `-std=c++14` to `opt`, `mode = omp`, `mkdir lib bin`, `make`; set `HMMVP_DIR/HMMVP_DEFINES/HMMVP_INC/HMMVP_LIBS` in `makefile.petsc` (links the C++ shim `hmmvp_c_shim.cpp`). EPL-1.0 licensed. |
 | HACApK | 3 | `cd HACApK/v.1.0.0/C_interface; make; ar rcs libhacapk.a m_*.o HACApK_*.o`, then `HACAPK_DEFINES = -DUSE_HACAPK` and `HACAPK_LIBS` in `makefile.petsc`. **Build the library with `-O3`** (`OPT` in its Makefile): the unoptimized build has a ~13x slower matvec. **The library MUST be compiled with the same MPI implementation as PETSc** (otherwise `HACApK_init` fails with `MPI_Comm_size failed`): use the wrappers PETSc reports, `pkg-config --variable=fcompiler PETSc`, or `$PETSC_DIR/$PETSC_ARCH/bin/mpifort` for `--download-mpich` builds. |
 
 PETSc example configure for everything at once:
@@ -45,6 +46,8 @@ adds the htool compression report):
         -mat_h2opus_maxrank 256                          # H2OPUS
     compress_interaction_matrix -geom_file geom.in -use_hmatrix 3 \
         -hacapk_ztol 1e-5                                # HACApK
+    compress_interaction_matrix -geom_file geom.in -use_hmatrix 4 \
+        -hmmvp_tol 1e-6 -hmmvp_nthreads 4                # hmmvp
 
 Matvec timing (adds n random-vector multiplies, timed for dense and H):
 
@@ -72,12 +75,21 @@ Forward `b = Ax`, error tracks the tolerance for HTOOL and HACApK:
 | H2OPUS (maxrank 256) | 2.3e-3 | 2.3e-3 | 2.6e-3 | — |
 | HACApK ztol 1e-4 | 2.0e-6 | 4.7e-6 | — | 1.8e-5 |
 | HACApK ztol 1e-5 | — | 2.5e-7 | 3.5e-7 | 6.2e-7 |
+| hmmvp tol 1e-5 | 7.3e-6 | 3.3e-5 | 1.6e-4 | — |
+| hmmvp tol 1e-6 | — | — | 1.1e-5 | — |
+
+hmmvp's -hmmvp_tol is a WHOLE-MATRIX relative Frobenius bound
+(the MREM method) - the only backend whose tolerance directly bounds
+a global error. note that the x=1 test vector used for the error rows
+above suffers cancellation in the row sums of this sign-structured
+kernel, which inflates the measured relative error somewhat above the
+operator-norm error for all backends alike.
 
 (*N=400 value at eta=100; the eps 1e-3 row is representative.)
 
 Inverse `x = A\b` (N=1600, vs dense LU): HTOOL 5.1e-6 (recommended
-config), HACApK works through the same KSP/MATSHELL path, H2OPUS
-8.1e-4 (floor, see below).
+config), hmmvp 1.9e-6 (tol 1e-6), HACApK works through the same
+KSP/MATSHELL path, H2OPUS 8.1e-4 (floor, see below).
 
 ## Performance (300 matvecs; assembly of one H matrix)
 
@@ -86,6 +98,7 @@ config), HACApK works through the same KSP/MATSHELL path, H2OPUS
 | dense | — | ~85 s | 25.6 s | 1x |
 | HTOOL (ACA eps 3e-5, eta 10) | 8.8e-6 | ~19 s | 6.6 s | 3.9x |
 | **HACApK ztol 1e-5** | **6.2e-7** | **11.7 s** | **3.8 s** | **6.7x** |
+| hmmvp tol 1e-6 (N=6400) | 1.1e-5 | 7.3 s | 1.5 s/300 | fastest matvec at 6400 |
 | HACApK ztol 1e-4 | 1.8e-5 | 9.0 s | 2.9 s | 8.8x |
 
 Speedups grow with N (HTOOL matvec: 1.7x at N=1600, 3.5-8x at 6400);
@@ -93,6 +106,13 @@ dense matvec scales N^2, the H backends ~N log N.
 
 ## Recommended settings
 
+- **hmmvp (`-use_hmatrix 4`)**: matches HACApK on assembly and matvec
+  speed (fastest matvec measured at N=6400), with two distinguishing
+  features: the whole-matrix Frobenius tolerance (-hmmvp_tol sets the
+  global operator error directly) and OpenMP-threaded construction and
+  matvec (-hmmvp_nthreads). Its native compress-to-file/load workflow
+  (CompressToFile/NewHmat) is the natural basis for the planned
+  save/reload option. -hmmvp_eta (default 3) is the admissibility.
 - **HACApK (`-use_hmatrix 3`) is the best fit for this operator**:
   index-based kernel interface, robust default ACA (no reliability
   tuning needed; `param(61)=1` normalization is set by the interface),
@@ -150,6 +170,7 @@ can be tested that way, timing cannot.
 | dense | works | distributed rows, exercised as the baseline in every run |
 | HTOOL | works | error stays in the eps class but differs per np (different block partition): 8.4e-5 / 1.1e-4 / 5.5e-5 at np=1/2/4, eps 1e-3 |
 | H2OPUS | **serial only** | `MatCreateH2OpusFromMat` sampling unsupported in parallel in this PETSc/h2opus; the tool exits with a clear message at np>1 |
+| hmmvp | works (redundant) | bit-identical to serial at np=2 and np=4 (each rank compresses and multiplies the full matrix - correct but redundant; intended for serial/OpenMP use; hmmvp's own MpiHmat is the upgrade path). inverse test verified at 1.9e-6 (tol 1e-6, N=1600) |
 | HACApK | works | **bit-identical to serial at np=2 and np=4** (1.16e-7 at ztol 1e-5): deterministic construction, only the leaf work distribution changes. the MATSHELL gathers x to all ranks (HACApK's adot needs global vectors and returns the global result on each rank) |
 
 - Context for the error target: in quasi-dynamic `rsf_solve` cycles,
