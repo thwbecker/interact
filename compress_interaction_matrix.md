@@ -113,6 +113,13 @@ dense matvec scales N^2, the H backends ~N log N.
   matvec (-hmmvp_nthreads). Its native compress-to-file/load workflow
   (CompressToFile/NewHmat) is the natural basis for the planned
   save/reload option. -hmmvp_eta (default 3) is the admissibility.
+  THREAD SAFETY: interact's Green's function chain is not thread safe
+  (the Okada dc3d routines use COMMON blocks); the shim therefore
+  serializes kernel calls during threaded compression (a mutex), so
+  -hmmvp_nthreads accelerates the compression algebra and the matvec
+  but not the kernel evaluations. for the same reason keep
+  OMP_NUM_THREADS=1 for any backend whose CONSTRUCTION may thread
+  kernel calls (e.g. HACApK built with OpenMP).
 - **HACApK (`-use_hmatrix 3`) is the best fit for this operator**:
   index-based kernel interface, robust default ACA (no reliability
   tuning needed; `param(61)=1` normalization is set by the interface),

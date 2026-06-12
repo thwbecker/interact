@@ -7,11 +7,9 @@
     (the same kernel that fills the dense matrix and drives the
     HACApK construction), converting hmmvp's 1-based block index sets
     to 0-based entries
-
   - compression uses the MREM whole-matrix Frobenius tolerance
     (tm_mrem_fro): ||B - A||_F <= tol ||B||_F, i.e. tol bounds exactly
     the global relative error that the test tool measures
-
   - build with -std=c++14 (hmmvp uses pre-C++17 dynamic exception
     specifications) and the hmmvp include paths, link
     -lhmmvp_omp -lstdc++ -fopenmp (see makefile.petsc)
@@ -22,6 +20,7 @@
 */
 #include <vector>
 #include <cstdio>
+#include <mutex>
 #include "Compress.hpp"
 #include "Hmat.hpp"
 
@@ -44,8 +43,16 @@ public:
   virtual bool Call(const hmmvp::CompressBlockInfo &cbi,
 		    const std::vector<hmmvp::UInt> &rs,
 		    const std::vector<hmmvp::UInt> &cs, double *B) const {
-    /* B is column-major with the fast index on rs; hmmvp indices are
-       1-based */
+    /* 
+       B is column-major with the fast index on rs; hmmvp indices are
+       1-based. kernel calls MUST be serialized: interact's Green's
+       function chain is not thread safe (the Okada dc3d routines use
+       COMMON blocks) and hmmvp's threaded compression calls this
+       concurrently. the mutex costs construction the kernel-call
+       parallelism (ACA algebra still threads); the MVP never calls
+       the kernel and threads freely
+    */
+    std::lock_guard<std::mutex> lock(kmutex);
     for (std::size_t ic = 0; ic < cs.size(); ic++)
       for (std::size_t ir = 0; ir < rs.size(); ir++)
 	*B++ = ckernel_func((int)rs[ir] - 1, (int)cs[ic] - 1, kctx);
@@ -53,6 +60,7 @@ public:
   }
 private:
   void *kctx;
+  mutable std::mutex kmutex;
 };
 }
 

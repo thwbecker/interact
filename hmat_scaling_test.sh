@@ -1,0 +1,70 @@
+#!/bin/bash
+#
+# benchmark H matrix backends of compress_interaction_matrix vs core count
+#
+#   use_hmatrix 1 (HTOOL)  - MPI parallel (mpirun -np P)
+#   use_hmatrix 3 (HACApK) - MPI parallel (mpirun -np P)
+#   use_hmatrix 4 (hmmvp)  - OpenMP threaded (-hmmvp_nthreads P, serial MPI)
+#
+# every run rebuilds the (MPI-distributed) dense reference and reports the
+# relative error of b = A x, the H assembly time, and timings for NRANDOM
+# dense and H matrix-vector products, so each line is self-checking.
+#
+# tolerances below are the matched ~1e-5 error class settings from
+# compress_interaction_matrix.md; adjust as needed.
+#
+# notes:
+# - HACApK matvecs gather x to all ranks and use a ring exchange:
+#   expect sublinear MPI scaling, that is part of what this measures
+# - the hmmvp runs are single-rank: the dense reference within them is
+#   serial, so mv_dense for hmmvp lines will not scale with P
+# - set MPIRUN="mpirun --oversubscribe" etc. if needed
+#
+BIN=${BIN:-compress_interaction_matrix}
+MPIRUN=${MPIRUN:-mpirun}
+GEOM=${GEOM:-geom.in}
+NFAULT=${NFAULT:-120}            # makefault -n; 120 x 60 x 2 = 14400 patches
+MFAULT=${MFAULT:-60}
+CORES=${CORES:-"1 2 4 8 16 24 48"}
+NRANDOM=${NRANDOM:-100}
+HTOOL_OPTS=${HTOOL_OPTS:-"-mat_htool_epsilon 3e-5 -mat_htool_eta 10"}
+HACAPK_OPTS=${HACAPK_OPTS:-"-hacapk_ztol 1e-4"}
+HMMVP_OPTS=${HMMVP_OPTS:-"-hmmvp_tol 1e-6"}
+OUT=${OUT:-hmat_scaling.dat}
+
+# geometry
+if [ ! -s $GEOM ]; then
+    echo "$0: generating $GEOM with 2 x $NFAULT x $MFAULT patches"
+    makefault -n $NFAULT -m $MFAULT > $GEOM
+    makefault -n $NFAULT -m $MFAULT -x 1 -grp 1 >> $GEOM
+fi
+N=$(wc -l < $GEOM)
+
+run_one(){ # $1 command prefix, $2 use_hmatrix, $3 options, $4 label, $5 cores
+    local out err ha td th
+    out=$($1 $BIN -geom_file $GEOM -use_hmatrix $2 $3 -nrandom $NRANDOM 2>&1)
+    err=$(echo "$out" | grep "b-b_h" | awk '{printf "%.2e",$NF}')
+    ha=$(echo  "$out" | grep "H matrix assembly" | awk '{printf "%.1f",$(NF-1)}')
+    td=$(echo  "$out" | grep "dense solves" | awk '{print $4}' | tr -d s)
+    th=$(echo  "$out" | grep -E "Hmatrix\(|H-matrix\(" | awk '{print $4}' | tr -d s)
+    printf "%-8s %5d %5d  err %-9s  asm %8s s  mv_dense %8s s  mv_H %8s s\n" \
+	   "$4" $N $5 "${err:-FAIL}" "${ha:--}" "${td:--}" "${th:--}" | tee -a $OUT
+}
+
+echo "# N=$N nrandom=$NRANDOM cores: $CORES  ($(date))" | tee $OUT
+# pin OpenMP to 1 thread for the MPI backends: interact's Green's
+# function chain is not thread safe (Okada dc3d COMMON blocks), and
+# HACApK's construction has OpenMP regions that would otherwise call
+# it concurrently with the ambient (large) default thread count
+export OMP_NUM_THREADS=1
+for P in $CORES; do
+    run_one "$MPIRUN -np $P"  1 "$HTOOL_OPTS"  "HTOOL"  $P
+done
+for P in $CORES; do
+    run_one "$MPIRUN -np $P"  3 "$HACAPK_OPTS" "HACApK" $P
+done
+for P in $CORES; do
+    export OMP_NUM_THREADS=$P
+    run_one ""                4 "$HMMVP_OPTS -hmmvp_nthreads $P" "hmmvp" $P
+done
+echo "$0: done, results in $OUT"
