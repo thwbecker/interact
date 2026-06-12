@@ -1,0 +1,22 @@
+# N=14400 nrandom=100 cores: 1 2 4 8 16 24 48  (Fri Jun 12 11:35:58 AM CDT 2026)
+HTOOL    14400     1  err 6.60e-07   asm    554.5 s  mv_dense    7.557 s  mv_H    3.852 s
+HTOOL    14400     2  err 6.57e-07   asm    271.0 s  mv_dense    5.186 s  mv_H    1.238 s
+HTOOL    14400     4  err 7.92e-07   asm    140.4 s  mv_dense    2.620 s  mv_H    0.892 s
+HTOOL    14400     8  err 4.00e-07   asm     58.8 s  mv_dense    1.256 s  mv_H    0.673 s
+HTOOL    14400    16  err 9.06e-07   asm     23.3 s  mv_dense    0.746 s  mv_H    0.130 s
+HTOOL    14400    24  err 4.84e-07   asm     13.5 s  mv_dense    0.662 s  mv_H    0.052 s
+HTOOL    14400    48  err 1.39e-07   asm      6.1 s  mv_dense    0.657 s  mv_H    0.078 s
+HACApK   14400     1  err 1.32e-05   asm     20.3 s  mv_dense    7.628 s  mv_H    1.733 s
+HACApK   14400     2  err 1.32e-05   asm     10.2 s  mv_dense    5.160 s  mv_H    0.878 s
+HACApK   14400     4  err 1.32e-05   asm      5.1 s  mv_dense    2.793 s  mv_H    0.468 s
+HACApK   14400     8  err 1.32e-05   asm      3.5 s  mv_dense    1.752 s  mv_H    0.249 s
+HACApK   14400    16  err 1.32e-05   asm      1.6 s  mv_dense    0.822 s  mv_H    0.136 s
+HACApK   14400    24  err 1.32e-05   asm      1.3 s  mv_dense    0.670 s  mv_H    0.131 s
+HACApK   14400    48  err 1.32e-05   asm      0.9 s  mv_dense    0.670 s  mv_H    0.120 s
+hmmvp    14400     1  err 3.87e-05   asm     22.5 s  mv_dense    7.608 s  mv_H    2.613 s
+hmmvp    14400     2  err 3.87e-05   asm     11.9 s  mv_dense    8.269 s  mv_H    3.615 s
+hmmvp    14400     4  err 3.87e-05   asm      6.7 s  mv_dense    8.923 s  mv_H    4.269 s
+hmmvp    14400     8  err 3.87e-05   asm      4.0 s  mv_dense    8.860 s  mv_H    2.346 s
+hmmvp    14400    16  err 3.87e-05   asm      2.7 s  mv_dense    8.972 s  mv_H    2.866 s
+hmmvp    14400    24  err 3.87e-05   asm      2.0 s  mv_dense    8.536 s  mv_H    4.435 s
+hmmvp    14400    48  err 3.87e-05   asm      1.2 s  mv_dense    8.621 s  mv_H    7.832 s

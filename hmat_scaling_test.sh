@@ -21,7 +21,7 @@
 # - set MPIRUN="mpirun --oversubscribe" etc. if needed
 #
 BIN=${BIN:-compress_interaction_matrix}
-MPIRUN=${MPIRUN:-mpirun}
+MPIRUN=${MPIRUN:-$PETSC_DIR/build/bin/mpirun}
 GEOM=${GEOM:-geom.in}
 NFAULT=${NFAULT:-120}            # makefault -n; 120 x 60 x 2 = 14400 patches
 MFAULT=${MFAULT:-60}
@@ -52,10 +52,16 @@ run_one(){ # $1 command prefix, $2 use_hmatrix, $3 options, $4 label, $5 cores
 }
 
 echo "# N=$N nrandom=$NRANDOM cores: $CORES  ($(date))" | tee $OUT
-# pin OpenMP to 1 thread for the MPI backends so ranks x threads do
-# not oversubscribe (the Okada kernel itself is now thread safe via
-# THREADPRIVATE dc3d.F, compiled with -fopenmp)
+# thread hygiene, applies to ALL runs:
+# - OMP_NUM_THREADS=1 keeps MPI ranks from oversubscribing; hmmvp
+#   raises its own pool internally via omp_set_num_threads(nthreads)
+#   from -hmmvp_nthreads, so it does NOT need the env var
+# - OPENBLAS/MKL pins keep BLAS single threaded: PETSc's dense MatMult
+#   and hmmvp's per-block dgemv otherwise nest BLAS threads inside
+#   block-level parallelism and thrash catastrophically
 export OMP_NUM_THREADS=1
+export OPENBLAS_NUM_THREADS=1
+export MKL_NUM_THREADS=1
 for P in $CORES; do
     run_one "$MPIRUN -np $P"  1 "$HTOOL_OPTS"  "HTOOL"  $P
 done
@@ -63,7 +69,6 @@ for P in $CORES; do
     run_one "$MPIRUN -np $P"  3 "$HACAPK_OPTS" "HACApK" $P
 done
 for P in $CORES; do
-    export OMP_NUM_THREADS=$P
     run_one ""                4 "$HMMVP_OPTS -hmmvp_nthreads $P" "hmmvp" $P
 done
 echo "$0: done, results in $OUT"
