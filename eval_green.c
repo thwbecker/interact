@@ -348,3 +348,31 @@ void eval_green_basic(COMP_PRECISION *x,struct flt *fault,
   eval_okada(x,fault,disp,u_global,sm_global,iret,GC_DISP_AND_STRESS);
 #endif
 }
+#ifdef USE_HACAPK
+
+/* 
+   entry callback, called from m_HACApK_calc_entry_ij.f90 with 0-based
+   indices: A[i][j] = rec_stress_mode stress at receiver patch i due to
+   unit src_slip_mode slip on source patch j, identical to the dense
+   fill and the htool kernel
+*/
+double ckernel_func(int i, int j, void *par)
+{
+  struct interact_ctx *ictx = (struct interact_ctx *)par;
+  COMP_PRECISION slip[3],disp[3],stress[3][3],trac[3],sval;
+  int iret;
+  get_right_slip(slip,ictx->src_slip_mode,1.0);
+  eval_green_at_receiver(ictx->fault,i,j,slip,disp,stress,&iret,
+			 GC_STRESS_ONLY,FALSE); /* operator assembly: single-point */
+  if(iret != 0)
+    return 0.0;
+  resolve_force(ictx->fault[i].normal,stress,trac);
+  if(ictx->rec_stress_mode == STRIKE)
+    sval = dotp_3d(trac,ictx->fault[i].t_strike);
+  else if(ictx->rec_stress_mode == DIP)
+    sval = dotp_3d(trac,ictx->fault[i].t_dip);
+  else
+    sval = dotp_3d(trac,ictx->fault[i].normal);
+  return (double)sval;
+}
+#endif

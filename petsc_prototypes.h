@@ -1,6 +1,8 @@
 #include <petscksp.h>
 #include "petscts.h"
 
+
+
 PetscErrorCode rsf_ODE_RHSFunction(TS, PetscReal, Vec, Vec, void*);
 PetscErrorCode rsf_TS_Monitor(TS, PetscInt, PetscReal, Vec, void*);
 PetscErrorCode rsf_domain_check(TS, PetscReal, Vec, PetscBool*);
@@ -30,3 +32,45 @@ typedef PetscErrorCode MatHtoolKernelFn(PetscInt, PetscInt, PetscInt, const Pets
 typedef PetscScalar MatH2OpusKernelFn(PetscInt, PetscReal[], PetscReal[], void *);
 #endif
 #endif
+
+
+#ifdef USE_HACAPK
+/* 
+   HACApK support via the C interface in HACApK/v.1.0.0/C_interface:
+   index-based kernel (a natural fit for patch-pair Green's functions,
+   unlike interpolation-based approaches), wrapped as a PETSc MATSHELL
+   so all comparison and timing machinery works unchanged.
+   build the library there first (make in that directory, or ar the
+   objects into libhacapk.a) and set HACAPK_DEFINES/HACAPK_LIBS, see
+   makefile.petsc
+*/
+extern void *cinit_hacapk_struct(int, void *);
+extern void cdeallocate_hacapk_struct(void *);
+extern void cset_hacapk_struct_coord(void *, double *, double *, double *);
+extern void cmake_hacapk_struct_hmat(void *, double);
+extern void chacapk_mult_Ax_H(void *, double *, double *);
+PetscErrorCode MatMult_HACApK(Mat , Vec , Vec );
+#endif
+
+#ifdef USE_HMMVP
+/* 
+   hmmvp (A.M. Bradley) support via hmmvp_c_shim.cpp: index-based
+   block kernel (same ckernel_func as HACApK), in-memory compression
+   with a WHOLE-MATRIX relative Frobenius tolerance -hmmvp_tol
+   (||B-A||_F <= tol ||B||_F, i.e. tol bounds exactly the error this
+   tool measures), OpenMP-threaded construction and matvec. wrapped
+   as a MATSHELL like HACApK; the Mvp needs global vectors, so the
+   same scatter-to-all context is used (at np>1 every rank holds the
+   full H matrix and computes the full product - correct but
+   redundant; intended for serial/threaded use)
+*/
+extern void *chmmvp_compress_in_memory(int, double *, double *, double *,
+				       double, double, int, void *);
+extern void chmmvp_mvp(void *, double *, double *);
+extern void chmmvp_get_info(void *, int *, int *, long *);
+extern void chmmvp_delete(void *);
+
+PetscErrorCode MatMult_hmmvp(Mat , Vec , Vec );
+#endif
+
+

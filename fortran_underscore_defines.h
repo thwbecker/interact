@@ -13,6 +13,7 @@
 #define mydc3d mydc3d_
 #define dc3d0 dc3d0_
 #define dc3d dc3d_
+#define dc3dts dc3dts_
 #define dc3d0 dc3d0_
 // crouch and starfiled
 #define tdd_coeff tdd_coeff_

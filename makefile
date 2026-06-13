@@ -171,12 +171,11 @@ endif
 #
 # add this for geoprojection support
 #
-include makefile.geoproject
+#include makefile.geoproject
 
 # add up all define flags
 DEFINE_FLAGS = $(MAIN_DEFINES) $(SLATEC_DEFINES) $(PETSC_DEFINES) \
-	$(PGPLOT_DEFINES) $(SUPERLU_DEFINES)  \
-	$(GEOPROJECT_DEFINES)
+	$(PGPLOT_DEFINES) $(SUPERLU_DEFINES) $(GEOPROJECT_DEFINES)
 # defines and pgplot flags
 FLAGS = $(DEFINE_FLAGS) $(PGPLOT_INCLUDES) $(SLATEC_INCLUDES) \
 	$(SUPERLU_INCLUDES) $(GEOPROJECT_INCLUDES) $(PETSC_INCLUDES) 
@@ -594,17 +593,17 @@ $(BDIR)/compress_interaction_matrix: $(ODIR)/compress_interaction_matrix.o $(ODI
 			$(PETSC_LIBS) $(HACAPK_LIBS) $(HMMVP_LIBS) $(PGLIBS) $(SLATEC_LIBS)  $(LDFLAGS)
 
 $(BDIR)/petsc_simple_solve: $(ODIR)/petsc_simple_solve.o $(ODIR)/coulomb_stress.o $(ODIR)/interact.o    \
-	$(ODIR)/petsc_interact.o $(GEN_P_INC) $(LIBLIST) 
+	$(ODIR)/petsc_interact.o $(GEN_P_INC) $(LIBLIST) $(HMMVP_OBJS)
 	$(MPILD)   $(ODIR)/petsc_simple_solve.o $(ODIR)/petsc_interact.o    \
-	$(ODIR)/coulomb_stress.o $(ODIR)/interact.o  \
+	$(ODIR)/coulomb_stress.o $(ODIR)/interact.o  $(HMMVP_OBJS) \
 	-o $(BDIR)/petsc_simple_solve $(LIBS) $(SUPERLU_LIBS) \
-			$(PETSC_LIBS) $(PGLIBS) $(SLATEC_LIBS)  $(LDFLAGS)
+			$(PETSC_LIBS)  $(HACAPK_LIBS) $(HMMVP_LIBS) $(PGLIBS) $(SLATEC_LIBS)  $(LDFLAGS)
 
 $(BDIR)/rsf_solve: $(ODIR)/rsf_solve.o $(ODIR)/coulomb_stress.o   $(ODIR)/interact.o  $(ODIR)/petsc_interact.o \
-	$(GEN_P_INC) $(LIBLIST) 
+	$(GEN_P_INC) $(LIBLIST)   $(HMMVP_OBJS)
 	$(MPILD)   $(ODIR)/rsf_solve.o $(ODIR)/petsc_interact.o   $(ODIR)/coulomb_stress.o $(ODIR)/interact.o  \
-	-o $(BDIR)/rsf_solve $(LIBS) $(SUPERLU_LIBS) \
-			$(PETSC_LIBS) $(PGLIBS) $(SLATEC_LIBS)  $(LDFLAGS)
+	-o $(BDIR)/rsf_solve $(LIBS) $(SUPERLU_LIBS)  $(HMMVP_OBJS) \
+			$(PETSC_LIBS)  $(HACAPK_LIBS) $(HMMVP_LIBS) $(PGLIBS) $(SLATEC_LIBS)  $(LDFLAGS)
 
 
 $(BDIR)/calc_design_matrix: $(ODIR)/calc_design_matrix.o  \

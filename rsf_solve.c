@@ -32,11 +32,11 @@
 */
 #ifdef USE_PETSC
 #include "petsc_prototypes.h"
-#endif
+
 
 #define INT_RSF_DIM 4		/* psi,tau,sigma,u(slip) per patch */
 
-#ifdef USE_PETSC
+
 /* 
    parameters for optional normal stress limiter, cf. HBI limitsigma
    (file scope since they are only used by the driver and RHS here) 
@@ -75,11 +75,11 @@ static PetscErrorCode rsf_event_function(TS,PetscReal,Vec,PetscScalar *,void *);
 static PetscErrorCode rsf_post_event(TS,PetscInt,PetscInt[],PetscReal,Vec,PetscBool,void *);
 /* context access for the domain check, whose callback has no user pointer */
 static struct interact_ctx *rsf_par_static = NULL;
-#endif
+
 
 int main(int argc,char **argv)
 {
-#ifdef USE_PETSC
+
 
   TS ts; /* timestepping context */
   TSAdapt adapt;
@@ -436,13 +436,10 @@ int main(int argc,char **argv)
   PetscCall(TSDestroy(&ts)); 
   PetscCall(PetscFinalize());
 
-#else
-  fprintf(stderr,"%s only petsc version implemented, but not compiled as such\n",argv[0]);
-#endif
   exit(0);
 }
 
-#ifdef USE_PETSC
+
 /* 
    compute time-derivatives for the state vector
    x = (psi1,tau1,sigma1,s1,psi2,tau2,sigma2,s2,....) of size INT_RSF_DIM*n

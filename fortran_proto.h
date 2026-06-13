@@ -71,7 +71,7 @@ extern void dc3d(double*,double*,double*,double*,double*,double*,double*,double*
 extern void dc3d0(double*,double*,double*,double*,double*,double*,double*,double*,
 		  double*,double*,double*,double*,double*,double*,double*,double*,
 		  double*,double*,double*,double*,double*,double*,int*);
-
+extern int dc3dts(void);
 extern void palett(int *, float *, float *);
 
 // eispack

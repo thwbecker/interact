@@ -1,12 +1,9 @@
 #include "interact.h"
-#ifdef USE_PETSC_HMAT
-
-/* this function is in interact.c */
+#ifdef USE_PETSC
 #include "petsc_prototypes.h"
 
-
+#ifdef USE_PETSC_HMAT
 #include "kdtree.h"		/* for H2OPUS */
-
 #endif
 
 /*
@@ -16,208 +13,15 @@
   
   reads in geometry file and calculates the interaction matrix, and
   then compresses it, testing forward and inverse computations
-
-  can use HTOOLS Petsc, H2OPUS  Petsc, and HACApK options 
-
-  also
-
-  -geom_file geom.in - for the fault geometry
-  -nrandom number (default: 0) - to run a number of solves with random vectors for timing)
-  -test_forward true/false (default: true) - run matrix multiplication or inversion
-
-  use_hmatrix: 1  HTOOLS
-               2  H2OPUS
-	       3  HACApK
   
-  notes from accuracy and performance testing (June 2026; two vertical
-  fault groups offset in x, strike-stress operator, half-space Okada,
-  regular makefault grids, N = 400 / 1600 / 6400 patches):
-
-  HTOOL (-use_hmatrix 1):
-  - index-based kernel interface, exact fit for patch-pair Green's
-    functions
-  - forward matvec error tracks -mat_htool_epsilon faithfully, e.g. at
-    N=400: 8.4e-5 (eps 1e-3), 4.7e-6 (1e-4), 3.6e-10 (1e-6), 1e-15
-    (1e-8); at eps 1e-8 the compression ratio reaches 1, i.e. the H
-    matrix degenerates to dense
-  - sympartialACA (PETSc default) vs SVD compressor: ACA errors are
-    2-10x looser at the same epsilon with similar compression but much
-    cheaper assembly of large admissible blocks (quasi-linear vs
-    O(N^2): at N=10000 and matched ~1e-4 error, ACA assembly 19 s vs
-    fullACA 116 s, SVD worse still)
-  - IMPORTANT eta caveat for sympartialACA: large eta admits big,
-    marginally separated blocks on which partial pivoting can
-    mis-converge (the strike-stress kernel's quadrant sign structure
-    produces near-zero pivot rows); at N=10000, eps 3e-5 gave 3.1e-4
-    error with eta=100 but 8.8e-6 with eta=10 at the same assembly
-    cost. use eta=10 (the PETSc default) with sympartialACA and
-    choose eps ~3x below the error target as safety factor; verify
-    with one run of this tool per new geometry class
-  - compression ratio / matvec speedup vs dense (ACA, eps 1e-6 / 1e-3):
-      N=1600: 1.7-3.1x / 1.9-4.7x
-      N=6400: 3.8-8.7x / 3.5-8.2x
-    roughly doubling per 4x in N, consistent with O(N log N)
-    asymptotics; recommended config (sympartialACA, eta 10, eps 3e-5)
-    at N=10000: error 8.8e-6, assembly 19 s, matvec speedup 5.1x
-  - unpreconditioned KSP solve agrees with dense LU to ~2e-6 relative
-    but is slower at these N (HPDDM / hierarchical preconditioning
-    would be needed if inverse solves ever matter)
-
-  H2OPUS (-use_hmatrix 2):
-  - has NO index interface: MatCreateH2OpusFromKernel evaluates the
-    kernel by Chebyshev interpolation at arbitrary points inside the
-    cluster bounding boxes, which is incompatible with patch-pair
-    Green's functions - the kdtree nearest-patch mapping yields a
-    piecewise constant surrogate whose polynomial interpolation has
-    O(1) errors in all admissible blocks (~57% matvec error)
-  - construction therefore uses MatCreateH2OpusFromMat (HARA, i.e.
-    hierarchical randomized sampling of the assembled dense operator),
-    which in this h2opus version is only implemented for SYMMETRIC
-    matrices: the H matrix approximates (K+K^T)/2, and the measured
-    operator asymmetry |K-K^T|_F/|K|_F ~ 4-8e-4 sets an irreducible
-    error floor
-  - measured matvec error 2.3-2.6e-3 at N=400-6400; needs
-    -mat_h2opus_maxrank >= 256 for N >= 1600 (the default 64 truncates
-    blocks and gave 3.3e-2 error at N=1600 with WORSE memory use than
-    maxrank 256)
-  - matvec speedup vs dense: 1.2x (N=1600), 3.9x (N=6400)
-
-  conclusion: HTOOL is the production choice for the non-symmetric
-  interaction operator; H2OPUS is usable for symmetric problems or
-  rough exploration. for quasi-dynamic rsf_solve earthquake cycles,
-  operator errors at the 1e-4 level already shift event onsets by
-  O(100 s) and can restructure two-fault rupture sequences, so the
-  h2opus ~2.5e-3 symmetrization floor is not production-viable there,
-  while htool at eps 1e-6 reproduces dense event onsets to ~5e-4 s
+  see compress_interaction_matrix.md
 
 */
 
 
-#if defined(USE_HACAPK) || defined(USE_HMMVP)
-/* 
-   shared MATSHELL context for H matrix libraries whose matvec
-   operates on GLOBAL vectors (HACApK, hmmvp): scatter the
-   distributed x to a full-length local copy, multiply, copy back the
-   locally owned slice of the (global) result
-*/
-typedef struct{
-  void *handle;			/* opaque library handle */
-  Vec xall;			/* full-length local copy of x */
-  VecScatter scat;		/* distributed x -> xall */
-  double *ball;			/* full-length result work array */
-  PetscInt rs,re;		/* local ownership range */
-} hacapk_shell_ctx;
-#endif
-#ifdef USE_HACAPK
-/* 
-   HACApK support via the C interface in HACApK/v.1.0.0/C_interface:
-   index-based kernel (a natural fit for patch-pair Green's functions,
-   unlike interpolation-based approaches), wrapped as a PETSc MATSHELL
-   so all comparison and timing machinery works unchanged.
-   build the library there first (make in that directory, or ar the
-   objects into libhacapk.a) and set HACAPK_DEFINES/HACAPK_LIBS, see
-   makefile.petsc
-*/
-extern void *cinit_hacapk_struct(int, void *);
-extern void cdeallocate_hacapk_struct(void *);
-extern void cset_hacapk_struct_coord(void *, double *, double *, double *);
-extern void cmake_hacapk_struct_hmat(void *, double);
-extern void chacapk_mult_Ax_H(void *, double *, double *);
-/* 
-   entry callback, called from m_HACApK_calc_entry_ij.f90 with 0-based
-   indices: A[i][j] = rec_stress_mode stress at receiver patch i due to
-   unit src_slip_mode slip on source patch j, identical to the dense
-   fill and the htool kernel
-*/
-double ckernel_func(int i, int j, void *par)
-{
-  struct interact_ctx *ictx = (struct interact_ctx *)par;
-  COMP_PRECISION slip[3],disp[3],stress[3][3],trac[3],sval;
-  int iret;
-  get_right_slip(slip,ictx->src_slip_mode,1.0);
-  eval_green_at_receiver(ictx->fault,i,j,slip,disp,stress,&iret,
-			 GC_STRESS_ONLY,FALSE); /* operator assembly: single-point */
-  if(iret != 0)
-    return 0.0;
-  resolve_force(ictx->fault[i].normal,stress,trac);
-  if(ictx->rec_stress_mode == STRIKE)
-    sval = dotp_3d(trac,ictx->fault[i].t_strike);
-  else if(ictx->rec_stress_mode == DIP)
-    sval = dotp_3d(trac,ictx->fault[i].t_dip);
-  else
-    sval = dotp_3d(trac,ictx->fault[i].normal);
-  return (double)sval;
-}
-/* MATSHELL multiply: y = A x through the HACApK H matrix */
-/* 
-   HACApK's adot expects the GLOBAL x vector on each rank and leaves
-   the GLOBAL result on each rank (ring exchange + permutation inside
-   HACApK_adot_pmt_lfmtx_p), while PETSc vectors are distributed:
-   scatter x to a full-length local copy first, then copy back the
-   locally owned slice of the result
-*/
-static PetscErrorCode MatMult_HACApK(Mat A, Vec x, Vec y)
-{
-  hacapk_shell_ctx *hctx;
-  const PetscScalar *xa;
-  PetscScalar *ya;
-  PetscInt i;
-  PetscFunctionBeginUser;
-  PetscCall(MatShellGetContext(A,&hctx));
-  PetscCall(VecScatterBegin(hctx->scat,x,hctx->xall,INSERT_VALUES,SCATTER_FORWARD));
-  PetscCall(VecScatterEnd(hctx->scat,x,hctx->xall,INSERT_VALUES,SCATTER_FORWARD));
-  PetscCall(VecGetArrayRead(hctx->xall,&xa));
-  chacapk_mult_Ax_H(hctx->handle,(double *)xa,hctx->ball);
-  PetscCall(VecRestoreArrayRead(hctx->xall,&xa));
-  PetscCall(VecGetArray(y,&ya));
-  for(i=hctx->rs;i < hctx->re;i++)
-    ya[i-hctx->rs] = (PetscScalar)hctx->ball[i];
-  PetscCall(VecRestoreArray(y,&ya));
-  PetscFunctionReturn(PETSC_SUCCESS);
-}
-#endif
-
-#ifdef USE_HMMVP
-/* 
-   hmmvp (A.M. Bradley) support via hmmvp_c_shim.cpp: index-based
-   block kernel (same ckernel_func as HACApK), in-memory compression
-   with a WHOLE-MATRIX relative Frobenius tolerance -hmmvp_tol
-   (||B-A||_F <= tol ||B||_F, i.e. tol bounds exactly the error this
-   tool measures), OpenMP-threaded construction and matvec. wrapped
-   as a MATSHELL like HACApK; the Mvp needs global vectors, so the
-   same scatter-to-all context is used (at np>1 every rank holds the
-   full H matrix and computes the full product - correct but
-   redundant; intended for serial/threaded use)
-*/
-extern void *chmmvp_compress_in_memory(int, double *, double *, double *,
-				       double, double, int, void *);
-extern void chmmvp_mvp(void *, double *, double *);
-extern void chmmvp_get_info(void *, int *, int *, long *);
-extern void chmmvp_delete(void *);
-static PetscErrorCode MatMult_hmmvp(Mat A, Vec x, Vec y)
-{
-  hacapk_shell_ctx *hctx;	/* same context layout as HACApK */
-  const PetscScalar *xa;
-  PetscScalar *ya;
-  PetscInt i;
-  PetscFunctionBeginUser;
-  PetscCall(MatShellGetContext(A,&hctx));
-  PetscCall(VecScatterBegin(hctx->scat,x,hctx->xall,INSERT_VALUES,SCATTER_FORWARD));
-  PetscCall(VecScatterEnd(hctx->scat,x,hctx->xall,INSERT_VALUES,SCATTER_FORWARD));
-  PetscCall(VecGetArrayRead(hctx->xall,&xa));
-  chmmvp_mvp(hctx->handle,(double *)xa,hctx->ball);
-  PetscCall(VecRestoreArrayRead(hctx->xall,&xa));
-  PetscCall(VecGetArray(y,&ya));
-  for(i=hctx->rs;i < hctx->re;i++)
-    ya[i-hctx->rs] = (PetscScalar)hctx->ball[i];
-  PetscCall(VecRestoreArray(y,&ya));
-  PetscFunctionReturn(PETSC_SUCCESS);
-}
-#endif
 
 int main(int argc, char **argv)
 {
-#ifdef USE_PETSC_HMAT
   struct med *medium;
   struct flt *fault;
   struct interact_ctx ictx[1];
@@ -240,6 +44,7 @@ int main(int argc, char **argv)
   PetscBool make_matrix_externally=PETSC_FALSE; /* make matrices here on in external routine (for testing) */
   double     target_x[3], sep_x;
   kd_node    nearest_x;
+  PetscMPIInt h2opus_csize,h2opus_crank;
   
   char geom_file[STRLEN]="geom.in";
   /* IMPORTANT */
@@ -247,7 +52,6 @@ int main(int argc, char **argv)
 
   /* start up Petsc proper */
   PetscCall(PetscInitialize(&argc, &argv, (char *)0, NULL));
-
   
   /* generate frameworks */
   medium=(struct med *)calloc(1,sizeof(struct med)); /* make one zero medium structure */
@@ -259,50 +63,43 @@ int main(int argc, char **argv)
   /* 
      start up petsc 
   */
-  medium->use_hmatrix = 1;
+  medium->use_hmatrix = 1;	/* default is HTOOLS: 0,1,2,3,4 are options */
   
   /* set defaults, can always override */
   PetscCall(PetscOptionsGetInt(NULL, NULL, "-use_hmatrix", &medium->use_hmatrix,&read_value));
-  if(medium->use_hmatrix == 4){
-    /*  */
-    fprintf(stderr,"%s: setting up for hmmvp\n",argv[0]);
-  }else if(medium->use_hmatrix == 3){
-    /*  */
-    fprintf(stderr,"%s: setting up for HACApK\n",argv[0]);
-    
-  }else if(medium->use_hmatrix == 2){
+  if(medium->use_hmatrix == 2){
+#ifdef USE_PETSC_HMAT    
     /*  */
     fprintf(stderr,"%s: setting up for H2OPUS\n",argv[0]);
-    fprintf(stderr,"%s: WARNING: H2OPUS construction ASSUMES A SYMMETRIC OPERATOR (not mutable:\n",argv[0]);
-    fprintf(stderr,"%s: WARNING: this h2opus only implements sampling-based construction for symmetric\n",argv[0]);
+    fprintf(stderr,"%s: WARNING: H2OPUS construction ASSUMES A SYMMETRIC OPERATOR (not mutable:\n",
+	    argv[0]);
+    fprintf(stderr,"%s: WARNING: this h2opus only implements sampling-based construction for symmetric\n",
+	    argv[0]);
     fprintf(stderr,"%s: WARNING: matrices); the H matrix approximates (K+K^T)/2, and the operator\n",argv[0]);
     fprintf(stderr,"%s: WARNING: asymmetry printed below sets an irreducible error floor\n",argv[0]);
-    {				/* this runs before medium->comm_size is set */
-      PetscMPIInt h2opus_csize;
-      PetscCallMPI(MPI_Comm_size(PETSC_COMM_WORLD,&h2opus_csize));
-      if(h2opus_csize > 1){
-	PetscMPIInt h2opus_crank;
-	PetscCallMPI(MPI_Comm_rank(PETSC_COMM_WORLD,&h2opus_crank));
-	if(h2opus_crank == 0)
-	  fprintf(stderr,"%s: H2OPUS sampling-based construction (MatCreateH2OpusFromMat) is not\n%s: supported in parallel in this PETSc/h2opus version - run serially\n",
-		  argv[0],argv[0]);
-	exit(-1);
-      }
+    /* this runs before medium->comm_size is set */
+    PetscCallMPI(MPI_Comm_size(PETSC_COMM_WORLD,&h2opus_csize));
+    if(h2opus_csize > 1){
+      PetscCallMPI(MPI_Comm_rank(PETSC_COMM_WORLD,&h2opus_crank));
+      if(h2opus_crank == 0)
+	fprintf(stderr,"%s: H2OPUS sampling-based construction (MatCreateH2OpusFromMat) is not\n%s: supported in parallel in this PETSc/h2opus version - run serially\n",
+		argv[0],argv[0]);
+      exit(-1);
     }
-    
+    /* defaults for H2OPUS */
     medium->h2opus_eta = 0.6;	/*  */
     PetscCall(PetscOptionsGetReal(NULL, NULL, "-eta", &medium->h2opus_eta, NULL));
     medium->h2opus_leafsize = 32;
     PetscCall(PetscOptionsGetInt(NULL, NULL, "-leafsize", &medium->h2opus_leafsize, NULL));
     medium->h2opus_basisord = 8;
     PetscCall(PetscOptionsGetInt(NULL, NULL, "-basisord", &medium->h2opus_basisord, NULL));
-
+#else
+    fprintf(stderr,"%s: H2OPUS requested but not compiled in (compile and add USE_PETSC_HMAT in makefile.petsc)\n",argv[0]);
+    exit(-1);
+#endif
   }else if(medium->use_hmatrix == 1){
-    
+#ifdef USE_PETSC_HMAT    
     fprintf(stderr,"%s: setting up for HTOOLS\n",argv[0]);
-	
-    
-    /* how do I get those assigned internally? */
     /* HTOOLS */
     /* defaults, only applied if not given on the command line */
     PetscCall(PetscOptionsHasName(NULL,NULL,"-mat_htool_eta",&flg));
@@ -313,11 +110,13 @@ int main(int argc, char **argv)
     if(!flg)PetscCall(PetscOptionsSetValue(NULL,"-mat_htool_compressor","SVD"));
     PetscCall(PetscOptionsHasName(NULL,NULL,"-pc_type",&flg));
     if(!flg)PetscCall(PetscOptionsSetValue(NULL,"-pc_type","none"));
+#else
+    fprintf(stderr,"%s: HTOOLS requested but not compiled in (compile and add USE_PETSC_HMAT in makefile.petsc)\n",argv[0]);
+    exit(-1);
+#endif
   }else{
-    fprintf(stderr,"default use_hmatrix %i\n",medium->use_hmatrix);
+    fprintf(stderr,"%s: use_hmatrix %i\n",argv[0],medium->use_hmatrix);
   }
-
-  
 
   PetscCallMPI(MPI_Comm_size(PETSC_COMM_WORLD, &medium->comm_size));
   PetscCallMPI(MPI_Comm_rank(PETSC_COMM_WORLD, &medium->comm_rank));
@@ -408,6 +207,7 @@ int main(int argc, char **argv)
 	  coords[i*ndim+k] = fault[i].x[k];
     }
     if(medium->use_hmatrix == 2){
+#ifdef USE_PETSC_HMAT      
       /* H2OPUS setup */
       PetscPrintf(PETSC_COMM_WORLD,"%s: kdtree setup for H2OPUS %i nodes\n",argv[0],m);
       PetscTime(&t0);
@@ -438,12 +238,13 @@ int main(int argc, char **argv)
 	  exit(-1);
 	}
       }
-
-      
+#else
+      fprintf(stderr,"%s: H2OPUS requested but not compiled in (compile and add USE_PETSC_HMAT in makefile.petsc)\n",argv[0]);
+      exit(-1);
+#endif
     }
     /* here, we're using the normal stress interaction matrix for the
        H version of Is */
-    
     PetscTime(&t0);
     if(medium->use_hmatrix == 4){	/* hmmvp via MATSHELL */
 #ifdef USE_HMMVP
@@ -467,7 +268,7 @@ int main(int argc, char **argv)
       fprintf(stderr,"%s: core %03i/%03i: assigning hmmvp m %i n %i tol %g (whole-matrix rel Frobenius) eta %g nthreads %i\n",
 	      argv[0],medium->comm_rank,medium->comm_size,m,n,(double)hmmvp_tol,
 	      (double)hmmvp_eta,hmmvp_nthreads);
-      if((hmmvp_nthreads > 1) && (dc3dts_() == 0)){
+      if((hmmvp_nthreads > 1) && (dc3dts() == 0)){
 	fprintf(stderr,"%s: -hmmvp_nthreads %i requested but dc3d.F was compiled WITHOUT\n%s: -fopenmp: the THREADPRIVATE directives are inactive and threaded kernel\n%s: calls would corrupt the matrix - rebuild with -fopenmp in FFLAGS/LDFLAGS\n",
 		argv[0],hmmvp_nthreads,argv[0],argv[0]);
 	exit(-1);
@@ -543,28 +344,28 @@ int main(int argc, char **argv)
       exit(-1);
 #endif
     }else{
-    PetscCall(MatCreate(PETSC_COMM_WORLD, &medium->In));
-    PetscCall(MatSetSizes(medium->In, PETSC_DECIDE, PETSC_DECIDE, m, n));  
-    
-    if(medium->use_hmatrix==1)
-      PetscCall(MatSetType(medium->In,MATHTOOL));
-    else
-      PetscCall(MatSetType(medium->In,MATH2OPUS));
-    /*  */
-    PetscCall(MatSetUp(medium->In));
-    PetscCall(MatGetLocalSize(medium->In, &lm, &ln));
-    dn = ln;on = n - ln;
-    PetscCall(MatSeqAIJSetPreallocation(medium->In, n, NULL));
-    PetscCall(MatMPIAIJSetPreallocation(medium->In, dn, NULL, on, NULL));
-    PetscCall(MatGetOwnershipRange(medium->In, &rs, &re));
-    
-    fprintf(stderr,"%s: core %03i/%03i: assigning %s row %5i to %5i, lm %i ln %i m %i n %i\n",
-	    argv[0],medium->comm_rank,medium->comm_size,(medium->use_hmatrix==1)?"HTOOLS":"H2OPUS",
-	    rs,re,lm,ln,m,n);
-    if(medium->use_hmatrix == 1){
-      PetscCall(MatCreateHtoolFromKernel(PETSC_COMM_WORLD,lm,ln, m, n,
-					 ndim,(coords+rs*ndim), (coords+rs*ndim), htools_kernel, ictx, &medium->In));
-    }else{
+      PetscCall(MatCreate(PETSC_COMM_WORLD, &medium->In));
+      PetscCall(MatSetSizes(medium->In, PETSC_DECIDE, PETSC_DECIDE, m, n));  
+      
+      if(medium->use_hmatrix==1)
+	PetscCall(MatSetType(medium->In,MATHTOOL));
+      else
+	PetscCall(MatSetType(medium->In,MATH2OPUS));
+      /*  */
+      PetscCall(MatSetUp(medium->In));
+      PetscCall(MatGetLocalSize(medium->In, &lm, &ln));
+      dn = ln;on = n - ln;
+      PetscCall(MatSeqAIJSetPreallocation(medium->In, n, NULL));
+      PetscCall(MatMPIAIJSetPreallocation(medium->In, dn, NULL, on, NULL));
+      PetscCall(MatGetOwnershipRange(medium->In, &rs, &re));
+      
+      fprintf(stderr,"%s: core %03i/%03i: assigning %s row %5i to %5i, lm %i ln %i m %i n %i\n",
+	      argv[0],medium->comm_rank,medium->comm_size,(medium->use_hmatrix==1)?"HTOOLS":"H2OPUS",
+	      rs,re,lm,ln,m,n);
+      if(medium->use_hmatrix == 1){
+	PetscCall(MatCreateHtoolFromKernel(PETSC_COMM_WORLD,lm,ln, m, n,
+					   ndim,(coords+rs*ndim), (coords+rs*ndim), htools_kernel, ictx, &medium->In));
+      }else{
 #if defined(PETSC_HAVE_H2OPUS)
       /* 
 	 construct the H2 matrix by hierarchical randomized sampling of
@@ -579,15 +380,15 @@ int main(int argc, char **argv)
 	 vector products and reproduces the true BEM operator to
 	 -mat_h2opus_rtol (default 1e-4)
       */
-      PetscCall(MatCreateH2OpusFromMat(medium->Is, ndim, coords, PETSC_FALSE,
-				       medium->h2opus_eta, medium->h2opus_leafsize,
-				       PETSC_DECIDE, PETSC_DECIDE, PETSC_DECIDE,
-				       &medium->In));
+	PetscCall(MatCreateH2OpusFromMat(medium->Is, ndim, coords, PETSC_FALSE,
+					 medium->h2opus_eta, medium->h2opus_leafsize,
+					 PETSC_DECIDE, PETSC_DECIDE, PETSC_DECIDE,
+					 &medium->In));
 #else
-      fprintf(stderr,"%s: H2OPUS requested but PETSc was built without h2opus\n",argv[0]);
-      exit(-1);
+	fprintf(stderr,"%s: H2OPUS requested but PETSc was built without h2opus\n",argv[0]);
+	exit(-1);
 #endif
-    }
+      }
     }				/* end htool/h2opus (non-HACApK) construction */
     if(medium->use_hmatrix == 2){
       /* 
@@ -611,7 +412,6 @@ int main(int argc, char **argv)
     }else{
       PetscCall(MatSetOption(medium->In, MAT_SYMMETRIC, PETSC_FALSE));
     }
-    
 
     PetscCall(MatSetFromOptions(medium->In));
     
@@ -627,14 +427,14 @@ int main(int argc, char **argv)
     calc_petsc_Isn_matrices(medium, fault,medium->use_hmatrix,1.0,0,&medium->In); /* Htools or HACApK */
   }
   /* dense */
-  if(n<20){
+  if(n < 20){
     HEADNODE
       fprintf(stderr,"%s: dense matrix:\n",argv[0]);
     PetscCall(MatView(medium->Is,PETSC_VIEWER_STDOUT_WORLD));
   }
   /* get info on H matrix */
   MatView(medium->In,PETSC_VIEWER_STDOUT_WORLD);
-  if(n<20){
+  if(n < 20){
     HEADNODE
       fprintf(stderr,"%s: H matrix converted back to dense:\n",argv[0]);
     PetscCall(MatConvert(medium->In,MATDENSE,MAT_INITIAL_MATRIX,&Ah_dense));
@@ -684,7 +484,8 @@ int main(int argc, char **argv)
     stop_time = clock();
     cpu_time_used = ((double)stop_time-start_time)/CLOCKS_PER_SEC;
     HEADNODE
-      fprintf(stderr,"%s: it took %20.3fs for %05i H-matrix(%i) solves\n",argv[0],cpu_time_used,nrandom+1,medium->use_hmatrix);
+      fprintf(stderr,"%s: it took %20.3fs for %05i H-matrix(%i) solves\n",
+	      argv[0],cpu_time_used,nrandom+1,medium->use_hmatrix);
     
     if((m<20)&&(nrandom==0))
       VecView(bh,PETSC_VIEWER_STDOUT_WORLD);
@@ -705,7 +506,8 @@ int main(int argc, char **argv)
       PetscCall(VecNorm(bh,NORM_2,(norm+1)));
       PetscCall(VecNorm(d,NORM_2,(norm+2)));
       HEADNODE
-	fprintf(stdout,"%s: |b| = %20.10e |b_h| = %20.10e |b-b_h|/|b| = %20.10e\n",argv[0],norm[0],norm[1],norm[2]/norm[0]);
+	fprintf(stdout,"%s: |b| = %20.10e |b_h| = %20.10e |b-b_h|/|b| = %20.10e\n",
+		argv[0],norm[0],norm[1],norm[2]/norm[0]);
       PetscCall(VecDestroy(&xh));
       /* get b values */
       PetscCall(VecScatterCreateToZero(b,&ctx,&bout));
@@ -753,7 +555,8 @@ int main(int argc, char **argv)
     stop_time = clock();  
     cpu_time_used = ((double)stop_time-start_time)/CLOCKS_PER_SEC;
     HEADNODE
-      fprintf(stderr,"%s: it took %20.3fs for %05i dense inverse solves\n",argv[0],cpu_time_used,nrandom+1);
+      fprintf(stderr,"%s: it took %20.3fs for %05i dense inverse solves\n",
+	      argv[0],cpu_time_used,nrandom+1);
     if((m<20)&&(nrandom==0))
       VecView(x,PETSC_VIEWER_STDOUT_WORLD);
     
@@ -796,17 +599,18 @@ int main(int argc, char **argv)
 	PetscCall(VecNorm(xh,NORM_2,(norm+1)));
 	PetscCall(VecNorm(d,NORM_2,(norm+2)));
 	HEADNODE
-	  fprintf(stdout,"%s: |x| = %20.10e |x_h| = %20.10e |x-x_h|/|x| = %20.10e\n",argv[0],norm[0],norm[1],norm[2]/norm[0]);
+	  fprintf(stdout,"%s: |x| = %20.10e |x_h| = %20.10e |x-x_h|/|x| = %20.10e\n",
+		  argv[0],norm[0],norm[1],norm[2]/norm[0]);
 	PetscCall(VecDestroy(&d));
       }
       PetscCall(VecDestroy(&xh));
     }
   }
   
- 
+  
   PetscCall(VecDestroy(&x));
   PetscCall(VecDestroy(&b));
- 
+  
   PetscCall(VecDestroy(&bh));
   free(bglobal);
   if(medium->use_hmatrix==2)	/* free the KD tree */
@@ -815,10 +619,8 @@ int main(int argc, char **argv)
   PetscCall(MatDestroy(&medium->Is));
   PetscCall(MatDestroy(&medium->In));
   PetscCall(PetscFinalize());
-#else
-  fprintf(stderr,"%s only petsc H matrix version implemented, but not compiled as such\n",argv[0]);
-#endif
   exit(0);
 
 }
 
+#endif

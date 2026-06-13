@@ -420,3 +420,24 @@ struct interact_ctx{
 
 /* the structures for blockinvert type programs */
 #include "blockinvert_structures.h"
+
+#ifdef USE_PETSC_HMAT
+
+
+#if defined(USE_HACAPK) || defined(USE_HMMVP)
+/* 
+   shared MATSHELL context for H matrix libraries whose matvec
+   operates on GLOBAL vectors (HACApK, hmmvp): scatter the
+   distributed x to a full-length local copy, multiply, copy back the
+   locally owned slice of the (global) result
+*/
+typedef struct{
+  void *handle;			/* opaque library handle */
+  Vec xall;			/* full-length local copy of x */
+  VecScatter scat;		/* distributed x -> xall */
+  double *ball;			/* full-length result work array */
+  PetscInt rs,re;		/* local ownership range */
+} hacapk_shell_ctx;
+#endif
+
+#endif

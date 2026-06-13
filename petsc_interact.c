@@ -17,8 +17,71 @@
 */
 #include "interact.h"
 #ifdef USE_PETSC
+
 #include "petsc_prototypes.h"
 
+
+#ifdef USE_HMMVP
+/* 
+   hmmvp (A.M. Bradley) support via hmmvp_c_shim.cpp: index-based
+   block kernel (same ckernel_func as HACApK), in-memory compression
+   with a WHOLE-MATRIX relative Frobenius tolerance -hmmvp_tol
+   (||B-A||_F <= tol ||B||_F, i.e. tol bounds exactly the error this
+   tool measures), OpenMP-threaded construction and matvec. wrapped
+   as a MATSHELL like HACApK; the Mvp needs global vectors, so the
+   same scatter-to-all context is used (at np>1 every rank holds the
+   full H matrix and computes the full product - correct but
+   redundant; intended for serial/threaded use)
+*/
+PetscErrorCode MatMult_hmmvp(Mat A, Vec x, Vec y)
+{
+  hacapk_shell_ctx *hctx;	/* same context layout as HACApK */
+  const PetscScalar *xa;
+  PetscScalar *ya;
+  PetscInt i;
+  PetscFunctionBeginUser;
+  PetscCall(MatShellGetContext(A,&hctx));
+  PetscCall(VecScatterBegin(hctx->scat,x,hctx->xall,INSERT_VALUES,SCATTER_FORWARD));
+  PetscCall(VecScatterEnd(hctx->scat,x,hctx->xall,INSERT_VALUES,SCATTER_FORWARD));
+  PetscCall(VecGetArrayRead(hctx->xall,&xa));
+  chmmvp_mvp(hctx->handle,(double *)xa,hctx->ball);
+  PetscCall(VecRestoreArrayRead(hctx->xall,&xa));
+  PetscCall(VecGetArray(y,&ya));
+  for(i=hctx->rs;i < hctx->re;i++)
+    ya[i-hctx->rs] = (PetscScalar)hctx->ball[i];
+  PetscCall(VecRestoreArray(y,&ya));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+#endif	/* end HMM */
+#ifdef USE_HACAPK
+/* MATSHELL multiply: y = A x through the HACApK H matrix */
+/* 
+   HACApK's adot expects the GLOBAL x vector on each rank and leaves
+   the GLOBAL result on each rank (ring exchange + permutation inside
+   HACApK_adot_pmt_lfmtx_p), while PETSc vectors are distributed:
+   scatter x to a full-length local copy first, then copy back the
+   locally owned slice of the result
+*/
+PetscErrorCode MatMult_HACApK(Mat A, Vec x, Vec y)
+{
+  hacapk_shell_ctx *hctx;
+  const PetscScalar *xa;
+  PetscScalar *ya;
+  PetscInt i;
+  PetscFunctionBeginUser;
+  PetscCall(MatShellGetContext(A,&hctx));
+  PetscCall(VecScatterBegin(hctx->scat,x,hctx->xall,INSERT_VALUES,SCATTER_FORWARD));
+  PetscCall(VecScatterEnd(hctx->scat,x,hctx->xall,INSERT_VALUES,SCATTER_FORWARD));
+  PetscCall(VecGetArrayRead(hctx->xall,&xa));
+  chacapk_mult_Ax_H(hctx->handle,(double *)xa,hctx->ball);
+  PetscCall(VecRestoreArrayRead(hctx->xall,&xa));
+  PetscCall(VecGetArray(y,&ya));
+  for(i=hctx->rs;i < hctx->re;i++)
+    ya[i-hctx->rs] = (PetscScalar)hctx->ball[i];
+  PetscCall(VecRestoreArray(y,&ya));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+#endif	/* end Haca */
 
 /* 
    
@@ -29,7 +92,7 @@
 
    scale: scale factor 
 
-   hmatrix can be 0 (dense), 1 HTOOLS or 2 HOPUS
+   hmatrix can be 0 (dense), 1 HTOOLS or 2 HOPUS, 3 or 4
 */
 
 PetscErrorCode calc_petsc_Isn_matrices(struct med *medium, struct flt *fault,
@@ -56,8 +119,9 @@ PetscErrorCode calc_petsc_Isn_matrices(struct med *medium, struct flt *fault,
   medium->use_hmatrix = use_hmatrix;
   /*  */
   m = n = medium->nrflt;
+  switch(medium->use_hmatrix){
+  case 1:	/* htools */
 #ifdef USE_PETSC_HMAT
-  if(medium->use_hmatrix == 1){	/* htools */
     /* 
        production default from compress_interaction_matrix testing
        (June 2026): sympartialACA and eta=10 (both PETSc defaults) are
@@ -77,25 +141,43 @@ PetscErrorCode calc_petsc_Isn_matrices(struct med *medium, struct flt *fault,
     for(i=0;i < m;i++)		/* all sources or receiveer coordinates  */
       for(k=0;k < ndim;k++)
 	coords[i*ndim+k] = fault[i].x[k];
-
-  }else if(medium->use_hmatrix == 2){	/* H2OPUS */
+#else
+    fprintf(stderr,"calc_petsc_Isn_matrices: HTOOLS not compiled in - check makefile.petsc\n");exit(-1);
+#endif
+    break;
+  case 2:	/* H2OPUS */
+    coords = (PetscReal *)realloc(coords,sizeof(PetscReal)*ndim*m);
+    for(i=0;i < m;i++)		/* all sources or receiveer coordinates  */
+      for(k=0;k < ndim;k++)
+	coords[i*ndim+k] = fault[i].x[k];
+#ifdef USE_PETSC_HMAT
     fprintf(stderr,"calc_petsc_Isn_matrices: H2OPUS not implemented (and WARNING: h2opus sampling-based\n");
     fprintf(stderr,"calc_petsc_Isn_matrices: construction assumes a SYMMETRIC operator, see compress_interaction_matrix)\n");
     exit(-1);
-  }else{
 #else
-    if(medium->use_hmatrix){
-      fprintf(stderr,"calc_petsc_Isn_matrices: requesting H matrix but not compiled as such (USE_PETSC_HMAT not set)\n");
-      exit(-1);
-    }
+    fprintf(stderr,"calc_petsc_Isn_matrices: H2OPUS not compiled in - check makefile.petsc\n");exit(-1);
 #endif
+    break;
+  case 3:
+    fprintf(stderr,"calc_petsc_Isn_matrices: need to implement mode 3\n");
+    exit(-1);
+    break;
+  case 4:
+    fprintf(stderr,"calc_petsc_Isn_matrices: need to implement mode 4\n");
+    exit(-1);
+    break;
+  case 0:	  /* dense */
+    /* default without HMAT compile or if not slected */
     PetscCall(PetscCalloc(m*sizeof(PetscScalar), &avalues));
     PetscCall(PetscCalloc(n*sizeof(PetscInt), &col_idx));
     for (i=0; i < n; i++) 
       col_idx[i] = i;
-#ifdef USE_PETSC_HMAT
-   }
-#endif
+    break;
+  default:
+    fprintf(stderr,"calc_petsc_Isn_matrices: hmat mode %i is undefined\n",medium->use_hmatrix);
+    exit(-1);
+    break;
+  }
   
   if(mode==0){
     ictx->rec_stress_mode = STRIKE;
@@ -106,26 +188,35 @@ PetscErrorCode calc_petsc_Isn_matrices(struct med *medium, struct flt *fault,
   /* make the matrix */
   PetscCall(MatCreate(PETSC_COMM_WORLD, this_mat));
   PetscCall(MatSetSizes(*this_mat, PETSC_DECIDE, PETSC_DECIDE, m, n));
-#ifdef USE_PETSC_HMAT
-  if(medium->use_hmatrix == 1){
+  switch(medium->use_hmatrix){
+  case 1:
     HEADNODE
-      fprintf(stderr,"calc_petsc_Isn_matrices: using Htool matrix for stress mode %i stress type %i\n",
+      fprintf(stderr,"calc_petsc_Isn_matrices: using HTOOL matrix for stress mode %i stress type %i\n",
 	      mode,ictx->rec_stress_mode);
     PetscCall(MatSetType(*this_mat, MATHTOOL));
-  }else if(medium->use_hmatrix == 2){
+    break;
+  case 2:
     HEADNODE
-      fprintf(stderr,"calc_petsc_Isn_matrices: using H2opus matrix for stress mode %i stress type %i\n",
+      fprintf(stderr,"calc_petsc_Isn_matrices: using H2OPUS matrix for stress mode %i stress type %i\n",
 	      mode,ictx->rec_stress_mode);
     PetscCall(MatSetType(*this_mat, MATH2OPUS));
-  }else{
-#endif
-     HEADNODE
+    break;
+  case 3:
+    fprintf(stderr,"calc_petsc_Isn_matrices: need to implement mode 3\n");
+    exit(-1);
+    break;
+  case 4:
+    fprintf(stderr,"calc_petsc_Isn_matrices: need to implement mode 4\n");
+    exit(-1);
+    break;
+  case 0:
+    HEADNODE
       fprintf(stderr,"calc_petsc_Isn_matrices: using dense matrix for stress mode %i stress type %i\n",
 	      mode,ictx->rec_stress_mode);
     PetscCall(MatSetType(*this_mat, MATDENSE));
-#ifdef USE_PETSC_HMAT
-   }
-#endif
+    break;
+  }
+
   PetscCall(MatSetUp(*this_mat));
   PetscCall(MatGetLocalSize(*this_mat, &lm, &ln));
   dn = ln;on = n - ln;
@@ -134,8 +225,8 @@ PetscErrorCode calc_petsc_Isn_matrices(struct med *medium, struct flt *fault,
   PetscCall(MatMPIAIJSetPreallocation(*this_mat, dn, NULL, on, NULL));
   PetscCall(MatGetOwnershipRange(*this_mat, &medium->rs, &medium->re));
   medium->rn = medium->re  - medium->rs; /* number of local elements */
-#ifdef USE_PETSC_HMAT
- if(medium->use_hmatrix==1){
+  switch(medium->use_hmatrix){
+  case 1:
     /* 
        
        H matrix setup HTOOLS
@@ -146,9 +237,11 @@ PetscErrorCode calc_petsc_Isn_matrices(struct med *medium, struct flt *fault,
     /* target (row) and source (column) coordinates are the LOCAL
        portions, each ndim entries per point (for our square matrices,
        row and column layouts coincide) */
-    PetscCall(MatCreateHtoolFromKernel(PETSC_COMM_WORLD,lm,ln, m, n,ndim,(coords+medium->rs*ndim), (coords+medium->rs*ndim),
+    PetscCall(MatCreateHtoolFromKernel(PETSC_COMM_WORLD,lm,ln, m, n,ndim,
+				       (coords+medium->rs*ndim), (coords+medium->rs*ndim),
 				       kernel,(void *)ictx, this_mat));
- }else if(medium->use_hmatrix==2){
+    break;
+  case 2:
     /* 
        
        H matrix setup H2OPUS
@@ -166,21 +259,29 @@ PetscErrorCode calc_petsc_Isn_matrices(struct med *medium, struct flt *fault,
     fprintf(stderr,"calc_petsc_Isn_matrices: H2OPUS requested but PETSc was built without h2opus\n");
     exit(-1);
 #endif
-  
-  }else{
-#endif
-   /* 
+    break;
+  case 3:
+    fprintf(stderr,"calc_petsc_Isn_matrices: need to implement mode 3\n");
+    exit(-1);
+    break;
+  case 4:
+    fprintf(stderr,"calc_petsc_Isn_matrices: need to implement mode 4\n");
+    exit(-1);
+    break;
+  case 0:
+    /* 
        assemble dense matrix 
     */
-   fprintf(stderr,"calc_petsc_Isn_matrices: core %03i/%03i: assigning dense row %5i to %5i\n",
-	   (int)medium->comm_rank,(int)medium->comm_size,(int)medium->rs,(int)medium->re);
+    fprintf(stderr,"calc_petsc_Isn_matrices: core %03i/%03i: assigning dense row %5i to %5i\n",
+	    (int)medium->comm_rank,(int)medium->comm_size,(int)medium->rs,(int)medium->re);
     for(j=medium->rs;j <  medium->re;j++){// rupturing faults for this CPU
       GenKEntries_htools(ndim,1,n,&j, col_idx, avalues,ictx);
       PetscCall(MatSetValues(*this_mat, 1, &j, n, col_idx,avalues, INSERT_VALUES));
     }
- #ifdef USE_PETSC_HMAT
- } 
-#endif
+    break;
+  }
+
+ 
   PetscCall(MatSetOption(*this_mat, MAT_SYMMETRIC, PETSC_FALSE));
   PetscCall(MatSetFromOptions(*this_mat));
   PetscCall(MatAssemblyBegin(*this_mat, MAT_FINAL_ASSEMBLY));
@@ -189,18 +290,13 @@ PetscErrorCode calc_petsc_Isn_matrices(struct med *medium, struct flt *fault,
      done, now scale (CHECK IF IMPLEMENTED)
   */
   PetscCall(MatScale(*this_mat,scale));
-    
- #ifdef USE_PETSC_HMAT
-  if(medium->use_hmatrix){
+  
+  if((medium->use_hmatrix==1) || (medium->use_hmatrix==2))
     free(coords);
-  }else{
-#endif
+  if(medium->use_hmatrix==0){
     PetscCall(PetscFree(avalues));
     PetscCall(PetscFree(col_idx));
-
- #ifdef USE_PETSC_HMAT
-   }
-#endif
+  }
 #if !PetscDefined(HAVE_OPENMP)
   PetscFunctionReturn(PETSC_SUCCESS);
 #else
@@ -208,4 +304,8 @@ PetscErrorCode calc_petsc_Isn_matrices(struct med *medium, struct flt *fault,
 #endif
 }
 
-#endif
+
+
+
+
+#endif	/* end use Petsc */

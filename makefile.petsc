@@ -1,5 +1,6 @@
 #
-# flags for PETSC support
+# flags for PETSC support - this can be compiled without any HMAT support if need be
+# and using petsc H matrix packages HTOOLS and H2OPUS or external interfaces HMMVP and HACApK
 #
 # the 32 bit versions work with Htools and H2OPUS
 PETSC_ARCH = arch-linux-c-opt
@@ -12,7 +13,6 @@ PETSC_HTOOL_USED=-DUSE_PETSC_HMAT
 # the 64 bit integer evrsion does not have H matrices
 #PETSC_ARCH = arch-linux-c-opt64
 #PETSC_HTOOL_USED=
-
 
 
 PETSc.pc := $(PETSC_DIR)/$(PETSC_ARCH)/lib/pkgconfig/PETSc.pc
@@ -28,22 +28,25 @@ SCARGS := $(shell pkg-config --variable=cflags_extra $(PACKAGES)) $(CFLAGS_OTHER
 CXXFLAGS := $(shell pkg-config --variable=cxxflags_extra $(PACKAGES)) $(CFLAGS_OTHER)
 SFARGS := $(shell pkg-config --variable=fflags_extra $(PACKAGES)) 
 
-
 CPPFLAGS := $(shell pkg-config --cflags-only-I $(PACKAGES))
 PETSC_LDIR := $(shell pkg-config --libs-only-L --libs-only-other $(PACKAGES))
 PETSC_LDIR += $(patsubst -L%, $(shell pkg-config --variable=ldflag_rpath $(PACKAGES))%, $(shell pkg-config --libs-only-L $(PACKAGES)))
 PETSC_LIBADD := $(shell pkg-config --libs-only-l $(PACKAGES)) -lm
 
-#
+# leave empty if not using
+HACAPK_LIBS =
+HACAPK_DEFINES =
 # optional HACApK support for compress_interaction_matrix: build the
 # C interface library first (cd HACApK/v.1.0.0/C_interface; make; 
 # ar rcs libhacapk.a m_*.o HACApK_*.o) then uncomment:
 HACAPK_DEFINES = -DUSE_HACAPK
 HACAPK_LIBS = -L./HACApK/v.1.0.0/C_interface -lhacapk -lgfortran -fopenmp -llapack -lblas
-#HACAPK_DEFINES =
-#HACAPK_LIBS =
 
 #
+# leave empty if not using
+#HMMVP_LIBS =
+#HMMVP_OBJS =
+#HMMVP_DEFINES
 # optional hmmvp support for compress_interaction_matrix
 # (https://github.com/ambrad/hmmvp, build there with -std=c++14 in
 # opt, mode=omp, and mkdir lib bin; see compress_interaction_matrix.md)
@@ -52,16 +55,11 @@ HMMVP_DEFINES = -DUSE_HMMVP
 HMMVP_INC = -I$(HMMVP_DIR) -I$(HMMVP_DIR)/hmmvp/include -I$(HMMVP_DIR)/util/include
 HMMVP_LIBS = -L$(HMMVP_DIR)/lib -lhmmvp_omp -lstdc++ -fopenmp -llapack -lblas
 HMMVP_OBJS = $(ODIR)/hmmvp_c_shim.o
-#HMMVP_DEFINES =
-#HMMVP_LIBS =
-#HMMVP_OBJS =
 
-
-
-PETSC_INCLUDES = -I$(PETSC_DIR)/include/ $(CPPFLAGS) -DUSE_PETSC $(PETSC_HTOOL_USED) $(HACAPK_DEFINES) $(HMMVP_DEFINES)
+PETSC_INCLUDES = -I$(PETSC_DIR)/include/ $(CPPFLAGS) 
 #
 #
-PETSC_LIBS = -L$(PETSC_DIR)/lib/  $(PETSC_LDIR) $(PETSC_LIBADD)  # -L/disk/rh_usr_local/intel/oneapi/mpi/latest/lib/
+PETSC_LIBS = -L$(PETSC_DIR)/lib/  $(PETSC_LDIR) $(PETSC_LIBADD)  
 
 MPICC = $(shell pkg-config --variable=ccompiler $(PACKAGES))
 MPICXX = $(shell pkg-config --variable=cxxcompiler $(PACKAGES))
@@ -73,3 +71,4 @@ ifeq ($(strip $(MPILD)),)
 MPILD = mpif77
 endif
 
+PETSC_DEFINES = -DUSE_PETSC $(PETSC_HTOOL_USED) $(HMMVP_DEFINES) $(HACAPK_DEFINES) 
