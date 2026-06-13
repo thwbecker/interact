@@ -1,15 +1,17 @@
 # interact - models static fault interactions using dislocations in an elastic medium
 
 `interact` uses `dc3d.f` as provided by Y. Okada as in Okada (BSSA,
-1992), has .f90 code converted from Nikkhoo and Walter (GJI,2015),
-linear algebra routines from SLATEC, LAPACK, and EISPACK, and Petsc
-interface.
+1992), has .f90 code converted from Nikkhoo and Walter (GJI, 2015),
+and uses triangular dislocation fixes from Noda (EPS, 2025). Linear
+algebra routines from SLATEC, LAPACK, and EISPACK, and Petsc interface
+which can include HTOOLS and H2OPUS. Also use HACApk the H-matrix
+library of ppOpen-HPC, also used by HBI, and HMMVP by A. Bradley.
 
-Might contain other copyrighted material by others (e.g. Numerical
-Recipes). Petsc implementation based on Dave May's examples and
-assistance, and .m to .f90 conversion for slip inspired by code by
-P. Bird. Parts of the code can be compiled against Petsc which is used
-to implement parallelism.
+Petsc implementation based on Dave May's examples and assistance, and
+.m to .f90 conversion for slip inspired by code by P. Bird, converted
+myself (but cross checks with that of OBI). Parts of the code can be
+compiled against Petsc which is used to implement parallelism. Since
+June 2026, work benefited from Claude code interactions.
 
 See files `INSTALLATION`, `README.md`, and `help.txt` for
 documentation and `COPYRIGHT` and `COPYING` for the license and
@@ -27,7 +29,25 @@ If you use `interact` please cite the following
 >    pages = {NG62A-0925}
 >  }
 
-Copyright (c) Thorsten Becker 2000 - 2025
+- HTOOL: P. Marchand et al., via PETSc (`--download-htool`),
+  https://github.com/htool-ddm/htool
+- H2OPUS: S. Zampini et al., via PETSc (`--download-h2opus`),
+  https://github.com/ecrc/h2opus
+- HACApK: T. Ida et al., ppOpen-HPC project; the version used here
+  follows the v1.0.0 sources; HACApK is also the H-matrix engine of
+  HBI (So Ozawa and co-workers), see
+  https://github.com/sozawa94/hbi and in particular
+  https://github.com/sozawa94/hbi/blob/master/HACApK_lib.f90
+- hmmvp: A. M. Bradley, Hierarchical matrix-vector products,
+  https://github.com/ambrad/hmmvp (EPL-1.0)
+- HBI: boundary integral earthquake cycle code by So Ozawa et al.,
+  https://github.com/sozawa94/hbi - used as a reference point for the
+  rate-and-state solver comparisons and for the thread-safe Okada
+  validation (see the thread safety notes above)
+- Okada, Y. (1992), Internal deformation due to shear and tensile
+  faults in a half-space, BSSA 82, 1018-1040 (dc3d.F)
+
+Copyright (c) Thorsten Becker 2000 - 2026
 
 thwbecker@post.harvard.edu
 
