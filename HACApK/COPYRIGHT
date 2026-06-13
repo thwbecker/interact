@@ -1,0 +1,27 @@
+This is a copy of HACApK
+
+HACApK: T. Ida et al., ppOpen-HPC project; the version used here
+follows the v1.0.0 sources; HACApK is also the H-matrix engine of HBI
+(So Ozawa and co-workers), see https://github.com/sozawa94/hbi and in
+particular https://github.com/sozawa94/hbi/blob/master/HACApK_lib.f90
+
+
+HBI: boundary integral earthquake cycle code by So Ozawa et al.,
+https://github.com/sozawa94/hbi - used as a reference point for the
+rate-and-state solver comparisons and for the thread-safe Okada
+validation (see the thread safety notes above)
+
+
+ Standard H-matrices: https://www.jstage.jst.go.jp/article/ipsjjip/22/4/22_642/_article/-char/en
+  Lattice H-matrices: https://ieeexplore.ieee.org/abstract/document/8425193
+
+
+So Ozawa, Akihiro Ida, Tetsuya Hoshino, Ryosuke Ando (2023),
+"Large-scale earthquake sequence simulations of 3D geometrically
+complex faults using the boundary element method accelerated by
+lattice H-matrices", Geophysical Journal International,232 (3),
+1471-1481 https://doi.org/10.1093/gji/ggac386
+
+So Ozawa, Yuyun Yang, Eric M. Dunham (2024), "Fault Valve Instability:
+A mechanism for slow slip events", Journal of Geophysical Research:
+Solid Earth, 129, https://doi.org/10.1029/2024JB029165,
