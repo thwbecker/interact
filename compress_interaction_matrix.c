@@ -89,8 +89,9 @@ int main(int argc, char **argv)
   /* set up defaults */
   switch(medium->use_hmatrix){
   case 1:
-#ifdef USE_PETSC_HMAT  
-    fprintf(stderr,"%s: setting up for HTOOLS\n",argv[0]);
+#ifdef USE_PETSC_HMAT
+    HEADNODE
+      fprintf(stderr,"%s: setting up for HTOOLS\n",argv[0]);
     /* HTOOLS */
     set_htools_defaults_and_options(medium);
 #else
@@ -116,13 +117,15 @@ int main(int argc, char **argv)
       exit(-1);
     }
 #else
-    fprintf(stderr,"%s: H2OPUS requested but not compiled in (compile and add USE_PETSC_HMAT in makefile.petsc)\n",argv[0]);
+    HEADNODE
+      fprintf(stderr,"%s: H2OPUS requested but not compiled in (compile and add USE_PETSC_HMAT in makefile.petsc)\n",argv[0]);
     exit(-1);
 #endif
     break;
   case 3:
 #ifdef USE_HACAPK
-    fprintf(stderr,"%s: setting up for HACApK\n",argv[0]);
+    HEADNODE
+      fprintf(stderr,"%s: setting up for HACApK\n",argv[0]);
     set_hacapk_defaults_and_options(medium);
 #else
     fprintf(stderr,"%s: HACAPK requested but not compiled in (see USE_HACAPK and makefile.petc)\n",argv[0]);
@@ -131,7 +134,8 @@ int main(int argc, char **argv)
     break;
   case 4:
 #ifdef USE_HMMVP
-    fprintf(stderr,"%s: setting up for GMMVP\n",argv[0]);
+    HEADNODE
+      fprintf(stderr,"%s: setting up for GMMVP\n",argv[0]);
     set_hmmvp_defaults_and_options(medium);
 #else
     fprintf(stderr,"%s: HMMVP requested but not compiled in (see USE_HMMVP and makefile.petc)\n",argv[0]);
@@ -375,7 +379,8 @@ int main(int argc, char **argv)
 					       (double)medium->hmmvp_eta,medium->hmmvp_nthreads,
 					       (void *)ictx);
       if(!hmmvp_handle){
-	fprintf(stderr,"%s: hmmvp compression failed\n",argv[0]);
+	HEADNODE
+	  fprintf(stderr,"%s: hmmvp compression failed\n",argv[0]);
 	exit(-1);
       }
       chmmvp_get_info(hmmvp_handle,&hmm,&hmn,&hmmvp_nnz);
@@ -543,8 +548,25 @@ int main(int argc, char **argv)
     PetscCall(KSPCreate(PETSC_COMM_WORLD, &ksp));
     PetscCall(KSPSetOperators(ksp, Adense, Adense));
     PetscCall(KSPGetPC(ksp, &pc));
-    PetscCall(PCSetType(pc, PCLU));
-    PetscCall(KSPSetFromOptions(ksp)); 
+    if(medium->comm_size > 1){
+      /*
+	 the dense reference matrix is mpidense under MPI, and sequential
+	 PCLU cannot factor it; unless PETSc was built with a parallel
+	 direct solver (MUMPS or SuperLU_DIST) MatGetFactor() fails with
+	 "Could not locate a solver type for factorization type LU and
+	 matrix type mpidense". fall back to an iterative reference solve
+	 (unpreconditioned GMRES to a tight tolerance) so the inverse
+	 accuracy comparison still runs in parallel. configure PETSc with
+	 --download-mumps (then this branch can use PCLU/MATSOLVERMUMPS)
+	 for a parallel DIRECT reference instead.
+      */
+      PetscCall(PCSetType(pc, PCNONE));
+      PetscCall(KSPSetType(ksp, KSPGMRES));
+      PetscCall(KSPSetTolerances(ksp, 1.0e-10, PETSC_DEFAULT, PETSC_DEFAULT, 100000));
+    }else{
+      PetscCall(PCSetType(pc, PCLU)); /* exact direct reference solve in serial */
+    }
+    PetscCall(KSPSetFromOptions(ksp)); /* command line still overrides the above */
     PetscCall(VecSet(b, 1.0));
     /* do we need those? */
     PetscCall(VecAssemblyBegin(b));PetscCall(VecAssemblyEnd(b));

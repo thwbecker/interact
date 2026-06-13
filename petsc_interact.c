@@ -150,7 +150,8 @@ PetscErrorCode calc_petsc_Isn_matrices(struct med *medium, struct flt *fault,
   case 2:	/* H2OPUS */
 #ifdef USE_PETSC_HMAT
     set_h2opus_defaults_and_options(medium);
-    fprintf(stderr,"calc_petsc_Isn_matrices: WARNING: construction assumes a SYMMETRIC operator, see compress_interaction_matrix)\n");
+    HEADNODE
+      fprintf(stderr,"calc_petsc_Isn_matrices: WARNING: construction assumes a SYMMETRIC operator, see compress_interaction_matrix)\n");
 #else
     fprintf(stderr,"calc_petsc_Isn_matrices: H2OPUS not compiled in - check makefile.petsc\n");exit(-1);
 #endif
@@ -328,7 +329,8 @@ PetscErrorCode calc_petsc_Isn_matrices(struct med *medium, struct flt *fault,
        construction for symmetric matrices (hlru_sym assertion); the
        result therefore approximates the symmetrized operator
     */
-    fprintf(stderr,"WARNING: H2OPUS only uses symmetric matrices approximation\n");
+    HEADNODE
+      fprintf(stderr,"WARNING: H2OPUS only uses symmetric matrices approximation\n");
     PetscCall(MatSetOption(*this_mat, MAT_SYMMETRIC, PETSC_TRUE));
   }else{
     PetscCall(MatSetOption(*this_mat, MAT_SYMMETRIC, PETSC_FALSE));
