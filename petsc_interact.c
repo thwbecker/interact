@@ -105,10 +105,10 @@ PetscErrorCode calc_petsc_Isn_matrices(struct med *medium, struct flt *fault,
   PetscInt    n, m, lm,ln,i,j,dn,on, *col_idx=NULL;
   /* kernel function */
 #ifdef USE_PETSC_HMAT		/* htools and H2opus  */
-  PetscReal   *coords=NULL;
-  PetscInt k;
+  PetscReal   *coords=NULL,*av=NULL;
+  PetscInt k,jj,*ci=NULL;
   MatHtoolKernelFn *kernel = GenKEntries_htools;
-  MatH2OpusKernelFn *h2opus_kernel = GenKEntries_h2opus;
+  Mat dtmp;
 #endif
 #if ( defined(USE_HMMVP) || defined(USE_HACAPK) )
   double *xc,*yc,*zc;
@@ -129,6 +129,12 @@ PetscErrorCode calc_petsc_Isn_matrices(struct med *medium, struct flt *fault,
   ictx->src_slip_mode = 0;
   /*  */
   m = n = medium->nrflt;
+
+  if(mode==0){
+    ictx->rec_stress_mode = STRIKE;
+  }else{
+    ictx->rec_stress_mode = NORMAL;
+  }
   switch(use_hmatrix){
   case 0:
     /* dense */
@@ -180,10 +186,10 @@ PetscErrorCode calc_petsc_Isn_matrices(struct med *medium, struct flt *fault,
     for(i=0;i < medium->nrflt;i++)		/* all sources or receiveer coordinates  */
       for(k=0;k < ndim;k++)
 	coords[i*ndim+k] = fault[i].x[k];
-    if(use_hmatrix == 2)
-      setup_kdtree(ndim,m,coords,fault,medium);
   }
 #endif
+#if ( defined(USE_HMMVP) || defined(USE_HACAPK) )
+  
   if((use_hmatrix==3)||(use_hmatrix==4)){	
     xc = (double *)malloc(sizeof(double)*m);
     yc = (double *)malloc(sizeof(double)*m);
@@ -194,12 +200,8 @@ PetscErrorCode calc_petsc_Isn_matrices(struct med *medium, struct flt *fault,
       zc[i] = (double)ictx->fault[i].x[INT_Z];
     }
   }
-
-  if(mode==0){
-    ictx->rec_stress_mode = STRIKE;
-  }else{
-    ictx->rec_stress_mode = NORMAL;
-  }
+#endif
+ 
 
   PetscCall(MatCreate(PETSC_COMM_WORLD, this_mat));
   PetscCall(MatSetSizes(*this_mat, PETSC_DECIDE, PETSC_DECIDE, m, n));
@@ -265,10 +267,42 @@ PetscErrorCode calc_petsc_Isn_matrices(struct med *medium, struct flt *fault,
 	    medium->comm_rank,medium->comm_size,medium->rs,medium->re,lm,ln,m,n);
 
 #if defined(PETSC_HAVE_H2OPUS)
-    PetscCall(MatCreateH2OpusFromKernel(PETSC_COMM_WORLD, lm, ln, m, n,ndim, (coords+medium->rs*ndim),
-					PETSC_FALSE, h2opus_kernel,(void *)ictx,
-					medium->h2opus_eta, medium->h2opus_leafsize,
-					medium->h2opus_basisord, this_mat));
+    /*
+       construct the H2 matrix by hierarchical randomized sampling of an
+       assembled dense operator (MatCreateH2OpusFromMat / HARA), NOT from
+       the kernel callback. MatCreateH2OpusFromKernel interpolates the
+       kernel by Chebyshev polynomials at arbitrary points inside cluster
+       bounding boxes, which is incompatible with patch-pair Green's
+       functions defined only at element centers: the adaptive
+       construction never reaches tolerance and hangs. This mirrors the
+       inline path in compress_interaction_matrix.c - a temporary dense
+       operator (same local layout) is built, sampled, and discarded.
+    */
+      
+    PetscCall(MatDestroy(this_mat)); /* drop the placeholder created above */
+
+    PetscCall(PetscCalloc(n*sizeof(PetscScalar), &av));
+    PetscCall(PetscCalloc(n*sizeof(PetscInt), &ci));
+    for(jj=0;jj < n;jj++) ci[jj] = jj;
+    /* make a dens matrix */
+    PetscCall(MatCreate(PETSC_COMM_WORLD,&dtmp));
+    PetscCall(MatSetSizes(dtmp,lm,ln,m,n));
+    PetscCall(MatSetType(dtmp,MATDENSE));
+    PetscCall(MatSetUp(dtmp));
+    for(jj=medium->rs;jj < medium->re;jj++){
+      GenKEntries_htools(ndim,1,n,&jj,ci,av,ictx);
+      PetscCall(MatSetValues(dtmp,1,&jj,n,ci,av,INSERT_VALUES));
+    }
+    PetscCall(MatAssemblyBegin(dtmp,MAT_FINAL_ASSEMBLY));
+    PetscCall(MatAssemblyEnd(dtmp,MAT_FINAL_ASSEMBLY));
+    /* dense finished, now convert */
+    PetscCall(MatCreateH2OpusFromMat(dtmp, ndim, coords, PETSC_FALSE,
+				     medium->h2opus_eta, medium->h2opus_leafsize,
+				     PETSC_DECIDE, PETSC_DECIDE, PETSC_DECIDE, this_mat));
+    PetscCall(MatDestroy(&dtmp));
+    PetscCall(PetscFree(av));
+    PetscCall(PetscFree(ci));
+
 #else
     fprintf(stderr,"calc_petsc_Isn_matrices: H2OPUS requested but PETSc was built without h2opus\n");
     exit(-1);
@@ -350,11 +384,13 @@ PetscErrorCode calc_petsc_Isn_matrices(struct med *medium, struct flt *fault,
   }
   if((use_hmatrix==1) || (use_hmatrix==2))
     free(coords);
+#if ( defined(USE_HMMVP) || defined(USE_HACAPK) )
   if((use_hmatrix==3)||(use_hmatrix==4)){
     free(xc);free(yc);free(zc);
   }
   if(use_hmatrix==3)
     PetscCall(VecDestroy(&xd));
+#endif
 #if !PetscDefined(HAVE_OPENMP)
   PetscFunctionReturn(PETSC_SUCCESS);
 #else
@@ -363,6 +399,12 @@ PetscErrorCode calc_petsc_Isn_matrices(struct med *medium, struct flt *fault,
 }
 
 #ifdef USE_PETSC_HMAT		/* htools and H2opus  */
+
+/* 
+   
+   the approach with the KDtree never worked for H2OPUS, leave here for now
+
+ */
 void setup_kdtree(int ndim,int m,PetscReal *coords,struct flt *fault,struct med *medium)
 {
   PetscLogDouble t0,t1;

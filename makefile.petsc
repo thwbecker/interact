@@ -32,10 +32,10 @@ CPPFLAGS := $(shell pkg-config --cflags-only-I $(PACKAGES))
 PETSC_LDIR := $(shell pkg-config --libs-only-L --libs-only-other $(PACKAGES))
 PETSC_LDIR += $(patsubst -L%, $(shell pkg-config --variable=ldflag_rpath $(PACKAGES))%, $(shell pkg-config --libs-only-L $(PACKAGES)))
 PETSC_LIBADD := $(shell pkg-config --libs-only-l $(PACKAGES)) -lm
-
-# leave empty if not using
-HACAPK_LIBS =
-HACAPK_DEFINES =
+#
+# leave empty if not using HACAPK
+#HACAPK_LIBS =
+#HACAPK_DEFINES =
 # optional HACApK support for compress_interaction_matrix: build the
 # C interface library first (cd HACApK/v.1.0.0/C_interface; make; 
 # ar rcs libhacapk.a m_*.o HACApK_*.o) then uncomment:
@@ -44,9 +44,10 @@ HACAPK_LIBS = -L./HACApK/v.1.0.0/C_interface -lhacapk -lgfortran -fopenmp -llapa
 
 #
 # leave empty if not using
-#HMMVP_LIBS =
-#HMMVP_OBJS =
-#HMMVP_DEFINES
+HMMVP_LIBS =
+HMMVP_OBJS =
+HMMVP_DEFINES =
+HMMVP_INC =
 # optional hmmvp support for compress_interaction_matrix
 # (https://github.com/ambrad/hmmvp, build there with -std=c++14 in
 # opt, mode=omp, and mkdir lib bin; see compress_interaction_matrix.md)

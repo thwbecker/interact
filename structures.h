@@ -39,7 +39,6 @@ struct geog{
   COMP_PRECISION strike_vec[3],dip_vec[3];
 };
 #ifdef USE_PETSC
-#if defined(USE_HACAPK) || defined(USE_HMMVP)
 /* 
    shared MATSHELL context for H matrix libraries whose matvec
    operates on GLOBAL vectors (HACApK, hmmvp): 
@@ -54,7 +53,6 @@ typedef struct{
   double *ball;			/* full-length result work array */
   PetscInt rs,re;		/* local ownership range */
 } hacapk_shell_ctx;
-#endif
 #endif
 
 /* 
@@ -303,9 +301,7 @@ struct med{
 #ifdef USE_HACAPK
   PetscReal hacapk_ztol;
 #endif
-#if (defined(USE_HACAPK)||defined(USE_HMMVP))
   hacapk_shell_ctx *Is_hctx,*In_hctx;
-#endif
   
 #else
   unsigned int comm_size,comm_rank;

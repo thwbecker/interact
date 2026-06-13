@@ -169,8 +169,8 @@ endif
 # you will loose sparse matrix SuperLU LU solver capabilities
 #include makefile.superlu
 #
-# add this for geoprojection support
-#
+GEO_TOOLS=
+# add this for geoprojection support, will override GEO_TOOLS
 #include makefile.geoproject
 
 # add up all define flags
@@ -377,7 +377,7 @@ random_prop_tools: $(BDIR)/create_random_stress_file \
 
 block_tools: $(BDIR)/block_checkflt $(BDIR)/block_evaluate_solution 
 
-geographic_tools: $(BDIR)/fstress2hor	$(BDIR)/fstress2eig $(BDIR)/fit_mean_stress
+geographic_tools: $(GEO_TOOLS) 
 
 analysis: $(BDIR)/mspectral
 #$(BDIR)/patch2geom : geomview, outdated

@@ -1,10 +1,6 @@
 #include "interact.h"
 #ifdef USE_PETSC
-
 #include "petsc_prototypes.h"
-
-#ifdef USE_PETSC_HMAT
-#include "kdtree.h"		/* for H2OPUS */
 #endif
 
 /*
@@ -19,10 +15,9 @@
 
 */
 
-
-
 int main(int argc, char **argv)
 {
+#ifdef USE_PETSC
   struct med *medium;
   struct flt *fault;
   struct interact_ctx ictx[1];
@@ -48,9 +43,9 @@ int main(int argc, char **argv)
   Mat KT;
   PetscReal nrmK,nrmD;
 #endif
+  hacapk_shell_ctx *hsc_dense,*hsc_h;
 #if ( defined(USE_HMMVP) || defined(USE_HACAPK) )
   double *xc,*yc,*zc;
-  hacapk_shell_ctx *hsc_dense,*hsc_h;
   Vec xd;
 #endif
 #ifdef USE_HMMVP
@@ -85,7 +80,7 @@ int main(int argc, char **argv)
   /* options */
   PetscCall(PetscOptionsGetInt(NULL, NULL, "-nrandom", &nrandom,&read_value));
   PetscCall(PetscOptionsGetBool(NULL, NULL, "-test_forward", &test_forward,&read_value));
-
+  PetscCall(PetscOptionsGetBool(NULL, NULL, "-make_matrix_externally", &make_matrix_externally,NULL));
   
   PetscCallMPI(MPI_Comm_size(PETSC_COMM_WORLD, &medium->comm_size));
   PetscCallMPI(MPI_Comm_rank(PETSC_COMM_WORLD, &medium->comm_rank));
@@ -159,6 +154,7 @@ int main(int argc, char **argv)
 
   */
   PetscCall(PetscOptionsGetString(NULL, NULL, "-geom_file", geom_file, STRLEN,&read_value));
+
  
 
   HEADNODE{
@@ -237,9 +233,8 @@ int main(int argc, char **argv)
       for(i=0;i < medium->nrflt;i++)		/* all sources or receiveer coordinates  */
 	for(k=0;k < ndim;k++)
 	  coords[i*ndim+k] = fault[i].x[k];
-      if(medium->use_hmatrix == 2)
-	setup_kdtree(ndim,m,coords,fault,medium);
     }
+#if ( defined(USE_HMMVP) || defined(USE_HACAPK) )
     if((medium->use_hmatrix==3)||(medium->use_hmatrix==4)){	
       xc = (double *)malloc(sizeof(double)*m);
       yc = (double *)malloc(sizeof(double)*m);
@@ -250,6 +245,7 @@ int main(int argc, char **argv)
 	zc[i] = (double)ictx->fault[i].x[INT_Z];
       }
     }
+#endif
     PetscTime(&t0);
     switch(medium->use_hmatrix){
     case 0:
@@ -261,9 +257,11 @@ int main(int argc, char **argv)
 	machine precision and |x-x_h|/|x| at the level of the KSP solver
 	tolerance. Note that the dense baseline used for the comparison
 	is always Adense - use_hmatrix=0 simply makes the second
-	("H") operator dense as well. Previously this value fell through
-	to the MATH2OPUS branch without the (use_hmatrix==2 gated)
-	coordinate/kdtree setup and aborted in MatAssemblyEnd.
+	("H") operator dense as well. 
+	
+	Previously this value fell through to the MATH2OPUS branch
+	without the (use_hmatrix==2 gated) coordinate/kdtree setup and
+	aborted in MatAssemblyEnd.
       */
       HEADNODE
 	fprintf(stderr,"%s: core %03i/%03i: assigning dense (use_hmatrix=0 self-consistency reference) m %i n %i\n",
@@ -407,10 +405,11 @@ int main(int argc, char **argv)
     
     if((medium->use_hmatrix==1)||(medium->use_hmatrix==2))
       free(coords);
+#if ( defined(USE_HMMVP) || defined(USE_HACAPK) )
     if((medium->use_hmatrix==3)||(medium->use_hmatrix==4)){
       free(xc);free(yc);free(zc);
     }
-    
+#endif    
     PetscCall(MatSetFromOptions(AH));
     
     PetscCall(MatAssemblyBegin(AH, MAT_FINAL_ASSEMBLY));
@@ -645,14 +644,11 @@ int main(int argc, char **argv)
   
   PetscCall(VecDestroy(&bh));
   free(bglobal);
-  if(medium->use_hmatrix==2)	/* free the KD tree */
-    KDTreeDestroy(&medium->kdtree);
 
   PetscCall(MatDestroy(&Adense));
   PetscCall(MatDestroy(&AH));
   PetscCall(PetscFinalize());
+#endif
   exit(0);
 
 }
-
-#endif	/* end use of petsc */

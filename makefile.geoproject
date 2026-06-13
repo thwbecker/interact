@@ -21,5 +21,4 @@ GEOPROJECT_OBJS = \
 
 
 
-
-
+GEO_TOOLS = $(BDIR)/fstress2hor	$(BDIR)/fstress2eig $(BDIR)/fit_mean_stress

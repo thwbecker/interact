@@ -76,11 +76,10 @@ static PetscErrorCode rsf_post_event(TS,PetscInt,PetscInt[],PetscReal,Vec,PetscB
 /* context access for the domain check, whose callback has no user pointer */
 static struct interact_ctx *rsf_par_static = NULL;
 
-
+#endif
 int main(int argc,char **argv)
 {
-
-
+#ifdef USE_PETSC
   TS ts; /* timestepping context */
   TSAdapt adapt;
   PetscReal *values = NULL;
@@ -435,10 +434,10 @@ int main(int argc,char **argv)
   /*  */
   PetscCall(TSDestroy(&ts)); 
   PetscCall(PetscFinalize());
-
+#endif
   exit(0);
 }
-
+#ifdef USE_PETSC
 
 /* 
    compute time-derivatives for the state vector
