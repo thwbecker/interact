@@ -272,7 +272,7 @@ int main(int argc,char **argv)
   */
   PetscCall(MatCreateVecs(medium->Is,&islip_rate_vec,&stress_rate));
   PetscCall(VecSet(islip_rate_vec,-medium->vpl));
-  for(i=0;i < 2;i++){
+  for(i=0;i < ((medium->calc_sigma_dot)?(2):(1));i++){
     if(i==0)
       PetscCall(MatMult(medium->Is,islip_rate_vec,stress_rate)); /* this is shear */
     else
@@ -434,11 +434,13 @@ int main(int argc,char **argv)
   PetscCall(TSView(ts, PETSC_VIEWER_STDOUT_WORLD));
 
   PetscCall(MatDestroy(&medium->Is));
-  PetscCall(MatDestroy(&medium->In));
+  
   PetscCall(VecDestroy(&medium->rsf_vel));
   PetscCall(VecDestroy(&medium->rsf_tau_dot));
-  if(medium->calc_sigma_dot)
+  if(medium->calc_sigma_dot){
+    PetscCall(MatDestroy(&medium->In));
     PetscCall(VecDestroy(&medium->rsf_sigma_dot));
+  }
   PetscCall(VecDestroy(&x));
   PetscCall(VecDestroy(&vatol));
 
@@ -525,9 +527,9 @@ PetscErrorCode rsf_ODE_RHSFunction(TS ts,PetscReal time,Vec X,Vec F,void *ptr)
     */
     if(medium->calc_sigma_dot)
       sdot = sigma_dot[k] + fault[i].sinc[1];
-    else
-      sdot = fault[i].sinc[1];
-    
+    else{
+      sdot = 0.;
+    }
     if(rsf_limit_sigma){	/* HBI limitsigma behavior */
       if((x[j+2] < rsf_min_sigma)||(x[j+2] > rsf_max_sigma))
 	sdot = 0.0;
