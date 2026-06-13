@@ -343,6 +343,23 @@ int main(int argc, char **argv)
       fprintf(stderr,"%s: HACApK requested but not compiled in (set HACAPK_DEFINES/HACAPK_LIBS in makefile.petsc)\n",argv[0]);
       exit(-1);
 #endif
+    }else if(medium->use_hmatrix == 0){
+      /*
+	 dense reference (use_hmatrix=0): build In as a dense copy of Is
+	 so that the forward (b = A x) and inverse (x = A\b) tests below
+	 compare the dense operator against itself. This is a
+	 self-consistency check; |b-b_h|/|b| should be at the level of
+	 machine precision and |x-x_h|/|x| at the level of the KSP solver
+	 tolerance. Note that the dense baseline used for the comparison
+	 is always medium->Is - use_hmatrix=0 simply makes the second
+	 ("H") operator dense as well. Previously this value fell through
+	 to the MATH2OPUS branch without the (use_hmatrix==2 gated)
+	 coordinate/kdtree setup and aborted in MatAssemblyEnd.
+      */
+      HEADNODE
+	fprintf(stderr,"%s: core %03i/%03i: assigning dense In (use_hmatrix=0 self-consistency reference) m %i n %i\n",
+		argv[0],medium->comm_rank,medium->comm_size,m,n);
+      PetscCall(MatDuplicate(medium->Is, MAT_COPY_VALUES, &medium->In));
     }else{
       PetscCall(MatCreate(PETSC_COMM_WORLD, &medium->In));
       PetscCall(MatSetSizes(medium->In, PETSC_DECIDE, PETSC_DECIDE, m, n));  
@@ -432,8 +449,11 @@ int main(int argc, char **argv)
       fprintf(stderr,"%s: dense matrix:\n",argv[0]);
     PetscCall(MatView(medium->Is,PETSC_VIEWER_STDOUT_WORLD));
   }
-  /* get info on H matrix */
-  MatView(medium->In,PETSC_VIEWER_STDOUT_WORLD);
+  /* get info on H matrix (skip for the use_hmatrix=0 dense reference,
+     where In is a full dense copy of Is and MatView would print every
+     entry rather than a compact compression summary) */
+  if(medium->use_hmatrix)
+    MatView(medium->In,PETSC_VIEWER_STDOUT_WORLD);
   if(n < 20){
     HEADNODE
       fprintf(stderr,"%s: H matrix converted back to dense:\n",argv[0]);
