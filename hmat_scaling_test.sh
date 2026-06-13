@@ -60,15 +60,20 @@ echo "# N=$N nrandom=$NRANDOM cores: $CORES  ($(date))" | tee $OUT
 #   and hmmvp's per-block dgemv otherwise nest BLAS threads inside
 #   block-level parallelism and thrash catastrophically
 export OMP_NUM_THREADS=1
+
 export OPENBLAS_NUM_THREADS=1
 export MKL_NUM_THREADS=1
-export OMP_PROC_BIND=close
-export OMP_PLACES=cores 
+
+unset OMP_PLACES; export OMP_PROC_BIND=false
+# this was a test for HMMVP
+#export OMP_PROC_BIND=close
+#export OMP_PLACES=cores 
+
 for P in $CORES; do
-    run_one "$MPIRUN -np $P"  1 "$HTOOL_OPTS"  "HTOOL"  $P
+    run_one "$MPIRUN --bind-to core --map-by core -np $P"  1 "$HTOOL_OPTS"  "HTOOL"  $P
 done
 for P in $CORES; do
-    run_one "$MPIRUN -np $P"  3 "$HACAPK_OPTS" "HACApK" $P
+    run_one "$MPIRUN --bind-to core --map-by core -np $P"  3 "$HACAPK_OPTS" "HACApK" $P
 done
 for P in $CORES; do
     run_one ""                4 "$HMMVP_OPTS -hmmvp_nthreads $P" "hmmvp" $P

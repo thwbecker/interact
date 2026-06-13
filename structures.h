@@ -279,7 +279,13 @@ struct med{
   kd_node kd_nodes;
   int kdtr_visited;
 #endif
-
+#ifdef USE_HMMVP
+  PetscReal hmmvp_tol, hmmvp_eta;
+  int hmmvp_nthreads;
+#endif
+#ifdef USE_HACAPK
+  PetscReal hacapk_ztol;
+#endif  
 #else
   unsigned int comm_size,comm_rank;
 #endif

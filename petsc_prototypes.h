@@ -1,8 +1,6 @@
 #include <petscksp.h>
 #include "petscts.h"
 
-
-
 PetscErrorCode rsf_ODE_RHSFunction(TS, PetscReal, Vec, Vec, void*);
 PetscErrorCode rsf_TS_Monitor(TS, PetscInt, PetscReal, Vec, void*);
 PetscErrorCode rsf_domain_check(TS, PetscReal, Vec, PetscBool*);
@@ -31,6 +29,14 @@ PetscErrorCode calc_petsc_Isn_matrices(struct med *, struct flt *,PetscInt ,Pets
 typedef PetscErrorCode MatHtoolKernelFn(PetscInt, PetscInt, PetscInt, const PetscInt *, const PetscInt *, PetscScalar *, void *);
 typedef PetscScalar MatH2OpusKernelFn(PetscInt, PetscReal[], PetscReal[], void *);
 #endif
+
+
+
+PetscErrorCode set_htools_defaults_and_options(struct med *);
+PetscErrorCode set_h2opus_defaults_and_options(struct med *);
+
+void setup_kdtree(int ,int ,PetscReal *,struct flt *,struct med *);
+
 #endif
 
 
@@ -50,6 +56,7 @@ extern void cset_hacapk_struct_coord(void *, double *, double *, double *);
 extern void cmake_hacapk_struct_hmat(void *, double);
 extern void chacapk_mult_Ax_H(void *, double *, double *);
 PetscErrorCode MatMult_HACApK(Mat , Vec , Vec );
+PetscErrorCode set_hacapk_defaults_and_options(struct med *);
 #endif
 
 #ifdef USE_HMMVP
@@ -69,6 +76,7 @@ extern void *chmmvp_compress_in_memory(int, double *, double *, double *,
 extern void chmmvp_mvp(void *, double *, double *);
 extern void chmmvp_get_info(void *, int *, int *, long *);
 extern void chmmvp_delete(void *);
+PetscErrorCode set_hmmvp_defaults_and_options(struct med *);
 
 PetscErrorCode MatMult_hmmvp(Mat , Vec , Vec );
 #endif
