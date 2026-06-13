@@ -1,7 +1,7 @@
 interact: internal double prec, A matrix double prec
-main: initializing on 2026-06-11 00:07:18 ncore: 1
+main: initializing on 2026-06-11 14:40:15 ncore: 1
 interact: nu: 0.25000 mu: 1.000e+04 from properties.h, therefore lambda/mu: 1.00000 alpha: 0.66667
-init: compiled on Jun 11 2026 00:04:39, running in serial
+init: compiled on Jun 11 2026 10:06:56, running in serial
 
 Interact: calculate fault stresses and displacements in a half space or in 2-D
           using a boundary element approach.
@@ -541,7 +541,7 @@ OPTIONS:
     interact - boundary element code for elastic half-spaces
     3-D quad dislocationS based on Okada (BSSA, 1992).
     3-D triangular dislocations based on Nikkhoo and Walter (GJI, 2015).
-    Triangular dislocations integration modifications based on Noda (EPS, 2015).
+    Triangular dislocations integration modifications based on Noda (EPS, 2025).
     2-D segment slip solution from Crouch and Starfield (1973).
     May include routines based on copyrighted software of others.
     Distributed under the GNU public license, see "COPYING".

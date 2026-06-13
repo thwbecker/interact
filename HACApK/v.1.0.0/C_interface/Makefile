@@ -4,7 +4,7 @@
 #Sherlock (intel MPI)
 #F90 = mpiifort -O3 -qopenmp -heap-arrays -ip -g -traceback
 
-MPIDIR=$(PETSCDIR)/build/bin/
+MPIDIR=$(PETSC_DIR)/build/bin/
 
 CC=$(MPIDIR)/mpicc
 F90=$(MPIDIR)/mpifort

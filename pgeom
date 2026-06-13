@@ -70,8 +70,8 @@ echo $0: determined region of $reg ann $ann
 echo $0: z axis is downscaled by $zscaling
 
 
-proj="-Jx$scl -P -Jz`echo $scl | gawk '{print($1/z)}' z=$zscaling`  -E135/30"
-#proj="-Jx$scl -P -Jz`echo $scl | gawk '{print($1/z)}' z=$zscaling`  -E30/30"
+#proj="-Jx$scl -P -Jz`echo $scl | gawk '{print($1/z)}' z=$zscaling`  -E135/30"
+proj="-Jx$scl -P -Jz`echo $scl | gawk '{print($1/z)}' z=$zscaling`  -E30/30"
 
 echo $0: reading from $tmpn.dat
 # plot the stuff for real
@@ -97,6 +97,6 @@ fi
 # and put some frame around it
 psxyz $tmpn.dat $reg -L -m $proj -W.25  -O $ann >> $file
 
-#echo $0: output in $file
-modifybb $file  1
+echo $0: output in $file
+modifybb $file
 

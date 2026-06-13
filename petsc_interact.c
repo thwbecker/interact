@@ -219,7 +219,7 @@ PetscErrorCode calc_petsc_Isn_matrices(struct med *medium, struct flt *fault,
   switch(use_hmatrix){
   case 0:
     HEADNODE
-      fprintf(stderr,"calc_petsc_Isn_matrices: using dense matrix for stress mode %i stress type %i\n",
+      fprintf(stderr,"calc_petsc_Isn_matrices: creating dense matrix for stress mode %i stress type %i\n",
 	      mode,ictx->rec_stress_mode);
     PetscCall(MatSetType(*this_mat, MATDENSE));
     /* 
@@ -236,7 +236,7 @@ PetscErrorCode calc_petsc_Isn_matrices(struct med *medium, struct flt *fault,
   case 1:
     /* make the matrix */
     HEADNODE
-      fprintf(stderr,"calc_petsc_Isn_matrices: using HTOOL matrix for stress mode %i stress type %i\n",
+      fprintf(stderr,"calc_petsc_Isn_matrices: creating HTOOL matrix for stress mode %i stress type %i\n",
 	      mode,ictx->rec_stress_mode);
     PetscCall(MatSetType(*this_mat, MATHTOOL));
     /* 
@@ -255,7 +255,7 @@ PetscErrorCode calc_petsc_Isn_matrices(struct med *medium, struct flt *fault,
     break;
   case 2:
     HEADNODE
-      fprintf(stderr,"calc_petsc_Isn_matrices: using H2OPUS matrix for stress mode %i stress type %i\n",
+      fprintf(stderr,"calc_petsc_Isn_matrices: creating H2OPUS matrix for stress mode %i stress type %i\n",
 	      mode,ictx->rec_stress_mode);
     PetscCall(MatSetType(*this_mat, MATH2OPUS));
     /* 
@@ -311,6 +311,9 @@ PetscErrorCode calc_petsc_Isn_matrices(struct med *medium, struct flt *fault,
 #endif
   case 3:
 #ifdef USE_HACAPK
+    HEADNODE
+      fprintf(stderr,"calc_petsc_Isn_matrices: creating HACAPK matrix for stress mode %i stress type %i\n",
+	      mode,ictx->rec_stress_mode);
     hacapk_handle = cinit_hacapk_struct((int)m,(void *)ictx);
     cset_hacapk_struct_coord(hacapk_handle,xc,yc,zc);
     fprintf(stderr,"core %03i/%03i: assigning HACApK m %i n %i ztol %g\n",
@@ -328,6 +331,9 @@ PetscErrorCode calc_petsc_Isn_matrices(struct med *medium, struct flt *fault,
 #endif
     break;
   case 4:
+    HEADNODE
+      fprintf(stderr,"calc_petsc_Isn_matrices: creating HHMMVP matrix for stress mode %i stress type %i\n",
+	      mode,ictx->rec_stress_mode);
 #ifdef USE_HMMVP
     hmmvp_handle = chmmvp_compress_in_memory((int)m,xc,yc,zc,(double)medium->hmmvp_tol,
 					     (double)medium->hmmvp_eta,medium->hmmvp_nthreads,
