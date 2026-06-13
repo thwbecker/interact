@@ -247,8 +247,8 @@ int main(int argc,char **argv)
      traction on the slipping patch (negative diagonal), so backslip
      -vpl produces positive loading
   */
-  calc_petsc_Isn_matrices(medium,fault,use_hmatrix, shear_modulus_si/SHEAR_MODULUS,0,&medium->Is); /* shear stress */
-  calc_petsc_Isn_matrices(medium,fault,use_hmatrix,-shear_modulus_si/SHEAR_MODULUS,1,&medium->In); /* normal stress, compression positive */
+  calc_petsc_Isn_matrices(medium,fault,use_hmatrix, shear_modulus_si/SHEAR_MODULUS,0,&medium->Is,medium->Is_hctx); /* shear stress */
+  calc_petsc_Isn_matrices(medium,fault,use_hmatrix,-shear_modulus_si/SHEAR_MODULUS,1,&medium->In,medium->In_hctx); /* normal stress, compression positive */
   if(use_hmatrix)
     PetscCall(MatView(medium->Is,PETSC_VIEWER_STDOUT_WORLD));
   /* 

@@ -16,7 +16,7 @@ PetscReal vel_from_rsf(PetscReal, PetscReal, PetscReal, PetscReal,PetscReal,
 		       PetscReal *, PetscReal *, PetscReal *,struct med *);
 
 
-PetscErrorCode calc_petsc_Isn_matrices(struct med *, struct flt *,PetscInt ,PetscReal, int, Mat *);
+PetscErrorCode calc_petsc_Isn_matrices(struct med *, struct flt *,PetscInt ,PetscReal, int, Mat *,hacapk_shell_ctx *);
 
 #ifdef USE_PETSC_HMAT
 #if PETSC_VERSION_LT(3,22,0)

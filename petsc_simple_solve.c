@@ -77,8 +77,8 @@ int main(int argc, char **argv)
   /* 
      compute interaction matrices 
   */
-  calc_petsc_Isn_matrices(medium, fault,use_hmatrix,1.0,0,&medium->Is);
-  calc_petsc_Isn_matrices(medium, fault,use_hmatrix,1.0,1,&medium->In);
+  calc_petsc_Isn_matrices(medium, fault,use_hmatrix,1.0,0,&medium->Is,medium->Is_hctx);
+  calc_petsc_Isn_matrices(medium, fault,use_hmatrix,1.0,1,&medium->In,medium->In_hctx);
   /* 
      display 
   */

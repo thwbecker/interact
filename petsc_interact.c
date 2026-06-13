@@ -97,7 +97,7 @@ PetscErrorCode MatMult_HACApK(Mat A, Vec x, Vec y)
 
 PetscErrorCode calc_petsc_Isn_matrices(struct med *medium, struct flt *fault,
 				       PetscInt use_hmatrix,PetscReal scale, int mode,
-				       Mat *this_mat)
+				       Mat *this_mat, hacapk_shell_ctx *hctx)
 {
   /* context */
   struct interact_ctx ictx[1];
@@ -112,7 +112,6 @@ PetscErrorCode calc_petsc_Isn_matrices(struct med *medium, struct flt *fault,
 #endif
 #if ( defined(USE_HMMVP) || defined(USE_HACAPK) )
   double *xc,*yc,*zc;
-  hacapk_shell_ctx *hctx;
   Vec xd;
 #endif
 #ifdef USE_HMMVP
@@ -128,8 +127,6 @@ PetscErrorCode calc_petsc_Isn_matrices(struct med *medium, struct flt *fault,
   ictx->fault = fault;
   /* defines how to slip */
   ictx->src_slip_mode = 0;
-  /*  */
-  medium->use_hmatrix = use_hmatrix;
   /*  */
   m = n = medium->nrflt;
   switch(use_hmatrix){
@@ -310,6 +307,7 @@ PetscErrorCode calc_petsc_Isn_matrices(struct med *medium, struct flt *fault,
       fprintf(stderr,"hmmvp %i by %i, %ld stored scalars, compression ratio %.5g\n",
 	      hmm,hmn,hmmvp_nnz,
 	      (double)((double)m*(double)n/(double)hmmvp_nnz));
+    
     hctx = (hacapk_shell_ctx *)malloc(sizeof(hacapk_shell_ctx));
     hctx->handle = hmmvp_handle;
     hctx->ball = (double *)malloc(sizeof(double)*m);
@@ -353,7 +351,7 @@ PetscErrorCode calc_petsc_Isn_matrices(struct med *medium, struct flt *fault,
   if((use_hmatrix==1) || (use_hmatrix==2))
     free(coords);
   if((use_hmatrix==3)||(use_hmatrix==4)){
-    free(xc);free(yc);free(zc);free(hctx->ball);
+    free(xc);free(yc);free(zc);
   }
   if(use_hmatrix==3)
     PetscCall(VecDestroy(&xd));

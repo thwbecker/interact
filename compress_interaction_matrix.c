@@ -50,7 +50,7 @@ int main(int argc, char **argv)
 #endif
 #if ( defined(USE_HMMVP) || defined(USE_HACAPK) )
   double *xc,*yc,*zc;
-  hacapk_shell_ctx *hctx;
+  hacapk_shell_ctx *hsc_dense,*hsc_h;
   Vec xd;
 #endif
 #ifdef USE_HMMVP
@@ -82,6 +82,10 @@ int main(int argc, char **argv)
   
   /* set defaults, can always override */
   PetscCall(PetscOptionsGetInt(NULL, NULL, "-use_hmatrix", &medium->use_hmatrix,&read_value));
+  /* options */
+  PetscCall(PetscOptionsGetInt(NULL, NULL, "-nrandom", &nrandom,&read_value));
+  PetscCall(PetscOptionsGetBool(NULL, NULL, "-test_forward", &test_forward,&read_value));
+
   
   PetscCallMPI(MPI_Comm_size(PETSC_COMM_WORLD, &medium->comm_size));
   PetscCallMPI(MPI_Comm_rank(PETSC_COMM_WORLD, &medium->comm_rank));
@@ -135,7 +139,7 @@ int main(int argc, char **argv)
   case 4:
 #ifdef USE_HMMVP
     HEADNODE
-      fprintf(stderr,"%s: setting up for GMMVP\n",argv[0]);
+      fprintf(stderr,"%s: setting up for HMMVP\n",argv[0]);
     set_hmmvp_defaults_and_options(medium);
 #else
     fprintf(stderr,"%s: HMMVP requested but not compiled in (see USE_HMMVP and makefile.petc)\n",argv[0]);
@@ -155,9 +159,7 @@ int main(int argc, char **argv)
 
   */
   PetscCall(PetscOptionsGetString(NULL, NULL, "-geom_file", geom_file, STRLEN,&read_value));
-  /* options */
-  PetscCall(PetscOptionsGetInt(NULL, NULL, "-nrandom", &nrandom,&read_value));
-  PetscCall(PetscOptionsGetBool(NULL, NULL, "-test_forward", &test_forward,&read_value));
+ 
 
   HEADNODE{
     if(read_value)
@@ -349,15 +351,15 @@ int main(int argc, char **argv)
       fprintf(stderr,"%s: core %03i/%03i: assigning HACApK m %i n %i ztol %g\n",
 	      argv[0],medium->comm_rank,medium->comm_size,m,n,(double)medium->hacapk_ztol);
       cmake_hacapk_struct_hmat(hacapk_handle,(double)medium->hacapk_ztol);
-      hctx = (hacapk_shell_ctx *)malloc(sizeof(hacapk_shell_ctx));
-      hctx->handle = hacapk_handle;
-      hctx->ball = (double *)malloc(sizeof(double)*m);
+      hsc_h = (hacapk_shell_ctx *)malloc(sizeof(hacapk_shell_ctx));
+      hsc_h->handle = hacapk_handle;
+      hsc_h->ball = (double *)malloc(sizeof(double)*m);
       PetscCall(MatCreateShell(PETSC_COMM_WORLD,PETSC_DECIDE,PETSC_DECIDE,m,n,
-			       (void *)hctx,&AH));
+			       (void *)hsc_h,&AH));
       PetscCall(MatShellSetOperation(AH,MATOP_MULT,(void (*)(void))MatMult_HACApK));
       PetscCall(MatCreateVecs(AH,&xd,NULL));
-      PetscCall(VecScatterCreateToAll(xd,&hctx->scat,&hctx->xall));
-      PetscCall(VecGetOwnershipRange(xd,&hctx->rs,&hctx->re));
+      PetscCall(VecScatterCreateToAll(xd,&hsc_h->scat,&hsc_h->xall));
+      PetscCall(VecGetOwnershipRange(xd,&hsc_h->rs,&hsc_h->re));
       PetscCall(VecDestroy(&xd));
       PetscCall(MatSetOption(AH, MAT_SYMMETRIC, PETSC_FALSE));
 #endif
@@ -388,15 +390,15 @@ int main(int argc, char **argv)
 	fprintf(stderr,"%s: hmmvp %i by %i, %ld stored scalars, compression ratio %.5g\n",
 		argv[0],hmm,hmn,hmmvp_nnz,
 		(double)((double)m*(double)n/(double)hmmvp_nnz));
-      hctx = (hacapk_shell_ctx *)malloc(sizeof(hacapk_shell_ctx));
-      hctx->handle = hmmvp_handle;
-      hctx->ball = (double *)malloc(sizeof(double)*m);
+      hsc_h = (hacapk_shell_ctx *)malloc(sizeof(hacapk_shell_ctx));
+      hsc_h->handle = hmmvp_handle;
+      hsc_h->ball = (double *)malloc(sizeof(double)*m);
       PetscCall(MatCreateShell(PETSC_COMM_WORLD,PETSC_DECIDE,PETSC_DECIDE,m,n,
-			       (void *)hctx,&AH));
+			       (void *)hsc_h,&AH));
       PetscCall(MatShellSetOperation(AH,MATOP_MULT,(void (*)(void))MatMult_hmmvp));
       PetscCall(MatCreateVecs(AH,&xd,NULL));
-      PetscCall(VecScatterCreateToAll(xd,&hctx->scat,&hctx->xall));
-      PetscCall(VecGetOwnershipRange(xd,&hctx->rs,&hctx->re));
+      PetscCall(VecScatterCreateToAll(xd,&hsc_h->scat,&hsc_h->xall));
+      PetscCall(VecGetOwnershipRange(xd,&hsc_h->rs,&hsc_h->re));
       PetscCall(VecDestroy(&xd));
       PetscCall(MatSetOption(AH, MAT_SYMMETRIC, PETSC_FALSE));
 #endif
@@ -421,8 +423,8 @@ int main(int argc, char **argv)
     /* 
        use external routines 
     */
-    calc_petsc_Isn_matrices(medium, fault,0,                  1.0,0,&Adense); /* dense */
-    calc_petsc_Isn_matrices(medium, fault,medium->use_hmatrix,1.0,0,&AH); /* Htools, H2opus, HACApK, or HMVVP */
+    calc_petsc_Isn_matrices(medium, fault,0,                  1.0,0,&Adense,hsc_dense); /* dense */
+    calc_petsc_Isn_matrices(medium, fault,medium->use_hmatrix,1.0,0,&AH,hsc_h); /* Htools, H2opus, HACApK, or HMVVP */
   }
 
   /* 
