@@ -283,8 +283,8 @@ struct med{
   /* preallocated work vectors for the RSF ODE right hand side
      (created once in rsf_solve, layout matching Is/In rows) */
   Vec         rsf_vel, rsf_tau_dot, rsf_sigma_dot;
-  PetscInt use_hmatrix;		/* 0,1,2 */
-  
+  PetscInt use_hmatrix;		/* 0,1,2,3,4 */
+  PetscBool calc_sigma_dot;
 #ifdef USE_PETSC_HMAT
   PetscReal h2opus_eta;		/* 0.6 */
   PetscInt  h2opus_leafsize;	/* 32 */

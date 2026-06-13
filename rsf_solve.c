@@ -116,9 +116,33 @@ int main(int argc,char **argv)
   medium->dc = 0.008;		/* D_c [m] */
   medium->vpl = 1e-9;		/* plate motion [m/s] */
   medium->v0 = 1e-6;		/* reference speed [m/s] (HBI: vref) */
+  /*  */
+  medium->calc_sigma_dot = FALSE; /* compute normal stress change? */
+  /* initial conditions, can overwrite below */
+  sigma_init = 50e6;		/* [Pa] */
+  tau_init = -1;		/* [Pa], if < 0, will use f0 * sigma_init */
+  vel_init = medium->vpl;	/* [m/s] */
+  rand_amp = 0;			/* random multiplier amplitude for initial state, e.g. 0.05 */
+  
+  /* time stepping controls, can override below */
+  rtol = 1e-4;			/* HBI eps_r default */
+  atol_slip = 1e-3;		/* [m] absolute tolerance for the slip entries,
+				   effectively excluding slip from error control as in HBI */
+  dt_init = 1.0;		/* [s], HBI dtinit default */
+  dt_max = 1e10;		/* [s], HBI dtmax default */
   /* 
      timestepping 
   */
+  dt_monitor = 5.0;		/* [yr], also caps the step size */
+  rdx_monitor = 1e-4;		/* relative state change trigger */
+  adx_monitor = 0.0;		/* absolute state change trigger, <= 0: off */
+  monitor_tmin = 0.0;		/* [yr] suppress monitor output before */
+  vel_event = 1e-3;		/* [m/s] event velocity threshold, cf. HBI velth */
+  vel_event_hyst = 0.5;		/* arrest at vel_event * hyst, debounces spurious
+				   crossings from interpolant oscillation during
+				   the rapid coseismic acceleration */
+  event_tmin = 0.0;		/* [yr] suppress event output before */
+
   medium->time = medium->slip_line_time = 0.;
   medium->stop_time = 3000*sec_per_year;	      /* stop time */
   /* output */
@@ -148,11 +172,8 @@ int main(int argc,char **argv)
   PetscCall(PetscOptionsGetReal(NULL,NULL,"-v0",&medium->v0,NULL));     /* reference velocity [m/s] */
   /* G/(2 c_s) radiation damping factor */
   medium->shear_mod_over_2cs_si = shear_modulus_si /(2.0*s_wave_speed_si);
-  /* initial conditions */
-  sigma_init = 50e6;		/* [Pa] */
-  tau_init = -1;		/* [Pa], if < 0, will use f0 * sigma_init */
-  vel_init = medium->vpl;	/* [m/s] */
-  rand_amp = 0;			/* random multiplier amplitude for initial state, e.g. 0.05 */
+ 
+
   PetscCall(PetscOptionsGetReal(NULL,NULL,"-sigma_init",&sigma_init,NULL));
   PetscCall(PetscOptionsGetReal(NULL,NULL,"-tau_init",&tau_init,NULL));
   PetscCall(PetscOptionsGetReal(NULL,NULL,"-vel_init",&vel_init,NULL));
@@ -164,12 +185,7 @@ int main(int argc,char **argv)
   PetscCall(PetscOptionsGetBool(NULL,NULL,"-limit_sigma",&rsf_limit_sigma,NULL));
   PetscCall(PetscOptionsGetReal(NULL,NULL,"-min_sigma",&rsf_min_sigma,NULL)); /* [Pa] */
   PetscCall(PetscOptionsGetReal(NULL,NULL,"-max_sigma",&rsf_max_sigma,NULL)); /* [Pa] */
-  /* time stepping controls */
-  rtol = 1e-4;			/* HBI eps_r default */
-  atol_slip = 1e-3;		/* [m] absolute tolerance for the slip entries,
-				   effectively excluding slip from error control as in HBI */
-  dt_init = 1.0;		/* [s], HBI dtinit default */
-  dt_max = 1e10;		/* [s], HBI dtmax default */
+  
   PetscCall(PetscOptionsGetReal(NULL,NULL,"-rtol",&rtol,NULL));
   PetscCall(PetscOptionsGetReal(NULL,NULL,"-atol_slip",&atol_slip,NULL));
   PetscCall(PetscOptionsGetReal(NULL,NULL,"-dt_init",&dt_init,NULL));
@@ -190,15 +206,7 @@ int main(int argc,char **argv)
      dt_monitor; events are slip velocity threshold crossings located
      by the TS event handler
   */
-  dt_monitor = 5.0;		/* [yr], also caps the step size */
-  rdx_monitor = 1e-4;		/* relative state change trigger */
-  adx_monitor = 0.0;		/* absolute state change trigger, <= 0: off */
-  monitor_tmin = 0.0;		/* [yr] suppress monitor output before */
-  vel_event = 1e-3;		/* [m/s] event velocity threshold, cf. HBI velth */
-  vel_event_hyst = 0.5;		/* arrest at vel_event * hyst, debounces spurious
-				   crossings from interpolant oscillation during
-				   the rapid coseismic acceleration */
-  event_tmin = 0.0;		/* [yr] suppress event output before */
+ 
   track_events = PETSC_TRUE;
   PetscCall(PetscOptionsGetReal(NULL,NULL,"-dt_monitor_yr",&dt_monitor,NULL));
   PetscCall(PetscOptionsGetReal(NULL,NULL,"-rdx_monitor",&rdx_monitor,NULL));
@@ -247,14 +255,16 @@ int main(int argc,char **argv)
      -vpl produces positive loading
   */
   calc_petsc_Isn_matrices(medium,fault,use_hmatrix, shear_modulus_si/SHEAR_MODULUS,0,&medium->Is,medium->Is_hctx); /* shear stress */
-  calc_petsc_Isn_matrices(medium,fault,use_hmatrix,-shear_modulus_si/SHEAR_MODULUS,1,&medium->In,medium->In_hctx); /* normal stress, compression positive */
+  if(medium->calc_sigma_dot)
+    calc_petsc_Isn_matrices(medium,fault,use_hmatrix,-shear_modulus_si/SHEAR_MODULUS,1,&medium->In,medium->In_hctx); /* normal stress, compression positive */
   if(use_hmatrix)
     PetscCall(MatView(medium->Is,PETSC_VIEWER_STDOUT_WORLD));
   /* 
      preallocate the RHS work vectors with the matrix row layout
   */
   PetscCall(MatCreateVecs(medium->Is,&medium->rsf_vel,&medium->rsf_tau_dot));
-  PetscCall(VecDuplicate(medium->rsf_tau_dot,&medium->rsf_sigma_dot));
+  if(medium->calc_sigma_dot)
+    PetscCall(VecDuplicate(medium->rsf_tau_dot,&medium->rsf_sigma_dot));
   /* 
      compute backslip stressing rates sinc[0] (shear) and sinc[1]
      (normal, compression positive) from slip rate -vpl, made
@@ -427,7 +437,8 @@ int main(int argc,char **argv)
   PetscCall(MatDestroy(&medium->In));
   PetscCall(VecDestroy(&medium->rsf_vel));
   PetscCall(VecDestroy(&medium->rsf_tau_dot));
-  PetscCall(VecDestroy(&medium->rsf_sigma_dot));
+  if(medium->calc_sigma_dot)
+    PetscCall(VecDestroy(&medium->rsf_sigma_dot));
   PetscCall(VecDestroy(&x));
   PetscCall(VecDestroy(&vatol));
 
@@ -486,13 +497,15 @@ PetscErrorCode rsf_ODE_RHSFunction(TS ts,PetscReal time,Vec X,Vec F,void *ptr)
      and H matrix; background backslip loading (sinc) is added below
   */
   PetscCall(MatMult(medium->Is, medium->rsf_vel, medium->rsf_tau_dot));
-  PetscCall(MatMult(medium->In, medium->rsf_vel, medium->rsf_sigma_dot));
+  if(medium->calc_sigma_dot)
+    PetscCall(MatMult(medium->In, medium->rsf_vel, medium->rsf_sigma_dot));
   /* 
      compute derivatives 
   */
   PetscCall(VecGetArrayRead(medium->rsf_vel,&velr));
   PetscCall(VecGetArrayRead(medium->rsf_tau_dot,&tau_dot));
-  PetscCall(VecGetArrayRead(medium->rsf_sigma_dot,&sigma_dot));
+  if(medium->calc_sigma_dot)
+    PetscCall(VecGetArrayRead(medium->rsf_sigma_dot,&sigma_dot));
   PetscCall(VecGetArray(F,&f));
   for (i = medium->rs, j=0, k=0; i < medium->re; i++, j+=INT_RSF_DIM, k++) {
     /* a = fault[].mu_s, b = fault[].mu_d as read by read_rsf */
@@ -510,7 +523,11 @@ PetscErrorCode rsf_ODE_RHSFunction(TS ts,PetscReal time,Vec X,Vec F,void *ptr)
     /* 
        d sigma/dt, compression positive (In was scaled by -1)
     */
-    sdot = sigma_dot[k] + fault[i].sinc[1];
+    if(medium->calc_sigma_dot)
+      sdot = sigma_dot[k] + fault[i].sinc[1];
+    else
+      sdot = fault[i].sinc[1];
+    
     if(rsf_limit_sigma){	/* HBI limitsigma behavior */
       if((x[j+2] < rsf_min_sigma)||(x[j+2] > rsf_max_sigma))
 	sdot = 0.0;
@@ -539,7 +556,8 @@ PetscErrorCode rsf_ODE_RHSFunction(TS ts,PetscReal time,Vec X,Vec F,void *ptr)
   PetscCall(VecRestoreArray(F,&f));
   PetscCall(VecRestoreArrayRead(medium->rsf_vel,&velr));
   PetscCall(VecRestoreArrayRead(medium->rsf_tau_dot,&tau_dot));
-  PetscCall(VecRestoreArrayRead(medium->rsf_sigma_dot,&sigma_dot));
+  if(medium->calc_sigma_dot)
+    PetscCall(VecRestoreArrayRead(medium->rsf_sigma_dot,&sigma_dot));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 /* 
