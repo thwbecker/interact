@@ -104,6 +104,10 @@
 # 		              NOTE: CERTAIN PROGRAMS USE petsc_settings.yaml FOR DEFAULTS 
 # ____________________________________________________________________________________________________
 
+VPATH = src src/green src/util src/block src/testing/
+
+LOCAL_INCLUDES = -Isrc/ -Isrc/util/ -Isrc/block/
+
 #  Example settings:
 #
 MY_PRECISION = -DUSE_DOUBLE_PRECISION
@@ -142,24 +146,24 @@ OKROUTINE_DEBUG = $(ODIR)/dc3d.dbg.o	# my modified version
 # 
 # include the machine dependent flags
 # 
-include makefile.gcc
-#include makefile.icc
-#include makefile.mixed_mkl
-#include makefile.mixed
-#include makefile.icc_frontera
+include config/makefile.gcc
+#include config/makefile.icc
+#include config/makefile.mixed_mkl
+#include config/makefile.mixed
+#include config/makefile.icc_frontera
 #
 # add this for pgplot support, otherwise comment it out
 # you will use runtime plotting capabilities
-#include makefile.pgplot
+#include config/makefile.pgplot
 #
 # add this for slatec NNLS routine support, otherwise comment it out
 # you will use NNLS solving capabilities
-#include makefile.slatec
+#include config/makefile.slatec
 
 #
 # petsc, will override some of the flags
 # comment out if not needed
-include makefile.petsc
+include config/makefile.petsc
 ifndef MPILD
 MPILD = $(LD)
 endif
@@ -177,7 +181,7 @@ GEO_TOOLS=
 DEFINE_FLAGS = $(MAIN_DEFINES) $(SLATEC_DEFINES) $(PETSC_DEFINES) \
 	$(PGPLOT_DEFINES) $(SUPERLU_DEFINES) $(GEOPROJECT_DEFINES)
 # defines and pgplot flags
-FLAGS = $(DEFINE_FLAGS) $(PGPLOT_INCLUDES) $(SLATEC_INCLUDES) \
+FLAGS = $(DEFINE_FLAGS) $(PGPLOT_INCLUDES) $(SLATEC_INCLUDES) $(LOCAL_INCLUDES) \
 	$(SUPERLU_INCLUDES) $(GEOPROJECT_INCLUDES) $(PETSC_INCLUDES) 
 # C and FORTRAN compiler specific flags, add them to the 
 
@@ -193,10 +197,10 @@ F90FLAGS = $(FLAGS) $(SF90ARGS) $(MACHINE_DEFINES)
 #
 # solve mode dependend, ie. one for each mode of accesing the
 # interaction matrix (improved speed, one would hope)
-SMD_OBJS = $(ODIR)/solve_mode_dependend_1.o	\
-	$(ODIR)/solve_mode_dependend_2.o	\
-	$(ODIR)/solve_mode_dependend_3.o	\
-	$(ODIR)/solve_mode_dependend_4.o 
+SMD_OBJS = $(ODIR)/solve_mode_dependent_1.o	\
+	$(ODIR)/solve_mode_dependent_2.o	\
+	$(ODIR)/solve_mode_dependent_3.o	\
+	$(ODIR)/solve_mode_dependent_4.o 
 
 SMD_OBJS_DEBUG = $(SMD_OBJS:.o=.dbg.o)
 #
@@ -583,7 +587,7 @@ $(BDIR)/calc_interaction_matrix: $(ODIR)/coulomb_stress.o \
 		$(PGLIBS) $(SLATEC_LIBS)  $(LDFLAGS)
 
 $(ODIR)/hmmvp_c_shim.o: hmmvp_c_shim.cpp
-	$(MPICXX) -std=c++14 -O2 -fPIC $(HMMVP_INC) $(DEFINE_FLAGS) -c hmmvp_c_shim.cpp -o $(ODIR)/hmmvp_c_shim.o
+	$(MPICXX) -std=c++14 -O2 -fPIC $(HMMVP_INC) $(DEFINE_FLAGS) -c $< -o $(ODIR)/hmmvp_c_shim.o
 
 $(BDIR)/compress_interaction_matrix: $(ODIR)/compress_interaction_matrix.o $(ODIR)/coulomb_stress.o $(HMMVP_OBJS) \
 	$(ODIR)/interact.o 	$(ODIR)/petsc_interact.o $(GEN_P_INC)  $(LIBLIST) 
@@ -826,58 +830,58 @@ $(ODIR)/noda_crack_test: $(T3OBJ) $(GEN_P_INC)  $(LIBLIST)  $(TRI_GREEN_OBJS)
 #
 #
 $(ODIR)/numrec_svd_routines.o: numrec_svd_routines.F $(GEN_P_INC)
-	$(F77) -c  $(FFLAGS) numrec_svd_routines.F $(MY_PRECISION) $(OPTIM_FLAGS) \
+	$(F77) -c  $(FFLAGS) $< $(MY_PRECISION) $(OPTIM_FLAGS) \
 	-o $(ODIR)/numrec_svd_routines.o
 
 $(ODIR)/numrec_svd_routines.dbg.o: numrec_svd_routines.F $(GEN_P_INC)
-	$(F77) -c  $(FFLAGS) numrec_svd_routines.F $(MY_PRECISION) $(DEBUG_FLAGS) \
+	$(F77) -c  $(FFLAGS) $< $(MY_PRECISION) $(DEBUG_FLAGS) \
 	-o $(ODIR)/numrec_svd_routines.dbg.o
 
 $(ODIR)/numrec_svd_routines.sgl.o: numrec_svd_routines.F $(GEN_P_INC)
-	$(F77) -c  $(FFLAGS) $(OPTIM_FLAGS) numrec_svd_routines.F -o $(ODIR)/numrec_svd_routines.sgl.o
+	$(F77) -c  $(FFLAGS) $(OPTIM_FLAGS) $< -o $(ODIR)/numrec_svd_routines.sgl.o
 
 #
 # other specialities
 #
-$(ODIR)/solve_mode_dependend_1.o: solve_mode_dependend.c $(GEN_P_INC)
-	$(CC) $(CFLAGS) -c solve_mode_dependend.c \
-	-DCOMP_MODE_1 $(MY_PRECISION) $(OPTIM_FLAGS)  -o  $(ODIR)/solve_mode_dependend_1.o
-$(ODIR)/solve_mode_dependend_2.o: solve_mode_dependend.c $(GEN_P_INC)
-	$(CC) $(CFLAGS) -c solve_mode_dependend.c \
-	-DCOMP_MODE_2 $(MY_PRECISION) $(OPTIM_FLAGS)   -o  $(ODIR)/solve_mode_dependend_2.o
-$(ODIR)/solve_mode_dependend_3.o: solve_mode_dependend.c $(GEN_P_INC)
-	$(CC) $(CFLAGS) -c solve_mode_dependend.c \
-	-DCOMP_MODE_3 $(MY_PRECISION) $(OPTIM_FLAGS)  -o  $(ODIR)/solve_mode_dependend_3.o
-$(ODIR)/solve_mode_dependend_4.o: solve_mode_dependend.c $(GEN_P_INC)
-	$(CC) $(CFLAGS) -c solve_mode_dependend.c \
-	-DCOMP_MODE_4 $(MY_PRECISION) $(OPTIM_FLAGS)  -o  $(ODIR)/solve_mode_dependend_4.o
+$(ODIR)/solve_mode_dependent_1.o: solve_mode_dependent.c $(GEN_P_INC)
+	$(CC) $(CFLAGS) -c $< \
+	-DCOMP_MODE_1 $(MY_PRECISION) $(OPTIM_FLAGS)  -o  $(ODIR)/solve_mode_dependent_1.o
+$(ODIR)/solve_mode_dependent_2.o: solve_mode_dependent.c $(GEN_P_INC)
+	$(CC) $(CFLAGS) -c $< \
+	-DCOMP_MODE_2 $(MY_PRECISION) $(OPTIM_FLAGS)   -o  $(ODIR)/solve_mode_dependent_2.o
+$(ODIR)/solve_mode_dependent_3.o: solve_mode_dependent.c $(GEN_P_INC)
+	$(CC) $(CFLAGS) -c $< \
+	-DCOMP_MODE_3 $(MY_PRECISION) $(OPTIM_FLAGS)  -o  $(ODIR)/solve_mode_dependent_3.o
+$(ODIR)/solve_mode_dependent_4.o: solve_mode_dependent.c $(GEN_P_INC)
+	$(CC) $(CFLAGS) -c $< \
+	-DCOMP_MODE_4 $(MY_PRECISION) $(OPTIM_FLAGS)  -o  $(ODIR)/solve_mode_dependent_4.o
 # debug
-$(ODIR)/solve_mode_dependend_1.dbg.o: solve_mode_dependend.c $(GEN_P_INC)
-	$(CC) $(CFLAGS) -c solve_mode_dependend.c \
-	-DCOMP_MODE_1 $(MY_PRECISION) $(DEBUG_FLAGS)  -o  $(ODIR)/solve_mode_dependend_1.dbg.o
-$(ODIR)/solve_mode_dependend_2.dbg.o: solve_mode_dependend.c $(GEN_P_INC)
-	$(CC) $(CFLAGS) -c solve_mode_dependend.c \
-	-DCOMP_MODE_2 $(MY_PRECISION) $(DEBUG_FLAGS)   -o  $(ODIR)/solve_mode_dependend_2.dbg.o
-$(ODIR)/solve_mode_dependend_3.dbg.o: solve_mode_dependend.c $(GEN_P_INC)
-	$(CC) $(CFLAGS) -c solve_mode_dependend.c \
-	-DCOMP_MODE_3 $(MY_PRECISION) $(DEBUG_FLAGS)  -o  $(ODIR)/solve_mode_dependend_3.dbg.o
-$(ODIR)/solve_mode_dependend_4.dbg.o: solve_mode_dependend.c $(GEN_P_INC)
-	$(CC) $(CFLAGS) -c solve_mode_dependend.c \
-	-DCOMP_MODE_4 $(MY_PRECISION) $(DEBUG_FLAGS)  -o  $(ODIR)/solve_mode_dependend_4.dbg.o
+$(ODIR)/solve_mode_dependent_1.dbg.o: solve_mode_dependent.c $(GEN_P_INC)
+	$(CC) $(CFLAGS) -c $< \
+	-DCOMP_MODE_1 $(MY_PRECISION) $(DEBUG_FLAGS)  -o  $(ODIR)/solve_mode_dependent_1.dbg.o
+$(ODIR)/solve_mode_dependent_2.dbg.o: solve_mode_dependent.c $(GEN_P_INC)
+	$(CC) $(CFLAGS) -c $< \
+	-DCOMP_MODE_2 $(MY_PRECISION) $(DEBUG_FLAGS)   -o  $(ODIR)/solve_mode_dependent_2.dbg.o
+$(ODIR)/solve_mode_dependent_3.dbg.o: solve_mode_dependent.c $(GEN_P_INC)
+	$(CC) $(CFLAGS) -c $< \
+	-DCOMP_MODE_3 $(MY_PRECISION) $(DEBUG_FLAGS)  -o  $(ODIR)/solve_mode_dependent_3.dbg.o
+$(ODIR)/solve_mode_dependent_4.dbg.o: solve_mode_dependent.c $(GEN_P_INC)
+	$(CC) $(CFLAGS) -c $< \
+	-DCOMP_MODE_4 $(MY_PRECISION) $(DEBUG_FLAGS)  -o  $(ODIR)/solve_mode_dependent_4.dbg.o
 #
 # single prec (leave out my_precision)
-$(ODIR)/solve_mode_dependend_1.sgl.o: solve_mode_dependend.c $(GEN_P_INC)
-	$(CC) $(CFLAGS) $(OPTIM_FLAGS) -c solve_mode_dependend.c \
-	-DCOMP_MODE_1  -o  $(ODIR)/solve_mode_dependend_1.sgl.o
-$(ODIR)/solve_mode_dependend_2.sgl.o: solve_mode_dependend.c $(GEN_P_INC)
-	$(CC) $(CFLAGS) $(OPTIM_FLAGS) -c solve_mode_dependend.c \
-	-DCOMP_MODE_2  -o  $(ODIR)/solve_mode_dependend_2.sgl.o
-$(ODIR)/solve_mode_dependend_3.sgl.o: solve_mode_dependend.c $(GEN_P_INC)
-	$(CC) $(CFLAGS)  $(OPTIM_FLAGS)  -c solve_mode_dependend.c \
-	-DCOMP_MODE_3  -o  $(ODIR)/solve_mode_dependend_3.sgl.o
-$(ODIR)/solve_mode_dependend_4.sgl.o: solve_mode_dependend.c $(GEN_P_INC)
-	$(CC) $(CFLAGS)  $(OPTIM_FLAGS) -c solve_mode_dependend.c \
-	-DCOMP_MODE_4  -o  $(ODIR)/solve_mode_dependend_4.sgl.o
+$(ODIR)/solve_mode_dependent_1.sgl.o: solve_mode_dependent.c $(GEN_P_INC)
+	$(CC) $(CFLAGS) $(OPTIM_FLAGS) -c $< \
+	-DCOMP_MODE_1  -o  $(ODIR)/solve_mode_dependent_1.sgl.o
+$(ODIR)/solve_mode_dependent_2.sgl.o: solve_mode_dependent.c $(GEN_P_INC)
+	$(CC) $(CFLAGS) $(OPTIM_FLAGS) -c $< \
+	-DCOMP_MODE_2  -o  $(ODIR)/solve_mode_dependent_2.sgl.o
+$(ODIR)/solve_mode_dependent_3.sgl.o: solve_mode_dependent.c $(GEN_P_INC)
+	$(CC) $(CFLAGS)  $(OPTIM_FLAGS)  -c $< \
+	-DCOMP_MODE_3  -o  $(ODIR)/solve_mode_dependent_3.sgl.o
+$(ODIR)/solve_mode_dependent_4.sgl.o: solve_mode_dependent.c $(GEN_P_INC)
+	$(CC) $(CFLAGS)  $(OPTIM_FLAGS) -c $< \
+	-DCOMP_MODE_4  -o  $(ODIR)/solve_mode_dependent_4.sgl.o
 #
 # spherical versions of the blockinvert code
 $(ODIR)/blockinvert.sph.o:	blockinvert.c $(GEN_P_INC)
@@ -931,27 +935,27 @@ $(ODIR)/block_read_euler.sph.sgl.o:	block_read_euler.c $(GEN_P_INC)
 #
 # the random noise version of coulomb stress
 $(ODIR)/coulomb_noise_stress.$(NOISELEVEL).o: coulomb_stress.c $(GEN_P_INC) noise.dat
-	$(CC) $(CFLAGS) $(OPTIM_FLAGS)  -c coulomb_stress.c \
+	$(CC) $(CFLAGS) $(OPTIM_FLAGS)  -c $< \
 	-DADD_COULOMB_STRESS_NOISE=$(NOISELEVEL) \
 	$(MY_PRECISION) -o  $(ODIR)/coulomb_noise_stress.$(NOISELEVEL).o
 
 $(ODIR)/coulomb_noise_stress.$(NOISELEVEL).sgl.o: coulomb_stress.c $(GEN_P_INC) noise.dat
-	$(CC) $(CFLAGS) $(OPTIM_FLAGS)  -c coulomb_stress.c \
+	$(CC) $(CFLAGS) $(OPTIM_FLAGS)  -c $< \
 	-DADD_COULOMB_STRESS_NOISE=$(NOISELEVEL) \
 	-o  $(ODIR)/coulomb_noise_stress.$(NOISELEVEL).sgl.o
 # 
 
 $(ODIR)/terminate.o:	terminate.c $(GEN_P_INC)
-	$(MPICC) $(OPTIM_FLAGS)  $(CFLAGS)  $(MY_PRECISION) -c terminate.c -o $(ODIR)/terminate.o
+	$(MPICC) $(OPTIM_FLAGS)  $(CFLAGS)  $(MY_PRECISION) -c $< -o $(ODIR)/terminate.o
 
 $(ODIR)/test_solvers.o:	test_solvers.c $(GEN_P_INC)
-	$(MPICC)  $(OPTIM_FLAGS) $(CFLAGS)  $(MY_PRECISION) -c test_solvers.c -o $(ODIR)/test_solvers.o
+	$(MPICC)  $(OPTIM_FLAGS) $(CFLAGS)  $(MY_PRECISION) -c $< -o $(ODIR)/test_solvers.o
 
 $(ODIR)/ex_dense.o:	ex_dense.c $(GEN_P_INC)
-	$(MPICC)  $(OPTIM_FLAGS) $(CFLAGS)  $(MY_PRECISION) -c ex_dense.c -o $(ODIR)/ex_dense.o
+	$(MPICC)  $(OPTIM_FLAGS) $(CFLAGS)  $(MY_PRECISION) -c $< -o $(ODIR)/ex_dense.o
 
 $(ODIR)/ex_dense_v2.o:	ex_dense_v2.c $(GEN_P_INC)
-	$(MPICC)  $(OPTIM_FLAGS) $(CFLAGS)  $(MY_PRECISION) -c ex_dense_v2.c -o $(ODIR)/ex_dense_v2.o
+	$(MPICC)  $(OPTIM_FLAGS) $(CFLAGS)  $(MY_PRECISION) -c $< -o $(ODIR)/ex_dense_v2.o
 
 
 
