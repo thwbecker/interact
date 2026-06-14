@@ -1,0 +1,42 @@
+#!/bin/bash
+runcode=${1-0}
+
+
+if [ $runcode -eq 1 ];then
+    makefault -l 50e3 -w 7.5e3 -tl 1e3 -tw 1e3 -z -7.5e3  > geom.in
+    echo 1 0 > bc.in
+    echo -1 -1 -1 10 1.5 >> bc.in
+    interact
+fi
+
+# get coordinates
+gawk '{print($1,$2,$3)}' geom.in > coord.dat
+# get strike slip values
+gawk '{if($1!="#")print($6)}' flt.dat > slip.dat
+
+# combine
+paste coord.dat slip.dat > tmp.dat
+
+mv tmp.dat slip.dat
+rm coord.dat
+
+# slip.dat  is now format: x y z u_strike
+
+# generate a gmt grid
+
+reg=-R-50e3/50e3/-15e3/0
+inc=-I1e3
+
+# use y z slip
+gawk '{print($2,$3,$4)}' slip.dat | surface $reg $inc -Gslip.grd
+
+
+#grdinfo slip.grd
+
+# plot
+makecpt -T-5/5/0.25 -Cpolar > slip.cpt
+
+grdimage -Ba10e3f10e3:"x":/a5e3f1e3:"z":WeSn -P -Jx.1e-3 -Cslip.cpt slip.grd -K > slip.ps
+psscale -D2/-.4/3/.15h -Cslip.cpt -B1/:"slip [m]": -O -N50 >> slip.ps
+
+echo $0: mean slip: `grdinfo -L slip.grd | grep mean | gawk '{print($3)}'`

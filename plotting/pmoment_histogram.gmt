@@ -1,0 +1,11 @@
+#!/bin/ksh
+
+awk '{if ($1<=2000)print log($3)+16}' cevents.dat > tmp.$$.1.dat
+awk '{if ($1> 2000)print log($3)+16}' cevents.dat > tmp.$$.2.dat
+
+
+
+pshistogram tmp.$$.1.dat -R1/16/1e-5/100 -P -Ba1f5/a1f5WeSn -JX7/5l -W1e-1 -Z1 -G255/0/0 -K > mhist.ps
+pshistogram tmp.$$.2.dat -R1/16/1e-5/100 -JX7/5l -W1e-1 -Z1 -L1/0/0/255 -O >> mhist.ps
+
+rm tmp.$$.?.dat
