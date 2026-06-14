@@ -169,6 +169,16 @@ above); the directional trends should transfer, the exact crossovers may not.
    run-to-run noise, so read it as "HACApK has lost its lead by 48," not a precise
    ordering.
 
+   This should *not* be read as a limitation of HACApK. The lattice-H HACApK is
+   designed explicitly for large-scale distributed-memory machines (Ozawa et al.,
+   2021; Ida et al.), a regime this 4000-cell single-node test does not exercise —
+   we are simply starving it of per-rank work. Other or newer HACApK
+   builds/configurations may well scale considerably better at high np, and the
+   saturation we see is most plausibly a small-problem artifact rather than
+   anything inherent. The same caution applies to HTOOL and to PETSc's
+   integration layer: all three are capable libraries kindly shared by their
+   authors, and these numbers reflect one build, one tuning, one problem.
+
 3. **HTOOL showed the best scaling overall** (28x total) but from the most
    expensive assembly; it only caught HACApK at the highest rank counts, and its
    memory advantage eroded there too. ACA (now the default) is what makes this
