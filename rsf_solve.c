@@ -168,8 +168,22 @@ int main(int argc,char **argv)
   PetscCallMPI(MPI_Comm_size(PETSC_COMM_WORLD, &medium->comm_size));
   PetscCallMPI(MPI_Comm_rank(PETSC_COMM_WORLD, &medium->comm_rank));
 
-  /* options for this code: 0 dense 1 htools 2 h2opus */
+  /* options for this code: 0 dense 1 htools 2 h2opus 3 hacapk 4 hmmvp */
   PetscCall(PetscOptionsGetInt(NULL, NULL, "-use_hmatrix", &use_hmatrix,&read_value));
+  /* HTOOL (use_hmatrix==1) compressor default: prefer sympartialACA over
+     PETSc's built-in SVD default.  On the SEAS BP5 4000-cell test (1 core),
+     the SVD compressor spent ~48 s assembling the H-matrix vs ~6.5 s for
+     HACApK and ~8 s for sympartialACA, for no measurable accuracy gain
+     (recurrence and the full max|V| trace agree with the dense solution to
+     <0.01 yr and <0.005 in log10|V| at epsilon<=1e-4 -- the error floor is
+     set by the ODE rtol, not the H-matrix tolerance).  Override on the
+     command line with -mat_htool_compressor {SVD,fullACA,partialACA}. See
+     rsf_solve.md for the full HTOOL/HACApK/dense performance comparison. */
+  if(use_hmatrix == 1){
+    PetscCall(PetscOptionsHasName(NULL,NULL,"-mat_htool_compressor",&read_value));
+    if(!read_value)
+      PetscCall(PetscOptionsSetValue(NULL,"-mat_htool_compressor","sympartialACA"));
+  }
   PetscCall(PetscOptionsGetString(NULL, NULL, "-geom_file", geom_file, STRLEN,&read_value));
   PetscCall(PetscOptionsGetString(NULL, NULL, "-rsf_file", rsf_file, STRLEN,&read_value));
   /* physical parameters */
