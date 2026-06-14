@@ -42,7 +42,7 @@ void phelp(void)
   PE("                          \"-ksp_type fgmres -pc_type jacobi -ksp_max_it 10000 -ksp_rtol 1.0e-8\".");
   PE("      Check the makefile for other solver options and MPI settings.");
   PE("      When running a one-step computation, will also compute stress fields in parallel.");
-#idef USE_PETSC_HMAT
+#ifdef USE_PETSC_HMAT
   PE("      The code can interface with HTOOLS, H2OPUS, HACApK and HMMVP H matrix packages.");
 #endif
 #else

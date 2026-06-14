@@ -120,14 +120,14 @@ int main(int argc, char **argv)
       fault[0].group = code;
     else
       fault[0].group = medium->nrflt;
-    if(iquad==2){
+    if(iquad==2){		/* triangle output */
       for(i=0;i<3;i++){
 	xc[i]=0;
 	for(j=0;j < np;j++)
 	  xc[i] += x[j*3+i];
 	xc[i] /= (double)np;
       }
-      /* pass through */
+      /* print triangle patch format */
       fprintf(stdout,"%19.12e %19.12e %19.12e %10.6f %10.6f %19.12e %19.12e %6i ",
 	      xc[INT_X],xc[INT_Y],xc[INT_Z],0.,0.,-1.,-1.,fault[0].group);
       fprintf(stdout,"%19.12e %19.12e %19.12e %19.12e %19.12e %19.12e %19.12e %19.12e %19.12e\n",
@@ -136,14 +136,24 @@ int main(int argc, char **argv)
 	      x[2*3+INT_X],	      x[2*3+INT_Y],	      x[2*3+INT_Z]);
       nrpatches++;
       medium->nrflt++;
-    }else if(iquad == 1){
+    }else if(iquad == 1){	/* irregular quad subdivided by three trianggles 
+
+  2--------------1
+  |\            /|
+  | \          / |
+  |  \   X    /  |
+  |   \      /   |
+  |    \    /    |
+  | N1  \  / N2  |
+  |      \/      |
+  3 ---- 0 ----- 4
+				*/
       for(i=0;i<3;i++){
 	xc[i]=0;
 	for(j=0;j < np;j++)
 	  xc[i] += x[j*3+i];
 	xc[i] /= (double)np;
       }
-      /* pass through */
       fprintf(stdout,"%19.12e %19.12e %19.12e %10.6f %10.6f %19.12e %19.12e %6i ",
 	      xc[INT_X],xc[INT_Y],xc[INT_Z],0.,0.,1.,-1.,fault[0].group);
       fprintf(stdout,"%19.12e %19.12e %19.12e %19.12e %19.12e %19.12e %19.12e %19.12e %19.12e %19.12e %19.12e %19.12e\n",
@@ -154,9 +164,10 @@ int main(int argc, char **argv)
       nrpatches++;
       medium->nrflt++;
     }else{
-      points2patch(fault,x,adjust_area);
+      points2patch(fault,x,adjust_area); /* fit best quad (if possible...) */
       medium->nrflt++;      
       if(dx<=0){
+	/* no subdivision */
 	seg[0]=seg[1]=1;
       }else{
 	/* hack for now */
