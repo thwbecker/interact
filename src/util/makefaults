@@ -1,0 +1,26 @@
+#!/bin/ksh
+random=1
+seg1=1
+seg2=1
+strike=90
+seed=0
+width=1.0
+length=3.0
+stime=1.0
+if [ $random -eq  1 ]
+then
+	nr=10
+	randomflt -f $nr -n $seg1 -m $seg2 -seed $seed     > geom.in
+	randomflt -f $nr -n $seg1 -m $seg2 -seed $seed -xyz > geom.xyz
+	randomflt -f $nr -n $seg1 -m $seg2 -seed $seed -bc  > bc.in
+else
+	makefault  -l $length -w $width -n $seg1 -m $seg2 -strike $strike > geom.in
+	makefault  -l $length -w $width -n $seg1 -m $seg2 -strike $strike -xyz > geom.xyz
+	makefault  -l $length -w $width -n $seg1 -m $seg2 -strike $strike  -stime $stime -bc > bc.in
+fi
+
+pgeom
+
+
+
+
