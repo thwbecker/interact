@@ -76,6 +76,16 @@ extern void *chmmvp_compress_in_memory(int, double *, double *, double *,
 extern void chmmvp_mvp(void *, double *, double *);
 extern void chmmvp_get_info(void *, int *, int *, long *);
 extern void chmmvp_delete(void *);
+/* MPI interface (distributed assembly to file + MpiHmat matvec). These
+   MUST be declared here: without the prototypes C assumes chmmvp_mpi_load
+   returns int and truncates the 64-bit MpiHmat* handle to 32 bits, which
+   then segfaults on first use. */
+extern int   chmmvp_compress_to_file(int, double *, double *, double *,
+				     double, double, void *, const char *);
+extern void *chmmvp_mpi_load(const char *, int);
+extern void  chmmvp_mpi_mvp(void *, double *, double *);
+extern void  chmmvp_mpi_get_info(void *, int *, int *, long *);
+extern void  chmmvp_mpi_delete(void *);
 PetscErrorCode set_hmmvp_defaults_and_options(struct med *);
 
 PetscErrorCode MatMult_hmmvp(Mat , Vec , Vec );
