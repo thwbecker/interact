@@ -15,7 +15,7 @@ MPICPP = mpiCC
 FORTRAN = /usr/bin/gfortran
 MODE_FLAGS = -fPIC
 
-#include make.inc
+include make.inc
 
 # Set the optimization level. I prefer '-O3'.
 #opt = 

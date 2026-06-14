@@ -32,8 +32,8 @@ void Init (int argc, char** argv) {
 #ifdef UTIL_MPI
   MPI_Init(&argc, &argv);
   MPI_Errhandler eh;
-  MPI_Errhandler_create(MPI_Handler_Crash, &eh);
-  MPI_Errhandler_set(MPI_COMM_WORLD, eh);
+  MPI_Comm_create_errhandler(MPI_Handler_Crash, &eh);
+  MPI_Comm_set_errhandler(MPI_COMM_WORLD, eh);
   MPI_Errhandler_free(&eh);
 #else
 #endif
