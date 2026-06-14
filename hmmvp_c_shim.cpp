@@ -30,7 +30,7 @@
 #include <mutex>
 #include "Compress.hpp"
 #include "Hmat.hpp"
-#ifdef UTIL_MPI
+#ifdef USE_HMMVP_MPI
 #  include "MpiHmat.hpp"
 #endif
 
@@ -197,7 +197,7 @@ int chmmvp_compress_to_file(int n, double *x, double *y, double *z,
   }
 }
 
-#ifdef UTIL_MPI
+#ifdef USE_HMMVP_MPI
 /* load the on-disk H matrix into a distributed MpiHmat (collective);
    nthreads>1 only matters for a hybrid MPI-OpenMP build */
 void *chmmvp_mpi_load(const char *hmat_fn, int nthreads)
@@ -236,9 +236,9 @@ void chmmvp_mpi_delete(void *hm)
 #else
 /* non-MPI build: provide stubs so the symbols resolve but fail loudly */
 void *chmmvp_mpi_load(const char *, int)
-{ std::fprintf(stderr, "chmmvp_mpi_load: built without UTIL_MPI\n"); return NULL; }
+{ std::fprintf(stderr, "chmmvp_mpi_load: built without USE_HMMVP_MPI\n"); return NULL; }
 void chmmvp_mpi_mvp(void *, double *, double *)
-{ std::fprintf(stderr, "chmmvp_mpi_mvp: built without UTIL_MPI\n"); }
+{ std::fprintf(stderr, "chmmvp_mpi_mvp: built without USE_HMMVP_MPI\n"); }
 void chmmvp_mpi_get_info(void *, int *m, int *n, long *nnz)
 { *m = *n = 0; *nnz = 0; }
 void chmmvp_mpi_delete(void *) {}
