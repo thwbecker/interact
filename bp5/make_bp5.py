@@ -23,7 +23,9 @@ imax, jmax = int(round(Lx/ds)), int(round(Ld/ds))
 # --- BP5-QD friction / medium parameters (SEAS / HBI conventions) ---
 a0, a_max = 0.004, 0.04   # direct-effect a in VW core / VS exterior
 b0  = 0.03                # evolution parameter b (uniform)
-dc0 = 0.14                # characteristic slip distance D_c [m] (uniform here)
+dc0 = 0.14                # characteristic slip distance D_c [m] (VW/VS bulk)
+dc_nuc = 0.13             # reduced D_RS inside the nucleation patch (SEAS BP5):
+                          #   smaller h*, pins re-nucleation to this patch
 f0  = 0.6                 # reference friction
 V0  = 1e-6                # reference velocity [m/s]   (HBI: vref)
 Vpl = 1e-9                # plate rate = initial loading velocity [m/s]
@@ -38,6 +40,7 @@ half = ds*1e3/2.0         # interact half-length [m]  (L=W -> ds-km square cell)
 fg = open(f"geom_bp5_{ds:g}km.in", "w")
 fr = open(f"rsf_bp5_{ds:g}km.dat", "w")
 fi = open(f"ic_bp5_{ds:g}km.in",  "w")
+fd = open(f"dc_bp5_{ds:g}km.in",  "w")
 nvw = nnuc = 0
 for i in range(imax):
     for j in range(jmax):
@@ -47,15 +50,18 @@ for i in range(imax):
         r = max(abs(dep-10)-6, abs(x)-30)/2.0
         a = min(a0 + r*(a_max-a0), a_max); a = max(a, a0)
         v = Vpl
+        dc = dc0
         if abs(x+24) < 6 and abs(dep-10) < 6:     # 12x12 km nucleation patch
-            v = Vnuc; nnuc += 1
+            v = Vnuc; dc = dc_nuc; nnuc += 1
         if a < 0.01: nvw += 1
         # steady-state-at-Vpl initial stress evaluated at the local velocity v
+        # (independent of D_RS; D_RS enters only the aging-law evolution rate)
         tau = sig*(a*np.arcsinh(0.5*v/V0*np.exp((f0 + b0*np.log(V0/Vpl))/a)) + eta*v)
         # interact geometry: strike=0 => strike dir +y, dip=90 => normal +x, dip +z(up)
         #   so BP5 along-strike -> interact y, depth -> z=-dep, fault plane at x=0
         fg.write(f"0.0 {x*1e3:.6e} {-dep*1e3:.6e} 0.0 90.0 {half:.1f} {half:.1f} 0\n")
         fr.write(f"{a:.6e} {b0:.6e}\n")
         fi.write(f"{tau*1e6:.8e} {v:.6e}\n")          # MPa -> Pa
-fg.close(); fr.close(); fi.close()
+        fd.write(f"{dc:.6e}\n")                        # per-cell D_c [m]
+fg.close(); fr.close(); fi.close(); fd.close()
 print(f"ds={ds:g} km : {imax}x{jmax} = {imax*jmax} cells ; VW={nvw} nucleation={nnuc}")

@@ -43,6 +43,10 @@
 */
 static PetscBool rsf_limit_sigma = PETSC_FALSE;
 static PetscReal rsf_min_sigma = 1e6, rsf_max_sigma = 300e6; /* Pa */
+/* optional per-cell D_c [m] (geometry order); NULL => use uniform
+   medium->dc.  Used for the BP5 nucleation patch (reduced D_RS) and
+   read in the RHS, so it lives at file scope alongside the statics above */
+static PetscReal *rsf_dc_vec = NULL;
 /* 
    context for the monitor and event functions, following the layout
    in hmatrix_test/ode_solve_test.c; the RHS keeps using the plain
@@ -88,6 +92,7 @@ int main(int argc,char **argv)
   const PetscReal sec_per_year = 365.25*24.*60.*60.;
   /*  */
   VecScatter ctx;
+  PetscInt tvmode = 0;		/* triangle evaluattion mode */
   Vec xout,x,vatol,islip_rate_vec,stress_rate;
   struct med *medium;struct flt *fault;
   PetscInt m,i,n,j,use_hmatrix=0;
@@ -100,8 +105,11 @@ int main(int argc,char **argv)
   PetscBool event_terminate[1] = {PETSC_FALSE};
   struct rsf_out_ctx uc[1];
   struct interact_ctx par[1]; /* user-defined work context */
-  char geom_file[STRLEN]="geom.in",rsf_file[STRLEN]="rsf.dat",rsf_ic_file[STRLEN]="";
-  PetscReal *ic_tau=NULL,*ic_vel=NULL;PetscBool have_ic=PETSC_FALSE;
+  char geom_file[STRLEN]="geom.in",rsf_file[STRLEN]="rsf.dat",rsf_ic_file[STRLEN]="",rsf_dc_file[STRLEN]="";
+  FILE *iin;
+  PetscInt ii;
+  PetscReal *ic_tau=NULL,*ic_vel=NULL;
+  PetscBool have_ic=PETSC_FALSE,have_dc=PETSC_FALSE; /* I/O */
   PetscBool read_value,warned = PETSC_FALSE,flg;
   char *home_dir = getenv("HOME");char par_file[STRLEN];
   snprintf(par_file,STRLEN,"%s/progs/src/interact/petsc_settings.yaml",(home_dir)?(home_dir):("."));
@@ -182,6 +190,10 @@ int main(int argc,char **argv)
      one row per patch in geometry order) for e.g. the SEAS BP5
      nucleation patch; when given, overrides uniform tau_init/vel_init */
   PetscCall(PetscOptionsGetString(NULL,NULL,"-rsf_ic_file",rsf_ic_file,STRLEN,&have_ic));
+  /* optional per-cell D_c file (one D_c[m] per patch, geometry order);
+     overrides the uniform -dc per cell, e.g. the reduced D_RS in the
+     SEAS BP5 nucleation patch */
+  PetscCall(PetscOptionsGetString(NULL,NULL,"-rsf_dc_file",rsf_dc_file,STRLEN,&have_dc));
   PetscCall(PetscOptionsGetReal(NULL,NULL,"-rand_amp",&rand_amp,NULL));
   if(tau_init < 0)
     tau_init = medium->f0 * sigma_init;
@@ -221,11 +233,10 @@ int main(int argc,char **argv)
   PetscCall(PetscOptionsGetReal(NULL,NULL,"-vel_event_hyst",&vel_event_hyst,NULL));
   PetscCall(PetscOptionsGetReal(NULL,NULL,"-event_tmin_yr",&event_tmin,NULL));
   PetscCall(PetscOptionsGetBool(NULL,NULL,"-track_events",&track_events,NULL));
-  {				/* triangular patch evaluation scheme, cf. -tv of interact */
-    PetscInt tvmode = 0;
-    PetscCall(PetscOptionsGetInt(NULL,NULL,"-tv",&tvmode,NULL));
-    medium->tri_eval_mode = (MODE_TYPE)tvmode;
-  }
+  /* triangular patch evaluation scheme, cf. -tv of interact */
+  PetscCall(PetscOptionsGetInt(NULL,NULL,"-tv",&tvmode,NULL));
+  medium->tri_eval_mode = (MODE_TYPE)tvmode;
+
   dt_monitor *= sec_per_year;monitor_tmin *= sec_per_year;event_tmin *= sec_per_year;
 
   /* get the geometry */
@@ -249,16 +260,40 @@ int main(int argc,char **argv)
   read_rsf(rsf_file,medium,fault);
   /* optional per-cell initial tau,vel (e.g. BP5 nucleation patch) */
   if(have_ic){
-    FILE *icin;PetscInt ic_i;
     ic_tau=(PetscReal *)malloc((size_t)n*sizeof(PetscReal));
     ic_vel=(PetscReal *)malloc((size_t)n*sizeof(PetscReal));
-    if((!ic_tau)||(!ic_vel)){fprintf(stderr,"%s: per-cell IC alloc failed\n",argv[0]);exit(-1);}
-    icin=myopen(rsf_ic_file,"r");
-    for(ic_i=0;ic_i < n;ic_i++)
-      if(fscanf(icin,"%lf %lf",(ic_tau+ic_i),(ic_vel+ic_i))!=2){
-	fprintf(stderr,"%s: error reading tau vel for patch %i from %s\n",argv[0],ic_i,rsf_ic_file);exit(-1);}
-    fclose(icin);
-    HEADNODE fprintf(stderr,"%s: read per-cell initial tau,vel from %s\n",argv[0],rsf_ic_file);
+    if((!ic_tau)||(!ic_vel)){
+      fprintf(stderr,"%s: per-cell IC alloc failed\n",argv[0]);
+      exit(-1);
+    }
+    iin = myopen(rsf_ic_file,"r");
+    for(ii=0;ii < n;ii++)
+      if(fscanf(iin,"%lf %lf",(ic_tau+ii),(ic_vel+ii))!=2){
+	fprintf(stderr,"%s: error reading tau vel for patch %i from %s\n",
+		argv[0],ii,rsf_ic_file);
+	exit(-1);
+      }
+    fclose(iin);
+    HEADNODE
+      fprintf(stderr,"%s: read per-cell initial tau,vel from %s\n",argv[0],rsf_ic_file);
+  }
+  /* optional per-cell D_c (e.g. reduced D_RS in the BP5 nucleation patch) */
+  if(have_dc){
+    rsf_dc_vec=(PetscReal *)malloc((size_t)n*sizeof(PetscReal));
+    if(!rsf_dc_vec){
+      fprintf(stderr,"%s: per-cell dc alloc failed\n",argv[0]);
+      exit(-1);
+    }
+    iin=myopen(rsf_dc_file,"r");
+    for(ii=0;ii < n;ii++)
+      if(fscanf(iin,"%lf",(rsf_dc_vec+ii))!=1){
+	fprintf(stderr,"%s: error reading dc for patch %i from %s\n",
+		argv[0],ii,rsf_dc_file);
+	exit(-1);
+      }
+    fclose(iin);
+    HEADNODE
+      fprintf(stderr,"%s: read per-cell D_c from %s\n",argv[0],rsf_dc_file);
   }
   /* 
      create and calculate interaction matrices, scaled from interact's
@@ -272,9 +307,11 @@ int main(int argc,char **argv)
      traction on the slipping patch (negative diagonal), so backslip
      -vpl produces positive loading
   */
-  calc_petsc_Isn_matrices(medium,fault,use_hmatrix, shear_modulus_si/SHEAR_MODULUS,0,&medium->Is,medium->Is_hctx); /* shear stress */
+  calc_petsc_Isn_matrices(medium,fault,use_hmatrix,
+			  shear_modulus_si/SHEAR_MODULUS,0,&medium->Is,medium->Is_hctx); /* shear stress */
   if(medium->calc_sigma_dot)
-    calc_petsc_Isn_matrices(medium,fault,use_hmatrix,-shear_modulus_si/SHEAR_MODULUS,1,&medium->In,medium->In_hctx); /* normal stress, compression positive */
+    calc_petsc_Isn_matrices(medium,fault,use_hmatrix,
+			    -shear_modulus_si/SHEAR_MODULUS,1,&medium->In,medium->In_hctx); /* normal stress, compression positive */
   if(use_hmatrix)
     PetscCall(MatView(medium->Is,PETSC_VIEWER_STDOUT_WORLD));
   /* 
@@ -348,7 +385,7 @@ int main(int argc,char **argv)
     /* check discretization against the quasi-static cohesive zone
        size Lb = G dc/(b sigma), using the smallest patch dimension */
     patch_l = 2.0*((fault[i].l < fault[i].w)?(fault[i].l):(fault[i].w));
-    stable_l = shear_modulus_si*medium->dc/fault[i].mu_d/fault[i].s[NORMAL];
+    stable_l = shear_modulus_si*(rsf_dc_vec?rsf_dc_vec[i]:medium->dc)/fault[i].mu_d/fault[i].s[NORMAL];
     if((patch_l > stable_l/3.)&&(!warned)){
       fprintf(stderr,"%s: WARNING: patch %05i: size %.3e m vs. Lb = G dc/(b sigma) %.3e m, coarser than Lb/3\n",
 	      argv[0],i,patch_l,stable_l);
@@ -542,7 +579,7 @@ PetscErrorCode rsf_ODE_RHSFunction(TS ts,PetscReal time,Vec X,Vec F,void *ptr)
        which allows v < 0
     */
     if(b != 0.0)		/* b == 0 guard as in HBI */
-      f[j] = (b/medium->dc) * (medium->v0 * PetscExpReal((medium->f0 - x[j])/b) - fabs(velr[k]));
+      f[j] = (b/(rsf_dc_vec?rsf_dc_vec[i]:medium->dc)) * (medium->v0 * PetscExpReal((medium->f0 - x[j])/b) - fabs(velr[k]));
     else
       f[j] = 0.0;
     /* 
