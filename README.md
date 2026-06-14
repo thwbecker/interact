@@ -54,8 +54,15 @@ thwbecker@post.harvard.edu
 ## Overview 
 
 This directory contains source codes needed to compile the elastic 2-D
-and half-space dislocation program `interact` as well as several tools
-that go with it. 
+and 3-D, half-space dislocation based, static fault interation program
+`interact` as well as several tools that go with it, including
+`rsf_solve` which allows for rate-state-friction quasi-dynamic cycle
+simulations. rsf_solve now runs the SCEC SEAS BP5-QD benchmark. From a
+clean build, the 1 km case reproduces the first spontaneous recurrence
+at 234.3 yr, matching a patched HBI run (234.3 yr) and the published
+boundary-element cluster to within ~0.01 yr; 2 km matches HBI exactly
+(236.8 yr). Per-cell initial conditions and D_RS are supplied via
+-rsf_ic_file / -rsf_dc_file; inputs and a generator are in bp5/.
 
 To compile, edit the `makefile` as described in the INSTALLATION
 document and type `make`. The default might have some extra packages
