@@ -1,4 +1,4 @@
-# interact - models static fault interactions using dislocations in an elastic medium
+# interact - models static and earthqauke cycle fault interactions using dislocations in an elastic medium
 
 `interact` uses `dc3d.f` as provided by Y. Okada as in Okada (BSSA,
 1992), has .f90 code converted from Nikkhoo and Walter (GJI, 2015),
