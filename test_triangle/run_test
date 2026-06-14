@@ -1,14 +1,18 @@
 #!/bin/bash
-ntests=${1-"1 2 3 4 5 6 7 8 9 10 11 12"}	# 1...8: different fault loading 9.... 11: field computations 12: line
+#ntests=${1-"1 2 3 4 5 6 7 8 9 10 11 12"}	# 1...8: different fault loading 9.... 11: field computations 12: line
+ntests=${1-"1 4 "}	# 1...8: different fault loading 9.... 11: field computations 12: line
 #ntests=${1-"11"}	# 
 #ntests=${1-"1"}
-angles=${2-"vert dip"}			# vert or dip
+#angles=${2-"vert dip"}			# vert or dip
+angles=${2-"dip"}			# vert or dip
 #angles=${2-"vert"}			# vert or dip
-geoms=${3-"0 1 2"}			# 0: quad 1: iquad 2: triangle
+#geoms=${3-"0 1 2"}			# 0: quad 1: iquad 2: triangle 2b 2c 2d: different integration for triangles
+geoms=${3-"0 1 2 2c 2d"}			# 0: quad 1: iquad 2: triangle 2b 2c 2d: different integration for triangles
 #geoms=${3-0}
 force_run=${4-1}
 #
-combine_plots=${5-0}
+combine_plots=${5-1}
+bumpy=${6-1}
 
 #binary=interact.mixed
 binary=interact
@@ -21,15 +25,11 @@ for ntest in $ntests;do
     for angle in $angles;do
 	if [ $ntest -le 8 ];then
 	    strike0=30;l0=10;w0=3		#
-	    #no=40;mo=16
 
 	    #no=60;mo=20
-	    no=90;mo=30
-	    #no=12;mo=8
-	    #no=20;mo=10
-	    #no=40;mo=20
-	    #no=4;mo=2
-	    #no=2;mo=2
+	    #no=90;mo=30
+	    no=30;mo=10
+	    #no=6;mo=2
 	    z=-3
 	elif [ $ntest -le 11 ];then
 	    strike0=40;
@@ -61,30 +61,66 @@ for ntest in $ntests;do
 	    else
 		adjust=2
 	    fi
-
+	    if [ $bumpy -eq 0 ];then
+		makefault -strike $strike -dip $dip -n $no -m $mo -l $l0 -z $z -w $w0  > rgeom.in # reference quad geometry
+	    else
+		bamp=0.1
+	    fi
 	    if [ $geom = 0 ];then
-		makefault -strike $strike -dip $dip -n $no -m $mo -l $l0 -z $z -w $w0  > geom.in
+		if [ $bumpy = 0 ];then
+		    cp rgeom.in geom.in
+		else
+		    # quad approximation
+		    ppcodes="1 0 0 0"
+		    ac=0
+		    awk -v cx=0 -v cy=0 -v cz=$z -v strike=$strike -v dip=$dip -v L=$l0 -v W=$w0 -v nx=$no -v ny=$mo \
+			-v as=$bamp -v lam_s=$l0 -v ad=$bamp -v lam_d=$w0 -v tri_mode=$ac -f make_curved_points.awk  | \
+			points2patch $ppcodes > geom.in
+		fi
+
 		glabel=quad
 	    elif [ $geom = 1 ];then
-		# convert quads to iquads (even though they are even geometry)
-		makefault -strike $strike -dip $dip -n $no -m $mo -l $l0 -z $z -w $w0 | \
-		    patch2vertices | points2patch 0 0 0 1 > geom.in
+		if [ $bumpy = 0 ];then
+		    # convert quads to iquads 
+		    cat rgeom.in  | patch2vertices | points2patch 0 0 0 1 > geom.in
+		else
+		    ppcodes="0 0 0 1"
+		    ac=0
+		    awk -v cx=0 -v cy=0 -v cz=$z -v strike=$strike -v dip=$dip -v L=$l0 -v W=$w0 -v nx=$no -v ny=$mo \
+			-v as=$bamp -v lam_s=$l0 -v ad=$bamp -v lam_d=$w0 -v tri_mode=$ac -f make_curved_points.awk  | \
+			points2patch $ppcodes > geom.in
+		fi
 		glabel=iquad
-	    elif [ $geom = 2 ];then
+	    elif [[ $geom = 2 || $geom = 2a || $geom = 2b || $geom = 2c || $geom = 2d ]];then
 		((nu=no));((mu=mo/2))
-		glabel=tri
-		makefault -strike $strike -dip $dip -n $nu -m $mu -l $l0 -z $z -w $w0  > geom.in
-		#cat geom.in | patchquad2patchtri 2 > tmp
-		#cat geom.in | patchquad2patchtri 1 > tmp
-		cat geom.in | patchquad2patchtri 0 > tmp
-		mv tmp geom.in
+		if [ $geom = 2 ];then
+		    glabel="tri-CTR"
+		elif [ $geom = 2c ];then
+		    glabel="tri-3(HYB)"
+		elif [ $geom = 2d ];then
+		    glabel="tri-4(mixed)"
+		else
+		    glabel="tri"$geom
+		fi
+		if [ $bumpy = 0 ];then
+		    #cat rgeom.in | patchquad2patchtri 2 > geom.in
+		    #cat rgeom.in | patchquad2patchtri 1 > geom.in
+		    cat rgeom.in | patchquad2patchtri 0 > geom.in
+		else
+		    # triangles
+		    ppcodes="0 0 0 2"
+		    ac=1 # or 2 or 3
+		    awk -v cx=0 -v cy=0 -v cz=$z -v strike=$strike -v dip=$dip -v L=$l0 -v W=$w0 -v nx=$no -v ny=$mo \
+			-v as=$bamp -v lam_s=$l0 -v ad=$bamp -v lam_d=$w0 -v tri_mode=$ac -f make_curved_points.awk  | \
+			points2patch $ppcodes > geom.in
+		fi
 		#cat geom.in
 		#exit
 	    else
 		echo $0: geom error
 		exit
 	    fi
-	    rm smlin.in 2> /dev/null
+	    rm smlin.in rgeom.in 2> /dev/null
 	    if [[ $ntest -eq 1 ]];then # prescribed slip
 		bc_type=0;bc_val=1;bc_name="prescribed u@-strike@-"
 	    elif [[ $ntest -eq 2 ]];then
@@ -159,10 +195,21 @@ EOF
 	    if [[ $force_run -eq 0 && -s  geoms/geom.$oname.in && -s flt_dat/flt.$oname.dat ]];then
 		echo $0: reusing output $oname
 	    else
+		#flags="-sv "
+		flags=""
+		if [ $geom = 2a ];then
+		    flags="$flags -tv 1"
+		elif [ $geom = 2b ];then
+		    flags="$flags -tv 2"
+		elif [ $geom = 2c ];then
+		    flags="$flags -tv 3"
+		elif [ $geom = 2d ];then
+		    flags="$flags -tv 4"
+		fi
 		rm flt.dat stress.out disp.out 2> /dev/null
-		#mpirun -np 4 $binary -ksp_type fgmres -pc_type none -ksp_max_it 50000 -ksp_rtol 1.0e-8
-		mpirun -np 8 $binary 	-pc_factor_mat_solver_type scalapack -mat_type scalapack
-		#$binary
+		$MPIRUN -np 16 $binary $flags -ksp_type fgmres -pc_type none -ksp_max_it 50000 -ksp_rtol 1.0e-7
+		#MPIRUN -np 16 $binary $flags 	-pc_factor_mat_solver_type scalapack -mat_type scalapack
+		#$binary $flags
 
 		mv geom.in geoms/geom.$oname.in
 		mv flt.dat flt_dat/flt.$oname.dat
@@ -181,14 +228,14 @@ EOF
 	    #echo $0: plotting
 	    if [ $combine_plots -eq 1 ];then
 		if [ $pf = 0 ];then
-		    ../plot_fault_solution flt_dat/flt.$oname geoms/geom.$oname.in "$label" $reg $rscale $adjust 2> /dev/null &
+		    ../plotting/plot_fault_solution flt_dat/flt.$oname geoms/geom.$oname.in "$label" $reg $rscale $adjust 2> /dev/null &
 		    fs="$fs  flt_dat/flt.$oname.ps"
 		else
 		    if [ $ft = 1 ];then
 			cp disp_dat/disp.$oname.out .
 			cp stress_dat/stress.$oname.out .
 			cp stress_dat/stress.$oname.hdr .
-			../plot_displacement_and_stress $oname 0 "$label"
+			../plotting/plot_displacement_and_stress $oname 0 "$label"
 			rm stress.$oname.out   stress.$oname.hdr disp.$oname.out 
 		    else
 			echo 
@@ -197,10 +244,10 @@ EOF
 		fi
 	    else
 		if [ $pf = 0 ];then
-		    ../plot_fault_solution flt_dat/flt.$oname geoms/geom.$oname.in "$label" $reg $rscale $adjust
+		    ../plotting/plot_fault_solution flt_dat/flt.$oname geoms/geom.$oname.in "$label" $reg $rscale $adjust
 		    #gv flt.$oname.ps &
 		#else
-		    #../plot_displacement_and_stress $oname "0 -3 -6" "$label"
+		    #../plotting/plot_displacement_and_stress $oname "0 -3 -6" "$label"
 		    #gv stress.$oname.ps &
 		fi
 	    fi
@@ -220,4 +267,6 @@ if [ $combine_plots -eq 1 ];then
     else
 	epsmerge -par -x 1 -y 1 --orientation Landscape $fs > comb.ps
     fi
+    ps2pdf comb.ps
+    rm comb.ps
 fi
