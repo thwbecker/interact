@@ -185,11 +185,13 @@ above); the directional trends should transfer, the exact crossovers may not.
    viable — SVD would inflate the already-dominant assembly.
 
 4. **Any crossover is expected to move with problem size.** HACApK likely
-   saturates here because the per-rank work is small; a larger model (e.g. 0.5 km
-   / 16k cells, ~4x the cells-per-rank) should push the saturation point — and the
-   dense/HTOOL crossover — to higher rank counts, but this has not yet been
-   measured. The np=48 point also crosses into hyperthreading, which tends to
-   penalize bandwidth-bound H-matrix matvecs (HACApK step time *rose* 24 → 48).
+   saturates here because the per-rank work is small; a larger model (0.5 km /
+   16k cells, ~4x the cells-per-rank) was predicted to push the saturation point —
+   and the dense/HTOOL crossover — to higher rank counts. This has since been
+   measured and the prediction held (see "Second resolution" below). The np=48
+   point also crosses into hyperthreading on this 24-core node, which tends to
+   penalize bandwidth-bound H-matrix matvecs (HACApK step time *rose* 24 → 48 at
+   1 km).
 
 ### On the `compress_interaction_matrix` discrepancy — a plausible partial explanation
 
@@ -202,15 +204,77 @@ The two benchmarks may simply probe different regimes rather than disagreeing.
 This is a working explanation, not a settled one — confirming it would need the
 microbenchmark re-run with matched compressor, tolerance, and core count.
 
+### Second resolution: 0.5 km / 16000 cells (measured)
+
+Same machine and protocol, finer grid (4x the cells, ~333 cells/rank at np=48
+instead of ~83). Same caveats as above — one machine, one run per point, np=48 is
+hyperthreaded. Total wallclock (s):
+
+| np | dense | HTOOL (ACA) | HACApK | fastest |
+|---:|---:|---:|---:|:--|
+| 1 | 786 | 2428 | **120** | HACApK |
+| 2 | 390 | 1269 | **62** | HACApK |
+| 4 | 190 | 771 | **36** | HACApK |
+| 8 | 113 | 160 | **21** | HACApK |
+| 16 | 75.6 | 47.8 | **12.6** | HACApK |
+| 24 | 57.1 | 26.3 | **9.8** | HACApK |
+| 48 | 47.8 | 14.3 | **9.3** | HACApK |
+
+Observations (specific to this configuration):
+
+1. **The predicted shift happened.** At 1 km, HACApK lost the lead at np=48; at
+   0.5 km it is fastest at *every* rank count tested. Its total speedup improved
+   to ~13x (from ~6.6x at 1 km), consistent with the small-cells-per-rank
+   saturation being the 1 km culprit. (It still flattens 24 → 48, but that step is
+   hyperthreaded here.)
+
+2. **HTOOL assembly becomes the dominant cost at this size.** Single-core ACA
+   assembly was ~2299 s (~38 min) at 16000 cells, vs ~21 s for HACApK and ~263 s
+   for dense — roughly a 73x jump for 4x cells (~quadratic), far worse than
+   HACApK's ~5.7x. It parallelizes very strongly (down to ~10 s at np=48), but for
+   serial or few-core use at this size HTOOL assembly is impractical. This may be
+   tunable (admissibility `eta`, clustering) and could differ with another PETSc
+   or Htool build; it should not be taken as a fixed property of the library.
+
+3. **But HTOOL has the cheapest matvec at high rank count** (~5.0 ms/step at np=48
+   vs HACApK's ~10.1 ms/step). The benchmark's short ~755-step run is
+   assembly-dominated, which favors HACApK; for a *long* production run the matvec
+   dominates and HTOOL's per-step edge amortizes its assembly. A rough linear
+   extrapolation puts the run-length crossover near ~1700 steps at np=48 (~3700 at
+   np=24) — i.e. a full multi-event BP5 cycle (~10^4 steps) could plausibly favor
+   HTOOL at high core count, if one accepts the large one-time assembly. This is an
+   extrapolation from a short run, not a measured production comparison, and
+   assumes a roughly constant per-step matvec cost.
+
+4. **Memory.** HACApK flat at 167 MB (8.5% of the 1953 MB dense); HTOOL best at
+   low np (102 MB, ~5%) but growing to ~204 MB by np=48 (per-rank duplication);
+   dense's ~2 GB footprint is itself a constraint and its matvec appears
+   bandwidth-saturated by np≈24.
+
 ### Practical default (provisional)
 
-On the evidence so far, keeping HACApK (`-use_hmatrix 3`) is reasonable for
-typical use — parameter sweeps, ensembles, and single-node jobs at BP5-like
-sizes. For a single large model on a many-core or multi-node allocation, don't
-assume any backend wins: benchmark dense and HTOOL(ACA) at the target rank count
-and resolution first with `scripts/bench_hmatrix.sh`, since the crossover is
-expected to move with cells-per-rank and is hardware-dependent. The default is a
-starting point, not a recommendation to skip measuring on your own system.
+On the evidence so far, keeping HACApK (`-use_hmatrix 3`) is a reasonable default:
+it had the cheapest assembly at every size and rank count tested and won on total
+wallclock for short-to-moderate runs, comfortably so for parameter sweeps,
+ensembles, and single-node jobs. Three caveats temper that, all pointing the same
+way — measure for your actual workload:
+
+- **Run length matters as much as core count.** The benchmarks are short
+  (~755 steps) and therefore assembly-weighted. For long production cycles
+  (~10^4 steps) the matvec dominates, and at high rank counts HTOOL's cheaper
+  matvec may amortize its (large) assembly and overtake HACApK — extrapolated,
+  not yet measured.
+- **Problem size moved the crossover.** At 0.5 km HACApK led to np=48, whereas at
+  1 km it did not — so conclusions at one resolution don't transfer.
+- **HTOOL assembly scales poorly with N on few cores** here (~38 min at 16k cells,
+  np=1), which may be tunable and build-dependent.
+
+So treat HACApK as the starting point, but for a single large model on a many-core
+or multi-node allocation — especially a long one — benchmark dense and HTOOL(ACA)
+at the target size, rank count, *and* representative step count with
+`scripts/bench_hmatrix.sh` rather than assuming. And try the MPI+OpenMP hybrid
+(see `rsf_solve_review.md`): HACApK's matvec is OpenMP-threaded, and the rank
+counts where it flattened are exactly where threads-per-rank may help.
 
 ---
 
