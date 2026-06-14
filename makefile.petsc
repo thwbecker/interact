@@ -53,11 +53,11 @@ HACAPK_LIBS = -L./HACApK/v.1.0.0/C_interface -lhacapk -lgfortran -fopenmp -llapa
 # opt, mode=omp, and mkdir lib bin; see compress_interaction_matrix.md)
 #
 # hmmvp build-mode flag for the C++ shim; MUST match the linked library:
-#   libhmmvp_mpi -> -DUTIL_MPI     (MpiHmat path; pure MPI)
+#   libhmmvp_mpi -> -DUSE_HMMVP_MPI     (MpiHmat path; pure MPI)
 #   libhmmvp_omp -> -fopenmp   (in-memory Hmat path)
 # the shim (hmmvp_c_shim.cpp) selects MpiHmat vs in-memory Hmat on USE_HMMVP_MPI,
 # so this must be passed to its compile rule (see makefile)
-HMMVP_DIR = ./hmmvp
+HMMVP_DIR = ./hmmvp/
 HMMVP_DEFINES = -DUSE_HMMVP -DUSE_HMMVP_MPI
 HMMVP_INC = -I$(HMMVP_DIR) -I$(HMMVP_DIR)/hmmvp/include -I$(HMMVP_DIR)/util/include
 HMMVP_LIBS = -L$(HMMVP_DIR)/lib -lhmmvp_mpi -lstdc++ -llapack -lblas
