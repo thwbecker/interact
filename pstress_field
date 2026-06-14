@@ -1,0 +1,228 @@
+#!/bin/bash
+#
+# plot stress  field
+#
+model=${1-stress}			# model name, model.out
+reverse_sign=${2-0}
+add_sigma1=${3-0}		# 0: 1: add to tc 2: add to sm and do not show tc
+add_label=${4-""}
+
+dname=`pwd | gawk -F/ '{print($(NF))}'`
+if [ $dname = nz ];then
+    sd=1
+    ann=a100f20
+    vinc=200
+    xunits=" [km]"
+    devs=sd			# for coulomb
+    norms=sm
+    addnlabel=""
+    srange=0.4			# for stress scale
+else
+    sd=5929.43380824804
+    ann=2f.2
+    vinc=.2
+    xunits=" [km]"
+    devs=sxy
+    norms=syy
+    addnlabel="/@~Dt@~"
+    srange=0.4			# for stress scale
+
+fi
+fname=`echo $model | gawk -F. '{print($1)}'`
+if [ $fname = tstress ];then	# total stress
+    psvscl=0.2
+    log_dev=1
+    prenlabel=""
+    #mean_stress=tm
+    mean_stress=sm
+else
+    mean_stress=sm
+    log_dev=0
+    psvscl=0.5
+    prenlabel="@~D@~"
+fi
+
+if [ $add_sigma1 = 2 ];then
+    plot_s="$mean_stress $devs"
+else
+    plot_s="$mean_stress $devs sc"
+fi
+
+if [ ! -s $model.hdr ];then
+    echo $0: $model.hdr not found
+    exit
+fi
+read xmin xmax m ymin ymax n zmin zmax o < $model.hdr
+dx=`echo $xmin $xmax $m | gawk '{printf("%.3f",($2-$1)/($3-1))}'`
+dy=`echo $ymin $ymax $n | gawk '{printf("%.3f",($2-$1)/($3-1))}'`
+
+
+zmid=`echo $zmin $zmax | gawk '{print(($1+$2)/2)}'`
+
+proj=-JX5
+reg=-R$xmin/$xmax/$ymin/$ymax
+
+echo $0: $reg $proj $xmin $xmax $m $ymin $ymax $n $zmin $zmax $o
+echo $0: zmid $zmid
+col=4
+for s in sxx sxy sxz syy syz szz;do
+    gawk -v z=$zmid -v col=$col -v s=$sd \
+	 '{if($3==z)print($1,$2,($col)/s)}' $model.out | \
+	xyz2grd $reg -I$dx/$dy -G$s.grd  &
+    ((col=col+1))
+done
+wait
+if [ $reverse_sign -eq 1 ];then
+    # comp pos 
+    for s in sxx sxy sxz syy;do
+	grdmath $s.grd NEG = tmp; mv tmp $s.grd
+    done
+    inv1="-I";inv2=""
+    # pressure
+    grdmath sxx.grd syy.grd szz.grd ADD ADD 3 DIV  = p.grd
+    
+else				# leave ext pos
+    inv1="";inv2=-I
+    grdmath sxx.grd syy.grd szz.grd ADD ADD 3 DIV NEG = p.grd
+fi
+#
+# deviatoric stress
+for t in xx yy zz;do
+    grdmath s$t.grd p.grd SUB = t$t.grd
+done
+cp sxy.grd txy.grd;cp sxz.grd txz.grd;cp syz.grd tyz.grd
+
+# horizontal major axes
+sxxsxysyy2magrd sxx.grd sxy.grd syy.grd s1.grd s2.grd azi.grd
+
+# deviatoric max shear stress
+grdmath s1.grd s2.grd SUB 2 DIV = sd.grd
+
+# mean stress
+grdmath s1.grd s2.grd ADD 2 DIV  = sm.grd
+if [ $fname = tstress ];then
+    sm_offset_scale=`grd2geo_mean sm.grd`
+else
+    sm_offset_scale=0
+fi
+if [ $reverse_sign = 1 ];then
+    grdmath $devs.grd NEG $norms.grd 0.7 MUL SUB = sc.grd
+else
+    grdmath $devs.grd $norms.grd 0.7 MUL ADD = sc.grd
+fi
+
+
+
+
+if [ $add_sigma1 -ne 0 ];then
+    
+    # e1 > e2, azi is azimuth to e1 in degrees CW from North
+    nstress=13
+    dxs1=`echo $xmin $xmax $nstress | gawk '{printf("%.3f",($2-$1)/($3-1))}'`
+    dys1=`echo $ymin $ymax $nstress | gawk '{printf("%.3f",($2-$1)/($3-1))}'`
+    echo $xmin $xmax $dxs1 $ymin $ymax $dys1 | \
+	gawk '{for(x=$1+$3/2;x<=$2;x+=$3)for(y=$4+$6/2;y<=$5;y+=$6)print(x,y)}' >\
+	     tmp.s1sample
+    if [ $reverse_sign = 1 ];then
+	# s1 comp s2 ext
+	#x: Strain crosses: in X,Y,Eps1,Eps2,Theta.n
+	#3: eps1, the most extensional eigenvalue of strain tensor, with extension taken positive.
+	
+	#4: eps2, the most compressional eigenvalue of strain tensor, with extension taken positive.
+	
+	#5: azimuth of eps2 in degrees CW from North.
+
+	cat <<EOF > tmps1.awk
+{print(\$1,\$2,-\$4,-\$3,\$5)}
+EOF
+    else
+	# s1 ext s2 comp
+	#x: Strain crosses: in X,Y,Eps1,Eps2,Theta.n
+	cat <<EOF > tmps1.awk
+{print(\$1,\$2,\$3,\$4,\$5+90)}
+EOF
+    fi
+    
+fi
+ofile=$model.ps
+
+for s in $plot_s;do
+    ends="-E"
+    addle=""
+    take_log=0
+    if [ $s = sm ];then
+	bannt=WesN
+	psbasemap $reg $proj -B$ann:"x$xunits":/$ann:"y$xunits":$bannt  -P -K -Y11 > $ofile
+	label="$prenlabel@~s@~@-m@-"
+
+	makecpt `echo $srange $sm_offset_scale |gawk '{printf("-T%g/%g/%g",-$1+$2,$1+$2,$1/10)}'` -Croma  $inv1 > tmp.cpt 
+    elif [ $s = sxy ];then
+	bannt=Wesn
+	psbasemap $reg $proj -B$ann:"x$xunits":/$ann:"y$xunits":$bannt -O -K -Y-5.25 >> $ofile
+	label="$prenlabel@~s@~@-xy@-"
+	makecpt -T-$srange/$srange/0.04  -Cvik $inv1 > tmp.cpt 
+    elif [ $s = sd ];then
+	if [ $add_sigma1 = 2 ];then
+	    bannt=WeSn
+	else
+	    bannt=Wesn
+	fi
+	psbasemap $reg $proj -B$ann:"x$xunits":/$ann:"y$xunits":$bannt -O -K -Y-5.25 >> $ofile
+	if [ $log_dev = 1 ];then
+	    label="log@-10@-($prenlabel@~t@~@-m@-";addle=")"
+	    makecpt -T-.25/.25/0.025  -Cimola > tmp.cpt
+	    ends=-E
+	    take_log=1
+	else
+	    ends="-Ef"
+	    label="$prenlabel@~t@~@-max@-"
+	    makecpt -T0/$srange/0.02 -I  -Cbilbao > tmp.cpt
+	fi
+    elif [ $s = sc ];then
+	bannt=Wesn
+	psbasemap $reg $proj -B$ann:"x$xunits":/$ann:"y$xunits":$bannt -O -K -Y-5.25 >> $ofile
+	makecpt -T-$srange/$srange/0.04  -Croma $inv1 > tmp.cpt 
+	label="@~t@~@-C@-"
+    fi
+    if [ $take_log -eq 1 ];then
+	grdmath $s.grd LOG10 = tmp.grd
+	grdimage $reg $proj tmp.grd -Ctmp.cpt -O -K >> $ofile
+    else
+	grdimage $reg $proj $s.grd -Ctmp.cpt -O -K >> $ofile
+    fi
+    #grdcontour $reg $proj $s.grd -A50 -O -K >> $ofile
+	#gawk -f geom2xyz.awk i=1 j=2  geom.in | \
+    patch2group geom.in | patch2xyz | \
+	psxy -m -W0.5,darkorange -t30 -O -K $reg $proj -B$ann/$ann"wesn" >> $ofile
+    if [[ $add_sigma -eq 1 && $s = sc ]];then
+	psc=1
+    elif [[ $add_sigma1 -eq 2 && $s = $mean_stress ]];then
+	psc=1
+    else
+	psc=0
+    fi
+    if [ $psc = 1 ];then
+	grdtrack -nn tmp.s1sample -Gs1.grd > tmp.1 &
+	grdtrack -nn tmp.s1sample -Gs2.grd  -Z > tmp.2 &
+	grdtrack -nn tmp.s1sample -Gazi.grd -Z > tmp.3 &
+	wait
+
+	paste tmp.1 tmp.2 tmp.3 | gawk -f tmps1.awk | \
+	    psvelo $reg $proj -Sx$psvscl  -O -K  -W.5 -A0.025/0.05/0.05  >> $ofile
+	#grdcontour $reg $proj -C15 azi.grd -O -K >> $ofile
+	rm tmp.? 
+    fi
+    echo 0.02 .95  28 0 29 LM "$label$addle" | pstext -R0/1/0/1 -JX5 -O -K -Gwhite -t10 >> $ofile
+    echo 0.02 .05  32 0 31 LM "$add_label" | pstext -R0/1/0/1 -JX5 -O -K -Gwhite -t20 >> $ofile
+    #psscale  -t40 -Dx4.25/2.5/3/.15 $ends -Ctmp.cpt -B.2/:"$label$addnlabel$addle":  -O -K >> $ofile
+    psscale -F+gwhite -t10 -Dx4.25/2.5/3/.15 $ends -Ctmp.cpt -B.2/  -O -K >> $ofile
+    
+done
+
+
+echo 4000 4000 0.1 | psxy -R -J -O >> $ofile
+
+modifybb $ofile 0
+
+rm s??.grd s?.grd p.grd e?.grd azi.grd tmp* 2>/dev/null
+echo $0: written to $ofile

@@ -1,0 +1,27 @@
+#!/bin/ksh
+
+
+
+reg=-R-2/2/-2/2
+inc=-I0.08
+
+    file=disp.out
+    
+    gawk '{print($1,$2,$4)}' $file | xyz2grd -V $reg $inc -Gtmp.$$.vx.grd 
+    gawk '{print($1,$2,$5)}' $file | xyz2grd -V $reg $inc -Gtmp.$$.vy.grd 
+
+    proj=-JX6
+    
+    vinc=-I0.2
+    grdmath  tmp.$$.vx.grd tmp.$$.vy.grd R2 SQRT = tmp.$$.vamp.grd
+
+    grdvector $vinc $reg $proj tmp.$$.vx.grd tmp.$$.vy.grd -P -S.25\
+	-Ba1f.1:"x":/a1f.1:"y"::."displacements":WeSn -Q0.015/0.06/0.04  -G200/0/0 > $file.ps
+
+    rm tmp.$$.v?.grd tmp.$$.vamp.grd
+
+
+    echo $0: output in $file.ps
+
+
+
