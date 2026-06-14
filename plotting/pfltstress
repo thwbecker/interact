@@ -1,0 +1,75 @@
+#!/bin/ksh
+
+aspect=2
+reg=-R-$aspect/$aspect/-1/1
+scale=1.0e-4
+
+tmpn=/tmp/tmp.$$
+
+inc=-I0.025
+proj='-Jx0.8 -Jz2.5 -P'
+annx=f0.1a1.0:"x/W":
+anny=f0.2a1.0:"y/W":
+annz=f0.2a1.0
+
+ic=9
+for t in ss sd sn; do
+    awk '{if($1!=""&&$1!="#")print($1*a,$2,$(ic)/s)}' \
+	s=$scale a=$aspect ic=$ic flt.dat | \
+	surface $reg $inc -G$t.grd 
+    mean=`grd2mean $t.grd`
+    grdmath $t.grd $mean SUB = $tmpn.grd
+    mv $tmpn.grd $t.grd
+    ((ic=ic+1))
+done
+# coulomb
+awk '{if($1!=""&&$1!="#")print($1*a,$2,$4/s)}' s=$scale a=$aspect flt.dat | \
+    surface $reg $inc -Gsc.grd  
+t=sc
+mean=`grd2mean $t.grd`
+grdmath $t.grd $mean SUB = $tmpn.grd
+mv $tmpn.grd $t.grd
+
+
+view=-E200/40
+
+ofile=flt.stress.ps
+
+
+for t in ss sd sn sc; do
+    $HOME/progs/batch/mymakecpt $t.grd -Chot > $tmpn.$t.cpt
+    echo $0: $t: `grd2minmax $t.grd`
+done
+
+#cmp=$HOME/progs/src/interact/slip.cpt
+
+
+    grdimage ss.grd -C$tmpn.ss.cpt $proj \
+	-B$annx/$anny/:."@~Ds@~@-s@-":WeSn   -K > $ofile
+#    grdcontour ss.grd -C0.1 $proj -O -K -S >> $ofile
+    psscale -C$tmpn.ss.cpt -D3.5/.7/1.9/0.2  -B2/:"@~Ds@~@-s@- [$scale]": \
+	-O -K -L -E  >> $ofile
+
+    grdimage sd.grd   -C$tmpn.sd.cpt $proj \
+	-B$annx/$anny/:."@~Ds@~@-d@-":WeSn     -Y3.5 -O -K >> $ofile
+#    grdcontour sd.grd -C0.1 $proj -O -S -K >> $ofile
+    psscale -C$tmpn.sd.cpt -D3.5/.7/1.9/0.2  -B2/:"@~Ds@~@-d@- [$scale]": \
+	-O  -L -E -K  >> $ofile
+
+    grdimage sc.grd   -C$tmpn.sc.cpt $proj \
+	-B$annx/$anny/:."@~Ds@~@-c@-":WeSn     -Y-3.5 -X5.5 -O -K >> $ofile
+#    grdcontour sc.grd -C0.1 $proj -O -S -K >> $ofile
+    psscale -C$tmpn.sc.cpt -D3.5/.7/1.9/0.2  -B.2/:"@~Ds@~@-c@- [$scale]": \
+	-O  -L -E -K  >> $ofile
+
+    grdimage sn.grd   -C$tmpn.sn.cpt $proj \
+	-B$annx/$anny/:."@~Ds@~@-n@-":WeSn     -Y3.5 -O -K >> $ofile
+#    grdcontour sn.grd -C0.1 $proj -O -S -K >> $ofile
+    psscale -C$tmpn.sn.cpt -D3.5/.7/1.9/0.2  -B.2/:"@~Ds@~@-n@- [$scale]": \
+	-O  -L -E  >> $ofile
+
+
+modifybb $ofile 0 0 850 530
+echo $0: output in $ofile
+
+rm $tmpn.*

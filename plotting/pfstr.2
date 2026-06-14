@@ -1,0 +1,66 @@
+#!/bin/ksh
+mode=${1-1}
+
+if [ $mode -eq 1 ]
+then
+    echo x y mode
+    l1="x"
+    l2="y"
+    reg=-R-2/2/-2/2
+    i=1
+    j=2
+fi
+
+if [ $mode -eq 2 ]
+then
+    echo x z mode
+    l1="x"
+    l2="z"
+    reg=-R-2/2/-4/0
+    i=1
+    j=3
+fi
+if [ $mode -eq 3 ]
+then
+    echo y z mode
+    l1="y"
+    l2="z"
+    reg=-R-2/2/-4/0
+    i=2 
+    j=3
+fi
+
+
+
+ann=1
+inc=-I0.08
+proj=-JX3.25
+file=flt_stress.out
+ofile=fstress.ps
+cmap=stress.cpt
+makecpt -Cjet -T-1/1/.1 > stress.cpt
+
+echo 0 A > cont.d
+
+cat $file | awk '{if($4>1e10)x=0.0;else x=$4;print($i,$j,x);}' i=$i j=$j   | \
+	xyz2grd   $reg $inc -Gst.grd
+cat $file | awk '{if($5>1e10)x=0.0;else x=$5;print($i,$j,x);}' i=$i j=$j  | \
+	xyz2grd   $reg $inc -Gsd.grd
+cat $file | awk '{if($6>1e10)x=0.0;else x=$6;print($i,$j,x);}' i=$i j=$j  | \
+	xyz2grd   $reg $inc -Gsn.grd
+
+#grd2cpt st.grd > stress.cpt
+grdimage st.grd -X0.75 -C$cmap $reg $proj -P -Ba$ann:$l1/"strike":/a$ann:$l2:WeSn -K > $ofile
+grdcontour st.grd -Ccont.d  -O -K $reg $proj >> $ofile 
+
+#grd2cpt sd.grd > stress.cpt
+grdimage sd.grd -C$cmap $reg $proj -P -Ba$ann:$l1/"dip":/a$ann:$l2:wEsN \
+    -O -Y2.5 -X3.75 -K >> $ofile
+grdcontour sd.grd -Ccont.d  -O -K $reg $proj >> $ofile 
+
+#grd2cpt sn.grd > stress.cpt
+grdimage sn.grd -C$cmap $reg $proj -P -Ba$ann:$l1/"normal":/a$ann:$l2:WesN \
+    -O -Y2.5 -X-3.75 -K >> $ofile
+grdcontour sn.grd -Ccont.d  -O  $reg $proj >> $ofile 
+
+echo $0: reading from $file, writing to $ofile
