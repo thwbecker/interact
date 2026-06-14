@@ -17,11 +17,12 @@ void phelp(void)
   PE("Interact: calculate fault stresses and displacements in a half space or in 2-D");
   PE("          using a boundary element approach.");
   PE("");
-  PE("Program reads in patch dividing a fault geometry and either solves");
+  PE("Program reads in patches subdividing a fault geometry and either solves");
   PE("for stresses and/or displacements in a one-step problem for various boundary");
   PE("conditions (sign (i.e. direction) constrained or unconstrained), or for a simulated loading");
-  PE("cycle where each patch follows a frictional constitutive law (e.g. Navier-Coulomb)");
+  PE("cycle where each patch follows a static-kinematic frictional constitutive law");
   PE("and repetitive rupture is allowed during continuous \"plate-tectonic\" loading.");
+  PE("(Note that there is also a rudimentary, rate-state-friction cycle solver, rsf_solve.).");
   PE("");
   PE("When stresses (stress tensor components) or pressure are referred to, positive values mean");
   PE("extensional and compressional regimes, respectively (physics convention).");
@@ -41,7 +42,9 @@ void phelp(void)
   PE("                          \"-ksp_type fgmres -pc_type jacobi -ksp_max_it 10000 -ksp_rtol 1.0e-8\".");
   PE("      Check the makefile for other solver options and MPI settings.");
   PE("      When running a one-step computation, will also compute stress fields in parallel.");
-
+#idef USE_PETSC_HMAT
+  PE("      The code can interface with HTOOLS, H2OPUS, HACApK and HMMVP H matrix packages.");
+#endif
 #else
   PE("(Petsc support not compiled in, if parallel support is desired, check makefile.)");
 #endif

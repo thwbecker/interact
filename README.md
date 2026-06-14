@@ -1,4 +1,14 @@
-# interact - models static and earthqauke cycle fault interactions using dislocations in an elastic medium
+# interact - models static and earthqauke cycle fault interactions
+# using dislocations in an elastic medium
+
+Program reads in patches subdividing a fault geometry and either
+solves for stresses and/or displacements in a one-step problem for
+various boundary conditions (sign (i.e. direction) constrained or
+unconstrained), or for a simulated loading cycle where each patch
+follows a static-kinematic frictional constitutive law and repetitive
+rupture is allowed during continuous "plate-tectonic" loading.  (Note
+that there is also a rudimentary, rate-state-friction cycle solver,
+rsf_solve.).
 
 `interact` uses `dc3d.f` as provided by Y. Okada as in Okada (BSSA,
 1992), has .f90 code converted from Nikkhoo and Walter (GJI, 2015),
@@ -13,7 +23,7 @@ myself (but cross checks with that of OBI). Parts of the code can be
 compiled against Petsc which is used to implement parallelism. Since
 June 2026, work benefited from Claude code interactions.
 
-See files `INSTALLATION`, `README.md`, and `help.txt` for
+See files `INSTALLATION`, `README.md`, and `interact_help.txt` for
 documentation and `COPYRIGHT` and `COPYING` for the license and
 warranty disclaimers.
 
@@ -85,7 +95,7 @@ arguments and input files.
 For documentation, use `program -h` after compilation, and refer to
 the numerous comments in the source code as well as in the
 makefiles. The output of `interact -h` is supplied as the file
-`help.txt`.
+`interact_help.txt`.
 
 The example.?.txt files describe some simple example calculations to,
 hopefully, elucidate the usage of interact and affiliated programs.
@@ -108,17 +118,27 @@ interact -h
 
 ## Binaries
 
-### Main program
+### Main programs
 
-interact: 
-	reads in fault geometry and boundary conditions. Can do a
+interact:
+
+	Reads in fault geometry and boundary conditions. Can do a
 	one-step calculation where a system of equations is solved
 	based on boundary conditions in stress and/or displacement on
 	the rectangular fault patches. BCs can have non-negativity
 	constraints, e.g. motion only in one direction. Program can
 	also simulate a loading experiment where patches behave
-	according to a friction criterion (so far, only Coulomb with
-	static and kinetic friction is implemented).
+	according to a friction criterion (only static and kinetic
+	friction is implemented).
+
+rsf_solve:
+	Reads in fault geometry and boundary conditions and
+	rate-state-friction parameters and solves for the
+	quasi-dynamic evolution of stress and slip, like tools such as
+	FDRA or HBI. ODE integration is Petsc parallelized and
+	different H matrix interfaces can be used. Solution details
+	follow HBI and repdocue the SCEC SEAS benchmark BP5 (see bp5
+	directory).
 
 ### Generation of input/output files for interact
 
@@ -270,6 +290,10 @@ check_feedback:
 	discretization, on average stresses of groups of patches will
 	always be OK.
 
+compress_interaction_matrix:
+	Test solver for dense and H matrix computation testing, allows
+	selecting between Petsc dense, HTOOLS, H2OPUS (only symmetric
+	approximation), HACApK and HMMVP H matrix interfaces.
 
 ## Parameters
 ________________________________________________________________________________
@@ -277,18 +301,19 @@ ________________________________________________________________________________
 Output from interact -h follows (run code for updated versions!)
 ________________________________________________________________________________
 interact: internal double prec, A matrix double prec
-main: initializing on 2026-06-11 14:40:15 ncore: 1
+main: initializing on 2026-06-14 08:08:48 ncore: 1
 interact: nu: 0.25000 mu: 1.000e+04 from properties.h, therefore lambda/mu: 1.00000 alpha: 0.66667
-init: compiled on Jun 11 2026 10:06:56, running in serial
+init: compiled on Jun 14 2026 00:13:24, running in serial
 
 Interact: calculate fault stresses and displacements in a half space or in 2-D
           using a boundary element approach.
 
-Program reads in patch dividing a fault geometry and either solves
+Program reads in patches subdividing a fault geometry and either solves
 for stresses and/or displacements in a one-step problem for various boundary
 conditions (sign (i.e. direction) constrained or unconstrained), or for a simulated loading
-cycle where each patch follows a frictional constitutive law (e.g. Navier-Coulomb)
+cycle where each patch follows a static-kinematic frictional constitutive law
 and repetitive rupture is allowed during continuous "plate-tectonic" loading.
+(Note that there is also a rudimentary, rate-state-friction cycle solver, rsf_solve.).
 
 When stresses (stress tensor components) or pressure are referred to, positive values mean
 extensional and compressional regimes, respectively (physics convention).
@@ -303,6 +328,7 @@ PetSc support was compiled in, providing limited access to parallel solves for o
                           "-ksp_type fgmres -pc_type jacobi -ksp_max_it 10000 -ksp_rtol 1.0e-8".
       Check the makefile for other solver options and MPI settings.
       When running a one-step computation, will also compute stress fields in parallel.
+      The code can interface with HTOOLS, H2OPUS, HACApK and HMMVP H matrix packages.
 
 (1) The fault geometry is input via the file "geom.in",
     a list of fault patches.
@@ -823,5 +849,4 @@ OPTIONS:
     2-D segment slip solution from Crouch and Starfield (1973).
     May include routines based on copyrighted software of others.
     Distributed under the GNU public license, see "COPYING".
-
 

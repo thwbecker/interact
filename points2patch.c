@@ -42,7 +42,7 @@ the opmode flag determines the output format, see interact.h
 
 */
 
-
+int read_points_local(COMP_PRECISION *,int *, my_boolean , FILE *, int );
 
 int main(int argc, char **argv)
 {
@@ -53,26 +53,30 @@ int main(int argc, char **argv)
   COMP_PRECISION *dummy=NULL;
   int i,j,opmode=PATCH_OUT_MODE,nrpatches,seg[2],code;
   long seed = -1;
-  my_boolean adjust_area=TRUE,use_code=FALSE,iquad=FALSE;
+  my_boolean adjust_area=TRUE,use_code=FALSE;
+  int iquad=0,np;
   medium=(struct med *)calloc(1,sizeof(struct med));
 #ifndef ALLOW_NON_3DQUAD_GEOM
   // simply for ease of storage reasons
   fprintf(stderr,"%s needs ALLOW_NON_3DQUAD_GEOM to be set\n",argv[0]);exit(-1);
 #endif
 
-  dx = 1.5;
+  //dx = 1.5;
+  dx=0;
 
   if((argc > 5)||((argc>1)&&(strcmp(argv[1],"-h")==0)) ){
-    fprintf(stderr,"%s: usage:\n\t%s [adjust_area, %i] [dx, %g] [use_code, %i] [iquad, %i]\n\tread in four 3-D points per line from stdin\n",
-	    argv[0],argv[0],adjust_area,dx,(int)use_code,(int)iquad);
+    fprintf(stderr,"%s: usage:\n\t%s [adjust_area, %i] [dx, %g] [use_code, %i] [iquad, %i]\n\tread in four or three 3-D points per line from stdin\n",
+	    argv[0],argv[0],adjust_area,dx,(int)use_code,iquad);
     fprintf(stderr,"\tif adjust_area is set, will attempt to make input and output same area\n");
     fprintf(stderr,"\tformat:\n\tx1_x x1_y x1_z x2_x x2_y x2_z ...\n\n");
     fprintf(stderr,"\tto form a regular quad, points have to be in FE (CCW) ordering, starting lower left\n");
     fprintf(stderr,"\tassumes that patch can be described by dip and strike only, no rake!\n");
     fprintf(stderr,"\twrites patch format to stdout\n");
     fprintf(stderr,"\tdx (%g) will subdivide the faults into patches with dx width/length\n",dx);
+    fprintf(stderr,"\t\t a <=0 dx will use no subdivision\n",dx);
     fprintf(stderr,"\tif use_code is set, will read in fault number codes\n");
-    fprintf(stderr,"\tif iquad is zero, will try to fit Okada, else uses irregular quads and dx does not apply\n");
+    fprintf(stderr,"\tif iquad is zero, will try to fit Okada, 1: uses irregular quads and subdivides into triangles\n");
+    fprintf(stderr,"\t\t2: expect three points, prints triangular elements\n");
     exit(-1);
   }
   if(argc >= 2){
@@ -86,22 +90,27 @@ int main(int argc, char **argv)
     use_code = (my_boolean)i;
   }
   if(argc > 4){
-    sscanf(argv[4],"%i",&i);
-    iquad = (my_boolean)i;
+    sscanf(argv[4],"%i",&iquad);
+  }
+  if(iquad == 2){
+    np=3;
+  }else{
+    np=4;
   }
   
-  fprintf(stderr,"%s: reading points from %s, writing patch to stdout,",
-	  argv[0],"stdin");
-  if(adjust_area)
+  fprintf(stderr,"%s: reading sets of %i points from %s, writing patch to stdout,",
+	  argv[0],np,"stdin");
+  if(adjust_area){
     fprintf(stderr," adjusting area");
-  else
+  }else{
     fprintf(stderr," area unadjusted");
+  }
   fprintf(stderr,", spacing %g, use code %i, iquad: %i\n",dx,use_code,iquad);
-
+  
   medium->nrflt=0;
   nrpatches=0;
-  while(read_points_local(x,&code, use_code, stdin)==4){
-    for(i=0;i<4;i++)
+  while(read_points_local(x,&code, use_code, stdin,np)==np){
+    for(i=0;i < np;i++)
       if(x[i*3+INT_Z] > 0.0){
 	fprintf(stderr,"%s: rectangle %i: point %i: z should be <= 0 (%g, %g, %g)\n",
 		argv[0],medium->nrflt+1,i+1,x[i*3+INT_X],x[i*3+INT_Y],x[i*3+INT_Z]);
@@ -111,12 +120,28 @@ int main(int argc, char **argv)
       fault[0].group = code;
     else
       fault[0].group = medium->nrflt;
-    if(iquad){
+    if(iquad==2){
       for(i=0;i<3;i++){
 	xc[i]=0;
-	for(j=0;j <4;j++)
+	for(j=0;j < np;j++)
 	  xc[i] += x[j*3+i];
-	xc[i] /= 4.0;
+	xc[i] /= (double)np;
+      }
+      /* pass through */
+      fprintf(stdout,"%19.12e %19.12e %19.12e %10.6f %10.6f %19.12e %19.12e %6i ",
+	      xc[INT_X],xc[INT_Y],xc[INT_Z],0.,0.,-1.,-1.,fault[0].group);
+      fprintf(stdout,"%19.12e %19.12e %19.12e %19.12e %19.12e %19.12e %19.12e %19.12e %19.12e\n",
+	      x[0*3+INT_X],	      x[0*3+INT_Y],	      x[0*3+INT_Z],
+	      x[1*3+INT_X],	      x[1*3+INT_Y],	      x[1*3+INT_Z],
+	      x[2*3+INT_X],	      x[2*3+INT_Y],	      x[2*3+INT_Z]);
+      nrpatches++;
+      medium->nrflt++;
+    }else if(iquad == 1){
+      for(i=0;i<3;i++){
+	xc[i]=0;
+	for(j=0;j < np;j++)
+	  xc[i] += x[j*3+i];
+	xc[i] /= (double)np;
       }
       /* pass through */
       fprintf(stdout,"%19.12e %19.12e %19.12e %10.6f %10.6f %19.12e %19.12e %6i ",
@@ -131,34 +156,33 @@ int main(int argc, char **argv)
     }else{
       points2patch(fault,x,adjust_area);
       medium->nrflt++;      
-      fprintf(stderr,"%s: set of points: %i code: %i\n",argv[0],medium->nrflt,fault[0].group);
-      /* hack for now */
-      seg[0] = 1 + fault[0].l/dx;
-      seg[1] = 1 + fault[0].w/dx;
+      if(dx<=0){
+	seg[0]=seg[1]=1;
+      }else{
+	/* hack for now */
+	seg[0] = 1 + fault[0].l/dx;
+	seg[1] = 1 + fault[0].w/dx;
+      }
       /* subdivide */
       divide_fault_in_patches(0,fault,&patch,&nrpatches,
 			      seg,FALSE,TRUE,0,0,&seed,FALSE);
 
-    }
-
-  }
-  if(!iquad){
-    for(i=0;i<nrpatches;i++){
-      print_patch_geometry_and_bc(i,patch,opmode,0.0,
-				  FALSE,stdout,FALSE,dummy);
+      for(i=0;i<nrpatches;i++){
+	print_patch_geometry_and_bc(i,patch,opmode,0.0,
+				    FALSE,stdout,FALSE,dummy);
+      }
     }
   }
-  fprintf(stderr,"%s: read %i sets of four points\n",
-	  argv[0],medium->nrflt);
-  fprintf(stderr,"%s: produced total %i faults with %i patches, irregular quads: %i\n",
-	  argv[0],medium->nrflt,nrpatches,(int)iquad);
+  fprintf(stderr,"%s: read %i sets of %i points\n",argv[0],medium->nrflt,np);
+  fprintf(stderr,"%s: produced total %i faults with %i patches\n",
+	  argv[0],medium->nrflt,nrpatches);
   exit(0);
 }
 
-int read_points_local(COMP_PRECISION *x,int *code, my_boolean read_code, FILE *in)
+int read_points_local(COMP_PRECISION *x,int *code, my_boolean read_code, FILE *in, int np)
 {
   int i,j;
-  for(i=0;i<4;i++){
+  for(i=0;i < np;i++){
     for(j=0;j < 3;j++){
       if(fscanf(in,ONE_CP_FORMAT,(x+i*3+j))!=1){
 	return FALSE;
