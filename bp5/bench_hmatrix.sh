@@ -15,14 +15,15 @@ set -u
 # ============================ CONFIG =======================================
 RB=${RB:-../bin/rsf_solve}                 # path to rsf_solve binary
 BP5=${BP5:-../bp5}                          # dir with the BP5 input files
-RES=${RES:-1km}                            # resolution tag: 1km (4000) or 2km (1000)
-NPLIST=${NPLIST:-"1 2 4 8 16 24"}          # MPI rank counts to test
+#RES=${RES:-1km}                            # resolution tag: 1km (4000) or 2km (1000)
+RES=${RES:-0.5km}                            # resolution tag: 1km (4000) or 2km (1000)
+NPLIST=${NPLIST:-"1 2 4 8 16 24 48"}          # MPI rank counts to test
 BACKENDS=${BACKENDS:-"dense htool hacapk"} # subset of {dense,htool,hacapk}
 STOP_YR=${1:-${STOP_YR:-60}}              # short run: assembly + steady matvec timing
 RTOL=${RTOL:-1e-4}
 ZTOL=${ZTOL:-1e-4}                         # HACApK -hacapk_ztol
 HEPS=${HEPS:-1e-4}                         # HTOOL  -mat_htool_epsilon
-MPIRUN=${MPIRUN:-mpirun}                   # set to "mpirun --oversubscribe" to test
+MPIRUN=${MPIRUN:-$PETSC_DIR/build/bin/mpirun}                   # set to "mpirun --oversubscribe" to test
                                            #   more ranks than physical cores
 EXTRA_MPI=${EXTRA_MPI:-}                   # e.g. "--bind-to core --map-by core"
 # If PETSc shared libs aren't on the loader path, set them here:
@@ -37,6 +38,8 @@ DC=$BP5/dc_bp5_${RES}.in
 for f in "$RB" "$GEOM" "$RSF" "$IC" "$DC"; do
   [ -e "$f" ] || { echo "ERROR: missing $f (check CONFIG)"; exit 1; }
 done
+
+NCELL=$(grep -cve '^[[:space:]]*$' "$GEOM")   # patches = non-blank lines in geom file
 
 COMMON="-geom_file $GEOM -rsf_file $RSF -rsf_ic_file $IC -rsf_dc_file $DC \
  -shear_modulus 3.204e10 -s_wave_speed 3464 -f0 0.6 -dc 0.14 -vpl 1e-9 \
@@ -74,8 +77,8 @@ for be in $BACKENDS; do
     case "$be" in
       hacapk) mem=$(awk -F= '/Memory of the H-matrix/{gsub(/[^0-9.]/,"",$2);printf "%.1f",$2; exit}' "$log") ;;
       htool)  cr=$(awk -F: '/compression ratio:/{print $2+0; exit}' "$log")
-              mem=$(awk -v c="$cr" -v r="$RES" 'BEGIN{n=(r=="1km")?4000:1000; d=n*n*8/1048576; printf (c>0)?"%.1f":"NA",(c>0)?d/c:0}') ;;
-      dense)  mem=$(awk -v r="$RES" 'BEGIN{n=(r=="1km")?4000:1000; printf "%.1f", n*n*8/1048576}') ;;
+              mem=$(awk -v c="$cr" -v n="$NCELL" 'BEGIN{d=n*n*8/1048576; printf (c>0)?"%.1f":"NA",(c>0)?d/c:0}') ;;
+      dense)  mem=$(awk -v n="$NCELL" 'BEGIN{printf "%.1f", n*n*8/1048576}') ;;
     esac
     printf "%-8s %4s %10s %11s %9s %8s %11s %9s\n" \
            "$be" "$np" "${total:-NA}" "$asm" "${ts_t:-NA}" "${ts_c:-NA}" "$mv" "${mem:-NA}"
