@@ -41,6 +41,8 @@ PetscErrorCode MatMult_hmmvp(Mat A, Vec x, Vec y)
   PetscFunctionBeginUser;
   PetscCall(MatShellGetContext(A,&hctx));
 #ifdef USE_HMMVP_MPI
+  PetscMPIInt rank;
+  PetscInt N;
   /*
     MPI path: hmmvp::MpiHmat::Mvp needs the full x on the root and
     leaves the full y valid on the root, with the compute distributed
@@ -48,29 +50,26 @@ PetscErrorCode MatMult_hmmvp(Mat A, Vec x, Vec y)
     full-length sequential vector on rank 0, empty elsewhere); ball is
     the full-length y work buffer that hmmvp requires on every rank.
   */
-  {
-    PetscMPIInt rank;
-    PetscCallMPI(MPI_Comm_rank(PetscObjectComm((PetscObject)A),&rank));
-    /* gather distributed x -> full x on the root */
-    PetscCall(VecScatterBegin(hctx->scat,x,hctx->xall,INSERT_VALUES,SCATTER_FORWARD));
-    PetscCall(VecScatterEnd(hctx->scat,x,hctx->xall,INSERT_VALUES,SCATTER_FORWARD));
-    /* collective matvec: root supplies x, every rank computes its
-       blocks, y (=ball) valid on the root afterwards */
-    PetscCall(VecGetArrayRead(hctx->xall,&xa));
-    chmmvp_mpi_mvp(hctx->handle,(rank==0)?(double *)xa:NULL,hctx->ball);
-    PetscCall(VecRestoreArrayRead(hctx->xall,&xa));
-    /* copy full y back into the root sequential vector, scatter out */
-    if(rank == 0){
-      PetscInt N;
-      PetscCall(VecGetLocalSize(hctx->xall,&N));
-      PetscCall(VecGetArray(hctx->xall,&ya));
-      for(i=0;i < N;i++)
-	ya[i] = (PetscScalar)hctx->ball[i];
-      PetscCall(VecRestoreArray(hctx->xall,&ya));
-    }
-    PetscCall(VecScatterBegin(hctx->scat,hctx->xall,y,INSERT_VALUES,SCATTER_REVERSE));
-    PetscCall(VecScatterEnd(hctx->scat,hctx->xall,y,INSERT_VALUES,SCATTER_REVERSE));
+  
+  PetscCallMPI(MPI_Comm_rank(PetscObjectComm((PetscObject)A),&rank));
+  /* gather distributed x -> full x on the root */
+  PetscCall(VecScatterBegin(hctx->scat,x,hctx->xall,INSERT_VALUES,SCATTER_FORWARD));
+  PetscCall(VecScatterEnd(hctx->scat,x,hctx->xall,INSERT_VALUES,SCATTER_FORWARD));
+  /* collective matvec: root supplies x, every rank computes its
+     blocks, y (=ball) valid on the root afterwards */
+  PetscCall(VecGetArrayRead(hctx->xall,&xa));
+  chmmvp_mpi_mvp(hctx->handle,(rank==0)?(double *)xa:NULL,hctx->ball);
+  PetscCall(VecRestoreArrayRead(hctx->xall,&xa));
+  /* copy full y back into the root sequential vector, scatter out */
+  if(rank == 0){
+    PetscCall(VecGetLocalSize(hctx->xall,&N));
+    PetscCall(VecGetArray(hctx->xall,&ya));
+    for(i=0;i < N;i++)
+      ya[i] = (PetscScalar)hctx->ball[i];
+    PetscCall(VecRestoreArray(hctx->xall,&ya));
   }
+  PetscCall(VecScatterBegin(hctx->scat,hctx->xall,y,INSERT_VALUES,SCATTER_REVERSE));
+  PetscCall(VecScatterEnd(hctx->scat,hctx->xall,y,INSERT_VALUES,SCATTER_REVERSE));
 #else
   /* in-memory (serial/OpenMP) path: every rank holds the full H matrix
      and computes the full product on the gathered x (xall is a
@@ -155,7 +154,7 @@ PetscErrorCode calc_petsc_Isn_matrices(struct med *medium, struct flt *fault,
   long hmmvp_nnz;
   int hmm,hmn;
 #ifdef USE_HMMVP_MPI
-  char hmmvp_fn[STRLEN];
+  char hmmvp_tmp[STRLEN],hmmvp_fn[STRLEN];
   PetscMPIInt mrank;
   int cret;
 #endif
@@ -402,6 +401,13 @@ PetscErrorCode calc_petsc_Isn_matrices(struct med *medium, struct flt *fault,
       exit(-1);
     }
     chmmvp_mpi_get_info(hmmvp_handle,&hmm,&hmn,&hmmvp_nnz);
+    /* each rank removes its own scratch file "<hmmvp_fn>_<rank>" left by the
+       parallel compressor (root concatenates these over MPI but never
+       unlinks them); /tmp is typically node-local, so root cannot do it */
+    if(mrank > 0){
+      snprintf(hmmvp_tmp,STRLEN,"%s_%d",hmmvp_fn,mrank);
+      remove(hmmvp_tmp);
+    }
     /* the file is fully read into the distributed MpiHmat at load, so
        the root can remove it now */
     if(mrank == 0)

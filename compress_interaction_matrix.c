@@ -50,7 +50,7 @@ int main(int argc, char **argv)
 #endif
 #ifdef USE_HMMVP
 #ifdef USE_HMMVP_MPI
-  char hmmvp_fn[STRLEN];
+  char hmmvp_fn[STRLEN], hmmvp_tmp[STRLEN];
   int cret;
 #endif
   void *hmmvp_handle;
@@ -396,6 +396,13 @@ int main(int argc, char **argv)
 	exit(-1);
       }
       chmmvp_mpi_get_info(hmmvp_handle,&hmm,&hmn,&hmmvp_nnz);
+      /* each rank removes its own hmmvp scratch file "<hmmvp_fn>_<rank>"
+	 left by the parallel compressor (root concatenates these over MPI but
+	 never unlinks them); /tmp is typically node-local, so root cannot do it */
+      if(medium->comm_rank > 0){
+	snprintf(hmmvp_tmp,STRLEN,"%s_%d",hmmvp_fn,medium->comm_rank);
+	remove(hmmvp_tmp);
+      }
       HEADNODE{			/* clean up */
 	remove(hmmvp_fn);
 	fprintf(stderr,"%s: hmmvp(MPI) %i by %i, %ld stored scalars, compression ratio %.5g\n",
