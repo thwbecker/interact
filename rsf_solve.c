@@ -100,7 +100,8 @@ int main(int argc,char **argv)
   PetscBool event_terminate[1] = {PETSC_FALSE};
   struct rsf_out_ctx uc[1];
   struct interact_ctx par[1]; /* user-defined work context */
-  char geom_file[STRLEN]="geom.in",rsf_file[STRLEN]="rsf.dat";
+  char geom_file[STRLEN]="geom.in",rsf_file[STRLEN]="rsf.dat",rsf_ic_file[STRLEN]="";
+  PetscReal *ic_tau=NULL,*ic_vel=NULL;PetscBool have_ic=PETSC_FALSE;
   PetscBool read_value,warned = PETSC_FALSE,flg;
   char *home_dir = getenv("HOME");char par_file[STRLEN];
   snprintf(par_file,STRLEN,"%s/progs/src/interact/petsc_settings.yaml",(home_dir)?(home_dir):("."));
@@ -177,6 +178,10 @@ int main(int argc,char **argv)
   PetscCall(PetscOptionsGetReal(NULL,NULL,"-sigma_init",&sigma_init,NULL));
   PetscCall(PetscOptionsGetReal(NULL,NULL,"-tau_init",&tau_init,NULL));
   PetscCall(PetscOptionsGetReal(NULL,NULL,"-vel_init",&vel_init,NULL));
+  /* optional per-cell initial conditions (tau[Pa] vel[m/s] per patch,
+     one row per patch in geometry order) for e.g. the SEAS BP5
+     nucleation patch; when given, overrides uniform tau_init/vel_init */
+  PetscCall(PetscOptionsGetString(NULL,NULL,"-rsf_ic_file",rsf_ic_file,STRLEN,&have_ic));
   PetscCall(PetscOptionsGetReal(NULL,NULL,"-rand_amp",&rand_amp,NULL));
   if(tau_init < 0)
     tau_init = medium->f0 * sigma_init;
@@ -242,6 +247,19 @@ int main(int argc,char **argv)
      now, read in a,b variations (stored in fault[].mu_s, fault[].mu_d)
   */
   read_rsf(rsf_file,medium,fault);
+  /* optional per-cell initial tau,vel (e.g. BP5 nucleation patch) */
+  if(have_ic){
+    FILE *icin;PetscInt ic_i;
+    ic_tau=(PetscReal *)malloc((size_t)n*sizeof(PetscReal));
+    ic_vel=(PetscReal *)malloc((size_t)n*sizeof(PetscReal));
+    if((!ic_tau)||(!ic_vel)){fprintf(stderr,"%s: per-cell IC alloc failed\n",argv[0]);exit(-1);}
+    icin=myopen(rsf_ic_file,"r");
+    for(ic_i=0;ic_i < n;ic_i++)
+      if(fscanf(icin,"%lf %lf",(ic_tau+ic_i),(ic_vel+ic_i))!=2){
+	fprintf(stderr,"%s: error reading tau vel for patch %i from %s\n",argv[0],ic_i,rsf_ic_file);exit(-1);}
+    fclose(icin);
+    HEADNODE fprintf(stderr,"%s: read per-cell initial tau,vel from %s\n",argv[0],rsf_ic_file);
+  }
   /* 
      create and calculate interaction matrices, scaled from interact's
      internal shear modulus to SI
@@ -312,8 +330,13 @@ int main(int argc,char **argv)
   for (i = medium->rs,j=i*INT_RSF_DIM; i < medium->re; i++,j+=INT_RSF_DIM){
     PetscCall(PetscRandomGetValue(prand,&rand_fac));
     fault[i].s[NORMAL] = sigma_init;	/* compression positive */
-    fault[i].s[STRIKE] = tau_init;
-    fault[i].u[0] = vel_init;
+    if(have_ic){
+      fault[i].s[STRIKE] = ic_tau[i];	/* per-cell initial shear stress [Pa] */
+      fault[i].u[0]      = ic_vel[i];	/* per-cell initial slip velocity [m/s] */
+    }else{
+      fault[i].s[STRIKE] = tau_init;
+      fault[i].u[0] = vel_init;
+    }
     /* state consistent with v = vel_init */
     state = fault[i].mu_s*log(2.0*medium->v0/fault[i].u[0]*sinh(fault[i].s[STRIKE]/fault[i].s[NORMAL]/fault[i].mu_s));
     if(rand_amp > 0)
