@@ -25,13 +25,18 @@
 #define OMPI_SKIP_MPICXX 1
 #define MPICH_SKIP_MPICXX 1
 
+#ifdef USE_HMMVP_MPI
+#  ifndef UTIL_MPI
+#    define UTIL_MPI
+#  endif
+#endif
+
 #include <vector>
 #include <cstdio>
 #include <mutex>
 #include "Compress.hpp"
 #include "Hmat.hpp"
 #ifdef USE_HMMVP_MPI
-#include "petsc_prototypes.h"
 #  include "MpiHmat.hpp"
 #endif
 
