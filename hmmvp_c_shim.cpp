@@ -31,6 +31,7 @@
 #include "Compress.hpp"
 #include "Hmat.hpp"
 #ifdef USE_HMMVP_MPI
+#include "petsc_prototypes.h"
 #  include "MpiHmat.hpp"
 #endif
 
@@ -187,6 +188,21 @@ int chmmvp_compress_to_file(int n, double *x, double *y, double *z,
     c->CompressToFile(hmat_fn);	/* collective; MPI-distributed blocks */
     hmmvp::DeleteCompressor(c);
     hmmvp::DeleteHd(hd);
+#ifdef USE_HMMVP_MPI
+    /* hmmvp's parallel compressor has each worker rank write its blocks to a
+       scratch file named "<hmat_fn>_<rank>" (Compressor::GetTmpFilename), which
+       the root concatenates into <hmat_fn> over MPI but never unlinks. Remove
+       our own scratch file here so it does not accumulate in /tmp. */
+    {
+      int wrank = 0;
+      MPI_Comm_rank(MPI_COMM_WORLD, &wrank);
+      if (wrank > 0) {
+        char tmpfn[1024];
+        std::snprintf(tmpfn, sizeof(tmpfn), "%s_%d", hmat_fn, wrank);
+        std::remove(tmpfn);
+      }
+    }
+#endif
     return 0;
   } catch (const std::exception &e) {
     std::fprintf(stderr, "chmmvp_compress_to_file: exception: %s\n", e.what());

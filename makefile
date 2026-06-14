@@ -583,7 +583,7 @@ $(BDIR)/calc_interaction_matrix: $(ODIR)/coulomb_stress.o \
 		$(PGLIBS) $(SLATEC_LIBS)  $(LDFLAGS)
 
 $(ODIR)/hmmvp_c_shim.o: hmmvp_c_shim.cpp
-	mpicxx -std=c++14 -O2 -fPIC $(HMMVP_INC) $(HMMVP_DEFINES) -c hmmvp_c_shim.cpp -o $(ODIR)/hmmvp_c_shim.o
+	$(MPICXX) -std=c++14 -O2 -fPIC $(HMMVP_INC) $(DEFINE_FLAGS) -c hmmvp_c_shim.cpp -o $(ODIR)/hmmvp_c_shim.o
 
 $(BDIR)/compress_interaction_matrix: $(ODIR)/compress_interaction_matrix.o $(ODIR)/coulomb_stress.o $(HMMVP_OBJS) \
 	$(ODIR)/interact.o 	$(ODIR)/petsc_interact.o $(GEN_P_INC)  $(LIBLIST) 
