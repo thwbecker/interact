@@ -18,11 +18,21 @@
     mpicxx -std=c++14 -O2 -I$(HMMVP_DIR)/hmmvp/include \
        -I$(HMMVP_DIR)/util/include -c hmmvp_c_shim.cpp
 */
+/* OpenMPI >= 5 and MPICH >= 4 removed the deprecated MPI C++ bindings,
+   so mpi.h (pulled in transitively by the hmmvp MPI headers) must not
+   include mpicxx.h. hmmvp and this shim use only the C MPI API. These
+   guards must precede any (transitive) <mpi.h> include. */
+#define OMPI_SKIP_MPICXX 1
+#define MPICH_SKIP_MPICXX 1
+
 #include <vector>
 #include <cstdio>
 #include <mutex>
 #include "Compress.hpp"
 #include "Hmat.hpp"
+#ifdef UTIL_MPI
+#  include "MpiHmat.hpp"
+#endif
 
 extern "C" {
   /* interact's per-entry kernel (0-based), defined in
@@ -34,6 +44,14 @@ extern "C" {
   void chmmvp_mvp(void *, double *, double *);
   void chmmvp_get_info(void *, int *, int *, long *);
   void chmmvp_delete(void *);
+
+  /* MPI interface (distributed assembly to file + MpiHmat matvec) */
+  int   chmmvp_compress_to_file(int, double *, double *, double *,
+				double, double, void *, const char *);
+  void *chmmvp_mpi_load(const char *, int);
+  void  chmmvp_mpi_mvp(void *, double *, double *);
+  void  chmmvp_mpi_get_info(void *, int *, int *, long *);
+  void  chmmvp_mpi_delete(void *);
 }
 
 namespace {
@@ -129,3 +147,99 @@ void chmmvp_delete(void *hm)
 {
   hmmvp::DeleteHmat((hmmvp::Hmat *)hm);
 }
+
+/* =====================================================================
+   MPI interface
+
+   hmmvp's MPI model differs from the in-memory OpenMP one: compression
+   is MPI-distributed and written to a file (Compressor::CompressToFile,
+   collective over MPI_COMM_WORLD), and the matvec is done by
+   hmmvp::MpiHmat<double>, which loads that file. In MpiHmat::Mvp the
+   full input x need be valid only on the root and the full output y is
+   valid only on the root after the call (compute is distributed across
+   ranks). The default permutation makes the root x/y use the same
+   ordering as the serial Hmat, i.e. the geometry (PETSc global) order.
+
+   All ranks must call chmmvp_compress_to_file and chmmvp_mpi_mvp
+   collectively. MPI_Init is assumed already done (PETSc does it).
+   ===================================================================== */
+
+/* build the H matrix with MPI-distributed assembly and write it to
+   hmat_fn (collective); returns 0 on success, -1 on error */
+int chmmvp_compress_to_file(int n, double *x, double *y, double *z,
+			    double tol, double eta, void *kctx,
+			    const char *hmat_fn)
+{
+  try {
+    hmmvp::Matrix<double> D(3, n);
+    for (int i = 0; i < n; i++) {
+      D(1, i + 1) = x[i];
+      D(2, i + 1) = y[i];
+      D(3, i + 1) = z[i];
+    }
+    hmmvp::Hd *hd = hmmvp::NewHd(D, NULL, eta);
+    InteractGF gf(kctx);
+    hmmvp::Compressor *c = hmmvp::NewCompressor(hd, &gf);
+    c->SetTolMethod(hmmvp::Compressor::tm_mrem_fro);
+    c->SetBfroEstimate(c->EstimateBfro());
+    c->SetTol(tol);
+    c->AvoidRedundantGfCalls(true);
+    c->CompressToFile(hmat_fn);	/* collective; MPI-distributed blocks */
+    hmmvp::DeleteCompressor(c);
+    hmmvp::DeleteHd(hd);
+    return 0;
+  } catch (const std::exception &e) {
+    std::fprintf(stderr, "chmmvp_compress_to_file: exception: %s\n", e.what());
+    return -1;
+  } catch (...) {
+    std::fprintf(stderr, "chmmvp_compress_to_file: unknown exception\n");
+    return -1;
+  }
+}
+
+#ifdef UTIL_MPI
+/* load the on-disk H matrix into a distributed MpiHmat (collective);
+   nthreads>1 only matters for a hybrid MPI-OpenMP build */
+void *chmmvp_mpi_load(const char *hmat_fn, int nthreads)
+{
+  try {
+    return (void *)new hmmvp::MpiHmat<double>(std::string(hmat_fn), 1, nthreads);
+  } catch (const std::exception &e) {
+    std::fprintf(stderr, "chmmvp_mpi_load: exception: %s\n", e.what());
+    return NULL;
+  } catch (...) {
+    std::fprintf(stderr, "chmmvp_mpi_load: unknown exception\n");
+    return NULL;
+  }
+}
+
+/* y = A x (collective). x need be valid only on the root; y must be
+   allocated to the full length m on every rank and is valid on the
+   root after the call. */
+void chmmvp_mpi_mvp(void *hm, double *x, double *y)
+{
+  ((hmmvp::MpiHmat<double> *)hm)->Mvp(x, y, 1);
+}
+
+void chmmvp_mpi_get_info(void *hm, int *m, int *n, long *nnz)
+{
+  hmmvp::MpiHmat<double> *h = (hmmvp::MpiHmat<double> *)hm;
+  *m = (int)h->GetM();
+  *n = (int)h->GetN();
+  *nnz = (long)h->GetNnz();
+}
+
+void chmmvp_mpi_delete(void *hm)
+{
+  delete (hmmvp::MpiHmat<double> *)hm;
+}
+#else
+/* non-MPI build: provide stubs so the symbols resolve but fail loudly */
+void *chmmvp_mpi_load(const char *, int)
+{ std::fprintf(stderr, "chmmvp_mpi_load: built without UTIL_MPI\n"); return NULL; }
+void chmmvp_mpi_mvp(void *, double *, double *)
+{ std::fprintf(stderr, "chmmvp_mpi_mvp: built without UTIL_MPI\n"); }
+void chmmvp_mpi_get_info(void *, int *m, int *n, long *nnz)
+{ *m = *n = 0; *nnz = 0; }
+void chmmvp_mpi_delete(void *) {}
+#endif

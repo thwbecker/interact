@@ -40,6 +40,41 @@ PetscErrorCode MatMult_hmmvp(Mat A, Vec x, Vec y)
   PetscInt i;
   PetscFunctionBeginUser;
   PetscCall(MatShellGetContext(A,&hctx));
+#ifdef USE_HMMVP_MPI
+  /*
+    MPI path: hmmvp::MpiHmat::Mvp needs the full x on the root and
+    leaves the full y valid on the root, with the compute distributed
+    across ranks. hctx->scat is a VecScatterToZero (xall is the
+    full-length sequential vector on rank 0, empty elsewhere); ball is
+    the full-length y work buffer that hmmvp requires on every rank.
+  */
+  {
+    PetscMPIInt rank;
+    PetscCallMPI(MPI_Comm_rank(PetscObjectComm((PetscObject)A),&rank));
+    /* gather distributed x -> full x on the root */
+    PetscCall(VecScatterBegin(hctx->scat,x,hctx->xall,INSERT_VALUES,SCATTER_FORWARD));
+    PetscCall(VecScatterEnd(hctx->scat,x,hctx->xall,INSERT_VALUES,SCATTER_FORWARD));
+    /* collective matvec: root supplies x, every rank computes its
+       blocks, y (=ball) valid on the root afterwards */
+    PetscCall(VecGetArrayRead(hctx->xall,&xa));
+    chmmvp_mpi_mvp(hctx->handle,(rank==0)?(double *)xa:NULL,hctx->ball);
+    PetscCall(VecRestoreArrayRead(hctx->xall,&xa));
+    /* copy full y back into the root sequential vector, scatter out */
+    if(rank == 0){
+      PetscInt N;
+      PetscCall(VecGetLocalSize(hctx->xall,&N));
+      PetscCall(VecGetArray(hctx->xall,&ya));
+      for(i=0;i < N;i++)
+	ya[i] = (PetscScalar)hctx->ball[i];
+      PetscCall(VecRestoreArray(hctx->xall,&ya));
+    }
+    PetscCall(VecScatterBegin(hctx->scat,hctx->xall,y,INSERT_VALUES,SCATTER_REVERSE));
+    PetscCall(VecScatterEnd(hctx->scat,hctx->xall,y,INSERT_VALUES,SCATTER_REVERSE));
+  }
+#else
+  /* in-memory (serial/OpenMP) path: every rank holds the full H matrix
+     and computes the full product on the gathered x (xall is a
+     scatter-to-all copy) */
   PetscCall(VecScatterBegin(hctx->scat,x,hctx->xall,INSERT_VALUES,SCATTER_FORWARD));
   PetscCall(VecScatterEnd(hctx->scat,x,hctx->xall,INSERT_VALUES,SCATTER_FORWARD));
   PetscCall(VecGetArrayRead(hctx->xall,&xa));
@@ -49,6 +84,7 @@ PetscErrorCode MatMult_hmmvp(Mat A, Vec x, Vec y)
   for(i=hctx->rs;i < hctx->re;i++)
     ya[i-hctx->rs] = (PetscScalar)hctx->ball[i];
   PetscCall(VecRestoreArray(y,&ya));
+#endif
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 #endif	/* end HMM */
@@ -118,6 +154,11 @@ PetscErrorCode calc_petsc_Isn_matrices(struct med *medium, struct flt *fault,
   void *hmmvp_handle;
   long hmmvp_nnz;
   int hmm,hmn;
+#ifdef USE_HMMVP_MPI
+  char hmmvp_fn[STRLEN];
+  PetscMPIInt mrank;
+  int cret;
+#endif
 #endif 
 #ifdef USE_HACAPK
   void *hacapk_handle;
@@ -189,7 +230,6 @@ PetscErrorCode calc_petsc_Isn_matrices(struct med *medium, struct flt *fault,
   }
 #endif
 #if ( defined(USE_HMMVP) || defined(USE_HACAPK) )
-  
   if((use_hmatrix==3)||(use_hmatrix==4)){	
     xc = (double *)malloc(sizeof(double)*m);
     yc = (double *)malloc(sizeof(double)*m);
@@ -206,7 +246,6 @@ PetscErrorCode calc_petsc_Isn_matrices(struct med *medium, struct flt *fault,
   PetscCall(MatCreate(PETSC_COMM_WORLD, this_mat));
   PetscCall(MatSetSizes(*this_mat, PETSC_DECIDE, PETSC_DECIDE, m, n));
  
-
   PetscCall(MatSetUp(*this_mat));
   PetscCall(MatGetLocalSize(*this_mat, &lm, &ln));
   dn = ln;on = n - ln;
@@ -331,10 +370,61 @@ PetscErrorCode calc_petsc_Isn_matrices(struct med *medium, struct flt *fault,
 #endif
     break;
   case 4:
-    HEADNODE
-      fprintf(stderr,"calc_petsc_Isn_matrices: creating HHMMVP matrix for stress mode %i stress type %i\n",
-	      mode,ictx->rec_stress_mode);
+    
 #ifdef USE_HMMVP
+#ifdef USE_HMMVP_MPI
+    HEADNODE
+      fprintf(stderr,"calc_petsc_Isn_matrices: creating HMMVP matrix for stress mode %i stress type %i MPI mode\n",
+	      mode,ictx->rec_stress_mode);
+    /*
+      MPI path: compress with distributed assembly to a temporary file
+      (collective over all ranks), then load it as a distributed
+      MpiHmat. The matvec (MatMult_hmmvp) gathers x to the root and
+      scatters y back. The file name must be identical on all ranks; we
+      derive it from the root pid and broadcast it.
+    */
+    PetscCallMPI(MPI_Comm_rank(PETSC_COMM_WORLD,&mrank));
+    if(mrank == 0)
+      snprintf(hmmvp_fn,STRLEN,"/tmp/hmmvp_interact_%d.hm",(int)getpid());
+    PetscCallMPI(MPI_Bcast(hmmvp_fn,STRLEN,MPI_CHAR,0,PETSC_COMM_WORLD));
+    HEADNODE
+      fprintf(stderr,"calc_petsc_Isn_matrices: hmmvp MPI compress to %s (tol %g eta %g)\n",
+	      hmmvp_fn,(double)medium->hmmvp_tol,(double)medium->hmmvp_eta);
+    cret = chmmvp_compress_to_file((int)m,xc,yc,zc,(double)medium->hmmvp_tol,
+				   (double)medium->hmmvp_eta,(void *)ictx,hmmvp_fn);
+    if(cret != 0){
+      fprintf(stderr,"hmmvp MPI compression failed\n");
+      exit(-1);
+    }
+    hmmvp_handle = chmmvp_mpi_load(hmmvp_fn,medium->hmmvp_nthreads);
+    if(!hmmvp_handle){
+      fprintf(stderr,"hmmvp MPI load failed\n");
+      exit(-1);
+    }
+    chmmvp_mpi_get_info(hmmvp_handle,&hmm,&hmn,&hmmvp_nnz);
+    /* the file is fully read into the distributed MpiHmat at load, so
+       the root can remove it now */
+    if(mrank == 0)
+      remove(hmmvp_fn);
+  
+    HEADNODE
+      fprintf(stderr,"hmmvp(MPI) %i by %i, %ld stored scalars, compression ratio %.5g\n",
+	      hmm,hmn,hmmvp_nnz,(double)((double)m*(double)n/(double)hmmvp_nnz));
+    hctx = (hacapk_shell_ctx *)malloc(sizeof(hacapk_shell_ctx));
+    hctx->handle = hmmvp_handle;
+    hctx->ball = (double *)malloc(sizeof(double)*m); /* full y on every rank */
+    PetscCall(MatCreateShell(PETSC_COMM_WORLD,PETSC_DECIDE,PETSC_DECIDE,m,n,
+			     (void *)hctx,this_mat));
+    PetscCall(MatShellSetOperation(*this_mat,MATOP_MULT,(void (*)(void))MatMult_hmmvp));
+    PetscCall(MatCreateVecs(*this_mat,&xd,NULL));
+    /* gather-to-root scatter: xall is full length on rank 0, empty elsewhere */
+    PetscCall(VecScatterCreateToZero(xd,&hctx->scat,&hctx->xall));
+    PetscCall(VecGetOwnershipRange(xd,&hctx->rs,&hctx->re));
+    PetscCall(VecDestroy(&xd));
+#else  /* in-memory OpenMP/serial path */
+    HEADNODE
+      fprintf(stderr,"calc_petsc_Isn_matrices: creating HMMVP matrix for stress mode %i stress type %i OpenMP\n",
+	      mode,ictx->rec_stress_mode);
     hmmvp_handle = chmmvp_compress_in_memory((int)m,xc,yc,zc,(double)medium->hmmvp_tol,
 					     (double)medium->hmmvp_eta,medium->hmmvp_nthreads,
 					       (void *)ictx);
@@ -358,7 +448,8 @@ PetscErrorCode calc_petsc_Isn_matrices(struct med *medium, struct flt *fault,
     PetscCall(VecScatterCreateToAll(xd,&hctx->scat,&hctx->xall));
     PetscCall(VecGetOwnershipRange(xd,&hctx->rs,&hctx->re));
     PetscCall(VecDestroy(&xd));
-#endif
+#endif /* USE_HMMVP_MPI */
+#endif /* USE_HMMVP */
     break;
   }
   if(use_hmatrix == 2){

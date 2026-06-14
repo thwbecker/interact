@@ -1,6 +1,10 @@
 # ------------------------------------------------------------------------------
 # GNU gmake file.
 
+# for MPI enabled library, use
+#make clean
+#make mode=mpi libhmmvp      # -> lib/libhmmvp_mpi.a
+
 # Change these lines to fit your system, or provide them in make.inc. fortranint
 # should be 4 or 8 bytes. This was established when you compiled LAPACK and
 # BLAS.
@@ -15,13 +19,14 @@ MPICPP = mpiCC
 FORTRAN = /usr/bin/gfortran
 MODE_FLAGS = -fPIC
 
-include make.inc
+include make.inc		#local edits, including use of PETSC MPI here
 
 # Set the optimization level. I prefer '-O3'.
 #opt = 
 #opt = -g
 #opt = -O3 -std=c++11 -Wdeprecated
-opt = -O3 -std=c++14 -Wdeprecated
+#opt = -O3 -std=c++14 -Wdeprecated
+opt = -O3 
 
 CFLAGS = $(opt)
 FFLAGS = $(opt)
@@ -31,8 +36,8 @@ LDFLAGS = -lm
 # MPI-OpenMP. I prefer OpenMP to MPI if I'm running on one shared-memory
 # machine. Compression cannot be run as hybrid; only the MVP can.
 #mode = s
-mode = omp
-#mode = mpi
+#mode = omp
+mode = mpi
 #mode = hybrid
 
 # Probably does not need to be changed:

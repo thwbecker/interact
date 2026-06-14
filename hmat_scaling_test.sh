@@ -4,7 +4,8 @@
 #
 #   use_hmatrix 1 (HTOOL)  - MPI parallel (mpirun -np P)
 #   use_hmatrix 3 (HACApK) - MPI parallel (mpirun -np P)
-#   use_hmatrix 4 (hmmvp)  - OpenMP threaded (-hmmvp_nthreads P, serial MPI)
+#   use_hmatrix 4 (hmmvp)  - MPI parallel (mpirun -np P): distributed assembly
+#                            to a temp file + MpiHmat matvec (root-gather)
 #
 # every run rebuilds the (MPI-distributed) dense reference and reports the
 # relative error of b = A x, the H assembly time, and timings for NRANDOM
@@ -16,8 +17,9 @@
 # notes:
 # - HACApK matvecs gather x to all ranks and use a ring exchange:
 #   expect sublinear MPI scaling, that is part of what this measures
-# - the hmmvp runs are single-rank: the dense reference within them is
-#   serial, so mv_dense for hmmvp lines will not scale with P
+# - hmmvp now runs under MPI (was OpenMP); assembly is distributed across
+#   ranks and the matvec gathers x to the root, computes distributed, and
+#   scatters y back (expect a root-funnel cost like HACApK)
 # - set MPIRUN="mpirun --oversubscribe" etc. if needed
 #
 BIN=${BIN:-compress_interaction_matrix}
@@ -60,22 +62,21 @@ echo "# N=$N nrandom=$NRANDOM cores: $CORES  ($(date))" | tee $OUT
 #   and hmmvp's per-block dgemv otherwise nest BLAS threads inside
 #   block-level parallelism and thrash catastrophically
 export OMP_NUM_THREADS=1
-
 export OPENBLAS_NUM_THREADS=1
 export MKL_NUM_THREADS=1
 
 unset OMP_PLACES; export OMP_PROC_BIND=false
-# this was a test for HMMVP
+# this was a test for HMMVP earlier, did not do much/hurt
 #export OMP_PROC_BIND=close
 #export OMP_PLACES=cores 
 
+#for P in $CORES; do
+#    run_one "$MPIRUN --bind-to core --map-by core -np $P"  1 "$HTOOL_OPTS"  "HTOOL"  $P
+#done
+#for P in $CORES; do
+#    run_one "$MPIRUN --bind-to core --map-by core -np $P"  3 "$HACAPK_OPTS" "HACApK" $P
+#done
 for P in $CORES; do
-    run_one "$MPIRUN --bind-to core --map-by core -np $P"  1 "$HTOOL_OPTS"  "HTOOL"  $P
-done
-for P in $CORES; do
-    run_one "$MPIRUN --bind-to core --map-by core -np $P"  3 "$HACAPK_OPTS" "HACApK" $P
-done
-for P in $CORES; do
-    run_one ""                4 "$HMMVP_OPTS -hmmvp_nthreads $P" "hmmvp" $P
+    run_one "$MPIRUN --bind-to core --map-by core -np $P"  4 "$HMMVP_OPTS" "hmmvp" $P
 done
 echo "$0: done, results in $OUT"

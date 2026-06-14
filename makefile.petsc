@@ -51,10 +51,10 @@ HMMVP_INC =
 # optional hmmvp support for compress_interaction_matrix
 # (https://github.com/ambrad/hmmvp, build there with -std=c++14 in
 # opt, mode=omp, and mkdir lib bin; see compress_interaction_matrix.md)
-HMMVP_DIR = $(HOME)/progs/src/hmmvp
-HMMVP_DEFINES = -DUSE_HMMVP
+HMMVP_DIR = ./hmmvp
+HMMVP_DEFINES = -DUSE_HMMVP -DUSE_HMMVP_MPI
 HMMVP_INC = -I$(HMMVP_DIR) -I$(HMMVP_DIR)/hmmvp/include -I$(HMMVP_DIR)/util/include
-HMMVP_LIBS = -L$(HMMVP_DIR)/lib -lhmmvp_omp -lstdc++ -fopenmp -llapack -lblas
+HMMVP_LIBS = -L$(HMMVP_DIR)/lib -lhmmvp_mpi -lstdc++ -llapack -lblas
 HMMVP_OBJS = $(ODIR)/hmmvp_c_shim.o
 
 PETSC_INCLUDES = -I$(PETSC_DIR)/include/ $(CPPFLAGS) 

@@ -49,6 +49,10 @@ int main(int argc, char **argv)
   Vec xd;
 #endif
 #ifdef USE_HMMVP
+#ifdef USE_HMMVP_MPI
+  char hmmvp_fn[STRLEN];
+  int cret;
+#endif
   void *hmmvp_handle;
   long hmmvp_nnz;
   int hmm,hmn;
@@ -137,7 +141,7 @@ int main(int argc, char **argv)
       fprintf(stderr,"%s: setting up for HMMVP\n",argv[0]);
     set_hmmvp_defaults_and_options(medium);
 #else
-    fprintf(stderr,"%s: HMMVP requested but not compiled in (see USE_HMMVP and makefile.petc)\n",argv[0]);
+    fprintf(stderr,"%s: HMMVP requested but not compiled in (see USE_HMMVP, hmmvp subdirectory, and makefile.petc)\n",argv[0]);
     exit(-1);
 #endif
     break;
@@ -222,7 +226,7 @@ int main(int argc, char **argv)
 
     /* 
        
-       ASSEMBLE DIFFERENT KIND OF H MATRICES
+       ASSEMBLE DIFFERENT KINDS OF H MATRICES
        
     */
     /* 
@@ -367,14 +371,57 @@ int main(int argc, char **argv)
 	 hmmvp via MATSHELL 
       */
 #ifdef USE_HMMVP
-      fprintf(stderr,"%s: core %03i/%03i: assigning hmmvp m %i n %i tol %g (whole-matrix rel Frobenius) eta %g nthreads %i\n",
-	      argv[0],medium->comm_rank,medium->comm_size,m,n,(double)medium->hmmvp_tol,
-	      (double)medium->hmmvp_eta,medium->hmmvp_nthreads);
+      
+#ifdef USE_HMMVP_MPI
+      /* MPI: compress with distributed assembly to a temporary file
+	 (collective), load as a distributed MpiHmat; MatMult_hmmvp
+	 gathers x to the root and scatters y back */
+      HEADNODE  		/* make /tmp filename with PID */
+	snprintf(hmmvp_fn,STRLEN,"/tmp/hmmvp_interact_%d.hm",(int)getpid());
+      PetscCallMPI(MPI_Bcast(hmmvp_fn,STRLEN,MPI_CHAR,0,PETSC_COMM_WORLD));
+      HEADNODE
+	fprintf(stderr,"%s: hmmvp MPI compress m %i n %i tol %g eta %g -> %s\n",
+		argv[0],m,n,(double)medium->hmmvp_tol,(double)medium->hmmvp_eta,hmmvp_fn);
+      cret = chmmvp_compress_to_file((int)m,xc,yc,zc,(double)medium->hmmvp_tol,
+				     (double)medium->hmmvp_eta,(void *)ictx,hmmvp_fn);
+      if(cret != 0){
+	HEADNODE
+	  fprintf(stderr,"%s: hmmvp MPI compression failed\n",argv[0]);
+	exit(-1);
+      }
+      hmmvp_handle = chmmvp_mpi_load(hmmvp_fn,medium->hmmvp_nthreads);
+      if(!hmmvp_handle){
+	HEADNODE
+	  fprintf(stderr,"%s: hmmvp MPI load failed\n",argv[0]);
+	exit(-1);
+      }
+      chmmvp_mpi_get_info(hmmvp_handle,&hmm,&hmn,&hmmvp_nnz);
+      HEADNODE{			/* clean up */
+	remove(hmmvp_fn);
+	fprintf(stderr,"%s: hmmvp(MPI) %i by %i, %ld stored scalars, compression ratio %.5g\n",
+		argv[0],hmm,hmn,hmmvp_nnz,(double)((double)m*(double)n/(double)hmmvp_nnz));
+      }
+      hsc_h = (hacapk_shell_ctx *)malloc(sizeof(hacapk_shell_ctx));
+      hsc_h->handle = hmmvp_handle;
+      hsc_h->ball = (double *)malloc(sizeof(double)*m); /* full y on every rank */
+      PetscCall(MatCreateShell(PETSC_COMM_WORLD,PETSC_DECIDE,PETSC_DECIDE,m,n,
+			       (void *)hsc_h,&AH));
+      PetscCall(MatShellSetOperation(AH,MATOP_MULT,(void (*)(void))MatMult_hmmvp));
+      PetscCall(MatCreateVecs(AH,&xd,NULL));
+      PetscCall(VecScatterCreateToZero(xd,&hsc_h->scat,&hsc_h->xall)); /* gather-to-root */
+      PetscCall(VecGetOwnershipRange(xd,&hsc_h->rs,&hsc_h->re));
+      PetscCall(VecDestroy(&xd));
+      PetscCall(MatSetOption(AH, MAT_SYMMETRIC, PETSC_FALSE));
+#else
       if((medium->hmmvp_nthreads > 1) && (dc3dts() == 0)){
 	fprintf(stderr,"%s: -hmmvp_nthreads %i requested but dc3d.F was compiled WITHOUT\n%s: -fopenmp: the THREADPRIVATE directives are inactive and threaded kernel\n%s: calls would corrupt the matrix - rebuild with -fopenmp in FFLAGS/LDFLAGS\n",
 		argv[0],medium->hmmvp_nthreads,argv[0],argv[0]);
 	exit(-1);
       }
+      /* in-memory OpenMP/serial path */
+      fprintf(stderr,"%s: core %03i/%03i: assigning hmmvp m %i n %i tol %g (whole-matrix rel Frobenius) eta %g nthreads %i\n",
+	      argv[0],medium->comm_rank,medium->comm_size,m,n,(double)medium->hmmvp_tol,
+	      (double)medium->hmmvp_eta,medium->hmmvp_nthreads);
       hmmvp_handle = chmmvp_compress_in_memory((int)m,xc,yc,zc,(double)medium->hmmvp_tol,
 					       (double)medium->hmmvp_eta,medium->hmmvp_nthreads,
 					       (void *)ictx);
@@ -399,7 +446,8 @@ int main(int argc, char **argv)
       PetscCall(VecGetOwnershipRange(xd,&hsc_h->rs,&hsc_h->re));
       PetscCall(VecDestroy(&xd));
       PetscCall(MatSetOption(AH, MAT_SYMMETRIC, PETSC_FALSE));
-#endif
+#endif /* USE_HMMVP_MPI */
+#endif /* USE_HMMVP */
       break;
     }
     
