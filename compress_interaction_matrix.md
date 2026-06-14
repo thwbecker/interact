@@ -112,51 +112,85 @@ KSP/MATSHELL path, H2OPUS 8.1e-4 (floor, see below).
 Speedups grow with N (HTOOL matvec: 1.7x at N=1600, 3.5-8x at 6400);
 dense matvec scales N^2, the H backends ~N log N.
 
-## Measured parallel scaling (48-core machine, N=14400, 100 matvecs)
+## Measured parallel scaling (48-core node, N=14400, 100 matvecs)
 
-| cores | HTOOL asm / mv_H | HACApK asm / mv_H | hmmvp asm / mv_H |
+All three backends now run their *native* distributed/parallel path:
+HTOOL and HACApK over MPI ranks, and hmmvp over MPI ranks via the
+file-based `MpiHmat` workflow (compress-to-file, then a collective
+`MpiHmat` matvec - see the MPI status section). `OPENBLAS_NUM_THREADS=1`
+throughout (threaded BLAS nested inside block-level parallelism
+thrashes). Times are wall-clock seconds: assembly of one H matrix, and
+the total for 100 H matvecs. `err` is the relative two-norm vs dense,
+which was rank-invariant for every backend across the whole sweep.
+
+![scaling](compress_interaction_matrix_scaling.png)
+
+| cores | hmmvp asm / mv_H | HACApK asm / mv_H | HTOOL asm / mv_H |
 |---|---|---|---|
-| 1 | 554 s / 38.5 ms | 20.3 s / 17.3 ms | 22.5 s / 26.1 ms |
-| 8 | 59 s / 6.7 ms | 3.5 s / 2.5 ms | 4.0 s / 23 ms |
-| 16 | 23 s / 1.3 ms | 1.6 s / 1.4 ms | 2.7 s / 29 ms |
-| 24 | **13.5 s / 0.52 ms** | 1.3 s / 1.3 ms | 2.0 s / 44 ms |
-| 48 | 6.1 s / 0.78 ms | **0.9 s** / 1.2 ms | 1.2 s / 78 ms |
+| 1  | 22.3 / 2.522 | 47.6 / 5.070 | 583.8 / 3.851 |
+| 2  | 22.4 / 1.281 | 26.4 / 2.729 | 299.1 / 1.338 |
+| 4  |  7.8 / 0.410 | 14.3 / 1.667 | 151.4 / 0.733 |
+| 8  |  3.6 / 0.200 |  7.0 / 0.894 |  64.0 / 0.404 |
+| 16 |  1.9 / 0.091 |  3.9 / 0.529 |  24.5 / 0.188 |
+| 24 |  1.9 / 0.073 |  3.5 / 0.517 |  15.0 / 0.105 |
+| 48 |  1.2 / 0.060 |  2.6 / 0.324 |   6.7 / 0.091 |
+| **err** | **3.9e-5** | **2.1e-10** | **6.6e-7** |
 
-(per-matvec ms; HTOOL/HACApK via MPI ranks, hmmvp via OpenMP threads;
-OPENBLAS_NUM_THREADS=1 throughout - threaded BLAS nested inside
-block-level parallelism thrashes catastrophically.)
+(dense matvec, the shared baseline, is backend-independent: 7.76 / 5.38
+/ 5.09 / 2.47 / 1.37 / 1.21 / 0.79 s at 1..48 cores.)
 
-Conclusions (for this geometry and machine): HTOOL's matvec was the
-fastest in parallel (~0.5 ms at 24
-ranks, 13x faster than 24-rank dense; its expensive reliable-config
-assembly scales superlinearly, 91x on 48 ranks, and amortizes after
-~25k matvecs - a fraction of one earthquake cycle run). HACApK wins
-assembly outright (sub-second at 48 ranks) with matvecs a factor ~2
-behind HTOOL, comm-bound beyond ~16 ranks (gather + ring exchange);
-its error is bit-identical across all rank counts and machines.
-hmmvp's threaded CONSTRUCTION scales well (19x at 48 - enabled by the
-THREADPRIVATE dc3d.F kernel) but its threaded matvec did not scale
-in these tests (verified including OMP_PROC_BIND=close /
-OMP_PLACES=cores pinning, which stabilizes the variance but produces
-no speedup over serial: the per-call fork/join plus static block
-partition is comparable to the ~26 ms of work); use it
-serial/few-threaded, for the global tolerance semantics and the
-future file-based MpiHmat workflow. In these tests the sweet spot
-for matvec-dominated production (earthquake cycles) was HTOOL at
-~16-24 ranks, and HACApK for assembly-dominated or frequently
-re-assembled workloads - but the balance can shift with geometry,
-problem size, tolerances, and hardware, so it is worth rerunning
-hmat_scaling_test.sh for your own configuration.
+Reading this table fairly requires one caveat up front: **the three
+backends are at very different achieved accuracies** (2.1e-10 to 3.9e-5,
+~5 orders apart), because each was run at its own recommended tolerance
+and those knobs are not comparable (hmmvp's whole-matrix Frobenius bound
+vs HACApK `ztol` vs HTOOL `eps`). Tighter tolerance stores more entries
+and slows the matvec, so part of any speed difference is bought with
+accuracy; a matched-error comparison would narrow the gaps below.
+
+Observations, for this geometry and machine:
+
+- **hmmvp** (MPI `MpiHmat` path) had the lowest assembly *and* lowest
+  matvec time at every core count here, scaling ~19x (assembly) and ~42x
+  (matvec, slightly superlinear from cache effects as the per-rank block
+  set shrinks) to 48 cores. This is also the loosest-tolerance run
+  (3.9e-5), so the speed is partly an accuracy trade; it is nonetheless
+  the configuration to beat when a ~1e-5 global error is acceptable.
+  Assembly is master/worker (rank 0 manages, ranks 1..np-1 compress), so
+  np=2 ~ serial (22.3 -> 22.4: one worker) and effective parallelism is
+  np-1; the matvec uses all ranks and scales from np=2.
+- **HACApK** was the most accurate by a wide margin (2.1e-10,
+  bit-identical across all rank counts), with assembly scaling well; its
+  matvec is the slowest of the three and goes comm-bound beyond ~16
+  ranks (0.529 -> 0.517 s from 16 -> 24), the gather + ring-exchange
+  limit noted earlier.
+- **HTOOL** has by far the most expensive assembly (a build-once,
+  reuse-many proposition) but it scales steeply and its matvec is
+  competitive with hmmvp's at high rank counts; accuracy sits between
+  the other two and varies slightly per rank count (its block partition
+  changes with the decomposition).
+
+So the earlier note that "hmmvp's matvec does not scale" applied to the
+*in-memory OpenMP* path; the *MPI `MpiHmat`* path measured here does
+scale. The practical split for this test: hmmvp when a ~1e-5 global
+error is fine and both build and matvec speed matter; HACApK when high
+accuracy or a deterministic, rank-invariant operator is the priority;
+HTOOL when the build cost can be amortized over very many matvecs. As
+always this can shift with geometry, problem size, tolerance, and
+hardware - rerun `hmat_scaling_test.sh` for your own configuration.
 
 ## Recommended settings
 
-- **hmmvp (`-use_hmatrix 4`)**: matches HACApK on assembly and matvec
-  speed (fastest matvec measured at N=6400), with two distinguishing
-  features: the whole-matrix Frobenius tolerance (-hmmvp_tol sets the
-  global operator error directly) and OpenMP-threaded construction and
-  matvec (-hmmvp_nthreads). Its native compress-to-file/load workflow
-  (CompressToFile/NewHmat) is the natural basis for the planned
-  save/reload option. -hmmvp_eta (default 3) is the admissibility.
+- **hmmvp (`-use_hmatrix 4`)**: in the N=14400 MPI scaling test above it
+  had the lowest assembly *and* matvec time of the three backends at
+  every core count - though at the loosest accuracy (3.9e-5 at tol 1e-5),
+  so that ranking is partly an accuracy trade and would tighten under a
+  matched-error comparison. Two distinguishing features: the whole-matrix
+  Frobenius tolerance (-hmmvp_tol sets the global operator error
+  directly) and two parallel modes - OpenMP-threaded in-memory
+  construction/matvec (-hmmvp_nthreads), and the MPI `MpiHmat` path
+  (compress-to-file + collective distributed matvec) that is what scales
+  across ranks in the table above. -hmmvp_eta (default 3) is the
+  admissibility.
   THREAD SAFETY: dc3d.F now carries !$OMP THREADPRIVATE COMMON blocks,
   making the rectangular Okada kernel chain thread safe - PROVIDED
   dc3d.F is compiled with -fopenmp (FFLAGS) and binaries link with
@@ -239,7 +273,7 @@ can be tested that way, timing cannot.
 | dense | works | distributed rows, exercised as the baseline in every run |
 | HTOOL | works | error stays in the eps class but differs per np (different block partition): 8.4e-5 / 1.1e-4 / 5.5e-5 at np=1/2/4, eps 1e-3 |
 | H2OPUS | **serial only** | `MatCreateH2OpusFromMat` sampling unsupported in parallel in this PETSc/h2opus; the tool exits with a clear message at np>1 |
-| hmmvp | works (redundant) | bit-identical to serial at np=2 and np=4 (each rank compresses and multiplies the full matrix - correct but redundant; intended for serial/OpenMP use; hmmvp's own MpiHmat is the upgrade path). inverse test verified at 1.9e-6 (tol 1e-6, N=1600) |
+| hmmvp | works (distributed) | under MPI, `-use_hmatrix 4` uses hmmvp's `MpiHmat`: each rank compresses its blocks to a per-rank scratch file, the root concatenates them into one `.hm`, and the load hands each rank its block subset for a collective matvec (gather `x` to root, per-rank block products, reduce). Error is rank-invariant (3.9e-5 at tol 1e-5) across np and the path scales (see the scaling section). np=1 is the serial in-memory build; the OpenMP-threaded in-memory matvec is the separate non-MPI path. Build note: the shim must see hmmvp's own `UTIL_MPI` (it maps `USE_HMMVP_MPI` onto it), or the `MpiHmat`/`mpi::Send/Recv` templates instantiate as no-op stubs and np>=2 fails. inverse test verified at 1.9e-6 (tol 1e-6, N=1600) |
 | HACApK | works | **bit-identical to serial at np=2 and np=4** (1.16e-7 at ztol 1e-5): deterministic construction, only the leaf work distribution changes. the MATSHELL gathers x to all ranks (HACApK's adot needs global vectors and returns the global result on each rank) |
 
 - Context for the error target: in quasi-dynamic `rsf_solve` cycles,
