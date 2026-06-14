@@ -70,12 +70,12 @@ unset OMP_PLACES; export OMP_PROC_BIND=false
 #export OMP_PROC_BIND=close
 #export OMP_PLACES=cores 
 
-#for P in $CORES; do
-#    run_one "$MPIRUN --bind-to core --map-by core -np $P"  1 "$HTOOL_OPTS"  "HTOOL"  $P
-#done
-#for P in $CORES; do
-#    run_one "$MPIRUN --bind-to core --map-by core -np $P"  3 "$HACAPK_OPTS" "HACApK" $P
-#done
+for P in $CORES; do
+    run_one "$MPIRUN --bind-to core --map-by core -np $P"  1 "$HTOOL_OPTS"  "HTOOL"  $P
+done
+for P in $CORES; do
+    run_one "$MPIRUN --bind-to core --map-by core -np $P"  3 "$HACAPK_OPTS" "HACApK" $P
+done
 for P in $CORES; do
     run_one "$MPIRUN --bind-to core --map-by core -np $P"  4 "$HMMVP_OPTS" "hmmvp" $P
 done
