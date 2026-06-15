@@ -22,35 +22,31 @@
 # and the only thing that differs is the H-matrix machinery. RTOL below is the
 # (separate) time-integration tolerance and is held fixed across backends.
 #
-# Usage:   ./rsf_solve_scaling_test.sh [stop_yr]
-# Edit the CONFIG block for your paths / core list / inputs.
-#
-# To override a backend tolerance for a one-off run, export e.g.
-#   HMMVP_TOL=3e-8 ./rsf_solve_scaling_test.sh
-# (each tolerance honours an environment override; see CONFIG).
+# Usage:   ./rsf_solve_scaling_test.sh [RES] [stop_yr]   # e.g. ./rsf_solve_scaling_test.sh 1km 1000
+# Knobs are POSITIONAL ($1,$2) or hardcoded in CONFIG; nothing is read from the
+# environment (except $PETSC_DIR for the launcher), so the run is deterministic.
 # ---------------------------------------------------------------------------
 set -u
 
 # ============================ CONFIG =======================================
-RB=${RB:-../bin/rsf_solve}                 # path to rsf_solve binary
-BP5=${BP5:-../bp5}                          # dir with the BP5 input files
-RES=${RES:-1km}                            # resolution tag: 1km (4000) or 2km (1000)
-NPLIST=${NPLIST:-"1 2 4 8 16 24 48"}       # MPI rank counts to test
-BACKENDS=${BACKENDS:-"dense htool hacapk hmmvp"}  # subset of {dense,htool,hacapk,hmmvp}
+RB=../bin/rsf_solve                 # path to rsf_solve binary
+BP5=../bp5                          # dir with the BP5 input files
+RES=${1-0.5km}                      # $1: resolution tag, e.g. 1km / 0.5km (default 0.5km)
+NPLIST="1 2 4 8 16 24 48"       # MPI rank counts to test
+BACKENDS="dense htool hacapk hmmvp"  # subset of {dense,htool,hacapk,hmmvp}
 
-# expanded run time: long enough that the matvec-dominated time-stepping
-# phase is well sampled and the one-off assembly is amortised (the original
-# 60 yr timed mostly assembly + transient). Override with arg 1 or STOP_YR.
-STOP_YR=${1:-${STOP_YR:-1000}}
+# expanded run time so the matvec-dominated phase is well sampled and the
+# one-off assembly is amortised.
+STOP_YR=${2-1000}                   # $2: run length in years (default 1000)
 
-RTOL=${RTOL:-1e-4}                         # time-integration rtol (NOT H tol)
-HEPS=${HEPS:-3e-5}                         # HTOOL  -mat_htool_epsilon  (~6.6e-7)
-ZTOL=${ZTOL:-1e-1}                         # HACApK -hacapk_ztol        (~2.2e-7)
-HMMVP_TOL=${HMMVP_TOL:-1e-7}               # hmmvp  -hmmvp_tol          (~1.6e-6)
+RTOL=1e-4                         # time-integration rtol (NOT H tol)
+HEPS=3e-5                         # HTOOL  -mat_htool_epsilon  (~6.6e-7)
+ZTOL=1e-1                         # HACApK -hacapk_ztol        (~2.2e-7)
+HMMVP_TOL=1e-7               # hmmvp  -hmmvp_tol          (~1.6e-6)
 
-MPIRUN=${MPIRUN:-$PETSC_DIR/build/bin/mpirun}   # set to "mpirun --oversubscribe"
+MPIRUN=$PETSC_DIR/build/bin/mpirun   # set to "mpirun --oversubscribe"
                                            #   to test more ranks than cores
-EXTRA_MPI=${EXTRA_MPI:-"--bind-to core --map-by core"}  # pin as in the compress sweep
+EXTRA_MPI="--bind-to core --map-by core"   # MPI pinning, as in the compress sweep
 
 # --- thread hygiene, applies to ALL runs (mirrors hmat_scaling_test.sh) ---
 #  single-thread BLAS: threaded BLAS nested inside block-level parallelism
@@ -106,14 +102,15 @@ for be in $BACKENDS; do
     [ -z "${mm_c:-}" ] && { mm_c=0; mm_t=0; }
     asm=$(awk -v t="$total" -v s="$ts_t" 'BEGIN{printf "%.2f", t-s}')
     mv=$(awk -v t="$mm_t" -v c="$mm_c" 'BEGIN{printf (c>0)?"%.3f":"NA", (c>0)?t/c*1000:0}')
-    # --- memory ---
+    # --- memory (N read from rsf_solve's 'NNNN patches' banner -> works at any RES) ---
+    N=$(awk '/patches/{for(i=1;i<=NF;i++) if($i ~ /^patches/){print $(i-1); exit}}' "$log")
     case "$be" in
       hacapk) mem=$(awk -F= '/Memory of the H-matrix/{gsub(/[^0-9.]/,"",$2);printf "%.1f",$2; exit}' "$log") ;;
       htool)  cr=$(awk -F: '/compression ratio:/{print $2+0; exit}' "$log")
-              mem=$(awk -v c="$cr" -v r="$RES" 'BEGIN{n=(r=="1km")?4000:1000; d=n*n*8/1048576; printf (c>0)?"%.1f":"NA",(c>0)?d/c:0}') ;;
-      hmmvp)  # hmmvp reports stored scalars + compression ratio; mem = stored*8
-              mem=$(awk '/stored scalars/{for(i=1;i<=NF;i++)if($i ~ /^[0-9]+$/){printf "%.1f",$i*8/1048576; break}; exit}' "$log") ;;
-      dense)  mem=$(awk -v r="$RES" 'BEGIN{n=(r=="1km")?4000:1000; printf "%.1f", n*n*8/1048576}') ;;
+              mem=$(awk -v c="$cr" -v n="$N" 'BEGIN{printf (c>0)?"%.1f":"NA",(c>0)?n*n*8/1048576/c:0}') ;;
+      hmmvp)  # 'hmmvp(MPI) 4000 by 4000, 3336045 stored scalars, ...' -> field before 'stored'
+              mem=$(awk '/stored scalars/{for(i=1;i<=NF;i++) if($i=="stored"){printf "%.1f",$(i-1)*8/1048576; exit}}' "$log") ;;
+      dense)  mem=$(awk -v n="$N" 'BEGIN{printf "%.1f", n*n*8/1048576}') ;;
     esac
     printf "%-8s %4s %10s %11s %9s %8s %11s %9s\n" \
            "$be" "$np" "${total:-NA}" "$asm" "${ts_t:-NA}" "${ts_c:-NA}" "$mv" "${mem:-NA}"

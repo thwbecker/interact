@@ -1,0 +1,106 @@
+ HBI ver. 2026.2.0
+ # of MPI          48
+ job number         200
+ Generating mesh
+ a                                                                                                                               
+ dc                                                                                                                              
+ tau                                                                                                                             
+ vel                                                                                                                             
+ Generating kernel
+ ***************** HACApK start ********************
+nd=      4000 nofc=      4000 nffc=         1
+nrank=        48 nth=         1
+ param:
+ 1.000E+00 0.000E+00 0.000E+00 0.000E+00 0.000E+00 0.000E+00 0.000E+00 2.000E+01 1.000E+00 1.000E+00
+
+ 0.000E+00 0.000E+00 0.000E+00 0.000E+00 0.000E+00 0.000E+00 0.000E+00 0.000E+00 0.000E+00 0.000E+00
+
+ 1.500E+01 1.000E+00 0.000E+00 0.000E+00 0.000E+00 0.000E+00 0.000E+00 0.000E+00 0.000E+00 0.000E+00
+
+ 0.000E+00 0.000E+00 0.000E+00 0.000E+00 0.000E+00 0.000E+00 0.000E+00 0.000E+00 0.000E+00 0.000E+00
+
+ 0.000E+00 0.000E+00 4.000E+00 0.000E+00 0.000E+00 0.000E+00 0.000E+00 0.000E+00 0.000E+00 0.000E+00
+
+ 2.000E+00 1.000E+00 1.000E+02 0.000E+00 0.000E+00 0.000E+00 0.000E+00 0.000E+00 0.000E+00 2.000E+00
+
+ 3.000E+00 7.000E+00 1.000E+03 1.000E+00 0.000E+00 0.000E+00 0.000E+00 0.000E+00 0.000E+00 0.000E+00
+
+ 1.000E-04 1.000E-06 0.000E+00 0.000E+00 0.000E+00 0.000E+00 0.000E+00 0.000E+00 0.000E+00 0.000E+00
+
+ 0.000E+00 0.000E+00 1.000E+01 0.000E+00 1.000E+00 0.000E+00 8.000E+00 0.000E+00 0.000E+00 0.000E+00
+
+ 1.000E-06 0.000E+00 0.000E+00 0.000E+00 0.000E+00 0.000E+00 0.000E+00 5.000E+01 1.000E+01 0.000E+00
+
+ nrank=          48 (           6 x           8 )
+No. of cluster=         575
+ Number of MPI_Blocks=        1024 ; sqrt(nblall)=          32
+ No. of nsmtx        2052        4408        2153        1024
+    1:Rk-matrix 2: dense-mat 3:H-matrix 4:MPI_Block
+ nlf global=                 6460
+ npgl=           6 npgt=           8
+ time_supermatrix             =   3.3501460000024963E-003
+ time_fill_hmtx               =  0.15994399000010162     
+ time_construction_Hmatrix    =  0.16354696700000204     
+ Maximun of kt=        23
+ Average of kt=        10
+ Memory of the H-matrix=   28.802452087402344      (Mbyte)
+ Memory compression v.s. dense matrix=   23.594968750000000      (%)
+ Maximun memory of sub-matrices for a MPI=  0.83946228027343750      (Mbyte)
+ Minimun memory of sub-matrices for a MPI=  0.40792846679687500      (Mbyte)
+ Minimun memory/Maximun memory=  0.48594019812778333     
+ Whole/(Maximun*Nrank)=  0.71480410645581505     
+ nrank=          48 (           6 x           8 )
+No. of cluster=         575
+ Number of MPI_Blocks=        1024 ; sqrt(nblall)=          32
+ No. of nsmtx        2052        4408        2153        1024
+    1:Rk-matrix 2: dense-mat 3:H-matrix 4:MPI_Block
+ npgl=           6 npgt=           8
+Note: The following floating-point exceptions are signalling: IEEE_INVALID_FLAG IEEE_DIVIDE_BY_ZERO
+Note: The following floating-point exceptions are signalling: IEEE_INVALID_FLAG
+Note: The following floating-point exceptions are signalling: IEEE_INVALID_FLAG IEEE_DIVIDE_BY_ZERO
+Note: The following floating-point exceptions are signalling: IEEE_INVALID_FLAG
+Note: The following floating-point exceptions are signalling: IEEE_INVALID_FLAG
+Note: The following floating-point exceptions are signalling: IEEE_INVALID_FLAG
+Note: The following floating-point exceptions are signalling: IEEE_INVALID_FLAG IEEE_DIVIDE_BY_ZERO
+Note: The following floating-point exceptions are signalling: IEEE_INVALID_FLAG IEEE_DIVIDE_BY_ZERO
+Note: The following floating-point exceptions are signalling: IEEE_INVALID_FLAG
+Note: The following floating-point exceptions are signalling: IEEE_INVALID_FLAG IEEE_DIVIDE_BY_ZERO
+Note: The following floating-point exceptions are signalling: IEEE_INVALID_FLAG
+Note: The following floating-point exceptions are signalling: IEEE_INVALID_FLAG IEEE_DIVIDE_BY_ZERO
+Note: The following floating-point exceptions are signalling: IEEE_INVALID_FLAG
+Note: The following floating-point exceptions are signalling: IEEE_INVALID_FLAG
+Note: The following floating-point exceptions are signalling: IEEE_INVALID_FLAG IEEE_DIVIDE_BY_ZERO
+Note: The following floating-point exceptions are signalling: IEEE_INVALID_FLAG
+Note: The following floating-point exceptions are signalling: IEEE_INVALID_FLAG IEEE_DIVIDE_BY_ZERO
+Note: The following floating-point exceptions are signalling: IEEE_INVALID_FLAG
+Note: The following floating-point exceptions are signalling: IEEE_INVALID_FLAG IEEE_DIVIDE_BY_ZERO
+Note: The following floating-point exceptions are signalling: IEEE_INVALID_FLAG IEEE_DIVIDE_BY_ZERO
+Note: The following floating-point exceptions are signalling: IEEE_INVALID_FLAG
+Note: The following floating-point exceptions are signalling: IEEE_INVALID_FLAG
+Note: The following floating-point exceptions are signalling: IEEE_INVALID_FLAG IEEE_DIVIDE_BY_ZERO
+Note: The following floating-point exceptions are signalling: IEEE_INVALID_FLAG
+Note: The following floating-point exceptions are signalling: IEEE_INVALID_FLAG
+Note: The following floating-point exceptions are signalling: IEEE_INVALID_FLAG IEEE_DIVIDE_BY_ZERO
+Note: The following floating-point exceptions are signalling: IEEE_INVALID_FLAG
+Note: The following floating-point exceptions are signalling: IEEE_INVALID_FLAG IEEE_DIVIDE_BY_ZERO
+Note: The following floating-point exceptions are signalling: IEEE_INVALID_FLAG
+Note: The following floating-point exceptions are signalling: IEEE_INVALID_FLAG IEEE_DIVIDE_BY_ZERO
+ ERROR!; sub HACApK_gen_lattice_vector; Process grid must have square shape!
+Note: The following floating-point exceptions are signalling: IEEE_INVALID_FLAG IEEE_DIVIDE_BY_ZERO
+Note: The following floating-point exceptions are signalling: IEEE_INVALID_FLAG
+Note: The following floating-point exceptions are signalling: IEEE_INVALID_FLAG
+Note: The following floating-point exceptions are signalling: IEEE_INVALID_FLAG IEEE_DIVIDE_BY_ZERO
+Note: The following floating-point exceptions are signalling: IEEE_INVALID_FLAG IEEE_DIVIDE_BY_ZERO
+Note: The following floating-point exceptions are signalling: IEEE_INVALID_FLAG
+Note: The following floating-point exceptions are signalling: IEEE_INVALID_FLAG IEEE_DIVIDE_BY_ZERO
+Note: The following floating-point exceptions are signalling: IEEE_INVALID_FLAG
+Note: The following floating-point exceptions are signalling: IEEE_INVALID_FLAG IEEE_DIVIDE_BY_ZERO
+Note: The following floating-point exceptions are signalling: IEEE_INVALID_FLAG
+Note: The following floating-point exceptions are signalling: IEEE_INVALID_FLAG IEEE_DIVIDE_BY_ZERO
+Note: The following floating-point exceptions are signalling: IEEE_INVALID_FLAG
+Note: The following floating-point exceptions are signalling: IEEE_INVALID_FLAG IEEE_DIVIDE_BY_ZERO
+Note: The following floating-point exceptions are signalling: IEEE_INVALID_FLAG IEEE_DIVIDE_BY_ZERO
+Note: The following floating-point exceptions are signalling: IEEE_INVALID_FLAG
+Note: The following floating-point exceptions are signalling: IEEE_INVALID_FLAG IEEE_DIVIDE_BY_ZERO
+Note: The following floating-point exceptions are signalling: IEEE_INVALID_FLAG
+Note: The following floating-point exceptions are signalling: IEEE_INVALID_FLAG IEEE_DIVIDE_BY_ZERO

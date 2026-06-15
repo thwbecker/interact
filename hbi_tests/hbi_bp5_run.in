@@ -1,0 +1,21 @@
+problem      3dph
+imax 100 !number of elements
+jmax 40
+filenumber    200 !id of output files
+interval 100000 !set by scaling script
+nstep 2000000 !set by scaling script
+tmax 1000 !set by scaling script
+backslip T !loading with backslip 
+vpl          1d-9 !backslip rate
+dtinit      1d-1 !initial time step
+parameterfromfile T !nonuniform parameters
+parameter_file "./hbi/examples/bp5r_param.dat"
+parameter_file_ncol 4
+sigmaconst T
+restart F !no restart
+ds 1.0
+dipangle 90.0
+crake 0.0
+b 0.03
+f0 0.6
+sigmainit 25.0

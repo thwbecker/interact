@@ -1,0 +1,90 @@
+ HBI ver. 2026.2.0
+ # of MPI          16
+ job number         200
+ Generating mesh
+ a                                                                                                                               
+ dc                                                                                                                              
+ tau                                                                                                                             
+ vel                                                                                                                             
+ Generating kernel
+ ***************** HACApK start ********************
+nd=      4000 nofc=      4000 nffc=         1
+nrank=        16 nth=         1
+ param:
+ 1.000E+00 0.000E+00 0.000E+00 0.000E+00 0.000E+00 0.000E+00 0.000E+00 2.000E+01 1.000E+00 1.000E+00
+
+ 0.000E+00 0.000E+00 0.000E+00 0.000E+00 0.000E+00 0.000E+00 0.000E+00 0.000E+00 0.000E+00 0.000E+00
+
+ 1.500E+01 1.000E+00 0.000E+00 0.000E+00 0.000E+00 0.000E+00 0.000E+00 0.000E+00 0.000E+00 0.000E+00
+
+ 0.000E+00 0.000E+00 0.000E+00 0.000E+00 0.000E+00 0.000E+00 0.000E+00 0.000E+00 0.000E+00 0.000E+00
+
+ 0.000E+00 0.000E+00 4.000E+00 0.000E+00 0.000E+00 0.000E+00 0.000E+00 0.000E+00 0.000E+00 0.000E+00
+
+ 2.000E+00 1.000E+00 1.000E+02 0.000E+00 0.000E+00 0.000E+00 0.000E+00 0.000E+00 0.000E+00 2.000E+00
+
+ 3.000E+00 7.000E+00 1.000E+03 1.000E+00 0.000E+00 0.000E+00 0.000E+00 0.000E+00 0.000E+00 0.000E+00
+
+ 1.000E-04 1.000E-06 0.000E+00 0.000E+00 0.000E+00 0.000E+00 0.000E+00 0.000E+00 0.000E+00 0.000E+00
+
+ 0.000E+00 0.000E+00 1.000E+01 0.000E+00 1.000E+00 0.000E+00 8.000E+00 0.000E+00 0.000E+00 0.000E+00
+
+ 1.000E-06 0.000E+00 0.000E+00 0.000E+00 0.000E+00 0.000E+00 0.000E+00 5.000E+01 1.000E+01 0.000E+00
+
+ nrank=          16 (           4 x           4 )
+No. of cluster=         575
+ Number of MPI_Blocks=         576 ; sqrt(nblall)=          24
+ No. of nsmtx        1640        4336        2077         576
+    1:Rk-matrix 2: dense-mat 3:H-matrix 4:MPI_Block
+ nlf global=                 5976
+ npgl=           4 npgt=           4
+ time_supermatrix             =   3.2519630001388578E-003
+ time_fill_hmtx               =  0.48389729799987435     
+ time_construction_Hmatrix    =  0.48723315799998090     
+ Maximun of kt=        24
+ Average of kt=        11
+ Memory of the H-matrix=   27.941940307617188      (Mbyte)
+ Memory compression v.s. dense matrix=   22.890037499999998      (%)
+ Maximun memory of sub-matrices for a MPI=   2.6425170898437500      (Mbyte)
+ Minimun memory of sub-matrices for a MPI=   1.1920776367187500      (Mbyte)
+ Minimun memory/Maximun memory=  0.45111444739577317     
+ Whole/(Maximun*Nrank)=  0.66087416272086841     
+ nrank=          16 (           4 x           4 )
+No. of cluster=         575
+ Number of MPI_Blocks=         576 ; sqrt(nblall)=          24
+ No. of nsmtx        1640        4336        2077         576
+    1:Rk-matrix 2: dense-mat 3:H-matrix 4:MPI_Block
+ npgl=           4 npgt=           4
+ Finished all initial processing, time(s)=  0.53161030199999004     
+ initial Vmax (m/s)   2.9999999999999999E-002
+ initial mu_avg  0.59248406966792821     
+time step=1       0.00000000 yr
+time step=161       0.00000420 yr
+time step=911     234.43519567 yr
+time step=1082     234.43520007 yr
+time step=1831     469.99019494 yr
+time step=2002     469.99019955 yr
+time step=2751     705.51422156 yr
+time step=2922     705.51422612 yr
+time step=3670     941.03803909 yr
+time step=3842     941.03804371 yr
+time step=3982    1000.00000000 yr
+ Time exceeds tmax at time step=        3982
+ time(s)   12.495477115999847       0.15997703900006854        12.038912681996635     
+ time for matvec(s)                       NaN   6.1692440140170675     
+Note: The following floating-point exceptions are signalling: IEEE_INVALID_FLAG IEEE_DIVIDE_BY_ZERO IEEE_DENORMAL
+Note: The following floating-point exceptions are signalling: IEEE_INVALID_FLAG IEEE_DIVIDE_BY_ZERO IEEE_DENORMAL
+Note: The following floating-point exceptions are signalling: IEEE_INVALID_FLAG IEEE_DIVIDE_BY_ZERO IEEE_DENORMAL
+Note: The following floating-point exceptions are signalling: IEEE_INVALID_FLAG IEEE_DIVIDE_BY_ZERO IEEE_DENORMAL
+Note: The following floating-point exceptions are signalling: IEEE_INVALID_FLAG IEEE_DIVIDE_BY_ZERO IEEE_DENORMAL
+Note: The following floating-point exceptions are signalling: IEEE_INVALID_FLAG IEEE_DIVIDE_BY_ZERO IEEE_DENORMAL
+Note: The following floating-point exceptions are signalling: IEEE_INVALID_FLAG IEEE_DIVIDE_BY_ZERO IEEE_DENORMAL
+Note: The following floating-point exceptions are signalling: IEEE_INVALID_FLAG IEEE_DIVIDE_BY_ZERO IEEE_DENORMAL
+Note: The following floating-point exceptions are signalling: IEEE_INVALID_FLAG IEEE_DIVIDE_BY_ZERO IEEE_OVERFLOW_FLAG IEEE_DENORMAL
+Note: The following floating-point exceptions are signalling: IEEE_INVALID_FLAG IEEE_DIVIDE_BY_ZERO IEEE_OVERFLOW_FLAG IEEE_DENORMAL
+Note: The following floating-point exceptions are signalling: IEEE_INVALID_FLAG IEEE_DIVIDE_BY_ZERO IEEE_DENORMAL
+Note: The following floating-point exceptions are signalling: IEEE_INVALID_FLAG IEEE_DIVIDE_BY_ZERO IEEE_OVERFLOW_FLAG IEEE_DENORMAL
+Note: The following floating-point exceptions are signalling: IEEE_INVALID_FLAG IEEE_DIVIDE_BY_ZERO IEEE_DENORMAL
+Note: The following floating-point exceptions are signalling: IEEE_INVALID_FLAG IEEE_DIVIDE_BY_ZERO IEEE_DENORMAL
+Note: The following floating-point exceptions are signalling: IEEE_INVALID_FLAG IEEE_DIVIDE_BY_ZERO IEEE_OVERFLOW_FLAG IEEE_DENORMAL
+Note: The following floating-point exceptions are signalling: IEEE_INVALID_FLAG IEEE_DIVIDE_BY_ZERO IEEE_DENORMAL
