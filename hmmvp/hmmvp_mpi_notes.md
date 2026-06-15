@@ -46,7 +46,7 @@ The two hmmvp paths are structurally different:
 
 ## Building hmmvp in MPI mode
 
-See `hmmvp_mpi_patches/` for two small compatibility edits to hmmvp needed on
+See `hmmvp_modern_mpi.patch` (and `README_hmmvp_mpi_build.md`) for two small compatibility edits to hmmvp needed on
 modern OpenMPI/MPICH (removed MPI-1 error-handler calls; suppress the removed
 MPI C++ bindings). Then `make clean && make mode=mpi libhmmvp` produces
 `lib/libhmmvp_mpi.a`. These edits are MPI-version compatibility fixes; on an
