@@ -1,31 +1,34 @@
-# interact - models static and earthuake cycle fault interactions
+# interact - models static and earthquake cycle fault interactions
 # using dislocations in an elastic medium
 
-Program reads in patches subdividing a fault geometry and either
-solves for stresses and/or displacements in a one-step problem for
-various boundary conditions (sign (i.e. direction) constrained or
-unconstrained), or for a simulated loading cycle where each patch
-follows a static-kinematic frictional constitutive law and repetitive
-rupture is allowed during continuous "plate-tectonic" loading.  (Note
-that there is also a rudimentary, rate-state-friction cycle solver,
-rsf_solve.).
+Program reads in patches subdividing a fault network in an elastic
+half-space and solves for stresses given slip or displacements given
+stress in a one-step problem for various boundary conditions (sign
+(i.e. direction) constrained or unconstrained). The core code
+`interact` can also simulate an earthquake cycle where each patch
+follows a static-kinematic frictional constitutive law. There is also
+also a rudimentary, rate-state-friction cycle solver, `rsf_solve`
+which efficiently and accurately solves SCEC SEAS problem BP5.
 
-`interact` uses `dc3d.f` as provided by Y. Okada as in Okada (BSSA,
-1992), has .f90 code converted from Nikkhoo and Walter (GJI, 2015),
-and uses triangular dislocation fixes from Noda (EPS, 2025). Linear
-algebra routines from SLATEC, LAPACK, and EISPACK, and Petsc interface
-which can include HTOOLS and H2OPUS. Also use HACApk the H-matrix
-library of ppOpen-HPC, also used by HBI, and HMMVP by A. Bradley.
+For dislocations, `interact` uses `dc3d.f` as provided by Y. Okada as
+in Okada (BSSA, 1992), has .f90 code converted from Nikkhoo and Walter
+(GJI, 2015), and uses triangular dislocation fixes from Noda (EPS,
+2025). Linear algebra routines from SLATEC, LAPACK, and EISPACK, and a
+newish PETSC interface which can also include HTOOLS and H2OPUS. Along
+with these H matrix packages, the code can also use HACApk, the
+H-matrix library of ppOpen-HPC, as used by HBI, and the HMMVP library
+by A. Bradley.
 
-Petsc implementation based on Dave May's examples and assistance, and
-.m to .f90 conversion for slip inspired by code by P. Bird, converted
-myself (but cross checks with that of OBI). Parts of the code can be
-compiled against Petsc which is used to implement parallelism. Since
-June 2026, work benefited from Claude code interactions.
+PETSC implementation included with Dave May's assistance, and .m to
+.f90 conversion for slip inspired by code by P. Bird, converted myself
+(but cross checks with that of HBI).
 
-See files `INSTALLATION`, `README.md`, and `interact_help.txt` for
-documentation and `COPYRIGHT` and `COPYING` for the license and
-warranty disclaimers.
+Since June 2026, work benefited from Claude code interactions and some
+readme and cookbook documents are created by Claude Code directly.
+
+See files the .md files including in subdirectories such as
+`test_scaling`, `bp5`, and `interact_help.txt` for documentation and
+`COPYRIGHT` and `COPYING` for the license and warranty disclaimers.
 
 If you use `interact` please cite the following
 
