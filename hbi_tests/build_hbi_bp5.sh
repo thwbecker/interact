@@ -11,14 +11,19 @@
 #
 # PARAMETERS ARE POSITIONAL (no environment-variable overrides, so nothing in your
 # shell can silently change the build). Edit the CONFIG block for paths/flags.
-#   $1 = eps_h  (optional) HBI's hardcoded ACA tolerance at main_LH.f90:145.
-#                empty/unset -> keep stock 1d-4 (near-dense for the smooth BP5 kernel);
-#                1d-1 -> match rsf_solve's HACApK ztol 1e-1 (~2.2e-7) for a fair compare.
+#   $1 = eps_h  (optional) sets HBI's *default* ACA tolerance at main_LH.f90:145.
+#
+# NOTE (recommended): you do NOT need to set eps_h at build time. read_inputfile()
+# runs (main_LH.f90:171) before matrix generation (493), so an `eps_h <val>` line in
+# the .in file overrides the default with no recompile -- and hbi_bp5_scaling_test.sh
+# injects exactly that from its $3 argument. So just build once (no $1) and set the
+# tolerance per run. For reference at BP5 1 km / N=4000: stock 1d-4 is near-dense
+# (~25.3 MB), eps_h=1d-1 -> ~12.3 MB (matches rsf_solve HACApK ztol 1e-1 ~12.1 MB).
+# The $1 argument is retained only as a convenience for changing the compiled default.
 #
 # The ONLY environment variable consulted is $MPIF90 (your MPI Fortran wrapper, e.g.
 # PETSc's build/bin/mpif90); it falls back to mpifort if unset. Set it explicitly:
-#   MPIF90=/path/to/mpif90 ./build_hbi_bp5.sh          # stock eps_h
-#   MPIF90=/path/to/mpif90 ./build_hbi_bp5.sh 1d-1     # matched-accuracy build
+#   MPIF90=/path/to/mpif90 ./build_hbi_bp5.sh          # build once; set eps_h per run
 # ---------------------------------------------------------------------------
 set -euo pipefail
 
