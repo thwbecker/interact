@@ -40,7 +40,7 @@ PETSC_LIBADD := $(shell pkg-config --libs-only-l $(PACKAGES)) -lm
 # C interface library first (cd HACApK/v.1.0.0/C_interface; make; 
 # ar rcs libhacapk.a m_*.o HACApK_*.o) then uncomment:
 HACAPK_DEFINES = -DUSE_HACAPK
-HACAPK_LIBS = -L./HACApK/v.1.0.0/C_interface -lhacapk -lgfortran -fopenmp -llapack -lblas
+HACAPK_LIBS = -L./HACApK/v.1.0.0/C_interface -lhacapk -lgfortran -fopenmp $(MATHLIBS)
 
 #
 # leave empty if not using
@@ -60,7 +60,7 @@ HACAPK_LIBS = -L./HACApK/v.1.0.0/C_interface -lhacapk -lgfortran -fopenmp -llapa
 HMMVP_DIR = ./hmmvp/
 HMMVP_DEFINES = -DUSE_HMMVP -DUSE_HMMVP_MPI
 HMMVP_INC = -I$(HMMVP_DIR) -I$(HMMVP_DIR)/hmmvp/include -I$(HMMVP_DIR)/util/include
-HMMVP_LIBS = -L$(HMMVP_DIR)/lib -lhmmvp_mpi -lstdc++ -llapack -lblas
+HMMVP_LIBS = -L$(HMMVP_DIR)/lib -lhmmvp_mpi -lstdc++ $(MATHLIBS)
 HMMVP_OBJS = $(ODIR)/hmmvp_c_shim.o
 
 PETSC_INCLUDES = -I$(PETSC_DIR)/include/ $(CPPFLAGS) 

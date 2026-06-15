@@ -1,2 +1,2 @@
 CPPFLAGS = -std=c++14 -DOMPI_SKIP_MPICXX -DMPICH_SKIP_MPICXX
-MPICPP = $(PETSC_DIR)/build/bin/mpic++
+MPICPP = $(PETSC_DIR)/build/bin/mpicxx
