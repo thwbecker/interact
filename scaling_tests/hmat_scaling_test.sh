@@ -11,8 +11,6 @@
 # relative error of b = A x, the H assembly time, and timings for NRANDOM
 # dense and H matrix-vector products, so each line is self-checking.
 #
-# tolerances below are the matched ~1e-5 error class settings from
-# compress_interaction_matrix.md; adjust as needed.
 #
 # notes:
 # - HACApK matvecs gather x to all ranks and use a ring exchange:
@@ -22,17 +20,20 @@
 #   scatters y back (expect a root-funnel cost like HACApK)
 # - set MPIRUN="mpirun --oversubscribe" etc. if needed
 #
-BIN=${BIN:-compress_interaction_matrix}
-MPIRUN=${MPIRUN:-$PETSC_DIR/build/bin/mpirun}
-GEOM=${GEOM:-geom.in}
-NFAULT=${NFAULT:-120}            # makefault -n; 120 x 60 x 2 = 14400 patches
-MFAULT=${MFAULT:-60}
-CORES=${CORES:-"1 2 4 8 16 24 48"}
-NRANDOM=${NRANDOM:-100}
-HTOOL_OPTS=${HTOOL_OPTS:-"-mat_htool_epsilon 3e-5 -mat_htool_eta 10"}
-HACAPK_OPTS=${HACAPK_OPTS:-"-hacapk_ztol 1e-4"}
-HMMVP_OPTS=${HMMVP_OPTS:-"-hmmvp_tol 1e-6"}
-OUT=${OUT:-hmat_scaling.dat}
+BIN=compress_interaction_matrix
+MPIRUN=$PETSC_DIR/build/bin/mpirun
+GEOM=geom.in
+NFAULT=120            # makefault -n; 120 x 60 x 2 = 14400 patches
+MFAULT=60
+CORES="1 2 4 8 16 24 48"
+NRANDOM=100
+#
+# roughly similar effective accuracy
+#
+HTOOL_OPTS="-mat_htool_epsilon 3e-5 -mat_htool_eta 10"
+HACAPK_OPTS="-hacapk_ztol 1e-1"
+HMMVP_OPTS="-hmmvp_tol 1e-7"
+OUT=hmat_scaling.dat
 
 # geometry
 if [ ! -s $GEOM ]; then
