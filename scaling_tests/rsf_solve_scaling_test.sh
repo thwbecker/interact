@@ -33,7 +33,8 @@ RB=../bin/rsf_solve                 # path to rsf_solve binary
 BP5=../bp5                          # dir with the BP5 input files
 RES=${1-0.5km}                      # $1: resolution tag, e.g. 1km / 0.5km (default 0.5km)
 NPLIST="1 2 4 8 16 24 48"       # MPI rank counts to test
-BACKENDS="dense htool hacapk hmmvp"  # subset of {dense,htool,hacapk,hmmvp}
+#BACKENDS="dense htool hacapk hmmvp"  # subset of {dense,htool,hacapk,hmmvp}
+BACKENDS="htool hacapk hmmvp"  # subset of {dense,htool,hacapk,hmmvp}
 
 # expanded run time so the matvec-dominated phase is well sampled and the
 # one-off assembly is amortised.

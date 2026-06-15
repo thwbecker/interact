@@ -1,4 +1,4 @@
-# interact - models static and earthqauke cycle fault interactions
+# interact - models static and earthuake cycle fault interactions
 # using dislocations in an elastic medium
 
 Program reads in patches subdividing a fault geometry and either
