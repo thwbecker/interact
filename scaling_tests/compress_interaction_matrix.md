@@ -168,6 +168,11 @@ Observations, for this geometry, error band, and machine:
   at high counts. HACApK's matvec saturates earliest (eff ~0.43; 0.240 ->
   0.173 -> 0.117 s over 16 -> 24 -> 48), consistent with its gather +
   ring-exchange communication pattern, so it falls to last by np>=16.
+  This saturation point and the post-np>=16 roll-off may, however, substantially
+  reflect this node's memory bandwidth and interconnect rather than an intrinsic
+  property of the backend; on hardware with more bandwidth per core or a faster
+  network the crossover np would likely move and the degradation could shrink.
+  Read the broad ordering as robust, the exact saturation np as machine-specific.
 - **Vs dense:** at this N the H-matvecs beat dense by only ~2-3x at np=1
   but by ~7x (HTOOL/HACApK) to ~13-18x (hmmvp) at high core counts,
   because the dense matvec scales poorly. N=14400 is modest for an
