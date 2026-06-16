@@ -264,12 +264,14 @@ int main(int argc, char **argv)
     /* 
        prepare with coordinates and such  
     */
+#ifdef USE_PETSC_HMAT
     if((medium->use_hmatrix==1)||(medium->use_hmatrix==2)){	
       coords = (PetscReal *)malloc(sizeof(PetscReal)*ndim*medium->nrflt);
       for(i=0;i < medium->nrflt;i++)		/* all sources or receiveer coordinates  */
 	for(k=0;k < ndim;k++)
 	  coords[i*ndim+k] = fault[i].x[k];
     }
+#endif
 #if ( defined(USE_HMMVP) || defined(USE_HACAPK) )
     if((medium->use_hmatrix==3)||(medium->use_hmatrix==4)){	
       xc = (double *)malloc(sizeof(double)*m);
@@ -377,6 +379,7 @@ int main(int argc, char **argv)
 #else
 	fprintf(stderr,"%s: H2OPUS or HTOOLS requested by not compiled in\n",argv[0]);
 	exit(-1);
+#endif
       }
       break;
     case 3:
