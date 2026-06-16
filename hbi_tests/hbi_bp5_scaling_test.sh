@@ -52,15 +52,18 @@
 # also skips any non-square np defensively.
 # ---------------------------------------------------------------------------
 set -u
+wdir=$HOST
+mkdir -p $wdir
+cd $wdir
 
 # ============================ CONFIG =======================================
 RES=${1-1km}                                # $1: resolution tag: 1km (N=4000) or 0.5km (N=16000)
 TMAX_YR=${2-1000}                           # $2: run length in years (default 1000; align with rsf_solve)
 HBI_EPS_H=${3-1d-1}                          # $3: ACA tolerance, injected into the .in (real knob; 1d-1 ~= rsf ztol 1e-1)
 
-HBI="./hbi/lhbiem"                          # path to the patched HBI binary (Makefile TARGET=lhbiem)
-INTPL="./examples/bp5r_${RES}.in"       # BP5 rectangular .in for this resolution
-PARAM="./examples/bp5r_${RES}_param.dat" # matching per-element params (rows == imax*jmax)
+HBI="../hbi/lhbiem"                          # path to the patched HBI binary (Makefile TARGET=lhbiem)
+INTPL="../examples/bp5r_${RES}.in"       # BP5 rectangular .in for this resolution
+PARAM="../examples/bp5r_${RES}_param.dat" # matching per-element params (rows == imax*jmax)
 NPLIST="1 4 9 16 25 36"                     # MPI ranks: MUST be perfect squares (see note below)
 NSTEP=2000000                               # high step cap so tmax is the stop criterion
 INTERVAL=100000                             # large so output/checkpoint I/O does not contaminate timing
@@ -103,8 +106,10 @@ make_runin
 
 echo "# HBI BP5 scaling: RES=$RES N=$N (imax=$IMAX jmax=$JMAX) tmax=$TMAX_YR yr eps_h=$HBI_EPS_H  ($(date))"
 echo "# NOTE eps_h set via .in keyword (overrides hardcoded default; no recompile needed)"
-CSV=hbi_bp5_scaling_${RES}.csv
-echo "code,np,N,eps_h,total_s,assembly_s,matvec_s,nsteps,matvec_ms_per_step,mem_MB" > "$CSV"
+
+CSV=hbi_bp5_scaling_${RES}
+
+echo "code,np,N,eps_h,total_s,assembly_s,matvec_s,nsteps,matvec_ms_per_step,mem_MB" > "$CSV".csv
 printf "%-5s %4s %6s %7s %9s %11s %10s %8s %16s %8s\n" \
        code np N eps_h total_s assembly_s matvec_s nsteps mv_ms/step mem_MB
 
@@ -136,11 +141,12 @@ for np in $NPLIST; do
   printf "%-5s %4s %6s %7s %9s %11s %10s %8s %16s %8s\n" \
          hbi "$np" "$N" "$HBI_EPS_H" "${total:-NA}" "${asm:-NA}" "${mv_tot:-NA}" \
          "${nsteps:-NA}" "$mvms" "${mem:-NA}"
-  echo "hbi,$np,$N,$HBI_EPS_H,${total:-NA},${asm:-NA},${mv_tot:-NA},${nsteps:-NA},$mvms,${mem:-NA}" >> "$CSV"
+  echo "hbi,$np,$N,$HBI_EPS_H,${total:-NA},${asm:-NA},${mv_tot:-NA},${nsteps:-NA},$mvms,${mem:-NA}" >> "$CSV".csv
 done
 
 echo ""
-echo "wrote $CSV  (per-run logs hbi_run_np<n>.log, run input $RUNIN)"
+echo "wrote $CSV.csv  (per-run logs hbi_run_np<n>.log, run input $RUNIN)"
+cp "$CSV".csv ../$CSV.$HOST
 cat <<'EOF'
 
 CROSS-CODE COMPARISON NOTES
@@ -161,3 +167,4 @@ CROSS-CODE COMPARISON NOTES
  - Match accuracy first (header note 1): comparing HBI@eps_h=1d-4 (near-dense)
    against rsf_solve@ztol=1e-1 would be apples-to-oranges.
 EOF
+cd ..
