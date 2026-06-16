@@ -73,7 +73,7 @@ int main(int argc, char **argv)
     fprintf(stderr,"\tassumes that patch can be described by dip and strike only, no rake!\n");
     fprintf(stderr,"\twrites patch format to stdout\n");
     fprintf(stderr,"\tdx (%g) will subdivide the faults into patches with dx width/length\n",dx);
-    fprintf(stderr,"\t\t a <=0 dx will use no subdivision\n",dx);
+    fprintf(stderr,"\t\t dx <=0  will use no subdivision\n");
     fprintf(stderr,"\tif use_code is set, will read in fault number codes\n");
     fprintf(stderr,"\tif iquad is zero, will try to fit Okada, 1: uses irregular quads and subdivides into triangles\n");
     fprintf(stderr,"\t\t2: expect three points, prints triangular elements\n");
