@@ -156,7 +156,21 @@ int main(int argc,char **argv)
   medium->stop_time = 3000*sec_per_year;	      /* stop time */
   /* output */
   medium->print_interval = 0.1*sec_per_year;	      /* for average property output */
-  medium->slip_line_dt = sec_per_year;		      /* for output of velocity grid */
+  /*
+     velocity-field snapshots to tmp_rsf/ (written in rsf_TS_Monitor): a
+     full-field dump for slip-evolution visualization, NOT required for the
+     BP5 benchmark quantities, so it defaults OFF here.  The earlier default
+     (1 yr) writes one frame per model-year; over a multi-century BP5 run
+     that is ~10^3 frames, each roughly the size of the on-fault field (~1 MB
+     at 0.5 km / N=16000), and the monitor does not purge tmp_rsf between
+     runs -- so repeated runs ACCUMULATE frames and can fill the working
+     disk.  A full disk then makes the snapshot writes (and the
+     rsf_monitor.dat writes) fail, which is easy to misread as a solver
+     stall.  Opt in when you want the frames, e.g. -slip_line_dt_yr 1 for the
+     fine SEAS-style interseismic cadence or a coarser value (say 10-20 yr)
+     for a cycle-scale view, and clean tmp_rsf between runs either way.
+  */
+  medium->slip_line_dt = 1.0e9*sec_per_year;	      /* OFF; opt in via -slip_line_dt_yr */
   
   /* start up MPI/PETSc, only read the YAML defaults file if it exists */
   PetscFunctionBegin;
@@ -439,6 +453,36 @@ int main(int argc,char **argv)
   */
   PetscCall(TSSetType(ts,TSRK));
   PetscCall(TSRKSetType(ts,TSRK5DP));
+  /*
+     NOTE on the integrator order: after the step-size controller (see the
+     longer note further down), the RK order is the other large production
+     lever.  5DP is kept as the default because its 5(4) order matches HBI's
+     Cash-Karp for the cross-code comparison.  A lower-order embedded pair
+     does fewer stage matvecs per accepted step -- 3BS (Bogacki-Shampine
+     RK3(2)) costs 3 vs 6 for 5DP -- and, although it takes more (and more
+     frequently rejected) steps, in our tests it still nets FEWER matvecs.
+     Judged by the physically meaningful metric, the event RECURRENCE
+     interval (which is far better converged than the absolute event phase:
+     the phase drifts by ~rtol run-to-run, the interval does not),
+       -ts_rk_type 3bs
+     reproduced the 5DP recurrence to within ~0.005-0.02 yr (<~0.01% of the
+     ~230 yr interval) at every resolution we tried -- BP5 2 km dense, 1 km
+     dense AND HACApK, 0.5 km HACApK -- while reducing matvecs by very roughly
+     24% (2 km), 35% (1 km) and 41% (0.5 km).  The saving appears to grow with
+     resolution because finer meshes take more steps, so the cheaper-per-step
+     method compounds.  Guidance (all specific to these single-host serial
+     tests and one event sequence, so confirm per case): keep 5DP for anything
+     compared against HBI; consider -ts_rk_type 3bs for production where a
+     recurrence error of order 0.02 yr is acceptable (it stacks with
+     -ts_adapt_type dsp below).  Do NOT loosen rtol below ~1e-4: at 1e-3 the
+     rejection rate climbed enough that the run was both less accurate and not
+     faster, and over long runs could make very slow progress.  In our runs
+     2a (RK2(1)) needed far more matvecs (tiny steps) and 5bs did not behave
+     well on the stiff coseismic phase; higher order (8vr) only repaid its
+     per-step cost for very tight ABSOLUTE event times, not long multi-cycle
+     runs.  A different problem, mesh, or machine could of course rank these
+     differently.
+  */
   /*
     Set the initial time and the initial timestep given above.
   */
