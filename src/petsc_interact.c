@@ -485,8 +485,10 @@ PetscErrorCode calc_petsc_Isn_matrices(struct med *medium, struct flt *fault,
     PetscCall(PetscFree(avalues));
     PetscCall(PetscFree(col_idx));
   }
+#ifdef USE_PETSC_HMAT
   if((use_hmatrix==1) || (use_hmatrix==2))
     free(coords);
+#endif
 #if ( defined(USE_HMMVP) || defined(USE_HACAPK) )
   if((use_hmatrix==3)||(use_hmatrix==4)){
     free(xc);free(yc);free(zc);

@@ -11,7 +11,37 @@
   reads in geometry file and calculates the interaction matrix, and
   then compresses it, testing forward and inverse computations
   
-  see compress_interaction_matrix.md
+  see compress_interaction_matrix.md for full discussion
+
+  --------------------------------------------------------------------
+  BACKEND SCALING SUMMARY (N=14400, single 48-core node, 100 matvecs,
+  matched ~1e-6 error band; see hmat_scaling_test.sh and the .md):
+
+    settings: HTOOL  -mat_htool_epsilon 3e-5 -mat_htool_eta 10  (6.6e-7)
+              HACApK -hacapk_ztol 1e-1                          (2.2e-7)
+              hmmvp  -hmmvp_tol 1e-7                            (1.6e-6)
+    (HACApK ztol is very conservative for this smooth Okada kernel, so
+     ztol 1e-1 - much looser than nominal - is what makes it comparable
+     rather than near-dense; do not run it at ztol 1e-4 for speed tests.)
+
+    assembly [s], 1->48 cores: HACApK 25.4->1.1 (fastest, ~23x)
+                               hmmvp  27.3->1.4 (np1~np2: master/worker)
+                               HTOOL  567.6->6.7 (most costly, ~85x super-linear)
+    matvec   [s], 1->48 cores: hmmvp  2.651->0.061 (fastest from np>=4, eff ~0.91)
+                               HTOOL  3.849->0.078 (eff ~1.0, 2nd at high core)
+                               HACApK 2.402->0.117 (fastest at np<=2, saturates, eff ~0.43)
+
+  RECOMMENDATION (this geometry/band/machine; may shift with N, tol,
+  library version, hardware - rerun hmat_scaling_test.sh):
+    - matvec-bound / iterative-solver use (e.g. rsf_solve), np>=4:
+      prefer hmmvp (-use_hmatrix 4, -hmmvp_tol 1e-7) - fastest matvec,
+      best scaling, near-cheapest assembly. hmmvp's error is floored
+      ~1e-6 at this N (Frobenius-estimate limited); use HACApK/HTOOL if
+      a tighter operator is needed.
+    - assembly-heavy / low core count / deterministic operator:
+      HACApK (-use_hmatrix 3, -hacapk_ztol 1e-1).
+    - build-once amortized over very many matvecs: HTOOL (-use_hmatrix 1).
+  --------------------------------------------------------------------
 
 */
 
@@ -26,7 +56,9 @@ int main(int argc, char **argv)
   PetscLogDouble t0,t1;
 
   double *bglobal,cpu_time_used;
+#ifdef USE_PETSC_HMAT
   MatHtoolKernelFn *htools_kernel = GenKEntries_htools;
+#endif
   KSP               ksp,ksph;
   PC                pc,pch;
   Vec         x, xh, b, bh, bout,d;
@@ -274,6 +306,7 @@ int main(int argc, char **argv)
       break;
     case 1:
     case 2:
+#ifdef USE_PETSC_HMAT
       /* HTOOLS or H2OPUS */
       PetscCall(MatCreate(PETSC_COMM_WORLD, &AH));
       PetscCall(MatSetSizes(AH, PETSC_DECIDE, PETSC_DECIDE, m, n));  
@@ -341,6 +374,9 @@ int main(int argc, char **argv)
 	fprintf(stderr,"%s: H2OPUS requested but PETSc was built without h2opus\n",argv[0]);
 	exit(-1);
 #endif
+#else
+	fprintf(stderr,"%s: H2OPUS or HTOOLS requested by not compiled in\n",argv[0]);
+	exit(-1);
       }
       break;
     case 3:
