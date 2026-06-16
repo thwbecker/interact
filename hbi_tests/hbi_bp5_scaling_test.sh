@@ -39,7 +39,7 @@
 #          e.g.  ./hbi_bp5_scaling_test.sh 1km 1000 1d-1
 # Knobs are POSITIONAL ($1,$2,$3) or hardcoded in CONFIG; nothing is read from the
 # environment (except $PETSC_DIR for the launcher), so the run is deterministic.
-# Needs ./hbi/examples/bp5r_<RES>.in and bp5r_<RES>_param.dat (make with bp5r_param_gen.py).
+# Needs ./examples/bp5r_<RES>.in and bp5r_<RES>_param.dat (make with bp5r_param_gen.py).
 #
 # eps_h ($3) is the HACApK ACA tolerance; it is injected as an .in keyword (read at
 # main_LH.f90:171, before matrix generation), so it overrides the hardcoded default
@@ -59,8 +59,8 @@ TMAX_YR=${2-1000}                           # $2: run length in years (default 1
 HBI_EPS_H=${3-1d-1}                          # $3: ACA tolerance, injected into the .in (real knob; 1d-1 ~= rsf ztol 1e-1)
 
 HBI="./hbi/lhbiem"                          # path to the patched HBI binary (Makefile TARGET=lhbiem)
-INTPL="./hbi/examples/bp5r_${RES}.in"       # BP5 rectangular .in for this resolution
-PARAM="./hbi/examples/bp5r_${RES}_param.dat" # matching per-element params (rows == imax*jmax)
+INTPL="./examples/bp5r_${RES}.in"       # BP5 rectangular .in for this resolution
+PARAM="./examples/bp5r_${RES}_param.dat" # matching per-element params (rows == imax*jmax)
 NPLIST="1 4 9 16 25 36"                     # MPI ranks: MUST be perfect squares (see note below)
 NSTEP=2000000                               # high step cap so tmax is the stop criterion
 INTERVAL=100000                             # large so output/checkpoint I/O does not contaminate timing
