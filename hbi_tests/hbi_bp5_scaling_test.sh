@@ -65,7 +65,7 @@ NPLIST="1 4 9 16 25 36"                     # MPI ranks: MUST be perfect squares
 NSTEP=2000000                               # high step cap so tmax is the stop criterion
 INTERVAL=100000                             # large so output/checkpoint I/O does not contaminate timing
 
-MPIRUN=$PETSC_DIR/build/bin/mpirun          # launcher ($PETSC_DIR is the one toolchain env input)
+MPIRUN=mpirun          # launcher ($PETSC_DIR is the one toolchain env input)
 EXTRA_MPI="--bind-to core --map-by core"    # MPI pinning, as in the other sweeps
 
 # HBI is hybrid MPI/OpenMP; pin one thread per rank for a pure-MPI sweep (to line

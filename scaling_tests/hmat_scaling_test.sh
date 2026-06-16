@@ -21,7 +21,7 @@
 # - set MPIRUN="mpirun --oversubscribe" etc. if needed
 #
 BIN=compress_interaction_matrix
-MPIRUN=$PETSC_DIR/build/bin/mpirun
+MPIRUN=mpirun
 GEOM=geom.in
 NFAULT=120            # makefault -n; 120 x 60 x 2 = 14400 patches
 MFAULT=60
