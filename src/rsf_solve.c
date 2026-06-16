@@ -461,6 +461,24 @@ int main(int argc,char **argv)
   /* HBI rkqs: step growth limited to 2x, shrink to >= 0.5x */
   PetscCall(TSGetAdapt(ts,&adapt));
   PetscCall(TSAdaptSetClip(adapt,0.5,2.0));
+  /* 
+     NOTE on the step-size controller: the default PETSc RK controller
+     ("basic") is used here because it mirrors HBI's rkqs (the clip and the
+     infinity norm above), which matters for the cross-code comparison.  For
+     PRODUCTION speed, the digital-signal-processing controller is often a
+     bigger lever than anything in the RHS, because rejected steps each waste
+     a full set of stage matvecs: on a BP5 2 km dense serial test,
+       -ts_adapt_type dsp
+     cut rejected steps by ~63% (188 -> 70) for the SAME accepted-step count,
+     i.e. ~12% fewer matvecs and ~9% less time in TSStep, at equal tolerance.
+     It does change the accepted step sequence, so event/recurrence times
+     shift by ~rtol (e.g. first event 236.81 -> 236.85 yr at rtol=1e-4) and it
+     no longer matches HBI's rkqs.  Recommendation: keep the default for
+     anything compared against HBI; pass -ts_adapt_type dsp for production
+     runs where reproducibility to << rtol is not required.  Numbers are
+     specific to that test (resolution, tolerance, machine); confirm per case,
+     since a different problem could trade rejections for more accepted steps.
+  */
   /* cap the step at the monitor interval, cf. ode_solve_test.c, so
      the change-triggered monitor cannot be stepped over */
   PetscCall(TSAdaptSetStepLimits(adapt,0.0,(dt_max < dt_monitor)?(dt_max):(dt_monitor)));
@@ -559,6 +577,24 @@ PetscErrorCode rsf_ODE_RHSFunction(TS ts,PetscReal time,Vec X,Vec F,void *ptr)
   /* 
      compute the slip rate vector
      v = 2 v0 exp(-psi/a) sinh(tau/(sigma a)) 
+  */
+  /* 
+     NOTE (possible optimization, intentionally NOT applied here):
+     this loop and the derivative loop below share per-cell factors.
+     vel_from_rsf returns mu = tau/sigma, scaled_tau = mu/a and
+     exp_fac = exp(-psi/a); the derivative loop then recomputes all three
+     and additionally calls cosh(scaled_tau).  One could instead form
+     exp(scaled_tau) ONCE here, get both sinh and cosh from it
+     (sinh=(e-1/e)/2, cosh=(e+1/e)/2), and stash the single combination the
+     derivative loop needs, cosh_fac = cosh(scaled_tau)*exp(-psi/a), in a
+     scratch array sized to medium->rn for reuse below.  On a BP5 2 km dense
+     serial test that made the RHS *arithmetic* ~1.6-1.7x faster, machine-
+     precision-identical (first-event time unchanged to ~1e-9 yr).  The
+     end-to-end effect is small here because the matvec dominates the step;
+     it would matter more where the matvec is cheap (H-matrix, high core
+     count).  It is left explicit on purpose: the gain is modest and a
+     precomputed/stashed form is easy to get subtly wrong if the friction
+     formulation is later changed, so clarity is preferred for now.
   */
   PetscCall(VecGetArray(medium->rsf_vel,&vel));
   /* i global patch, j local x offset, k local patch */
