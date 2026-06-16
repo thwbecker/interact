@@ -26,7 +26,7 @@ include make.inc		#local edits, including use of PETSC MPI here
 #opt = -g
 #opt = -O3 -std=c++11 -Wdeprecated
 #opt = -O3 -std=c++14 -Wdeprecated
-opt = -O3  -march=native 
+opt = -O3  -march=x86-64-v3
 
 CFLAGS = $(opt)
 FFLAGS = $(opt)

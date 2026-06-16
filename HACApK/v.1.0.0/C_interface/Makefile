@@ -1,5 +1,5 @@
 #gnu compiler
-#F90= mpifort -fbacktrace -g -fallow-argument-mismatch -ffree-form -ffree-line-length-none -O3 -march=native -fopenmp
+#F90= mpifort -fbacktrace -g -fallow-argument-mismatch -ffree-form -ffree-line-length-none -O3 -march=x86-64-v3 -fopenmp
 
 #Sherlock (intel MPI)
 #F90 = mpiifort -O3 -qopenmp -heap-arrays -ip -g -traceback
@@ -10,7 +10,7 @@ F90=mpifort
 F77=mpif77
 LD=$(F90)
 
-OPT = -O3 -march=native -fno-strict-aliasing
+OPT = -O3 -march=x86-64-v3 -fno-strict-aliasing
 #OPT = -g
 
 CFLAGS = $(OPT)
