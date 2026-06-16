@@ -1,0 +1,82 @@
+#
+# LINUX system dependent flags
+#
+# CONSTANTS
+#
+# constants you might want to change according to the machine specs
+#
+# IMAT_SPARSE_LIM: limit in MB for I matrix size at which the program switches 
+#                  automatically to sparse matrix storage, ~70% of RAM of machine
+# IMAT_SIZE_LIM:   max size of the interaction matrix in MB that we want in 
+#                  in memory, if size is larger AND NO SPARSE STORAGE is invoked
+#                  will read from file. This is so slow, it's next to impossible to work.
+#
+MACHINE_DEFINES = -DIMAT_SPARSE_LIM=8000.0 -DIMAT_SIZE_LIM=8000.1   
+#
+# LINUX system dependent flags for gcc
+#
+#
+# compilers
+CC = gcc
+# if parallel desired, define here or in .petsc to be mpicc
+MPICC = $(CC)
+F77 = /usr/bin/gfortran
+F90 = /usr/bin/gfortran
+LD = $(F77)
+# if petsc or parallel compile is desired, define in .petsc or here to use mpif77
+MPILD = $(LD)
+AR = ar
+# set the compiler flag for library directories
+MY_LIBDIR_SPEC = -L
+
+
+
+# LINKER FLAGS (without -lm, that get's added later)
+# gcc
+LDFLAGS = -lssp -fopenmp
+
+# X 11 only needed for PGPLOT
+X11LIBDIR = /usr/lib/x86_64-linux-gnu/
+#
+MATHLIBS = -L${TACC_MKL_LIB} -lmkl_intel_lp64 -lmkl_sequential -lmkl_core -lpthread  -lm
+#
+# warning options
+GCCWOPT = -Wall
+#-Werror
+
+
+# fast execution options, default use
+OPTIM_FLAGS = -Ofast -march=native $(GCCWOPT)
+CFLAGS_OTHER =  -Wno-discarded-qualifiers
+SCARGS =  $(GCCWOPT) $(CFLAGS_OTHER)
+
+# -DSUPER_DUPER_DEBUG -DDDMALLOC
+DEBUG_FLAGS=-DDEBUG -g -DSUPER_DUPER_DEBUG
+
+# other debugging options, comment in for debugging
+
+
+#
+# fortran flags
+#
+SFARGS = -Wall -ffixed-line-length-132  -fmax-errors=0 -x f77-cpp-input
+SF90ARGS = -Wall   -fmax-errors=0 -cpp
+#
+SFARGSSAVE = $(SFARGS)
+#
+# BLAS
+BLASLIB =  $(MATHLIBS)
+
+COMPUTATIONAL_LIBS = $(BLASLIB)
+#
+# where are the modified EISPACK routines from the myeispack.tar.gz
+EISPACK_DIR = eispack/
+# file installed?
+EISPACK_LIB = $(MY_LIBDIR_SPEC)$(EISPACK_DIR)/ -lmyeis
+
+
+
+
+# name of interact binary depending on compiler flags
+#INTERACT_BINARY_NAME = interact.gcc
+INTERACT_BINARY_NAME = interact
