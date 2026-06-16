@@ -3,7 +3,7 @@
 # and using petsc H matrix packages HTOOLS and H2OPUS or external interfaces HMMVP and HACApK
 #
 # the 32 bit versions work with Htools and H2OPUS
-PETSC_ARCH = arch-linux-c-opt
+# PETSC_ARCH = arch-linux-c-opt
 PETSC_HTOOL_USED=-DUSE_PETSC_HMAT
 #
 # debug 32 bit version
@@ -21,8 +21,6 @@ FILE2 := $(PETSC_DIR)/lib/pkgconfig/PETSc.pc # fallback
 PETSc.pc := $(if $(wildcard $(FILE1)),$(FILE1),$(FILE2))
 
 
-
-PETSc.pc := $(PETSC_DIR)/$(PETSC_ARCH)/lib/pkgconfig/PETSc.pc
 
 # Additional libraries that support pkg-config can be added to the list of PACKAGES below.
 PACKAGES := $(PETSc.pc)
