@@ -46,7 +46,8 @@ GCCWOPT = -Wall
 
 
 # fast execution options, default use
-OPTIM_FLAGS = -Ofast -march=native $(GCCWOPT)
+OPTIM_FLAGS = -O3 -march=native $(GCCWOPT)
+
 CFLAGS_OTHER =  -Wno-discarded-qualifiers
 SCARGS =  $(GCCWOPT) $(CFLAGS_OTHER)
 
