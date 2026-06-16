@@ -56,8 +56,10 @@ int main(int argc, char **argv)
   PetscLogDouble t0,t1;
 
   double *bglobal,cpu_time_used;
-#ifdef USE_PETSC_HMAT
+#ifdef USE_PETSC_HMAT		/* Htools or H2OPUS  */
   MatHtoolKernelFn *htools_kernel = GenKEntries_htools;
+  Mat KT;
+  PetscReal nrmK,nrmD;
 #endif
   KSP               ksp,ksph;
   PC                pc,pch;
@@ -71,10 +73,6 @@ int main(int argc, char **argv)
   PetscBool read_value,flg,test_forward=PETSC_TRUE;
   PetscBool make_matrix_externally=PETSC_FALSE; /* make matrices here on in external routine (for testing) */
   char geom_file[STRLEN]="geom.in";
-#ifdef USE_PETSC_HMAT
-  Mat KT;
-  PetscReal nrmK,nrmD;
-#endif
   hacapk_shell_ctx *hsc_dense,*hsc_h;
 #if ( defined(USE_HMMVP) || defined(USE_HACAPK) )
   double *xc,*yc,*zc;
@@ -376,11 +374,8 @@ int main(int argc, char **argv)
 	fprintf(stderr,"%s: H2OPUS requested but PETSc was built without h2opus\n",argv[0]);
 	exit(-1);
 #endif
-#else
-	fprintf(stderr,"%s: H2OPUS or HTOOLS requested by not compiled in\n",argv[0]);
-	exit(-1);
-#endif
       }
+#endif
       break;
     case 3:
       /* 
@@ -746,3 +741,4 @@ int main(int argc, char **argv)
   exit(0);
 
 }
+
