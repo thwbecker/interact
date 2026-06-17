@@ -67,6 +67,25 @@ HMMVP_DEFINES = -DUSE_HMMVP -DUSE_HMMVP_MPI
 HMMVP_INC = -I$(HMMVP_DIR) -I$(HMMVP_DIR)/hmmvp/include -I$(HMMVP_DIR)/util/include
 HMMVP_LIBS = -L$(HMMVP_DIR)/lib -lhmmvp_mpi -lstdc++ $(MATHLIBS)
 HMMVP_OBJS = $(ODIR)/hmmvp_c_shim.o
+#
+# BigWham (use_hmatrix 5): native FULL-SPACE hierarchical matrix backend.
+# OFF by default (BigWham is GPL v3, OpenMP-only, and not part of interact).
+# To enable: clone https://github.com/GeoEnergyLab-EPFL/BigWham into
+# interact/BigWham, build it with BigWham/compile_for_interact.sh, then
+# uncomment the BIGWHAM_* lines below (and, if cblas.h is not on the default
+# include path, add its directory to BIGWHAM_INC, e.g. on Debian/Ubuntu
+# -I/usr/include/x86_64-linux-gnu). Leave empty to build without BigWham.
+#BIGWHAM_DIR =
+#BIGWHAM_DEFINES =
+#BIGWHAM_INC =
+#BIGWHAM_LIBS =
+#BIGWHAM_OBJS =
+BIGWHAM_DIR = ./bigwham/BigWham/
+BIGWHAM_DEFINES = -DUSE_BIGWHAM
+BIGWHAM_INC = -I$(BIGWHAM_DIR)/src -I$(BIGWHAM_DIR)/il -DBIGWHAM_OPENMP -DIL_BLAS -DIL_OPENBLAS -DIL_OPENMP
+# those are slightly different from our MATHLIBs - do we worry?
+BIGWHAM_LIBS = $(BIGWHAM_DIR)/build/libBigWham.a -lopenblas -llapacke -lstdc++ -lgomp -lpthread $(MATHLIBS)
+BIGWHAM_OBJS = $(ODIR)/bigwham_shim.o
 
 PETSC_INCLUDES = -I$(PETSC_DIR)/include/ $(CPPFLAGS) 
 #
@@ -83,4 +102,4 @@ ifeq ($(strip $(MPILD)),)
 MPILD = mpif77
 endif
 
-PETSC_DEFINES = -DUSE_PETSC $(PETSC_HTOOL_USED) $(HMMVP_DEFINES) $(HACAPK_DEFINES) 
+PETSC_DEFINES = -DUSE_PETSC $(PETSC_HTOOL_USED) $(HMMVP_DEFINES) $(HACAPK_DEFINES) $(BIGWHAM_DEFINES) 
