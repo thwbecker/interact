@@ -91,4 +91,17 @@ PetscErrorCode set_hmmvp_defaults_and_options(struct med *);
 PetscErrorCode MatMult_hmmvp(Mat , Vec , Vec );
 #endif
 
+#ifdef USE_BIGWHAM
+/* BigWham full-space H-matrix shim (src/la_and_geo/bigwham_shim.cc). BigWham
+   owns its kernel, so create takes a mesh (coor,conn) + elastic constants, not
+   a kernel callback. matvec/diagonal are length 3*n_elements (natural order). */
+extern void *cbigwham_create(const double *, int, const int *, int,
+			     const char *, double, double, int);
+extern void  cbigwham_build(void *, int, double, double);
+extern void  cbigwham_mvp(void *, const double *, double *);
+extern void  cbigwham_get_diagonal(void *, double *);
+extern void  cbigwham_get_info(void *, int *, int *, double *);
+extern void  cbigwham_delete(void *);
+#endif
+
 

@@ -42,14 +42,14 @@
 set -u
 
 # ---------------------------------------------------------------- configuration
-BIN=${BIN:-../bin/compress_interaction_matrix}
-MAKEFAULT=${MAKEFAULT:-../bin/makefault}
-MPIRUN=${MPIRUN:-mpirun}
-GEOM=${GEOM:-geom_fvh.in}
+BIN=../bin/compress_interaction_matrix
+MAKEFAULT=../bin/makefault
+MPIRUN=mpirun
+GEOM=geom_fvh.in
 # "slightly bigger": 2 x NFAULT x MFAULT patches (two parallel fault planes).
 # 2 x 40 x 25 = 2000 patches by default; bump for a real scaling test.
-NFAULT=${NFAULT:-40}
-MFAULT=${MFAULT:-25}
+NFAULT=40
+MFAULT=25
 CORES=${CORES:-1}                 # space separated list, e.g. "1 4 16"; MPI ranks
 NRANDOM=${NRANDOM:-50}            # matvecs timed per run
 OUT=${OUT:-full_vs_half.dat}
