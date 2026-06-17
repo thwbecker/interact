@@ -75,8 +75,8 @@ void eval_okada(COMP_PRECISION *x,struct flt *fault,
   COMP_PRECISION corners[MAX_NR_EL_VERTICES*3],l,w;
 #endif
   cpdip=(double)fault->dip;
-#ifdef DEBUG
   ifullspace = (fullspace==TRUE)?(1):(0);
+#ifdef DEBUG
   if(cpdip < 0 || cpdip > 90){
     fprintf(stderr,"eval_okada: dip (%g) should be between 0 and 90 (maybe)\n",
 	    cpdip);
