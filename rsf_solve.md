@@ -251,6 +251,26 @@ Observations (specific to this configuration):
    dense's ~2 GB footprint is itself a constraint and its matvec appears
    bandwidth-saturated by np≈24.
 
+### Multi-host update (six hosts) — the saturation is real and host-dependent
+
+The single-node 0.5 km numbers above have since been reproduced on six shared-memory
+hosts (committed scaling CSVs and summary plots). They confirm the picture and sharpen
+the caveats, so the single-node claim "HACApK fastest at *every* rank count" should be
+read as a property of *that* node rather than a general result:
+
+- **np ≈ 16–24 is the host-robust sweet spot.** At np=24, `hacapk` was the fastest
+  matvec on *every* host tested — the one ordering that holds everywhere.
+- **np=48 is host-dependent.** On cleanly-scaling nodes `htool` and `hmmvp` keep scaling
+  and **overtake `hacapk` by np=48** (`hacapk`, the leanest and most bandwidth-bound
+  matvec, plateaus near np≈16–24); bandwidth-limited nodes instead *degrade* past np≈24;
+  and one node's np=48 collapsed across all backends, reproducibly — an oversubscription
+  artifact (fewer usable cores than ranks), not a backend property. The node in the table
+  above, where `hacapk` stayed fastest to np=48, sits at the favorable end of that spread.
+- The transferable statements are therefore: `hacapk` is the best low-to-mid-rank choice
+  (and the cheapest serial matvec), while `htool`/`hmmvp` are the backends with headroom
+  left at high rank. The cross-code version of the same conclusion (vs HBI's lattice) is
+  in `hbi_tests/rsf_solve_vs_hbi_scaling.md`.
+
 ### Practical default (provisional)
 
 On the evidence so far, keeping HACApK (`-use_hmatrix 3`) is a reasonable default:
@@ -272,9 +292,42 @@ way — measure for your actual workload:
 So treat HACApK as the starting point, but for a single large model on a many-core
 or multi-node allocation — especially a long one — benchmark dense and HTOOL(ACA)
 at the target size, rank count, *and* representative step count with
-`scripts/bench_hmatrix.sh` rather than assuming. And try the MPI+OpenMP hybrid
-(see `rsf_solve_review.md`): HACApK's matvec is OpenMP-threaded, and the rank
-counts where it flattened are exactly where threads-per-rank may help.
+`scripts/bench_hmatrix.sh` rather than assuming. It is also worth trying the
+MPI+OpenMP hybrid: HACApK's matvec is OpenMP-threaded, and the rank counts where it
+flattened are exactly where threads-per-rank may help.
+
+---
+
+## Integrator order — an orthogonal speedup lever
+
+Everything above concerns the *matvec* (which operator backend, how many ranks). A
+second, independent lever is the **Runge–Kutta order**, set with `-ts_rk_type`. The
+default is Dormand–Prince `5dp` (5(4), 6 stage matvecs per accepted step), chosen partly
+so its order matches HBI's Cash–Karp for cross-code comparison. A lower-order embedded
+pair does fewer stage matvecs per step: `3bs` (Bogacki–Shampine RK3(2)) costs 3, and
+although it takes more (and more frequently rejected) steps, it still nets fewer matvecs.
+
+Judged by the physically meaningful metric — the event **recurrence interval**, which is
+far better converged than the absolute event phase (the phase drifts by ~`rtol`
+run-to-run; the interval does not) — `-ts_rk_type 3bs` reproduced the `5dp` recurrence to
+within ~0.005–0.02 yr (<~0.01% of the ~230 yr interval) at every resolution tried (BP5
+2 km dense; 1 km dense and HACApK; 0.5 km HACApK), while reducing matvecs by very roughly
+**24% (2 km), 35% (1 km), 41% (0.5 km)** — the saving grows with resolution because finer
+meshes take more steps, so the cheaper-per-step method compounds. These are single-host
+serial runs over one event sequence, so confirm for your own case.
+
+Practical guidance (also captured in comments in `src/rsf_solve.c`):
+
+- Keep `5dp` (the default) for anything compared against HBI, and where you want the most
+  converged recurrence.
+- Consider `-ts_rk_type 3bs` for production where a recurrence error of order ~0.02 yr is
+  acceptable; it stacks with the step controller `-ts_adapt_type dsp` (which trims
+  rejected steps at equal accuracy).
+- Do **not** loosen `-rtol` below ~1e-4: at 1e-3 the rejection rate climbs enough that the
+  run is both less accurate and not faster, and over long runs can make very slow progress.
+- `2a` (RK2(1)) needed far more matvecs here; `5bs` behaved poorly on the stiff coseismic
+  phase; higher order (`8vr`) only repaid its per-step cost for very tight *absolute* event
+  times, not long multi-cycle runs.
 
 ---
 
@@ -292,3 +345,11 @@ mpirun -np 1 bin/rsf_solve -use_hmatrix 0   <bp5 flags>
 ```
 
 Add `-log_view` to get per-event timings (`MatMult`, `TSStep`).
+
+Velocity-field snapshots (the `tmp_rsf/vel-*-gmt` files used for slip-evolution plots)
+now default **off**; enable them with `-slip_line_dt_yr <interval>` (e.g. `1` for the fine
+SEAS-style interseismic cadence, or `10`–`20` for a cycle-scale view). They are written
+once per interval and are *not* purged between runs, so for long, fine-grid runs (e.g.
+0.5 km / N=16000, ~1 MB per frame) they accumulate quickly and can fill the working disk;
+clean `tmp_rsf` between runs, and note that a full disk makes the snapshot and
+`rsf_monitor.dat` writes fail, which can look like a solver stall.

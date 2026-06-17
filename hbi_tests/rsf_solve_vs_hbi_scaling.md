@@ -78,7 +78,11 @@ intrinsic property of standard HACApK's algorithm. On a machine with more bandwi
 core or a faster network, the saturation point would likely move and the post-np=16
 degradation could shrink or vanish. We therefore do **not** read the np≈16 roll-off as a
 fixed property of the method; only the broad ordering (H-backends >> dense; lattice not
-competitive at ≤48 cores at matched accuracy) is robust here.
+competitive at ≤48 cores at matched accuracy) is robust here. *(Update: rsf scaling runs
+on six shared-memory hosts since bear this out — np≈16–24 is a host-robust sweet spot
+where `hacapk` is fastest everywhere, while np=48 is host-dependent: `htool`/`hmmvp`
+overtake `hacapk` on cleanly-scaling nodes, bandwidth-limited nodes degrade, and one
+node's np=48 was a reproducible oversubscription artifact.)*
 
 ## Caveats
 

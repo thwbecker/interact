@@ -3,12 +3,18 @@
 #  interact: model fault interactions using dislocations in an elastic         #
 #            medium                                                            #
 #	                                                                       #
-#    Copyright (C) Thorsten Becker 2000 - 2025                                 #
+#    Copyright (C) Thorsten Becker 2000 - 2026                                 #
 #                                                                              #
-#    Unteract uses dc3d.f as provided by Y. Okada as in Okada (BSSA, 1992) and #
-#    linear algebra routines from SLATEC, LAPACK, and EISPACK.                 #
-#    Contains f90 converted routines from Nikkhoo and Walter (GJI, 2015)       #
-#    Might contain material copyrighted by others (e.g. Numerical Recipes etc) #
+#                                                                              #
+# For dislocations, `interact` uses `dc3d.f` as provided by Y. Okada as        #
+# in Okada (BSSA, 1992), has .f90 code converted from Nikkhoo and Walter       #
+# (GJI, 2015), and uses triangular dislocation fixes from Noda (EPS,           #
+# 2025). Linear algebra routines from SLATEC, LAPACK, and EISPACK, and a       #
+# newish PETSC interface which can also include HTOOLS and H2OPUS. Along       #
+# with these H matrix packages, the code can also use HACApk, the              #
+# H-matrix library of ppOpen-HPC, as used by HBI, and the HMMVP library        #
+# by A. Bradley.                                                               #
+#                                                                              #
 #                                                                              #
 #  If you use interact in real work, a citation to use would be:               #
 #                                                                              #
