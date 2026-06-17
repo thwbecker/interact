@@ -75,7 +75,7 @@ HMMVP_OBJS = $(ODIR)/hmmvp_c_shim.o
 # -I/usr/include/x86_64-linux-gnu). Leave empty to build without BigWham.
 
 BIGWHAM_DIR = ./bigwham/BigWham/
-ifeq ($(wildcard $(BINGHAM_DIR)/.),) # does NOT exist
+ifeq ($(wildcard $(BIGWHAM_DIR)/.),) # does NOT exist
      BIGWHAM_DEFINES =
      BIGWHAM_INC =
      BIGWHAM_LIBS =
