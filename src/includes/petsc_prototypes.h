@@ -102,6 +102,11 @@ extern void  cbigwham_mvp(void *, const double *, double *);
 extern void  cbigwham_get_diagonal(void *, double *);
 extern void  cbigwham_get_info(void *, int *, int *, double *);
 extern void  cbigwham_delete(void *);
+/* interact-side BigWham driver (petsc_interact.c) */
+void           set_bigwham_defaults_and_options(struct med *);
+PetscErrorCode MatMult_bigwham(Mat, Vec, Vec);
+PetscErrorCode setup_bigwham_matshell(struct med *, struct flt *, PetscReal, int,
+				      Mat *, hacapk_shell_ctx **);
 #endif
 
 

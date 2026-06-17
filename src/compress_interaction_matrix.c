@@ -71,7 +71,10 @@ int main(int argc, char **argv)
   VecScatter ctx;
   PetscRandom rand_str;
   PetscBool read_value,flg,test_forward=PETSC_TRUE,use_full_space=PETSC_FALSE;
-  PetscBool make_matrix_externally=PETSC_FALSE; /* make matrices here on in external routine (for testing) */
+  PetscBool make_matrix_externally=PETSC_FALSE; /* make matrices here
+						   on in external
+						   routine (for
+						   testing) */
   char geom_file[STRLEN]="geom.in";
   hacapk_shell_ctx *hsc_dense,*hsc_h;
 #if ( defined(USE_HMMVP) || defined(USE_HACAPK) )
@@ -194,6 +197,16 @@ int main(int argc, char **argv)
     exit(-1);
 #endif
     break;
+  case 5:
+#ifdef USE_BIGWHAM
+    HEADNODE
+      fprintf(stderr,"%s: setting up for BigWham (full-space)\n",argv[0]);
+    set_bigwham_defaults_and_options(medium);
+#else
+    fprintf(stderr,"%s: BigWham requested but not compiled in (see USE_BIGWHAM, bigwham subdirectory, and makefile.petsc)\n",argv[0]);
+    exit(-1);
+#endif
+    break;
   case 0:			/* dense */
     break;
   }
@@ -207,8 +220,6 @@ int main(int argc, char **argv)
 
   */
   PetscCall(PetscOptionsGetString(NULL, NULL, "-geom_file", geom_file, STRLEN,&read_value));
-
- 
 
   HEADNODE{
     if(read_value)
@@ -226,7 +237,10 @@ int main(int argc, char **argv)
 
   
   if(!make_matrix_externally){
-    
+    /* 
+       make all the matrices here in this program, only for testing purposes
+
+     */
     HEADNODE{
       fprintf(stderr,"%s: computing %i by %i matrix LOCALLY\n",argv[0], m,n);
       
@@ -508,6 +522,18 @@ int main(int argc, char **argv)
       PetscCall(MatSetOption(AH, MAT_SYMMETRIC, PETSC_FALSE));
 #endif /* USE_HMMVP_MPI */
 #endif /* USE_HMMVP */
+      break;
+    case 5:
+#ifdef USE_BIGWHAM
+      /* BigWham full-space H matrix as a MATSHELL; builds its own mesh from
+	 the patch geometry and applies the strike-slip -> strike-shear
+	 sub-block of the 3N x 3N operator (see setup_bigwham_matshell). */
+      PetscCall(setup_bigwham_matshell(medium,fault,1.0,0,&AH,&hsc_h));
+      PetscCall(MatSetOption(AH, MAT_SYMMETRIC, PETSC_FALSE));
+#else
+      fprintf(stderr,"%s: BigWham requested but not compiled in\n",argv[0]);
+      exit(-1);
+#endif
       break;
     }
     

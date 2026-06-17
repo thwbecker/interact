@@ -16,6 +16,9 @@
 
 */
 #include "interact.h"
+#ifdef USE_BIGWHAM
+#include "properties.h"		/* YOUNG_MODULUS, POISSON_NU for the BigWham elastic constants */
+#endif
 #ifdef USE_PETSC
 #include "petsc_prototypes.h"
 
@@ -130,6 +133,143 @@ PetscErrorCode MatMult_HACApK(Mat A, Vec x, Vec y)
    hmatrix can be 0 (dense), 1 HTOOLS or 2 HOPUS, 3 or 4 
 */
 
+#ifdef USE_BIGWHAM
+/*
+   BigWham (full-space) driver. BigWham owns its kernel and operates on a
+   3N x 3N traction-from-slip operator in each element's local frame; interact's
+   compress / rsf operator is the strike-slip -> strike-shear N x N sub-block.
+   We assemble BigWham from interact's patch geometry, then in the matvec expand
+   the N strike-slip vector to 3N, apply, and extract the strike traction.
+
+   Sign / scale: BigWham returns traction with its own displacement-discontinuity
+   sign convention; interact's resolved shear stress has the opposite sign for the
+   self term (slip relieves shear). BIGWHAM_STRESS_SIGN folds that in; it is
+   verified against the native full-space Okada dense operator (compress with
+   -full_space 1) and may need revisiting if BigWham's convention changes.
+*/
+#ifndef BIGWHAM_STRESS_SIGN
+#define BIGWHAM_STRESS_SIGN (-1.0)
+#endif
+
+void set_bigwham_defaults_and_options(struct med *medium)
+{
+  PetscBool set;
+  medium->bigwham_eta       = 3.0;
+  medium->bigwham_eps_aca   = 1.0e-4;
+  medium->bigwham_max_leaf  = 32;
+  medium->bigwham_nthreads  = 1;
+  PetscOptionsGetReal(NULL,NULL,"-bigwham_eta",     &medium->bigwham_eta,      &set);
+  PetscOptionsGetReal(NULL,NULL,"-bigwham_eps_aca", &medium->bigwham_eps_aca,  &set);
+  PetscOptionsGetInt (NULL,NULL,"-bigwham_leaf",    &medium->bigwham_max_leaf, &set);
+  PetscOptionsGetInt (NULL,NULL,"-bigwham_nthreads",&medium->bigwham_nthreads, &set);
+}
+
+/* y = A x through BigWham, strike-slip -> strike-shear projection */
+PetscErrorCode MatMult_bigwham(Mat A, Vec x, Vec y)
+{
+  hacapk_shell_ctx *hctx;
+  const PetscScalar *xa;
+  PetscScalar *ya;
+  PetscInt i,n,lo,hi;
+  PetscFunctionBeginUser;
+  PetscCall(MatShellGetContext(A,&hctx));
+  /* gather the full x onto every rank (BigWham is OpenMP, global vectors) */
+  PetscCall(VecScatterBegin(hctx->scat,x,hctx->xall,INSERT_VALUES,SCATTER_FORWARD));
+  PetscCall(VecScatterEnd  (hctx->scat,x,hctx->xall,INSERT_VALUES,SCATTER_FORWARD));
+  PetscCall(VecGetArrayRead(hctx->xall,&xa));
+  n = hctx->nelt;
+  for(i=0;i < n;i++){		/* expand N strike-slip -> 3N (e1=strike) */
+    hctx->x3[3*i+0] = (double)xa[i];
+    hctx->x3[3*i+1] = 0.0;
+    hctx->x3[3*i+2] = 0.0;
+  }
+  PetscCall(VecRestoreArrayRead(hctx->xall,&xa));
+  cbigwham_mvp(hctx->handle,hctx->x3,hctx->y3);	      /* 3N -> 3N */
+  for(i=0;i < n;i++)		/* extract strike traction (e1) -> N */
+    hctx->ball[i] = hctx->bscale * hctx->y3[3*i+0];
+  PetscCall(VecGetOwnershipRange(y,&lo,&hi));
+  PetscCall(VecGetArray(y,&ya));
+  for(i=lo;i < hi;i++)
+    ya[i-lo] = (PetscScalar)hctx->ball[i];
+  PetscCall(VecRestoreArray(y,&ya));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+/*
+  Build (coor,conn) for BigWham 3DR0 rectangles from interact patch geometry,
+  assemble the hierarchical matrix, and wrap it in a MATSHELL.
+
+  Corner ordering matches BigWham's local-frame convention (polygon.h:
+  tangent1 = v1-v0, tangent2 = v3-v0, normal = t1 x t2), so that with
+    v0 = x - l*ts - w*td,  v1 = x + l*ts - w*td,
+    v2 = x + l*ts + w*td,  v3 = x - l*ts + w*td,
+  BigWham's local e1 = t_strike, e2 = t_dip (l,w are interact HALF lengths).
+  Elastic constants come from the same macros the Okada kernel uses, so the
+  comparison is consistent.
+*/
+PetscErrorCode setup_bigwham_matshell(struct med *medium, struct flt *fault,
+				      PetscReal scale, int mode,
+				      Mat *this_mat, hacapk_shell_ctx **hctx_out)
+{
+  hacapk_shell_ctx *hctx;
+  Vec xd;
+  PetscInt i,k,m,n;
+  double *coor; int *conn;
+  double E,nu,l,w,ts,td,c;
+  void *handle;
+  int bm,bn; double comp;
+  PetscFunctionBeginUser;
+  m = n = medium->nrflt;
+  coor = (double *)malloc(sizeof(double)*3*4*(size_t)n); /* 4 corners/patch, not shared */
+  conn = (int    *)malloc(sizeof(int)   *4*(size_t)n);
+  for(i=0;i < n;i++){
+    for(k=0;k < 3;k++){
+      ts = (double)fault[i].t_strike[k];
+      td = (double)fault[i].t_dip[k];
+      c  = (double)fault[i].x[k];
+      l  = (double)fault[i].l;
+      w  = (double)fault[i].w;
+      coor[3*(4*i+0)+k] = c - l*ts - w*td;
+      coor[3*(4*i+1)+k] = c + l*ts - w*td;
+      coor[3*(4*i+2)+k] = c + l*ts + w*td;
+      coor[3*(4*i+3)+k] = c - l*ts + w*td;
+    }
+    conn[4*i+0] = 4*i+0; conn[4*i+1] = 4*i+1;
+    conn[4*i+2] = 4*i+2; conn[4*i+3] = 4*i+3;
+  }
+  E  = (double)YOUNG_MODULUS;	/* = 2 G (1+nu), same constants as Okada */
+  nu = (double)POISSON_NU;
+  if(!medium->full_space)	/* BigWham is an infinite-medium kernel */
+    HEADNODE
+      fprintf(stderr,"setup_bigwham_matshell: WARNING: BigWham is full-space only; without -full_space 1 the dense reference is the Okada half-space operator and the comparison is not apples-to-apples\n");
+  handle = cbigwham_create(coor,3*4*(int)n,conn,4*(int)n,"3DR0-H",E,nu,
+			   (int)medium->bigwham_nthreads);
+  cbigwham_build(handle,(int)medium->bigwham_max_leaf,
+		 (double)medium->bigwham_eta,(double)medium->bigwham_eps_aca);
+  free(coor); free(conn);
+  cbigwham_get_info(handle,&bm,&bn,&comp);
+  HEADNODE
+    fprintf(stderr,"bigwham %i by %i (3 x %i patches), compression ratio %.5g\n",
+	    bm,bn,(int)n,comp);
+
+  hctx = (hacapk_shell_ctx *)malloc(sizeof(hacapk_shell_ctx));
+  hctx->handle = handle;
+  hctx->nelt   = n;
+  hctx->x3     = (double *)malloc(sizeof(double)*3*(size_t)n);
+  hctx->y3     = (double *)malloc(sizeof(double)*3*(size_t)n);
+  hctx->ball   = (double *)malloc(sizeof(double)*m);
+  hctx->bscale = (double)scale * BIGWHAM_STRESS_SIGN;
+  PetscCall(MatCreateShell(PETSC_COMM_WORLD,PETSC_DECIDE,PETSC_DECIDE,m,n,(void *)hctx,this_mat));
+  PetscCall(MatShellSetOperation(*this_mat,MATOP_MULT,(void (*)(void))MatMult_bigwham));
+  PetscCall(MatCreateVecs(*this_mat,&xd,NULL));
+  PetscCall(VecScatterCreateToAll(xd,&hctx->scat,&hctx->xall));
+  PetscCall(VecGetOwnershipRange(xd,&hctx->rs,&hctx->re));
+  PetscCall(VecDestroy(&xd));
+  *hctx_out = hctx;
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+#endif /* USE_BIGWHAM */
+
 PetscErrorCode calc_petsc_Isn_matrices(struct med *medium, struct flt *fault,
 				       PetscInt use_hmatrix,PetscReal scale, int mode,
 				       Mat *this_mat, hacapk_shell_ctx *hctx)
@@ -212,6 +352,14 @@ PetscErrorCode calc_petsc_Isn_matrices(struct med *medium, struct flt *fault,
     set_hmmvp_defaults_and_options(medium);
 #else
     fprintf(stderr,"HMMVP requested but not compiled in (see USE_HMMVP and makefile.petc)\n");
+    exit(-1);
+#endif
+    break;
+  case 5:
+#ifdef USE_BIGWHAM
+    set_bigwham_defaults_and_options(medium);
+#else
+    fprintf(stderr,"BigWham requested but not compiled in (see USE_BIGWHAM and makefile.petsc)\n");
     exit(-1);
 #endif
     break;
@@ -456,6 +604,14 @@ PetscErrorCode calc_petsc_Isn_matrices(struct med *medium, struct flt *fault,
     PetscCall(VecDestroy(&xd));
 #endif /* USE_HMMVP_MPI */
 #endif /* USE_HMMVP */
+    break;
+  case 5:
+#ifdef USE_BIGWHAM
+    /* BigWham builds its own mesh from the patch geometry, so it needs none of
+       the htool coords or the hacapk/hmmvp xc/yc/zc arrays. It overwrites the
+       AIJ *this_mat created above with its MATSHELL, like cases 3 and 4. */
+    PetscCall(setup_bigwham_matshell(medium,fault,scale,mode,this_mat,&hctx));
+#endif
     break;
   }
   if(use_hmatrix == 2){

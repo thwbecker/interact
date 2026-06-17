@@ -342,7 +342,11 @@ GEN_P_INC = src/includes/interact.h src/includes/precision_single.h src/includes
 LIBLIST = $(ODIR)/libpatchio.a $(ODIR)/libinput.a $(EISPACK_DIR)/libmyeis.a $(TGF_LIB)
 LIBLIST_DEBUG = $(ODIR)/libpatchio.dbg.a $(ODIR)/libinput.dbg.a $(EISPACK_DIR)/libmyeis.a $(TGF_LIB)
 LIBLIST_SGL = 	$(ODIR)/libpatchio.sgl.a $(ODIR)/libinput.sgl.a
-
+#
+# external type libraries for h matrices outside of petsc mainly
+#
+EXT_HMAT_LIBS = $(HACAPK_LIBS) $(HMMVP_LIBS) $(BIGWHAM_LIBS) $(SLATEC_LIBS) $(SUPERLU_LIBS)  
+EXT_HMAT_OBJS =  $(HMMVP_OBJS) $(BIGWHAM_OBJS)
 #
 # libraries, also linker flags
 #
@@ -603,25 +607,25 @@ $(ODIR)/bigwham_shim.o: bigwham_shim.cc
 	$(MPICXX) -std=c++17 $(OPTIM_FLAGS) \
 	-fPIC $(BIGWHAM_INC) $(DEFINE_FLAGS) -c $< -o $(ODIR)/bigwham_shim.o
 
-$(BDIR)/compress_interaction_matrix: $(ODIR)/compress_interaction_matrix.o $(ODIR)/coulomb_stress.o $(HMMVP_OBJS) $(BIGWHAM_OBJS) \
-	$(ODIR)/interact.o 	$(ODIR)/petsc_interact.o $(GEN_P_INC)  $(LIBLIST) 
+$(BDIR)/compress_interaction_matrix: $(ODIR)/compress_interaction_matrix.o $(ODIR)/coulomb_stress.o \
+	$(EXT_HMAT_OBJS)  $(ODIR)/interact.o $(ODIR)/petsc_interact.o $(EXT_HMAT_OBJS) \
+	$(GEN_P_INC)  $(LIBLIST) 
 	$(MPILD)   $(ODIR)/compress_interaction_matrix.o \
 	$(ODIR)/petsc_interact.o 	$(ODIR)/coulomb_stress.o $(ODIR)/interact.o  \
-	-o $(BDIR)/compress_interaction_matrix $(HMMVP_OBJS) $(BIGWHAM_OBJS) $(LIBS) $(SUPERLU_LIBS) \
-			$(PETSC_LIBS) $(HACAPK_LIBS) $(HMMVP_LIBS) $(BIGWHAM_LIBS) $(PGLIBS) $(SLATEC_LIBS)  $(LDFLAGS)
+	-o $(BDIR)/compress_interaction_matrix $(EXT_HMAT_OBJS) $(LIBS)  \
+			$(PETSC_LIBS) $(EXT_HMAT_LIBS) $(PGLIBS)   $(LDFLAGS)
 
 $(BDIR)/petsc_simple_solve: $(ODIR)/petsc_simple_solve.o $(ODIR)/coulomb_stress.o $(ODIR)/interact.o    \
-	$(ODIR)/petsc_interact.o $(GEN_P_INC) $(LIBLIST) $(HMMVP_OBJS)
+	$(ODIR)/petsc_interact.o $(GEN_P_INC) $(LIBLIST) $(EXT_HMAT_OBJS)
 	$(MPILD)   $(ODIR)/petsc_simple_solve.o $(ODIR)/petsc_interact.o    \
-	$(ODIR)/coulomb_stress.o $(ODIR)/interact.o  $(HMMVP_OBJS) \
-	-o $(BDIR)/petsc_simple_solve $(LIBS) $(SUPERLU_LIBS) \
-			$(PETSC_LIBS)  $(HACAPK_LIBS) $(HMMVP_LIBS) $(PGLIBS) $(SLATEC_LIBS)  $(LDFLAGS)
+	$(ODIR)/coulomb_stress.o $(ODIR)/interact.o  $(EXT_HMAT_OBJS) \
+	-o $(BDIR)/petsc_simple_solve $(LIBS) $(PETSC_LIBS)  $(EXT_HMAT_LIBS) $(PGLIBS)   $(LDFLAGS)
 
-$(BDIR)/rsf_solve: $(ODIR)/rsf_solve.o $(ODIR)/coulomb_stress.o   $(ODIR)/interact.o  $(ODIR)/petsc_interact.o \
-	$(GEN_P_INC) $(LIBLIST)   $(HMMVP_OBJS) $(BIGWHAM_OBJS)
-	$(MPILD)   $(ODIR)/rsf_solve.o $(ODIR)/petsc_interact.o   $(ODIR)/coulomb_stress.o $(ODIR)/interact.o  \
-	-o $(BDIR)/rsf_solve $(LIBS) $(SUPERLU_LIBS)  $(HMMVP_OBJS) $(BIGWHAM_OBJS) \
-			$(PETSC_LIBS)  $(HACAPK_LIBS) $(HMMVP_LIBS) $(BIGWHAM_LIBS) $(PGLIBS) $(SLATEC_LIBS)  $(LDFLAGS)
+$(BDIR)/rsf_solve: $(ODIR)/rsf_solve.o $(ODIR)/coulomb_stress.o \
+	$(ODIR)/interact.o  $(ODIR)/petsc_interact.o $(GEN_P_INC) $(LIBLIST)   $(EXT_HMAT_OBJS) 
+	$(MPILD)   $(ODIR)/rsf_solve.o $(ODIR)/petsc_interact.o  \
+	$(ODIR)/coulomb_stress.o $(ODIR)/interact.o  \
+	-o $(BDIR)/rsf_solve $(LIBS) $(EXT_HMAT_OBJS) $(PETSC_LIBS)  $(EXT_HMAT_LIBS) $(LDFLAGS)
 
 
 $(BDIR)/calc_design_matrix: $(ODIR)/calc_design_matrix.o  \

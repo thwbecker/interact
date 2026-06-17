@@ -52,6 +52,16 @@ typedef struct{
   VecScatter scat;		/* distributed x -> xall */
   double *ball;			/* full-length result work array */
   PetscInt rs,re;		/* local ownership range */
+#ifdef USE_BIGWHAM
+  /* BigWham only (NULL/0 for HACApK, hmmvp): interact's operator is the
+     strike-slip -> strike-stress N x N sub-block, while BigWham is 3N x 3N
+     in its per-element local frame. x3/y3 are 3N scratch for that
+     projection, nelt = N, bscale folds in sign/scale to interact's
+     stress convention. */
+  double *x3,*y3;
+  PetscInt nelt;
+  double bscale;
+#endif
 } hacapk_shell_ctx;
 #endif
 
@@ -307,6 +317,10 @@ struct med{
 #endif
 #ifdef USE_HACAPK
   PetscReal hacapk_ztol;
+#endif
+#ifdef USE_BIGWHAM
+  PetscReal bigwham_eta, bigwham_eps_aca; /* admissibility, ACA tolerance */
+  PetscInt bigwham_max_leaf, bigwham_nthreads;
 #endif
   hacapk_shell_ctx *Is_hctx,*In_hctx;
   

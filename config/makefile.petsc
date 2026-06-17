@@ -20,8 +20,6 @@ FILE2 := $(PETSC_DIR)/lib/pkgconfig/PETSc.pc # fallback
 
 PETSc.pc := $(if $(wildcard $(FILE1)),$(FILE1),$(FILE2))
 
-
-
 # Additional libraries that support pkg-config can be added to the list of PACKAGES below.
 PACKAGES := $(PETSc.pc)
 
@@ -75,17 +73,21 @@ HMMVP_OBJS = $(ODIR)/hmmvp_c_shim.o
 # uncomment the BIGWHAM_* lines below (and, if cblas.h is not on the default
 # include path, add its directory to BIGWHAM_INC, e.g. on Debian/Ubuntu
 # -I/usr/include/x86_64-linux-gnu). Leave empty to build without BigWham.
-BIGWHAM_DIR =
-BIGWHAM_DEFINES =
-BIGWHAM_INC =
-BIGWHAM_LIBS =
-BIGWHAM_OBJS =
-#BIGWHAM_DIR = ./bigwham/BigWham/
-#BIGWHAM_DEFINES = -DUSE_BIGWHAM
-#BIGWHAM_INC = -I$(BIGWHAM_DIR)/src -I$(BIGWHAM_DIR)/il -DBIGWHAM_OPENMP -DIL_BLAS -DIL_OPENBLAS -DIL_OPENMP
-# those are slightly different from our MATHLIBs - do we worry?
-#BIGWHAM_LIBS = $(BIGWHAM_DIR)/build/libBigWham.a -lopenblas -llapacke -lstdc++ -lgomp -lpthread $(MATHLIBS)
-#BIGWHAM_OBJS = $(ODIR)/bigwham_shim.o
+
+BIGWHAM_DIR = ./bigwham/BigWham/
+ifeq ($(wildcard $(BINGHAM_DIR)/.),) # does NOT exist
+     BIGWHAM_DEFINES =
+     BIGWHAM_INC =
+     BIGWHAM_LIBS =
+     BIGWHAM_OBJS =
+else
+     BIGWHAM_DEFINES = -DUSE_BIGWHAM
+     BIGWHAM_INC = -I$(BIGWHAM_DIR)/src -I$(BIGWHAM_DIR)/il -DBIGWHAM_OPENMP -DIL_BLAS -DIL_OPENBLAS -DIL_OPENMP
+     # those are slightly different from our MATHLIBs - do we worry?
+     BIGWHAM_LIBS = $(BIGWHAM_DIR)/build/libBigWham.a -lopenblas -llapacke -lstdc++ -lgomp -lpthread $(MATHLIBS)
+     BIGWHAM_OBJS = $(ODIR)/bigwham_shim.o
+endif
+
 
 PETSC_INCLUDES = -I$(PETSC_DIR)/include/ $(CPPFLAGS) 
 #
