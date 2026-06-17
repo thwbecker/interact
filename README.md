@@ -86,8 +86,8 @@ compiled automatically, as provided).
 
 General settings as to the operation of interact are set in
 `makefile`, material properties such as the shear modulus are set in
-`properties.h`, and all system-dependent settings should be changed in
-`makefile.gcc` or similar.  The reasoning behind this setup is that
+`src/includes/properties.h`, and all system-dependent settings should be changed in
+`config/makefile.gcc` or similar.  The reasoning behind this setup is that
 you are not likely to change the, say, shear modulus very often
 because it simply affects the scaling. Likewise, you will also not
 want to change the way interact works that frequently, so we hardwire
@@ -625,20 +625,28 @@ PetSc support was compiled in, providing limited access to parallel solves for o
 
 PARAMETERS:
 
- Elastic and frictional law properties are hard-coded and should be set in the "properties.h" file.
- Whenever you want to change those, you will have to recompile the program. This was done to improve
- the execution speed, assuming that material properties will not change between different model runs.
+ Elastic and frictional law properties are hard-coded and should be
+ set in the "properties.h" file.  Whenever you want to change those,
+ you will have to recompile the program. This was done to improve the
+ execution speed, assuming that material properties will not change
+ between different model runs.
 
- In the following, we will refer to two different matrices, A and I. The interaction, or I, matrix is
- assembled once for the loading simulations and holds all possible stress influence coefficients for all
- combinations of patch slips for a given geometry. I is typically held in memory and can be quite big, depending
- on the problem. Hence, there is the option to store a reduced, sparse version of I. If patches are activated
- (slipping) during a loading simulation (according to their frictional law), a system of equations
- A x = b is set up to solve for the slip vector x that corresponds to the target stress drop. This A matrix
- is also the only matrix that is assembled for a one-step calculation as we specifically know the patch/boundary
- conditions we have to consider in this case. There are several possible modes for solving completely
- unconstrained A x = b systems; constrained systems (where some entries in x have to be >=0 for unidirectionally
- constrained slip) are always solved with a direct implementation of Lawson and Hanson's solver.
+ In the following, we will refer to two different matrices, A and
+ I. The interaction, or I, matrix is assembled once for the loading
+ simulations and holds all possible stress influence coefficients for
+ all combinations of patch slips for a given geometry. I is typically
+ held in memory and can be quite big, depending on the problem. Hence,
+ there is the option to store a reduced, sparse version of I. If
+ patches are activated (slipping) during a loading simulation
+ (according to their frictional law), a system of equations A x = b is
+ set up to solve for the slip vector x that corresponds to the target
+ stress drop. This A matrix is also the only matrix that is assembled
+ for a one-step calculation as we specifically know the patch/boundary
+ conditions we have to consider in this case. There are several
+ possible modes for solving completely unconstrained A x = b systems;
+ constrained systems (where some entries in x have to be >=0 for
+ unidirectionally constrained slip) are always solved with a direct
+ implementation of Lawson and Hanson's solver.
 
  The following parameters can be set to non-default values on the command line:
 

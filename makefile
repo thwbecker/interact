@@ -106,7 +106,7 @@
 
 VPATH = src src/green src/util src/block src/testing/
 
-LOCAL_INCLUDES = -Isrc/ -Isrc/util/ -Isrc/block/
+LOCAL_INCLUDES = -Isrc/includes/ -Isrc/util/ -Isrc/block/
 
 #  Example settings:
 #
@@ -328,9 +328,9 @@ T2OBJ = $(ODIR)/test_triangle_stress.o $(INTERACT_OBJS)
 # 
 # include dependencies for all source codes
 #
-GEN_P_INC = interact.h precision_single.h precision_double.h \
-	structures.h macros.h auto_proto.h auto_proto.sgl.h fortran_proto.h \
-	filenames.h properties.h blockinvert.h constants.h
+GEN_P_INC = src/includes/interact.h src/includes/precision_single.h src/includes/precision_double.h \
+	src/includes/structures.h src/includes/macros.h src/includes/auto_proto.h src/includes/auto_proto.sgl.h src/includes/fortran_proto.h \
+	src/includes/filenames.h src/includes/properties.h src/block/blockinvert.h src/block/blockinvert_structures.h src/includes/constants.h
 
 LIBLIST = $(ODIR)/libpatchio.a $(ODIR)/libinput.a $(EISPACK_DIR)/libmyeis.a $(TGF_LIB)
 LIBLIST_DEBUG = $(ODIR)/libpatchio.dbg.a $(ODIR)/libinput.dbg.a $(EISPACK_DIR)/libmyeis.a $(TGF_LIB)
@@ -407,7 +407,7 @@ pgplot_progs:  $(BDIR)/plotevents $(BDIR)/read_bin_events
 clean: 
 	rm -rf $(ODIR)/*.o $(ODIR)/*.a  
 dist_clean:
-	rm -rf $(BDIR)/* auto_proto.h auto_proto.sgl.h
+	rm -rf $(BDIR)/* src/includes/auto_proto.h src/includes/auto_proto.sgl.h
 
 obj_directories:
 	if [ ! -s $(ODIR) ];then \
@@ -574,7 +574,7 @@ $(BDIR)/check_feedback: $(ODIR)/coulomb_stress.o $(ODIR)/check_feedback.o  $(GEN
 	$(ODIR)/coulomb_stress.o \
 		-o $(BDIR)/check_feedback  $(LIBS) $(SUPERLU_LIBS) $(SLATEC_LIBS) $(PGLIBS) $(LDFLAGS) 
 
-$(BDIR)/mspectral: $(ODIR)/mspectral.o  interact.h $(ODIR)/myopen.o $(ODIR)/period.o
+$(BDIR)/mspectral: $(ODIR)/mspectral.o  src/includes/interact.h $(ODIR)/myopen.o $(ODIR)/period.o
 	$(LD) $(LDFLAGS)  $(ODIR)/mspectral.o $(ODIR)/myopen.o $(ODIR)/period.o \
 		-o $(BDIR)/mspectral  $(LIBS)
 
@@ -752,29 +752,29 @@ $(BDIR)/geo_okada: $(ODIR)/geo_okada.o $(ODIR)/coulomb_stress.o $(GEN_P_INC)  \
 # C function prototyper
 #
 
-proto: 	auto_proto.h auto_proto.sgl.h
+proto: 	src/includes/auto_proto.h src/includes/auto_proto.sgl.h
 
 auto_proto.h: 
-	rm -f auto_proto.h 2> /dev/null;\
-	touch auto_proto.h;\
+	rm -f src/includes/auto_proto.h 2> /dev/null;\
+	touch src/includes/auto_proto.h;\
 #	cproto  $(DEFINE_FLAGS)  $(GEOPROJECT_INCLUDES) $(PETSC_INCLUDES) \
 	cproto  $(DEFINE_FLAGS)  $(GEOPROJECT_INCLUDES)  \
 		$(PGPLOT_DEFINES) $(PGPLOT_INCLUDES) $(MY_PRECISION) \
 		$(SLATEC_INCLUDES)  $(SUPERLU_INCLUDES)  -f2 -q *.c 2> /dev/null | \
 		grep -v "void main("  | grep -v "int main(" > tmp.h; \
-		mv tmp.h auto_proto.h
+		mv tmp.h src/includes/auto_proto.h
 
 
 
-auto_proto.sgl.h: 
-	rm -f auto_proto.sgl.h 2> /dev/null;\
-	touch auto_proto.sgl.h;\
+src/includes/auto_proto.sgl.h: 
+	rm -f src/includes/auto_proto.sgl.h 2> /dev/null;\
+	touch src/includes/auto_proto.sgl.h;\
 #	cproto  $(DEFINE_FLAGS)  $(GEOPROJECT_INCLUDES)  $(PETSC_INCLUDES) \
 	cproto  $(DEFINE_FLAGS)  $(GEOPROJECT_INCLUDES)  \
 		$(PGPLOT_DEFINES) $(PGPLOT_INCLUDES)  \
 		$(SLATEC_INCLUDES)  $(SUPERLU_INCLUDES)  -f2 -q *.c 2> /dev/null  | \
 		grep -v "void main("  | grep -v "int main(" > tmp.h;\
-	mv tmp.h auto_proto.sgl.h
+	mv tmp.h src/includes/auto_proto.sgl.h
 
 
 #
