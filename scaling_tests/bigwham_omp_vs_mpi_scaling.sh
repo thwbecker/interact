@@ -3,10 +3,10 @@
 # bigwham_omp_vs_mpi_scaling.sh
 #
 # Assembly (and matvec) scaling on a full-space problem, comparing:
+#   - BigWham      (use_hmatrix 5): OpenMP-parallel, full-space native kernel
 #   - HTOOL        (use_hmatrix 1): MPI-parallel,    Okada full-space (-full_space 1)
 #   - HACApK       (use_hmatrix 3): MPI-parallel,    Okada full-space
 #   - HMMVP        (use_hmatrix 4): MPI-parallel,    Okada full-space
-#   - BigWham      (use_hmatrix 5): OpenMP-parallel, full-space native kernel
 #
 # For each parallelism level P the script runs BigWham on a single MPI rank with
 # P OpenMP threads, and the Okada backends on P MPI ranks with one thread each.
@@ -40,7 +40,7 @@ set -u
 
 n=${1:-30}
 m=${2:-20}
-procs=${3:-"1 2 4"}
+procs=${3:-"1 2 4 8"}
 nrandom=${4:-20}
 
 # ---- configuration (edit for your machine) ----------------------------------
@@ -91,8 +91,13 @@ par_for(){  case "$1" in 5) echo omp;; *) echo mpi;; esac; }
 run_one(){ # $1 backend  $2 P
     local be="$1" P="$2" pre="" out asm mv err comp
     if [ "$be" -eq 5 ]; then
-        # BigWham: single rank, P OpenMP threads
-        out=$(OMP_NUM_THREADS="$P" OPENBLAS_NUM_THREADS="$P" \
+        # BigWham: single MPI rank, P OpenMP threads over H-matrix blocks. Keep
+        # BLAS single-threaded so the per-block GEMVs do not nest P threads
+        # inside P OpenMP threads (that P x P oversubscription is what made the
+        # matvec get slower with more threads). If your BigWham build leans on
+        # threaded BLAS for assembly you can raise OPENBLAS_NUM_THREADS, but for
+        # the OpenMP-over-blocks matvec one BLAS thread is the right choice.
+        out=$(OMP_NUM_THREADS="$P" OPENBLAS_NUM_THREADS=1 \
               "$BIN" -geom_file "$GEOM" -use_hmatrix 5 -full_space 1 \
                      -bigwham_nthreads "$P" $(opts_for 5) -nrandom "$nrandom" 2>&1)
     else
@@ -127,5 +132,15 @@ done
 
 echo "wrote $OUT and $CSV"
 echo ""
-echo "reminder: assembly/matvec timings are meaningful only with >= P real cores;"
-echo "          the relerr column is each backend vs the native full-space Okada dense."
+echo "reading the numbers:"
+echo "  - assembly (asm_s) is the headline; it is meaningful with >= P real cores."
+echo "  - matvec (mv_s) is the summed timing loop. At small N (a few hundred"
+echo "    patches) it is sub-millisecond per call and dominated by timer noise"
+echo "    and thread-launch overhead, so do not read its scaling there; raise N"
+echo "    (a few thousand) and nrandom (100+) to time it meaningfully."
+echo "  - relerr is each backend vs the native full-space Okada dense reference,"
+echo "    which the tool builds every run. That reference is O(N^2) in memory and"
+echo "    time, so it, not the H assembly, caps how large N can go here."
+echo "  - BigWham assembles the full 3N x 3N traction operator while the Okada"
+echo "    backends assemble the N x N strike-strike block, so compare assembly"
+echo "    scaling (slope vs P) rather than absolute time across the two groups."
