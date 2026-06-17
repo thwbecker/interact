@@ -107,7 +107,7 @@ C=====  IMAGE-SOURCE CONTRIBUTION  =====
 C=======================================                                
 c     skip free-surface correction in full-space mode (real-source
 c     Part-A term only). th
-      IF(IFULLSPACE_DC3D.EQ.0) THEN
+      IF(IFULLSPACE.EQ.0) THEN
       DD=DEPTH-Z                                                        
       CALL DCCON1(XX,YY,DD)                                             
       CALL UA0(XX,YY,DD,PP1,PP2,PP3,PP4,DUA)                            
@@ -710,7 +710,7 @@ C=====  IMAGE-SOURCE CONTRIBUTION  =====
 C=======================================
 c     skip the free-surface correction entirely in full-space mode; U
 c     then holds the infinite-medium (real-source Part-A) solution. th
-      IF(IFULLSPACE_DC3D.EQ.0) THEN
+      IF(IFULLSPACE.EQ.0) THEN
       D=DEPTH-Z                                                         
       P=Y*CD+D*SD                                                       
       Q=Y*SD-D*CD                                                       
