@@ -4,7 +4,7 @@
 #  interact: model fault interactions using dislocations in an elastic         #
 #            medium                                                            #
 #	                                                                       #
-#    Copyright (c) Thorsten W. Becker 2000 - 2025                              #
+#    Copyright (c) Thorsten W. Becker 2000 - 2026                              #
 #                                                                              #
 #    Interact uses dc3d.f as provided by Y. Okada as in Okada (BSSA, 1992) and #
 #    linear algebra routines from SLATEC, LAPACK, and EISPACK.                 #

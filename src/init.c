@@ -24,7 +24,7 @@ void check_parameters_and_init(int argc, char **argv,
     read_stress_relation_factors,use_slip_files,whole_fault_deactivations,
     use_sparse_storage,use_old_imat,use_old_amat,save_imat,save_amat,
     check_for_interaction_feedback,keep_slipping,attempt_restart,
-    suppress_nan_output,
+    suppress_nan_output,full_space,
     twod_approx_is_plane_stress,print_plane_coord,half_plane,
     variable_time_step,debug,no_interactions,force_petsc;
   MODE_TYPE tri_eval_mode;  
@@ -54,7 +54,7 @@ void check_parameters_and_init(int argc, char **argv,
 		  &suppress_nan_output,&pressure,
 		  &twod_approx_is_plane_stress,&print_plane_coord,
 		  &half_plane,&variable_time_step,&debug,&wcutoff,
-		  &no_interactions,&force_petsc,&tri_eval_mode,
+		  &no_interactions,&force_petsc,&tri_eval_mode,&full_space,
 		  (*medium)->comm_rank);
   // load files, etc
   initialize(medium,fault,read_fault_properties,max_nr_flt_files,
@@ -65,7 +65,7 @@ void check_parameters_and_init(int argc, char **argv,
 	     keep_slipping,attempt_restart,solver_mode,suppress_nan_output,
 	     pressure,twod_approx_is_plane_stress,
 	     print_plane_coord,half_plane,variable_time_step,debug,TRUE,wcutoff,
-	     no_interactions,force_petsc,tri_eval_mode);
+	     no_interactions,force_petsc,tri_eval_mode,full_space);
 }
 /*
 
@@ -98,7 +98,7 @@ void initialize(struct med **medium, struct flt **fault,
 		my_boolean variable_time_step,my_boolean debug,
 		my_boolean init_system,COMP_PRECISION wcutoff,
 		my_boolean no_interactions,my_boolean force_petsc,
-		MODE_TYPE tri_eval_mode)
+		MODE_TYPE tri_eval_mode, my_boolean full_space)
 {
 #ifdef USE_PETSC
   int fchunk;
@@ -266,6 +266,8 @@ void initialize(struct med **medium, struct flt **fault,
   (*medium)->attempt_restart = attempt_restart;
   // output of NaNs in stress or displacement?
   (*medium)->suppress_nan_output = suppress_nan_output;
+  /* full space? */
+  (*medium)->full_space = FALSE;
   if(force_petsc){
 #ifdef USE_PETSC
     (*medium)->force_petsc = force_petsc;
@@ -407,6 +409,7 @@ void init_parameters(char **argv, int argc, my_boolean *read_fault_properties,
 		     my_boolean *no_interactions,
 		     my_boolean *force_petsc,
 		     MODE_TYPE *tri_eval_mode,
+		     my_boolean *full_space,
 		     int rank)
 {
   int i,itmp;
@@ -445,6 +448,7 @@ void init_parameters(char **argv, int argc, my_boolean *read_fault_properties,
   *wcutoff = SVD_THRESHOLD;
   *no_interactions = FALSE;
   *force_petsc = FALSE;
+  *full_space = FALSE;
   /* 
      check for input options 
   */
@@ -493,6 +497,8 @@ void init_parameters(char **argv, int argc, my_boolean *read_fault_properties,
       toggle(print_plane_coord);
     }else if(strcmp(argv[i],"-ct")==0){// time step
       toggle(variable_time_step);
+    }else if(strcmp(argv[i],"-full")==0){// full space
+      *full_space = TRUE;
     }else if(strcmp(argv[i],"-sv")==0){// use SVD solver for Ax=b
       *solver_mode = SVD_SOLVER;
     }else if(strcmp(argv[i],"-sl")==0){// use LU solver for Ax=b

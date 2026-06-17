@@ -31,10 +31,10 @@
 extern void dc3d(double*,double*,double*,double*,double*,double*,double*,double*,
 		 double*,double*,double*,double*,double*,double*,double*,double*,
 		 double*,double*,double*,double*,double*,double*,double*,double*,
-		 double*,int*);
+		 double*,int*,int*);
 extern void dc3d0(double*,double*,double*,double*,double*,double*,double*,double*,
 		  double*,double*,double*,double*,double*,double*,double*,double*,
-		  double*,double*,double*,double*,double*,double*,int*);
+		  double*,double*,double*,double*,double*,double*,int*,int*);
 
 /*
   
@@ -60,7 +60,7 @@ void eval_okada(COMP_PRECISION *x,struct flt *fault,
 		COMP_PRECISION *disp,
 		COMP_PRECISION *u_global, 
 		COMP_PRECISION sm_global[3][3],int *iret,
-		MODE_TYPE mode)
+		MODE_TYPE mode,my_boolean fullspace)
 {
 
   COMP_PRECISION iso,dx[3],sm_local[3][3];
@@ -70,12 +70,13 @@ void eval_okada(COMP_PRECISION *x,struct flt *fault,
 #endif
   COMP_PRECISION x_local[3],u[12];
   static double medium_alpha = ALPHA_CONST;
-  double al1,al2,aw1,aw2,depth,cpdip;
+  double al1,al2,aw1,aw2,depth,cpdip;int ifullspace;
 #ifdef DEBUG
   COMP_PRECISION corners[MAX_NR_EL_VERTICES*3],l,w;
 #endif
   cpdip=(double)fault->dip;
 #ifdef DEBUG
+  ifullspace = (fullspace==TRUE)?(1):(0);
   if(cpdip < 0 || cpdip > 90){
     fprintf(stderr,"eval_okada: dip (%g) should be between 0 and 90 (maybe)\n",
 	    cpdip);
@@ -108,7 +109,7 @@ void eval_okada(COMP_PRECISION *x,struct flt *fault,
        &depth,&cpdip,&al1,&al2,&aw1,&aw2,
        (disp+STRIKE),(disp+DIP),(disp+NORMAL),
        (u+OKUX),(u+OKUY),(u+OKUZ),(u+OKUXX),(u+OKUYX),(u+OKUZX),
-       (u+OKUXY),(u+OKUYY),(u+OKUZY),(u+OKUXZ),(u+OKUYZ),(u+OKUZZ),iret);
+       (u+OKUXY),(u+OKUYY),(u+OKUZY),(u+OKUXZ),(u+OKUYZ),(u+OKUZZ),iret,&ifullspace);
 #else  /* single prec */
   for(i=0;i<3;i++){
     disp_d[i] = (double)disp[i];
@@ -120,7 +121,7 @@ void eval_okada(COMP_PRECISION *x,struct flt *fault,
        (disp_d+STRIKE),(disp_d+DIP),(disp_d+NORMAL),
        (u_d+OKUX),(u_d+OKUY),(u_d+OKUZ),(u_d+OKUXX),(u_d+OKUYX),(u_d+OKUZX),
        (u_d+OKUXY),(u_d+OKUYY),(u_d+OKUZY),(u_d+OKUXZ),(u_d+OKUYZ),(u_d+OKUZZ),
-       iret);
+       iret,&ifullspace);
   for(i=0;i < 12;i++){
     u[i] = (COMP_PRECISION)u_d[i];
   }
@@ -189,7 +190,7 @@ void eval_okada_basic(COMP_PRECISION *x,
 		      COMP_PRECISION *disp,
 		      COMP_PRECISION *u_global, 
 		      COMP_PRECISION sm_global[3][3],
-		      int *iret)
+		      int *iret,my_boolean fullspace)
 {
 #ifndef USE_DOUBLE_PRECISION
   double depth_d,x_d[3],disp_d[3],u_d[12],dip_d,u_global_d[3];
@@ -198,6 +199,8 @@ void eval_okada_basic(COMP_PRECISION *x,
   double medium_alpha = ALPHA_CONST;
   COMP_PRECISION u[12],iso;
   double al1,al2,aw1,aw2;
+  int ifullspace;
+  ifullspace = (fullspace==TRUE)?(1):(0);
   al1 = (double)-l;al2 = (double)l;
   aw1 = (double)-w;aw2 = (double)w;
   //#ifdef DEBUG
@@ -212,7 +215,7 @@ void eval_okada_basic(COMP_PRECISION *x,
        &al1,&al2,&aw1,&aw2,(disp+STRIKE),(disp+DIP),
        (disp+NORMAL),(u_global+INT_X),(u_global+INT_Y),(u_global+INT_Z),
        (u+OKUXX),(u+OKUYX),(u+OKUZX),(u+OKUXY),(u+OKUYY),
-       (u+OKUZY),(u+OKUXZ),(u+OKUYZ),(u+OKUZZ),iret);
+       (u+OKUZY),(u+OKUXZ),(u+OKUYZ),(u+OKUZZ),iret,&ifullspace);
 #else
   for(i=0;i<3;i++){
     x_d[i] = (double)x[i];
@@ -224,7 +227,7 @@ void eval_okada_basic(COMP_PRECISION *x,
        &al1,&al2,&aw1,&aw2,(disp_d+STRIKE),(disp_d+DIP),
        (disp_d+NORMAL),(u_global_d+INT_X),(u_global_d+INT_Y),(u_global_d+INT_Z),
        (u_d+OKUXX),(u_d+OKUYX),(u_d+OKUZX),(u_d+OKUXY),(u_d+OKUYY),
-       (u_d+OKUZY),(u_d+OKUXZ),(u_d+OKUYZ),(u_d+OKUZZ),iret);
+       (u_d+OKUZY),(u_d+OKUXZ),(u_d+OKUYZ),(u_d+OKUZZ),iret,&ifullspace);
   for(i=0;i<3;i++)
     u_global[i] = (COMP_PRECISION)u_global_d[i];
   for(i=0;i<12;i++)
@@ -262,11 +265,11 @@ void eval_okada_basic(COMP_PRECISION *x,
 void eval_point(COMP_PRECISION *x,struct flt *fault,
 		COMP_PRECISION *disp,COMP_PRECISION *u_global, 
 		COMP_PRECISION sm_global[3][3],int *iret,
-		MODE_TYPE mode)
+		MODE_TYPE mode,my_boolean fullspace)
 {
   eval_point_short(x,fault->x,fault->area,fault->sin_alpha,
 		   fault->cos_alpha,(COMP_PRECISION)fault->dip,
-		   disp,u_global,sm_global,iret,mode);
+		   disp,u_global,sm_global,iret,mode,fullspace);
 }
 /*
 
@@ -280,17 +283,20 @@ void eval_point_short(COMP_PRECISION *x,COMP_PRECISION *xf,COMP_PRECISION area,
 		      COMP_PRECISION dip,COMP_PRECISION *disp,
 		      COMP_PRECISION *u_global, 
 		      COMP_PRECISION sm_global[3][3],
-		      int *iret,MODE_TYPE mode)
+		      int *iret,MODE_TYPE mode,
+		      my_boolean fullspace)
 {
   double medium_alpha = ALPHA_CONST;
   COMP_PRECISION mu_alpha = SHEAR_MODULUS/LAMBDA_CONST;
   COMP_PRECISION u[12],
     iso,x_local[3],dx[3],sm_local[3][3];
   double depth,potency[4];
+  int ifullspace;
 #ifndef USE_DOUBLE_PRECISION
   double u_d[12],x_local_d[3],dip_d;
   int i;
 #endif
+  ifullspace = (fullspace==TRUE)?(1):(0);
   dx[INT_X]=x[INT_X] - xf[INT_X];
   dx[INT_Y]=x[INT_Y] - xf[INT_Y];
   dx[INT_Z]=x[INT_Z];
@@ -311,7 +317,7 @@ void eval_point_short(COMP_PRECISION *x,COMP_PRECISION *xf,COMP_PRECISION area,
 	(u+OKUX),(u+OKUY),(u+OKUZ),
 	(u+OKUXX),(u+OKUYX),(u+OKUZX),
 	(u+OKUXY),(u+OKUYY),(u+OKUZY),
-	(u+OKUXZ),(u+OKUYZ),(u+OKUZZ),iret);
+	(u+OKUXZ),(u+OKUYZ),(u+OKUZZ),iret,&ifullspace);
 #else
   dip_d = (double)dip;
   for(i=0;i<3;i++)
@@ -322,7 +328,7 @@ void eval_point_short(COMP_PRECISION *x,COMP_PRECISION *xf,COMP_PRECISION area,
 	(u_d+OKUX),(u_d+OKUY),(u_d+OKUZ),
 	(u_d+OKUXX),(u_d+OKUYX),(u_d+OKUZX),
 	(u_d+OKUXY),(u_d+OKUYY),(u_d+OKUZY),
-	(u_d+OKUXZ),(u_d+OKUYZ),(u_d+OKUZZ),iret);
+	(u_d+OKUXZ),(u_d+OKUYZ),(u_d+OKUZZ),iret,&ifullspace);
   for(i=0;i<12;i++)
     u[i] = (COMP_PRECISION)u_d[i];
 #endif

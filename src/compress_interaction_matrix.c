@@ -70,7 +70,7 @@ int main(int argc, char **argv)
   PetscInt nrandom = 0;	/* for timing tests */
   VecScatter ctx;
   PetscRandom rand_str;
-  PetscBool read_value,flg,test_forward=PETSC_TRUE;
+  PetscBool read_value,flg,test_forward=PETSC_TRUE,use_full_space=PETSC_FALSE;
   PetscBool make_matrix_externally=PETSC_FALSE; /* make matrices here on in external routine (for testing) */
   char geom_file[STRLEN]="geom.in";
   hacapk_shell_ctx *hsc_dense,*hsc_h;
@@ -111,6 +111,12 @@ int main(int argc, char **argv)
   
   /* set defaults, can always override */
   PetscCall(PetscOptionsGetInt(NULL, NULL, "-use_hmatrix", &medium->use_hmatrix,&read_value));
+  /* forward or inverse test? */
+  PetscCall(PetscOptionsGetBool(NULL, NULL, "-test_forward", &test_forward,&read_value));
+  /* default: standard Okada half-space */
+  PetscCall(PetscOptionsGetInt(NULL, NULL, "-full_space", &use_full_space,&read_value)); /* use read in or default */
+  medium->full_space = (my_boolean)use_full_space;
+
   /* options */
   PetscCall(PetscOptionsGetInt(NULL, NULL, "-nrandom", &nrandom,&read_value));
   PetscCall(PetscOptionsGetBool(NULL, NULL, "-test_forward", &test_forward,&read_value));
@@ -118,6 +124,19 @@ int main(int argc, char **argv)
   
   PetscCallMPI(MPI_Comm_size(PETSC_COMM_WORLD, &medium->comm_size));
   PetscCallMPI(MPI_Comm_rank(PETSC_COMM_WORLD, &medium->comm_rank));
+
+  /* propagate the half-space / full-space choice into the Okada kernel
+     (dc3d / dc3d0) once, before any assembly. with full_space != 0 the
+     Okada-based dense and H-matrix paths return the infinite-medium
+     (full-space, real-source) term only. this is read-only during the
+     subsequent (possibly threaded) assembly, so the shared flag is safe.
+     a native full-space backend (e.g. BigWham, use_hmatrix=5) can then be
+     compared against this on the same operator. */
+  HEADNODE
+    fprintf(stderr,"%s: Okada kernel mode: %s\n",argv[0],
+	    medium->full_space ?
+	    "FULL-SPACE (infinite medium, free surface suppressed)" :
+	    "half-space (standard Okada)");
   
   /* set up defaults */
   switch(medium->use_hmatrix){

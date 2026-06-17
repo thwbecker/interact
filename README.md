@@ -303,12 +303,13 @@ ________________________________________________________________________________
 
 Output from interact -h follows (run code for updated versions!)
 ________________________________________________________________________________
-interact: internal double prec, A matrix double prec
-main: initializing on 2026-06-14 08:08:48 ncore: 1
-interact: nu: 0.25000 mu: 1.000e+04 from properties.h, therefore lambda/mu: 1.00000 alpha: 0.66667
-init: compiled on Jun 14 2026 00:13:24, running in serial
 
-Interact: calculate fault stresses and displacements in a half space or in 2-D
+interact: internal double prec, A matrix double prec
+main: initializing on 2026-06-17 10:57:42 ncore: 1
+interact: nu: 0.25000 mu: 1.000e+04 from properties.h, therefore lambda/mu: 1.00000 alpha: 0.66667
+init: compiled on Jun 17 2026 10:54:26, running in serial
+
+Interact: calculate fault stresses and displacements in a half or full space or in 2-D
           using a boundary element approach.
 
 Program reads in patches subdividing a fault geometry and either solves
@@ -336,6 +337,7 @@ PetSc support was compiled in, providing limited access to parallel solves for o
 (1) The fault geometry is input via the file "geom.in",
     a list of fault patches.
     This file has the following ("patch") format for regular, rectangular (Okada) faults or point sources
+    The default is to use half-space, but the -full flag can switch point and rectangles to full space for Okada
     (free format ASCII list of parameters):
 
     x_0 y_0 z_0 strike_0 dip_0 hlength_0 hwidth_0 group_0 ...
@@ -364,7 +366,7 @@ PetSc support was compiled in, providing limited access to parallel solves for o
     Since the "ALLOW_NON_3DQUAD_GEOM" flag was used during runtime, the program can deal with
     some additional patch geometries besides rectangular. Those are selected as follows:
 
-    - point source in half-space
+    - point source in half or full space
       If ONLY fault half-length is set to a negative value, a point source will be assumed instead
       of a rectangular fault patch. In this case, width should be set to the `fault' area
       and half-length is equivalent to -aspect_ratio, where aspect_ratio is some equivalent L/W.
@@ -701,6 +703,9 @@ OPTIONS:
      OFF by default, if switch is set will be ON. See -ni for suppressed interactions in one step.
 
  -ni suppress all interactions between faults except the interactions of patches within the fault group
+
+ -full
+     use full space for Okada rectangular or point sources, default is half space.
 
  -ct use constant time steps for the loading simulation
      OFF by default, if switch is set will be ON.

@@ -60,7 +60,7 @@ PetscScalar GenKEntries_h2opus(PetscInt sdim, PetscReal x[], PetscReal y[], void
 
   get_right_slip(slip,ictx->src_slip_mode,1.0);	/* strike motion */
   eval_green_at_receiver(ictx->fault,(int)i,(int)j,slip,disp,stress,&iret,GC_STRESS_ONLY,
-			 FALSE);	/* operator assembly: single-point */
+			 FALSE,ictx->medium->full_space);	/* operator assembly: single-point */
   if(iret != 0){
     fprintf(stderr,"GenKentries_h2opus: WARNING: i=%3i j=%3i singular\n",(int)i,(int)j);
     sval = 0.0;
@@ -123,7 +123,7 @@ PetscErrorCode GenKEntries_htools(PetscInt sdim, PetscInt M, PetscInt N,
   for (j = 0; j < M; j++) {
     for (k = 0; k < N; k++) {
       eval_green_at_receiver(ictx->fault,(int)J[j],(int)K[k],slip,disp,stress,&iret,
-			     GC_STRESS_ONLY,FALSE); /* operator assembly: single-point */
+			     GC_STRESS_ONLY,FALSE,ictx->medium->full_space); /* operator assembly: single-point */
       if(iret != 0){
 	fprintf(stderr,"GenKentries_htools: WARNING: i=%3i j=%3i singular\n",(int)j,(int)k);
 	sval = 0.0;
@@ -293,7 +293,7 @@ void calc_interaction_matrix(struct med *medium,struct flt *fault,
 	for(i=0;i<medium->nrflt;i++){// loop over observing faults
 	  // evaluate the 'Green's function'
 	  eval_green_at_receiver(fault,i,j,disp,u,sm,&iret,GC_STRESS_ONLY,
-				 FALSE); /* operator assembly: single-point */
+				 FALSE,medium->full_space); /* operator assembly: single-point */
 	  if(iret != 0){
 	    /* 
 	       Green's function is singular at this point,
@@ -548,7 +548,8 @@ void calc_interaction_matrix(struct med *medium,struct flt *fault,
 
  */
 COMP_PRECISION interaction_coefficient(int i, int j, int k, int l,
-				       struct flt *fault,int *iret)
+				       struct flt *fault,int *iret,
+				       my_boolean full_space)
 {
   COMP_PRECISION disp[3],fac,
     sm[3][3]={{0.,0.,0.},{0.,0.,0.},{0.,0.,0.}},u[3]={0.,0.,0.};
@@ -566,7 +567,7 @@ COMP_PRECISION interaction_coefficient(int i, int j, int k, int l,
     /* obtain the stress vector at fault i (centroid) when fault j
        slips with disp[] */
     eval_green_at_receiver(fault,i,j,disp,u,sm,iret,GC_STRESS_ONLY,
-			   FALSE);	/* operator entries: single-point */
+			   FALSE,full_space);	/* operator entries: single-point */
     if(! *iret){// if not singular,
       // obtain the traction vector for i,j,k 
       resolve_force(fault[i].normal,sm,trac);

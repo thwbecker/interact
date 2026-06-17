@@ -22,7 +22,8 @@
 void eval_green_and_project_stress_to_fault(struct flt *fault, int ireceive,
 					    int islip, COMP_PRECISION *slip,
 					    COMP_PRECISION *s,
-					    my_boolean multi_point_eval)
+					    my_boolean multi_point_eval,
+					    my_boolean full_space)
 {
   //#define SUPER_DUPER_DEBUG
   int iret;
@@ -34,7 +35,7 @@ void eval_green_and_project_stress_to_fault(struct flt *fault, int ireceive,
 	  slip[0],slip[1],slip[2],fault[ireceive].x[0],fault[ireceive].x[1],fault[ireceive].x[2]);
 #endif
   eval_green_at_receiver(fault,ireceive,islip,slip,u,sm,&iret,GC_STRESS_ONLY,
-			 multi_point_eval);
+			 multi_point_eval,full_space);
   if(!iret){
     /* project the stresses */
     resolve_force(fault[ireceive].normal,sm,trac); /* convert to local
@@ -84,13 +85,14 @@ void eval_green_and_project_stress_to_fault(struct flt *fault, int ireceive,
 void eval_green(COMP_PRECISION *x,struct flt *fault,
 		COMP_PRECISION *disp,COMP_PRECISION *u_global, 
 		COMP_PRECISION sm_global[3][3],int *iret,
-		MODE_TYPE mode,my_boolean eval_on_itself)
+		MODE_TYPE mode,my_boolean eval_on_itself,
+		my_boolean full_space)
 /* mode type only for triangular */
 {
 #ifdef ALLOW_NON_3DQUAD_GEOM
   switch(fault->type){
   case POINT_SOURCE:{
-    eval_point(x,fault,disp,u_global,sm_global,iret,mode);
+    eval_point(x,fault,disp,u_global,sm_global,iret,mode,full_space);
     break;
   }
     /* 
@@ -120,7 +122,7 @@ void eval_green(COMP_PRECISION *x,struct flt *fault,
     break;
   }
   case OKADA_PATCH:{
-    eval_okada(x,fault,disp,u_global,sm_global,iret,mode);
+    eval_okada(x,fault,disp,u_global,sm_global,iret,mode,full_space);
     break;
   }
   case TWO_DIM_SEGMENT_PLANE_STRAIN:{
@@ -142,7 +144,7 @@ void eval_green(COMP_PRECISION *x,struct flt *fault,
     exit(-1);
   }}
 #else
-  eval_okada(x,fault,disp,u_global,sm_global,iret,mode);
+  eval_okada(x,fault,disp,u_global,sm_global,iret,mode, full_space);
 #endif
 }
 
@@ -236,7 +238,8 @@ static int get_noda_points(int rtype,COMP_PRECISION eta[7][3],COMP_PRECISION w[7
 void eval_green_at_receiver(struct flt *fault,int irec,int isrc,
 			    COMP_PRECISION *slip,COMP_PRECISION *u,
 			    COMP_PRECISION sm_global[3][3],int *iret,
-			    MODE_TYPE mode,my_boolean multi_point_eval)
+			    MODE_TYPE mode,my_boolean multi_point_eval,
+			    my_boolean full_space)
 {
   /* 
      multi_point_eval selects whether the Noda multi-point receiver
@@ -275,7 +278,7 @@ void eval_green_at_receiver(struct flt *fault,int irec,int isrc,
       for(p=0;p < np;p++){
 	calc_tri_bary_coord(fault[irec].xn,xl,eta[p][0],eta[p][1],eta[p][2]);
 	eval_green(xl,(fault+isrc),slip,u_loc,sm_loc,iret,mode,
-		   (irec==isrc)?(TRUE):(FALSE));
+		   (irec==isrc)?(TRUE):(FALSE),full_space);
 	if(*iret)
 	  return;			/* singular evaluation */
 	if(mode != GC_DISP_ONLY)
@@ -289,11 +292,11 @@ void eval_green_at_receiver(struct flt *fault,int irec,int isrc,
     break;
   default:
     eval_green(fault[irec].x,(fault+isrc),slip,u,sm_global,iret,mode,
-	       (irec==isrc)?(TRUE):(FALSE));
+	       (irec==isrc)?(TRUE):(FALSE),full_space);
   }
 #else
   eval_green(fault[irec].x,(fault+isrc),slip,u,sm_global,iret,mode,
-	     (irec==isrc)?(TRUE):(FALSE));
+	     (irec==isrc)?(TRUE):(FALSE),full_space);
 #endif
 }
 
@@ -307,7 +310,8 @@ void eval_green_at_receiver(struct flt *fault,int irec,int isrc,
 void eval_green_basic(COMP_PRECISION *x,struct flt *fault,
 		      COMP_PRECISION *disp,
 		      COMP_PRECISION *u_global, 
-		      COMP_PRECISION sm_global[3][3],int *iret)
+		      COMP_PRECISION sm_global[3][3],int *iret,
+		      my_boolean full_space)
 {
   
 #ifdef DEBUG
@@ -326,7 +330,7 @@ void eval_green_basic(COMP_PRECISION *x,struct flt *fault,
 		     (COMP_PRECISION)fault->w,
 		     (COMP_PRECISION)fault->dip,
 		     (COMP_PRECISION) -fault->x[INT_Z],
-		     disp,u_global,sm_global,iret);
+		     disp,u_global,sm_global,iret,full_space);
     break;
   }
   case TWO_DIM_SEGMENT_PLANE_STRAIN:{
@@ -345,7 +349,7 @@ void eval_green_basic(COMP_PRECISION *x,struct flt *fault,
     exit(-1);
   }}
 #else
-  eval_okada(x,fault,disp,u_global,sm_global,iret,GC_DISP_AND_STRESS);
+  eval_okada(x,fault,disp,u_global,sm_global,iret,GC_DISP_AND_STRESS,full_space);
 #endif
 }
 #ifdef USE_HACAPK
@@ -363,7 +367,7 @@ double ckernel_func(int i, int j, void *par)
   int iret;
   get_right_slip(slip,ictx->src_slip_mode,1.0);
   eval_green_at_receiver(ictx->fault,i,j,slip,disp,stress,&iret,
-			 GC_STRESS_ONLY,FALSE); /* operator assembly: single-point */
+			 GC_STRESS_ONLY,FALSE,ictx->medium->full_space); /* operator assembly: single-point */
   if(iret != 0)
     return 0.0;
   resolve_force(ictx->fault[i].normal,stress,trac);

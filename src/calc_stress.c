@@ -428,7 +428,7 @@ void calc_fields(struct med *medium,struct flt *fault,
 		//
 		/* we leave on_fault FALSE by default here */
 		eval_green(xl,(fault+iflt),fault[iflt].u,u,sm,&iret,
-			   GC_DISP_AND_STRESS,on_fault);
+			   GC_DISP_AND_STRESS,on_fault,medium->full_space);
 		//fprintf(stderr,"core %i k %3i i %3i j %3i flt %3i %11g\n",medium->comm_rank,k,i,j,iflt,u[INT_X]);
 		if(!iret){
 
@@ -486,7 +486,7 @@ void calc_fields(struct med *medium,struct flt *fault,
 	  // actual fault contribution is accounted for HERE
 	  //
 	  eval_green(xl,(fault+iflt),fault[iflt].u,u,sm,&iret,
-		     GC_DISP_AND_STRESS,on_fault);
+		     GC_DISP_AND_STRESS,on_fault,medium->full_space);
 	  if(!iret){
 	    local_u[p1]   += (SUM_ARR_PREC)u[INT_X];
 	    local_u[p1+1] += (SUM_ARR_PREC)u[INT_Y];

@@ -67,10 +67,10 @@ extern void law_nnls(A_MATRIX_PREC *,int *,int *, int *,
 extern void dc3d(double*,double*,double*,double*,double*,double*,double*,double*,
 		 double*,double*,double*,double*,double*,double*,double*,double*,
 		 double*,double*,double*,double*,double*,double*,double*,double*,
-		 double*,int*);
+		 double*,int*,int*);
 extern void dc3d0(double*,double*,double*,double*,double*,double*,double*,double*,
 		  double*,double*,double*,double*,double*,double*,double*,double*,
-		  double*,double*,double*,double*,double*,double*,int*);
+		  double*,double*,double*,double*,double*,double*,int*,int*);
 extern int dc3dts(void);
 extern void palett(int *, float *, float *);
 

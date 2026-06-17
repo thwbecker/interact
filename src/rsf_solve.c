@@ -90,6 +90,7 @@ int main(int argc,char **argv)
   /* material parameters */
   PetscReal shear_modulus_si = 32.04e9, s_wave_speed_si = 3.464e3;
   const PetscReal sec_per_year = 365.25*24.*60.*60.;
+  PetscBool use_full_space=PETSC_FALSE;
   /*  */
   VecScatter ctx;
   PetscInt tvmode = 0;		/* triangle evaluattion mode */
@@ -199,6 +200,10 @@ int main(int argc,char **argv)
       PetscCall(PetscOptionsSetValue(NULL,"-mat_htool_compressor","sympartialACA"));
   }
   PetscCall(PetscOptionsGetString(NULL, NULL, "-geom_file", geom_file, STRLEN,&read_value));
+  PetscCall(PetscOptionsGetInt(NULL, NULL, "-full_space", &use_full_space,&read_value)); /* use read in or default */
+  medium->full_space = (my_boolean)use_full_space;
+
+
   PetscCall(PetscOptionsGetString(NULL, NULL, "-rsf_file", rsf_file, STRLEN,&read_value));
   /* physical parameters */
   PetscCall(PetscOptionsGetReal(NULL,NULL,"-shear_modulus",&shear_modulus_si,NULL)); /* G [Pa] */

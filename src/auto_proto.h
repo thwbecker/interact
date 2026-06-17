@@ -133,18 +133,20 @@ void get_2dseg_disp(double *, double *, double *, double, double, double, double
 void get_2dseg_stress(double [3][3], double *, double *, double, double, double, double);
 void eval_2dsegment_plane_strain_tdd(double *, struct flt *, double *, double *, double [3][3], int, int *, unsigned char);
 /* eval_green.c */
-void eval_green_and_project_stress_to_fault(struct flt *, int, int, double *, double *, unsigned char);
-void eval_green(double *, struct flt *, double *, double *, double [3][3], int *, unsigned char, unsigned char);
+void eval_green_and_project_stress_to_fault(struct flt *, int, int, double *, double *, unsigned char, unsigned char);
+void eval_green(double *, struct flt *, double *, double *, double [3][3], int *, unsigned char, unsigned char, unsigned char);
 void eval_triangle_general(double *, struct flt *, double *, double *, double [3][3], int *, unsigned char, unsigned char);
-void eval_green_at_receiver(struct flt *, int, int, double *, double *, double [3][3], int *, unsigned char, unsigned char);
-void eval_green_basic(double *, struct flt *, double *, double *, double [3][3], int *);
+void eval_green_at_receiver(struct flt *, int, int, double *, double *, double [3][3], int *, unsigned char, unsigned char,
+			    unsigned char);
+void eval_green_basic(double *, struct flt *, double *, double *, double [3][3], int *,unsigned char);
 /* eval_iquad.c */
 void eval_iquad(double *, struct flt *, double *, double *, double [3][3], int *, unsigned char);
 /* eval_okada.c */
-void eval_okada(double *, struct flt *, double *, double *, double [3][3], int *, unsigned char);
-void eval_okada_basic(double *, double, double, double, double, double *, double *, double [3][3], int *);
-void eval_point(double *, struct flt *, double *, double *, double [3][3], int *, unsigned char);
-void eval_point_short(double *, double *, double, double, double, double, double *, double *, double [3][3], int *, unsigned char);
+void eval_okada(double *, struct flt *, double *, double *, double [3][3], int *, unsigned char, unsigned char);
+void eval_okada_basic(double *, double, double, double, double, double *, double *, double [3][3], int *, unsigned char);
+void eval_point(double *, struct flt *, double *, double *, double [3][3], int *, unsigned char, unsigned char);
+void eval_point_short(double *, double *, double, double, double, double, double *, double *, double [3][3], int *, unsigned char,
+		      unsigned char);
 void set_stress_and_disp_nan(double [3][3], double *, unsigned char);
 /* eval_triangle_gauss.c */
 void eval_triangle_gauss(double *, struct flt *, double *, double *, double [3][3], int *);
@@ -238,9 +240,9 @@ char *comment_on_code(short int);
 char *comment_on_code_bc(short int, double);
 /* init.c */
 void check_parameters_and_init(int, char **, struct med **, struct flt **, unsigned char *, double *, double *);
-void initialize(struct med **, struct flt **, unsigned char, int, unsigned char, unsigned char, double, double *, double *, unsigned char, unsigned char, unsigned char, double, unsigned char, double, unsigned char, unsigned char, unsigned char, unsigned char, unsigned char, unsigned char, unsigned char, short int, unsigned char, double, unsigned char, unsigned char, unsigned char, unsigned char, unsigned char, unsigned char, double, unsigned char, unsigned char, unsigned char);
+void initialize(struct med **, struct flt **, unsigned char, int, unsigned char, unsigned char, double, double *, double *, unsigned char, unsigned char, unsigned char, double, unsigned char, double, unsigned char, unsigned char, unsigned char, unsigned char, unsigned char, unsigned char, unsigned char, short int, unsigned char, double, unsigned char, unsigned char, unsigned char, unsigned char, unsigned char, unsigned char, double, unsigned char, unsigned char, unsigned char, unsigned char);
 void init_files(struct med **, struct flt **);
-void init_parameters(char **, int, unsigned char *, unsigned char *, unsigned char *, unsigned char *, double *, int *, unsigned char *, unsigned char *, unsigned char *, double *, unsigned char *, double *, unsigned char *, unsigned char *, unsigned char *, unsigned char *, unsigned char *, unsigned char *, unsigned char *, short int *, unsigned char *, double *, unsigned char *, unsigned char *, unsigned char *, unsigned char *, unsigned char *, double *, unsigned char *, unsigned char *, unsigned char *, int);
+void init_parameters(char **, int, unsigned char *, unsigned char *, unsigned char *, unsigned char *, double *, int *, unsigned char *, unsigned char *, unsigned char *, double *, unsigned char *, double *, unsigned char *, unsigned char *, unsigned char *, unsigned char *, unsigned char *, unsigned char *, unsigned char *, short int *, unsigned char *, double *, unsigned char *, unsigned char *, unsigned char *, unsigned char *, unsigned char *, double *, unsigned char *, unsigned char *, unsigned char *,  unsigned char *, int);
 void advance_argument(int *, int, char **);
 char *name_boolean(unsigned char);
 unsigned char toggle(unsigned char *);
@@ -252,7 +254,7 @@ int write_patch_event_file(float, int, int, float, float *, FILE *);
 void read_rsf(char *, struct med *, struct flt *);
 /* interact.c */
 void calc_interaction_matrix(struct med *, struct flt *, unsigned char);
-double interaction_coefficient(int, int, int, int, struct flt *, int *);
+double interaction_coefficient(int, int, int, int, struct flt *, int *, unsigned char);
 void get_right_slip(double *, int, double);
 double ic_from_file(int, int, int, int, struct med *);
 double aij_from_file(int, int, int, FILE *);

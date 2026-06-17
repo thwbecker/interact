@@ -180,6 +180,12 @@ struct med{
   COMP_PRECISION time,dt0,dt,stop_time,time_to_failure;
   COMP_PRECISION print_interval,slip_line_dt,old_moment_time,slip_line_time;
 #endif
+  my_boolean full_space;		/* 0 = Okada half-space (default), 1 = infinite-medium
+					   (full-space) Okada real-source term only; set into
+					   dc3d via SET_DC3D_FULLSPACE before assembly. Lets the
+					   Okada-based dense / H-matrix paths produce a full-space
+					   operator for apples-to-apples comparison against a
+					   native full-space H-matrix backend such as BigWham. */
   int nr_timesteps;
   /* triangle mode type */
   MODE_TYPE tri_eval_mode;    /* 
@@ -283,7 +289,8 @@ struct med{
   /* preallocated work vectors for the RSF ODE right hand side
      (created once in rsf_solve, layout matching Is/In rows) */
   Vec         rsf_vel, rsf_tau_dot, rsf_sigma_dot;
-  PetscInt use_hmatrix;		/* 0,1,2,3,4 */
+  PetscInt use_hmatrix;		/* 0,1,2,3,4 (5 = BigWham full-space, if compiled) */
+  
   PetscBool calc_sigma_dot;
 #ifdef USE_PETSC_HMAT
   PetscReal h2opus_eta;		/* 0.6 */

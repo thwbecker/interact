@@ -18,6 +18,7 @@ int main(int argc, char **argv)
   COMP_PRECISION dx,h,z0,x0,zp0,zp1,xoff,r,cen[2],disp[3],s[3],
     smax,dt,e[4],e09[4],u[3],sm[3][3],dummy[2];
   COMP_PRECISION *sval;
+  my_boolean full_space = FALSE;
   int q = 3,nx,nz,i,j,k,n,nf,n09,iret;
   char *tname[4]={"-tv 0 (CTR)","-tv 1 (M244)","-tv 2 (M236)","-tv 3 (HYB)"};
   if(argc > 1)
@@ -79,7 +80,7 @@ int main(int argc, char **argv)
       s[0]=s[1]=s[2]=0.0;
       for(j=0;j < nf;j++){	/* sources */
 	disp[STRIKE] = sval[j];disp[DIP] = disp[NORMAL] = 0.0;
-	eval_green_and_project_stress_to_fault(fault,i,j,disp,s,TRUE);
+	eval_green_and_project_stress_to_fault(fault,i,j,disp,s,TRUE,full_space);
       }
       dt = fabs(s[STRIKE] + 1.0); /* analytic: -1 */
       e[k] += dt;
@@ -106,7 +107,7 @@ int main(int argc, char **argv)
       s[0]=s[1]=s[2]=0.0;
       for(j=0;j < nf;j++){
 	disp[STRIKE] = sval[j];disp[DIP] = disp[NORMAL] = 0.0;
-	eval_green_and_project_stress_to_fault(fault,i,j,disp,s,(k)?(TRUE):(FALSE));
+	eval_green_and_project_stress_to_fault(fault,i,j,disp,s,(k)?(TRUE):(FALSE),full_space);
       }
       dummy[k] += fabs(s[STRIKE] + 1.0);
     }

@@ -14,7 +14,7 @@
 void phelp(void)
 {
   PE("");
-  PE("Interact: calculate fault stresses and displacements in a half space or in 2-D");
+  PE("Interact: calculate fault stresses and displacements in a half or full space or in 2-D");
   PE("          using a boundary element approach.");
   PE("");
   PE("Program reads in patches subdividing a fault geometry and either solves");
@@ -52,6 +52,7 @@ void phelp(void)
   fprintf(stderr,"(1) The fault geometry is input via the file \"%s\",\n    a list of fault patches.\n",
 	  GEOMETRY_FILE);
   PE("    This file has the following (\"patch\") format for regular, rectangular (Okada) faults or point sources");
+  PE("    The default is to use half-space, but the -full flag can switch point and rectangles to full space for Okada");
   PE("    (free format ASCII list of parameters):\n");
   PE("    x_0 y_0 z_0 strike_0 dip_0 hlength_0 hwidth_0 group_0 ...");
   PE("    x_1 y_1 z_1 strike_1 dip_1 hlength_1 hwidth_1 group_1 ...");
@@ -78,7 +79,7 @@ void phelp(void)
   PE("    Since the \"ALLOW_NON_3DQUAD_GEOM\" flag was used during runtime, the program can deal with");
   PE("    some additional patch geometries besides rectangular. Those are selected as follows:");
   PE("");
-  PE("    - point source in half-space");
+  PE("    - point source in half or full space");
   PE("      If ONLY fault half-length is set to a negative value, a point source will be assumed instead");
   PE("      of a rectangular fault patch. In this case, width should be set to the `fault' area");
   PE("      and half-length is equivalent to -aspect_ratio, where aspect_ratio is some equivalent L/W.");
@@ -495,6 +496,10 @@ void phelp(void)
   
   PE("");
   PE(" -ni suppress all interactions between faults except the interactions of patches within the fault group");
+  PE("");
+  PE(" -full");
+  PE("     use full space for Okada rectangular or point sources, default is half space.");
+  
   PE("");
   PE(" -ct use constant time steps for the loading simulation");
   fprintf(stderr,"     %s by default, if switch is set will be %s.\n",

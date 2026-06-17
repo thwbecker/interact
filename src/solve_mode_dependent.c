@@ -134,10 +134,10 @@ void assemble_ap_matrix_4(A_MATRIX_PREC *a,int naflt,int naflt_con,
 #elif defined COMP_MODE_3
 	      // need to calculate interaction coefficient right here
 	      a[eqc2m+eqc1] = (A_MATRIX_PREC)
-		interaction_coefficient(namef1tmp,namef2tmp,(int)l,(int)j,fault,&iret);
+		interaction_coefficient(namef1tmp,namef2tmp,(int)l,(int)j,fault,&iret,medium->full_space);
 	      if(cf != 0.0){
 		itmp=(A_MATRIX_PREC)interaction_coefficient(namef1tmp,namef2tmp,(int)l,
-							    NORMAL,fault,&iret);
+							    NORMAL,fault,&iret,medium->full_space);
 		if(iret){
 		  fprintf(stderr,"assemble_ap_matrix_3: WARNING: encountered iret: i/j/k/l: %i/%i/%i/%i\n",
 			  (int)namef1tmp,(int)namef2tmp,(int)l,(int)j);
@@ -256,9 +256,10 @@ void assemble_a_matrix_4(A_MATRIX_PREC *a,int naflt,
 	      // calculate interaction coefficients right now
 	      //
 	      a[eqc2nreq+eqc1] = (A_MATRIX_PREC)
-		interaction_coefficient(nameaf[i],nameaf[k],(int)l,(int)j,fault,&iret);
+		interaction_coefficient(nameaf[i],nameaf[k],(int)l,(int)j,fault,&iret,medium->full_space);
 	       if(cf != 0.0){	/* coulomb addition */
-		 itmp=(A_MATRIX_PREC)interaction_coefficient(nameaf[i],nameaf[k],(int)l,NORMAL,fault,&iret);
+		 itmp=(A_MATRIX_PREC)interaction_coefficient(nameaf[i],nameaf[k],(int)l,NORMAL,fault,&iret,
+							     medium->full_space);
 		 if(iret){
 		   fprintf(stderr,"assemble_a_matrix_3: WARNING: encountered iret: i/j/k/l: %i/%i/%i/%i\n",
 			   nameaf[i],nameaf[k],(int)l,(int)j);
@@ -396,7 +397,7 @@ void add_quake_stress_4(my_boolean *sma,COMP_PRECISION *slip,
 			  possible slip dirs. */
 	if(sma[j]){
 	  for(k=0;k<3;k++){
-	    iadbl = interaction_coefficient(i,r_flt,(int)j,(int)k,fault,&iret);
+	    iadbl = interaction_coefficient(i,r_flt,(int)j,(int)k,fault,&iret,medium->full_space);
 	    // if so, make sure that cutoff values are consistent
 	    if(fabs(iadbl) < medium->i_mat_cutoff){
 	      iadbl = 0.0;
@@ -440,7 +441,7 @@ void add_quake_stress_4(my_boolean *sma,COMP_PRECISION *slip,
       /* compute the effect of slip of r_flt on fault[i] and add to it's stress fault[i].s */
       /* stress from a given (solved/prescribed) slip: full receiver
 	 quality, multi-point types honored */
-      eval_green_and_project_stress_to_fault(fault,i,r_flt,slip,fault[i].s,TRUE);
+      eval_green_and_project_stress_to_fault(fault,i,r_flt,slip,fault[i].s,TRUE,medium->full_space);
     }
 #else
     for(j=0;j < 3;j++){/* loop through all 
@@ -568,14 +569,18 @@ my_boolean check_coulomb_stress_feedback_4(int nrflt,
 			   fault[j].mu_s,(COMP_PRECISION)ic_from_file(j,i,mode,NORMAL,medium),medium->cohesion);
 #elif defined COMP_MODE_3
 	// calculate now
-	cs_jj=coulomb_stress(fabs((COMP_PRECISION)interaction_coefficient(j,j,mode,mode,fault,&iret)),
-			   fault[j].mu_s,(COMP_PRECISION)interaction_coefficient(j,j,mode,NORMAL,fault,&iret),medium->cohesion);
-	cs_ij=coulomb_stress(fabs((COMP_PRECISION)interaction_coefficient(i,j,mode,mode,fault,&iret)),
-			   fault[i].mu_s,(COMP_PRECISION)interaction_coefficient(i,j,mode,NORMAL,fault,&iret),medium->cohesion);
-	cs_ii=coulomb_stress(fabs((COMP_PRECISION)interaction_coefficient(i,i,mode,mode,fault,&iret)),
-			   fault[i].mu_s,(COMP_PRECISION)interaction_coefficient(i,i,mode,NORMAL,fault,&iret),medium->cohesion);
-	cs_ji=coulomb_stress(fabs((COMP_PRECISION)interaction_coefficient(j,i,mode,mode,fault,&iret)),
-			   fault[j].mu_s,(COMP_PRECISION)interaction_coefficient(j,i,mode,NORMAL,fault,&iret),medium->cohesion);
+	cs_jj=coulomb_stress(fabs((COMP_PRECISION)interaction_coefficient(j,j,mode,mode,fault,&iret,medium->full_space)),
+			   fault[j].mu_s,(COMP_PRECISION)interaction_coefficient(j,j,mode,NORMAL,fault,&iret,medium->full_space),
+			     medium->cohesion);
+	cs_ij=coulomb_stress(fabs((COMP_PRECISION)interaction_coefficient(i,j,mode,mode,fault,&iret,medium->full_space)),
+			   fault[i].mu_s,(COMP_PRECISION)interaction_coefficient(i,j,mode,NORMAL,fault,&iret,medium->full_space),
+			     medium->cohesion);
+	cs_ii=coulomb_stress(fabs((COMP_PRECISION)interaction_coefficient(i,i,mode,mode,fault,&iret,medium->full_space)),
+			   fault[i].mu_s,(COMP_PRECISION)interaction_coefficient(i,i,mode,NORMAL,fault,&iret,medium->full_space),
+			     medium->cohesion);
+	cs_ji=coulomb_stress(fabs((COMP_PRECISION)interaction_coefficient(j,i,mode,mode,fault,&iret,medium->full_space)),
+			   fault[j].mu_s,(COMP_PRECISION)interaction_coefficient(j,i,mode,NORMAL,fault,&iret,medium->full_space),
+			     medium->cohesion);
 #else
 	// sparse storage
 	cs_jj=coulomb_stress(fabs((COMP_PRECISION)get_nrs_sparse_el(POSII(j,mode),POSIJ(j,mode),medium->is1,medium->val)),
