@@ -64,7 +64,7 @@ HBI_EPS_H=${3-1d-1}                          # $3: ACA tolerance, injected into 
 HBI="../hbi/lhbiem"                          # path to the patched HBI binary (Makefile TARGET=lhbiem)
 INTPL="../examples/bp5r_${RES}.in"       # BP5 rectangular .in for this resolution
 PARAM="../examples/bp5r_${RES}_param.dat" # matching per-element params (rows == imax*jmax)
-NPLIST="1 4 9 16 25 36"                     # MPI ranks: MUST be perfect squares (see note below)
+NPLIST=${4-"1 4 9 16 25 36"}                     # MPI ranks: MUST be perfect squares (see note below)
 NSTEP=2000000                               # high step cap so tmax is the stop criterion
 INTERVAL=100000                             # large so output/checkpoint I/O does not contaminate timing
 
@@ -146,7 +146,7 @@ done
 
 echo ""
 echo "wrote $CSV.csv  (per-run logs hbi_run_np<n>.log, run input $RUNIN)"
-cp "$CSV".csv ../$CSV.$HOST
+cp "$CSV".csv ../$CSV.$HOST.csv
 cat <<'EOF'
 
 CROSS-CODE COMPARISON NOTES

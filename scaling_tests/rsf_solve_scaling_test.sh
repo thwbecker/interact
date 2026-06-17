@@ -29,8 +29,11 @@
 set -u
 
 # ============================ CONFIG =======================================
-RB=../bin/rsf_solve                 # path to rsf_solve binary
-BP5=../bp5                          # dir with the BP5 input files
+wdir=$HOST			# move to working directory
+mkdir -p $wdir
+cd $wdir
+RB=../../bin/rsf_solve                 # path to rsf_solve binary
+BP5=../../bp5                          # dir with the BP5 input files
 RES=${1-0.5km}                      # $1: resolution tag, e.g. 1km / 0.5km (default 0.5km)
 NPLIST="1 2 4 8 16 24 48"       # MPI rank counts to test
 if [ $RES = "1km" ];then
@@ -48,7 +51,7 @@ HEPS=3e-5                         # HTOOL  -mat_htool_epsilon  (~6.6e-7)
 ZTOL=1e-1                         # HACApK -hacapk_ztol        (~2.2e-7)
 HMMVP_TOL=1e-7               # hmmvp  -hmmvp_tol          (~1.6e-6)
 
-MPIRUN=$PETSC_DIR/build/bin/mpirun   # set to "mpirun --oversubscribe"
+MPIRUN=mpirun   # set to "mpirun --oversubscribe"
                                            #   to test more ranks than cores
 EXTRA_MPI="--bind-to core --map-by core"   # MPI pinning, as in the compress sweep
 
@@ -126,3 +129,5 @@ echo "wrote $CSV  (and per-run logs run_<backend>_np<n>.log)"
 echo "matvec_ms is per-MatMult mean (steady-state cost); compare across backends"
 echo "at the np you actually run. See compress_interaction_matrix.md for the"
 echo "matched-band rationale and the forward-operator scaling these settings came from."
+cp rsf_solve_scaling_${RES}.csv ../rsf_solve_scaling_${RES}.$HOST.csv
+cd ..
