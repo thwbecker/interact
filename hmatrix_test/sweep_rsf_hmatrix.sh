@@ -42,11 +42,14 @@ DT_MON=${DT_MON:-2.0}                       # monitor cadence [yr] (also caps st
 VEL_EVENT=${VEL_EVENT:-1e-3}                # event slip-rate threshold [m/s]
 MAXSTEPS=${MAXSTEPS:-400000}
 RUN_TIMEOUT=${RUN_TIMEOUT:-0}               # per-run wall limit [s]; 0 = no limit.
-                                            #  Guards against a backend whose matvec
-                                            #  is slow in a given environment (e.g.
-                                            #  HMMVP streams its operator from disk,
-                                            #  so its throughput depends on the
-                                            #  filesystem) stalling the whole sweep.
+                                            #  Guards against a backend/tolerance
+                                            #  whose adaptive step count blows up
+                                            #  (a less accurate operator makes the
+                                            #  rate-and-state integrator collapse
+                                            #  its step) from stalling the sweep.
+                                            #  HMMVP in particular needs a tighter
+                                            #  tolerance than HACAPK for clean
+                                            #  stepping; watch the nstep column.
 
 # tolerance lists per backend (the primary accuracy knob for each)
 HEPS_LIST=${HEPS_LIST:-"1e-2 1e-3 1e-4 1e-6"}    # HTOOLS -mat_htool_epsilon
@@ -56,6 +59,11 @@ BACKENDS=${BACKENDS:-"dense htool hacapk hmmvp"} # subset to run
 
 MPIRUN=${MPIRUN:-mpirun}                    # e.g. ibrun / srun on a cluster,
                                             #  "mpirun --oversubscribe --allow-run-as-root" locally
+PROGRESS_SEC=${PROGRESS_SEC:-15}            # print latest simulated year every N s
+                                            #  while a run is going (0 = silent).
+                                            #  Dense is the slowest backend (O(N^2),
+                                            #  no compression); this shows it is
+                                            #  advancing rather than stalled.
 # export LD_LIBRARY_PATH=$PETSC_DIR/$PETSC_ARCH/lib:$LD_LIBRARY_PATH
 # ===========================================================================
 
@@ -100,7 +108,17 @@ run_one(){  # $1=cfgname  $2=backend  $3=tol-flags
     if [ "$be" = hmmvp ]; then np=1; omp=$PROCS; extra="-hmmvp_nthreads $PROCS"; fi
     [ "${RUN_TIMEOUT:-0}" != 0 ] && to="timeout ${RUN_TIMEOUT}"
     OMP_NUM_THREADS=$omp OPENBLAS_NUM_THREADS=1 \
-      $to $MPIRUN -np "$np" "$RB" $COMMON $(type_flag "$be") $tf $extra > run.log 2>&1
+      $to $MPIRUN -np "$np" "$RB" $COMMON $(type_flag "$be") $tf $extra > run.log 2>&1 &
+    local pid=$!
+    if [ "${PROGRESS_SEC:-15}" != 0 ]; then
+      while kill -0 "$pid" 2>/dev/null; do
+        sleep "${PROGRESS_SEC:-15}"
+        kill -0 "$pid" 2>/dev/null || break
+        local lt; lt=$(grep -v '^#' rsf_monitor.dat 2>/dev/null | tail -1 | awk '{print $3}')
+        echo "    [$name] running: t=${lt:-0} yr (of $STOP_YR), $(grep -cv '^#' rsf_monitor.dat 2>/dev/null) monitor rows"
+      done
+    fi
+    wait "$pid"
   )
 }
 
