@@ -10,13 +10,65 @@ through several hierarchical-matrix (H-matrix) backends, selected with
 | `-use_hmatrix` | backend | parallelism | tolerance knob (default) | notes |
 |:--:|----|----|----|----|
 | 0 | dense | MPI | — | exact reference; O(N^2) memory and matvec |
-| 1 | **HTOOL** (PETSc `MATHTOOL`) | MPI | `-mat_htool_epsilon` (1e-6) | also `-mat_htool_eta` (100), `-mat_htool_compressor` |
+| 1 | **HTOOL** (PETSc `MATHTOOL`) | MPI | `-mat_htool_epsilon` (3e-5) | also `-mat_htool_eta` (100), `-mat_htool_compressor` |
 | 2 | H2OPUS | serial/GPU | `-h2opus_eta` | |
-| 3 | **HACApK** (lattice H-matrix) | MPI | `-hacapk_ztol` (1e-4) | shell matvec into HACApK |
-| 4 | hmmvp | OpenMP | `-hmmvp_tol` (1e-5), `-hmmvp_eta` (3) | |
+| 3 | **HACApK** (lattice H-matrix) | MPI | `-hacapk_ztol` (1e-1) | shell matvec into HACApK |
+| 4 | hmmvp | MPI | `-hmmvp_tol` (1e-5), `-hmmvp_eta` (3) | run under MPI; matched-accuracy comparisons use tol 1e-7 |
 
 This note focuses on the two production MPI backends, **HTOOL** and **HACApK**,
 benchmarked against the **dense** ground truth.
+
+## Recommended defaults for a single-fault cycle
+
+Based on the scaling and compression studies (`scaling_tests/rsf_solve_scaling_test.sh`,
+`scaling_tests/hmat_scaling_test.sh`, `scaling_tests/rsf_solve_compression.md`):
+
+- Resolution: 1 km is the official BP5 resolution. The cohesive zone
+  `L_b = G D_RS / (b sigma)` is about 6 km, so 2 km resolves it with only ~3
+  cells: it still runs (recurrence ~236.8 yr versus 234.3 yr at 1 km, see
+  `bp5/README.md`) but is under-resolved, so use 1 km or finer for production
+  accuracy. (A strongly-coupled two-fault test did stall at 2 km when stepping
+  through its first event, but that reflects that more aggressive coupled
+  nucleation, not the single BP5 fault.)
+- Integrator: `5dp` (the default) when matching HBI or minimizing phase error,
+  `-ts_rk_type 3bs` for production (roughly 24 to 41 percent fewer matvecs, more
+  at finer resolution, at a recurrence-interval error well under 0.02 yr). ODE
+  `-rtol 1e-4`.
+- Backend: HACApK (`-use_hmatrix 3`) is the robust default (trivial assembly,
+  best compression at matched accuracy, competitive-to-best matvec, flat low
+  memory), strongest at the np = 16 to 24 sweet spot. HTOOL and hmmvp have
+  headroom at higher rank counts on cleanly-scaling hosts. Run hmmvp under MPI.
+- H-matrix tolerance at the matched ~1e-6 accuracy band: HACApK `ztol` 1e-1,
+  HTOOL `epsilon` 3e-5, hmmvp `tol` 1e-7. These sit about a decade below the
+  `rtol 1e-4` integration floor that actually limits the cycle accuracy, so the
+  dynamics are unperturbed; looser is possible once `nsteps` is confirmed flat.
+  These are now the code defaults for HACApK and HTOOL (see below); hmmvp's
+  default is left at 1e-5, which is still below the integration floor.
+
+All of the above is specific to the tested builds and BP5 geometry; other
+kernels, sizes, or library versions may shift the picture, so measure rather
+than extrapolate.
+
+---
+
+## Default change (2026-06): H-matrix tolerance defaults to the matched band
+
+The HACApK and HTOOL tolerance defaults in `petsc_interact.c` were loosened to the
+matched ~1e-6 accuracy band:
+
+```
+HACApK  -hacapk_ztol        1e-4  ->  1e-1     # set in set_hacapk_defaults_and_options
+HTOOL   -mat_htool_epsilon  1e-6  ->  3e-5     # set in set_htools_defaults_and_options
+```
+
+The earlier values were tighter than the cycle needs. For the smooth Okada
+kernel HACApK's `ztol` is conservative, so 1e-1 already reaches a forward error
+~2.2e-7 (well below the `rtol 1e-4` cycle floor) while compressing far more than
+1e-4, which is effectively near-dense for this kernel. HTOOL `epsilon` 3e-5 gives
+~6.6e-7 and, unlike 1e-6, does not land HTOOL at its least-compressed,
+slowest-matvec point at large N. Both are overridable on the command line as
+before. See `scaling_tests/rsf_solve_compression.md` for the compression-versus-N
+evidence and `compress_interaction_matrix.md` for the tolerance-to-error mapping.
 
 ---
 
@@ -51,6 +103,14 @@ is measured against the dense solution.
 | HTOOL SVD eps 1e-4 | 234.294 | +0.0002 | 0.0041 | 18.9 MB (15%) | 48.3 s | 27.2 s | 2.46 ms | 75 s |
 | HTOOL ACA eps 1e-4 | 234.285 | −0.009 | 0.0050 | 23.5 MB (18%) | 8.0 s | 32.0 s | 2.94 ms | 40 s |
 | HTOOL SVD eps 1e-6 | 234.294 | −0.0002 | 0.0039 | 28.9 MB (23%) | 49.1 s | 33.8 s | 3.16 ms | 83 s |
+
+(The HACApK row here is at `ztol` 1e-4, which is now known to be near-dense for
+this kernel and is no longer the default. At the recommended `ztol` 1e-1 it
+compresses far more: roughly 10x at 1 km and 27x at 0.5 km versus the ~5x of
+the 1e-4 setting, with a faster matvec, at the same cycle accuracy. See
+`scaling_tests/rsf_solve_compression.md`. The relative ranking of the backends
+in this single-core table is unaffected; only HACApK's memory and matvec improve
+at the recommended setting.)
 
 ### Findings
 

@@ -735,7 +735,15 @@ PetscErrorCode set_htools_defaults_and_options(struct med *medium)
       PetscCall(PetscOptionsSetValue(NULL,"-mat_htool_eta","100")); 
     PetscCall(PetscOptionsHasName(NULL,NULL,"-mat_htool_epsilon",&flg));
     if(!flg)
-      PetscCall(PetscOptionsSetValue(NULL,"-mat_htool_epsilon","1e-6"));
+      /* matched ~1e-6 accuracy band (see compress_interaction_matrix.md and
+	 scaling_tests/rsf_solve_compression.md): eps 3e-5 gave a forward error
+	 ~6.6e-7 at N=14400, comfortably below the rsf_solve ODE rtol (1e-4)
+	 that sets the cycle error floor. The earlier 1e-6 default was tighter
+	 than needed and, at production sizes (e.g. 0.5 km / N~16000), landed
+	 HTOOL near its least-compressed, slowest-matvec point. Specific to the
+	 tested build and BP5 geometry; other configs may want a different
+	 value. */
+      PetscCall(PetscOptionsSetValue(NULL,"-mat_htool_epsilon","3e-5"));
     PetscCall(PetscOptionsHasName(NULL,NULL,"-mat_htool_compressor",&flg));
     if(!flg)
       PetscCall(PetscOptionsSetValue(NULL,"-mat_htool_compressor","sympartialACA"));
@@ -756,6 +764,15 @@ PetscErrorCode set_hmmvp_defaults_and_options(struct med *medium)
 {
   static my_boolean init=FALSE;
   if(!init){
+    /* hmmvp_tol left at 1e-5: this is below the ODE rtol (1e-4) cycle error
+       floor, so it is accurate enough for the single-fault cycle while
+       compressing more than a tighter setting. Note the matched-accuracy
+       comparisons in the scaling and compression notes use hmmvp_tol 1e-7,
+       the point where hmmvp's stochastic Frobenius error estimate reaches
+       ~1.6e-6 (tightening below that does not help); 1e-7 is the value to use
+       when matching hmmvp's operator accuracy to HTOOL eps 3e-5 / HACApK ztol
+       1e-1, not necessarily the best cycle default. A forward-error sweep over
+       hmmvp_tol would settle whether 1e-5 or something looser is optimal. */
     medium->hmmvp_tol = 1.0e-5;
     medium->hmmvp_eta = 3.0;
     medium->hmmvp_nthreads = 1;
@@ -777,7 +794,16 @@ PetscErrorCode set_hacapk_defaults_and_options(struct med *medium)
 {
   static my_boolean init=FALSE;
   if(!init){
-    medium->hacapk_ztol = 1.0e-4;
+    /* matched ~1e-6 accuracy band: ztol 1e-1 gave a forward error ~2.2e-7 at
+       N=14400 (see compress_interaction_matrix.md), well below the ODE rtol
+       (1e-4) that sets the cycle error floor. HACApK's ztol is conservative
+       for the smooth Okada kernel, so 1e-1 already reaches the band while
+       compressing far more than the earlier 1e-4 default, which is effectively
+       near-dense for this kernel (scaling_tests/rsf_solve_scaling_test.sh and
+       rsf_solve_compression.md): at 0.5 km, ztol 1e-1 stored ~27x less than
+       dense versus ~15x at 1e-4, with a faster matvec. Specific to the tested
+       build and BP5 geometry; verify before relying on it for other kernels. */
+    medium->hacapk_ztol = 1.0e-1;
     PetscCall(PetscOptionsGetReal(NULL,NULL,"-hacapk_ztol",&medium->hacapk_ztol,NULL));
   }
   init=TRUE;
