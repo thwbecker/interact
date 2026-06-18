@@ -31,12 +31,14 @@ On a multi-core node, with `rsf_solve` already built and `PETSC_DIR`/`PETSC_ARCH
 set (and PETSc libs on `LD_LIBRARY_PATH`):
 
 ```
-./sweep_rsf_hmatrix.sh 2.0 260 8
+./sweep_rsf_hmatrix.sh 1.0 260 8
 #                       ds  yr  procs
 ```
 
-This generates a 2 km, 2000-patch two-fault problem, runs to 260 yr (past the
-first event), and uses 8-way parallelism per run. Edit the CONFIG block at the
+This generates a 1 km two-fault problem, runs to 260 yr (past the first event),
+and uses 8-way parallelism per run. Use ds=1.0 or finer: a 2 km grid is too
+coarse to integrate through the coseismic rupture (the adaptive step size
+collapses at the first event and the run appears to stall). Edit the CONFIG block at the
 top of `sweep_rsf_hmatrix.sh` for paths, fault separation, the per-backend
 tolerance lists, and `MPIRUN` (set it to `ibrun` or `srun` on a cluster). On a
 single-core box, pass `procs=1` (or set `MPIRUN` to oversubscribe) for a
@@ -85,18 +87,35 @@ given.
 
 ## Caveats
 
-- The fault separation is a modeling choice, not a standardized BP5 quantity, so
-  the resulting sequence is illustrative of an interacting pair rather than a
-  benchmark. The coupling strength depends on `sep` relative to the VW patch
-  size.
-- HMMVP streams its compressed operator from a disk file rather than holding it
-  in memory, so its time-stepping throughput depends on the filesystem. On a
-  fast node or scratch filesystem this is fine (its assembly and single-matvec
-  performance were strong in separate tests); on a slow or constrained
-  filesystem the per-step file traffic can dominate. The `RUN_TIMEOUT` config
-  guards against any backend stalling the whole sweep in a given environment;
-  set it generously on a real run, or to 0 to disable. If HMMVP looks anomalously
-  slow, check where its `.hm` file lands and whether that path is fast.
+- Resolution must carry the rupture. At 2 km the BP5 process zone is only ~3
+  cells and the solve cannot step through the first coseismic event: the step
+  size collapses to zero and every backend (including the exact dense solve)
+  stalls. Use 1 km, where the single-fault BP5 cycle was validated, or 0.5 km if
+  the two-fault coupling still stalls. The progress poll prints the latest dt; a
+  dt collapsing toward 0 with the time stuck is the signature of an
+  under-resolved rupture, distinct from a backend simply being slow.
+- The dense reference is the cost driver at these sizes (no compression, O(N^2)
+  matvec). To keep it tractable you can limit `stop_yr` to just past the first
+  event rather than several recurrence cycles, since the trace and first-event
+  timing already give the accuracy signal; or, if the dense reference is
+  impractical at your chosen resolution, use a tight-tolerance H-run (for
+  example hacapk at `ztol` 1e-6) as the reference instead and compare the looser
+  settings against it.
+- HMMVP needs a tighter tolerance than the others for clean cycle stepping. Its
+  matvec is in-memory and cheap (the MPI path loads the operator into RAM once;
+  per-matvec cost is comparable to HACAPK), but at a loose tolerance its forward
+  operator is the least accurate of the three, and the adaptive rate-and-state
+  integrator responds to that operator noise by collapsing its step size. In
+  testing at a coarse resolution, HMMVP at `-hmmvp_tol` 1e-2 took roughly 200x
+  smaller steps than HACAPK and barely advanced in simulated time, while at
+  `-hmmvp_tol` 1e-7 it stepped normally and finished as fast as HACAPK. The
+  effect is the cost showing up as step count rather than per-step cost, so watch
+  the `nstep` column: a backend/tolerance that inflates `nstep` is paying for
+  operator error through the integrator. The `RUN_TIMEOUT` config guards against
+  any backend/tolerance combination whose step count blows up from stalling the
+  whole sweep; set it generously on a real run, or to 0 to disable. This is the
+  accuracy-vs-speed coupling the sweep is meant to expose, so include tight
+  HMMVP tolerances in `HMTOL_LIST` rather than only loose ones.
 - Parallelism: the MPI backends (dense, HTOOLS, HACAPK) run on `procs` MPI
   ranks; HMMVP, being OpenMP, runs on one rank with `procs` threads, so each
   backend gets `procs`-way parallelism in its native mode. Cross-backend timing

@@ -30,7 +30,9 @@ RB=${RB:-$HERE/../bin/rsf_solve}            # path to rsf_solve binary
 GEN=${GEN:-$HERE/make_two_fault.py}
 ACC=${ACC:-$HERE/rsf_accuracy.py}
 
-DS=${1:-${DS:-2.0}}                         # cell size [km]
+DS=${1:-${DS:-1.0}}                         # cell size [km]; 1.0 carries the BP5
+                                            #  rupture (2.0 is too coarse: the step
+                                            #  size collapses at the first event).
 STOP_YR=${2:-${STOP_YR:-260}}               # simulated time [yr]
 PROCS=${3:-${PROCS:-4}}                     # parallelism per run
 SEP=${SEP:-4.0}                             # fault-normal separation [km]
@@ -114,8 +116,12 @@ run_one(){  # $1=cfgname  $2=backend  $3=tol-flags
       while kill -0 "$pid" 2>/dev/null; do
         sleep "${PROGRESS_SEC:-15}"
         kill -0 "$pid" 2>/dev/null || break
-        local lt; lt=$(grep -v '^#' rsf_monitor.dat 2>/dev/null | tail -1 | awk '{print $3}')
-        echo "    [$name] running: t=${lt:-0} yr (of $STOP_YR), $(grep -cv '^#' rsf_monitor.dat 2>/dev/null) monitor rows"
+        # report the MAX simulated time reached and the latest dt; a dt
+        # collapsing toward 0 with the time stuck means the mesh cannot
+        # resolve the current (coseismic) phase, not that the run is hung.
+        local prog; prog=$(grep -v '^#' rsf_monitor.dat 2>/dev/null | \
+          awk 'BEGIN{m=0;d=0}{if($3+0>m)m=$3; d=$4}END{printf "%.4g %.2e",m,d}')
+        echo "    [$name] t=${prog%% *}/$STOP_YR yr, last dt=${prog#* } s, $(grep -cv '^#' rsf_monitor.dat 2>/dev/null) rows"
       done
     fi
     wait "$pid"
