@@ -48,6 +48,16 @@ MAKEFAULT=${MAKEFAULT:-../bin/makefault}
 WORK=$(mktemp -d)
 trap 'rm -rf "$WORK"' EXIT
 
+# This correctness test is serial by design: every run is small and we only
+# care about accuracy, not timing. Pin the thread counts so it behaves the same
+# on a laptop and on a many-core node. Without this, an inherited
+# OMP_NUM_THREADS (often one per core on a compute node) makes BigWham spin up a
+# thread per core for each tiny assembly, which thrashes and can look like a
+# stall. Override by exporting BWTEST_THREADS before running if you really want
+# threads here.
+export OMP_NUM_THREADS=${BWTEST_THREADS:-1}
+export OPENBLAS_NUM_THREADS=${BWTEST_THREADS:-1}
+
 # accuracy threshold for the PASS/FAIL flag: a real frame/sign bug shows up as
 # O(0.1)..O(2), far above this, while a correct operator agrees to the ACA
 # tolerance or better. Floor at 1e-9 for the no-compression (tiny N) cases.
@@ -162,6 +172,36 @@ echo ""
 echo "Half-space guard (running use_hmatrix 5 without -full_space should warn):"
 "$BIN" -geom_file "$WORK/single.in" -use_hmatrix 5 -nrandom 1 2>&1 \
     | grep -i "full-space only" | sed 's/^/   /' | head -1
+
+# ---------------------------------------------------------------------------
+# 9. BigWham matvec thread invariance. The threaded matvec accumulates into a
+#    private per-thread vector and reduces at the end, so it is worth confirming
+#    the answer does not depend on the thread count. OMP_NUM_THREADS is pinned
+#    to 1 above (serial assembly), and the matvec thread count is the separate
+#    -bigwham_nthreads knob, so this sweeps that and checks the error against the
+#    full-space Okada dense is the same for every thread count. Useful to run on
+#    a many-core machine before trusting threaded matvecs there.
+echo ""
+echo "BigWham matvec thread invariance on the planar mesh"
+echo "(relerr vs full-space Okada should be identical across -bigwham_nthreads):"
+printf "%-18s %-s\n" "bigwham_nthreads" "relerr"
+ref=""
+inv="PASS"
+for nth in 1 2 4 8; do
+    out=$("$BIN" -geom_file "$WORK/plane.in" -use_hmatrix 5 -full_space 1 \
+                 -bigwham_nthreads "$nth" -bigwham_eps_aca "$eps_aca" -nrandom 3 2>&1)
+    r=$(echo "$out" | grep "b-b_h" | awk '{print $NF}')
+    printf "%-18s %-s\n" "$nth" "${r:-FAIL}"
+    if [ -z "$ref" ]; then
+        ref="$r"
+    else
+        # flag if the relerr moves by more than a small relative amount across
+        # thread counts (it should be bit-for-bit or extremely close)
+        same=$(awk -v a="$ref" -v b="$r" 'BEGIN{d=(a-b); if(d<0)d=-d; m=(a>0?a:1e-30); print (d/m<1e-6)?1:0}')
+        [ "$same" -eq 1 ] || inv="FAIL (thread count changed the answer)"
+    fi
+done
+echo "thread invariance: $inv"
 
 echo ""
 echo "done."
