@@ -135,6 +135,39 @@ The balance depends on problem size, so the choice is size-aware here.
   sizes and settings tested; hmmvp is designed and tuned for large problems and
   may compare differently elsewhere.
 
+## Relation to the forward-operator test (hmat_scaling_test.sh)
+
+scaling_tests/hmat_scaling_test.sh is the compress_interaction_matrix analog: a
+two-fault 14400-patch geometry swept over MPI ranks at the same matched band,
+reporting forward error, assembly, and matvec. It is consistent with this sweep
+on the points that matter most, and it validates the matched band directly,
+which this compression test only assumes.
+
+- Matched band confirmed. hmat_scaling measures the forward error we do not
+  measure here: eps 3e-5 gives about 6.6e-7, ztol 1e-1 about 2.2e-7, and tol
+  1e-7 about 1.6e-6. So those three settings really are a matched roughly 1e-6
+  band, which underlies every cross-backend statement above. It also confirms
+  the hmmvp floor: its error stays near 1.5 to 1.6e-6 from tol 1e-7 out to 1e-3,
+  so hmmvp's loose-tolerance high compression is below the accuracy band.
+- Assembly agrees in shape and ranking: htool dominates and is strongly
+  rank-dependent (about 568 s at np 1 down to about 7 s at np 48 for 14400),
+  while hacapk and hmmvp assemble cheaply (about 25 s at np 1 to about 1 s at np
+  48). Same ordering as here.
+- The matvec cross-backend ranking differs between the two tests, and this is a
+  measurement distinction rather than a contradiction. hmat_scaling does a block
+  forward apply of 100 vectors, which amortizes per-call overhead and reflects
+  raw operator throughput; there hmmvp's matvec looks fastest. rsf_solve applies
+  the operator one vector at a time inside the ODE loop through a PETSc MATSHELL,
+  paying the full per-call cost every step (including the gather and scatter,
+  and for hmmvp a scatter to root on every apply), which is why hmmvp ranks
+  among the slowest here while hacapk and htool lead. The two harnesses also use
+  different geometry (two makefault faults versus the single planar BP5 fault),
+  which contributes to the per-backend differences as well. For choosing a
+  backend for actual cycle runs the per-call rsf_solve numbers are the relevant
+  ones; for raw forward throughput hmat_scaling is the right reference. If
+  hmmvp's throughput is attractive, the lever is its per-call MATSHELL overhead,
+  not its compression.
+
 ## Caveats
 
 - These numbers are specific to the tested configurations (1 km at np 8 and
