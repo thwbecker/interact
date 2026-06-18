@@ -245,7 +245,7 @@ int main(int argc,char **argv)
   }
   
   PetscCall(PetscOptionsGetString(NULL, NULL, "-geom_file", geom_file, STRLEN,&read_value));
-  PetscCall(PetscOptionsGetInt(NULL, NULL, "-full_space", &use_full_space,&read_value)); /* use read in or default */
+  PetscCall(PetscOptionsGetBool(NULL, NULL, "-full_space", &use_full_space,&read_value)); /* use read in or default */
   medium->full_space = (my_boolean)use_full_space;
   PetscCall(PetscOptionsGetString(NULL, NULL, "-rsf_file", rsf_file, STRLEN,&read_value));
   /* physical parameters */
