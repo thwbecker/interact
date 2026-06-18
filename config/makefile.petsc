@@ -70,11 +70,11 @@ HMMVP_OBJS = $(ODIR)/hmmvp_c_shim.o
 # OFF by default (BigWham is GPL v3, OpenMP-only, and not part of interact).
 # To enable: clone https://github.com/GeoEnergyLab-EPFL/BigWham into
 # interact/BigWham, build it with BigWham/compile_for_interact.sh, then
-# uncomment the BIGWHAM_* lines below (and, if cblas.h is not on the default
+# set the BIGWHAM_* lines below (and, if cblas.h is not on the default
 # include path, add its directory to BIGWHAM_INC, e.g. on Debian/Ubuntu
-# -I/usr/include/x86_64-linux-gnu). Leave empty to build without BigWham.
-
-BIGWHAM_DIR = ./bigwham/BigWham/
+# -I/usr/include/x86_64-linux-gnu). Leave dir to non existant to build without BigWham.
+BIGWHAM_DIR = xxx
+#BIGWHAM_DIR = ./bigwham/BigWham/
 ifeq ($(wildcard $(BIGWHAM_DIR)/.),) # does NOT exist
      BIGWHAM_DEFINES =
      BIGWHAM_INC =

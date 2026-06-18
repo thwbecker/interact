@@ -202,7 +202,8 @@ int main(int argc,char **argv)
 #ifdef USE_PETSC_HMAT		/* htools and H2opus  */
     set_htools_defaults_and_options(medium);
 #else
-    fprintf(stderr,"%s: h matrix type %i not compiled in, see makefile.petsc \n",argv[0]);
+    fprintf(stderr,"%s: h matrix type %i not compiled in, see makefile.petsc \n",
+	    argv[0],medium->use_hmatrix);
     exit(-1);
 #endif
     break;
@@ -210,7 +211,7 @@ int main(int argc,char **argv)
 #ifdef USE_PETSC_HMAT		/* htools and H2opus  */
     set_h2opus_defaults_and_options(medium);
 #else
-    fprintf(stderr,"%s: h matrix type %i not compiled in, see makefile.petsc \n",argv[0]);
+    fprintf(stderr,"%s: h matrix type %i not compiled in, see makefile.petsc \n",argv[0],medium->use_hmatrix);
     exit(-1);
 #endif
     break;
@@ -218,7 +219,7 @@ int main(int argc,char **argv)
 #ifdef USE_HACAPK
     set_hacapk_defaults_and_options(medium);
 #else
-    fprintf(stderr,"%s: h matrix type %i not compiled in, see makefile.petsc \n",argv[0]);
+    fprintf(stderr,"%s: h matrix type %i not compiled in, see makefile.petsc \n",argv[0],medium->use_hmatrix);
     exit(-1);
 #endif
    break;
@@ -226,7 +227,7 @@ int main(int argc,char **argv)
 #ifdef USE_HMMVP
     set_hmmvp_defaults_and_options(medium);
 #else
-    fprintf(stderr,"%s: h matrix type %i not compiled in, see makefile.petsc \n",argv[0]);
+    fprintf(stderr,"%s: h matrix type %i not compiled in, see makefile.petsc \n",argv[0],medium->use_hmatrix);
     exit(-1);
 #endif
     break;
@@ -234,7 +235,7 @@ int main(int argc,char **argv)
 #ifdef USE_BIGWHAM
     set_bigwham_defaults_and_options(medium);
 #else
-    fprintf(stderr,"%s: h matrix type %i not compiled in, see makefile.petsc \n",argv[0]);
+    fprintf(stderr,"%s: h matrix type %i not compiled in, see makefile.petsc \n",argv[0],medium->use_hmatrix);
     exit(-1);
 #endif
     break;

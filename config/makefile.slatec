@@ -7,7 +7,7 @@ SLATEC_DEFINES = -DUSE_SLATEC_NNLS
 #
 # where did we put the SLATEC distribution form slatec_nnls.tar?
 #
-SLATEC_DIR = slatec/
+SLATEC_DIR = src/la_and_geo/slatec/
 #
 # where are the slatec include files?
 #
@@ -19,6 +19,6 @@ SLATEC_INCLUDES = -I$(SLATEC_DIR)/
 # for ATLAS type of blas/linpack
 #
 SLATEC_LIBS = -L$(SLATEC_DIR)/ \
-	-lslatec_sgl -lslatec_dbl  $(BLASLIB) 
+	-lslatec_sgl -lslatec_dbl  $(MATHLIB) 
 	
 
