@@ -2,10 +2,14 @@
 
 Companion note to the MPI scaling test. This sweep fixes the rank count and
 varies each H-matrix backend's accuracy tolerance, mapping compression against
-speed on the single SEAS BP5 fault. Numbers below are for two configurations
-(1 km at np = 8 and 0.5 km at np = 16, both 50 yr interseismic runs at rtol
-1e-4) and one build of each library; other resolutions, rank counts, builds, or
-library versions may behave differently.
+speed on the single SEAS BP5 fault. Numbers below are from a tolerance sweep at
+three resolutions (2 km, 1 km, 0.5 km, i.e. N about 1000, 4000, 16000) at 50 yr
+and rtol 1e-4, run on walter, and one build of each library; other rank counts,
+builds, or library versions may behave differently. The compression columns
+(compr_x, mem) are independent of rank count; the timing columns (assembly,
+matvec, total) depend on it, and the per-rank count was not recorded in the
+CSVs, so cross-resolution timing should be read with that caveat while
+within-resolution comparisons are clean.
 
 ## Setup
 
@@ -17,49 +21,106 @@ different operator accuracy for each (the tolerance-to-error mapping is in
 compress_interaction_matrix.md). compr_x is dense memory divided by H-matrix
 memory; matvec_ms is the mean per-MatMult cost.
 
-## Results (1 km, np = 8, 50 yr, rtol 1e-4)
+## Results (tolerance sweep, 50 yr, rtol 1e-4, walter)
+
+### 2 km (N about 1000)
 
 | backend | tol  | compr_x | mem_MB | assembly_s | matvec_ms | total_s | nsteps |
 |---------|------|--------:|-------:|-----------:|----------:|--------:|-------:|
-| dense   | -    |   1.0   | 122.1  |  3.12      | 1.897     | 7.37    | 341    |
-| htool   | 1e-2 |  13.7   |   8.9  |  3.49      | 0.183     | 4.02    | 342    |
-| htool   | 1e-3 |   8.6   |  14.2  |  3.49      | 0.189     | 4.01    | 341    |
-| htool   | 1e-4 |   6.3   |  19.5  |  3.56      | 0.188     | 4.08    | 342    |
-| htool   | 1e-5 |   4.9   |  24.7  |  3.54      | 0.202     | 4.09    | 342    |
-| htool   | 1e-6 |   4.0   |  30.4  |  3.62      | 0.238     | 4.24    | 341    |
-| hacapk  | 1e-1 |  10.1   |  12.1  |  0.30      | 0.253     | 0.95    | 337    |
-| hacapk  | 3e-2 |   8.8   |  13.8  |  0.36      | 0.286     | 1.10    | 339    |
-| hacapk  | 1e-2 |   7.9   |  15.4  |  0.43      | 0.306     | 1.19    | 338    |
-| hacapk  | 3e-3 |   6.7   |  18.2  |  0.46      | 0.344     | 1.31    | 340    |
-| hacapk  | 1e-3 |   6.0   |  20.2  |  0.48      | 0.371     | 1.38    | 341    |
-| hmmvp   | 1e-3 |  16.3   |   7.5  |  0.47      | 0.312     | 1.24    | 336    |
-| hmmvp   | 1e-4 |  11.6   |  10.5  |  0.58      | 0.320     | 1.38    | 340    |
-| hmmvp   | 1e-5 |   8.3   |  14.7  |  0.67      | 0.333     | 1.50    | 342    |
-| hmmvp   | 1e-6 |   6.2   |  19.8  |  0.80      | 0.365     | 1.70    | 341    |
-| hmmvp   | 1e-7 |   4.8   |  25.5  |  0.91      | 0.380     | 1.83    | 341    |
+| dense   | -    |   1.0   |   7.6  |  0.16      | 0.040     | 0.277   | 226    |
+| htool   | 1e-2 |   3.8   |   2.0  |  0.17      | 0.063     | 0.313   | 224    |
+| htool   | 1e-3 |   2.5   |   3.0  |  0.18      | 0.066     | 0.323   | 226    |
+| htool   | 1e-4 |   2.0   |   3.8  |  0.19      | 0.065     | 0.329   | 226    |
+| htool   | 1e-5 |   1.6   |   4.7  |  0.20      | 0.061     | 0.336   | 226    |
+| htool   | 1e-6 |   1.4   |   5.4  |  0.20      | 0.062     | 0.339   | 226    |
+| hacapk  | 1e-1 |   3.8   |   2.0  |  0.07      | 0.116     | 0.307   | 223    |
+| hacapk  | 3e-2 |   3.6   |   2.1  |  0.07      | 0.121     | 0.323   | 226    |
+| hacapk  | 1e-2 |   3.3   |   2.3  |  0.07      | 0.121     | 0.322   | 226    |
+| hacapk  | 3e-3 |   3.0   |   2.5  |  0.08      | 0.124     | 0.327   | 226    |
+| hacapk  | 1e-3 |   2.7   |   2.8  |  0.08      | 0.128     | 0.336   | 226    |
+| hmmvp   | 1e-3 |   5.8   |   1.3  |  0.14      | 0.115     | 0.362   | 224    |
+| hmmvp   | 1e-4 |   4.0   |   1.9  |  0.15      | 0.117     | 0.382   | 226    |
+| hmmvp   | 1e-5 |   3.0   |   2.5  |  0.16      | 0.118     | 0.392   | 226    |
+| hmmvp   | 1e-6 |   2.5   |   3.1  |  0.18      | 0.122     | 0.421   | 226    |
+| hmmvp   | 1e-7 |   1.9   |   3.9  |  0.20      | 0.126     | 0.439   | 226    |
 
-## Results (0.5 km, np = 16, 50 yr, rtol 1e-4)
-
-N is about 16000, so the dense operator is roughly 2 GB and the dense baseline
-is skipped. compr_x is relative to that dense size.
+### 1 km (N about 4000)
 
 | backend | tol  | compr_x | mem_MB | assembly_s | matvec_ms | total_s | nsteps |
 |---------|------|--------:|-------:|-----------:|----------:|--------:|-------:|
-| htool   | 1e-2 |  35.4   |  55.2  | 42.57      | 0.631     | 45.98   | 722    |
-| htool   | 1e-3 |  21.7   |  89.9  | 41.69      | 0.838     | 46.02   | 718    |
-| htool   | 1e-4 |  15.4   | 127.2  | 41.36      | 1.337     | 48.14   | 717    |
-| htool   | 1e-5 |   9.4   | 206.9  | 42.33      | 3.205     | 57.78   | 718    |
-| htool   | 1e-6 |   4.4   | 442.1  | 47.27      | 7.682     | 83.64   | 716    |
-| hacapk  | 1e-1 |  26.8   |  73.0  |  0.81      | 0.833     | 5.06    | 713    |
-| hacapk  | 3e-2 |  22.0   |  88.6  |  0.94      | 0.975     | 5.92    | 723    |
-| hacapk  | 1e-2 |  19.1   | 102.1  |  1.09      | 1.133     | 6.82    | 718    |
-| hacapk  | 3e-3 |  16.3   | 119.5  |  1.28      | 1.414     | 8.27    | 715    |
-| hacapk  | 1e-3 |  14.7   | 132.7  |  1.32      | 1.565     | 9.04    | 716    |
-| hmmvp   | 1e-3 |  47.9   |  40.8  |  1.24      | 0.887     | 5.84    | 723    |
-| hmmvp   | 1e-4 |  34.6   |  56.5  |  1.74      | 0.919     | 6.46    | 718    |
-| hmmvp   | 1e-5 |  25.0   |  78.2  |  1.87      | 0.968     | 6.82    | 718    |
-| hmmvp   | 1e-6 |  17.8   | 110.0  |  2.40      | 1.605     | 10.31   | 717    |
-| hmmvp   | 1e-7 |  13.6   | 144.0  |  3.46      | 2.225     | 14.24   | 717    |
+| dense   | -    |   1.0   | 122.1  |  1.70      | 0.506     | 2.88    | 341    |
+| htool   | 1e-2 |  11.7   |  10.4  |  1.52      | 0.123     | 1.85    | 338    |
+| htool   | 1e-3 |   7.4   |  16.6  |  1.50      | 0.131     | 1.86    | 342    |
+| htool   | 1e-4 |   5.3   |  22.9  |  1.54      | 0.133     | 1.90    | 342    |
+| htool   | 1e-5 |   4.2   |  29.4  |  1.54      | 0.142     | 1.92    | 341    |
+| htool   | 1e-6 |   3.3   |  36.8  |  1.57      | 0.148     | 1.95    | 341    |
+| hacapk  | 1e-1 |  10.1   |  12.1  |  0.19      | 0.214     | 0.72    | 337    |
+| hacapk  | 3e-2 |   8.8   |  13.8  |  0.22      | 0.238     | 0.81    | 339    |
+| hacapk  | 1e-2 |   7.9   |  15.4  |  0.25      | 0.259     | 0.87    | 338    |
+| hacapk  | 3e-3 |   6.7   |  18.2  |  0.28      | 0.266     | 0.93    | 340    |
+| hacapk  | 1e-3 |   6.0   |  20.2  |  0.31      | 0.288     | 1.00    | 341    |
+| hmmvp   | 1e-3 |  16.3   |   7.5  |  0.35      | 0.240     | 0.93    | 336    |
+| hmmvp   | 1e-4 |  11.6   |  10.5  |  0.39      | 0.242     | 0.98    | 341    |
+| hmmvp   | 1e-5 |   8.3   |  14.7  |  0.43      | 0.242     | 1.02    | 342    |
+| hmmvp   | 1e-6 |   6.2   |  19.8  |  0.50      | 0.261     | 1.13    | 341    |
+| hmmvp   | 1e-7 |   4.8   |  25.5  |  0.59      | 0.267     | 1.23    | 341    |
+
+### 0.5 km (N about 16000)
+
+The dense operator is roughly 2 GB, so the dense baseline is skipped; compr_x is
+relative to that dense size.
+
+| backend | tol  | compr_x | mem_MB | assembly_s | matvec_ms | total_s | nsteps |
+|---------|------|--------:|-------:|-----------:|----------:|--------:|-------:|
+| htool   | 1e-2 |  35.4   |  55.2  | 42.76      | 0.669     | 46.33   | 722    |
+| htool   | 1e-3 |  21.7   |  89.9  | 42.11      | 0.855     | 46.50   | 718    |
+| htool   | 1e-4 |  15.4   | 127.2  | 41.98      | 1.362     | 48.86   | 717    |
+| htool   | 1e-5 |   9.4   | 206.9  | 42.56      | 3.169     | 58.09   | 718    |
+| htool   | 1e-6 |   4.4   | 442.1  | 47.02      | 7.726     | 83.40   | 716    |
+| hacapk  | 1e-1 |  26.8   |  73.0  |  0.86      | 0.841     | 5.15    | 713    |
+| hacapk  | 3e-2 |  22.0   |  88.6  |  1.00      | 0.982     | 6.02    | 723    |
+| hacapk  | 1e-2 |  19.1   | 102.1  |  1.14      | 1.143     | 6.94    | 718    |
+| hacapk  | 3e-3 |  16.3   | 119.5  |  1.26      | 1.373     | 8.07    | 715    |
+| hacapk  | 1e-3 |  14.7   | 132.7  |  1.40      | 1.554     | 9.08    | 716    |
+| hmmvp   | 1e-3 |  47.9   |  40.8  |  1.28      | 0.892     | 5.82    | 720    |
+| hmmvp   | 1e-4 |  34.6   |  56.5  |  1.56      | 0.903     | 6.27    | 722    |
+| hmmvp   | 1e-5 |  25.0   |  78.2  |  1.89      | 0.981     | 6.93    | 721    |
+| hmmvp   | 1e-6 |  17.8   | 110.0  |  2.45      | 1.589     | 10.29   | 717    |
+| hmmvp   | 1e-7 |  13.6   | 144.0  |  2.87      | 2.194     | 13.51   | 717    |
+
+## Compression versus N (matched ~1e-6 accuracy)
+
+Reading the compression ratio at the matched band across the three sizes (htool
+epsilon 3e-5 interpolated between its 1e-4 and 1e-5 rows; hacapk ztol 1e-1 and
+hmmvp tol 1e-7 are exact):
+
+| N (resolution) | htool | hacapk | hmmvp |
+|----------------|------:|-------:|------:|
+| 1000 (2 km)    |  1.8  |   3.8  |  1.9  |
+| 4000 (1 km)    |  4.7  |  10.1  |  4.8  |
+| 16000 (0.5 km) | 11.9  |  26.8  | 13.6  |
+
+See compression_vs_N.png (compression ratio versus N, log-log) and
+compression_speed_tradeoff.png (per-matvec cost versus compression along each
+tolerance sweep, one panel per size).
+
+- Compression grows with N for all three, a bit slower than the O(N log N)
+  memory scaling reference (compr_x roughly proportional to N / log N), going
+  from single-digit at N = 1000 to 12 to 27x at N = 16000. So the larger the
+  fault discretization, the more there is to gain from compression, which is the
+  expected H-matrix behaviour and means these strategies matter most exactly
+  where the dense operator becomes unaffordable.
+- At matched accuracy the three are close at every size, with HACApK
+  consistently highest and pulling further ahead as N grows (about 2x htool and
+  hmmvp at 0.5 km). Its ztol is conservative for the smooth Okada kernel, so it
+  reaches the band while admitting more low-rank blocks. htool and hmmvp track
+  each other closely.
+- The per-matvec cost frontier (second figure) is flat in compression at 2 km
+  and 1 km but opens up at 0.5 km, where htool's matvec runs from 7.7 ms at its
+  least-compressed (tight tol) setting down to 0.67 ms at its most-compressed,
+  while hacapk and hmmvp stay in the 0.8 to 2.2 ms range. So at large N htool is
+  only matvec-competitive at its high-compression end, and its cheap-and-flat
+  matvec from the smaller sizes does not carry over.
 
 ## Findings
 
@@ -86,8 +147,8 @@ is skipped. compr_x is relative to that dense size.
    nominal tolerance. At the matched roughly 1e-6 band derived in
    compress_interaction_matrix.md (approximately htool epsilon 3e-5, hacapk ztol
    1e-1, hmmvp tol 1e-7): at 1 km, hacapk compresses best (about 10x, about
-   12 MB), htool is around 5 to 6x (about 20 MB) but with the fastest matvec
-   (about 0.19 ms), and hmmvp is about 4.8x (about 25 MB) with the slowest
+   12 MB), htool is around 4.7x (about 25 MB) but with the fastest matvec
+   (about 0.13 ms), and hmmvp is about 4.8x (about 25 MB) with the slowest
    matvec. The raw table can mislead on this point: hmmvp's headline 16x at tol
    1e-3 is its low-accuracy end (its Frobenius-norm error estimate floors near
    1e-6 at this N), not a matched-accuracy compression number.
@@ -98,10 +159,10 @@ is skipped. compr_x is relative to that dense size.
      0.5 km than at 1 km (loose-end compr_x about 35x htool, 27x hacapk, 48x
      hmmvp).
    - htool's matvec is no longer tolerance-insensitive at large N. At 1 km it
-     was flat near 0.19 ms across the tolerance range; at 0.5 km it scales from
+     was flat near 0.13 ms across the tolerance range; at 0.5 km it scales from
      0.63 ms at 1e-2 to 7.68 ms at 1e-6, because the tight settings store a
      large fraction of the operator (442 MB at 1e-6, about 22 percent of dense).
-   - htool's assembly grows steeply at large N: about 42 s at 0.5 km np 16,
+   - htool's assembly grows steeply at large N: about 42 s at 0.5 km,
      versus about 1 to 3 s for hacapk and hmmvp, and it dominates htool's total
      on a short run. Part of this is rank count (htool assembly scales with
      ranks, so more ranks would reduce it), but it remains the most expensive
@@ -118,7 +179,7 @@ is skipped. compr_x is relative to that dense size.
 
 The balance depends on problem size, so the choice is size-aware here.
 
-- At 1 km, htool has the cheapest matvec (about 0.19 ms, nearly independent of
+- At 1 km, htool has the cheapest matvec (about 0.13 ms, nearly independent of
   tolerance) and is attractive for long, matvec-dominated cycles, at the cost of
   an expensive one-time assembly and more memory at matched accuracy. hacapk at
   ztol near 1e-1 is the choice when memory or assembly time matters, or for many
@@ -170,13 +231,15 @@ which this compression test only assumes.
 
 ## Caveats
 
-- These numbers are specific to the tested configurations (1 km at np 8 and
-  0.5 km at np 16, 50 yr, rtol 1e-4, this build of PETSc with HTOOL, HACApK, and
-  hmmvp, and these BP5 parameters). Other resolutions, rank counts, kernels, or
-  library versions may give different compression and timing, and a newer
-  release of any of these libraries may behave differently. The size dependence
-  seen between 1 km and 0.5 km is itself a reason not to extrapolate any single
-  size to another without measuring.
+- These numbers are specific to the tested configurations (2 km, 1 km, and
+  0.5 km on walter, 50 yr, rtol 1e-4, this build of PETSc with HTOOL, HACApK, and
+  hmmvp, and these BP5 parameters). The per-rank count was not recorded in the
+  CSVs, so the timing columns should be compared within a resolution rather than
+  across resolutions; the compression columns do not have this issue. Other rank
+  counts, kernels, or library versions may give different compression and
+  timing, and a newer release of any of these libraries may behave differently.
+  The size dependence seen across 2 km, 1 km, and 0.5 km is itself a reason not
+  to extrapolate any single size to another without measuring.
 - The test measures compression and speed, not accuracy. The flat nsteps
   indicates the dynamics are unperturbed at these tolerances, but the
   operator-error-versus-tolerance mapping that justifies the matched-band
