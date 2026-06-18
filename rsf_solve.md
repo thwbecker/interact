@@ -394,8 +394,8 @@ Practical guidance (also captured in comments in `src/rsf_solve.c`):
 ## Quick reference — running the benchmark
 
 ```bash
-# HACApK (recommended serial default)
-mpirun -np 1 bin/rsf_solve -use_hmatrix 3 -hacapk_ztol 1e-4   <bp5 flags>
+# HACApK (recommended serial default; ztol defaults to 1e-1)
+mpirun -np 1 bin/rsf_solve -use_hmatrix 3   <bp5 flags>
 
 # HTOOL (now defaults to sympartialACA; relax epsilon for speed)
 mpirun -np 1 bin/rsf_solve -use_hmatrix 1 -mat_htool_epsilon 1e-4   <bp5 flags>

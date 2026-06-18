@@ -116,10 +116,11 @@ given.
   whole sweep; set it generously on a real run, or to 0 to disable. This is the
   accuracy-vs-speed coupling the sweep is meant to expose, so include tight
   HMMVP tolerances in `HMTOL_LIST` rather than only loose ones.
-- Parallelism: the MPI backends (dense, HTOOLS, HACAPK) run on `procs` MPI
-  ranks; HMMVP, being OpenMP, runs on one rank with `procs` threads, so each
-  backend gets `procs`-way parallelism in its native mode. Cross-backend timing
-  comparisons are fairest at a fixed `procs` understood this way.
+- Parallelism: all four backends (dense, HTOOLS, HACAPK, HMMVP) run on `procs`
+  MPI ranks, so each gets `procs`-way parallelism in its native mode. HMMVP now
+  runs under MPI; set `HMMVP_OMP=1` to instead run it on one rank with `procs`
+  OpenMP threads. Cross-backend timing comparisons are fairest at a fixed
+  `procs` understood this way.
 - Default tolerance lists are a starting point; widen or narrow them in CONFIG.
   Secondary knobs (`-mat_htool_eta`, `-mat_htool_compressor`, `-hmmvp_eta`) are
   left at their `rsf_solve` defaults and can be added to the sweep if of

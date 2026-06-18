@@ -82,7 +82,7 @@ mpirun -np 1 bin/rsf_solve \
   -rsf_file    rsf_bp5_1km.dat \
   -rsf_ic_file ic_bp5_1km.in \
   -rsf_dc_file dc_bp5_1km.in \
-  -use_hmatrix 3 -hacapk_ztol 1e-4 \
+  -use_hmatrix 3 \
   -shear_modulus 3.204e10 -s_wave_speed 3464 \
   -f0 0.6 -dc 0.14 -vpl 1e-9 -v0 1e-6 -sigma_init 25e6 \
   -rtol 1e-4 -stop_time_yr 1800 -ts_max_steps 2000000 \
@@ -90,8 +90,12 @@ mpirun -np 1 bin/rsf_solve \
 ```
 
 Notes:
-- `-use_hmatrix 3` = HACApK (≈25 MB, 21 % compression at 4000 cells). `0` = dense, `1` = HTOOL;
-  the cycle is identical across all three (dense ≡ HACApK to machine precision).
+- `-use_hmatrix 3` = HACApK, now defaulting to `ztol 1e-1` (about 12 MB, ~10x compression at
+  4000 cells; see `scaling_tests/rsf_solve_compression.md`). `0` = dense, `1` = HTOOL. At this
+  matched-accuracy default the three agree on the cycle to within the ODE tolerance (recurrence
+  to ~0.01 yr). The earlier `ztol 1e-4` brings HACApK to near-machine-precision agreement with
+  dense but is effectively near-dense (about 25 MB, ~5x), so it is no longer the default; pass
+  `-hacapk_ztol 1e-4` explicitly if you want that tighter setting.
 - `-dc 0.14` sets the bulk value; `-rsf_dc_file` overrides it in the nucleation patch.
 - `-sigma_init` and `-shear_modulus` are in **Pa**.
 - Output `rsf_monitor.dat`: `step  t[s]  t[yr]  dt[s]  log10(max|V|)  mean_slip …`.
