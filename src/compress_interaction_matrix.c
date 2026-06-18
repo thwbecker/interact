@@ -309,7 +309,7 @@ int main(int argc, char **argv)
     }
 #endif
 #if ( defined(USE_HMMVP) || defined(USE_HACAPK) )
-    if((medium->use_hmatrix==3)||(medium->use_hmatrix==4)){	
+    if((medium->use_hmatrix==IHMAT_TYPE_HACAPK)||(medium->use_hmatrix==IHMAT_TYPE_HMMVP)){	
       xc = (double *)malloc(sizeof(double)*m);
       yc = (double *)malloc(sizeof(double)*m);
       zc = (double *)malloc(sizeof(double)*m);
@@ -348,7 +348,7 @@ int main(int argc, char **argv)
       /* HTOOLS or H2OPUS */
       PetscCall(MatCreate(PETSC_COMM_WORLD, &AH));
       PetscCall(MatSetSizes(AH, PETSC_DECIDE, PETSC_DECIDE, m, n));  
-      if(medium->use_hmatrix==1)
+      if(medium->use_hmatrix==IHMAT_TYPE_HTOOLS)
 	PetscCall(MatSetType(AH,MATHTOOL));
       else
 	PetscCall(MatSetType(AH,MATH2OPUS));
@@ -361,7 +361,7 @@ int main(int argc, char **argv)
       PetscCall(MatGetOwnershipRange(AH, &rs, &re));
       
       fprintf(stderr,"%s: core %03i/%03i: assigning %s row %5i to %5i, lm %i ln %i m %i n %i\n",
-	      argv[0],medium->comm_rank,medium->comm_size,(medium->use_hmatrix==1)?"HTOOLS":"H2OPUS",
+	      argv[0],medium->comm_rank,medium->comm_size,(medium->use_hmatrix==IHMAT_TYPE_HTOOLS)?"HTOOLS":"H2OPUS",
 	      rs,re,lm,ln,m,n);
       if(medium->use_hmatrix == IHMAT_TYPE_HTOOLS){
 	/* 
