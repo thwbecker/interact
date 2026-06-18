@@ -107,7 +107,13 @@ run_one(){  # $1=cfgname  $2=backend  $3=tol-flags
   local name="$1" be="$2" tf="$3" dir="$OUT/$1"
   mkdir -p "$dir"; ( cd "$dir" || exit 1
     local np=$PROCS omp=1 extra="" to=""
-    if [ "$be" = hmmvp ]; then np=1; omp=$PROCS; extra="-hmmvp_nthreads $PROCS"; fi
+    # HMMVP has a working MPI path that scales (see the 0.5 km scaling data), so
+    # run it under MPI on PROCS ranks like the others for a fair comparison,
+    # one thread per rank. Set HMMVP_OMP=1 to instead run 1 rank x PROCS threads.
+    if [ "$be" = hmmvp ]; then
+      if [ "${HMMVP_OMP:-0}" = 1 ]; then np=1; omp=$PROCS; extra="-hmmvp_nthreads $PROCS";
+      else extra="-hmmvp_nthreads 1"; fi
+    fi
     [ "${RUN_TIMEOUT:-0}" != 0 ] && to="timeout ${RUN_TIMEOUT}"
     OMP_NUM_THREADS=$omp OPENBLAS_NUM_THREADS=1 \
       $to $MPIRUN -np "$np" "$RB" $COMMON $(type_flag "$be") $tf $extra > run.log 2>&1 &
@@ -162,9 +168,10 @@ run_one dense dense ""
 read D_total D_asm D_mv D_steps D_mem < <(parse_speed "$OUT/dense" dense)
 echo "dense: total=${D_total}s assembly=${D_asm}s matvec=${D_mv}ms steps=${D_steps} mem=${D_mem}MB"
 DREF="$OUT/dense"
+D_nev=$(grep -v '^#' "$DREF/rsf_events.dat" 2>/dev/null | awk '$3==1' | wc -l | tr -d ' ')
 # dense self-row (zero deviation by construction)
 declare -a ROWS
-ROWS+=("dense - $D_total $D_asm $D_mv $D_steps $D_mem 0 0 0 0 -")
+ROWS+=("dense - $D_total $D_asm $D_mv $D_steps $D_mem 0 0 0 0 ${D_nev:-0}")
 
 # --- H-matrix backends across their tolerance knob -------------------------
 sweep_backend(){  # $1=backend  $2=tolflag-name  $3="list"
