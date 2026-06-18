@@ -10,21 +10,18 @@
 #
 # to compile, edit i1mach.f, r1mach.f and d1mach.f for individual
 # machine constants and change the compiler options below
-#
-# SGI
-#CFLAGS = -Ofast=$(ARCH)
-#LOPT = -IPA
-# LINUX
-#CFLAGS = -O2
+include ../../../config/makefile.gcc
+
 LOPT = $(MATHLIBS)
 #LOPT = -lblas
 #LOPT = -L/usr/local/src/atlas_Linux_P4SSE2/lib/  -lf77blas -latlas
 #LOPT = -L/opt/lib/ -lblas 
 #LOPT = -L/usr/local/lib -lblas
 #
-CFLAGS = -O2
-FFLAGS = -O2 -fdollar-ok  -x f77-cpp-input -x f95-cpp-input -ffixed-line-length-132
-F90FLAGS = -O2 -fdollar-ok  -x f77-cpp-input -x f95-cpp-input -ffixed-line-length-132
+
+CFLAGS = -O3
+FFLAGS = -O3 -fdollar-ok  -fallow-invalid-boz -fallow-argument-mismatch  -x f77-cpp-input -x f95-cpp-input -ffixed-line-length-132
+F90FLAGS = -O3 -fdollar-ok -fallow-invalid-boz  -fallow-argument-mismatch  -x f77-cpp-input -x f95-cpp-input -ffixed-line-length-132
 #FFLAGS = $(CFLAGS)
 #> nnls 12 6 6
 #i686/nnls: m(rows): 12 n(columns): 6, no NN rows
@@ -84,10 +81,10 @@ obj_dirs:
 	fi;
 
 nnls: nnls.o libslatec_dbl.a
-	$(CC) $(CFLAGS) nnls.o  -o $(BIN)/nnls $(L_DBL_FLAGS)  
+	$(F90) $(CFLAGS) nnls.o  -o $(BIN)/nnls $(L_DBL_FLAGS)  
 
 nnls_sgl: nnls_sgl.o libslatec_sgl.a
-	$(CC) $(CFLAGS) nnls_sgl.o  -o $(BIN)/nnls_sgl $(L_SGL_FLAGS)  
+	$(F90) $(CFLAGS) nnls_sgl.o  -o $(BIN)/nnls_sgl $(L_SGL_FLAGS)  
 
 
 nnls_sgl.o: nnls.c
