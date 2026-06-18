@@ -69,6 +69,7 @@ HTOOL_OPTS=${HTOOL_OPTS:-"-mat_htool_epsilon 1e-4 -mat_htool_eta 10"}
 HACAPK_OPTS=${HACAPK_OPTS:-"-hacapk_ztol 1e-2"}
 HMMVP_OPTS=${HMMVP_OPTS:-"-hmmvp_tol 1e-4"}
 BIGWHAM_OPTS=${BIGWHAM_OPTS:-"-bigwham_eps_aca 1e-4 -bigwham_eta 3 -bigwham_leaf 32"}
+#BIGWHAM_OPTS=${BIGWHAM_OPTS:-"-bigwham_eps_aca 1e-3 -bigwham_eta 5 -bigwham_leaf 32"}
 
 GEOM="$(mktemp -d)/scale.in"
 OUT=${OUT:-bigwham_omp_vs_mpi.dat}
@@ -84,6 +85,7 @@ for exe in "$BIN" "$MAKEFAULT"; do
 done
 
 "$MAKEFAULT" -strike "$STRIKE" -dip "$DIP" -n "$n" -m "$m" -z -5 > "$GEOM" 2>/dev/null
+#"$MAKEFAULT" -y 2 -strike "$STRIKE" -dip "$DIP" -n "$n" -m "$m" -z -5 >> "$GEOM" 2>/dev/null
 N=$(grep -cve '^[[:space:]]*$' "$GEOM")
 
 echo "================================================================================"
