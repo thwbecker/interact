@@ -2,10 +2,10 @@
 
 Companion note to the MPI scaling test. This sweep fixes the rank count and
 varies each H-matrix backend's accuracy tolerance, mapping compression against
-speed on the single SEAS BP5 fault. All numbers below are for one configuration
-(1 km resolution, np = 8, a 50 yr interseismic run, rtol 1e-4) and one build of
-each library; other resolutions, rank counts, builds, or library versions may
-behave differently.
+speed on the single SEAS BP5 fault. Numbers below are for two configurations
+(1 km at np = 8 and 0.5 km at np = 16, both 50 yr interseismic runs at rtol
+1e-4) and one build of each library; other resolutions, rank counts, builds, or
+library versions may behave differently.
 
 ## Setup
 
@@ -38,6 +38,29 @@ memory; matvec_ms is the mean per-MatMult cost.
 | hmmvp   | 1e-6 |   6.2   |  19.8  |  0.80      | 0.365     | 1.70    | 341    |
 | hmmvp   | 1e-7 |   4.8   |  25.5  |  0.91      | 0.380     | 1.83    | 341    |
 
+## Results (0.5 km, np = 16, 50 yr, rtol 1e-4)
+
+N is about 16000, so the dense operator is roughly 2 GB and the dense baseline
+is skipped. compr_x is relative to that dense size.
+
+| backend | tol  | compr_x | mem_MB | assembly_s | matvec_ms | total_s | nsteps |
+|---------|------|--------:|-------:|-----------:|----------:|--------:|-------:|
+| htool   | 1e-2 |  35.4   |  55.2  | 42.57      | 0.631     | 45.98   | 722    |
+| htool   | 1e-3 |  21.7   |  89.9  | 41.69      | 0.838     | 46.02   | 718    |
+| htool   | 1e-4 |  15.4   | 127.2  | 41.36      | 1.337     | 48.14   | 717    |
+| htool   | 1e-5 |   9.4   | 206.9  | 42.33      | 3.205     | 57.78   | 718    |
+| htool   | 1e-6 |   4.4   | 442.1  | 47.27      | 7.682     | 83.64   | 716    |
+| hacapk  | 1e-1 |  26.8   |  73.0  |  0.81      | 0.833     | 5.06    | 713    |
+| hacapk  | 3e-2 |  22.0   |  88.6  |  0.94      | 0.975     | 5.92    | 723    |
+| hacapk  | 1e-2 |  19.1   | 102.1  |  1.09      | 1.133     | 6.82    | 718    |
+| hacapk  | 3e-3 |  16.3   | 119.5  |  1.28      | 1.414     | 8.27    | 715    |
+| hacapk  | 1e-3 |  14.7   | 132.7  |  1.32      | 1.565     | 9.04    | 716    |
+| hmmvp   | 1e-3 |  47.9   |  40.8  |  1.24      | 0.887     | 5.84    | 723    |
+| hmmvp   | 1e-4 |  34.6   |  56.5  |  1.74      | 0.919     | 6.46    | 718    |
+| hmmvp   | 1e-5 |  25.0   |  78.2  |  1.87      | 0.968     | 6.82    | 718    |
+| hmmvp   | 1e-6 |  17.8   | 110.0  |  2.40      | 1.605     | 10.31   | 717    |
+| hmmvp   | 1e-7 |  13.6   | 144.0  |  3.46      | 2.225     | 14.24   | 717    |
+
 ## Findings
 
 1. Deterministic and dynamics-neutral across the sweep. nsteps is 337 to 342 in
@@ -62,37 +85,68 @@ memory; matvec_ms is the mean per-MatMult cost.
 5. Cross-backend comparison should be made at matched accuracy, not matched
    nominal tolerance. At the matched roughly 1e-6 band derived in
    compress_interaction_matrix.md (approximately htool epsilon 3e-5, hacapk ztol
-   1e-1, hmmvp tol 1e-7) for this case: hacapk compresses best (about 10x, about
-   12 MB), because its ztol is conservative for the smooth Okada kernel so a
-   loose 1e-1 already reaches the band; htool is around 5 to 6x (about 20 MB)
-   but with the fastest matvec; hmmvp is about 4.8x (about 25 MB) with the
-   slowest matvec, the weakest of the three at matched accuracy here. The raw
-   table can mislead on this point: hmmvp's 16x at tol 1e-3 is its low-accuracy
-   end (its Frobenius-norm error estimate floors near 1e-6 at this N), not a
-   matched-accuracy compression number.
+   1e-1, hmmvp tol 1e-7): at 1 km, hacapk compresses best (about 10x, about
+   12 MB), htool is around 5 to 6x (about 20 MB) but with the fastest matvec
+   (about 0.19 ms), and hmmvp is about 4.8x (about 25 MB) with the slowest
+   matvec. The raw table can mislead on this point: hmmvp's headline 16x at tol
+   1e-3 is its low-accuracy end (its Frobenius-norm error estimate floors near
+   1e-6 at this N), not a matched-accuracy compression number.
 
-## Backend choice for this configuration
+6. The picture is size-dependent, and two of the 1 km readings on htool do not
+   survive to 0.5 km (N about 16000):
+   - Compression improves with size for all three, roughly 2 to 3x better at
+     0.5 km than at 1 km (loose-end compr_x about 35x htool, 27x hacapk, 48x
+     hmmvp).
+   - htool's matvec is no longer tolerance-insensitive at large N. At 1 km it
+     was flat near 0.19 ms across the tolerance range; at 0.5 km it scales from
+     0.63 ms at 1e-2 to 7.68 ms at 1e-6, because the tight settings store a
+     large fraction of the operator (442 MB at 1e-6, about 22 percent of dense).
+   - htool's assembly grows steeply at large N: about 42 s at 0.5 km np 16,
+     versus about 1 to 3 s for hacapk and hmmvp, and it dominates htool's total
+     on a short run. Part of this is rank count (htool assembly scales with
+     ranks, so more ranks would reduce it), but it remains the most expensive
+     assembler here.
+   - As a result the matched-accuracy ranking flips at 0.5 km: hacapk at ztol
+     1e-1 is best on every axis (about 27x, 73 MB, 0.8 s assembly, 0.83 ms
+     matvec), while htool at the matched eps needs roughly 2 ms matvec plus the
+     large assembly, and hmmvp at 1e-7 is about 13.6x at 144 MB with a 2.2 ms
+     matvec. So hacapk leads even on the matvec that dominates a long cycle,
+     because its conservative ztol reaches the accuracy band while staying well
+     compressed.
 
-- Long, matvec-dominated cycles: htool, for the cheapest matvec, which can be
-  tightened for accuracy at little matvec cost. The price is an expensive
-  one-time assembly and more memory at matched accuracy.
-- Memory- or assembly-constrained workflows, or many short runs: hacapk at ztol
-  near 1e-1, for the best compression at target accuracy with near-free assembly
-  and a competitive matvec.
-- hmmvp showed no regime where it was strictly best at 1 km in this test. This
-  is specific to the size and settings and could differ at other sizes or with
-  other builds; hmmvp is designed and tuned for large problems.
+## Backend choice
+
+The balance depends on problem size, so the choice is size-aware here.
+
+- At 1 km, htool has the cheapest matvec (about 0.19 ms, nearly independent of
+  tolerance) and is attractive for long, matvec-dominated cycles, at the cost of
+  an expensive one-time assembly and more memory at matched accuracy. hacapk at
+  ztol near 1e-1 is the choice when memory or assembly time matters, or for many
+  short runs.
+- At 0.5 km, hacapk at ztol near 1e-1 is the all-around pick at matched
+  accuracy: best compression, near-free assembly, and the fastest matvec, so it
+  wins even for long cycles. htool's matvec advantage does not hold at this size
+  and its assembly is a liability; it becomes attractive mainly if its assembly
+  is amortized over very long runs and given enough ranks to bring the assembly
+  down, and even then its matvec at matched accuracy trails hacapk here.
+- hmmvp showed no regime where it was strictly best in this test. Its raw
+  loose-tolerance compression is the highest of the three, but that is below the
+  matched accuracy band; at matched accuracy it trails. This is specific to the
+  sizes and settings tested; hmmvp is designed and tuned for large problems and
+  may compare differently elsewhere.
 
 ## Caveats
 
-- These numbers are specific to the tested configuration (1 km, np 8, 50 yr,
-  rtol 1e-4, this build of PETSc with HTOOL, HACApK, and hmmvp, and these BP5
-  parameters). Other resolutions, rank counts, kernels, or library versions may
-  give different compression and timing, and a newer release of any of these
-  libraries may behave differently.
+- These numbers are specific to the tested configurations (1 km at np 8 and
+  0.5 km at np 16, 50 yr, rtol 1e-4, this build of PETSc with HTOOL, HACApK, and
+  hmmvp, and these BP5 parameters). Other resolutions, rank counts, kernels, or
+  library versions may give different compression and timing, and a newer
+  release of any of these libraries may behave differently. The size dependence
+  seen between 1 km and 0.5 km is itself a reason not to extrapolate any single
+  size to another without measuring.
 - The test measures compression and speed, not accuracy. The flat nsteps
   indicates the dynamics are unperturbed at these tolerances, but the
   operator-error-versus-tolerance mapping that justifies the matched-band
-  reading lives in compress_interaction_matrix.md.
-- Worth confirming at 0.5 km, where compression ratios rise and the matvec
-  advantage over dense widens, whether the matched-accuracy ranking holds.
+  reading lives in compress_interaction_matrix.md, and that mapping was
+  characterized near N = 14400, so the exact matched-band values may shift
+  somewhat at other sizes.
