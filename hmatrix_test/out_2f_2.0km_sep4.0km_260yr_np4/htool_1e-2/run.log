@@ -1,0 +1,28 @@
+/home/twb/progs/src/interact/hmatrix_test/../bin/rsf_solve: read geometry from /home/twb/progs/src/interact/hmatrix_test/out_2f_2.0km_sep4.0km_260yr_np4/geom_2f_2km_4km.in, 2000 patches, on 4 cores
+/home/twb/progs/src/interact/hmatrix_test/../bin/rsf_solve: G 3.204000e+10 Pa cs 3464 m/s eta 4.624711e+06 f0 0.6 dc 0.14 m v0 1.000e-06 vpl 1.000e-09 m/s
+/home/twb/progs/src/interact/hmatrix_test/../bin/rsf_solve: sigma0 2.500000e+07 tau0 1.500000e+07 Pa vinit 1.000e-09 m/s rand_amp 0
+/home/twb/progs/src/interact/hmatrix_test/../bin/rsf_solve: rtol 1.0e-04 dt_init 1 s dt_max 1e+10 s stop 260 yr
+read_rsf: read a and b values, on averag 0.032152 and 0.03
+read_rsf: read a and b values, on averag 0.032152 and 0.03
+read_rsf: read a and b values, on averag 0.032152 and 0.03
+read_rsf: read a and b values, on averag 0.032152 and 0.03
+/home/twb/progs/src/interact/hmatrix_test/../bin/rsf_solve: read per-cell initial tau,vel from /home/twb/progs/src/interact/hmatrix_test/out_2f_2.0km_sep4.0km_260yr_np4/ic_2f_2km_4km.in
+/home/twb/progs/src/interact/hmatrix_test/../bin/rsf_solve: read per-cell D_c from /home/twb/progs/src/interact/hmatrix_test/out_2f_2.0km_sep4.0km_260yr_np4/dc_2f_2km_4km.in
+calc_petsc_Isn_matrices: creating HTOOL matrix for stress mode 0 stress type 0
+calc_petsc_Isn_matrices: core 000/004: assigning HTOOL  row     0 to   500, lm 500 ln 500 m 2000 n 2000
+calc_petsc_Isn_matrices: core 001/004: assigning HTOOL  row   500 to  1000, lm 500 ln 500 m 2000 n 2000
+calc_petsc_Isn_matrices: core 002/004: assigning HTOOL  row  1000 to  1500, lm 500 ln 500 m 2000 n 2000
+calc_petsc_Isn_matrices: core 003/004: assigning HTOOL  row  1500 to  2000, lm 500 ln 500 m 2000 n 2000
+[mpiexec@IG-A93561] Sending Ctrl-C to processes as requested
+[mpiexec@IG-A93561] Press Ctrl-C again to force abort
+
+===================================================================================
+=   BAD TERMINATION OF ONE OF YOUR APPLICATION PROCESSES
+=   PID 639034 RUNNING AT IG-A93561
+=   EXIT CODE: 2
+=   CLEANING UP REMAINING PROCESSES
+=   YOU CAN IGNORE THE BELOW CLEANUP MESSAGES
+===================================================================================
+YOUR APPLICATION TERMINATED WITH THE EXIT STRING: Interrupt (signal 2)
+This typically refers to a problem with your application.
+Please see the FAQ page for debugging suggestions
