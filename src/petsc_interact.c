@@ -282,7 +282,7 @@ PetscErrorCode calc_petsc_Isn_matrices(struct med *medium, struct flt *fault,
 #ifdef USE_PETSC_HMAT		/* htools and H2opus  */
   PetscReal   *coords=NULL,*av=NULL;
   PetscInt k,jj,*ci=NULL;
-  MatHtoolKernelFn *kernel = GenKEntries_htools;
+  MatHtoolKernelFn *kernel = GenKEntries_petsc;
   Mat dtmp;
 #endif
 #if ( defined(USE_HMMVP) || defined(USE_HACAPK) )
@@ -316,21 +316,21 @@ PetscErrorCode calc_petsc_Isn_matrices(struct med *medium, struct flt *fault,
     ictx->rec_stress_mode = NORMAL;
   }
   switch(use_hmatrix){
-  case 0:
+  case IHMAT_TYPE_DENSE:
     /* dense */
     PetscCall(PetscCalloc(m*sizeof(PetscScalar), &avalues));
     PetscCall(PetscCalloc(n*sizeof(PetscInt), &col_idx));
     for (i=0; i < n; i++) 
       col_idx[i] = i;
     break;
-  case 1:	/* HTOOLS */
+  case IHMAT_TYPE_HTOOLS:	/* HTOOLS */
 #ifdef USE_PETSC_HMAT
     set_htools_defaults_and_options(medium);
 #else
     fprintf(stderr,"calc_petsc_Isn_matrices: HTOOLS not compiled in - check makefile.petsc\n");exit(-1);
 #endif
     break;
-  case 2:	/* H2OPUS */
+  case IHMAT_TYPE_H2OPUS:	/* H2OPUS */
 #ifdef USE_PETSC_HMAT
     set_h2opus_defaults_and_options(medium);
     HEADNODE
@@ -339,7 +339,7 @@ PetscErrorCode calc_petsc_Isn_matrices(struct med *medium, struct flt *fault,
     fprintf(stderr,"calc_petsc_Isn_matrices: H2OPUS not compiled in - check makefile.petsc\n");exit(-1);
 #endif
     break;
-  case 3:
+  case IHMAT_TYPE_HACAPK:
 #ifdef USE_HACAPK
     set_hacapk_defaults_and_options(medium);
 #else
@@ -347,7 +347,7 @@ PetscErrorCode calc_petsc_Isn_matrices(struct med *medium, struct flt *fault,
     exit(-1);
 #endif
     break;
-  case 4:
+  case IHMAT_TYPE_HMMVP:
 #ifdef USE_HMMVP
     set_hmmvp_defaults_and_options(medium);
 #else
@@ -355,7 +355,7 @@ PetscErrorCode calc_petsc_Isn_matrices(struct med *medium, struct flt *fault,
     exit(-1);
 #endif
     break;
-  case 5:
+  case IHMAT_TYPE_BIGWHAM:
 #ifdef USE_BIGWHAM
     set_bigwham_defaults_and_options(medium);
 #else
@@ -369,7 +369,7 @@ PetscErrorCode calc_petsc_Isn_matrices(struct med *medium, struct flt *fault,
     break;
   }
 #ifdef USE_PETSC_HMAT
-  if((use_hmatrix==1)||(use_hmatrix==2)){	
+  if((use_hmatrix==IHMAT_TYPE_HTOOLS)||(use_hmatrix==IHMAT_TYPE_H2OPUS)){	
     coords = (PetscReal *)malloc(sizeof(PetscReal)*ndim*medium->nrflt);
     for(i=0;i < medium->nrflt;i++)		/* all sources or receiveer coordinates  */
       for(k=0;k < ndim;k++)
@@ -377,7 +377,7 @@ PetscErrorCode calc_petsc_Isn_matrices(struct med *medium, struct flt *fault,
   }
 #endif
 #if ( defined(USE_HMMVP) || defined(USE_HACAPK) )
-  if((use_hmatrix==3)||(use_hmatrix==4)){	
+  if((use_hmatrix==IHMAT_TYPE_HACAPK)||(use_hmatrix==IHMAT_TYPE_HMMVP)){	
     xc = (double *)malloc(sizeof(double)*m);
     yc = (double *)malloc(sizeof(double)*m);
     zc = (double *)malloc(sizeof(double)*m);
@@ -403,7 +403,7 @@ PetscErrorCode calc_petsc_Isn_matrices(struct med *medium, struct flt *fault,
   medium->rn = medium->re  - medium->rs; /* number of local elements */
 
   switch(use_hmatrix){
-  case 0:
+  case IHMAT_TYPE_DENSE :
     HEADNODE
       fprintf(stderr,"calc_petsc_Isn_matrices: creating dense matrix for stress mode %i stress type %i\n",
 	      mode,ictx->rec_stress_mode);
@@ -414,12 +414,12 @@ PetscErrorCode calc_petsc_Isn_matrices(struct med *medium, struct flt *fault,
     fprintf(stderr,"calc_petsc_Isn_matrices: core %03i/%03i: assigning dense row %5i to %5i\n",
 	    (int)medium->comm_rank,(int)medium->comm_size,(int)medium->rs,(int)medium->re);
     for(j=medium->rs;j <  medium->re;j++){// rupturing faults for this CPU
-      GenKEntries_htools(ndim,1,n,&j, col_idx, avalues,ictx);
+      GenKEntries_petsc(ndim,1,n,&j, col_idx, avalues,ictx);
       PetscCall(MatSetValues(*this_mat, 1, &j, n, col_idx,avalues, INSERT_VALUES));
     }
     break;
 #ifdef USE_PETSC_HMAT
-  case 1:
+  case IHMAT_TYPE_HTOOLS:
     /* make the matrix */
     HEADNODE
       fprintf(stderr,"calc_petsc_Isn_matrices: creating HTOOL matrix for stress mode %i stress type %i\n",
@@ -439,7 +439,7 @@ PetscErrorCode calc_petsc_Isn_matrices(struct med *medium, struct flt *fault,
 				       (coords+medium->rs*ndim), (coords+medium->rs*ndim),
 				       kernel,(void *)ictx, this_mat));
     break;
-  case 2:
+  case IHMAT_TYPE_H2OPUS:
     HEADNODE
       fprintf(stderr,"calc_petsc_Isn_matrices: creating H2OPUS matrix for stress mode %i stress type %i\n",
 	      mode,ictx->rec_stress_mode);
@@ -476,7 +476,7 @@ PetscErrorCode calc_petsc_Isn_matrices(struct med *medium, struct flt *fault,
     PetscCall(MatSetType(dtmp,MATDENSE));
     PetscCall(MatSetUp(dtmp));
     for(jj=medium->rs;jj < medium->re;jj++){
-      GenKEntries_htools(ndim,1,n,&jj,ci,av,ictx);
+      GenKEntries_petsc(ndim,1,n,&jj,ci,av,ictx);
       PetscCall(MatSetValues(dtmp,1,&jj,n,ci,av,INSERT_VALUES));
     }
     PetscCall(MatAssemblyBegin(dtmp,MAT_FINAL_ASSEMBLY));
@@ -495,7 +495,7 @@ PetscErrorCode calc_petsc_Isn_matrices(struct med *medium, struct flt *fault,
 #endif
     break;
 #endif
-  case 3:
+  case IHMAT_TYPE_HACAPK:
 #ifdef USE_HACAPK
     HEADNODE
       fprintf(stderr,"calc_petsc_Isn_matrices: creating HACAPK matrix for stress mode %i stress type %i\n",
@@ -516,7 +516,7 @@ PetscErrorCode calc_petsc_Isn_matrices(struct med *medium, struct flt *fault,
     PetscCall(VecDestroy(&xd));
 #endif
     break;
-  case 4:
+  case IHMAT_TYPE_HMMVP:
     
 #ifdef USE_HMMVP
 #ifdef USE_HMMVP_MPI
@@ -605,7 +605,7 @@ PetscErrorCode calc_petsc_Isn_matrices(struct med *medium, struct flt *fault,
 #endif /* USE_HMMVP_MPI */
 #endif /* USE_HMMVP */
     break;
-  case 5:
+  case IHMAT_TYPE_BIGWHAM:
 #ifdef USE_BIGWHAM
     /* BigWham builds its own mesh from the patch geometry, so it needs none of
        the htool coords or the hacapk/hmmvp xc/yc/zc arrays. It overwrites the
@@ -614,7 +614,7 @@ PetscErrorCode calc_petsc_Isn_matrices(struct med *medium, struct flt *fault,
 #endif
     break;
   }
-  if(use_hmatrix == 2){
+  if(use_hmatrix == IHMAT_TYPE_H2OPUS){
     /* 
        this version of h2opus only implements sampling-based
        construction for symmetric matrices (hlru_sym assertion); the
@@ -637,19 +637,19 @@ PetscErrorCode calc_petsc_Isn_matrices(struct med *medium, struct flt *fault,
   PetscCall(MatScale(*this_mat,scale));
 
   /* free things */
-  if(use_hmatrix==0){
+  if(use_hmatrix==IHMAT_TYPE_DENSE ){
     PetscCall(PetscFree(avalues));
     PetscCall(PetscFree(col_idx));
   }
 #ifdef USE_PETSC_HMAT
-  if((use_hmatrix==1) || (use_hmatrix==2))
+  if((use_hmatrix==IHMAT_TYPE_HTOOLS) || (use_hmatrix==IHMAT_TYPE_H2OPUS))
     free(coords);
 #endif
 #if ( defined(USE_HMMVP) || defined(USE_HACAPK) )
-  if((use_hmatrix==3)||(use_hmatrix==4)){
+  if((use_hmatrix==IHMAT_TYPE_HACAPK)||(use_hmatrix==IHMAT_TYPE_HMMVP)){
     free(xc);free(yc);free(zc);
   }
-  if(use_hmatrix==3)
+  if(use_hmatrix==IHMAT_TYPE_HACAPK)
     PetscCall(VecDestroy(&xd));
 #endif
 #if !PetscDefined(HAVE_OPENMP)
@@ -738,7 +738,7 @@ PetscErrorCode set_htools_defaults_and_options(struct med *medium)
       PetscCall(PetscOptionsSetValue(NULL,"-mat_htool_epsilon","1e-6"));
     PetscCall(PetscOptionsHasName(NULL,NULL,"-mat_htool_compressor",&flg));
     if(!flg)
-      PetscCall(PetscOptionsSetValue(NULL,"-mat_htool_compressor","SVD"));
+      PetscCall(PetscOptionsSetValue(NULL,"-mat_htool_compressor","sympartialACA"));
     PetscCall(PetscOptionsHasName(NULL,NULL,"-pc_type",&flg));
     if(!flg)
       PetscCall(PetscOptionsSetValue(NULL,"-pc_type","none"));

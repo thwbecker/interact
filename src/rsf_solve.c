@@ -96,7 +96,7 @@ int main(int argc,char **argv)
   PetscInt tvmode = 0;		/* triangle evaluattion mode */
   Vec xout,x,vatol,islip_rate_vec,stress_rate;
   struct med *medium;struct flt *fault;
-  PetscInt m,i,n,j,use_hmatrix=0;
+  PetscInt m,i,n,j,use_hmatrix=IHMAT_TYPE_DENSE;
   PetscRandom prand;
   PetscReal state,patch_l,stable_l,rand_fac,dummy[3];
   PetscReal sigma_init,tau_init,vel_init,rtol,atol_slip,dt_init,dt_max,rand_amp,tmp;
@@ -183,9 +183,9 @@ int main(int argc,char **argv)
   PetscCallMPI(MPI_Comm_size(PETSC_COMM_WORLD, &medium->comm_size));
   PetscCallMPI(MPI_Comm_rank(PETSC_COMM_WORLD, &medium->comm_rank));
 
-  /* options for this code: 0 dense 1 htools 2 h2opus 3 hacapk 4 hmmvp */
+  /* options for this code: 0 dense 1 htools 2 h2opus 3 hacapk 4 hmmvp 5 BIGWHAM, see petsc_prototypes.h */
   PetscCall(PetscOptionsGetInt(NULL, NULL, "-use_hmatrix", &use_hmatrix,&read_value));
-  /* HTOOL (use_hmatrix==1) compressor default: prefer sympartialACA over
+  /* HTOOL (use_hmatrix==IHMAT_TYPE_HTOOLS ) compressor default: prefer sympartialACA over
      PETSc's built-in SVD default.  On the SEAS BP5 4000-cell test (1 core),
      the SVD compressor spent ~48 s assembling the H-matrix vs ~6.5 s for
      HACApK and ~8 s for sympartialACA, for no measurable accuracy gain
@@ -194,16 +194,59 @@ int main(int argc,char **argv)
      set by the ODE rtol, not the H-matrix tolerance).  Override on the
      command line with -mat_htool_compressor {SVD,fullACA,partialACA}. See
      rsf_solve.md for the full HTOOL/HACApK/dense performance comparison. */
-  if(use_hmatrix == 1){
-    PetscCall(PetscOptionsHasName(NULL,NULL,"-mat_htool_compressor",&read_value));
-    if(!read_value)
-      PetscCall(PetscOptionsSetValue(NULL,"-mat_htool_compressor","sympartialACA"));
+  medium->use_hmatrix = use_hmatrix;
+  switch(medium->use_hmatrix){
+  case IHMAT_TYPE_DENSE:
+    break;
+  case IHMAT_TYPE_HTOOLS: /* this now defaults to sympartialACA, not SVD */
+#ifdef USE_PETSC_HMAT		/* htools and H2opus  */
+    set_htools_defaults_and_options(medium);
+#else
+    fprintf(stderr,"%s: h matrix type %i not compiled in, see makefile.petsc \n",argv[0]);
+    exit(-1);
+#endif
+    break;
+  case IHMAT_TYPE_H2OPUS: /* this did not used to get called */
+#ifdef USE_PETSC_HMAT		/* htools and H2opus  */
+    set_h2opus_defaults_and_options(medium);
+#else
+    fprintf(stderr,"%s: h matrix type %i not compiled in, see makefile.petsc \n",argv[0]);
+    exit(-1);
+#endif
+    break;
+  case IHMAT_TYPE_HACAPK: /* this did not used to get called */
+#ifdef USE_HACAPK
+    set_hacapk_defaults_and_options(medium);
+#else
+    fprintf(stderr,"%s: h matrix type %i not compiled in, see makefile.petsc \n",argv[0]);
+    exit(-1);
+#endif
+   break;
+  case IHMAT_TYPE_HMMVP: /* this did not used to get called */
+#ifdef USE_HMMVP
+    set_hmmvp_defaults_and_options(medium);
+#else
+    fprintf(stderr,"%s: h matrix type %i not compiled in, see makefile.petsc \n",argv[0]);
+    exit(-1);
+#endif
+    break;
+  case IHMAT_TYPE_BIGWHAM: /* this did not used to get called */
+#ifdef USE_BIGWHAM
+    set_bigwham_defaults_and_options(medium);
+#else
+    fprintf(stderr,"%s: h matrix type %i not compiled in, see makefile.petsc \n",argv[0]);
+    exit(-1);
+#endif
+    break;
+  default:
+    fprintf(stderr,"%s: h matrix type %i undefined\n",argv[0],medium->use_hmatrix);
+    exit(-1);
+    break;
   }
+  
   PetscCall(PetscOptionsGetString(NULL, NULL, "-geom_file", geom_file, STRLEN,&read_value));
   PetscCall(PetscOptionsGetInt(NULL, NULL, "-full_space", &use_full_space,&read_value)); /* use read in or default */
   medium->full_space = (my_boolean)use_full_space;
-
-
   PetscCall(PetscOptionsGetString(NULL, NULL, "-rsf_file", rsf_file, STRLEN,&read_value));
   /* physical parameters */
   PetscCall(PetscOptionsGetReal(NULL,NULL,"-shear_modulus",&shear_modulus_si,NULL)); /* G [Pa] */
@@ -215,7 +258,6 @@ int main(int argc,char **argv)
   /* G/(2 c_s) radiation damping factor */
   medium->shear_mod_over_2cs_si = shear_modulus_si /(2.0*s_wave_speed_si);
  
-
   PetscCall(PetscOptionsGetReal(NULL,NULL,"-sigma_init",&sigma_init,NULL));
   PetscCall(PetscOptionsGetReal(NULL,NULL,"-tau_init",&tau_init,NULL));
   PetscCall(PetscOptionsGetReal(NULL,NULL,"-vel_init",&vel_init,NULL));
@@ -344,7 +386,10 @@ int main(int argc,char **argv)
 			  shear_modulus_si/SHEAR_MODULUS,0,&medium->Is,medium->Is_hctx); /* shear stress */
   if(medium->calc_sigma_dot)
     calc_petsc_Isn_matrices(medium,fault,use_hmatrix,
-			    -shear_modulus_si/SHEAR_MODULUS,1,&medium->In,medium->In_hctx); /* normal stress, compression positive */
+			    -shear_modulus_si/SHEAR_MODULUS,1,&medium->In,medium->In_hctx); /* normal
+											       stress,
+											       compression
+											       positive */
   if(use_hmatrix)
     PetscCall(MatView(medium->Is,PETSC_VIEWER_STDOUT_WORLD));
   /* 

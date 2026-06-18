@@ -1,6 +1,14 @@
 #include <petscksp.h>
 #include "petscts.h"
 
+/* mode descriptions */
+#define IHMAT_TYPE_DENSE 0
+#define IHMAT_TYPE_HTOOLS 1
+#define IHMAT_TYPE_H2OPUS 2
+#define IHMAT_TYPE_HACAPK 3
+#define IHMAT_TYPE_HMMVP 4
+#define IHMAT_TYPE_BIGWHAM 5
+
 PetscErrorCode rsf_ODE_RHSFunction(TS, PetscReal, Vec, Vec, void*);
 PetscErrorCode rsf_TS_Monitor(TS, PetscInt, PetscReal, Vec, void*);
 PetscErrorCode rsf_domain_check(TS, PetscReal, Vec, PetscBool*);
@@ -8,9 +16,9 @@ PetscErrorCode rsf_domain_check(TS, PetscReal, Vec, PetscBool*);
 /* kernel function */
 
 
-PetscErrorCode GenKEntries_htools(PetscInt , PetscInt , PetscInt ,const PetscInt *,
-				  const PetscInt *, PetscScalar *, void *);
-PetscScalar GenKEntries_h2opus(PetscInt, PetscReal [], PetscReal [], void *);
+PetscErrorCode GenKEntries_petsc(PetscInt , PetscInt , PetscInt ,const PetscInt *,
+				 const PetscInt *, PetscScalar *, void *);
+
 
 PetscReal vel_from_rsf(PetscReal, PetscReal, PetscReal, PetscReal,PetscReal,
 		       PetscReal *, PetscReal *, PetscReal *,struct med *);
@@ -19,6 +27,10 @@ PetscReal vel_from_rsf(PetscReal, PetscReal, PetscReal, PetscReal,PetscReal,
 PetscErrorCode calc_petsc_Isn_matrices(struct med *, struct flt *,PetscInt ,PetscReal, int, Mat *,hacapk_shell_ctx *);
 
 #ifdef USE_PETSC_HMAT
+
+PetscScalar GenKEntries_h2opus(PetscInt, PetscReal [], PetscReal [], void *);
+PetscErrorCode set_htools_defaults_and_options(struct med *);
+PetscErrorCode set_h2opus_defaults_and_options(struct med *);
 #if PETSC_VERSION_LT(3,22,0)
 /* 
    compatibility with older PETSc: the Mat*Kernel callback types were
@@ -30,10 +42,6 @@ typedef PetscErrorCode MatHtoolKernelFn(PetscInt, PetscInt, PetscInt, const Pets
 typedef PetscScalar MatH2OpusKernelFn(PetscInt, PetscReal[], PetscReal[], void *);
 #endif
 
-
-
-PetscErrorCode set_htools_defaults_and_options(struct med *);
-PetscErrorCode set_h2opus_defaults_and_options(struct med *);
 
 void setup_kdtree(int ,int ,PetscReal *,struct flt *,struct med *);
 

@@ -82,7 +82,8 @@ PetscScalar GenKEntries_h2opus(PetscInt sdim, PetscReal x[], PetscReal y[], void
 #endif
 
 /* 
-   generate interaction matrix entries in a way suitable for petsc HTOOLS
+   generate interaction matrix entries in a way suitable for petsc
+   HTOOLS or Petsc dense assembly
 
    sdim dimension
    M local m
@@ -92,9 +93,10 @@ PetscScalar GenKEntries_h2opus(PetscInt sdim, PetscReal x[], PetscReal y[], void
 
    this is modified from the ex82.c petsc example
  */
-PetscErrorCode GenKEntries_htools(PetscInt sdim, PetscInt M, PetscInt N,
-				  const PetscInt *J, const PetscInt *K, PetscScalar *ptr,
-				  void *kernel_ctx)
+PetscErrorCode GenKEntries_petsc(PetscInt sdim, PetscInt M, PetscInt N,
+				 const PetscInt *J, const PetscInt *K,
+				 PetscScalar *ptr,
+				 void *kernel_ctx)
 {
   PetscInt  j, k;
   COMP_PRECISION slip[3],disp[3],stress[3][3],trac[3],sval;
@@ -106,7 +108,7 @@ PetscErrorCode GenKEntries_htools(PetscInt sdim, PetscInt M, PetscInt N,
   PetscFunctionBeginUser;
 #endif
   
-  //fprintf(stderr,"GenKentries: slip %i rec %i\n",ictx->src_slip_mode,ictx->rec_stress_mode);
+  //fprintf(stderr,"GenKentries_petsc: slip %i rec %i\n",ictx->src_slip_mode,ictx->rec_stress_mode);
   get_right_slip(slip,ictx->src_slip_mode,1.0);	/* strike motion */
   /* 
      NOTE on convention: for MatMult(A, slip) = stress semantics (and
@@ -125,7 +127,7 @@ PetscErrorCode GenKEntries_htools(PetscInt sdim, PetscInt M, PetscInt N,
       eval_green_at_receiver(ictx->fault,(int)J[j],(int)K[k],slip,disp,stress,&iret,
 			     GC_STRESS_ONLY,FALSE,ictx->medium->full_space); /* operator assembly: single-point */
       if(iret != 0){
-	fprintf(stderr,"GenKentries_htools: WARNING: i=%3i j=%3i singular\n",(int)j,(int)k);
+	fprintf(stderr,"GenKentries_petsc: WARNING: i=%3i j=%3i singular\n",(int)j,(int)k);
 	sval = 0.0;
       }else{
 	resolve_force(ictx->fault[J[j]].normal,stress,trac);
@@ -136,11 +138,11 @@ PetscErrorCode GenKEntries_htools(PetscInt sdim, PetscInt M, PetscInt N,
 	else if(ictx->rec_stress_mode == NORMAL)
 	  sval = dotp_3d(trac,ictx->fault[J[j]].normal);
 	else{
-	  fprintf(stderr,"GenKentries_htools: receive mode %i undefined\n",ictx->rec_stress_mode);
+	  fprintf(stderr,"GenKentries_petsc: receive mode %i undefined\n",ictx->rec_stress_mode);
 	  exit(-1);
 	}
       }
-      //if(ictx->rec_stress_mode == STRIKE)fprintf(stderr,"GenKEntries: j %i M %i k %i val %g\n",j,M,k,sval);
+      //if(ictx->rec_stress_mode == STRIKE)fprintf(stderr,"GenKEntries_petsc: j %i M %i k %i val %g\n",j,M,k,sval);
       ptr[j + M * k] = sval;
     }
   }

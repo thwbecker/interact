@@ -56,8 +56,8 @@ int main(int argc, char **argv)
   PetscLogDouble t0,t1;
 
   double *bglobal,cpu_time_used;
-#ifdef USE_PETSC_HMAT		/* Htools or H2OPUS  */
-  MatHtoolKernelFn *htools_kernel = GenKEntries_htools;
+#ifdef USE_PETSC_HMAT		
+  MatHtoolKernelFn *htools_kernel = GenKEntries_petsc;
   Mat KT;
   PetscReal nrmK,nrmD;
 #endif
@@ -110,14 +110,15 @@ int main(int argc, char **argv)
   /* 
      start up petsc 
   */
-  medium->use_hmatrix = 1;	/* default is HTOOLS: 0,1,2,3,4 are options */
+  medium->use_hmatrix =  IHMAT_TYPE_HTOOLS;	/* default is HTOOLS: 0,1,2,3,4,5 are possibly options, 
+						   depending on compile, see petsc_prototypes.h */
   
   /* set defaults, can always override */
   PetscCall(PetscOptionsGetInt(NULL, NULL, "-use_hmatrix", &medium->use_hmatrix,&read_value));
   /* forward or inverse test? */
   PetscCall(PetscOptionsGetBool(NULL, NULL, "-test_forward", &test_forward,&read_value));
   /* default: standard Okada half-space */
-  PetscCall(PetscOptionsGetInt(NULL, NULL, "-full_space", &use_full_space,&read_value)); /* use read in or default */
+  PetscCall(PetscOptionsGetBool(NULL, NULL, "-full_space", &use_full_space,&read_value)); /* use read in or default */
   medium->full_space = (my_boolean)use_full_space;
 
   /* options */
@@ -143,7 +144,7 @@ int main(int argc, char **argv)
   
   /* set up defaults */
   switch(medium->use_hmatrix){
-  case 1:
+  case  IHMAT_TYPE_HTOOLS:
 #ifdef USE_PETSC_HMAT
     HEADNODE
       fprintf(stderr,"%s: setting up for HTOOLS\n",argv[0]);
@@ -154,7 +155,7 @@ int main(int argc, char **argv)
     exit(-1);
 #endif
     break;
-  case 2:
+  case IHMAT_TYPE_H2OPUS:
 #ifdef USE_PETSC_HMAT
     /*  */
     fprintf(stderr,"%s: setting up for H2OPUS\n",argv[0]);
@@ -177,7 +178,7 @@ int main(int argc, char **argv)
     exit(-1);
 #endif
     break;
-  case 3:
+  case  IHMAT_TYPE_HACAPK:
 #ifdef USE_HACAPK
     HEADNODE
       fprintf(stderr,"%s: setting up for HACApK\n",argv[0]);
@@ -187,7 +188,7 @@ int main(int argc, char **argv)
     exit(-1);
 #endif
     break;
-  case 4:
+  case IHMAT_TYPE_HMMVP:
 #ifdef USE_HMMVP
     HEADNODE
       fprintf(stderr,"%s: setting up for HMMVP\n",argv[0]);
@@ -197,7 +198,7 @@ int main(int argc, char **argv)
     exit(-1);
 #endif
     break;
-  case 5:
+  case IHMAT_TYPE_BIGWHAM:
 #ifdef USE_BIGWHAM
     HEADNODE
       fprintf(stderr,"%s: setting up for BigWham (full-space)\n",argv[0]);
@@ -207,7 +208,11 @@ int main(int argc, char **argv)
     exit(-1);
 #endif
     break;
-  case 0:			/* dense */
+  case IHMAT_TYPE_DENSE:			/* dense */
+    break;
+  default:
+    fprintf(stderr,"%s: HMat mode %i undefined\n",argv[0],medium->use_hmatrix);
+    exit(-1);
     break;
   }
 
@@ -275,7 +280,7 @@ int main(int argc, char **argv)
 	    argv[0],medium->comm_rank,medium->comm_size,medium->rs,medium->re);
     PetscTime(&t0);
     for(j=medium->rs;j <  medium->re;j++){// rupturing faults for this CPU
-      GenKEntries_htools(ndim,1,n,&j, col_idx, avalues,ictx);
+      GenKEntries_petsc(ndim,1,n,&j, col_idx, avalues,ictx);
       PetscCall(MatSetValues(Adense, 1, &j, n, col_idx,avalues, INSERT_VALUES));
     }
     PetscCall(PetscFree(avalues));
@@ -296,7 +301,7 @@ int main(int argc, char **argv)
        prepare with coordinates and such  
     */
 #ifdef USE_PETSC_HMAT
-    if((medium->use_hmatrix==1)||(medium->use_hmatrix==2)){	
+    if((medium->use_hmatrix==IHMAT_TYPE_HTOOLS)||(medium->use_hmatrix==IHMAT_TYPE_H2OPUS)){	
       coords = (PetscReal *)malloc(sizeof(PetscReal)*ndim*medium->nrflt);
       for(i=0;i < medium->nrflt;i++)		/* all sources or receiveer coordinates  */
 	for(k=0;k < ndim;k++)
@@ -317,7 +322,7 @@ int main(int argc, char **argv)
 #endif
     PetscTime(&t0);
     switch(medium->use_hmatrix){
-    case 0:
+    case IHMAT_TYPE_DENSE:
       /*
 	DENSE REFERENCE (use_hmatrix=0): build In as a dense copy of Is
 	so that the forward (b = A x) and inverse (x = A\b) tests below
@@ -337,8 +342,8 @@ int main(int argc, char **argv)
 		argv[0],medium->comm_rank,medium->comm_size,m,n);
       PetscCall(MatDuplicate(Adense, MAT_COPY_VALUES, &AH));
       break;
-    case 1:
-    case 2:
+    case IHMAT_TYPE_HTOOLS:
+    case IHMAT_TYPE_H2OPUS:
 #ifdef USE_PETSC_HMAT
       /* HTOOLS or H2OPUS */
       PetscCall(MatCreate(PETSC_COMM_WORLD, &AH));
@@ -358,7 +363,7 @@ int main(int argc, char **argv)
       fprintf(stderr,"%s: core %03i/%03i: assigning %s row %5i to %5i, lm %i ln %i m %i n %i\n",
 	      argv[0],medium->comm_rank,medium->comm_size,(medium->use_hmatrix==1)?"HTOOLS":"H2OPUS",
 	      rs,re,lm,ln,m,n);
-      if(medium->use_hmatrix == 1){
+      if(medium->use_hmatrix == IHMAT_TYPE_HTOOLS){
 	/* 
 	   HTOOLS 
 	*/
@@ -410,7 +415,7 @@ int main(int argc, char **argv)
       }
 #endif
       break;
-    case 3:
+    case IHMAT_TYPE_HACAPK:
       /* 
 	 HACApK via MATSHELL 
       */
@@ -433,7 +438,7 @@ int main(int argc, char **argv)
       PetscCall(MatSetOption(AH, MAT_SYMMETRIC, PETSC_FALSE));
 #endif
       break;
-    case 4:
+    case IHMAT_TYPE_HMMVP:
       /* 
 	 hmmvp via MATSHELL 
       */
@@ -523,7 +528,7 @@ int main(int argc, char **argv)
 #endif /* USE_HMMVP_MPI */
 #endif /* USE_HMMVP */
       break;
-    case 5:
+    case IHMAT_TYPE_BIGWHAM:
 #ifdef USE_BIGWHAM
       /* BigWham full-space H matrix as a MATSHELL; builds its own mesh from
 	 the patch geometry and applies the strike-slip -> strike-shear
@@ -537,10 +542,10 @@ int main(int argc, char **argv)
       break;
     }
     
-    if((medium->use_hmatrix==1)||(medium->use_hmatrix==2))
+    if((medium->use_hmatrix==IHMAT_TYPE_HTOOLS)||(medium->use_hmatrix==IHMAT_TYPE_H2OPUS))
       free(coords);
 #if ( defined(USE_HMMVP) || defined(USE_HACAPK) )
-    if((medium->use_hmatrix==3)||(medium->use_hmatrix==4)){
+    if((medium->use_hmatrix==IHMAT_TYPE_HACAPK )||(medium->use_hmatrix==IHMAT_TYPE_HMMVP)){
       free(xc);free(yc);free(zc);
     }
 #endif    
