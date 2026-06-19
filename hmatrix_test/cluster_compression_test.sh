@@ -29,6 +29,11 @@
 # admissibility/leaf settings; a different operator, size, tolerance, or a
 # production library may shift them. See cluster_compression.md.
 #
+# IMPORTANT: compress_interaction_matrix must be built from a source that
+# has the -dump_matrix / -dump_coords flags. If it is not, the dump writes
+# nothing and this script stops with a clear message; rebuild the binary
+# (make bin/compress_interaction_matrix) and rerun.
+#
 # Usage:
 #   ./cluster_compression_test.sh [SCALE] [np]
 #     SCALE : patch-count knob, strike segments per fault (default 24);
@@ -37,34 +42,32 @@
 #     np    : MPI ranks for the backend survey (default 1). The dumps always
 #             use 1 rank so the full matrix is local.
 #
-# Config via environment:
-#   ETA, TOL, LEAF : admissibility, low-rank tolerance, leaf size for
-#                    cluster_compare.py (defaults 2.0, 1e-5, 8).
-#   BACKENDS       : backend ids for the survey (default "1 3 4" =
-#                    HTOOL HACApK hmmvp; 0 = dense reference).
-#   DO_SURVEY      : 1 to run the backend survey, 0 to skip (default 1).
-#   KEEP           : 1 to keep the per-case dumps, 0 to clean (default 0).
+# All other parameters are set as plain assignments below; edit them here.
+# This script intentionally does NOT read parameters from environment
+# variables.
 
 set -u
 
-SCALE=${1:-24}
-NP=${2:-1}
-ETA=${ETA:-2.0}
-TOL=${TOL:-1e-5}
-LEAF=${LEAF:-8}
-BACKENDS=${BACKENDS:-"1 3 4"}
-DO_SURVEY=${DO_SURVEY:-1}
-KEEP=${KEEP:-0}
+# ---- parameters (edit here; no environment variables) ----------------------
+SCALE=24                  # default strike segments per fault; arg 1 overrides
+NP=1                      # default MPI ranks for the survey; arg 2 overrides
+[ $# -ge 1 ] && SCALE=$1
+[ $# -ge 2 ] && NP=$2
 
-# locate binaries and the analyzer relative to this script / repo
-HERE=$(cd "$(dirname "$0")" && pwd)
-ROOT=$(cd "$HERE/.." && pwd)
-MF=${MF:-$ROOT/bin/makefault}
-CIM=${CIM:-$ROOT/bin/compress_interaction_matrix}
-CC=${CC:-$HERE/cluster_compare.py}
-MPIRUN=${MPIRUN:-"mpirun --oversubscribe --allow-run-as-root"}
+ETA=2.0                   # admissibility constant for cluster_compare.py
+TOL=1e-5                  # low-rank relative tolerance
+LEAF=8                    # leaf cluster size
+BACKENDS="1 3 4"          # survey backends: 1=HTOOL 3=HACApK 4=hmmvp (0=dense)
+DO_SURVEY=1               # 1 run the backend survey, 0 skip
+KEEP=0                    # 1 keep the per-case dumps, 0 clean up
 
-for f in "$MF" "$CIM" "$CC"; do
+# tools, relative to the directory this script is run from (repo subdir)
+MF=../bin/makefault
+CIM=../bin/compress_interaction_matrix
+CCCOMP=cluster_compare.py
+MPIRUN=mpirun
+
+for f in "$MF" "$CIM" "$CCCOMP"; do
   [ -e "$f" ] || { echo "missing: $f" >&2; exit 1; }
 done
 
@@ -76,7 +79,7 @@ L=14; W=6
 WORK=$(mktemp -d)
 trap '[ "$KEEP" = 1 ] || rm -rf "$WORK"' EXIT
 
-mkfault(){ # n m strike dip x y z grp  -> stdout patches
+mkfault(){ # x y z strike dip grp  -> stdout patches
   $MF -n $NS -m $ND -l $L -w $W -x "$1" -y "$2" -z "$3" -strike "$4" -dip "$5" -grp "$6" 2>/dev/null
 }
 
@@ -105,12 +108,35 @@ for c in "${CASES[@]}"; do
   g="$WORK/$c.in"
   ngrp=$(awk '{print $8}' "$g" | sort -u | wc -l)
   [ "$ngrp" -lt 2 ] && continue   # clustering test needs two faults
+
+  # dump the dense operator and the coordinates. keep the run log so that a
+  # missing dump can be explained rather than crashing cluster_compare.py.
+  dlog="$WORK/$c.dumplog"
   $MPIRUN -np 1 "$CIM" -geom_file "$g" -use_hmatrix 0 \
-      -dump_matrix "$WORK/$c.bin" -dump_coords "$WORK/$c.coords" >/dev/null 2>&1
-  out=$(python3 "$CC" -m "$WORK/$c.bin" -c "$WORK/$c.coords" -tol "$TOL" -eta "$ETA" -leaf "$LEAF")
+      -dump_matrix "$WORK/$c.bin" -dump_coords "$WORK/$c.coords" > "$dlog" 2>&1
+  if [ ! -s "$WORK/$c.bin.info" ] || [ ! -s "$WORK/$c.bin" ]; then
+    echo >&2
+    echo "ERROR: the dump for case '$c' produced no matrix file." >&2
+    echo "       Expected $WORK/$c.bin and .info, but they are missing or empty." >&2
+    echo "       The likely cause is that" >&2
+    echo "         $CIM" >&2
+    echo "       was not built with the -dump_matrix / -dump_coords flags." >&2
+    echo "       Rebuild it from the updated src/compress_interaction_matrix.c:" >&2
+    echo "         make bin/compress_interaction_matrix" >&2
+    echo "       then rerun. Last lines of the dump run:" >&2
+    tail -n 6 "$dlog" | sed 's/^/         | /' >&2
+    exit 1
+  fi
+
+  out=$(python3 "$CCCOMP" -m "$WORK/$c.bin" -c "$WORK/$c.coords" -tol "$TOL" -eta "$ETA" -leaf "$LEAF")
   N=$(echo "$out"   | awk '/^operator:/{print $2}')
   jx=$(echo "$out"  | awk '$1=="joint"{print $3}')
   sx=$(echo "$out"  | awk '$1=="split"{print $3}')
+  if [ -z "$jx" ] || [ -z "$sx" ]; then
+    Nshow="$N"; [ -z "$Nshow" ] && Nshow="?"
+    printf "%-11s %6s %10s %10s %9s  %s\n" "$c" "$Nshow" "?" "?" "?" "cluster_compare failed"
+    continue
+  fi
   jv=${jx%x}; sv=${sx%x}
   gain=$(awk -v j="$jv" -v s="$sv" 'BEGIN{printf "%+.1f%%", 100*(s-j)/j}')
   verdict=$(awk -v j="$jv" -v s="$sv" 'BEGIN{d=100*(s-j)/j; if(d<-1)print "split worse"; else if(d>1)print "split helps"; else print "geometric ok"}')
