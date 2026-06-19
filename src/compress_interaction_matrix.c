@@ -75,6 +75,11 @@ int main(int argc, char **argv)
 						   on in external
 						   routine (for
 						   testing) */
+  /* -skip_dense: build only the H-matrix, time it, and exit before the
+     dense reference and the error/solve check. The dense reference is
+     m*n entries, which exceeds 32-bit PetscInt and a single rank's memory
+     at large N, so this is what lets the assembly be timed on one rank. */
+  PetscBool skip_dense=PETSC_FALSE;
   char geom_file[STRLEN]="geom.in";
   /* optional external dumps (see -dump_matrix / -dump_coords below) */
   char dump_matrix_file[STRLEN]="",dump_coords_file[STRLEN]="";
@@ -128,6 +133,7 @@ int main(int argc, char **argv)
   PetscCall(PetscOptionsGetInt(NULL, NULL, "-nrandom", &nrandom,&read_value));
   PetscCall(PetscOptionsGetBool(NULL, NULL, "-test_forward", &test_forward,&read_value));
   PetscCall(PetscOptionsGetBool(NULL, NULL, "-make_matrix_externally", &make_matrix_externally,NULL));
+  PetscCall(PetscOptionsGetBool(NULL, NULL, "-skip_dense", &skip_dense,NULL));
   
   PetscCallMPI(MPI_Comm_size(PETSC_COMM_WORLD, &medium->comm_size));
   PetscCallMPI(MPI_Comm_rank(PETSC_COMM_WORLD, &medium->comm_rank));
@@ -262,6 +268,28 @@ int main(int argc, char **argv)
     /* 
        dense matrix setup, using Adense
     */
+    /* The dense reference is a MATDENSE of m by n. With 32-bit PetscInt a
+       local block of local_rows*n entries overflows the index once it
+       exceeds PETSC_MAX_INT, which segfaults rather than erroring cleanly.
+       Detect that up front from the row split and fall back to the
+       H-matrix-only path (as if -skip_dense) with a warning, so the run
+       still produces the assembly instead of crashing. Adding MPI ranks
+       lowers local_rows. A 64-bit PetscInt build removes the limit but is
+       not an option when use_hmatrix selects HTOOL, which does not support
+       64-bit indices, so adding ranks (or -skip_dense) is the way out. */
+    if(!skip_dense){
+      PetscInt local_rows=PETSC_DECIDE,glob=m;
+      PetscCall(PetscSplitOwnership(PETSC_COMM_WORLD,&local_rows,&glob));
+      if((PetscInt64)local_rows*(PetscInt64)n > (PetscInt64)PETSC_MAX_INT){
+	HEADNODE
+	  fprintf(stderr,"%s: WARNING: dense reference local block %ld x %i = %lld entries exceeds the PetscInt limit (%lld); skipping the dense reference and the error check. Add MPI ranks so each rank's block stays under the limit, or pass -skip_dense. (A 64-bit PetscInt build removes the limit but is incompatible with HTOOL.)\n",
+		  argv[0],(long)local_rows,n,
+		  (long long)((PetscInt64)local_rows*(PetscInt64)n),(long long)PETSC_MAX_INT);
+	skip_dense = PETSC_TRUE;
+      }
+    }
+
+    if(!skip_dense){
     PetscCall(MatCreate(PETSC_COMM_WORLD, &Adense));
     PetscCall(MatSetSizes(Adense, PETSC_DECIDE, PETSC_DECIDE, m, n));
     PetscCall(MatSetType(Adense, MATDENSE));
@@ -300,6 +328,24 @@ int main(int argc, char **argv)
     HEADNODE
       fprintf(stderr,"%s: dense assembly took %12.4f s\n",argv[0],t1-t0);
     /* dense done */
+    }else{
+      /* -skip_dense: do not build the dense reference. Create a tiny empty
+         AIJ matrix with the same global size only to reproduce the row
+         distribution (lm, ln, rs, re, rn) that the H-matrix build below
+         relies on. The error/solve check is skipped (we exit right after
+         the H-matrix assembly is timed). */
+      PetscCall(MatCreate(PETSC_COMM_WORLD, &Adense));
+      PetscCall(MatSetSizes(Adense, PETSC_DECIDE, PETSC_DECIDE, m, n));
+      PetscCall(MatSetType(Adense, MATAIJ));
+      PetscCall(MatSeqAIJSetPreallocation(Adense, 0, NULL));
+      PetscCall(MatMPIAIJSetPreallocation(Adense, 0, NULL, 0, NULL));
+      PetscCall(MatSetUp(Adense));
+      PetscCall(MatGetLocalSize(Adense, &lm, &ln));
+      PetscCall(MatGetOwnershipRange(Adense, &medium->rs, &medium->re));
+      medium->rn = medium->re - medium->rs;
+      HEADNODE
+	fprintf(stderr,"%s: -skip_dense: no dense reference (H-matrix assembly timing only)\n",argv[0]);
+    }
 
     /*
        optional external dumps of the operator and its point cloud, so
@@ -640,6 +686,17 @@ int main(int argc, char **argv)
     PetscTime(&t1);
     HEADNODE
       fprintf(stderr,"%s: H matrix assembly took %12.4f s\n",argv[0],t1-t0);
+
+    if(skip_dense){
+      /* assembly timed; nothing to compare against (no dense reference),
+         so clean up and exit before the error/solve section. */
+      HEADNODE
+	fprintf(stderr,"%s: -skip_dense: exiting after H-matrix assembly (no error check)\n",argv[0]);
+      PetscCall(MatDestroy(&AH));
+      PetscCall(MatDestroy(&Adense));
+      PetscCall(PetscFinalize());
+      return 0;
+    }
 
   }else{
     /* 

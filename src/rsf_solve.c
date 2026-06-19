@@ -383,14 +383,31 @@ int main(int argc,char **argv)
      traction on the slipping patch (negative diagonal), so backslip
      -vpl produces positive loading
   */
-  calc_petsc_Isn_matrices(medium,fault,use_hmatrix,
-			  shear_modulus_si/SHEAR_MODULUS,0,&medium->Is,medium->Is_hctx); /* shear stress */
-  if(medium->calc_sigma_dot)
+  /* instrument the interaction-matrix build so its wall time can be
+     compared directly against the MatAssemblyEnd event in -log_view.
+     the two should agree; if the build wall is small but -log_view
+     still charges a large MatAssemblyEnd, the cost is deferred. */
+  {
+    PetscLogDouble tb0,tb1;
+    PetscCall(PetscBarrier(NULL));
+    PetscCall(PetscTime(&tb0));
     calc_petsc_Isn_matrices(medium,fault,use_hmatrix,
-			    -shear_modulus_si/SHEAR_MODULUS,1,&medium->In,medium->In_hctx); /* normal
-											       stress,
-											       compression
-											       positive */
+			    shear_modulus_si/SHEAR_MODULUS,0,&medium->Is,medium->Is_hctx); /* shear stress */
+    PetscCall(PetscBarrier(NULL));
+    PetscCall(PetscTime(&tb1));
+    HEADNODE
+      fprintf(stderr,"rsf_solve: Is (shear) interaction matrix build wall = %12.4f s\n",(double)(tb1-tb0));
+    if(medium->calc_sigma_dot){
+      PetscCall(PetscBarrier(NULL));
+      PetscCall(PetscTime(&tb0));
+      calc_petsc_Isn_matrices(medium,fault,use_hmatrix,
+			      -shear_modulus_si/SHEAR_MODULUS,1,&medium->In,medium->In_hctx); /* normal stress, compression positive */
+      PetscCall(PetscBarrier(NULL));
+      PetscCall(PetscTime(&tb1));
+      HEADNODE
+	fprintf(stderr,"rsf_solve: In (normal) interaction matrix build wall = %12.4f s\n",(double)(tb1-tb0));
+    }
+  }
   if(use_hmatrix)
     PetscCall(MatView(medium->Is,PETSC_VIEWER_STDOUT_WORLD));
   /* 

@@ -397,8 +397,19 @@ PetscErrorCode calc_petsc_Isn_matrices(struct med *medium, struct flt *fault,
   PetscCall(MatGetLocalSize(*this_mat, &lm, &ln));
   dn = ln;on = n - ln;
   
-  PetscCall(MatSeqAIJSetPreallocation(*this_mat, n, NULL));
-  PetscCall(MatMPIAIJSetPreallocation(*this_mat, dn, NULL, on, NULL));
+  if(use_hmatrix == IHMAT_TYPE_DENSE){
+    PetscCall(MatSeqAIJSetPreallocation(*this_mat, n, NULL));
+    PetscCall(MatMPIAIJSetPreallocation(*this_mat, dn, NULL, on, NULL));
+  }else{
+    /* the H-matrix backends below replace *this_mat with their own type
+       (MATHTOOL / MATSHELL), so a full dense-row AIJ preallocation here
+       (lm*n entries per rank) is allocated and then discarded. At large N
+       that throwaway allocation is O(N^2/np) in work and memory and can
+       dominate the build (and exhaust memory); preallocate nothing, since
+       only the row distribution (lm/ln/rs/re) computed above is needed. */
+    PetscCall(MatSeqAIJSetPreallocation(*this_mat, 0, NULL));
+    PetscCall(MatMPIAIJSetPreallocation(*this_mat, 0, NULL, 0, NULL));
+  }
   PetscCall(MatGetOwnershipRange(*this_mat, &medium->rs, &medium->re));
   medium->rn = medium->re  - medium->rs; /* number of local elements */
 
@@ -745,7 +756,8 @@ PetscErrorCode set_htools_defaults_and_options(struct med *medium)
 	 value. */
       PetscCall(PetscOptionsSetValue(NULL,"-mat_htool_epsilon","3e-5"));
     PetscCall(PetscOptionsHasName(NULL,NULL,"-mat_htool_compressor",&flg));
-    if(!flg)
+    if(!flg)			/* this is a symmetric compressor, a
+				   mismatch, but fast? */
       PetscCall(PetscOptionsSetValue(NULL,"-mat_htool_compressor","sympartialACA"));
     PetscCall(PetscOptionsHasName(NULL,NULL,"-pc_type",&flg));
     if(!flg)

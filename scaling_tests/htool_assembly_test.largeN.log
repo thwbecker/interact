@@ -1,0 +1,8 @@
+makefault: x: (0, 0, -20) l: 50 w: 20 s: 0 d: 90 grp: 0 n:   400 m:   160 patches: 64000 scaling: 1.000000e+00 
+np=1  htool_assembly_s=123.2445
+np=2  htool_assembly_s=67.2192
+np=4  htool_assembly_s=32.6561
+np=8  htool_assembly_s=18.1698
+np=16  htool_assembly_s=13.5092
+np=24  htool_assembly_s=10.6972
+np=48  htool_assembly_s=8.7266
