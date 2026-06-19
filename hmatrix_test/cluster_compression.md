@@ -70,39 +70,58 @@ blocks dense, so accuracy is held fixed and only the partition changes.
 ## What the experiment shows
 
 `scaling_tests/cluster_compression_test.sh` runs a panel of makefault cases
-through this comparison and, separately, through the real backends. The
-clustering result is consistent across the sizes tried:
+through this comparison and, separately, through the real backends. Two things
+govern whether splitting by fault helps: the orientation contrast between the
+two faults, which sets the sign, and the resolution (patch count), which sets
+the size of the effect.
 
-  - Splitting helps only when the two faults genuinely interleave in space.
-    The clear case is two perpendicular faults intersecting through the same
-    box (vertical and horizontal, perpendicular normals): every spatial
-    cluster contains both faults, so the joint tree cannot avoid mixing
-    orientations, and splitting recovers a bounded amount. In the cases tried
-    the saving was in the single digits to roughly ten percent of stored
-    scalars, largest at a moderate admissibility constant (around eta = 2,
-    where there are many far blocks but they are still large enough to carry
-    the mixed rank) and smaller at the extremes.
+Sweeping resolution at eta = 2, tol = 1e-5, leaf = 8, the storage saving from
+splitting (positive means split stores fewer scalars than joint) behaves as:
 
-  - For two planar faults of different orientation that are close but
-    spatially divergent (for example dip 90 next to dip 45), splitting gives
-    no gain and is slightly worse, because different-orientation planar
-    faults also separate in space, so the geometric tree already isolates
-    them and a forced split only fragments the far blocks.
+    N        cross (perpendicular)    divergent (dip 90 / dip 45)
+    192            +4 %                     -1 %
+    384            +7 %                     -1 %
+    640           +10 %                     -1 %
+    1040           +9 %                     -1 %
+    1536          +11 %                     +2 %
+    6144          +16 %                     +6 %
 
-  - For two parallel same-orientation faults, or two faults far apart,
-    joint and split are effectively equal, as expected: the geometric tree
-    separates them on its own.
+    parallel (same orientation): about -2 to -4 % at all N
+    separated (far apart):       0 % at all N
 
-The practical reading is that the intuition is mechanically correct but has
-limited bite for two planar faults, because the configurations where
-orientation mixing would hurt (different orientation) are largely the same
-configurations where the faults are spatially separable and the geometric
-tree already does the right thing. The regime where fault-aware clustering
-could pay is genuine spatial interleaving of differently oriented patches:
-intersecting or conjugate faults sharing a volume, rough or non-planar
-single faults whose adjacent patches differ in orientation, or dense networks
-of many small faults of varied orientation. Even there the gain is a bounded
-constant factor on the admissible far blocks, not an order of magnitude.
+The intersecting case, two perpendicular faults sharing one box so that every
+spatial cluster contains both orientations, gains the most, and the gain grows
+with resolution, from a few percent at a few hundred patches to roughly fifteen
+percent at several thousand. Two different-orientation faults that are close but
+spatially divergent (dip 90 next to dip 45) are a wash at low resolution, where
+the geometric tree separates them on its own, but turn positive as resolution
+rises (about six percent at N = 6144): once the region where they pass close is
+resolved into many fine patches of two orientations, the joint tree begins
+mixing them in shared clusters, and splitting recovers that. Two parallel
+same-orientation faults never benefit (splitting is slightly worse at all N:
+there is no orientation contrast to exploit and the split only fragments the
+far blocks), and two faults far apart are unaffected (both trees separate them).
+
+The practical reading is that the intuition is mechanically correct, that the
+gain is a bounded constant factor on the admissible far blocks rather than an
+order of magnitude, and that it is larger than the smallest tests suggested
+because it grows with resolution. It requires an orientation contrast between
+the faults; same-orientation faults gain nothing. The regimes where it could
+pay are therefore differently oriented faults at production resolution: most
+strongly genuine spatial interleaving (intersecting or conjugate faults sharing
+a volume, rough or non-planar faults whose adjacent patches differ in
+orientation, or dense networks of varied orientation), and to a smaller but no
+longer negligible degree even differently oriented faults that merely come
+close at high resolution.
+
+These figures are from the simplified in-house model and should be read as a
+band rather than a precise curve; the resolution trend is not perfectly
+monotonic (the cross case dips slightly near N = 1040). They are also the
+headroom a fault-aware tree could add on top of the joint result: the real
+backends, which cluster on centroids and cannot split, compress the same joint
+operators to ratios close to the model's joint column (see the survey below),
+so a production library that already compresses harder may realize only part of
+the split saving.
 
 One implementation caveat: none of the three backends can be told to split by
 fault, since they take centroids only. HTOOL's native library does support a
@@ -115,19 +134,22 @@ result, not something the current backends produce.
 
 The second table in the driver runs HTOOL, HACApK, and hmmvp on each joint
 operator and reports their compression ratio (dense divided by H-matrix
-storage). At the small sizes used for the clustering panel every backend
-compresses little, which is expected: the far field is a small fraction of a
-few-hundred-patch operator, and the separated case, with a large well-isolated
-cross block, is the only one that compresses appreciably. Raising the panel
-scale pushes N up and the backends into a more representative regime; the
-broader, larger-N backend scaling and accuracy comparison lives in
-`rsf_solve_compression.md`, `compress_interaction_matrix.md`, and
+storage). At the small sizes used by default for the clustering panel every
+backend compresses little, which is expected: the far field is a small fraction
+of a few-hundred-patch operator, and the separated case, with a large
+well-isolated cross block, is the only one that compresses appreciably. Raising
+the panel scale pushes N up and the backends into a more representative regime:
+at SCALE = 48 (N = 1536) the three compress to roughly 1.6 to 3.6x (HTOOL and
+HACApK) and 2.3 to 5.3x (hmmvp), and at SCALE = 96 (N = 6144) to roughly 3.4 to
+8.2x and 6.3 to 13x, with hmmvp highest and the separated case compressing most.
+HACApK in particular moves from near-dense at the few-hundred-patch sizes (its
+reported memory sits slightly above the dense matrix there) to a few-fold
+compression at these larger N, which confirms the small-N readings reflected the
+operator size and the conservative default settings rather than a limitation of
+the library. The broader, larger-N backend scaling and accuracy comparison lives
+in `rsf_solve_compression.md`, `compress_interaction_matrix.md`, and
 `hmat_scaling_test.sh`, and the recommendations there (which backend for
 assembly-bound vs matvec-bound work) are the ones to use for production sizing.
-The HACApK percentages above sit above 100 percent at these small N, meaning
-its H-matrix is slightly larger than dense; that reflects the small operator
-and the conservative default settings, not a limitation of the library, and it
-compresses well at the larger N reported in the other notes.
 
 ## Files
 
