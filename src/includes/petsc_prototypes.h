@@ -13,6 +13,7 @@ PetscErrorCode rsf_ODE_RHSFunction(TS, PetscReal, Vec, Vec, void*);
 PetscErrorCode rsf_TS_Monitor(TS, PetscInt, PetscReal, Vec, void*);
 PetscErrorCode rsf_domain_check(TS, PetscReal, Vec, PetscBool*);
 
+PetscErrorCode print_petsc_matrix(Mat , PetscInt , PetscInt ,char *);
 /* kernel function */
 
 

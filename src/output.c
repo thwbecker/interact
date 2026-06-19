@@ -11,6 +11,50 @@
 #include "interact.h"
 #include "properties.h"
 
+#ifdef USE_PETSC
+#include "petsc_prototypes.h"
+
+PetscErrorCode print_petsc_matrix(Mat A, PetscInt n, PetscInt m,
+				  char *dump_matrix_file)
+{
+  FILE *fp;
+  PetscInt *cidx;
+  PetscScalar *rowb;
+  char infon[STRLEN];
+  int i,j;
+  PetscCall(PetscMalloc1(n,&cidx));
+  PetscCall(PetscMalloc1(n,&rowb));
+  for(j=0;j < n;j++)
+    cidx[j] = j;
+  fp = fopen(dump_matrix_file,"wb");
+  if(!fp){
+    fprintf(stderr,"print_petsc_matrix: cannot open %s for writing\n",
+	    dump_matrix_file);
+    exit(-1);
+  }
+  for(i=0;i < m;i++){
+    PetscCall(MatGetValues(A,1,&i,n,cidx,rowb));
+    if((PetscInt)fwrite(rowb,sizeof(PetscScalar),n,fp) != n){
+      fprintf(stderr,"print_petsc_matrix: short write to %s\n",dump_matrix_file);
+      exit(-1);
+    }
+  }
+  fclose(fp);
+  /* info file */
+  snprintf(infon,STRLEN,"%s.info",dump_matrix_file);
+  fp = fopen(infon,"w");
+  fprintf(fp,"%ld %ld row-major float64 little-endian  A[i*n+j]=stress(recv i,src j)\n",(long)m,(long)n);
+  fclose(fp);
+  PetscCall(PetscFree(cidx));
+  PetscCall(PetscFree(rowb));
+  fprintf(stderr,"print_petsc_matrix: wrote dense matrix (%ld by %ld) to %s (+ %s.info)\n",
+	  (long)m,(long)n,dump_matrix_file,dump_matrix_file);
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+
+
+#endif
 int mysystem(const char *command)
 {
   int rval;
@@ -49,6 +93,31 @@ void flush_slipline(struct med *medium,
   }
   medium->slip_line_time=medium->time;
 }
+
+/* print fault coordinates and normal */
+
+void print_fault_geometry_and_normals(struct flt *fault, int nrflt, chat *dump_coords_file)
+{
+  FILE *fp;
+  int i;
+  fp = fopen(dump_coords_file,"w");
+  if(!fp){
+    fprintf(stderr,"print_fault_geometry_and_normal: cannot open %s for writing\n",argv[0],dump_coords_file);
+    exit(-1);
+  }
+  fprintf(fp,"# i x y z strike dip l w area nx ny nz group (centroid, orientation[deg], half-sizes, area, unit normal, group/fault id)\n");
+  for(i=0;i < nrflt;i++)
+    fprintf(fp,"%6ld %14.7e %14.7e %14.7e %8.3f %8.3f %12.6e %12.6e %12.6e %10.6f %10.6f %10.6f %5i\n",
+	    (long)i,
+	    (double)fault[i].x[INT_X],(double)fault[i].x[INT_Y],(double)fault[i].x[INT_Z],
+	    (double)fault[i].strike,(double)fault[i].dip,
+	    (double)fault[i].l,(double)fault[i].w,(double)fault[i].area,
+	    (double)fault[i].normal[INT_X],(double)fault[i].normal[INT_Y],(double)fault[i].normal[INT_Z],
+	    fault[i].group);
+  fclose(fp);
+  fprintf(stderr,"print_fault_geometry_and_normal: wrote %i patch coordinates to %s\n",medium->nrflt,dump_coords_file);
+}
+
 /* 
    print stress and displacements to individual files
    for each fault group of several, averaged patches 

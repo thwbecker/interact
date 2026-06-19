@@ -104,6 +104,7 @@ int main(int argc,char **argv)
   PetscBool track_events;
   PetscInt event_direction[1] = {0}; /* detect both crossing directions */
   PetscBool event_terminate[1] = {PETSC_FALSE};
+  PetscLogDouble tb0,tb1;
   struct rsf_out_ctx uc[1];
   struct interact_ctx par[1]; /* user-defined work context */
   char geom_file[STRLEN]="geom.in",rsf_file[STRLEN]="rsf.dat",rsf_ic_file[STRLEN]="",rsf_dc_file[STRLEN]="";
@@ -387,28 +388,28 @@ int main(int argc,char **argv)
      compared directly against the MatAssemblyEnd event in -log_view.
      the two should agree; if the build wall is small but -log_view
      still charges a large MatAssemblyEnd, the cost is deferred. */
-  {
-    PetscLogDouble tb0,tb1;
+  
+  PetscCall(PetscBarrier(NULL));
+  PetscCall(PetscTime(&tb0));
+  calc_petsc_Isn_matrices(medium,fault,use_hmatrix,
+			  shear_modulus_si/SHEAR_MODULUS,0,&medium->Is,medium->Is_hctx); /* shear stress */
+  PetscCall(PetscBarrier(NULL));
+  PetscCall(PetscTime(&tb1));
+  HEADNODE
+    fprintf(stderr,"rsf_solve: Is (shear) interaction matrix build wall = %12.4f s\n",(double)(tb1-tb0));
+  if(medium->calc_sigma_dot){
     PetscCall(PetscBarrier(NULL));
     PetscCall(PetscTime(&tb0));
     calc_petsc_Isn_matrices(medium,fault,use_hmatrix,
-			    shear_modulus_si/SHEAR_MODULUS,0,&medium->Is,medium->Is_hctx); /* shear stress */
+			    -shear_modulus_si/SHEAR_MODULUS,1,&medium->In,medium->In_hctx); /* normal stress, compression positive */
     PetscCall(PetscBarrier(NULL));
     PetscCall(PetscTime(&tb1));
     HEADNODE
-      fprintf(stderr,"rsf_solve: Is (shear) interaction matrix build wall = %12.4f s\n",(double)(tb1-tb0));
-    if(medium->calc_sigma_dot){
-      PetscCall(PetscBarrier(NULL));
-      PetscCall(PetscTime(&tb0));
-      calc_petsc_Isn_matrices(medium,fault,use_hmatrix,
-			      -shear_modulus_si/SHEAR_MODULUS,1,&medium->In,medium->In_hctx); /* normal stress, compression positive */
-      PetscCall(PetscBarrier(NULL));
-      PetscCall(PetscTime(&tb1));
-      HEADNODE
-	fprintf(stderr,"rsf_solve: In (normal) interaction matrix build wall = %12.4f s\n",(double)(tb1-tb0));
-    }
+      fprintf(stderr,"rsf_solve: In (normal) interaction matrix build wall = %12.4f s\n",(double)(tb1-tb0));
   }
-  if(use_hmatrix)
+
+  if(use_hmatrix)		/* this should only print simple info,
+				   not full matrix for H matrix */
     PetscCall(MatView(medium->Is,PETSC_VIEWER_STDOUT_WORLD));
   /* 
      preallocate the RHS work vectors with the matrix row layout

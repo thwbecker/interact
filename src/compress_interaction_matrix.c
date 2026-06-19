@@ -369,59 +369,13 @@ int main(int argc, char **argv)
 	HEADNODE
 	  fprintf(stderr,"%s: -dump_matrix needs a single MPI rank (rerun with -np 1); skipping matrix dump\n",argv[0]);
       }else{
-	FILE *fp;
-	PetscInt *cidx;
-	PetscScalar *rowb;
-	char infon[STRLEN];
-	PetscCall(PetscMalloc1(n,&cidx));
-	PetscCall(PetscMalloc1(n,&rowb));
-	for(j=0;j < n;j++)
-	  cidx[j] = j;
-	fp = fopen(dump_matrix_file,"wb");
-	if(!fp){
-	  fprintf(stderr,"%s: cannot open %s for writing\n",argv[0],dump_matrix_file);
-	  exit(-1);
-	}
-	for(i=0;i < m;i++){
-	  PetscCall(MatGetValues(Adense,1,&i,n,cidx,rowb));
-	  if((PetscInt)fwrite(rowb,sizeof(PetscScalar),n,fp) != n){
-	    fprintf(stderr,"%s: short write to %s\n",argv[0],dump_matrix_file);
-	    exit(-1);
-	  }
-	}
-	fclose(fp);
-	snprintf(infon,STRLEN,"%s.info",dump_matrix_file);
-	fp = fopen(infon,"w");
-	fprintf(fp,"%ld %ld row-major float64 little-endian  A[i*n+j]=stress(recv i,src j)\n",(long)m,(long)n);
-	fclose(fp);
-	PetscCall(PetscFree(cidx));
-	PetscCall(PetscFree(rowb));
-	fprintf(stderr,"%s: wrote dense matrix (%ld by %ld) to %s (+ %s.info)\n",
-		argv[0],(long)m,(long)n,dump_matrix_file,dump_matrix_file);
+	print_petsc_matrix(Adense,n,m,dump_matrix_file);
       }
     }
-    if(do_dump_coords){
-      HEADNODE{
-	FILE *fp;
-	fp = fopen(dump_coords_file,"w");
-	if(!fp){
-	  fprintf(stderr,"%s: cannot open %s for writing\n",argv[0],dump_coords_file);
-	  exit(-1);
-	}
-	fprintf(fp,"# i x y z strike dip l w area nx ny nz group (centroid, orientation[deg], half-sizes, area, unit normal, group/fault id)\n");
-	for(i=0;i < medium->nrflt;i++)
-	  fprintf(fp,"%6ld %14.7e %14.7e %14.7e %8.3f %8.3f %12.6e %12.6e %12.6e %10.6f %10.6f %10.6f %5i\n",
-		  (long)i,
-		  (double)fault[i].x[INT_X],(double)fault[i].x[INT_Y],(double)fault[i].x[INT_Z],
-		  (double)fault[i].strike,(double)fault[i].dip,
-		  (double)fault[i].l,(double)fault[i].w,(double)fault[i].area,
-		  (double)fault[i].normal[INT_X],(double)fault[i].normal[INT_Y],(double)fault[i].normal[INT_Z],
-		  fault[i].group);
-	fclose(fp);
-	fprintf(stderr,"%s: wrote %i patch coordinates to %s\n",argv[0],medium->nrflt,dump_coords_file);
-      }
-    }
-
+    if(do_dump_coords)
+      HEADNODE
+	print_fault_geometry_and_normals(fault,medium->nrflt,dump_coords_file);
+    
     /* 
        
        ASSEMBLE DIFFERENT KINDS OF H MATRICES

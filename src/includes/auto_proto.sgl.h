@@ -12,6 +12,7 @@ void block_eval_blockvec(float *, float, int, float *, struct prj *, float *);
 void run_lm(struct bmd *, long int *, struct prj, float *, unsigned char, unsigned char, float, float *, unsigned char, unsigned char, float, unsigned char, unsigned char, unsigned char, int, int, char **);
 /* block_matrix.c */
 void assemble_block_fltdep_matrices(float **, float **, float **, float **, float *, float *, float *, int, int, int, int, int, int, int, float *, struct bflt *, struct bck *, unsigned char, unsigned char);
+void print_fault_geometry_and_normals(struct flt *, int , chat *);
 void assemble_block_a(float **, float *, int *, int, int, struct bck *, int, struct bmd *);
 void assemble_block_d(float **, struct bflt *, int, int, int, struct bmd *);
 void assemble_block_i(float **, struct bflt *, int, int, int);
