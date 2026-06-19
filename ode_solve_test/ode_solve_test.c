@@ -1,4 +1,4 @@
-#include "../interact.h"
+#include "interact.h"
 #include <quadmath.h>
 #define LHEADNODE if(par->medium->comm_rank==0)
 /*

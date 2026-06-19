@@ -2,25 +2,23 @@ MY_PRECISION = -DUSE_DOUBLE_PRECISION
 
 
 # d
-include ../makefile.gcc
-include ../makefile.petsc
+include ../config/makefile.gcc
+include ../config/makefile.petsc
 ifndef MPILD
 MPILD = $(LD)
 endif
 
+LOCAL_INCLUDES = -I../src/includes/ -I../src/util/ -I../src/block/
+
+INCLUDES = $(LOCAL_INCLUDES) $(PETSC_INCLUDES)
 BDIR = bin/
 ODIR = objects/
 
 # petsc h2opus and htool examples
-all: $(BDIR)/ex21  $(BDIR)/ex82 $(BDIR)/ode_solve_test
+all: $(BDIR)/ode_solve_test
 
-$(BDIR)/ex21: $(ODIR)/ex21.o $(GEN_P_INC) $(LIBLIST) 
-	$(MPILD) -o $(BDIR)/ex21 $(ODIR)/ex21.o $(PETSC_LIBS) $(LIBS) $(SUPERLU_LIBS)  $(SLATEC_LIBS)   $(LDFLAGS)
 
-$(BDIR)/ex82: $(ODIR)/ex82.o $(GEN_P_INC) $(LIBLIST) 
-	$(MPILD) -o $(BDIR)/ex82 $(ODIR)/ex82.o $(PETSC_LIBS) $(LIBS) $(SUPERLU_LIBS)  $(SLATEC_LIBS)   $(LDFLAGS)
-
-$(BDIR)/ode_solve_test: $(ODIR)/ode_solve_test.o $(GEN_P_INC) $(LIBLIST) 
+$(BDIR)/ode_solve_test: $(ODIR)/ode_solve_test.o $(LIBLIST) 
 	$(MPILD) -o $(BDIR)/ode_solve_test $(ODIR)/ode_solve_test.o \
 	$(PETSC_LIBS) $(LIBS) $(SUPERLU_LIBS)  $(SLATEC_LIBS)   $(LDFLAGS)
 
@@ -41,15 +39,15 @@ obj_directories:
 	fi;\
 
 #
-$(ODIR)/%.o:	%.c $(GEN_P_INC)
-	$(CC) $(PETSC_INCLUDES) $(CFLAGS)  $(MY_PRECISION) -c $< -o $(ODIR)/$*.o
+$(ODIR)/%.o:	%.c 
+	$(CC) $(INCLUDES) $(CFLAGS)  $(MY_PRECISION) -c $< -o $(ODIR)/$*.o
 
-$(ODIR)/%.o:	%.f $(GEN_P_INC)
-	$(F77) $(PETSC_INCLUDES) $(FFLAGS) $(MY_PRECISION) -c $< -o $(ODIR)/$*.o
+$(ODIR)/%.o:	%.f 
+	$(F77) $(INCLUDES) $(FFLAGS) $(MY_PRECISION) -c $< -o $(ODIR)/$*.o
 
-$(ODIR)/%.o:	%.F $(GEN_P_INC)
-	$(F77) $(PETSC_INCLUDES) $(FFLAGS) $(MY_PRECISION) -c $<  -o $(ODIR)/$*.o
+$(ODIR)/%.o:	%.F 
+	$(F77) $(INCLUDES) $(FFLAGS) $(MY_PRECISION) -c $<  -o $(ODIR)/$*.o
 
-$(ODIR)/%.o:	%.f90 $(GEN_P_INC)
-	$(F90)   $(PETSC_INCLUDES) $(F90FLAGS) $(MY_PRECISION) -c $<  -o $(ODIR)/$*.o
+$(ODIR)/%.o:	%.f90 
+	$(F90)   $(INCLUDES) $(F90FLAGS) $(MY_PRECISION) -c $<  -o $(ODIR)/$*.o
 
