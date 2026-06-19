@@ -1,0 +1,23 @@
+ ./cluster_compression_test.sh 128
+panel scale: NS=128 ND=42 per fault; admissibility eta=2.0 tol=1e-5 leaf=8
+
+=== 1. clustering: joint geometric tree vs split-by-fault (matched accuracy) ===
+case             N    joint_x    split_x      gain  verdict
+parallel     10752      6.02x      6.00x     -0.3%  geometric ok
+divergent    10752      5.61x      5.97x     +6.4%  split helps
+cross        10752      5.37x      6.57x    +22.3%  split helps
+separated    10752     11.53x     11.53x     +0.0%  geometric ok
+
+  joint_x/split_x = dense/stored compression; gain = (split-joint)/joint.
+  positive gain means isolating the faults stores less (helps).
+
+=== 2. backend compressibility on the joint operator (np=1) ===
+case             N     htool    hacapk     hmmvp
+single        5376  6.113080      5.06    10.385
+parallel     10752  5.414794      4.90    10.814
+divergent    10752  5.053096      4.74     11.46
+cross        10752  4.668618      4.92    10.723
+separated    10752 11.972493      9.51    19.957
+
+  values are compression ratio (dense/H-matrix); >1 compresses, <=1 near-dense.
+  small N compresses little for every backend; raise SCALE to see the trend.

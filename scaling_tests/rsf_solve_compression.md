@@ -88,6 +88,41 @@ relative to that dense size.
 | hmmvp   | 1e-6 |  17.8   | 110.0  |  2.45      | 1.589     | 10.29   | 717    |
 | hmmvp   | 1e-7 |  13.6   | 144.0  |  2.87      | 2.194     | 13.51   | 717    |
 
+### 0.25 km (N about 64000)
+
+The dense operator is roughly 31 GB. A dense baseline run is included here for
+timing context (compr_x is relative to it); the H-matrix rows are what matter.
+
+| backend | tol  | compr_x | mem_MB | assembly_s | matvec_ms | total_s | nsteps |
+|---------|------|--------:|-------:|-----------:|----------:|--------:|-------:|
+| dense   | -    |   1.0   | 31250  |  319.90    | 302.509   | 3535    | 1581   |
+| htool   | 1e-2 | 122.6   |  254.9 | 4026.65    | 29.452    | 4088    | 1619   |
+| htool   | 1e-3 |  71.4   |  437.4 | 3996.27    | 28.657    | 4072    | 1586   |
+| htool   | 1e-4 |  16.2   | 1934.3 | 4024.99    | 63.657    | 4559    | 1588   |
+| htool   | 1e-5 |   5.2   | 5986.6 | 4020.10    | 131.035   | 5362    | 1587   |
+| htool   | 1e-6 |   3.7   | 8462.1 | 4013.50    | 158.807   | 5708    | 1586   |
+| hacapk  | 1e-1 |  68.5   |  456.1 |    5.16    | 6.194     | 73.8    | 1572   |
+| hacapk  | 3e-2 |  57.7   |  541.4 |    5.93    | 7.024     | 86.1    | 1580   |
+| hacapk  | 1e-2 |  50.3   |  621.4 |    6.66    | 7.887     | 95.3    | 1572   |
+| hacapk  | 3e-3 |  43.2   |  723.8 |    7.57    | 8.946     | 106.5   | 1577   |
+| hacapk  | 1e-3 |  38.6   |  810.4 |    8.23    | 9.770     | 115.6   | 1579   |
+| hmmvp   | 1e-3 | 149.8   |  208.6 |    6.29    | 5.083     | 66.6    | 1636   |
+| hmmvp   | 1e-4 | 111.1   |  281.2 |    7.91    | 5.553     | 71.2    | 1583   |
+| hmmvp   | 1e-5 |  79.7   |  392.3 |    9.88    | 6.095     | 79.0    | 1583   |
+| hmmvp   | 1e-6 |  56.0   |  558.1 |   12.77    | 9.883     | 125.3   | 1587   |
+| hmmvp   | 1e-7 |  42.3   |  739.4 |   14.92    | 11.612    | 144.4   | 1587   |
+
+At this resolution hmmvp and HACApK take the 31 GB operator down to 200 to 810 MB
+and assemble it in 5 to 15 s, for a 25 to 50x end-to-end speedup over dense.
+HTOOL compresses comparably well (up to 123x at 1e-2) and its matvec stays 2 to
+10x faster than dense, but its assembly is about 4000 s, roughly 12x the dense
+assembly and 500 to 800x the HACApK and hmmvp assembly at the same size and rank
+count, so it is net slower than dense end to end here. The assembly is also
+nearly flat across tolerance (4013 to 4027 s), so it is not the ACA work that
+dominates. nsteps is consistent across all backends and tolerances (1572 to
+1636), so the compression is not corrupting the trajectory. The HTOOL assembly
+cost is examined in its own section below.
+
 ## Compression versus N (matched ~1e-6 accuracy)
 
 Reading the compression ratio at the matched band across the three sizes (htool
@@ -162,11 +197,12 @@ tolerance sweep, one panel per size).
      was flat near 0.13 ms across the tolerance range; at 0.5 km it scales from
      0.63 ms at 1e-2 to 7.68 ms at 1e-6, because the tight settings store a
      large fraction of the operator (442 MB at 1e-6, about 22 percent of dense).
-   - htool's assembly grows steeply at large N: about 42 s at 0.5 km,
-     versus about 1 to 3 s for hacapk and hmmvp, and it dominates htool's total
-     on a short run. Part of this is rank count (htool assembly scales with
-     ranks, so more ranks would reduce it), but it remains the most expensive
-     assembler here.
+   - htool's assembly grows steeply at large N: about 0.3 s at 1 km, 42 s at
+     0.5 km, and about 4000 s at 0.25 km, versus about 1 to 15 s for hacapk and
+     hmmvp at the same sizes, and it dominates htool's total. At 0.25 km it is
+     net slower than dense end to end. This is examined in "HTOOL assembly at
+     large N" below; it is not a serial-assembly bug (the work does distribute
+     across ranks), but its cost at production sizes is the open question.
    - As a result the matched-accuracy ranking flips at 0.5 km: hacapk at ztol
      1e-1 is best on every axis (about 27x, 73 MB, 0.8 s assembly, 0.83 ms
      matvec), while htool at the matched eps needs roughly 2 ms matvec plus the
@@ -228,6 +264,70 @@ which this compression test only assumes.
   ones; for raw forward throughput hmat_scaling is the right reference. If
   hmmvp's throughput is attractive, the lever is its per-call MATSHELL overhead,
   not its compression.
+
+## HTOOL assembly at large N
+
+The HTOOL assembly cost climbs sharply with resolution: about 0.3 s at 1 km
+(N about 4000), 42 s at 0.5 km (N about 16000), and about 4000 s at 0.25 km
+(N about 64000), the last roughly 12x the dense assembly and 500 to 800x the
+HACApK and hmmvp assembly at the same size and rank count. Because that looked
+like it could be an effectively serial assembly, the wiring and scaling were
+checked directly with this build, mostly on a single core. The short answer is
+that it is not serial by construction, and the usual suspects are ruled out, but
+the production cost is not reproduced by the small-N behavior and remains open.
+
+What was checked:
+
+  - Not serial. The PETSc layout is an even row split (MatSetSizes with
+    PETSC_DECIDE), and an np=1 versus np=2 run on one physical core shows the
+    assembly work distributing: wall time stays flat as ranks double, which is
+    the signature of constant total work split across ranks, matching the dense
+    control, and the per-rank row ranges split evenly. A redundant or serial
+    assembly would instead have roughly doubled the one-core wall time at np=2.
+
+  - Not the admissibility constant. Sweeping -mat_htool_eta over 2, 10, 30, 100
+    at N=6400 left eta=100 (the default) the fastest assembler and the best
+    compressed, because a tighter eta forces more dense near-field blocks through
+    the per-entry Okada kernel. Whether this tradeoff inverts at much larger N,
+    where loose eta makes the top-level admissible blocks very large and the ACA
+    on them expensive, was not reachable on a single core.
+
+  - Not OpenMP oversubscription in this build. htool assembly time at N=6400 was
+    flat across OMP_NUM_THREADS of 1, 2, 4, 8 on one core, so the assembly is not
+    meaningfully OpenMP threaded here (unlike hmmvp, which pins itself to one
+    thread internally).
+
+  - Benign in the reachable range. Single-core assembly scaled about as N^1.35
+    from N=1600 to 12780 (about 1.0, 2.5, 6.5, 16.6 s) and stayed faster than the
+    dense assembler throughout.
+
+The gap is that extrapolating that benign single-core trend to N=64000 predicts
+on the order of 100 to 200 core-seconds, a few seconds on 16 ranks, two to three
+orders of magnitude below the observed 4000 s. The 0.5 km point (42 s on 16
+ranks) is already about 30x above the single-core extrapolation. So the cost at
+production sizes is explained neither by serial wiring nor by the small-N
+scaling. The two candidates that remain, both untested here, are a sharp
+super-linear breakdown above N about 16000 (the 42 s to 4000 s jump from 0.5 km
+to 0.25 km is about N^3 over that interval) and poor parallel efficiency at high
+rank count, where adding ranks stops reducing the assembly.
+
+The decisive check needs the cluster: hold N fixed at 0.5 km (N about 16000) and
+vary ranks (1, 2, 4, 8, 16), timing the htool assembly alone. If it is roughly
+flat in rank count the assembly is effectively serial at scale despite the
+correct row split, which would point at a serial section in htool's parallel
+assembly path or a load imbalance in its block distribution, and would be worth
+raising with the htool or PETSc MATHTOOL maintainers. If it falls with rank count
+the assembly is simply expensive and super-linear at this size, and the practical
+answer is to prefer the cheaper assemblers. A second, independent check is
+-mat_htool_eta at 0.25 km (for example 100 versus 10 versus 2), since the eta
+tradeoff measured at small N may invert once the admissible blocks become very
+large. All of this is specific to this build of PETSc and htool and to the BP5
+geometry; a different htool version or configuration may behave differently.
+
+Until that is resolved, HACApK at ztol near 1e-1 and hmmvp at 1e-3 to 1e-5 are
+the backends to use at 0.25 km: both assemble in seconds, compress 40 to 150x,
+and run the cycle 25 to 50x faster than dense, while HTOOL's otherwise strong
+compression and matvec are buried under its assembly cost at this resolution.
 
 ## Caveats
 
