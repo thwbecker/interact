@@ -1,0 +1,49 @@
+#!/bin/bash
+
+make_n_files=${1-0}
+
+use_exp_solve=1
+if [ $make_n_files -eq 1 ];then
+
+    for init in 1 2 3;do
+	gawk -v i=$init -v use=$use_exp_solve '{if($3==i)if($5==use)print($0)}' twe.$init.log > tmp.$init.dat
+	ks=`gawk '{print($1)}' tmp.$init.dat | sort -g | uniq`
+	for k in $ks;do
+	    gawk -v k=$k '{if($1==k)print($4,$2)}' tmp.$init.dat > tmp.$init.$k.dat
+	done
+    done
+    for init in 1 2 3;do
+	rm tmp.n.$init 2> /dev/null
+	ks=`gawk '{print($1)}' tmp.$init.dat | sort -g | uniq`
+	for k in $ks;do
+	    echo $i $k
+	    ./find_distinct tmp.$init.$k.dat | gawk -v k=$k '{print($1,k,$2)}' >> tmp.n.$init
+	    rm tmp.$init.$k.dat
+	done
+	rm tmp.$init.dat
+	mv tmp.n.$init twes.$init.dat
+	minmax twes.$init.dat
+    done
+fi
+reg=-R-9/0.5/0.8571/0.858
+inc=-I0.025/0.00001
+proj=-JX5/5
+fs=""
+makecpt -T3.5/6.5/1 -Croma > tmp.cpt
+for init in 1 2 3;do
+    minmax twes.$init.dat
+    gawk -v only_first=1 -f log10.awk twes.$init.dat > tmp.dat
+    #minmax tmp.dat
+    blockmedian $reg $inc -C -T0.95 tmp.dat | xyz2grd $reg $inc -Gtmp.$init.grd
+    #surface -Lld -Lud $reg $inc tmp.dat -Gtmp.$init.grd 
+    #grdinfo tmp.$init.grd
+    ofile=tmp.$init.ps
+    grdimage $reg $proj tmp.$init.grd -Ctmp.cpt -Ba1f.1:"log@-10@-(@~e@~)":/a.0001f.00001:."@~D@~x@-$init@-": -K -P > $ofile
+    #gawk '{print($1,$2,$3,0.05)}' tmp.dat | psxy $reg $proj -Ctmp.cpt -Sc -Ba1f.1:"log@-10@-(@~e@~)":/a.00002f.00001:."@~D@~x@-$init@-": -K -P -t30 > $ofile
+    psscale -D2.5/-.2/3/.15h -Ctmp.cpt -B1 -O >> $ofile
+    modifybb $ofile
+    fs="$fs $ofile"
+done
+epsmerge -x 3 -y 1 --orientation Lanscape  -par $fs > twes.ps
+modifybb twes.ps 1
+rm $fs tmp*  twes.ps

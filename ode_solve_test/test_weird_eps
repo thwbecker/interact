@@ -1,0 +1,56 @@
+#!/bin/bash
+inits=${1-"1 2 3"}
+use_exp_solve=${2-1}
+ks=${3-"all"}			# value or "all"
+
+tmpn=`mktemp`
+trap "rm -f $tmpn*" EXIT
+
+if [ $ks = "all" ];then
+    #ks=`gawk 'BEGIN{for(x=0.8571;x<=0.8580;x+=0.0000025)print(x)}'`
+    ks=`gawk 'BEGIN{for(x=0.8573;x<=0.8579;x+=0.000001)print(x)}'`
+fi
+echo $ks | wc
+
+#epss=`gawk 'BEGIN{x=1e-9;while(x<2){print(x);x*=1.025;}}' `
+epss=`gawk 'BEGIN{x=-9;while(x<=1){print(10**x);x+=0.05;}}' `
+
+echo $epss | wc
+#echo $ks
+#echo $epss
+
+tmpn=`mktemp`
+trap "rm -f $tmpn*" EXIT
+
+rm twe.$init.$$.log 2> /dev/null
+
+tc=0
+for k in $ks;do
+    for init in $inits;do
+	cp twe.$init.log $tmpn.old
+	for eps in $epss;do
+	    #gawk -v k=$k -v e=$eps -v u=$use_exp_solve '{if($1==k)if($4==e)if($5==u)print($0)}' $tmpn.old
+	    nold=`gawk -v k=$k -v e=$eps -v u=$use_exp_solve '{if($1==k)if($4==e)if($5==u)print($0)}' $tmpn.old | lc`
+	    if [ $nold -eq 0 ];then
+		echo $0: running for init $init k $k e $eps ues $use_exp_solve
+		find_intersect $k 1 $init $eps $use_exp_solve > $tmpn.$init.$k.$eps.log &
+		((tc=tc+1))
+		if [ $tc -ge $NR_CPUS ];then
+		    wait
+		    cat $tmpn.*.log  >> twe.$init.$$.log
+		    rm  $tmpn.*.log
+		    tc=0
+		fi
+	    else
+		echo $0: found $nold for init $init k $k e $eps ues $use_exp_solve
+	    fi
+	done
+    done
+done
+wait
+cat $tmpn.*.log  >> twe.$init.$$.log
+rm  $tmpn.*.log
+
+#sort twe.$init.log | uniq > tmp.$$; mv tmp.$$ twe.$init.log
+cat twe.$init.$$.log >> twe.$init.log
+rm twe.$init.$$.log

@@ -1,0 +1,21 @@
+#!/bin/bash
+gcc -O3 find_distinct.c -o find_distinct
+./find_distinct px0log.dat 0 > tmp.1
+sort -gr tmp.1 > tmp; mv tmp tmp.1
+
+gnuplot <<EOF
+set term post port enh
+set out 'tmp.ps'
+set xrange [1.01:0.84]
+set multi
+set size 1,.5
+set origin 0,.5
+set xlabel '{/Symbol k}''
+set ylabel 'y(x=0)'
+plot 'px0log.dat' using (\$3==0)?(\$1):(1/0) : (\$2)  w p ps 0.2
+set origin 0,0
+set ylabel 'log_2(n_p)'
+plot 'tmp.1' using 1 : (log(\$2)/log(2)) w l
+EOF
+modifybb tmp.ps 1
+

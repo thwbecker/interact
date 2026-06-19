@@ -1,0 +1,58 @@
+#!/bin/bash
+k=${1-0.96}			# non d k to compute
+skip_check=${2-0}
+init=${3-0}			# imode init, 0: {e,e,e} 1,2,3: {e,0,0}, {0,e,0}, {0,0,e} 4: period sol 5, 6, 7... random eps
+eps=${4-4.5e-4}			# eps for init
+use_exp_solve=${5-0}
+
+cwd=`pwd`
+tmpd=`mktemp -d`
+trap "rm -r $tmpd" EXIT
+
+lfile=$cwd/px0log.dat
+if [[ -s $lfile ||  $skip_check -eq 0 ]];then
+    cp $lfile $tmpd/
+    gawk -v k=$k '{if($1==k)print($0)}' $tmpnd/$lfile > $tmpd/tmp
+fi
+
+
+if [[ $skip_check -eq 1 || `lc $tmpd/tmp` -eq 0 ]];then
+    cd $tmpd
+    popt=""
+    f=`echo $k | gawk '{printf("zero.%020.15f.dat",$1)}'`
+    imode=$init;
+    while [ $imode -lt 10 ];do
+	rm $f tmp.new 2> /dev/null
+	def_flags="-atol 1e-12  -rtol 1e-10 -t_final 1e6 -log_events -event_tmin .9999e6"
+	if [ $use_exp_solve -eq 1 ];then
+	    flags="$def_flags -use_exp_solve"
+	else
+	    flags="$def_flags -use_exp_solve"
+	fi
+	    
+	$cwd/bin/ode_solve_test $popt -eps $eps -imode $imode -knd $k  $flags > /dev/null 2> /dev/null
+
+	if [  -s $f ];then
+	    gawk '{printf("%9.6f\n",$3)}' $f  | sort -g | uniq | \
+		gawk -v k=$k -v i=$imode -v eps=$eps -v ues=$use_exp_solve \
+		     '{printf("%10.8f %9.6f %i %12e %i\n",k,$1,i,eps,ues)}' > tmp.new
+	    imode=20
+	else
+	    ((imode=imode+1))
+	    echo $k trying imode $imode now > "/dev/stderr"
+	    if [ $imode -gt 7 ];then
+		eps=1e-5
+	    fi
+	fi
+	
+    done
+    if [ ! -s $f ];then
+	echo $k NaN NaN $eps
+    else
+	cat tmp.new 
+    fi
+    rm tmp.new 2> /dev/null
+else
+    echo $0: $k already in log file > "/dev/stderr"
+    cat $tmpd/tmp
+fi
