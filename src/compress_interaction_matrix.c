@@ -76,6 +76,9 @@ int main(int argc, char **argv)
 						   routine (for
 						   testing) */
   char geom_file[STRLEN]="geom.in";
+  /* optional external dumps (see -dump_matrix / -dump_coords below) */
+  char dump_matrix_file[STRLEN]="",dump_coords_file[STRLEN]="";
+  PetscBool do_dump_matrix=PETSC_FALSE,do_dump_coords=PETSC_FALSE;
   hacapk_shell_ctx *hsc_dense,*hsc_h;
 #if ( defined(USE_HMMVP) || defined(USE_HACAPK) )
   double *xc,*yc,*zc;
@@ -225,6 +228,12 @@ int main(int argc, char **argv)
 
   */
   PetscCall(PetscOptionsGetString(NULL, NULL, "-geom_file", geom_file, STRLEN,&read_value));
+  /* optional: dump the dense interaction matrix and/or the patch source
+     geometry to file for external analysis (e.g. testing alternative
+     cluster trees for H-matrix compression). both are off unless a file
+     name is given. */
+  PetscCall(PetscOptionsGetString(NULL, NULL, "-dump_matrix", dump_matrix_file, STRLEN,&do_dump_matrix));
+  PetscCall(PetscOptionsGetString(NULL, NULL, "-dump_coords", dump_coords_file, STRLEN,&do_dump_coords));
 
   HEADNODE{
     if(read_value)
@@ -291,6 +300,81 @@ int main(int argc, char **argv)
     HEADNODE
       fprintf(stderr,"%s: dense assembly took %12.4f s\n",argv[0],t1-t0);
     /* dense done */
+
+    /*
+       optional external dumps of the operator and its point cloud, so
+       that alternative cluster trees / admissibility choices can be
+       explored outside interact (e.g. fault-split vs joint geometric
+       clustering for H-matrix compression).
+
+       -dump_matrix <file>: the dense interaction matrix as raw
+          row-major float64, A[i*n+j] = stress at receiver i from unit
+          slip at source j (the same operator the H-matrix backends
+          approximate). a companion <file>.info records "m n" and the
+          layout. needs a single MPI rank so the full matrix is local.
+
+       -dump_coords <file>: one ASCII row per patch with centroid,
+          orientation, half-sizes, area, unit normal and group id, i.e.
+          everything a clustering routine needs, including the normal so
+          that orientation (not just centroid position) can be used.
+    */
+    if(do_dump_matrix){
+      if(medium->comm_size != 1){
+	HEADNODE
+	  fprintf(stderr,"%s: -dump_matrix needs a single MPI rank (rerun with -np 1); skipping matrix dump\n",argv[0]);
+      }else{
+	FILE *fp;
+	PetscInt *cidx;
+	PetscScalar *rowb;
+	char infon[STRLEN];
+	PetscCall(PetscMalloc1(n,&cidx));
+	PetscCall(PetscMalloc1(n,&rowb));
+	for(j=0;j < n;j++)
+	  cidx[j] = j;
+	fp = fopen(dump_matrix_file,"wb");
+	if(!fp){
+	  fprintf(stderr,"%s: cannot open %s for writing\n",argv[0],dump_matrix_file);
+	  exit(-1);
+	}
+	for(i=0;i < m;i++){
+	  PetscCall(MatGetValues(Adense,1,&i,n,cidx,rowb));
+	  if((PetscInt)fwrite(rowb,sizeof(PetscScalar),n,fp) != n){
+	    fprintf(stderr,"%s: short write to %s\n",argv[0],dump_matrix_file);
+	    exit(-1);
+	  }
+	}
+	fclose(fp);
+	snprintf(infon,STRLEN,"%s.info",dump_matrix_file);
+	fp = fopen(infon,"w");
+	fprintf(fp,"%ld %ld row-major float64 little-endian  A[i*n+j]=stress(recv i,src j)\n",(long)m,(long)n);
+	fclose(fp);
+	PetscCall(PetscFree(cidx));
+	PetscCall(PetscFree(rowb));
+	fprintf(stderr,"%s: wrote dense matrix (%ld by %ld) to %s (+ %s.info)\n",
+		argv[0],(long)m,(long)n,dump_matrix_file,dump_matrix_file);
+      }
+    }
+    if(do_dump_coords){
+      HEADNODE{
+	FILE *fp;
+	fp = fopen(dump_coords_file,"w");
+	if(!fp){
+	  fprintf(stderr,"%s: cannot open %s for writing\n",argv[0],dump_coords_file);
+	  exit(-1);
+	}
+	fprintf(fp,"# i x y z strike dip l w area nx ny nz group (centroid, orientation[deg], half-sizes, area, unit normal, group/fault id)\n");
+	for(i=0;i < medium->nrflt;i++)
+	  fprintf(fp,"%6ld %14.7e %14.7e %14.7e %8.3f %8.3f %12.6e %12.6e %12.6e %10.6f %10.6f %10.6f %5i\n",
+		  (long)i,
+		  (double)fault[i].x[INT_X],(double)fault[i].x[INT_Y],(double)fault[i].x[INT_Z],
+		  (double)fault[i].strike,(double)fault[i].dip,
+		  (double)fault[i].l,(double)fault[i].w,(double)fault[i].area,
+		  (double)fault[i].normal[INT_X],(double)fault[i].normal[INT_Y],(double)fault[i].normal[INT_Z],
+		  fault[i].group);
+	fclose(fp);
+	fprintf(stderr,"%s: wrote %i patch coordinates to %s\n",argv[0],medium->nrflt,dump_coords_file);
+      }
+    }
 
     /* 
        
