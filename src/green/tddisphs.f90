@@ -104,9 +104,11 @@
 !
 ! F90 CONVERSION - November 2023
 !
-! downloaded 11,2023 by TWB - converted to F90, with some
+! downloaded 11,2023 by TWB - converted to F90, by hand, with some
 ! cross-referencing/inspiration by Peter Bird's half space
 ! displacement conversion
+! June 2026: this was extensively checked, and works ~the same as the HBI conversion of which
+! I was not aware of - mine should be faster because of avoidance of some recomputations
 !
 ! loc is location vector, X,Y,Z
 ! u is displacement vector, East, North, Vertical
@@ -565,7 +567,7 @@ SUBROUTINE Angdisdispfsc(y1, y2, y3, beta, b1, b2, b3, nu, a, & ! inputs
 
   C_PREC :: cosB, cotB, Fib, r2b, rb, sinB, &
        & v1cb1, v1cb2, v1cb3, v2cb1, v2cb2, v2cb3, v3cb1, v3cb2, v3cb3, &
-       & y3b, z1b, z3b,y1s,cosBs
+       & y3b, z1b, z3b,y1s,cosBs,aoverrb
 
   C_PREC :: N1, N2, N3,one_over_rb,N4,log_rbpy3b,log_rbpz3b,rbc,y2s,cotBs,cotBh
 
@@ -612,6 +614,7 @@ SUBROUTINE Angdisdispfsc(y1, y2, y3, beta, b1, b2, b3, nu, a, & ! inputs
   N2 = unity-N4
   N3 = 2.0D0*N1
 
+  aoverrb = a/rb
   
   !Fib = 2*atan(-y2./(-(rb+y3b)*cot(beta/2)+y1)); % The Burgers' function
 
@@ -621,42 +624,42 @@ SUBROUTINE Angdisdispfsc(y1, y2, y3, beta, b1, b2, b3, nu, a, & ! inputs
 
  
   v1cb1 = b1*one_over_four_pi/N1*(-N3*N2*Fib*cotBs+N2*y2/ &
-       & (rb+y3b)*((N2-a/rb)*cotB-y1/(rb+y3b)*(nu+a/rb))+N2*               &
-       & y2*cosB*cotB/(rb+z3b)*(cosB+a/rb)+a*y2*(y3b-a)*cotB/rbc+y2*                               &
-       & (y3b-a)/(rb*(rb+y3b))*(-N2*cotB+y1/(rb+y3b)*(N4+a/rb)+                  &
+       & (rb+y3b)*((N2-aoverrb)*cotB-y1/(rb+y3b)*(nu+aoverrb))+N2*               &
+       & y2*cosB*cotB/(rb+z3b)*(cosB+aoverrb)+a*y2*(y3b-a)*cotB/rbc+y2*                               &
+       & (y3b-a)/(rb*(rb+y3b))*(-N2*cotB+y1/(rb+y3b)*(N4+aoverrb)+                  &
        & a*y1/r2b)+y2*(y3b-a)/(rb*(rb+z3b))*(cosB/(rb+z3b)*((rb*                                   &
-       & cosB+y3b)*(N2*cosB-a/rb)*cotB+N3*(rb*sinB-y1)*cosB)-            &
+       & cosB+y3b)*(N2*cosB-aoverrb)*cotB+N3*(rb*sinB-y1)*cosB)-            &
        & a*y3b*cosB*cotB/r2b));
 
   
   v2cb1 = b1*one_over_four_pi/N1*(N2*((N3*cotBs-nu)*log_rbpy3b-(2.0D0* &
        & N1*cotBs+N2)*cosB*log_rbpz3b)-N2/(rb+y3b)*(y1*         &
-       & cotB*(N2-a/rb)+nu*y3b-a+y2s/(rb+y3b)*(nu+a/rb))-(unity-N4                 &
-       & )*z1b*cotB/(rb+z3b)*(cosB+a/rb)-a*y1*(y3b-a)*cotB/rbc+                                  &
+       & cotB*(N2-aoverrb)+nu*y3b-a+y2s/(rb+y3b)*(nu+aoverrb))-(unity-N4                 &
+       & )*z1b*cotB/(rb+z3b)*(cosB+aoverrb)-a*y1*(y3b-a)*cotB/rbc+                                  &
        & (y3b-a)/(rb+y3b)*(-N4+one_over_rb*(N2*y1*cotB-a)+y2s/(rb*                &
-       & (rb+y3b))*(N4+a/rb)+a*y2s/rbc)+(y3b-a)/(rb+z3b)*(cosBs-                         &
+       & (rb+y3b))*(N4+aoverrb)+a*y2s/rbc)+(y3b-a)/(rb+z3b)*(cosBs-                         &
        & one_over_rb*(N2*z1b*cotB+a*cosB)+a*y3b*z1b*cotB/rbc-unity/(rb*                 &
        & (rb+z3b))*(y2s*cosBs-a*z1b*cotB/rb*(rb*cosB+y3b))))
 
  
   v3cb1 = b1*one_over_four_pi/N1*(N3*((N2*Fib*cotB)+(y2/(rb+y3b)*(N4  &
-       & +a/rb))-(y2*cosB/(rb+z3b)*(cosB+a/rb)))+y2*(y3b-a)/rb*(N4                             &
+       & +aoverrb))-(y2*cosB/(rb+z3b)*(cosB+aoverrb)))+y2*(y3b-a)/rb*(N4                             &
        & /(rb+y3b)+a/r2b)+y2*(y3b-a)*cosB/(rb*(rb+z3b))*(N2-                     &
-       & (rb*cosB+y3b)/(rb+z3b)*(cosB+a/rb)-a*y3b/r2b))
+       & (rb*cosB+y3b)/(rb+z3b)*(cosB+aoverrb)-a*y3b/r2b))
 
   
   v1cb2 = b2*one_over_four_pi/N1*(N2*((N3*cotBs+nu)*log_rbpy3b-(2* &
        & N1*cotBs+1)*cosB*log_rbpz3b)+N2/(rb+y3b)*(-N2*   &
-       & y1*cotB+nu*y3b-a+a*y1*cotB/rb+y1s/(rb+y3b)*(nu+a/rb))-(unity-N4                   &
+       & y1*cotB+nu*y3b-a+a*y1*cotB/rb+y1s/(rb+y3b)*(nu+aoverrb))-(unity-N4                   &
        & )*cotB/(rb+z3b)*(z1b*cosB-a*(rb*sinB-y1)/(rb*cosB))-a*y1*                             &
        & (y3b-a)*cotB/rbc+(y3b-a)/(rb+y3b)*(N4+one_over_rb*(N2*y1*            &
-       & cotB+a)-y1s/(rb*(rb+y3b))*(N4+a/rb)-a*y1s/rbc)+(y3b-a)*                     &
+       & cotB+a)-y1s/(rb*(rb+y3b))*(N4+aoverrb)-a*y1s/rbc)+(y3b-a)*                     &
        & cotB/(rb+z3b)*(-cosB*sinB+a*y1*y3b/(rbc*cosB)+(rb*sinB-y1)/                           &
        & rb*(N3*cosB-(rb*cosB+y3b)/(rb+z3b)*(unity+a/(rb*cosB)))))
 
  
   v2cb2 = b2*one_over_four_pi/N1*(N3*N2*Fib*cotBs+N2*y2/  &
-       & (rb+y3b)*(-(N2-a/rb)*cotB+y1/(rb+y3b)*(nu+a/rb))-N2*              &
+       & (rb+y3b)*(-(N2-aoverrb)*cotB+y1/(rb+y3b)*(nu+aoverrb))-N2*              &
        & y2*cotB/(rb+z3b)*(unity+a/(rb*cosB))-a*y2*(y3b-a)*cotB/rbc+y2*                            &
        & (y3b-a)/(rb*(rb+y3b))*(N2*cotB-N4*y1/(rb+y3b)-a*y1/rb*                  &
        & (one_over_rb+unity/(rb+y3b)))+y2*(y3b-a)*cotB/(rb*(rb+z3b))*(-N3*                &
@@ -664,28 +667,28 @@ SUBROUTINE Angdisdispfsc(y1, y2, y3, beta, b1, b2, b3, nu, a, & ! inputs
 
   
   v3cb2 = b2*one_over_four_pi/N1*(-N3*N2*cotB*(log_rbpy3b-cosB*  &
-       &  log_rbpz3b)-N3*y1/(rb+y3b)*(N4+a/rb)+N3*z1b/(rb+ &
-       &  z3b)*(cosB+a/rb)+(y3b-a)/rb*(N2*cotB-N4*y1/(rb+y3b)-a*          &
+       &  log_rbpz3b)-N3*y1/(rb+y3b)*(N4+aoverrb)+N3*z1b/(rb+ &
+       &  z3b)*(cosB+aoverrb)+(y3b-a)/rb*(N2*cotB-N4*y1/(rb+y3b)-a*          &
        &  y1/r2b)-(y3b-a)/(rb+z3b)*(cosB*sinB+(rb*cosB+y3b)*cotB/rb*                        &
-       &  (N3*cosB-(rb*cosB+y3b)/(rb+z3b))+a/rb*(sinB-y3b*z1b/                  &
+       &  (N3*cosB-(rb*cosB+y3b)/(rb+z3b))+aoverrb*(sinB-y3b*z1b/                  &
        &  r2b-z1b*(rb*cosB+y3b)/(rb*(rb+z3b)))))
 
   
-  v1cb3 = b3*one_over_four_pi/N1*(N2*(y2/(rb+y3b)*(unity+a/rb)-y2*cosB/(rb+  &
-       & z3b)*(cosB+a/rb))-y2*(y3b-a)/rb*(a/r2b+unity/(rb+y3b))+y2*                 &
+  v1cb3 = b3*one_over_four_pi/N1*(N2*(y2/(rb+y3b)*(unity+aoverrb)-y2*cosB/(rb+  &
+       & z3b)*(cosB+aoverrb))-y2*(y3b-a)/rb*(a/r2b+unity/(rb+y3b))+y2*                 &
        & (y3b-a)*cosB/(rb*(rb+z3b))*((rb*cosB+y3b)/(rb+z3b)*(cosB+a/                  &
        & rb)+a*y3b/r2b))
 
 
   v2cb3 = b3*one_over_four_pi/N1*(N2*(-sinB*log_rbpz3b-y1/(rb+y3b)*(unity+a/  &
-       & rb)+z1b/(rb+z3b)*(cosB+a/rb))+y1*(y3b-a)/rb*(a/r2b+unity/(rb+                &
-       & y3b))-(y3b-a)/(rb+z3b)*(sinB*(cosB-a/rb)+z1b/rb*(unity+a*y3b/                  &
+       & rb)+z1b/(rb+z3b)*(cosB+aoverrb))+y1*(y3b-a)/rb*(a/r2b+unity/(rb+                &
+       & y3b))-(y3b-a)/(rb+z3b)*(sinB*(cosB-aoverrb)+z1b/rb*(unity+a*y3b/                  &
        & r2b)-unity/(rb*(rb+z3b))*(y2s*cosB*sinB-a*z1b/rb*(rb*cosB+y3b))))
 
   
   v3cb3 = b3*one_over_four_pi/N1*(N3*Fib+N3*(y2*sinB/(rb+z3b)*(cosB+  &
-       & a/rb))+y2*(y3b-a)*sinB/(rb*(rb+z3b))*(unity+(rb*cosB+y3b)/(rb+                          &
-       & z3b)*(cosB+a/rb)+a*y3b/r2b))
+       & aoverrb))+y2*(y3b-a)*sinB/(rb*(rb+z3b))*(unity+(rb*cosB+y3b)/(rb+                          &
+       & z3b)*(cosB+aoverrb)+a*y3b/r2b))
 
  
   v1 = v1cb1 + v1cb2 + v1cb3
