@@ -1,5 +1,4 @@
-# interact - models static and earthquake cycle fault interactions
-# using dislocations in an elastic medium
+# interact - models static and earthquake cycle fault interactions using dislocations in an elastic medium
 
 Program reads in patches subdividing a fault network in an elastic
 half-space and solves for stresses given slip or displacements given
