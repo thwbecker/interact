@@ -34,6 +34,11 @@
 #include "petsc_prototypes.h"
 #include "rsf.h"
 #endif
+#ifdef USE_PETSC
+/* single definition of the domain-check context pointer declared in rsf.h
+   (the callback registered with TSSetFunctionDomainError has no user pointer) */
+struct interact_ctx *rsf_par_static = NULL;
+#endif
 /*
    thin driver: gather settings, then run the solver; the two phases
    live in rsf_get_settings and rsf_solve_run below

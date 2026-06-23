@@ -97,4 +97,4 @@ PetscErrorCode rsf_post_event(TS,PetscInt,PetscInt[],PetscReal,Vec,PetscBool,voi
 
 
 /* context access for the domain check, whose callback has no user pointer */
-static struct interact_ctx *rsf_par_static = NULL;
+extern struct interact_ctx *rsf_par_static;

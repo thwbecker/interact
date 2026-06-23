@@ -7,6 +7,13 @@
 void init_medium_rsf(struct med *medium)
 {
   struct rsf_vars *rsf;
+  /* the rsf parameter block hangs off medium and is allocated here,
+     before any field is set; medium itself was calloc-ed in main */
+  medium->rsf = (struct rsf_vars *)calloc(1,sizeof(struct rsf_vars));
+  if(!medium->rsf){
+    fprintf(stderr,"init_medium_rsf: rsf_vars allocation failed\n");
+    exit(-1);
+  }
   rsf = medium->rsf;
   /* 
      default frictional and loading parameters, can be overridden via
