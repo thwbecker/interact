@@ -6,6 +6,105 @@
 
 
 
+/* 
+   set up the monitor and event tracking environment,
+   cf. init_monitor_and_event in ode_solve_test.c
+*/
+PetscErrorCode rsf_init_monitor_and_event(struct rsf_out_ctx *uc,struct interact_ctx *par,
+					  PetscReal dt_monitor,PetscReal adx_monitor,
+					  PetscReal rdx_monitor,PetscReal monitor_tmin,
+					  PetscReal event_tmin,PetscReal vel_event,
+					  PetscReal vel_event_hyst,PetscBool track_events,
+					  PetscReal t_init,Vec X0,PetscReal vel_init,
+					  PetscBool field_enable,PetscInt field_step_interval,
+					  PetscReal field_tmin,struct rsf_group_grid *groups,
+					  int ngroup,double *vbuf)
+{
+  struct med *medium;
+  PetscFunctionBeginUser;
+  medium = par->medium;
+  uc->par = par;
+  uc->dt_monitor = dt_monitor;
+  uc->adx_monitor = adx_monitor;
+  uc->rdx_monitor = rdx_monitor;
+  uc->monitor_tmin = monitor_tmin;
+  uc->event_tmin = event_tmin;
+  uc->vel_event = vel_event;
+  uc->vel_event_hyst = vel_event_hyst;
+  uc->track_events = track_events;
+  uc->slipping = (vel_init > vel_event)?(PETSC_TRUE):(PETSC_FALSE);
+  uc->nevent = 0;
+  uc->field_out = 0;
+  uc->next_print_time = t_init;	/* fields at start, then every print_interval */
+  /* compact per-fault slip-rate field output state */
+  uc->field_enable = field_enable;
+  uc->field_step_interval = field_step_interval;
+  uc->field_tmin = field_tmin;
+  uc->field_frame = 0;
+  uc->fout_field_times = NULL;
+  uc->groups = groups;
+  uc->ngroup = ngroup;
+  uc->vbuf = vbuf;
+  /* force the first monitor call to log */
+  uc->old_time = t_init - 2.0*dt_monitor;
+  uc->fout_monitor = uc->fout_stats = uc->fout_event = NULL;
+  if(medium->comm_rank == 0){
+    uc->fout_monitor = fopen("rsf_monitor.dat","w");
+    fprintf(uc->fout_monitor,"# step time[s] time[yr] dt[s] log10(max|v|[m/s]) mean_slip[m] mean_mu max_sigma[Pa] min_sigma[Pa]\n");
+    uc->fout_stats = fopen("rsf_stats.dat","w");
+    fprintf(uc->fout_stats,"# time[yr] mean_vel std_vel min_vel max_vel mean_slip\n");
+    if(uc->track_events){
+      uc->fout_event = fopen("rsf_events.dat","w");
+      fprintf(uc->fout_event,"# time[s] time[yr] onset(1)/arrest(-1) log10(max|v|[m/s]) mean_slip[m] mean_mu, |v| threshold %.3e m/s\n",
+	      uc->vel_event);
+    }
+    if(uc->field_enable){
+      int ierr_dir = system("mkdir -p tmp_rsf");
+      if(ierr_dir)
+	fprintf(stderr,"rsf_init_monitor_and_event: WARNING: could not make tmp_rsf directory\n");
+      uc->fout_field_times = fopen("rsf_vel.times","w");
+      if(uc->fout_field_times){
+	fprintf(uc->fout_field_times,"# frame step time[yr] time[s] log10(max|v|[m/s])\n");
+	fprintf(uc->fout_field_times,"# field per group in tmp_rsf/rsf_vel.gGGG.NNNNNN.bin (float32 along_strike,down_dip,log10|v| triples, xyz2grd -bi3f); geometry rsf_geom.gGGG.dat\n");
+      }
+    }
+  }
+  PetscCall(VecDuplicate(X0,&uc->Xold));
+  PetscCall(VecCopy(X0,uc->Xold));
+  /* gather context for the full-field output */
+  PetscCall(VecScatterCreateToZero(X0,&uc->gather,&uc->gathered));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+/* close output files and free work space, cf. ode_solve_test.c */
+PetscErrorCode rsf_finalize_monitor_and_event(struct rsf_out_ctx *uc)
+{
+  struct med *medium;
+  PetscFunctionBeginUser;
+  medium = uc->par->medium;
+  if(medium->comm_rank == 0){
+    if(uc->fout_monitor)fclose(uc->fout_monitor);
+    if(uc->fout_stats)fclose(uc->fout_stats);
+    if(uc->fout_event){
+      fclose(uc->fout_event);
+      fprintf(stderr,"rsf_finalize_monitor_and_event: tracked %i events (|v| through %.3e m/s)\n",
+	      uc->nevent,uc->vel_event);
+    }
+    if(uc->fout_field_times){
+      fclose(uc->fout_field_times);
+      fprintf(stderr,"rsf_finalize_monitor_and_event: wrote %i slip-rate field frame(s) across %i group(s) to tmp_rsf/\n",
+	      uc->field_frame,uc->ngroup);
+    }
+    rsf_free_groups(uc->groups,uc->ngroup);
+    uc->groups = NULL;uc->ngroup = 0;
+    if(uc->vbuf){free(uc->vbuf);uc->vbuf = NULL;}
+  }
+  PetscCall(VecDestroy(&uc->Xold));
+  PetscCall(VecScatterDestroy(&uc->gather));
+  PetscCall(VecDestroy(&uc->gathered));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+
 
 /* 
    monitoring function, cf. myMonitor in hmatrix_test/ode_solve_test.c:
