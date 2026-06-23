@@ -7,7 +7,7 @@
 #	respective source files for detailed references.
 # 	As of 05/2026, some additions by Claude Code. 
 #
-#  makefile for interact and related programs
+#  makefile for interact, rsf_solve, and related programs
 #
 #
 #################################################################################
@@ -18,7 +18,7 @@
 # LINUX files have PGPLOT support).
 #
 # Then type "make" and "interact -h" after succesful compilation for
-# the help page.
+# the help page for interact. Also see README.md
 #
 # 
 # for calc_eigen_from_cart_stress you need EISPACK in the modified
@@ -278,6 +278,10 @@ INTERACT_OBJS_DEBUG = $(ODIR)/rupture.dbg.o $(ODIR)/adjust_time_step.dbg.o  $(OD
 INTERACT_NOISE_OBJS = $(ODIR)/rupture.o	$(ODIR)/calc_stress.o \
 	$(ODIR)/adjust_time_step.o $(MATRIX_SOLVER_OBJS)	\
 	$(ODIR)/coulomb_noise_stress.$(NOISELEVEL).o $(ODIR)/terminate.o
+#
+# objects for rsf_solve
+RSF_SOLVE_OBJS = $(ODIR)/rsf_solve.o $(ODIR)/rsf_engine.o $(ODIR)/rsf_init.o $(ODIR)/rsf_output.o
+
 #
 # objects for randomflt
 RANDOMFLT_OBJS = $(ODIR)/randomflt.o $(ODIR)/compare_fault.o	\
@@ -621,9 +625,9 @@ $(BDIR)/petsc_simple_solve: $(ODIR)/petsc_simple_solve.o $(ODIR)/coulomb_stress.
 	$(ODIR)/coulomb_stress.o $(ODIR)/interact.o  $(EXT_HMAT_OBJS) \
 	-o $(BDIR)/petsc_simple_solve $(LIBS) $(PETSC_LIBS)  $(EXT_HMAT_LIBS) $(PGLIBS)   $(LDFLAGS)
 
-$(BDIR)/rsf_solve: $(ODIR)/rsf_solve.o $(ODIR)/coulomb_stress.o \
+$(BDIR)/rsf_solve: $(RSF_SOLVE_OBJS) $(ODIR)/coulomb_stress.o \
 	$(ODIR)/interact.o  $(ODIR)/petsc_interact.o $(GEN_P_INC) $(LIBLIST)   $(EXT_HMAT_OBJS) 
-	$(MPILD)   $(ODIR)/rsf_solve.o $(ODIR)/petsc_interact.o  \
+	$(MPILD)   $(RSF_SOLVE_OBJS) $(ODIR)/petsc_interact.o  \
 	$(ODIR)/coulomb_stress.o $(ODIR)/interact.o  \
 	-o $(BDIR)/rsf_solve $(LIBS) $(EXT_HMAT_OBJS) $(PETSC_LIBS)  $(EXT_HMAT_LIBS) $(LDFLAGS)
 

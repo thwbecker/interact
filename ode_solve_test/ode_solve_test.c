@@ -445,8 +445,9 @@ static PetscErrorCode init_monitor_and_event(void *ctx, PetscReal dt_monitor, Pe
     if(par->track_events){
       snprintf(par->fname_event,PETSC_MAX_PATH_LEN,"zero.%020.15f.dat",par->knd);
       par->fout_event = fopen(par->fname_event,"w");
-      fprintf(stderr,"writing events to %s, init at t %g, logging after %g%% of t_f\n",par->fname_event,t_init,
-	      par->event_tmin/par->t_final*100);
+      fprintf(stderr,"writing events to %s, init at t %g, logging after %g%% of t_f, %g\n",
+	      par->fname_event,t_init,
+	      par->event_tmin/par->t_final*100, -par->event_tmin+par->t_final);
     }
   }
   PetscCall(VecDuplicate(X0, &par->Xold));

@@ -1,6 +1,5 @@
 MY_PRECISION = -DUSE_DOUBLE_PRECISION
 
-
 # d
 include ../config/makefile.gcc
 include ../config/makefile.petsc
@@ -40,14 +39,14 @@ obj_directories:
 
 #
 $(ODIR)/%.o:	%.c 
-	$(CC) $(INCLUDES) $(CFLAGS)  $(MY_PRECISION) -c $< -o $(ODIR)/$*.o
+	$(CC) $(INCLUDES) $(CFLAGS)  $(PETSC_DEFINES) $(MY_PRECISION) -c $< -o $(ODIR)/$*.o
 
 $(ODIR)/%.o:	%.f 
-	$(F77) $(INCLUDES) $(FFLAGS) $(MY_PRECISION) -c $< -o $(ODIR)/$*.o
+	$(F77) $(INCLUDES) $(FFLAGS) $(PETSC_DEFINES) $(MY_PRECISION) -c $< -o $(ODIR)/$*.o
 
 $(ODIR)/%.o:	%.F 
-	$(F77) $(INCLUDES) $(FFLAGS) $(MY_PRECISION) -c $<  -o $(ODIR)/$*.o
+	$(F77) $(INCLUDES) $(FFLAGS) $(PETSC_DEFINES) $(MY_PRECISION) -c $<  -o $(ODIR)/$*.o
 
 $(ODIR)/%.o:	%.f90 
-	$(F90)   $(INCLUDES) $(F90FLAGS) $(MY_PRECISION) -c $<  -o $(ODIR)/$*.o
+	$(F90)   $(INCLUDES) $(F90FLAGS) $(PETSC_DEFINES) $(MY_PRECISION) -c $<  -o $(ODIR)/$*.o
 

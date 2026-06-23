@@ -443,15 +443,15 @@ void calc_fields(struct med *medium,struct flt *fault,
 		  local_s[p2+5] += (SUM_ARR_PREC)sm[INT_Z][INT_Z];
 		}else{
 		  singular_count++;
-		  local_u[p1]   = medium->nan;
-		  local_u[p1+1] = medium->nan;
-		  local_u[p1+2] = medium->nan;
-		  local_s[p2]   = medium->nan;
-		  local_s[p2+1] = medium->nan;
-		  local_s[p2+2] = medium->nan;
-		  local_s[p2+3] = medium->nan;
-		  local_s[p2+4] = medium->nan;
-		  local_s[p2+5] = medium->nan;
+		  local_u[p1]   = NAN;
+		  local_u[p1+1] = NAN;
+		  local_u[p1+2] = NAN;
+		  local_s[p2]   = NAN;
+		  local_s[p2+1] = NAN;
+		  local_s[p2+2] = NAN;
+		  local_s[p2+3] = NAN;
+		  local_s[p2+4] = NAN;
+		  local_s[p2+5] = NAN;
 		}
 	      }
 	    }
@@ -499,15 +499,15 @@ void calc_fields(struct med *medium,struct flt *fault,
 	    local_s[p2+5] += (SUM_ARR_PREC)sm[INT_Z][INT_Z];
 	  }else{
 	    singular_count++;
-	    local_u[p1]   = medium->nan;
-	    local_u[p1+1] = medium->nan;
-	    local_u[p1+2] = medium->nan;
-	    local_s[p2]   = medium->nan;
-	    local_s[p2+1] = medium->nan;
-	    local_s[p2+2] = medium->nan;
-	    local_s[p2+3] = medium->nan;
-	    local_s[p2+4] = medium->nan;
-	    local_s[p2+5] = medium->nan;
+	    local_u[p1]   = NAN;
+	    local_u[p1+1] = NAN;
+	    local_u[p1+2] = NAN;
+	    local_s[p2]   = NAN;
+	    local_s[p2+1] = NAN;
+	    local_s[p2+2] = NAN;
+	    local_s[p2+3] = NAN;
+	    local_s[p2+4] = NAN;
+	    local_s[p2+5] = NAN;
 	  }
 	}
       }

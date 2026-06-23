@@ -27,10 +27,15 @@ rm twe.$init.$$.log 2> /dev/null
 tc=0
 for k in $ks;do
     for init in $inits;do
-	cp twe.$init.log $tmpn.old
+	if [ -s twe.$init.log ];then
+	    cp twe.$init.log $tmpn.old
+	fi
 	for eps in $epss;do
-	    #gawk -v k=$k -v e=$eps -v u=$use_exp_solve '{if($1==k)if($4==e)if($5==u)print($0)}' $tmpn.old
-	    nold=`gawk -v k=$k -v e=$eps -v u=$use_exp_solve '{if($1==k)if($4==e)if($5==u)print($0)}' $tmpn.old | lc`
+	    if [ -s $tmpn.old ];then
+		nold=`gawk -v k=$k -v e=$eps -v u=$use_exp_solve '{if($1==k)if($4==e)if($5==u)print($0)}' $tmpn.old | lc`
+	    else
+		nold=0
+	    fi
 	    if [ $nold -eq 0 ];then
 		echo $0: running for init $init k $k e $eps ues $use_exp_solve
 		find_intersect $k 1 $init $eps $use_exp_solve > $tmpn.$init.$k.$eps.log &

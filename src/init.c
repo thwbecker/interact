@@ -13,11 +13,15 @@
 #include "interact.h"
 #include "properties.h"
 
-void check_parameters_and_init(int argc, char **argv,
-			       struct med **medium,
-			       struct flt **fault,
-			       my_boolean *read_initial_fault_stress,
-			       COMP_PRECISION *a,COMP_PRECISION *b)
+
+
+
+
+void check_parameters_and_init_interact(int argc, char **argv,
+					struct med **medium,
+					struct flt **fault,
+					my_boolean *read_initial_fault_stress,
+					COMP_PRECISION *a,COMP_PRECISION *b)
 {
   int max_nr_flt_files;
   my_boolean read_fault_properties,suppress_interactions,whole_fault_mode,
@@ -34,38 +38,38 @@ void check_parameters_and_init(int argc, char **argv,
 
   if((*medium)->comm_rank==0){
     if((*medium)->comm_size==1)
-      fprintf(stderr,"init: compiled on %s %s, running in serial\n",__DATE__,__TIME__);
+      fprintf(stderr,"heck_parameters_and_init_interact: compiled on %s %s, running in serial\n",__DATE__,__TIME__);
     else
-      fprintf(stderr,"init: compiled on %s %s, running on %i cores\n",__DATE__,__TIME__,(*medium)->comm_size);
+      fprintf(stderr,"heck_parameters_and_init_interact: compiled on %s %s, running on %i cores\n",__DATE__,__TIME__,(*medium)->comm_size);
   }
   
   // initialization phase, get parameters from command
   // line options
-  init_parameters(argv,argc, &read_fault_properties,
-		  read_initial_fault_stress,
-		  &suppress_interactions,&whole_fault_mode,
-		  &med_cohesion,&max_nr_flt_files,
-		  &read_stress_relation_factors,&use_slip_files,
-		  &whole_fault_deactivations,
-		  &min_stress_drop,&use_sparse_storage,
-		  &i_mat_cutoff,&use_old_imat,&use_old_amat,
-		  &save_imat,&save_amat,&check_for_interaction_feedback,
-		  &keep_slipping,&attempt_restart,&solver_mode,
-		  &suppress_nan_output,&pressure,
-		  &twod_approx_is_plane_stress,&print_plane_coord,
-		  &half_plane,&variable_time_step,&debug,&wcutoff,
-		  &no_interactions,&force_petsc,&tri_eval_mode,&full_space,
-		  (*medium)->comm_rank);
+  init_parameters_interact(argv,argc, &read_fault_properties,
+			   read_initial_fault_stress,
+			   &suppress_interactions,&whole_fault_mode,
+			   &med_cohesion,&max_nr_flt_files,
+			   &read_stress_relation_factors,&use_slip_files,
+			   &whole_fault_deactivations,
+			   &min_stress_drop,&use_sparse_storage,
+			   &i_mat_cutoff,&use_old_imat,&use_old_amat,
+			   &save_imat,&save_amat,&check_for_interaction_feedback,
+			   &keep_slipping,&attempt_restart,&solver_mode,
+			   &suppress_nan_output,&pressure,
+			   &twod_approx_is_plane_stress,&print_plane_coord,
+			   &half_plane,&variable_time_step,&debug,&wcutoff,
+			   &no_interactions,&force_petsc,&tri_eval_mode,&full_space,
+			   (*medium)->comm_rank);
   // load files, etc
-  initialize(medium,fault,read_fault_properties,max_nr_flt_files,
-	     suppress_interactions,whole_fault_mode,med_cohesion,a,b,
-	     read_stress_relation_factors,use_slip_files,whole_fault_deactivations,
-	     min_stress_drop,use_sparse_storage,i_mat_cutoff,use_old_imat,
-	     use_old_amat,save_imat,save_amat,check_for_interaction_feedback,
-	     keep_slipping,attempt_restart,solver_mode,suppress_nan_output,
-	     pressure,twod_approx_is_plane_stress,
-	     print_plane_coord,half_plane,variable_time_step,debug,TRUE,wcutoff,
-	     no_interactions,force_petsc,tri_eval_mode,full_space);
+  initialize_interact(medium,fault,read_fault_properties,max_nr_flt_files,
+		      suppress_interactions,whole_fault_mode,med_cohesion,a,b,
+		      read_stress_relation_factors,use_slip_files,whole_fault_deactivations,
+		      min_stress_drop,use_sparse_storage,i_mat_cutoff,use_old_imat,
+		      use_old_amat,save_imat,save_amat,check_for_interaction_feedback,
+		      keep_slipping,attempt_restart,solver_mode,suppress_nan_output,
+		      pressure,twod_approx_is_plane_stress,
+		      print_plane_coord,half_plane,variable_time_step,debug,TRUE,wcutoff,
+		      no_interactions,force_petsc,tri_eval_mode,full_space);
 }
 /*
 
@@ -81,24 +85,24 @@ void check_parameters_and_init(int argc, char **argv,
   init_system should normally be TRUE
 
 */
-void initialize(struct med **medium, struct flt **fault,
-		my_boolean read_fault_properties,int max_nr_flt_files,
-		my_boolean suppress_interactions,my_boolean whole_fault_mode,
-		COMP_PRECISION med_cohesion,COMP_PRECISION *a,COMP_PRECISION *b,
-		my_boolean read_stress_relation_factors,my_boolean use_slip_files,
-		my_boolean whole_fault_deactivations,COMP_PRECISION min_stress_drop,
-		my_boolean use_sparse_storage,I_MATRIX_PREC i_mat_cutoff,
-		my_boolean use_old_imat,my_boolean use_old_amat,
-		my_boolean save_imat,my_boolean save_amat,
-		my_boolean check_for_interaction_feedback,my_boolean keep_slipping,
-		my_boolean attempt_restart,short int solver_mode,
-		my_boolean suppress_nan_output,
-		COMP_PRECISION pressure,my_boolean twod_approx_is_plane_stress,
-		my_boolean print_plane_coord,my_boolean half_plane,
-		my_boolean variable_time_step,my_boolean debug,
-		my_boolean init_system,COMP_PRECISION wcutoff,
-		my_boolean no_interactions,my_boolean force_petsc,
-		MODE_TYPE tri_eval_mode, my_boolean full_space)
+void initialize_interact(struct med **medium, struct flt **fault,
+			 my_boolean read_fault_properties,int max_nr_flt_files,
+			 my_boolean suppress_interactions,my_boolean whole_fault_mode,
+			 COMP_PRECISION med_cohesion,COMP_PRECISION *a,COMP_PRECISION *b,
+			 my_boolean read_stress_relation_factors,my_boolean use_slip_files,
+			 my_boolean whole_fault_deactivations,COMP_PRECISION min_stress_drop,
+			 my_boolean use_sparse_storage,I_MATRIX_PREC i_mat_cutoff,
+			 my_boolean use_old_imat,my_boolean use_old_amat,
+			 my_boolean save_imat,my_boolean save_amat,
+			 my_boolean check_for_interaction_feedback,my_boolean keep_slipping,
+			 my_boolean attempt_restart,short int solver_mode,
+			 my_boolean suppress_nan_output,
+			 COMP_PRECISION pressure,my_boolean twod_approx_is_plane_stress,
+			 my_boolean print_plane_coord,my_boolean half_plane,
+			 my_boolean variable_time_step,my_boolean debug,
+			 my_boolean init_system,COMP_PRECISION wcutoff,
+			 my_boolean no_interactions,my_boolean force_petsc,
+			 MODE_TYPE tri_eval_mode, my_boolean full_space)
 {
 #ifdef USE_PETSC
   int fchunk;
@@ -117,7 +121,7 @@ void initialize(struct med **medium, struct flt **fault,
   read_geometry(GEOMETRY_FILE,medium,fault,read_fault_properties,
 		twod_approx_is_plane_stress,half_plane,TRUE);
   if((*medium)->comm_rank==0)
-    fprintf(stderr,"initialize: all stress values are based on a shear modulus of %g\n",
+    fprintf(stderr,"initialize_interact: all stress values are based on a shear modulus of %g\n",
 	    SHEAR_MODULUS);
 
   /* assign faults to processors */
@@ -131,7 +135,7 @@ void initialize(struct med **medium, struct flt **fault,
     */
     fchunk = (int)((float)(*medium)->nrflt / (float)(*medium)->comm_size + 0.5);
     if(fchunk < 1){
-      fprintf(stderr,"initialize: too many cores (%i) for the number of faults (%i), chunk %i\n",
+      fprintf(stderr,"initialize_interact: too many cores (%i) for the number of faults (%i), chunk %i\n",
 	      (*medium)->comm_size,(*medium)->nrflt,fchunk);
        exit(-1);
     }
@@ -159,10 +163,10 @@ void initialize(struct med **medium, struct flt **fault,
   /* check for time stepping before reading in BCs */
   (*medium)->variable_time_step = variable_time_step;
   if(!(*medium)->variable_time_step)
-    fprintf(stderr,"initialize: WARNING: using constant time steps\n");
+    fprintf(stderr,"initialize_interact: WARNING: using constant time steps\n");
 
   if(((*medium)->debug = debug)){
-    fprintf(stderr,"initialize: running in debugging mode, output in directory %s\n",INT_TMP_DIR);
+    fprintf(stderr,"initialize_interact: running in debugging mode, output in directory %s\n",INT_TMP_DIR);
     snprintf(tmpstring,STRLEN,"mkdir -p %s",INT_TMP_DIR);
     mysystem(tmpstring);
   }
@@ -176,18 +180,18 @@ void initialize(struct med **medium, struct flt **fault,
   //
   (*medium)->no_interactions = no_interactions;
   if((*medium)->no_interactions)
-    fprintf(stderr,"initialize: WARNING: suppressing all fault-to-fault interactions!\n");
+    fprintf(stderr,"initialize_interact: WARNING: suppressing all fault-to-fault interactions!\n");
   (*medium)->solver_mode = solver_mode;
   (*medium)->max_nr_flt_files=max_nr_flt_files;
   (*medium)->suppress_interactions = suppress_interactions;
   (*medium)->print_plane_coord = print_plane_coord;
   if((*medium)->suppress_interactions){
     if((*medium)->op_mode == ONE_STEP_CALCULATION){
-      fprintf(stderr,"initialize: suppressed interactions are only meant for loading simulation!\n");
+      fprintf(stderr,"initialize_interact: suppressed interactions are only meant for loading simulation!\n");
       exit(-1);
     }
     else
-      fprintf(stderr,"initialize: WARNING: suppressing interactions\n");
+      fprintf(stderr,"initialize_interact: WARNING: suppressing interactions\n");
   }
   (*medium)->whole_fault_activations=whole_fault_mode;
   (*medium)->whole_fault_deactivations=whole_fault_deactivations;
@@ -207,41 +211,41 @@ void initialize(struct med **medium, struct flt **fault,
   if((*medium)->op_mode != ONE_STEP_CALCULATION){
     // some messages only if we are really in a loading simulation
     if((*medium)->whole_fault_activations)
-      fprintf(stderr,"initialize: whole groups are activated when patches are critical\n");
+      fprintf(stderr,"initialize_interact: whole groups are activated when patches are critical\n");
     if((*medium)->whole_fault_deactivations)
-      fprintf(stderr,"initialize: whole fault gets deactivated when patch deactivated\n");
+      fprintf(stderr,"initialize_interact: whole fault gets deactivated when patch deactivated\n");
     if(EXHAUSTIVE_CRITICAL_STRESS_EPS != CRITICAL_STRESS_EPS){
-      fprintf(stderr,"initialize: note that the critical stress threshold is different for exhaustive and iterative approaches\n");
+      fprintf(stderr,"initialize_interact: note that the critical stress threshold is different for exhaustive and iterative approaches\n");
     }
     if((*medium)->keep_slipping)
-      fprintf(stderr,"initialize: initially slipping patches remain active\n");
+      fprintf(stderr,"initialize_interact: initially slipping patches remain active\n");
     else
-      fprintf(stderr,"initialize: initially slipping patches are exhausted by triggering\n");
+      fprintf(stderr,"initialize_interact: initially slipping patches are exhausted by triggering\n");
   }
   (*medium)->use_slip_files=use_slip_files;
   (*medium)->cohesion=med_cohesion;
 #ifdef NO_COHESION
   if((*medium)->cohesion != 0.0){
-    fprintf(stderr,"initialize: program was compiled assuming that cohesion is zero\n");
-    fprintf(stderr,"initialize: therefore cohesion = %g will not work. Exiting.\n",
+    fprintf(stderr,"initialize_interact: program was compiled assuming that cohesion is zero\n");
+    fprintf(stderr,"initialize_interact: therefore cohesion = %g will not work. Exiting.\n",
 	    (*medium->cohesion));
     exit(-1);
   }
 #else
   if((*medium)->cohesion == 0.0)
     if((*medium)->op_mode != ONE_STEP_CALCULATION)
-      fprintf(stderr,"initialize: you could use the -DNO_COHESION option to recompile for C=0 at all times\n");
+      fprintf(stderr,"initialize_interact: you could use the -DNO_COHESION option to recompile for C=0 at all times\n");
 #endif
 
   (*medium)->min_stress_drop = min_stress_drop;
   if((*medium)->min_stress_drop != 0.0){
     if((*medium)->op_mode != ONE_STEP_CALCULATION)
-      fprintf(stderr,"initialize: minimum stress drop for loading simulation set to %g\n",
+      fprintf(stderr,"initialize_interact: minimum stress drop for loading simulation set to %g\n",
 	      (*medium)->min_stress_drop);
   }
   (*medium)->use_sparse_storage = use_sparse_storage;
   if(((*medium)->use_sparse_storage) && ((*medium)->op_mode == ONE_STEP_CALCULATION)){
-    fprintf(stderr,"initialize: sparse storage only works for loading simulation!\n");
+    fprintf(stderr,"initialize_interact: sparse storage only works for loading simulation!\n");
     exit(-1);
   }
   (*medium)->i_mat_cutoff = i_mat_cutoff;
@@ -252,8 +256,8 @@ void initialize(struct med **medium, struct flt **fault,
   (*medium)->wcutoff = wcutoff;
   if(((*medium)->op_mode != ONE_STEP_CALCULATION)&&
      ((*medium)->save_amat || (*medium)->use_old_amat)){
-    fprintf(stderr,"initialize: saving/restoring the current equations (A) matrix only makes sense for one step calculations.\n");
-    fprintf(stderr,"initialize: if you want to store the interaction (I) matrix, use -si and -oi, respectively.");
+    fprintf(stderr,"initialize_interact: saving/restoring the current equations (A) matrix only makes sense for one step calculations.\n");
+    fprintf(stderr,"initialize_interact: if you want to store the interaction (I) matrix, use -si and -oi, respectively.");
     exit(-1);
   }
   (*medium)->check_for_interaction_feedback =
@@ -273,7 +277,7 @@ void initialize(struct med **medium, struct flt **fault,
     (*medium)->force_petsc = force_petsc;
 #else
     if((*medium)->comm_rank==0)
-      fprintf(stderr,"initialize: force_petsc is true, but no Petsc support compiled in\n");
+      fprintf(stderr,"initialize_interact: force_petsc is true, but no Petsc support compiled in\n");
     
 #endif
   }
@@ -283,7 +287,7 @@ void initialize(struct med **medium, struct flt **fault,
   */
   switch((*medium)->op_mode){
   case SIMULATE_LOADING_AND_PLOT:{// loading simulation with plotting
-    init_files(medium,fault);
+    init_files_interact(medium,fault);
 #ifdef USE_PGPLOT
     (*medium)->nr_xwindows=3; 
     (*medium)->time_tic_interval=1;
@@ -295,7 +299,7 @@ void initialize(struct med **medium, struct flt **fault,
     break;
   }
   case SIMULATE_LOADING:{// loading simulation
-    init_files(medium,fault);
+    init_files_interact(medium,fault);
     calc_interaction_matrix(*medium,*fault,FALSE); 
     break;
   }
@@ -312,7 +316,7 @@ void initialize(struct med **medium, struct flt **fault,
 /* 
    initialize files for output 
 */
-void init_files(struct med **medium,struct flt **fault)
+void init_files_interact(struct med **medium,struct flt **fault)
 {
   int i;
   char tmpstring[STRLEN],tmpstring2[STRLEN];
@@ -333,30 +337,30 @@ void init_files(struct med **medium,struct flt **fault)
     }
     sprintf(tmpstring,"%s.%i.dat",FAULT_DATA_PREFIX,0);
     sprintf(tmpstring2,"%s.%i.dat",FAULT_DATA_PREFIX,(*medium)->nrgrp-1);
-    fprintf(stderr,"init_files: writing to fault group data files \"%s\" ... \"%s\" every %g timesteps\n",
+    fprintf(stderr,"init_files_interact: writing to fault group data files \"%s\" ... \"%s\" every %g timesteps\n",
 	    tmpstring,tmpstring2,(*medium)->print_interval);
     if((*medium)->variable_time_step)
-      fprintf(stderr,"init_files: will use %g as upper limit for variable dt\n",
+      fprintf(stderr,"init_files_interact: will use %g as upper limit for variable dt\n",
 	      (*medium)->print_interval);
     (*medium)->flt_stress_init=TRUE;
   }
   // slip event files
 #ifdef BINARY_PATCH_EVENT_FILE
-  fprintf(stderr,"init_files: writing to \"%s\", format: time nr_iter patch_nr slip[s,d,n] moment",EVENT_FILE_BINARY);
-  fprintf(stderr,",\ninit_files: in binary format (flt/int/int/flt/flt/flt/flt)\n");
+  fprintf(stderr,"init_files_interact: writing to \"%s\", format: time nr_iter patch_nr slip[s,d,n] moment",EVENT_FILE_BINARY);
+  fprintf(stderr,",\ninit_files_interact: in binary format (flt/int/int/flt/flt/flt/flt)\n");
   (*medium)->events_out= myopen(EVENT_FILE_BINARY,"w");
 #else
-  fprintf(stderr,"init_files: writing to \"%s\", format: time nr_iter patch_nr slip[s,d,n] moment",EVENT_FILE_ASCII);
+  fprintf(stderr,"init_files_interact: writing to \"%s\", format: time nr_iter patch_nr slip[s,d,n] moment",EVENT_FILE_ASCII);
   fprintf(stderr,", ascii format\n");
   (*medium)->events_out= myopen(EVENT_FILE_ASCII,"w");
 #endif
   // cevents.dat file for events per quake
-  fprintf(stderr,"init_files: writing to \"%s\", format: time group_nr moment total_moment m_slip_s m_slip_d m_slip_n m_slip_x m_slip_y m_slip_z m_x m_y m_z\n",
+  fprintf(stderr,"init_files_interact: writing to \"%s\", format: time group_nr moment total_moment m_slip_s m_slip_d m_slip_n m_slip_x m_slip_y m_slip_z m_x m_y m_z\n",
 	  CEVENT_FILE);
   (*medium)->cevents_out=myopen(CEVENT_FILE,"w");
   (*medium)->events_init=TRUE;
 
-  fprintf(stderr,"init_files: writing to \"%s\", format: time group_nr mead/std_s,d,n\n",
+  fprintf(stderr,"init_files_interact: writing to \"%s\", format: time group_nr mead/std_s,d,n\n",
 	  STRESS_STAT_FILE);
   (*medium)->stress_stat_out=myopen(STRESS_STAT_FILE,"w");
   
@@ -372,45 +376,45 @@ void init_files(struct med **medium,struct flt **fault)
 	}
 	sprintf(tmpstring,"%s.%i.dat",SLIP_LINE_PREFIX,0);
 	sprintf(tmpstring2,"%s.%i.dat",SLIP_LINE_PREFIX,(*medium)->nrgrp-1);
-	fprintf(stderr,"init_files: writing to slipline files \"%s\" ... \"%s\" every %g timesteps\n",
+	fprintf(stderr,"init_files_interact: writing to slipline files \"%s\" ... \"%s\" every %g timesteps\n",
 		tmpstring,tmpstring2,(*medium)->slip_line_dt);
 	(*medium)->slip_line_init=TRUE;
       }
     }else{
-      fprintf(stderr,"init_files: slipline.*.dat files suppressed\n");
+      fprintf(stderr,"init_files_interact: slipline.*.dat files suppressed\n");
     }
   }
 }
 
 
-void init_parameters(char **argv, int argc, my_boolean *read_fault_properties,
-		     my_boolean *read_initial_fault_stress,
-		     my_boolean *suppress_interactions,my_boolean *whole_fault_mode,
-		     COMP_PRECISION *med_cohesion,int *max_nr_flt_files,
-		     my_boolean *read_stress_relation_factors,
-		     my_boolean *use_slip_files,
-		     my_boolean *whole_fault_deactivations,
-		     COMP_PRECISION *min_stress_drop,
-		     my_boolean *use_sparse_storage,
-		     I_MATRIX_PREC *i_mat_cutoff,my_boolean *use_old_imat,
-		     my_boolean *use_old_amat,my_boolean *save_imat,
-		     my_boolean *save_amat,
-		     my_boolean *check_for_interaction_feedback,
-		     my_boolean *keep_slipping,
-		     my_boolean *attempt_restart,short int *solver_mode,
-		     my_boolean *suppress_nan_output,
-		     COMP_PRECISION *pressure,
-		     my_boolean *twod_approx_is_plane_stress,
-		     my_boolean *print_plane_coord,
-		     my_boolean *half_plane,
-		     my_boolean *variable_time_step,
-		     my_boolean *debug,
-		     COMP_PRECISION *wcutoff,
-		     my_boolean *no_interactions,
-		     my_boolean *force_petsc,
-		     MODE_TYPE *tri_eval_mode,
-		     my_boolean *full_space,
-		     int rank)
+void init_parameters_interact(char **argv, int argc, my_boolean *read_fault_properties,
+			      my_boolean *read_initial_fault_stress,
+			      my_boolean *suppress_interactions,my_boolean *whole_fault_mode,
+			      COMP_PRECISION *med_cohesion,int *max_nr_flt_files,
+			      my_boolean *read_stress_relation_factors,
+			      my_boolean *use_slip_files,
+			      my_boolean *whole_fault_deactivations,
+			      COMP_PRECISION *min_stress_drop,
+			      my_boolean *use_sparse_storage,
+			      I_MATRIX_PREC *i_mat_cutoff,my_boolean *use_old_imat,
+			      my_boolean *use_old_amat,my_boolean *save_imat,
+			      my_boolean *save_amat,
+			      my_boolean *check_for_interaction_feedback,
+			      my_boolean *keep_slipping,
+			      my_boolean *attempt_restart,short int *solver_mode,
+			      my_boolean *suppress_nan_output,
+			      COMP_PRECISION *pressure,
+			      my_boolean *twod_approx_is_plane_stress,
+			      my_boolean *print_plane_coord,
+			      my_boolean *half_plane,
+			      my_boolean *variable_time_step,
+			      my_boolean *debug,
+			      COMP_PRECISION *wcutoff,
+			      my_boolean *no_interactions,
+			      my_boolean *force_petsc,
+			      MODE_TYPE *tri_eval_mode,
+			      my_boolean *full_space,
+			      int rank)
 {
   int i,itmp;
   my_boolean warned = FALSE;
@@ -512,8 +516,8 @@ void init_parameters(char **argv, int argc, my_boolean *read_fault_properties,
       sscanf(argv[i],ONE_CP_FORMAT,med_cohesion);
 #ifdef NO_COHESION
       if(rank == 0){
-	fprintf(stderr,"init_parameters program was compiled with NO_COHESION option\n");
-	fprintf(stderr,"init_parameters therefore, cohesion is always zero and -c does not make sense\n");
+	fprintf(stderr,"init_parameters_interact: program was compiled with NO_COHESION option\n");
+	fprintf(stderr,"init_parameters_interact: therefore, cohesion is always zero and -c does not make sense\n");
       }
       exit(-1);
 #endif
@@ -537,7 +541,7 @@ void init_parameters(char **argv, int argc, my_boolean *read_fault_properties,
       advance_argument(&i,argc,argv);
       sscanf(argv[i],"%i",&itmp);
       if((itmp < 0) || (itmp >TRIANGULAR_MIXED -TRIANGULAR )){
-	fprintf(stderr,"init_parameters: tri eval mode %i out of bounds\n",itmp);
+	fprintf(stderr,"init_parameters_interact: tri eval mode %i out of bounds\n",itmp);
 	exit(-1);
       }
       *tri_eval_mode = (MODE_TYPE)itmp;
@@ -545,7 +549,7 @@ void init_parameters(char **argv, int argc, my_boolean *read_fault_properties,
       toggle(force_petsc);
     }else{
       if((rank == 0)&&(!warned)){
-	fprintf(stderr,"init_parameters encountered at least one parameter which cannot be interpreted by interact\n");
+	fprintf(stderr,"init_parameters_interact: encountered at least one parameter which cannot be interpreted by interact\n");
 	warned = TRUE;
       }
     }

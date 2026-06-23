@@ -904,7 +904,7 @@ void calc_group_geometry(struct med *medium,struct flt *fault,
       grp[i].prange[DIP]=   (grp[i].pmax[DIP]-   grp[i].pmin[DIP])/2.0;
       grp[i].prange[STRIKE]=(grp[i].pmax[STRIKE]-grp[i].pmin[STRIKE])/2.0;
     }else{
-      grp[i].prange[DIP]=grp[i].prange[STRIKE]=medium->nan;
+      grp[i].prange[DIP]=grp[i].prange[STRIKE]=NAN;
     }
   }
 }

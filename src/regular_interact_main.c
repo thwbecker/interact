@@ -77,7 +77,7 @@ int main(int argc, char **argv)
     fprintf(stderr,"%s: nu: %.5f mu: %.3e from properties.h, therefore lambda/mu: %.5f alpha: %.5f\n",
 	    argv[0],POISSON_NU,SHEAR_MODULUS,LAMBDA_CONST/SHEAR_MODULUS, ALPHA_CONST);
   }
-  check_parameters_and_init(argc,argv,&medium,&fault,&read_initial_fault_stress,a,b);
+  check_parameters_and_init_interact(argc,argv,&medium,&fault,&read_initial_fault_stress,a,b);
   // decide which mode we are in and execute main loops
   switch(medium->op_mode){
     /*

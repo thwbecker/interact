@@ -96,13 +96,13 @@ void flush_slipline(struct med *medium,
 
 /* print fault coordinates and normal */
 
-void print_fault_geometry_and_normals(struct flt *fault, int nrflt, chat *dump_coords_file)
+void print_fault_geometry_and_normals(struct flt *fault, int nrflt, char *dump_coords_file)
 {
   FILE *fp;
   int i;
   fp = fopen(dump_coords_file,"w");
   if(!fp){
-    fprintf(stderr,"print_fault_geometry_and_normal: cannot open %s for writing\n",argv[0],dump_coords_file);
+    fprintf(stderr,"print_fault_geometry_and_normal: cannot open %s for writing\n",dump_coords_file);
     exit(-1);
   }
   fprintf(fp,"# i x y z strike dip l w area nx ny nz group (centroid, orientation[deg], half-sizes, area, unit normal, group/fault id)\n");
@@ -115,7 +115,7 @@ void print_fault_geometry_and_normals(struct flt *fault, int nrflt, chat *dump_c
 	    (double)fault[i].normal[INT_X],(double)fault[i].normal[INT_Y],(double)fault[i].normal[INT_Z],
 	    fault[i].group);
   fclose(fp);
-  fprintf(stderr,"print_fault_geometry_and_normal: wrote %i patch coordinates to %s\n",medium->nrflt,dump_coords_file);
+  fprintf(stderr,"print_fault_geometry_and_normal: wrote %i patch coordinates to %s\n",nrflt,dump_coords_file);
 }
 
 /* 

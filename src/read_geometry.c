@@ -12,7 +12,7 @@
 
    read in the fault patch geometries
 
-   initialize the fault and medium structures
+   initialize the fault structure
 
 */
 
@@ -101,7 +101,7 @@ void read_geometry(char *patch_filename,struct med **medium,
     (*medium)->xmax[i] = FLT_MIN;
     (*medium)->xmin[i] = FLT_MAX;
   } 
-  (*medium)->nan = NAN;
+ 
   (*medium)->wmean= (*medium)->lmean=0.0;
   lmin = wmin =  FLT_MAX;
   lmax = wmax = -FLT_MAX;// L and W are positive quantities

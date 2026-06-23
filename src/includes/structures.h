@@ -63,13 +63,54 @@ typedef struct{
   double bscale;
 #endif
 } hacapk_shell_ctx;
+
+/* 
+   
+   parameters for an rsf_solve type rate state friction run
+
+*/
+
+struct rsf_vars{
+  /*  */
+  COMP_PRECISION f0,shear_mod_over_2cs_si,dc,v0,vpl,vmin;
+  /* preallocated work vectors for the RSF ODE right hand side
+     (created once in rsf_solve, layout matching Is/In rows) */
+  Vec vel,tau_dot,sigma_dot;
+  PetscBool calc_sigma_dot;
+  /* optional per-cell D_c [m] (geometry order); NULL => use uniform
+     medium->dc.  Used for the BP5 nucleation patch (reduced D_RS) and
+     read in the RHS, so it lives at file scope alongside the statics above 
+     gets init in init_medium_rsf
+  */
+  PetscReal *dc_vec;
+  /* 
+   parameters for optional normal stress limiter, cf. HBI limitsigma
+   (file scope since they are only used by the driver and RHS here) 
+  */
+  PetscBool limit_sigma;
+  PetscReal min_sigma , max_sigma;
+  /*  */
+  short int dim;
+};
+
+
+
+
+
+
+
+
+
 #endif
+
+
 
 /* 
 
    MEDIUM STRUCTURE 
    
-   holds all general information that is not fault related
+   holds all general information for an interact or rsf_solve run that
+   is not fault-related
 
 */
 struct med{
@@ -286,9 +327,6 @@ struct med{
   COMP_PRECISION x_scroll_time,x_scroll_interval,
     x_scroll_inc;
 #endif
-  /* RSF stuff */
-  COMP_PRECISION f0,shear_mod_over_2cs_si,dc,v0,vpl,vmin;
-  COMP_PRECISION nan;		/* remember to initialize  */
   /*  */
   my_boolean force_petsc;
   unsigned int myfault0,myfaultn;
@@ -296,18 +334,17 @@ struct med{
   PetscMPIInt comm_size, comm_rank;
   PetscInt    rs, re, rn;
   Mat         Is,In;
-  /* preallocated work vectors for the RSF ODE right hand side
-     (created once in rsf_solve, layout matching Is/In rows) */
-  Vec         rsf_vel, rsf_tau_dot, rsf_sigma_dot;
+
   PetscInt use_hmatrix;		/* 0,1,2,3,4 (5 = BigWham full-space, if compiled) */
-  
-  PetscBool calc_sigma_dot;
+  struct rsf_vars *rsf;
+
 #ifdef USE_PETSC_HMAT
   PetscReal h2opus_eta;		/* 0.6 */
   PetscInt  h2opus_leafsize;	/* 32 */
   PetscInt  h2opus_basisord;	/* 8 */
-  /*  */
-  KDTree      kdtree;
+
+  /* H2OPUS */
+  KDTree  kdtree;
   kd_node kd_nodes;
   int kdtr_visited;
 #endif
