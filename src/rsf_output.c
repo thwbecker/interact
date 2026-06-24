@@ -5,7 +5,6 @@
 #include "rsf.h"
 
 
-
 /* 
    set up the monitor and event tracking environment,
    cf. init_monitor_and_event in ode_solve_test.c
@@ -103,6 +102,7 @@ PetscErrorCode rsf_finalize_monitor_and_event(struct rsf_out_ctx *uc)
   PetscCall(VecDestroy(&uc->gathered));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
+
 
 
 
