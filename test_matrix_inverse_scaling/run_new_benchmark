@@ -28,10 +28,11 @@ nos=${1-"50 100 200"}  # along strike resolution
 ncores=${2-"1 2 4 8 16 32"}          # MPI core counts to test
 tests=${3-"1 2"}               # 1: forward (prescribed slip)  2: inverse (stress bc, needs solve)
 geoms=${4-"0 2"}               # 0: quad patches   2: triangular patches
-replace_log=${5-0}			# append or replace?
+replace_log=${5-1}			# append or replace?
 #
 mpi_bind="--bind-to core" # mpirun binding; append " --oversubscribe" to test below np cores
-print_bulk=1              # bc.in flag: 0 do not print bulk fields, 1 print bulk fields on grid
+nbulk=301              # 0 do not print bulk fields, > 0 print bulk fields on nbulk x nbulk grid
+replace_petsc_def_file=0
 
 # pure MPI scaling: one OpenMP thread per rank. OMP_NUM_THREADS is the intended
 # control for threading and is the only environment variable this script sets.
@@ -41,22 +42,24 @@ export OMP_NUM_THREADS=1
 # petsc_settings.yaml). we write there so the file is the one interact will pick up.
 petsc_yaml="$HOME/progs/src/interact/petsc_settings.yaml"
 
-mkdir -p logs
 
-# PETSc defaults written once (iterative solver). command line options still override.
-cat <<EOF > "$petsc_yaml"
+if [ $replace_petsc_def_file -eq 1 ];then
+    # PETSc defaults written once (iterative solver). command line options still override.
+    cat <<EOF > "$petsc_yaml"
 --- 
 ksp_type: fgmres
 pc_type: jacobi
 ksp_max_it: 10000
 ksp_rtol: 1.0e-8
 EOF
+fi
 
+cwd=`pwd`
 
-stats=stats.log
+stats=$cwd/stats.$HOST.log
 if [[ $replace_log -eq 1 || ! -s $stats ]];then
     # fresh stats file with a header
-    echo "# geom np ntest ncore total_wall_s asm_wall_s solve_wall_s ksp_solve_s mat_mult_s pc_apply_s pc_setup_s" > "$stats"
+    echo "# geom np ntest nbulk2 ncore total_wall_s asm_wall_s solve_wall_s ksp_solve_s mat_mult_s pc_apply_s pc_setup_s" > "$stats"
 fi
 
 # pull a "X.XXX s since init" value for a given message from a file (empty if absent)
@@ -78,6 +81,10 @@ diff_or_na() { # $1 a  $2 b
         echo NA
     fi
 }
+wdir=$HOST
+mkdir -p $wdir
+cd $wdir
+mkdir -p logs
 
 for no in $nos; do
     for ntest in $tests; do
@@ -98,50 +105,52 @@ for no in $nos; do
             fi
             np=$(wc -l < geom.in)          # patch count (one patch per line)
 	    # bc file
-	    if [ $print_bulk -eq 1 ];then
-		nbulk=201
+	    if [ $nbulk -eq 0 ];then
 		cat <<EOF > bc.in
 		1 1
 		-10 10 $nbulk -10 10 $nbulk -1 -1 1 
 EOF
 	    else
-		nbulk=0
 		echo 1 0 > bc.in
 	    fi
+	    ((nbulk2=nbulk*nbulk))
 	    echo -1 -1 -1 $bc_type $bc_val >> bc.in
 	    #
             for ncore in $ncores; do
-                tag=$g.$np.$ntest.$ncore
-                out=logs/log.$tag.out      # PETSc -log_view table (stdout)
-                err=logs/log.$tag.err      # interact messages incl. timing markers (stderr)
+		if [ $ncore -le $NR_CPUS ];then
+                    tag=$g.$np.$ntest.$ncore
+                    out=logs/log.$tag.out      # PETSc -log_view table (stdout)
+                    err=logs/log.$tag.err      # interact messages incl. timing markers (stderr)
+		    
+                    # time the whole run; -fpetsc forces the PETSc solver at every core count,
+                    # -log_view emits the PETSc performance table on stdout.
+                    /usr/bin/time --output time.out --format "%e" \
+				  mpirun $mpi_bind -np "$ncore" interact -fpetsc -log_view > "$out" 2> "$err"
+		    
+                    total=$(cat time.out 2> /dev/null)
+                    if [ -z "$total" ]; then total=NA; fi
+		    
+                    t_att=$(since_init "attempting Petsc"         "$err")
+                    t_asm=$(since_init "parallel assembly done"   "$err")
+                    t_sol=$(since_init "parallel solve completed" "$err")
+                    asm_wall=$(diff_or_na "$t_asm" "$t_att")
+                    solve_wall=$(diff_or_na "$t_sol" "$t_asm")
+		    
+                    ksp=$(logview_time KSPSolve "$out")
+                    mvm=$(logview_time MatMult  "$out")
+                    pca=$(logview_time PCApply  "$out")
+                    pcs=$(logview_time PCSetUp  "$out")
+		    
+                    echo "$g $np $ntest $nbulk2 $ncore $total $asm_wall $solve_wall $ksp $mvm $pca $pcs" >> "$stats"
+                    echo $0: $wdir `tail -1 "$stats"`
 
-                # time the whole run; -fpetsc forces the PETSc solver at every core count,
-                # -log_view emits the PETSc performance table on stdout.
-                /usr/bin/time --output time.out --format "%e" \
-                    mpirun $mpi_bind -np "$ncore" interact -fpetsc -log_view > "$out" 2> "$err"
-
-                total=$(cat time.out 2> /dev/null)
-                if [ -z "$total" ]; then total=NA; fi
-
-                t_att=$(since_init "attempting Petsc"         "$err")
-                t_asm=$(since_init "parallel assembly done"   "$err")
-                t_sol=$(since_init "parallel solve completed" "$err")
-                asm_wall=$(diff_or_na "$t_asm" "$t_att")
-                solve_wall=$(diff_or_na "$t_sol" "$t_asm")
-
-                ksp=$(logview_time KSPSolve "$out")
-                mvm=$(logview_time MatMult  "$out")
-                pca=$(logview_time PCApply  "$out")
-                pcs=$(logview_time PCSetUp  "$out")
-
-                echo "$g $np $ntest $nbulk $ncore $total $asm_wall $solve_wall $ksp $mvm $pca $pcs" >> "$stats"
-                tail -1 "$stats"
-
-                rm -f flt.dat disp.out stress.out
+                    rm -f flt.dat disp.out stress.out time.out
+		fi
             done
+	    
             rm -f bc.in geom.in
         done
     done
 done
 
-rm -f time.out
+
