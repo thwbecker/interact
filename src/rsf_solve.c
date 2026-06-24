@@ -47,20 +47,9 @@ int main(int argc,char **argv)
   struct interact_ctx par[1];	/* fault geometry and medium */
   struct med *medium;
   struct rsf_solve_settings set[1];
-  FILE *tst;
-  char *home_dir = getenv("HOME");
-  char par_file[STRLEN];
-  /* only read the YAML defaults file if it exists */
-  snprintf(par_file,STRLEN,"%s/progs/src/interact/petsc_settings.yaml",(home_dir)?(home_dir):("."));
-  tst = fopen(par_file,"r");
-  if(tst){
-    HEADNODE
-      fprintf(stderr,"%s: found and using Petsc options in %s\n",argv[0],par_file);
-    fclose(tst);
-  }else{
-    par_file[0]='\0';
-  }
-  PetscInitialize(&argc,&argv,(par_file[0])?(par_file):(NULL),NULL); /* initialize from setting file and or command line */
+  /* shared startup: loads $HOME/progs/src/interact/petsc_settings.yaml if present
+     (command-line options still override), identical across all PETSc interact tools */
+  PetscCall(interact_petsc_initialize(&argc,&argv));
   /* holds the parameets */
   par->medium=(struct med *)calloc(1,sizeof(struct med)); /* init as all zeros */
   medium = par->medium;

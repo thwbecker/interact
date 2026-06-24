@@ -105,7 +105,7 @@ int main(int argc, char **argv)
   PetscFunctionBeginUser;
 
   /* start up Petsc proper */
-  PetscCall(PetscInitialize(&argc, &argv, (char *)0, NULL));
+  PetscCall(interact_petsc_initialize(&argc, &argv));
   
   /* generate frameworks */
   medium=(struct med *)calloc(1,sizeof(struct med)); /* make one zero medium structure */

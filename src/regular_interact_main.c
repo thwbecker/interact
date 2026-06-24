@@ -43,6 +43,9 @@ interact -h
 */
 #include "interact.h"
 #include "properties.h"
+#ifdef USE_PETSC
+#include "petsc_prototypes.h"		/* for interact_petsc_initialize */
+#endif
 
 
 
@@ -60,12 +63,17 @@ int main(int argc, char **argv)
   strftime(time_out_string, 20, "%Y-%m-%d %H:%M:%S",
 	   localtime(&medium->init_time.tv_sec));
 #ifdef USE_PETSC
+#ifdef USE_DOUBLE_PRECISION
   PetscFunctionBegin;
-  PetscCall(PetscInitialize(&argc, &argv, (char *)0, NULL));
+  PetscCall(interact_petsc_initialize(&argc, &argv));
   PetscCallMPI(MPI_Comm_size(PETSC_COMM_WORLD, &medium->comm_size));
   PetscCallMPI(MPI_Comm_rank(PETSC_COMM_WORLD, &medium->comm_rank));
   if(medium->comm_size == 0)
     medium->comm_size = 1;	/* fix for non MPI call? */
+#else  /* USE_PETSC but single precision: PETSc is set up for double only */
+  fprintf(stderr,"%s: ERROR: PETSc support is configured for double precision only; this is a single-precision build and cannot run with PETSc. Use the double-precision interact binary instead.\n",argv[0]);
+  return 1;
+#endif
 #else
   medium->comm_size = 1;
 #endif

@@ -25,6 +25,7 @@ PetscReal vel_from_rsf(PetscReal, PetscReal, PetscReal, PetscReal,PetscReal,
 		       PetscReal *, PetscReal *, PetscReal *,struct med *);
 
 
+PetscErrorCode interact_petsc_initialize(int *, char ***);
 PetscErrorCode calc_petsc_Isn_matrices(struct med *, struct flt *,PetscInt ,PetscReal, int, Mat *,hacapk_shell_ctx *);
 
 #ifdef USE_PETSC_HMAT

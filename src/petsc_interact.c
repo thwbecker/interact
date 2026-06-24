@@ -22,6 +22,41 @@
 #ifdef USE_PETSC
 #include "petsc_prototypes.h"
 
+/*
+   interact_petsc_initialize: single, shared PETSc startup for the interact
+   tools (interact, compress_interaction_matrix, rsf_solve).
+
+   Locates the optional PETSc options file
+   $HOME/progs/src/interact/petsc_settings.yaml and, if it exists, passes it to
+   PetscInitialize so its entries act as defaults (command-line options still
+   override). On rank 0 it notes which file was used. This centralizes what
+   rsf_solve previously did inline so every PETSc-using interact program starts
+   up identically. medium is intentionally not touched here: callers still set
+   comm_size / comm_rank themselves after this returns, exactly as before.
+*/
+PetscErrorCode interact_petsc_initialize(int *argc, char ***argv)
+{
+  char par_file[STRLEN];
+  char *home_dir = getenv("HOME");
+  FILE *tst;
+  PetscBool have_file = PETSC_FALSE;
+  /* only read the YAML defaults file if it exists */
+  snprintf(par_file,STRLEN,"%s/progs/src/interact/petsc_settings.yaml",
+	   (home_dir)?(home_dir):("."));
+  tst = fopen(par_file,"r");
+  if(tst){
+    have_file = PETSC_TRUE;
+    fclose(tst);
+  }
+  PetscCall(PetscInitialize(argc,argv,(have_file)?(par_file):(NULL),NULL));
+  if(have_file)
+    PetscCall(PetscFPrintf(PETSC_COMM_WORLD,stderr,
+			   "%s: found and using Petsc options in %s\n",
+			   (argv && (*argv) && (*argv)[0])?((*argv)[0]):("interact"),
+			   par_file));
+  return PETSC_SUCCESS;
+}
+
 
 #ifdef USE_HMMVP
 /* 
