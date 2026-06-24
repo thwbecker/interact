@@ -74,6 +74,7 @@ PetscErrorCode rsf_init_monitor_and_event(struct rsf_out_ctx *uc,struct interact
   PetscCall(VecScatterCreateToZero(X0,&uc->gather,&uc->gathered));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
+
 /* close output files and free work space, cf. ode_solve_test.c */
 PetscErrorCode rsf_finalize_monitor_and_event(struct rsf_out_ctx *uc)
 {
