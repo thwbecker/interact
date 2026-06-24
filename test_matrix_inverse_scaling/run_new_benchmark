@@ -31,7 +31,9 @@ geoms=${4-"0 2"}               # 0: quad patches   2: triangular patches
 replace_log=${5-1}			# append or replace?
 #
 mpi_bind="--bind-to core" # mpirun binding; append " --oversubscribe" to test below np cores
-nbulk=301              # 0 do not print bulk fields, > 0 print bulk fields on nbulk x nbulk grid
+# for forward evaluation
+nbulk=0              # 0 do not print bulk fields, > 0 print bulk fields on nbulk x nbulk grid
+#
 replace_petsc_def_file=0
 
 # pure MPI scaling: one OpenMP thread per rank. OMP_NUM_THREADS is the intended
@@ -59,7 +61,7 @@ cwd=`pwd`
 stats=$cwd/stats.$HOST.log
 if [[ $replace_log -eq 1 || ! -s $stats ]];then
     # fresh stats file with a header
-    echo "# geom np ntest nbulk2 ncore total_wall_s asm_wall_s solve_wall_s ksp_solve_s mat_mult_s pc_apply_s pc_setup_s" > "$stats"
+    echo "# geom np nbulk2 ntest  ncore total_wall_s asm_wall_s solve_wall_s ksp_solve_s mat_mult_s pc_apply_s pc_setup_s" > "$stats"
 fi
 
 # pull a "X.XXX s since init" value for a given message from a file (empty if absent)
@@ -105,15 +107,17 @@ for no in $nos; do
             fi
             np=$(wc -l < geom.in)          # patch count (one patch per line)
 	    # bc file
-	    if [ $nbulk -eq 0 ];then
+	    if [[ $nbulk -ne 0 && $ntest -eq 1 ]];then # only for forward test
 		cat <<EOF > bc.in
 		1 1
 		-10 10 $nbulk -10 10 $nbulk -1 -1 1 
 EOF
+		((nbulk2=nbulk*nbulk))
 	    else
 		echo 1 0 > bc.in
+		nbulk2=0
 	    fi
-	    ((nbulk2=nbulk*nbulk))
+
 	    echo -1 -1 -1 $bc_type $bc_val >> bc.in
 	    #
             for ncore in $ncores; do
@@ -141,7 +145,7 @@ EOF
                     pca=$(logview_time PCApply  "$out")
                     pcs=$(logview_time PCSetUp  "$out")
 		    
-                    echo "$g $np $ntest $nbulk2 $ncore $total $asm_wall $solve_wall $ksp $mvm $pca $pcs" >> "$stats"
+                    echo "$g $np $nbulk2 $ntest $ncore $total $asm_wall $solve_wall $ksp $mvm $pca $pcs" >> "$stats"
                     echo $0: $wdir `tail -1 "$stats"`
 
                     rm -f flt.dat disp.out stress.out time.out
