@@ -1,4 +1,4 @@
-# `rsf_solve` — H-matrix backends and performance notes
+# `rsf_solve`: H-matrix backends and performance notes
 
 `rsf_solve` integrates a rate-and-state quasi-dynamic earthquake cycle on an
 interact patch geometry. The dense elastic interaction operator is applied once
@@ -9,7 +9,7 @@ through several hierarchical-matrix (H-matrix) backends, selected with
 
 | `-use_hmatrix` | backend | parallelism | tolerance knob (default) | notes |
 |:--:|----|----|----|----|
-| 0 | dense | MPI | — | exact reference; O(N^2) memory and matvec |
+| 0 | dense | MPI | n/a | exact reference; O(N^2) memory and matvec |
 | 1 | **HTOOL** (PETSc `MATHTOOL`) | MPI | `-mat_htool_epsilon` (3e-5) | also `-mat_htool_eta` (100), `-mat_htool_compressor` |
 | 2 | H2OPUS | serial/GPU | `-h2opus_eta` | |
 | 3 | **HACApK** (lattice H-matrix) | MPI | `-hacapk_ztol` (1e-1) | shell matvec into HACApK |
@@ -17,6 +17,66 @@ through several hierarchical-matrix (H-matrix) backends, selected with
 
 This note focuses on the two production MPI backends, **HTOOL** and **HACApK**,
 benchmarked against the **dense** ground truth.
+
+## Source layout
+
+`rsf_solve` was split (2026-06) from a single `rsf_solve.c` into four translation
+units plus a shared header, separating the driver, the physics, the option/IC
+parsing, and the output. The split is mechanical: the RHS, friction inversion,
+initial conditions, backslip loading, and defaults are unchanged from the
+single-file version (verified by reproducing the BP5 cycle, see below). All
+rate-and-state parameters that used to live in file-scope statics now hang off
+`medium->rsf` (a `struct rsf_vars`, allocated in `init_medium_rsf`), so no mutable
+rsf state is global.
+
+| file | role | key routines |
+|----|----|----|
+| `src/rsf_solve.c` | driver | `main`; `rsf_solve_run` (geometry, interaction matrices, backslip loading, initial conditions, TS setup, solve, teardown); `rsf_event_function` (slip-rate threshold crossing for event onset/arrest) |
+| `src/rsf_init.c` | setup | `init_medium_rsf` (allocate `medium->rsf`, set `dim`); `rsf_get_settings` (all option parsing, unit conversions, defaults, H-matrix backend selection) |
+| `src/rsf_engine.c` | physics | `vel_from_rsf` (invert the regularized friction law for slip rate); `rsf_ODE_RHSFunction` (the quasi-dynamic aging-law RHS, where the `Is` matvec and the backslip `sinc` loading enter); `rsf_domain_check` (per-step validity gate) |
+| `src/rsf_output.c` | output | `rsf_init_monitor_and_event` and `rsf_finalize_monitor_and_event` (set up and tear down the TS monitor, event detector, gather, and output files); `rsf_TS_Monitor` (state-change logging to `rsf_monitor.dat`, periodic stats, optional per-group GMT slip-rate fields); `rsf_post_event`; and the field-output group helpers (`rsf_build_groups`, `rsf_group_coords`, `rsf_write_group_geometry`, `rsf_free_groups`, `rsf_dcmp`) |
+| `src/includes/rsf.h` | header | the output/grid/settings structs (`rsf_out_ctx`, `rsf_group_grid`, `rsf_solve_settings`), the rsf prototypes, and the single shared `rsf_par_static` (the geometry pointer the domain check reads) |
+
+The build links all four objects via `RSF_SOLVE_OBJS` in the makefile:
+
+    RSF_SOLVE_OBJS = $(ODIR)/rsf_solve.o $(ODIR)/rsf_engine.o $(ODIR)/rsf_init.o $(ODIR)/rsf_output.o
+
+One build caveat worth flagging: this split also moved three `Vec` fields out of
+`struct med` and added the `medium->rsf` pointer, which shifts the offsets of
+later `struct med` members. After pulling that change, do a clean rebuild
+(`rm objects/*.o objects/*.a`, or `make clean`) so every object sees the same
+`structures.h` layout. A partial rebuild that reuses a stale `petsc_interact.o`
+(which writes `medium->rs/re/rn`) against freshly built rsf objects will read the
+ownership range at the wrong offset and segfault in the monitor on the first
+output step. This is a stale-object hazard, not a code defect: a clean build
+fixes it.
+
+## BP5 accuracy and refactor validation
+
+The split is validated by reproducing the SEAS BP5-QD benchmark and comparing
+against the single-file predecessor and against HBI (`sozawa94/hbi`).
+
+Setup: `bp5/` 1 km inputs (`geom_bp5_1km.in`, `rsf_bp5_1km.dat`, `ic_bp5_1km.in`,
+`dc_bp5_1km.in`), dense backend (`-use_hmatrix 0`), `-rtol 1e-4`, run to 250 yr
+(just past the first spontaneous system event). Accuracy is read from the first
+system-event onset in `rsf_events.dat` and the slip-rate trace in
+`rsf_monitor.dat`.
+
+| code | first spontaneous event | note |
+|----|----|----|
+| interact `rsf_solve`, split (`rsf_*.c`) | 234.2937 yr | this refactor |
+| interact `rsf_solve`, single-file predecessor | 234.2938 yr | matches to 1e-4 yr |
+| HBI (lattice HACApK, near-dense) | about 234.2 to 234.4 yr | exact value depends on the onset threshold |
+
+The split matches the predecessor to about 1e-4 yr over a 234 yr interval, which
+is time-step accumulation at the ULP level rather than a physics difference, and
+tracks HBI to within roughly 0.14 yr (about 0.06 percent), the same agreement
+documented for the pre-split code (`bp5/README.md`, `bp5_physics_crosscheck.md`).
+The slip-rate traces overlay across the seeded event near t = 0, the interseismic
+plateau at the plate rate (log10 of max slip rate near -9), and the first
+spontaneous event near 234 yr (`bp5_rsf_vs_hbi_split.png`). This is specific to
+the 1 km dense BP5 configuration; the per-backend H-matrix accuracy at this and
+other resolutions is in the benchmark table below.
 
 ## Recommended defaults for a single-fault cycle
 
@@ -76,7 +136,7 @@ evidence and `compress_interaction_matrix.md` for the tolerance-to-error mapping
 
 PETSc's `MATHTOOL` defaults its low-rank compressor to **SVD**, which is the most
 accurate but by far the most expensive to assemble. For `rsf_solve` the accuracy
-of the compressor is irrelevant in practice (see below — the error floor is set
+of the compressor is irrelevant in practice (see below, the error floor is set
 by the ODE tolerance, not the H-matrix), so `rsf_solve` now sets
 
 ```
@@ -98,7 +158,7 @@ is measured against the dense solution.
 
 | backend (tolerance) | recurrence | Δ vs dense | max Δtrace | memory | setup | step | matvec | **total** |
 |----|----|----|----|----|----|----|----|----|
-| dense | 234.294 yr | — | — | 128 MB | 19.5 s | 199.5 s | 20.14 ms | **219 s** |
+| dense | 234.294 yr | n/a | n/a | 128 MB | 19.5 s | 199.5 s | 20.14 ms | **219 s** |
 | **HACApK** ztol 1e-4 | 234.293 | −0.0008 | 0.0036 | 25.2 MB (20%) | 6.5 s | 19.8 s | **1.75 ms** | **26 s** |
 | HTOOL SVD eps 1e-4 | 234.294 | +0.0002 | 0.0041 | 18.9 MB (15%) | 48.3 s | 27.2 s | 2.46 ms | 75 s |
 | HTOOL ACA eps 1e-4 | 234.285 | −0.009 | 0.0050 | 23.5 MB (18%) | 8.0 s | 32.0 s | 2.94 ms | 40 s |
@@ -117,7 +177,7 @@ at the recommended setting.)
 1. **Accuracy is a wash.** Every H-matrix variant reproduces the dense
    recurrence to <0.01 yr (~3e-6 relative) and the entire `log10 max|V|` trace to
    <=0.005 log units. Tightening HTOOL from `epsilon`=1e-4 to 1e-6 does *not*
-   improve accuracy — the error floor is set by the ODE `rtol` (1e-4), not the
+   improve accuracy, the error floor is set by the ODE `rtol` (1e-4), not the
    H-matrix tolerance. So at `ztol`/`epsilon` <= 1e-4 both backends are
    effectively exact for this problem; there is no accuracy reason to prefer one.
 
@@ -151,7 +211,7 @@ the ranking. Candidate explanations, roughly in order of suspected importance:
    microbenchmark, SVD-vs-ACA explains a large swing.
 2. **What is timed.** The microbenchmark times assembly plus a handful of
    matvecs; `rsf_solve` times ~10^4 matvecs inside an adaptive ODE integrator.
-   The two reward different things — assembly throughput vs steady-state matvec
+   The two reward different things, assembly throughput vs steady-state matvec
    latency. HACApK's shell matvec is a direct call into its optimized routine;
    HTOOL's goes through the PETSc `MATHTOOL` layer.
 3. **Admissibility (`eta`) and geometry.** HTOOL `eta`=100 is a loose
@@ -165,8 +225,8 @@ the ranking. Candidate explanations, roughly in order of suspected importance:
    the most important open question and is exactly what the scaling tests below
    target.**
 
-These are hypotheses to test, not conclusions. The single-core verdict —
-"HACApK is the better default for serial / small-core BP5-type problems" — should
+These are hypotheses to test, not conclusions. The single-core verdict, 
+"HACApK is the better default for serial / small-core BP5-type problems", should
 not be read as universal.
 
 ---
@@ -177,7 +237,7 @@ Measured with `scripts/bench_hmatrix.sh` on a 24-core node (np=48 uses
 hyperthreads), BP5 1 km / 4000 cells, short timing run (~357 steps, no event).
 `step` is the matvec-bound time-stepping cost; `total` includes assembly.
 
-> **Scope and caveats — read the numbers below as indicative, not definitive.**
+> **Scope and caveats, read the numbers below as indicative, not definitive.**
 > They come from a *single* machine, a *single* problem size (4000 cells), and a
 > *single* timing run per point (no repetition, so expect ~10-20% run-to-run
 > noise, especially at high rank counts where wallclocks are ~1-2 s). Absolute
@@ -201,20 +261,20 @@ hyperthreads), BP5 1 km / 4000 cells, short timing run (~357 steps, no event).
 | 24 | 1.99 | 2.22 | **1.56** | HACApK |
 | 48 | **1.23** | 1.49 | 1.64 | dense |
 
-**Component speedup, np=1 → 48:** assembly — HTOOL 35x, dense 23x, HACApK 10x;
-matvec/step — dense 28x, HTOOL 18x, **HACApK only 5.7x**; total — HTOOL 28x,
+**Component speedup, np=1 → 48:** assembly, HTOOL 35x, dense 23x, HACApK 10x;
+matvec/step, dense 28x, HTOOL 18x, **HACApK only 5.7x**; total, HTOOL 28x,
 dense 25x, HACApK 6.6x.
 
 **Memory (MB):** dense flat 122; HACApK flat 25.2; HTOOL grows with rank count
-(17.9 at np=1 → 39.3 at np=48 — per-rank clustering duplicates near-field blocks),
+(17.9 at np=1 → 39.3 at np=48, per-rank clustering duplicates near-field blocks),
 crossing above HACApK around np=24.
 
-### Findings — the picture appears core-count dependent
+### Findings: the picture appears core-count dependent
 
 These observations are specific to this machine and problem size (see caveats
 above); the directional trends should transfer, the exact crossovers may not.
 
-1. **HACApK was fastest at all physical-core counts here (np <= 24)** — fastest
+1. **HACApK was fastest at all physical-core counts here (np <= 24)**, fastest
    assembly at *every* rank count tested (3.8 s → 0.4 s) and the fastest serial
    matvec. On this 24-core box it looks like a sensible default for BP5-scale
    problems (1.3-4x ahead). On other hardware the margin will vary.
@@ -224,14 +284,14 @@ above); the directional trends should transfer, the exact crossovers may not.
    granularity: at 4000 cells / 48 ranks that is only ~83 cells/rank, where
    communication tends to dominate a hierarchical matvec while the dense matvec
    stays embarrassingly parallel (BLAS gemv + one reduction). In this run the
-   ranking flips at np=48 — dense (1.23 s) < HTOOL (1.49 s) < HACApK (1.64 s) —
+   ranking flips at np=48, dense (1.23 s) < HTOOL (1.49 s) < HACApK (1.64 s), 
    though those three are within ~30% of each other and of the same order as the
    run-to-run noise, so read it as "HACApK has lost its lead by 48," not a precise
    ordering.
 
    This should *not* be read as a limitation of HACApK. The lattice-H HACApK is
    designed explicitly for large-scale distributed-memory machines (Ozawa et al.,
-   2021; Ida et al.), a regime this 4000-cell single-node test does not exercise —
+   2021; Ida et al.), a regime this 4000-cell single-node test does not exercise, 
    we are simply starving it of per-rank work. Other or newer HACApK
    builds/configurations may well scale considerably better at high np, and the
    saturation we see is most plausibly a small-problem artifact rather than
@@ -242,32 +302,32 @@ above); the directional trends should transfer, the exact crossovers may not.
 3. **HTOOL showed the best scaling overall** (28x total) but from the most
    expensive assembly; it only caught HACApK at the highest rank counts, and its
    memory advantage eroded there too. ACA (now the default) is what makes this
-   viable — SVD would inflate the already-dominant assembly.
+   viable, SVD would inflate the already-dominant assembly.
 
 4. **Any crossover is expected to move with problem size.** HACApK likely
    saturates here because the per-rank work is small; a larger model (0.5 km /
-   16k cells, ~4x the cells-per-rank) was predicted to push the saturation point —
-   and the dense/HTOOL crossover — to higher rank counts. This has since been
+   16k cells, ~4x the cells-per-rank) was predicted to push the saturation point, 
+   and the dense/HTOOL crossover, to higher rank counts. This has since been
    measured and the prediction held (see "Second resolution" below). The np=48
    point also crosses into hyperthreading on this 24-core node, which tends to
    penalize bandwidth-bound H-matrix matvecs (HACApK step time *rose* 24 → 48 at
    1 km).
 
-### On the `compress_interaction_matrix` discrepancy — a plausible partial explanation
+### On the `compress_interaction_matrix` discrepancy: a plausible partial explanation
 
 The scaling data is *consistent with* two of the earlier hypotheses, without
 proving either. (i) HTOOL compresses better and scales better, so a microbenchmark
 weighted toward **memory/compression or run at high core count** would plausibly
-favor HTOOL — matching that test's ranking. (ii) The earthquake-cycle run instead
+favor HTOOL, matching that test's ranking. (ii) The earthquake-cycle run instead
 stresses **serial-to-moderate-core matvec latency**, where HACApK did better here.
 The two benchmarks may simply probe different regimes rather than disagreeing.
-This is a working explanation, not a settled one — confirming it would need the
+This is a working explanation, not a settled one, confirming it would need the
 microbenchmark re-run with matched compressor, tolerance, and core count.
 
 ### Second resolution: 0.5 km / 16000 cells (measured)
 
 Same machine and protocol, finer grid (4x the cells, ~333 cells/rank at np=48
-instead of ~83). Same caveats as above — one machine, one run per point, np=48 is
+instead of ~83). Same caveats as above, one machine, one run per point, np=48 is
 hyperthreaded. Total wallclock (s):
 
 | np | dense | HTOOL (ACA) | HACApK | fastest |
@@ -290,7 +350,7 @@ Observations (specific to this configuration):
 
 2. **HTOOL assembly becomes the dominant cost at this size.** Single-core ACA
    assembly was ~2299 s (~38 min) at 16000 cells, vs ~21 s for HACApK and ~263 s
-   for dense — roughly a 73x jump for 4x cells (~quadratic), far worse than
+   for dense, roughly a 73x jump for 4x cells (~quadratic), far worse than
    HACApK's ~5.7x. It parallelizes very strongly (down to ~10 s at np=48), but for
    serial or few-core use at this size HTOOL assembly is impractical. This may be
    tunable (admissibility `eta`, clustering) and could differ with another PETSc
@@ -301,7 +361,7 @@ Observations (specific to this configuration):
    assembly-dominated, which favors HACApK; for a *long* production run the matvec
    dominates and HTOOL's per-step edge amortizes its assembly. A rough linear
    extrapolation puts the run-length crossover near ~1700 steps at np=48 (~3700 at
-   np=24) — i.e. a full multi-event BP5 cycle (~10^4 steps) could plausibly favor
+   np=24), i.e. a full multi-event BP5 cycle (~10^4 steps) could plausibly favor
    HTOOL at high core count, if one accepts the large one-time assembly. This is an
    extrapolation from a short run, not a measured production comparison, and
    assumes a roughly constant per-step matvec cost.
@@ -311,19 +371,19 @@ Observations (specific to this configuration):
    dense's ~2 GB footprint is itself a constraint and its matvec appears
    bandwidth-saturated by np≈24.
 
-### Multi-host update (six hosts) — the saturation is real and host-dependent
+### Multi-host update (six hosts): the saturation is real and host-dependent
 
 The single-node 0.5 km numbers above have since been reproduced on six shared-memory
 hosts (committed scaling CSVs and summary plots). They confirm the picture and sharpen
 the caveats, so the single-node claim "HACApK fastest at *every* rank count" should be
 read as a property of *that* node rather than a general result:
 
-- **np ≈ 16–24 is the host-robust sweet spot.** At np=24, `hacapk` was the fastest
-  matvec on *every* host tested — the one ordering that holds everywhere.
+- **np ≈ 16-24 is the host-robust sweet spot.** At np=24, `hacapk` was the fastest
+  matvec on *every* host tested, the one ordering that holds everywhere.
 - **np=48 is host-dependent.** On cleanly-scaling nodes `htool` and `hmmvp` keep scaling
   and **overtake `hacapk` by np=48** (`hacapk`, the leanest and most bandwidth-bound
-  matvec, plateaus near np≈16–24); bandwidth-limited nodes instead *degrade* past np≈24;
-  and one node's np=48 collapsed across all backends, reproducibly — an oversubscription
+  matvec, plateaus near np≈16-24); bandwidth-limited nodes instead *degrade* past np≈24;
+  and one node's np=48 collapsed across all backends, reproducibly, an oversubscription
   artifact (fewer usable cores than ranks), not a backend property. The node in the table
   above, where `hacapk` stayed fastest to np=48, sits at the favorable end of that spread.
 - The transferable statements are therefore: `hacapk` is the best low-to-mid-rank choice
@@ -337,20 +397,20 @@ On the evidence so far, keeping HACApK (`-use_hmatrix 3`) is a reasonable defaul
 it had the cheapest assembly at every size and rank count tested and won on total
 wallclock for short-to-moderate runs, comfortably so for parameter sweeps,
 ensembles, and single-node jobs. Three caveats temper that, all pointing the same
-way — measure for your actual workload:
+way, measure for your actual workload:
 
 - **Run length matters as much as core count.** The benchmarks are short
   (~755 steps) and therefore assembly-weighted. For long production cycles
   (~10^4 steps) the matvec dominates, and at high rank counts HTOOL's cheaper
-  matvec may amortize its (large) assembly and overtake HACApK — extrapolated,
+  matvec may amortize its (large) assembly and overtake HACApK, extrapolated,
   not yet measured.
 - **Problem size moved the crossover.** At 0.5 km HACApK led to np=48, whereas at
-  1 km it did not — so conclusions at one resolution don't transfer.
+  1 km it did not, so conclusions at one resolution don't transfer.
 - **HTOOL assembly scales poorly with N on few cores** here (~38 min at 16k cells,
   np=1), which may be tunable and build-dependent.
 
 So treat HACApK as the starting point, but for a single large model on a many-core
-or multi-node allocation — especially a long one — benchmark dense and HTOOL(ACA)
+or multi-node allocation, especially a long one, benchmark dense and HTOOL(ACA)
 at the target size, rank count, *and* representative step count with
 `scripts/bench_hmatrix.sh` rather than assuming. It is also worth trying the
 MPI+OpenMP hybrid: HACApK's matvec is OpenMP-threaded, and the rank counts where it
@@ -358,21 +418,21 @@ flattened are exactly where threads-per-rank may help.
 
 ---
 
-## Integrator order — an orthogonal speedup lever
+## Integrator order: an orthogonal speedup lever
 
 Everything above concerns the *matvec* (which operator backend, how many ranks). A
-second, independent lever is the **Runge–Kutta order**, set with `-ts_rk_type`. The
-default is Dormand–Prince `5dp` (5(4), 6 stage matvecs per accepted step), chosen partly
-so its order matches HBI's Cash–Karp for cross-code comparison. A lower-order embedded
-pair does fewer stage matvecs per step: `3bs` (Bogacki–Shampine RK3(2)) costs 3, and
+second, independent lever is the **Runge-Kutta order**, set with `-ts_rk_type`. The
+default is Dormand-Prince `5dp` (5(4), 6 stage matvecs per accepted step), chosen partly
+so its order matches HBI's Cash-Karp for cross-code comparison. A lower-order embedded
+pair does fewer stage matvecs per step: `3bs` (Bogacki-Shampine RK3(2)) costs 3, and
 although it takes more (and more frequently rejected) steps, it still nets fewer matvecs.
 
-Judged by the physically meaningful metric — the event **recurrence interval**, which is
+Judged by the physically meaningful metric, the event **recurrence interval**, which is
 far better converged than the absolute event phase (the phase drifts by ~`rtol`
-run-to-run; the interval does not) — `-ts_rk_type 3bs` reproduced the `5dp` recurrence to
-within ~0.005–0.02 yr (<~0.01% of the ~230 yr interval) at every resolution tried (BP5
+run-to-run; the interval does not), `-ts_rk_type 3bs` reproduced the `5dp` recurrence to
+within ~0.005-0.02 yr (<~0.01% of the ~230 yr interval) at every resolution tried (BP5
 2 km dense; 1 km dense and HACApK; 0.5 km HACApK), while reducing matvecs by very roughly
-**24% (2 km), 35% (1 km), 41% (0.5 km)** — the saving grows with resolution because finer
+**24% (2 km), 35% (1 km), 41% (0.5 km)**, the saving grows with resolution because finer
 meshes take more steps, so the cheaper-per-step method compounds. These are single-host
 serial runs over one event sequence, so confirm for your own case.
 
@@ -391,7 +451,7 @@ Practical guidance (also captured in comments in `src/rsf_solve.c`):
 
 ---
 
-## Quick reference — running the benchmark
+## Quick reference: running the benchmark
 
 ```bash
 # HACApK (recommended serial default; ztol defaults to 1e-1)
@@ -408,7 +468,7 @@ Add `-log_view` to get per-event timings (`MatMult`, `TSStep`).
 
 Velocity-field snapshots (the `tmp_rsf/vel-*-gmt` files used for slip-evolution plots)
 now default **off**; enable them with `-slip_line_dt_yr <interval>` (e.g. `1` for the fine
-SEAS-style interseismic cadence, or `10`–`20` for a cycle-scale view). They are written
+SEAS-style interseismic cadence, or `10`-`20` for a cycle-scale view). They are written
 once per interval and are *not* purged between runs, so for long, fine-grid runs (e.g.
 0.5 km / N=16000, ~1 MB per frame) they accumulate quickly and can fill the working disk;
 clean `tmp_rsf` between runs, and note that a full disk makes the snapshot and
