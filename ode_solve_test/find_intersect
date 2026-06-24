@@ -1,9 +1,9 @@
 #!/bin/bash
-k=${1-0.96}			# non d k to compute
-skip_check=${2-0}
+k=${1-0.8575}			# non d k to compute
+skip_check=${2-1}
 init=${3-0}			# imode init, 0: {e,e,e} 1,2,3: {e,0,0}, {0,e,0}, {0,0,e} 4: period sol 5, 6, 7... random eps
 eps=${4-4.5e-4}			# eps for init
-use_exp_solve=${5-0}
+use_exp_solve=${5-1}
 
 cwd=`pwd`
 tmpd=`mktemp -d`
@@ -23,15 +23,14 @@ if [[ $skip_check -eq 1 || `lc $tmpd/tmp` -eq 0 ]];then
     imode=$init;
     while [ $imode -lt 10 ];do
 	rm $f tmp.new 2> /dev/null
-	def_flags="-atol 1e-12  -rtol 1e-10 -t_final 1e6 -log_events -event_tmin .9999e6"
+	def_flags="-atol 1e-12  -rtol 1e-10 -t_final 1e6 -log_events -event_tmin .995e6"
 	if [ $use_exp_solve -eq 1 ];then
 	    flags="$def_flags -use_exp_solve"
 	else
 	    flags="$def_flags -use_exp_solve"
 	fi
 	    
-	$cwd/bin/ode_solve_test $popt -eps $eps -imode $imode -knd $k  $flags > /dev/null 2> /dev/null
-
+	$cwd/bin/ode_solve_test $popt -eps $eps -imode $imode -knd $k  $flags  > /dev/null 2> /dev/null
 	if [  -s $f ];then
 	    gawk '{printf("%9.6f\n",$3)}' $f  | sort -g | uniq | \
 		gawk -v k=$k -v i=$imode -v eps=$eps -v ues=$use_exp_solve \

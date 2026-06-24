@@ -40,6 +40,7 @@ if [ $RES = "1km" ];then
     BACKENDS="dense htool hacapk hmmvp"  # subset of {dense,htool,hacapk,hmmvp}
 else
     BACKENDS="htool hacapk hmmvp"  # subset of {dense,htool,hacapk,hmmvp}
+    #BACKENDS="htool"  # subset of {dense,htool,hacapk,hmmvp}
 fi
 
 # expanded run time so the matvec-dominated phase is well sampled and the
@@ -89,7 +90,7 @@ flags_for(){  # backend -> rsf_solve flags
 
 echo "# rsf_solve scaling: RES=$RES stop_yr=$STOP_YR rtol=$RTOL  ($(date))"
 echo "# matched ~1e-6 band: htool eps=$HEPS  hacapk ztol=$ZTOL  hmmvp tol=$HMMVP_TOL"
-CSV=rsf_solve_scaling_${RES}.csv
+CSV=nrsf_solve_scaling_${RES}.csv
 echo "backend,np,total_s,assembly_s,step_s,nsteps,matvec_ms,mem_MB" > "$CSV"
 printf "%-8s %4s %10s %11s %9s %8s %11s %9s\n" \
        backend np total_s assembly_s step_s nsteps matvec_ms mem_MB
@@ -129,5 +130,5 @@ echo "wrote $CSV  (and per-run logs run_<backend>_np<n>.log)"
 echo "matvec_ms is per-MatMult mean (steady-state cost); compare across backends"
 echo "at the np you actually run. See compress_interaction_matrix.md for the"
 echo "matched-band rationale and the forward-operator scaling these settings came from."
-cp rsf_solve_scaling_${RES}.csv ../rsf_solve_scaling_${RES}.$HOST.csv
+#cp rsf_solve_scaling_${RES}.csv ../rsf_solve_scaling_${RES}.$HOST.csv
 cd ..

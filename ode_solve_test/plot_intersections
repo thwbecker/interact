@@ -1,7 +1,7 @@
 #!/bin/bash
-pimodes=`seq 10 -1 0`
+#pimodes=`seq 10 -1 0`
 #pimodes="1"
-#pimodes="0 1"
+pimodes="0 1"
 
 tmpn=`mktemp`
 trap "rm -f $tmpn*" EXIT
@@ -88,11 +88,11 @@ for i in 1 2 3 4;do
     fi
     #ann=-Ba3f2:"@~k@~'":/a0.01f.001:y:
     if [ $i -eq 1 ];then
-	psbasemap $reg $proj -K -P $ann"WesN" > $ofile
+	psbasemap $reg $proj -K -P $ann"WesN" -Y7 > $ofile
     elif [ $i -eq 2 ];then
 	psbasemap $reg $proj -K -O $ann"wEsN" -X7.25 >> $ofile
     elif [ $i -eq 3 ];then
-	psbasemap $reg $proj -K -O $ann"WeSn" -X-7.25 -Y-6.25 >> $ofile
+	psbasemap $reg $proj -K -O $ann"WeSn" -X-7.25 -Y-6.5 >> $ofile
     elif [ $i -eq 4 ];then
 	psbasemap $reg $proj -K -O $ann"wESn" -X7.25 >> $ofile
     fi
@@ -112,8 +112,11 @@ EOF
 	echo $imode $c $col
 	psxy $tmpn.$imode -Sc$gs -G$col $reg $proj -O -K >> $ofile
     done
-    #psbasemap $reg $proj -O $ann >> $ofile
-    psbasemap $reg $proj -O $ann -K >> $ofile
+    if [ $i -eq 4 ];then       # close
+	echo 1000 1000 1 | psxy -Sc $reg $proj -O >> $ofile
+    else
+	echo 1000 1000 1 | psxy -Sc $reg $proj -O -K >> $ofile
+    fi
     #modifybb $ofile 0
     #fs="$fs $ofile"
 done

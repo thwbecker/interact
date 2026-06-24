@@ -28,7 +28,12 @@ MPILD = $(LD)
 AR = ar
 # set the compiler flag for library directories
 MY_LIBDIR_SPEC = -L
-
+#
+# warning options
+GCCWOPT = -Wall
+#-Werror
+# fast execution options, default use
+OPTIM_FLAGS = -O3  -march=x86-64-v3  $(GCCWOPT)
 
 
 # LINKER FLAGS (without -lm, that get's added later)
@@ -39,14 +44,8 @@ LDFLAGS = -fopenmp
 X11LIBDIR = /usr/lib/x86_64-linux-gnu/
 #
 MATHLIBS = -llapack -lblas -lm
-#
-# warning options
-GCCWOPT = -Wall
-#-Werror
 
 
-# fast execution options, default use
-OPTIM_FLAGS = -O3  -march=x86-64-v3  $(GCCWOPT)
 
 CFLAGS_OTHER =  -Wno-discarded-qualifiers
 SCARGS =  $(GCCWOPT) $(CFLAGS_OTHER)

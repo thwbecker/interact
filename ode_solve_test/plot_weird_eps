@@ -1,10 +1,13 @@
 #!/bin/bash
-use_exp_solve=${1-1}
-sort_log_files=${2-0}
+sort_log_files=${1-0}
+use_exp_solve=${2-1}
 
-k=0.8575			# k value to plot 
+#k=0.8575			# k value to plot 0.8575 is chaotic, 
+k=0.8577 			# different orbits
 inits="1 2 3"			# init directions to plot
-if [ $sort_log_files -eq 1 ];then
+
+
+if [ $sort_log_files -eq 1 ];then # redo the files from scan output
     for init in $inits;do
 	for f in `ls twe.$init.*.log`;do
 	    echo $f
@@ -15,8 +18,14 @@ if [ $sort_log_files -eq 1 ];then
 	mv tmp.$$ twe.$init.log
     done
 fi
-
-y[1]=-1.653599;y[2]=-0.979634;y[3]=-0.086116;y[4]=0.125704 # stable 4 orbits values
+if [ $k = 0.8575 ];then
+    y[1]=-1.653599;y[2]=-0.979634;y[3]=-0.086116;y[4]=0.125704 # stable 4 orbits values
+elif [ $k = 0.8577 ];then
+    y[1]=-1.648315;y[2]=-0.982097;y[3]=-0.084155;y[4]=0.125151 # stable 4 orbits values
+else
+    echo $0: no stable orbits for k $k
+    exit
+fi
 label[1]="@~D@~x"
 label[2]="@~D@~y"
 label[3]="@~D@~z"
@@ -51,9 +60,13 @@ for init in $inits;do
 done
 wait
 for init in $inits;do
-    echo $0: `minmax tmp.sel.$init`
-    # remove stionary
-    ( gawk -v y1=${y[1]}  -v y2=${y[2]}  -v y3=${y[3]}  -v y4=${y[4]} '{if(($2!=y1)&&($2!=y2)&&($2!=y3)&&($2!=y4))print($0)}' tmp.sel.$init > tmp.sel.ns.$init ) &
+    if [ ! -s tmp.sel.$init ];then
+	echo $0: did not select any for init $init
+    else
+	echo $0: `minmax tmp.sel.$init`
+	# remove stionary
+	( gawk -v y1=${y[1]}  -v y2=${y[2]}  -v y3=${y[3]}  -v y4=${y[4]} '{if(($2!=y1)&&($2!=y2)&&($2!=y3)&&($2!=y4))print($0)}' tmp.sel.$init > tmp.sel.ns.$init ) &
+    fi
 done
 wait
 
@@ -66,16 +79,21 @@ for init in $inits;do
 	gawk -v y=${y[$i]} '{if($2==y){printf("%e %e\n",$4*.95,y);printf("%e %e\n",$4*1.05,y);print(">")}}' tmp.sel.$init  | \
 	    psxy  -m  $reg $proj -O -K -W1,$col >> $ofile
     done
+    minmax tmp.sel.ns.$init 
     # plot non-stationary as circles
-    gawk '{printf("%e %e\n",$4,$2)}' tmp.sel.ns.$init  | psxy -Sc0.05 -G$col -t30  -W0.5 $reg $proj -O -K >> $ofile
+    #gawk '{printf("%e %e\n",$4,$2)}' tmp.sel.ns.$init  | psxy -Sc0.05 -G$col -t30  -W0.5 $reg $proj -O -K >> $ofile
+    gawk '{printf("%e %e\n",$4,$2)}' tmp.sel.ns.$init  | psxy -Sc0.05 -G$col -t30   $reg $proj -O -K >> $ofile
     echo $xl -1.3 24 0 29 CM "${label[$init]}" | pstext $reg $proj -O -K -F+f$col >> $ofile
     xl=`echo $xl | gawk '{print($1*5)}'`
 done
 
-ymin=2;ymax=8
+ymin=2;
+ymax=8
+#ymax=50
 reg=-R$xmin/$xmax/$ymin/$ymax
 proj=-JX7l/3
 psbasemap -Ba1f3p:"@~e@~":/a2f1:"number of intersections":WeSn  -O -K $reg $proj -Y-3.25 >> $ofile
+#psbasemap -Ba1f3p:"@~e@~":/a20f5:"number of intersections":WeSn  -O -K $reg $proj -Y-3.25 >> $ofile
 #cat <<EOF | psxy $reg $proj -Ggray -L -O -K >> $ofile
 #${e[1]} $ymin
 #${e[2]} $ymin
@@ -88,8 +106,13 @@ for init in $inits;do
     gawk '{printf("%8.4e %10.5e\n",$4,$2)}' tmp.sel.$init | sort -g > tmp.dat
     #minmax tmp.dat
     ./find_distinct tmp.dat > tmp.2.dat
-    gawk '{if($2!=4)print($0)}' tmp.2.dat | psxy -Sc0.05 -G$col -t30  -W0.5 $reg $proj -O -K >> $ofile
-    gawk '{if($2==4){print($1*.95,$2);print($1*1.05,$2);}}' tmp.2.dat | psxy -W1,$col -m $reg $proj -O -K >> $ofile
+    if [ `lc tmp.2.dat` -ne 0 ];then
+	minmax tmp.2.dat
+	gawk '{if($2!=4)print($0)}' tmp.2.dat | psxy -Sc0.05 -G$col -t30  -W0.5 $reg $proj -O -K >> $ofile
+	gawk '{if($2==4){print($1*.95,$2);print($1*1.05,$2);}}' tmp.2.dat | psxy -W1,$col -m $reg $proj -O -K >> $ofile
+    else
+	echo $0: empyy distinct\?
+    fi
     rm tmp.dat tmp.2.dat
 done
 echo 10000 1000 0.1 | psxy $reg $proj -Sc -O >> $ofile

@@ -1,0 +1,63 @@
+#!/bin/bash
+nos=${1-"4 8 10 12 20 30 40 50 60 70 80 90 100 120 130 140"}
+ncores=${2-"1 2 4 8"}
+tests=${3-"1 2"} # 1: forward 2: inverse
+geoms=${4-"0 2"} # 0: quad 2: tri
+mkdir -p logs
+
+for no in $nos;do
+    for ntest in $tests;do		# forward or with matrix solve
+	if [[ $ntest -eq 1 ]];then	# forward
+	    bc_type=0;bc_val=1
+	elif [[ $ntest -eq 2 ]];then # inverse
+	    bc_type=10;bc_val=-2e3
+	fi
+	
+	for g in $geoms;do		# geometry loop 
+	    mo=$no
+	    if [ $g = 0 ];then	# testing quad assembly
+		#echo $no $mo
+		makefault -n $no -m $mo > geom.in 2> /dev/null
+	    else		# testing triagnles
+		((nu=no));((mu=mo/2))
+		#echo $nu $mu
+		makefault -n $nu -m $mu 2> /dev/null | patchquad2patchtri 2 > geom.in 2> /dev/null
+	    fi
+	    np=`lc geom.in`
+	    
+	
+	    cat <<EOF > bc.in
+1 0 
+-1 -1 -1 $bc_type $bc_val
+EOF
+
+	    cat <<EOF > $HOME/progs/src/interact/petsc_settings.yaml # defaults
+--- 
+ksp_type: fgmres
+pc_type: jacobi
+ksp_max_it: 10000
+ksp_rtol: 1.0e-8
+
+EOF
+
+	    for ncore in $ncores ;do
+		echo "mpirun --bind-to core -np $ncore interact -log_view  2> tmp.log" > tmp.script
+
+		chmod +x tmp.script
+		/usr/bin/time --output time.out --format "%e" tmp.script 
+		echo $g $np $ntest $ncore `cat time.out` >> stats.log
+		tail -1 stats.log
+
+		cat tmp.log
+		exit
+		#cat tmp.log
+
+		mv tmp.log logs/log.$g.$np.$ntest.$ncore
+		rm tmp.script  flt.dat disp.out stress.out time.out tmp.log 2> /dev/null
+	    done
+	    rm bc.in
+	done
+	rm geom.in
+	
+    done
+done

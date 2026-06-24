@@ -12,7 +12,8 @@ geoms=${3-"0 1 2 2c 2d"}			# 0: quad 1: iquad 2: triangle 2b 2c 2d: different in
 force_run=${4-1}
 #
 combine_plots=${5-1}
-bumpy=${6-1}
+#bumpy=${6-1}
+bumpy=${6-0}
 
 #binary=interact.mixed
 binary=interact
@@ -207,9 +208,9 @@ EOF
 		    flags="$flags -tv 4"
 		fi
 		rm flt.dat stress.out disp.out 2> /dev/null
-		$MPIRUN -np 16 $binary $flags -ksp_type fgmres -pc_type none -ksp_max_it 50000 -ksp_rtol 1.0e-7
-		#MPIRUN -np 16 $binary $flags 	-pc_factor_mat_solver_type scalapack -mat_type scalapack
-		#$binary $flags
+		#mpirun -np 16 $binary $flags -ksp_type fgmres -pc_type none -ksp_max_it 50000 -ksp_rtol 1.0e-7
+		#mpirun -np 16 $binary $flags 	-pc_factor_mat_solver_type scalapack -mat_type scalapack
+		$binary $flags
 
 		mv geom.in geoms/geom.$oname.in
 		mv flt.dat flt_dat/flt.$oname.dat

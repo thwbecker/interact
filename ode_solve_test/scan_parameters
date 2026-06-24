@@ -9,7 +9,7 @@ kstop=${2-1.001}
 kinc=${3-0.0001}
 imode=${4-0}			# init mode, 0: {e,e,e} 1,2,3: {e,0,0}, {0,e,0}, {0,0,e} 4: period sol 5, 6, 7... random eps
 eps=${5-4.5e-4}			# for init
-use_exp_solve=${6-0}
+use_exp_solve=${6-1}
 cpu_lim=${7-64}			# limit to how many cores?
 run=${8-1}			# 1: add 2: replace
 

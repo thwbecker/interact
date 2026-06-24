@@ -1,7 +1,8 @@
 #!/bin/bash
-inits=${1-"1 2 3"}
-use_exp_solve=${2-1}
-ks=${3-"all"}			# value or "all"
+ks=${1-"all"}			# value or "all" 0.8577 
+inits=${2-"1 2 3"}		# directions
+eps_dx=${3-0.025}		# spacing
+use_exp_solve=${4-1}
 
 tmpn=`mktemp`
 trap "rm -f $tmpn*" EXIT
@@ -12,8 +13,7 @@ if [ $ks = "all" ];then
 fi
 echo $ks | wc
 
-#epss=`gawk 'BEGIN{x=1e-9;while(x<2){print(x);x*=1.025;}}' `
-epss=`gawk 'BEGIN{x=-9;while(x<=1){print(10**x);x+=0.05;}}' `
+epss=`gawk -v dx=$eps_dx 'BEGIN{x=-9;while(x<=1){print(10**x);x+=dx;}}' `
 
 echo $epss | wc
 #echo $ks
@@ -38,7 +38,7 @@ for k in $ks;do
 	    fi
 	    if [ $nold -eq 0 ];then
 		echo $0: running for init $init k $k e $eps ues $use_exp_solve
-		find_intersect $k 1 $init $eps $use_exp_solve > $tmpn.$init.$k.$eps.log &
+		(find_intersect $k 1 $init $eps $use_exp_solve > $tmpn.$init.$k.$eps.log ) &
 		((tc=tc+1))
 		if [ $tc -ge $NR_CPUS ];then
 		    wait
