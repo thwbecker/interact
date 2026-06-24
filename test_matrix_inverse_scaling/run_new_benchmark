@@ -1,63 +1,147 @@
 #!/bin/bash
-nos=${1-"4 8 10 12 20 30 40 50 60 70 80 90 100 120 130 140"}
-ncores=${2-"1 2 4 8"}
-tests=${3-"1 2"} # 1: forward 2: inverse
-geoms=${4-"0 2"} # 0: quad 2: tri
+#
+# scaling benchmark for interact one step problems: matrix assembly,
+# forward evaluation, and inverse (linear) solve, as a function of MPI core count.
+#
+# for each (geometry, test, core count) it builds a geometry, writes a one step
+# bc.in, runs interact under mpirun, and records total wall time plus per phase
+# timings into stats.log. both the interact messages (stderr) and the full PETSc
+# -log_view table (stdout) are saved per run under logs/.
+##
+# the per phase wall times come from interact's own "s since init" markers in the
+# PETSc solve path:
+#   attempting Petsc ... solve   -> time entering the solve (read + setup so far)
+#   parallel assembly done       -> matrix assembly finished
+#   parallel solve completed     -> linear solve finished
+# so assembly wall = (assembly done) minus (attempting), and
+#    solve wall    = (solve completed) minus (assembly done).
+# the PETSc -log_view events (KSPSolve, MatMult, PCApply, PCSetUp) break the solve
+# down further. these markers are present for the inverse test (which assembles and
+# solves); the forward test with bcode 0 prescribes slip and writes flt.dat without
+# a solve, so its granular columns will read NA (see note at the bottom).
+#
+# note on cores: this is meant for a multicore node. on a machine with fewer
+# physical cores than the requested np, mpirun will refuse to oversubscribe unless
+# you add --oversubscribe to mpi_bind below.
+
+nos=${1-"50 100 200"}  # along strike resolution
+ncores=${2-"1 2 4 8 16 32"}          # MPI core counts to test
+tests=${3-"1 2"}               # 1: forward (prescribed slip)  2: inverse (stress bc, needs solve)
+geoms=${4-"0 2"}               # 0: quad patches   2: triangular patches
+replace_log=${5-0}			# append or replace?
+#
+mpi_bind="--bind-to core" # mpirun binding; append " --oversubscribe" to test below np cores
+print_bulk=1              # bc.in flag: 0 do not print bulk fields, 1 print bulk fields on grid
+
+# pure MPI scaling: one OpenMP thread per rank. OMP_NUM_THREADS is the intended
+# control for threading and is the only environment variable this script sets.
+export OMP_NUM_THREADS=1
+
+# interact reads its PETSc options from a fixed path ($HOME/progs/src/interact/
+# petsc_settings.yaml). we write there so the file is the one interact will pick up.
+petsc_yaml="$HOME/progs/src/interact/petsc_settings.yaml"
+
 mkdir -p logs
 
-for no in $nos;do
-    for ntest in $tests;do		# forward or with matrix solve
-	if [[ $ntest -eq 1 ]];then	# forward
-	    bc_type=0;bc_val=1
-	elif [[ $ntest -eq 2 ]];then # inverse
-	    bc_type=10;bc_val=-2e3
-	fi
-	
-	for g in $geoms;do		# geometry loop 
-	    mo=$no
-	    if [ $g = 0 ];then	# testing quad assembly
-		#echo $no $mo
-		makefault -n $no -m $mo > geom.in 2> /dev/null
-	    else		# testing triagnles
-		((nu=no));((mu=mo/2))
-		#echo $nu $mu
-		makefault -n $nu -m $mu 2> /dev/null | patchquad2patchtri 2 > geom.in 2> /dev/null
-	    fi
-	    np=`lc geom.in`
-	    
-	
-	    cat <<EOF > bc.in
-1 0 
--1 -1 -1 $bc_type $bc_val
-EOF
-
-	    cat <<EOF > $HOME/progs/src/interact/petsc_settings.yaml # defaults
+# PETSc defaults written once (iterative solver). command line options still override.
+cat <<EOF > "$petsc_yaml"
 --- 
 ksp_type: fgmres
 pc_type: jacobi
 ksp_max_it: 10000
 ksp_rtol: 1.0e-8
-
 EOF
 
-	    for ncore in $ncores ;do
-		echo "mpirun --bind-to core -np $ncore interact -log_view  2> tmp.log" > tmp.script
 
-		chmod +x tmp.script
-		/usr/bin/time --output time.out --format "%e" tmp.script 
-		echo $g $np $ntest $ncore `cat time.out` >> stats.log
-		tail -1 stats.log
+stats=stats.log
+if [[ $replace_log -eq 1 || ! -s $stats ]];then
+    # fresh stats file with a header
+    echo "# geom np ntest ncore total_wall_s asm_wall_s solve_wall_s ksp_solve_s mat_mult_s pc_apply_s pc_setup_s" > "$stats"
+fi
 
-		cat tmp.log
-		exit
-		#cat tmp.log
+# pull a "X.XXX s since init" value for a given message from a file (empty if absent)
+since_init() { # $1 message  $2 file
+    grep -m1 "$1" "$2" 2>/dev/null | grep -oE "[0-9]+\.[0-9]+ s since init" | grep -oE "^[0-9]+\.[0-9]+"
+}
 
-		mv tmp.log logs/log.$g.$np.$ntest.$ncore
-		rm tmp.script  flt.dat disp.out stress.out time.out tmp.log 2> /dev/null
-	    done
-	    rm bc.in
-	done
-	rm geom.in
-	
+# pull the Max time (column 4) for a PETSc -log_view event, or NA if absent
+logview_time() { # $1 event  $2 file
+    val=$(awk -v e="$1" '$1==e{print $4; exit}' "$2")
+    if [ -n "$val" ]; then echo "$val"; else echo NA; fi
+}
+
+# a minus b with three decimals, or NA if either operand is missing
+diff_or_na() { # $1 a  $2 b
+    if [ -n "$1" ] && [ -n "$2" ]; then
+        awk -v a="$1" -v b="$2" 'BEGIN{printf "%.3f", a-b}'
+    else
+        echo NA
+    fi
+}
+
+for no in $nos; do
+    for ntest in $tests; do
+        if [ "$ntest" -eq 1 ]; then        # forward: prescribed (left lateral) slip
+            bc_type=0;  bc_val=1
+        else                               # inverse: general strike slip stress, needs a solve
+            bc_type=10; bc_val=-2e3
+        fi
+
+        for g in $geoms; do
+            mo=$no
+            if [ "$g" = 0 ]; then          # quad patches
+                makefault -n "$no" -m "$mo" > geom.in 2> /dev/null
+            else                           # triangular patches (two triangles per quad)
+                nu=$no
+                mu=$((mo / 2))
+                makefault -n "$nu" -m "$mu" 2> /dev/null | patchquad2patchtri 2 > geom.in 2> /dev/null
+            fi
+            np=$(wc -l < geom.in)          # patch count (one patch per line)
+	    # bc file
+	    if [ $print_bulk -eq 1 ];then
+		nbulk=201
+		cat <<EOF > bc.in
+		1 1
+		-10 10 $nbulk -10 10 $nbulk -1 -1 1 
+EOF
+	    else
+		nbulk=0
+		echo 1 0 > bc.in
+	    fi
+	    echo -1 -1 -1 $bc_type $bc_val >> bc.in
+	    #
+            for ncore in $ncores; do
+                tag=$g.$np.$ntest.$ncore
+                out=logs/log.$tag.out      # PETSc -log_view table (stdout)
+                err=logs/log.$tag.err      # interact messages incl. timing markers (stderr)
+
+                # time the whole run; -fpetsc forces the PETSc solver at every core count,
+                # -log_view emits the PETSc performance table on stdout.
+                /usr/bin/time --output time.out --format "%e" \
+                    mpirun $mpi_bind -np "$ncore" interact -fpetsc -log_view > "$out" 2> "$err"
+
+                total=$(cat time.out 2> /dev/null)
+                if [ -z "$total" ]; then total=NA; fi
+
+                t_att=$(since_init "attempting Petsc"         "$err")
+                t_asm=$(since_init "parallel assembly done"   "$err")
+                t_sol=$(since_init "parallel solve completed" "$err")
+                asm_wall=$(diff_or_na "$t_asm" "$t_att")
+                solve_wall=$(diff_or_na "$t_sol" "$t_asm")
+
+                ksp=$(logview_time KSPSolve "$out")
+                mvm=$(logview_time MatMult  "$out")
+                pca=$(logview_time PCApply  "$out")
+                pcs=$(logview_time PCSetUp  "$out")
+
+                echo "$g $np $ntest $nbulk $ncore $total $asm_wall $solve_wall $ksp $mvm $pca $pcs" >> "$stats"
+                tail -1 "$stats"
+
+                rm -f flt.dat disp.out stress.out
+            done
+            rm -f bc.in geom.in
+        done
     done
 done
+
+rm -f time.out
