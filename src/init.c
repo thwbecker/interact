@@ -59,6 +59,7 @@ void check_parameters_and_init_interact(int argc, char **argv,
 			   &twod_approx_is_plane_stress,&print_plane_coord,
 			   &half_plane,&variable_time_step,&debug,&wcutoff,
 			   &no_interactions,&force_petsc,&tri_eval_mode,&full_space,
+			   &((*medium)->no_post_slip_fault_stress_eval),
 			   (*medium)->comm_rank);
   // load files, etc
   initialize_interact(medium,fault,read_fault_properties,max_nr_flt_files,
@@ -414,6 +415,7 @@ void init_parameters_interact(char **argv, int argc, my_boolean *read_fault_prop
 			      my_boolean *force_petsc,
 			      MODE_TYPE *tri_eval_mode,
 			      my_boolean *full_space,
+			      my_boolean *no_post_slip_fault_stress_eval,
 			      int rank)
 {
   int i,itmp;
@@ -453,6 +455,7 @@ void init_parameters_interact(char **argv, int argc, my_boolean *read_fault_prop
   *no_interactions = FALSE;
   *force_petsc = FALSE;
   *full_space = FALSE;
+  *no_post_slip_fault_stress_eval = FALSE; /* default: do evaluate post slip fault stress */
   /* 
      check for input options 
   */
@@ -547,6 +550,8 @@ void init_parameters_interact(char **argv, int argc, my_boolean *read_fault_prop
       *tri_eval_mode = (MODE_TYPE)itmp;
     }else if(strcmp(argv[i],"-fpetsc")==0){// 
       toggle(force_petsc);
+    }else if(strcmp(argv[i],"-npsfse")==0){/* no post slip fault stress evaluation */
+      toggle(no_post_slip_fault_stress_eval);
     }else{
       if((rank == 0)&&(!warned)){
 	fprintf(stderr,"init_parameters_interact: encountered at least one parameter which cannot be interpreted by interact\n");

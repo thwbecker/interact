@@ -303,10 +303,12 @@ ________________________________________________________________________________
 Output from interact -h follows (run code for updated versions!)
 ________________________________________________________________________________
 
+
+interact: found and using Petsc options in /home/twb/progs/src/interact/petsc_settings.yaml
 interact: internal double prec, A matrix double prec
-main: initializing on 2026-06-17 10:57:42 ncore: 1
+main: initializing on 2026-06-24 19:07:53 ncore: 1
 interact: nu: 0.25000 mu: 1.000e+04 from properties.h, therefore lambda/mu: 1.00000 alpha: 0.66667
-init: compiled on Jun 17 2026 10:54:26, running in serial
+heck_parameters_and_init_interact: compiled on Jun 24 2026 19:01:53, running in serial
 
 Interact: calculate fault stresses and displacements in a half or full space or in 2-D
           using a boundary element approach.
@@ -624,28 +626,20 @@ PetSc support was compiled in, providing limited access to parallel solves for o
 
 PARAMETERS:
 
- Elastic and frictional law properties are hard-coded and should be
- set in the "properties.h" file.  Whenever you want to change those,
- you will have to recompile the program. This was done to improve the
- execution speed, assuming that material properties will not change
- between different model runs.
+ Elastic and frictional law properties are hard-coded and should be set in the "properties.h" file.
+ Whenever you want to change those, you will have to recompile the program. This was done to improve
+ the execution speed, assuming that material properties will not change between different model runs.
 
- In the following, we will refer to two different matrices, A and
- I. The interaction, or I, matrix is assembled once for the loading
- simulations and holds all possible stress influence coefficients for
- all combinations of patch slips for a given geometry. I is typically
- held in memory and can be quite big, depending on the problem. Hence,
- there is the option to store a reduced, sparse version of I. If
- patches are activated (slipping) during a loading simulation
- (according to their frictional law), a system of equations A x = b is
- set up to solve for the slip vector x that corresponds to the target
- stress drop. This A matrix is also the only matrix that is assembled
- for a one-step calculation as we specifically know the patch/boundary
- conditions we have to consider in this case. There are several
- possible modes for solving completely unconstrained A x = b systems;
- constrained systems (where some entries in x have to be >=0 for
- unidirectionally constrained slip) are always solved with a direct
- implementation of Lawson and Hanson's solver.
+ In the following, we will refer to two different matrices, A and I. The interaction, or I, matrix is
+ assembled once for the loading simulations and holds all possible stress influence coefficients for all
+ combinations of patch slips for a given geometry. I is typically held in memory and can be quite big, depending
+ on the problem. Hence, there is the option to store a reduced, sparse version of I. If patches are activated
+ (slipping) during a loading simulation (according to their frictional law), a system of equations
+ A x = b is set up to solve for the slip vector x that corresponds to the target stress drop. This A matrix
+ is also the only matrix that is assembled for a one-step calculation as we specifically know the patch/boundary
+ conditions we have to consider in this case. There are several possible modes for solving completely
+ unconstrained A x = b systems; constrained systems (where some entries in x have to be >=0 for unidirectionally
+ constrained slip) are always solved with a direct implementation of Lawson and Hanson's solver.
 
  The following parameters can be set to non-default values on the command line:
 
@@ -846,7 +840,13 @@ OPTIONS:
  -d  debug output, if you want extra checks, compile with -DDEBUG
      OFF by default, if switch is set will be ON.
 
- -fpetsc    force Petsc solvers even for serial runs (else LAPACK for LU)
+-fpetsc
+     force Petsc solvers even for serial runs (else LAPACK for LU)
+
+-npsfse
+     no post slip fault stress evaluation: after a one-step solve, print
+     the slip solution without the serial resolved-stress evaluation on
+     all patches (default off, i.e. the stress evaluation is performed)
 
  -ps Change the default 2-D elastic approximation for segments from plane-strain to plane-stress.
      OFF by default, if switch is set will be ON.

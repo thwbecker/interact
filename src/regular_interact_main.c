@@ -95,6 +95,10 @@ int main(int argc, char **argv)
     */
   case SIMULATE_LOADING_AND_PLOT:
   case SIMULATE_LOADING:{
+    if(medium->no_post_slip_fault_stress_eval){
+      fprintf(stderr,"main: ERROR (?): loading simulation with NO post slip stress evaluation\n");
+      exit(-1);
+    }
     /* 
        loading simulation is only serial 
     */
@@ -174,13 +178,24 @@ int main(int argc, char **argv)
 #endif
       // don't add to moment list, calculate the stress change, add use
       // the normal sign convention: FT 1.0
+      //
+      // the stress change evaluation (8th argument to add_solution) is the
+      // serial resolved-stress calculation on all patches. with -npsfse it is
+      // skipped, so the one-step solve only assembles, solves, and prints slip.
+      HEADNODE
+	fprintf(stderr,"main: one-step: post slip fault stress evaluation %s\n",
+		(medium->no_post_slip_fault_stress_eval)?
+		("OFF (-npsfse): slip solution only, flt.dat stresses left at pre-solve values"):
+		("ON (default)"));
       if(medium->naflt)
 	add_solution(medium->naflt,medium->sma,medium->xsol,
-		     medium->nameaf,medium,fault,FALSE,TRUE,1.0);
+		     medium->nameaf,medium,fault,FALSE,
+		     (medium->no_post_slip_fault_stress_eval)?(FALSE):(TRUE),1.0);
       if(medium->naflt_con)
 	add_solution(medium->naflt_con,medium->sma_con,
 		     medium->xsol_con,medium->nameaf_con,
-		     medium,fault,FALSE,TRUE,1.0);
+		     medium,fault,FALSE,
+		     (medium->no_post_slip_fault_stress_eval)?(FALSE):(TRUE),1.0);
     }
     HEADNODE{
       print_fault_data(ONE_STEP_FAULT_DATA_FILE,medium,fault);

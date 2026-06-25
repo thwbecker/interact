@@ -1,7 +1,8 @@
+interact: found and using Petsc options in /home/twb/progs/src/interact/petsc_settings.yaml
 interact: internal double prec, A matrix double prec
-main: initializing on 2026-06-17 10:57:42 ncore: 1
+main: initializing on 2026-06-24 19:11:01 ncore: 1
 interact: nu: 0.25000 mu: 1.000e+04 from properties.h, therefore lambda/mu: 1.00000 alpha: 0.66667
-init: compiled on Jun 17 2026 10:54:26, running in serial
+heck_parameters_and_init_interact: compiled on Jun 24 2026 19:01:53, running in serial
 
 Interact: calculate fault stresses and displacements in a half or full space or in 2-D
           using a boundary element approach.
@@ -533,7 +534,13 @@ OPTIONS:
  -d  debug output, if you want extra checks, compile with -DDEBUG
      OFF by default, if switch is set will be ON.
 
- -fpetsc    force Petsc solvers even for serial runs (else LAPACK for LU)
+ -fpetsc
+     force Petsc solvers even for serial runs (else LAPACK for LU)
+
+ -npsfse
+     no post slip fault stress evaluation: after a one-step solve, print
+     the slip solution without the serial resolved-stress evaluation on
+     all patches (default off, i.e. the stress evaluation is performed)
 
  -ps Change the default 2-D elastic approximation for segments from plane-strain to plane-stress.
      OFF by default, if switch is set will be ON.

@@ -698,9 +698,15 @@ void phelp(void)
   PE("");
 #endif
 #ifdef USE_PETSC
-  PE(" -fpetsc    force Petsc solvers even for serial runs (else LAPACK for LU)");
-  PE("")
+  PE(" -fpetsc");
+  PE("     force Petsc solvers even for serial runs (else LAPACK for LU)");
+  PE("");
 #endif
+  PE(" -npsfse");
+  PE("     no post slip fault stress evaluation: after a one-step solve, print");
+  PE("     the slip solution without the serial resolved-stress evaluation on");
+  PE("     all patches (default off, i.e. the stress evaluation is performed)");
+  PE("")
 #ifdef ALLOW_NON_3DQUAD_GEOM
   fprintf(stderr," -ps Change the default 2-D elastic approximation for segments from plane-%s to plane-%s.\n",
 	  (TWO_DIM_APPROX_IS_PLANE_STRESS_DEF)?("stress"):("strain"),

@@ -329,6 +329,9 @@ struct med{
 #endif
   /*  */
   my_boolean force_petsc;
+  /* -npsfse: if true, skip the post slip fault stress evaluation after a
+     one step solve (assemble, solve, print slip only). default false. */
+  my_boolean no_post_slip_fault_stress_eval;
   unsigned int myfault0,myfaultn;
 #ifdef USE_PETSC
   PetscMPIInt comm_size, comm_rank;

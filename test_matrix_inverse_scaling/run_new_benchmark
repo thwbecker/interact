@@ -129,7 +129,7 @@ EOF
                     # time the whole run; -fpetsc forces the PETSc solver at every core count,
                     # -log_view emits the PETSc performance table on stdout.
                     /usr/bin/time --output time.out --format "%e" \
-				  mpirun $mpi_bind -np "$ncore" interact -fpetsc -log_view > "$out" 2> "$err"
+				  mpirun $mpi_bind -np "$ncore" interact -fpetsc -npsfse -log_view > "$out" 2> "$err"
 		    
                     total=$(cat time.out 2> /dev/null)
                     if [ -z "$total" ]; then total=NA; fi
