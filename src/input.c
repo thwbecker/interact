@@ -114,5 +114,6 @@ void read_rsf(char *filename, struct med *medium, struct flt *fault)
   fclose(in);
   aavg /= (COMP_PRECISION)medium->nrflt;
   bavg /= (COMP_PRECISION)medium->nrflt;
-  fprintf(stderr,"read_rsf: read a and b values, on averag %g and %g\n",aavg,bavg);
+  HEADNODE
+    fprintf(stderr,"read_rsf: read a and b values, on averag %g and %g\n",aavg,bavg);
 }

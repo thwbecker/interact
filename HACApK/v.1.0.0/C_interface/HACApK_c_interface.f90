@@ -196,7 +196,7 @@ CONTAINS
        stop
     endif 
     lf_struct%hmat_init = .true.
-    print *,'made hmat with ztol ',ztol
+!    print *,'made hmat with ztol ',ztol
     deallocate(coord)
   END SUBROUTINE cmake_hacapk_struct_hmat
   
