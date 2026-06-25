@@ -25,7 +25,7 @@
 # you add --oversubscribe to mpi_bind below.
 
 nos=${1-"50 100 200"}  # along strike resolution
-ncores=${2-"1 2 4 8 16 32"}          # MPI core counts to test
+ncores=${2-"1 2 4 8 16 32 64"}          # MPI core counts to test
 tests=${3-"1 2"}               # 1: forward (prescribed slip)  2: inverse (stress bc, needs solve)
 geoms=${4-"0 2"}               # 0: quad patches   2: triangular patches
 replace_log=${5-1}			# append or replace?
