@@ -125,12 +125,13 @@ EOF
                     tag=$g.$np.$ntest.$ncore
                     out=logs/log.$tag.out      # PETSc -log_view table (stdout)
                     err=logs/log.$tag.err      # interact messages incl. timing markers (stderr)
-		    
+		    echo $0: running $g $np $nbulk2 $ntest $ncore
+
                     # time the whole run; -fpetsc forces the PETSc solver at every core count,
                     # -log_view emits the PETSc performance table on stdout.
                     /usr/bin/time --output time.out --format "%e" \
 				  mpirun $mpi_bind -np "$ncore" interact -fpetsc -npsfse -log_view > "$out" 2> "$err"
-		    
+
                     total=$(cat time.out 2> /dev/null)
                     if [ -z "$total" ]; then total=NA; fi
 		    
