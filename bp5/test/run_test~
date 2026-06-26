@@ -1,0 +1,8 @@
+#!/bin/bash
+
+mpirun -np 8 ../../bin/rsf_solve  \
+       -geom_file   ../geom_bp5_1km.in -rsf_file    ../rsf_bp5_1km.dat   \
+       -rsf_ic_file ../ic_bp5_1km.in   -rsf_dc_file ../dc_bp5_1km.in   \
+       -use_hmatrix 3   -shear_modulus 3.204e10 -s_wave_speed 3464 \
+       -f0 0.6 -dc 0.14 -vpl 1e-9 -v0 1e-6 -sigma_init 25e6  \
+       -rtol 1e-4 -stop_time_yr 1800 -ts_max_steps 2000000   -print_interval_yr 0.02 -log_view
