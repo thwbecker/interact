@@ -165,6 +165,41 @@ CONTAINS
   END function cget_hacapk_struct_coordp
 
   !
+  ! return the LOCAL number of stored scalars in this rank's H-matrix
+  ! partition: dense leaves contribute ndl*ndt, low-rank (Rk) leaves
+  ! contribute kt*(ndl+ndt) for the U(ndl x kt) and V(ndt x kt) factors.
+  ! the C caller reduces across ranks for the global count. returns 0 if the
+  ! H-matrix has not been built yet.
+  !
+  function cget_hacapk_nnz(c_gen_pointer) result(nnz) &
+       BIND(C, name='cget_hacapk_nnz')
+    use, intrinsic :: iso_c_binding, only: c_long
+    TYPE(C_PTR), value, INTENT(in) :: c_gen_pointer
+    integer(c_long) :: nnz
+    !
+    TYPE(hacapk_chandle_struct), POINTER :: lf_struct
+    integer*4 :: ip, nlf
+    integer(c_long) :: s, ndl, ndt, kt
+    nnz = 0_c_long
+    call c_f_pointer(c_gen_pointer, lf_struct) ! Associate the C handle with a Fortran pointer.
+    if(.not.lf_struct%hmat_init) return
+    if(.not.associated(lf_struct%st_leafmtxp%st_lf)) return
+    nlf = lf_struct%st_leafmtxp%nlf
+    s = 0_c_long
+    do ip = 1, nlf
+       ndl = int(lf_struct%st_leafmtxp%st_lf(ip)%ndl, c_long)
+       ndt = int(lf_struct%st_leafmtxp%st_lf(ip)%ndt, c_long)
+       kt  = int(lf_struct%st_leafmtxp%st_lf(ip)%kt,  c_long)
+       if(lf_struct%st_leafmtxp%st_lf(ip)%ltmtx == 1)then
+          s = s + kt * (ndl + ndt) ! low-rank factors
+       else
+          s = s + ndl * ndt        ! dense leaf
+       endif
+    end do
+    nnz = s
+  END function cget_hacapk_nnz
+
+  !
   ! generate the H matrix with kernel provided
   !
   SUBROUTINE cmake_hacapk_struct_hmat(c_pointer, ztol) BIND(C, name='cmake_hacapk_struct_hmat')

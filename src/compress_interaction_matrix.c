@@ -152,78 +152,8 @@ int main(int argc, char **argv)
 	    "half-space (standard Okada)");
   
   /* set up defaults */
-  switch(medium->use_hmatrix){
-  case  IHMAT_TYPE_HTOOLS:
-#ifdef USE_PETSC_HMAT
-    HEADNODE
-      fprintf(stderr,"%s: setting up for HTOOLS\n",argv[0]);
-    /* HTOOLS */
-    set_htools_defaults_and_options(medium);
-#else
-    fprintf(stderr,"%s: HTOOLS requested but not compiled in (compile and add USE_PETSC_HMAT in makefile.petsc)\n",argv[0]);
-    exit(-1);
-#endif
-    break;
-  case IHMAT_TYPE_H2OPUS:
-#ifdef USE_PETSC_HMAT
-    /*  */
-    fprintf(stderr,"%s: setting up for H2OPUS\n",argv[0]);
-    set_h2opus_defaults_and_options(medium);
-    fprintf(stderr,"%s: WARNING: H2OPUS construction ASSUMES A SYMMETRIC OPERATOR (not mutable:\n",
-	    argv[0]);
-    fprintf(stderr,"%s: WARNING: this h2opus only implements sampling-based construction for symmetric\n",
-	    argv[0]);
-    fprintf(stderr,"%s: WARNING: matrices); the H matrix approximates (K+K^T)/2, and the operator\n",argv[0]);
-    fprintf(stderr,"%s: WARNING: asymmetry printed below sets an irreducible error floor\n",argv[0]);
-    if(medium->comm_size > 1){
-      if(medium->comm_rank == 0)
-	fprintf(stderr,"%s: H2OPUS sampling-based construction (MatCreateH2OpusFromMat) is not\n%s: supported in parallel in this PETSc/h2opus version - run serially\n",
-		argv[0],argv[0]);
-      exit(-1);
-    }
-#else
-    HEADNODE
-      fprintf(stderr,"%s: H2OPUS requested but not compiled in (compile and add USE_PETSC_HMAT in makefile.petsc)\n",argv[0]);
-    exit(-1);
-#endif
-    break;
-  case  IHMAT_TYPE_HACAPK:
-#ifdef USE_HACAPK
-    HEADNODE
-      fprintf(stderr,"%s: setting up for HACApK\n",argv[0]);
-    set_hacapk_defaults_and_options(medium);
-#else
-    fprintf(stderr,"%s: HACAPK requested but not compiled in (see USE_HACAPK and makefile.petc)\n",argv[0]);
-    exit(-1);
-#endif
-    break;
-  case IHMAT_TYPE_HMMVP:
-#ifdef USE_HMMVP
-    HEADNODE
-      fprintf(stderr,"%s: setting up for HMMVP\n",argv[0]);
-    set_hmmvp_defaults_and_options(medium);
-#else
-    fprintf(stderr,"%s: HMMVP requested but not compiled in (see USE_HMMVP, hmmvp subdirectory, and makefile.petc)\n",argv[0]);
-    exit(-1);
-#endif
-    break;
-  case IHMAT_TYPE_BIGWHAM:
-#ifdef USE_BIGWHAM
-    HEADNODE
-      fprintf(stderr,"%s: setting up for BigWham (full-space)\n",argv[0]);
-    set_bigwham_defaults_and_options(medium);
-#else
-    fprintf(stderr,"%s: BigWham requested but not compiled in (see USE_BIGWHAM, bigwham subdirectory, and makefile.petsc)\n",argv[0]);
-    exit(-1);
-#endif
-    break;
-  case IHMAT_TYPE_DENSE:			/* dense */
-    break;
-  default:
-    fprintf(stderr,"%s: HMat mode %i undefined\n",argv[0],medium->use_hmatrix);
-    exit(-1);
-    break;
-  }
+  if(medium->use_hmatrix)
+    set_hmat_defaults_and_options(medium,medium->use_hmatrix);
 
   
   PetscCall(PetscRandomCreate(PETSC_COMM_WORLD, &rand_str));

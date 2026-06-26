@@ -133,55 +133,9 @@ PetscErrorCode rsf_get_settings(int argc,char **argv,struct interact_ctx *par,
      command line with -mat_htool_compressor {SVD,fullACA,partialACA}. See
      rsf_solve.md for the full HTOOL/HACApK/dense performance comparison. */
   medium->use_hmatrix = use_hmatrix;
-  switch(medium->use_hmatrix){
-  case IHMAT_TYPE_DENSE:
-    break;
-  case IHMAT_TYPE_HTOOLS: /* this now defaults to sympartialACA, not SVD */
-#ifdef USE_PETSC_HMAT		/* htools and H2opus  */
-    set_htools_defaults_and_options(medium);
-#else
-    fprintf(stderr,"%s: h matrix type %i not compiled in, see makefile.petsc \n",
-	    argv[0],medium->use_hmatrix);
-    exit(-1);
-#endif
-    break;
-  case IHMAT_TYPE_H2OPUS: /* this did not used to get called */
-#ifdef USE_PETSC_HMAT		/* htools and H2opus  */
-    set_h2opus_defaults_and_options(medium);
-#else
-    fprintf(stderr,"%s: h matrix type %i not compiled in, see makefile.petsc \n",argv[0],medium->use_hmatrix);
-    exit(-1);
-#endif
-    break;
-  case IHMAT_TYPE_HACAPK: /* this did not used to get called */
-#ifdef USE_HACAPK
-    set_hacapk_defaults_and_options(medium);
-#else
-    fprintf(stderr,"%s: h matrix type %i not compiled in, see makefile.petsc \n",argv[0],medium->use_hmatrix);
-    exit(-1);
-#endif
-   break;
-  case IHMAT_TYPE_HMMVP: /* this did not used to get called */
-#ifdef USE_HMMVP
-    set_hmmvp_defaults_and_options(medium);
-#else
-    fprintf(stderr,"%s: h matrix type %i not compiled in, see makefile.petsc \n",argv[0],medium->use_hmatrix);
-    exit(-1);
-#endif
-    break;
-  case IHMAT_TYPE_BIGWHAM: /* this did not used to get called */
-#ifdef USE_BIGWHAM
-    set_bigwham_defaults_and_options(medium);
-#else
-    fprintf(stderr,"%s: h matrix type %i not compiled in, see makefile.petsc \n",argv[0],medium->use_hmatrix);
-    exit(-1);
-#endif
-    break;
-  default:
-    fprintf(stderr,"%s: h matrix type %i undefined\n",argv[0],medium->use_hmatrix);
-    exit(-1);
-    break;
-  }
+  if(medium->use_hmatrix)
+    set_hmat_defaults_and_options(medium,medium->use_hmatrix);
+
   
   PetscCall(PetscOptionsGetString(NULL, NULL, "-geom_file", geom_file, STRLEN,&read_value));
   PetscCall(PetscOptionsGetBool(NULL, NULL, "-full_space", &use_full_space,&read_value)); /* use read in or default */

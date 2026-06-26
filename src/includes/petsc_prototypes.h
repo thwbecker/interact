@@ -20,19 +20,19 @@ PetscErrorCode print_petsc_matrix(Mat , PetscInt , PetscInt ,char *);
 PetscErrorCode GenKEntries_petsc(PetscInt , PetscInt , PetscInt ,const PetscInt *,
 				 const PetscInt *, PetscScalar *, void *);
 
-
+void report_hmat_storage(struct med *, const char *,PetscInt , PetscInt , long );
 PetscReal vel_from_rsf(PetscReal, PetscReal, PetscReal, PetscReal,PetscReal,
 		       PetscReal *, PetscReal *, PetscReal *,struct med *);
-
+const char *hmat_backend_name(int );
 
 PetscErrorCode interact_petsc_initialize(int *, char ***);
 PetscErrorCode calc_petsc_Isn_matrices(struct med *, struct flt *,PetscInt ,PetscReal, int, Mat *,hacapk_shell_ctx *);
+PetscErrorCode set_hmat_defaults_and_options(struct med *,int);
+
 
 #ifdef USE_PETSC_HMAT
-
 PetscScalar GenKEntries_h2opus(PetscInt, PetscReal [], PetscReal [], void *);
-PetscErrorCode set_htools_defaults_and_options(struct med *);
-PetscErrorCode set_h2opus_defaults_and_options(struct med *);
+
 #if PETSC_VERSION_LT(3,22,0)
 /* 
    compatibility with older PETSc: the Mat*Kernel callback types were
@@ -64,9 +64,12 @@ extern void *cinit_hacapk_struct(int, void *);
 extern void cdeallocate_hacapk_struct(void *);
 extern void cset_hacapk_struct_coord(void *, double *, double *, double *);
 extern void cmake_hacapk_struct_hmat(void *, double);
+/* return this rank's number of stored scalars in the assembled HACApk
+   H-matrix (dense leaves ndl*ndt, low-rank leaves kt*(ndl+ndt)); the caller
+   sums across ranks for the global count. */
+extern long cget_hacapk_nnz(void *);
 extern void chacapk_mult_Ax_H(void *, double *, double *);
 PetscErrorCode MatMult_HACApK(Mat , Vec , Vec );
-PetscErrorCode set_hacapk_defaults_and_options(struct med *);
 #endif
 
 #ifdef USE_HMMVP
@@ -96,7 +99,7 @@ extern void *chmmvp_mpi_load(const char *, int);
 extern void  chmmvp_mpi_mvp(void *, double *, double *);
 extern void  chmmvp_mpi_get_info(void *, int *, int *, long *);
 extern void  chmmvp_mpi_delete(void *);
-PetscErrorCode set_hmmvp_defaults_and_options(struct med *);
+
 
 PetscErrorCode MatMult_hmmvp(Mat , Vec , Vec );
 #endif
@@ -113,7 +116,6 @@ extern void  cbigwham_get_diagonal(void *, double *);
 extern void  cbigwham_get_info(void *, int *, int *, double *);
 extern void  cbigwham_delete(void *);
 /* interact-side BigWham driver (petsc_interact.c) */
-void           set_bigwham_defaults_and_options(struct med *);
 PetscErrorCode MatMult_bigwham(Mat, Vec, Vec);
 PetscErrorCode setup_bigwham_matshell(struct med *, struct flt *, PetscReal, int,
 				      Mat *, hacapk_shell_ctx **);
