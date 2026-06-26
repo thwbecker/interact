@@ -733,7 +733,6 @@ PetscErrorCode calc_petsc_Isn_matrices(struct med *medium, struct flt *fault,
 }
 
 #ifdef USE_PETSC_HMAT		/* htools and H2opus  */
-
 /* 
    
    the approach with the KDtree never worked for H2OPUS, leave here for now
@@ -777,7 +776,7 @@ void setup_kdtree(int ndim,int m,PetscReal *coords,struct flt *fault,struct med 
 
 }
 
-
+#endif
 
 
 PetscErrorCode set_hmat_defaults_and_options(struct med *medium, int hmat) /*  the hmat might be
@@ -877,6 +876,7 @@ PetscErrorCode set_hmat_defaults_and_options(struct med *medium, int hmat) /*  t
     exit(-1);
     break;
   }
+  
 #if !PetscDefined(HAVE_OPENMP)
   PetscFunctionReturn(PETSC_SUCCESS);
 #else
