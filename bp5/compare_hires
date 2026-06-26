@@ -1,6 +1,7 @@
 #!/bin/bash
 
-
+#ress="1km 0.5km"
+ress="1km 0.5km 0.25km"
 fs=""
 for hmat in 1 3 4;do
     dir=ntest.$hmat
@@ -12,16 +13,17 @@ for hmat in 1 3 4;do
 	label="HMMVP"
     fi
     
-    for res in 1km 0.5km;do
+    for res in $ress;do
 	
 	ofile=bp5_hires.$res.$hmat.ps
     
 	#reg=-R0/500/-10/1;xann=a200f20;xl=50
 	#reg=-R220/250/-10/1;xann=a5f1;xl=240 # first event
-	reg=-R460/480/-10/1;xann=a2f.5;xl=461 # second event
+	#reg=-R440/480/-10/1;xann=a5f1;xl=445 # second event
+	reg=-R440/480/-10/1;xann=a5f1;xl=445 # second event
 	proj=-JX7/5
-	psbasemap $reg $proj -K -P "-B"$xann:"time [yr]":/a2f.2:"log@-10@-(max(v) [m/s])"::."BP5, $label, $res": > $ofile
-	gawk '{print($3,$5)}' ntest.0/rsf_monitor.$res.0.inf.dat | psxy $reg $proj -O -K -W3 >> $ofile # dense
+	psbasemap $reg $proj -K -P "-B"$xann:"time [yr]":/a2f.2:"log@-10@-(max(v) [m/s])"::."$label, $res": > $ofile
+	gawk '{print($3,$5)}' ntest.0/rsf_monitor.$res.0.inf.dat | psxy $reg $proj -O -K -W5,gray >> $ofile # dense
 	yl=0
 	echo $xl $yl 20 0 29 LM "dense" | pstext $reg $proj -O -K  >> $ofile;((yl=yl-1))
 	epsa=`ls $dir/rsf_monitor.$res.$hmat.*.dat | gawk -F. '{print($(NF-1))}' | sort -gr`
@@ -29,7 +31,7 @@ for hmat in 1 3 4;do
 	for eps in $epsa;do
 	    col=`platecolor $pc`
 	    gawk '{print($3,$5)}' $dir/rsf_monitor.$res.$hmat.$eps.dat | psxy $reg $proj -O -K -W1,$col >> $ofile
-	    labele=`echo $eps | gawk -Fe '{print($1,$2)}' | gawk '{printf("@[\\\\epsilon = %.1f\\\\cdot 10^{%i}@[",$1,$2)}'`
+	    labele=`echo $eps | gawk -Fe '{print($1,$2)}' | gawk '{printf("@[\\\\epsilon = %.0f\\\\cdot 10^{%i}@[",$1,$2)}'`
 	    echo $xl $yl 20 0 29 LM "$labele" | pstext $reg $proj -O -K -F+f$col >> $ofile;	((yl=yl-1))
 	    ((pc=pc+1))
 	done
@@ -38,6 +40,6 @@ for hmat in 1 3 4;do
 	fs="$fs $ofile"
     done
 done
-epsmerge -x 2 -y 3 --orientation Portrait -par $fs > bp5_hires.ps
+epsmerge -x 3 -y 3 --orientation Landscape -par $fs > bp5_hires.ps
 modifybb bp5_hires.ps 1
 rm $fs
