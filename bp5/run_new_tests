@@ -1,0 +1,59 @@
+#!/bin/bash
+hmat=${1-0}
+
+res=${2-1km}
+ncore=${3-24}
+
+tmax=500
+
+export OMP_NUM_THREADS=1
+if [ $hmat = 0 ];then
+    tol_flag=""
+    epsv=inf
+elif [ $hmat = 1 ];then		# htools
+    epsv="1e-3 7e-4 5e-4 1e-4 1e-5"
+    tol_flag="-mat_htool_epsilon"
+elif [ $hmat = 3 ];then		# hacapk
+    epsv="1e-2 1e-3 1e-4 1e-5 "
+    tol_flag="-hacapk_ztol"
+elif [ $hmat = 4 ];then		# HMMVP
+    epsv="1e-3 5e-4 1e-4 1e-5 1e-6"
+    tol_flag="-hmmvp_tol"
+else
+    echo $0: error
+    exit
+fi
+
+mkdir -p ntest.$hmat
+cd ntest.$hmat
+for eps in $epsv;do
+    oname=$res.$hmat.$eps
+    lfile=log.$oname.dat
+    if [ ! -s $lfile ];then
+
+	echo $0: writing to $lfile
+	if [ $eps = inf ];then
+	    flags=""
+	else
+	flags="$tol_flag $eps"
+	fi
+	
+	date > $lfile
+	mpirun -np $ncore  ../../bin/rsf_solve  \
+	       -geom_file   ../"geom_bp5_"$res".in" -rsf_file    ../"rsf_bp5_"$res".dat"   \
+	       -rsf_ic_file ../"ic_bp5_"$res".in"   -rsf_dc_file ../"dc_bp5_"$res".in"   \
+	       -use_hmatrix $hmat $flags -shear_modulus 3.204e10 -s_wave_speed 3464 \
+	       -f0 0.6 -dc 0.14 -vpl 1e-9 -v0 1e-6 -sigma_init 25e6  \
+	       -rtol 1e-4 -ts_rk_type 3bs -stop_time_yr $tmax \
+	       -ts_max_steps 2000000   -print_interval_yr 0.02 -log_view 2>> $lfile >> $lfile
+	date >> $lfile
+	for f in rsf_events rsf_monitor rsf_stats;do
+	    mv $f.dat $f.$oname.dat
+	    
+	done
+    else
+	echo $0: not rerunning, $lfile exists
+    fi
+    
+done
+cd ..

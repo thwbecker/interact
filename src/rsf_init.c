@@ -116,9 +116,14 @@ PetscErrorCode rsf_get_settings(int argc,char **argv,struct interact_ctx *par,
      for a cycle-scale view, and clean tmp_rsf between runs either way.
   */
   medium->slip_line_dt = 1.0e9*sec_per_year;	      /* OFF; opt in via -slip_line_dt_yr */
-  /* options for this code: 0 dense 1 htools 2 h2opus 3 hacapk 4 hmmvp 5 BIGWHAM, see petsc_prototypes.h */
+  /* options for this code: 
+     0 dense 1 htools 2 h2opus 
+     3 hacapk 4 hmmvp 5 BIGWHAM, 
+     see petsc_prototypes.h 
+*/
   PetscCall(PetscOptionsGetInt(NULL, NULL, "-use_hmatrix", &use_hmatrix,&read_value));
-  /* HTOOL (use_hmatrix==IHMAT_TYPE_HTOOLS ) compressor default: prefer sympartialACA over
+  /* HTOOL (use_hmatrix==IHMAT_TYPE_HTOOLS ) 
+     compressor default: prefer sympartialACA over
      PETSc's built-in SVD default.  On the SEAS BP5 4000-cell test (1 core),
      the SVD compressor spent ~48 s assembling the H-matrix vs ~6.5 s for
      HACApK and ~8 s for sympartialACA, for no measurable accuracy gain
