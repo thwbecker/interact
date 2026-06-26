@@ -820,7 +820,8 @@ PetscErrorCode set_hmmvp_defaults_and_options(struct med *medium)
        when matching hmmvp's operator accuracy to HTOOL eps 3e-5 / HACApK ztol
        1e-1, not necessarily the best cycle default. A forward-error sweep over
        hmmvp_tol would settle whether 1e-5 or something looser is optimal. */
-    medium->hmmvp_tol = 1.0e-5;
+    //medium->hmmvp_tol = 1.0e-5;
+    medium->hmmvp_tol = 1.0e-7;	/* this brings it in line with the HACApk defaults */
     medium->hmmvp_eta = 3.0;
     medium->hmmvp_nthreads = 1;
     

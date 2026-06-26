@@ -1,5 +1,5 @@
-set term post enh color solid
-set out 'bp5_hires.ps'
+set term png
+set out 'bp5_hires.png'
 set xlabel 'time [yr]'
 set ylabel 'log@-10@-(max(v) [m/s])'
 plot 'test/rsf_monitor.dat'   using 3 : 5 title 'HACApk'  w l, \
