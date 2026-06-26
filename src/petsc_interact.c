@@ -838,7 +838,7 @@ PetscErrorCode set_hmat_defaults_and_options(struct med *medium, int hmat) /*  t
       PetscCall(PetscOptionsGetInt(NULL, NULL, "-basisord", &medium->h2opus_basisord, NULL));
 #else
       HEADNODE
-	fprintf(stderr,"set_hmat_defaults_and_options: HTOOLS not compiled in - see USE_PETSC_HMAT check makefile.petsc\n");
+	fprintf(stderr,"set_hmat_defaults_and_options: H2OPUS not compiled in - see USE_PETSC_HMAT check makefile.petsc\n");
       exit(-1);
       
 #endif     
