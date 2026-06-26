@@ -777,123 +777,106 @@ void setup_kdtree(int ndim,int m,PetscReal *coords,struct flt *fault,struct med 
 
 }
 
-PetscErrorCode set_h2opus_defaults_and_options(struct med *medium)
-{
-  static my_boolean init=FALSE;
-  if(!init){
-    
-  }
-  init = TRUE;
-#if !PetscDefined(HAVE_OPENMP)
-  PetscFunctionReturn(PETSC_SUCCESS);
-#else
-  return 0;
-#endif
-}
-#endif
+
 
 
 PetscErrorCode set_hmat_defaults_and_options(struct med *medium, int hmat) /*  the hmat might be
 									       different from medium->hmat */
 {
-  static my_boolean init = FALSE;
   PetscBool flg;
-  if(!init){
-    HEADNODE
-      fprintf(stderr,"set_hmat_defaults_and_options: initializing for %s\n",hmat_backend_name(hmat));
-    switch(hmat){
-    case IHMAT_TYPE_HTOOLS:
+  HEADNODE
+    fprintf(stderr,"set_hmat_defaults_and_options: initializing for %s\n",hmat_backend_name(hmat));
+  switch(hmat){
+  case IHMAT_TYPE_HTOOLS:
 #ifdef USE_PETSC_HMAT
-      /* htools */
-      PetscCall(PetscOptionsHasName(NULL,NULL,"-mat_htool_eta",&flg));
-      if(!flg)
-	PetscCall(PetscOptionsSetValue(NULL,"-mat_htool_eta","100")); 
-      /* epsilon */
-      PetscCall(PetscOptionsHasName(NULL,NULL,"-mat_htool_epsilon",&flg));
-      if(!flg)
-	PetscCall(PetscOptionsSetValue(NULL,"-mat_htool_epsilon","1e-5"));
-      /* compressor */
-      PetscCall(PetscOptionsHasName(NULL,NULL,"-mat_htool_compressor",&flg));
-      if(!flg)			/* this is a symmetric compressor, a
+    /* htools */
+    PetscCall(PetscOptionsHasName(NULL,NULL,"-mat_htool_eta",&flg));
+    if(!flg)
+      PetscCall(PetscOptionsSetValue(NULL,"-mat_htool_eta","100")); 
+    /* epsilon */
+    PetscCall(PetscOptionsHasName(NULL,NULL,"-mat_htool_epsilon",&flg));
+    if(!flg)
+      PetscCall(PetscOptionsSetValue(NULL,"-mat_htool_epsilon","1e-5"));
+    /* compressor */
+    PetscCall(PetscOptionsHasName(NULL,NULL,"-mat_htool_compressor",&flg));
+    if(!flg)			/* this is a symmetric compressor, a
 				   mismatch, but fast? */
-	PetscCall(PetscOptionsSetValue(NULL,"-mat_htool_compressor","sympartialACA"));
-      /*  */
-      PetscCall(PetscOptionsHasName(NULL,NULL,"-pc_type",&flg));
-      if(!flg)
-	PetscCall(PetscOptionsSetValue(NULL,"-pc_type","none"));
+      PetscCall(PetscOptionsSetValue(NULL,"-mat_htool_compressor","sympartialACA"));
+    /*  */
+    PetscCall(PetscOptionsHasName(NULL,NULL,"-pc_type",&flg));
+    if(!flg)
+      PetscCall(PetscOptionsSetValue(NULL,"-pc_type","none"));
 #else
-      HEADNODE
-	fprintf(stderr,"set_hmat_defaults_and_options: HTOOLS not compiled in - see USE_PETSC_HMAT check makefile.petsc\n");
-      exit(-1);
+    HEADNODE
+      fprintf(stderr,"set_hmat_defaults_and_options: HTOOLS not compiled in - see USE_PETSC_HMAT check makefile.petsc\n");
+    exit(-1);
 #endif     
-      break;
-    case IHMAT_TYPE_H2OPUS:
+    break;
+  case IHMAT_TYPE_H2OPUS:
 #ifdef USE_PETSC_HMAT
-      /* defaults for H2OPUS */
-      medium->h2opus_eta = 0.6;	/*  */
-      PetscCall(PetscOptionsGetReal(NULL, NULL, "-eta", &medium->h2opus_eta, NULL));
-      medium->h2opus_leafsize = 32;
-      PetscCall(PetscOptionsGetInt(NULL, NULL, "-leafsize", &medium->h2opus_leafsize, NULL));
-      medium->h2opus_basisord = 8;
-      PetscCall(PetscOptionsGetInt(NULL, NULL, "-basisord", &medium->h2opus_basisord, NULL));
+    /* defaults for H2OPUS */
+    medium->h2opus_eta = 0.6;	/*  */
+    PetscCall(PetscOptionsGetReal(NULL, NULL, "-eta", &medium->h2opus_eta, NULL));
+    medium->h2opus_leafsize = 32;
+    PetscCall(PetscOptionsGetInt(NULL, NULL, "-leafsize", &medium->h2opus_leafsize, NULL));
+    medium->h2opus_basisord = 8;
+    PetscCall(PetscOptionsGetInt(NULL, NULL, "-basisord", &medium->h2opus_basisord, NULL));
 #else
-      HEADNODE
-	fprintf(stderr,"set_hmat_defaults_and_options: H2OPUS not compiled in - see USE_PETSC_HMAT check makefile.petsc\n");
-      exit(-1);
-      
+    HEADNODE
+      fprintf(stderr,"set_hmat_defaults_and_options: H2OPUS not compiled in - see USE_PETSC_HMAT check makefile.petsc\n");
+    exit(-1);
+    
 #endif     
-      break;
-    case IHMAT_TYPE_HACAPK:
+    break;
+  case IHMAT_TYPE_HACAPK:
 #ifdef USE_HACAPK
-      /* hacapl */
-      medium->hacapk_ztol = 1.0e-4; /* seems like a solid choice */
-      PetscCall(PetscOptionsGetReal(NULL,NULL,"-hacapk_ztol",&medium->hacapk_ztol,NULL));
+    /* hacapl */
+    medium->hacapk_ztol = 1.0e-4; /* seems like a solid choice */
+    PetscCall(PetscOptionsGetReal(NULL,NULL,"-hacapk_ztol",&medium->hacapk_ztol,NULL));
 #else
-      HEADNODE
-	fprintf(stderr,"set_hmat_defaults_and_options: HACApk requested but not compiled in (see USE_HACAPK and makefile.petc)\n");
-      exit(-1);
-#endif
-      break;
-    case IHMAT_TYPE_HMMVP:
-#ifdef USE_HMMVP
-      /* hmmvp */
-      medium->hmmvp_tol = 1.0e-6;	/* 1e-5 OK for low res, high res might need 1-6*/
-      medium->hmmvp_eta = 3.0;
-      medium->hmmvp_nthreads = 1;
-      
-      PetscCall(PetscOptionsGetReal(NULL,NULL,"-hmmvp_tol",&medium->hmmvp_tol,NULL));
-      PetscCall(PetscOptionsGetReal(NULL,NULL,"-hmmvp_eta",&medium->hmmvp_eta,NULL));
-      PetscCall(PetscOptionsGetInt(NULL,NULL,"-hmmvp_nthreads",&medium->hmmvp_nthreads,NULL));
-#else
-      HEADNODE
-	fprintf(stderr,"set_hmat_defaults_and_options: HMMVP requested but not compiled in (see USE_HMMVP and makefile.petc)\n");
+    HEADNODE
+      fprintf(stderr,"set_hmat_defaults_and_options: HACApk requested but not compiled in (see USE_HACAPK and makefile.petc)\n");
     exit(-1);
 #endif
-      break;
-    case IHMAT_TYPE_BIGWHAM:
-#ifdef USE_BIGWHAM
-      medium->bigwham_eta       = 3.0;
-      medium->bigwham_eps_aca   = 1.0e-4;
-      medium->bigwham_max_leaf  = 32;
-      medium->bigwham_nthreads  = 1;
-      PetscOptionsGetReal(NULL,NULL,"-bigwham_eta",     &medium->bigwham_eta,      &flg);
-      PetscOptionsGetReal(NULL,NULL,"-bigwham_eps_aca", &medium->bigwham_eps_aca,  &flg);
-      PetscOptionsGetInt (NULL,NULL,"-bigwham_leaf",    &medium->bigwham_max_leaf, &flg);
-      PetscOptionsGetInt (NULL,NULL,"-bigwham_nthreads",&medium->bigwham_nthreads, &flg);
+    break;
+  case IHMAT_TYPE_HMMVP:
+#ifdef USE_HMMVP
+    /* hmmvp */
+    medium->hmmvp_tol = 1.0e-6;	/* 1e-5 OK for low res, high res might need 1-6*/
+    medium->hmmvp_eta = 3.0;
+    medium->hmmvp_nthreads = 1;
+    
+    PetscCall(PetscOptionsGetReal(NULL,NULL,"-hmmvp_tol",&medium->hmmvp_tol,NULL));
+    PetscCall(PetscOptionsGetReal(NULL,NULL,"-hmmvp_eta",&medium->hmmvp_eta,NULL));
+    PetscCall(PetscOptionsGetInt(NULL,NULL,"-hmmvp_nthreads",&medium->hmmvp_nthreads,NULL));
 #else
-      HEADNODE
-	fprintf(stderr,"set_hmat_defaults_and_options: BigWham requested but not compiled in (see USE_BIGWHAM and makefile.petsc)\n");
-      exit(-1);
+    HEADNODE
+      fprintf(stderr,"set_hmat_defaults_and_options: HMMVP requested but not compiled in (see USE_HMMVP and makefile.petc)\n");
+    exit(-1);
 #endif
-      break;
-    default:
-      HEADNODE
-	fprintf(stderr,"set_hmat_defaults_and_options: not set up for %s\n",hmat_backend_name(hmat));
-      exit(-1);
-      break;
-    }
+    break;
+  case IHMAT_TYPE_BIGWHAM:
+#ifdef USE_BIGWHAM
+    medium->bigwham_eta       = 3.0;
+    medium->bigwham_eps_aca   = 1.0e-4;
+    medium->bigwham_max_leaf  = 32;
+    medium->bigwham_nthreads  = 1;
+    PetscOptionsGetReal(NULL,NULL,"-bigwham_eta",     &medium->bigwham_eta,      &flg);
+    PetscOptionsGetReal(NULL,NULL,"-bigwham_eps_aca", &medium->bigwham_eps_aca,  &flg);
+    PetscOptionsGetInt (NULL,NULL,"-bigwham_leaf",    &medium->bigwham_max_leaf, &flg);
+    PetscOptionsGetInt (NULL,NULL,"-bigwham_nthreads",&medium->bigwham_nthreads, &flg);
+#else
+    HEADNODE
+      fprintf(stderr,"set_hmat_defaults_and_options: BigWham requested but not compiled in (see USE_BIGWHAM and makefile.petsc)\n");
+    exit(-1);
+#endif
+    break;
+  default:
+    HEADNODE
+      fprintf(stderr,"set_hmat_defaults_and_options: not set up for %s\n",hmat_backend_name(hmat));
+    exit(-1);
+    break;
   }
-  init = TRUE;
 #if !PetscDefined(HAVE_OPENMP)
   PetscFunctionReturn(PETSC_SUCCESS);
 #else
