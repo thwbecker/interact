@@ -6,8 +6,12 @@ ntests=${1-"1 4 "}	# 1...8: different fault loading 9.... 11: field computations
 #angles=${2-"vert dip"}			# vert or dip
 angles=${2-"dip"}			# vert or dip
 #angles=${2-"vert"}			# vert or dip
-#geoms=${3-"0 1 2"}			# 0: quad 1: iquad 2: triangle 2b 2c 2d: different integration for triangles
-geoms=${3-"0 1 2 2c 2d"}			# 0: quad 1: iquad 2: triangle 2b 2c 2d: different integration for triangles
+#
+# geometry
+#
+# 0: quad 1: iquad 2: triangle 2b 2c 2d: different integration for triangles 3: equilateral triangle
+#geoms=${3-"0 1 2"}			
+geoms=${3-"0 1 2 2c 2d 3"}			
 #geoms=${3-0}
 force_run=${4-1}
 #
@@ -117,6 +121,11 @@ for ntest in $ntests;do
 		fi
 		#cat geom.in
 		#exit
+	    elif [[ $geom = 3 ]];then # equilaterial
+		dx=`echo $l0 $n0 | gawk '{print($1/$2)}'`
+		makefault -strike $strike -dip $dip -l $l0 -z $z -w $w0  |  \
+		    patch2vertices | ../src/util/quad2trimesh.sh -$dx -1 | tri2patch 20 > geom.in
+		glabel="etri"
 	    else
 		echo $0: geom error
 		exit

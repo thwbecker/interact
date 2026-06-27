@@ -1,0 +1,14 @@
+#!/bin/bash
+#dx=${1-0.2}			# <0 --> adopt
+dx=${1--0.2}			# <0 --> adopt
+#angle=${2-34}			# <0 --> use interior points
+angle=${2--1}
+# use Shewchuk mesher to try to get equilateral triangles subdividing rectangle
+
+makefault -strike -30 -l 2 -dip 40  | patch2vertices | \
+    ../src/util/quad2trimesh.sh $dx $angle | \
+    tri2patch 20 > geom.in
+../plotting/pgeom
+
+#cat geom.in | patch2vtk 
+
