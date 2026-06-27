@@ -162,6 +162,7 @@ CONTAINS
   
   ! hacapack norm style
   ! ACA norm 1:MREM  2:test 3:norm
+  ! 1: relative 3: absolute (HBI default)
 
   SUBROUTINE cset_hacapk_inorm(c_pointer, inorm) &
        BIND(C, name='cset_hacapk_inorm')
