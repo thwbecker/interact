@@ -22,7 +22,7 @@ elif [ $hmat = 3 ];then		# hacapk
     tol_flag="-hacapk_inorm 1 -hacapk_ztol" # switch to absolute norm
 elif [ $hmat = 4 ];then		# HMMVP
     epsv="1e-3 5e-4 1e-4 1e-5 1e-6"
-    tol_flag="-hmmvp_tol"
+    tol_flag="-hmmvp_inorm 1  -hmmvp_tol" # swith to absolute norm
 else
     echo $0: error
     exit
