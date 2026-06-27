@@ -475,7 +475,7 @@ int main(int argc, char **argv)
 	fprintf(stderr,"%s: hmmvp MPI compress m %i n %i tol %g eta %g -> %s\n",
 		argv[0],m,n,(double)medium->hmmvp_tol,(double)medium->hmmvp_eta,hmmvp_fn);
       cret = chmmvp_compress_to_file((int)m,xc,yc,zc,(double)medium->hmmvp_tol,
-				     (double)medium->hmmvp_eta,(void *)ictx,hmmvp_fn);
+				     (double)medium->hmmvp_eta,medium->hmmvp_inorm,(void *)ictx,hmmvp_fn);
       if(cret != 0){
 	HEADNODE
 	  fprintf(stderr,"%s: hmmvp MPI compression failed\n",argv[0]);
@@ -522,7 +522,7 @@ int main(int argc, char **argv)
 	      argv[0],medium->comm_rank,medium->comm_size,m,n,(double)medium->hmmvp_tol,
 	      (double)medium->hmmvp_eta,medium->hmmvp_nthreads);
       hmmvp_handle = chmmvp_compress_in_memory((int)m,xc,yc,zc,(double)medium->hmmvp_tol,
-					       (double)medium->hmmvp_eta,medium->hmmvp_nthreads,
+					       (double)medium->hmmvp_eta,medium->hmmvp_inorm,medium->hmmvp_nthreads,
 					       (void *)ictx);
       if(!hmmvp_handle){
 	HEADNODE

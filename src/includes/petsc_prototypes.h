@@ -87,7 +87,7 @@ PetscErrorCode MatMult_HACApK(Mat , Vec , Vec );
    redundant; intended for serial/threaded use)
 */
 extern void *chmmvp_compress_in_memory(int, double *, double *, double *,
-				       double, double, int, void *);
+				       double, double, int, int, void *);
 extern void chmmvp_mvp(void *, double *, double *);
 extern void chmmvp_get_info(void *, int *, int *, long *);
 extern void chmmvp_delete(void *);
@@ -96,7 +96,7 @@ extern void chmmvp_delete(void *);
    returns int and truncates the 64-bit MpiHmat* handle to 32 bits, which
    then segfaults on first use. */
 extern int   chmmvp_compress_to_file(int, double *, double *, double *,
-				     double, double, void *, const char *);
+				     double, double, int, void *, const char *);
 extern void *chmmvp_mpi_load(const char *, int);
 extern void  chmmvp_mpi_mvp(void *, double *, double *);
 extern void  chmmvp_mpi_get_info(void *, int *, int *, long *);

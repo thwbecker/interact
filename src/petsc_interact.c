@@ -574,7 +574,7 @@ PetscErrorCode calc_petsc_Isn_matrices(struct med *medium, struct flt *fault,
       fprintf(stderr,"calc_petsc_Isn_matrices: hmmvp MPI compress to %s (tol %g eta %g)\n",
 	      hmmvp_fn,(double)medium->hmmvp_tol,(double)medium->hmmvp_eta);
     cret = chmmvp_compress_to_file((int)m,xc,yc,zc,(double)medium->hmmvp_tol,
-				   (double)medium->hmmvp_eta,(void *)ictx,hmmvp_fn);
+				   (double)medium->hmmvp_eta,medium->hmmvp_inorm,(void *)ictx,hmmvp_fn);
     if(cret != 0){
       fprintf(stderr,"hmmvp MPI compression failed\n");
       exit(-1);
@@ -616,7 +616,7 @@ PetscErrorCode calc_petsc_Isn_matrices(struct med *medium, struct flt *fault,
       fprintf(stderr,"calc_petsc_Isn_matrices: creating HMMVP matrix for stress mode %i stress type %i OpenMP\n",
 	      mode,ictx->rec_stress_mode);
     hmmvp_handle = chmmvp_compress_in_memory((int)m,xc,yc,zc,(double)medium->hmmvp_tol,
-					     (double)medium->hmmvp_eta,medium->hmmvp_nthreads,
+					     (double)medium->hmmvp_eta,medium->hmmvp_inorm,medium->hmmvp_nthreads,
 					       (void *)ictx);
     if(!hmmvp_handle){
       fprintf(stderr,"hmmvp compression failed\n");
@@ -853,10 +853,14 @@ PetscErrorCode set_hmat_defaults_and_options(struct med *medium, int hmat) /*  t
     medium->hmmvp_tol = 1.0e-6;	/* 1e-5 OK for low res, high res might need 1-6*/
     medium->hmmvp_eta = 3.0;
     medium->hmmvp_nthreads = 1;
+    medium->hmmvp_inorm = 3;	/* tolerance norm mode, kept comparable with -hacapk_inorm:
+				   1 = block-local (tm_brem_fro), else matrix-global (tm_mrem_fro,
+				   the hmmvp default and the prior hardcoded behavior) */
     
     PetscCall(PetscOptionsGetReal(NULL,NULL,"-hmmvp_tol",&medium->hmmvp_tol,NULL));
     PetscCall(PetscOptionsGetReal(NULL,NULL,"-hmmvp_eta",&medium->hmmvp_eta,NULL));
     PetscCall(PetscOptionsGetInt(NULL,NULL,"-hmmvp_nthreads",&medium->hmmvp_nthreads,NULL));
+    PetscCall(PetscOptionsGetInt(NULL,NULL,"-hmmvp_inorm",&medium->hmmvp_inorm,NULL));
 #else
     HEADNODE
       fprintf(stderr,"set_hmat_defaults_and_options: HMMVP requested but not compiled in (see USE_HMMVP and makefile.petc)\n");

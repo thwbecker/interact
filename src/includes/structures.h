@@ -354,6 +354,7 @@ struct med{
 #ifdef USE_HMMVP
   PetscReal hmmvp_tol, hmmvp_eta;
   int hmmvp_nthreads;
+  PetscInt hmmvp_inorm;		/* tolerance norm: 1=block-local (tm_brem_fro), else matrix-global (tm_mrem_fro) */
 #endif
 #ifdef USE_HACAPK
   PetscReal hacapk_ztol, hacapk_eta;
