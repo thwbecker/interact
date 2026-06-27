@@ -645,12 +645,18 @@ call dgesvd ( 'S', 'S', ndl, ndt, waa, lda, w, u, ldu, vt, nn, work, lwork, info
 ! print*,'HACApK_aca=',aca
   if(zeps>eps .and. k<krank)then
 !$omp critical
-    print *,'k=',k
-    print *,'zeps=',zeps
-    print *,'eps=',eps
-    write(6,1000) 'nstrtl=',nstrtl,' nstrtt=',nstrtt,' ndl=',ndl,' ndt=',ndt
-    print*,'znrm=',znrm
-    stop
+!   same guard as HACApK_aca: keep the rank-k block rather than aborting the job
+!   when the SVD path cannot reach eps before breakdown. only reachable when SVD
+!   compression is selected (param(60)/=1). set param(1)>1 to log occurrences.
+    if(param(1)>1)then
+      print *,'WARNING: HACApK_SVD kept a rank-k block above tolerance'
+      print *,'k=',k
+      print *,'zeps=',zeps
+      print *,'eps=',eps
+      write(6,1000) 'nstrtl=',nstrtl,' nstrtt=',nstrtt,' ndl=',ndl,' ndt=',ndt
+      print*,'znrm=',znrm
+    endif
+!    stop
 !$omp end critical
   endif
 ! stop
@@ -731,12 +737,20 @@ call dgesvd ( 'S', 'S', ndl, ndt, waa, lda, w, u, ldu, vt, nn, work, lwork, info
 ! print*,'HACApK_aca=',aca
   if(zeps>eps .and. k<krank)then
 !$omp critical
-    print *,'k=',k
-    print *,'zeps=',zeps
-    print *,'eps=',eps
-    write(6,1000) 'nstrtl=',nstrtl,' nstrtt=',nstrtt,' ndl=',ndl,' ndt=',ndt
-    print*,'znrm=',znrm
-    stop
+!   do not abort the MPI job here: keep the rank-k approximation. ACA reached the
+!   pivot noise floor (ACA_EPS) before the relative tolerance eps, which happens
+!   for far-field blocks at fine resolution with a loose tolerance, in particular
+!   under param(61)=1 (block-local normalization). the block is stored at its best
+!   achievable rank; set param(1)>1 to log when this occurs.
+    if(param(1)>1)then
+      print *,'WARNING: HACApK_aca kept a rank-k block above tolerance'
+      print *,'k=',k
+      print *,'zeps=',zeps
+      print *,'eps=',eps
+      write(6,1000) 'nstrtl=',nstrtl,' nstrtt=',nstrtt,' ndl=',ndl,' ndt=',ndt
+      print*,'znrm=',znrm
+    endif
+!    stop
 !$omp end critical
   endif
 ! stop

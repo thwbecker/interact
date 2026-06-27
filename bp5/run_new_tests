@@ -49,6 +49,10 @@ for res in $ress;do
 		   -ts_max_steps 2000000   -print_interval_yr 0.02 -log_view 2>> $lfile >> $lfile
 	    date >> $lfile
 	    for f in rsf_events rsf_monitor rsf_stats;do
+		if [ ! -s $f.dat ];then
+		    echo $0: $f. dat not produced for $oname
+		    exit
+		fi
 		mv $f.dat $f.$oname.dat
 		
 	    done

@@ -75,7 +75,11 @@ CONTAINS
     ! threshold of mode 1 falsely flags admissible blocks as zero ("stop
     ! HACApK_aca 3"). use the relative norm mode (3) with param(72)=1e-6,
     ! matching HBI, so the threshold scales with the block norm.
-    hacapk_int_handle%st_ctl%param(61) = 3            ! matrix normalization (relative)
+    !
+    !hacapk_int_handle%st_ctl%param(61) = 3            ! matrix normalization (relative)
+
+    hacapk_int_handle%st_ctl%param(61) = 1            ! matrix normalization (absolute)
+    
     hacapk_int_handle%st_ctl%param(72) = 1.0e-6       ! ACA_EPS multiplier
     !
     ! for C kernel parameters

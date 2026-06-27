@@ -20,7 +20,7 @@ for hmat in 1 3 4;do
 	#reg=-R0/500/-10/1;xann=a200f20;xl=50
 	#reg=-R220/250/-10/1;xann=a5f1;xl=240 # first event
 	#reg=-R440/480/-10/1;xann=a5f1;xl=445 # second event
-	reg=-R440/480/-10/1;xann=a5f1;xl=445 # second event
+	reg=-R430/480/-10/1;xann=a5f1;xl=445 # second event
 	proj=-JX7/5
 	psbasemap $reg $proj -K -P "-B"$xann:"time [yr]":/a2f.2:"log@-10@-(max(v) [m/s])"::."$label, $res": > $ofile
 	gawk '{print($3,$5)}' ntest.0/rsf_monitor.$res.0.inf.dat | psxy $reg $proj -O -K -W5,gray >> $ofile # dense
