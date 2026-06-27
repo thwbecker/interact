@@ -19,7 +19,7 @@ combine_plots=${5-1}
 #bumpy=${6-1}
 bumpy=${6-0}
 
-#binary=interact.mixed
+show_edges=1
 binary=interact
 
 reg=-R-11/11/-11/11/-4/0
@@ -67,13 +67,21 @@ for ntest in $ntests;do
 		adjust=2
 	    fi
 	    if [ $bumpy -eq 0 ];then
-		makefault -strike $strike -dip $dip -n $no -m $mo -l $l0 -z $z -w $w0  > rgeom.in # reference quad geometry
+		if [ $geom != 3 ];then
+		    makefault -strike $strike -dip $dip -n $no -m $mo -l $l0 -z $z -w $w0  > rgeom.in # reference quad geometry
+		fi
 	    else
+		if [ $geom -eq 3 ];then
+		    echo $0: equi tri geom $geom not set up for bumpy
+		    exit
+		fi
 		bamp=0.1
 	    fi
 	    if [ $geom = 0 ];then
 		if [ $bumpy = 0 ];then
-		    cp rgeom.in geom.in
+		    if [ $geom != 3 ];then
+			cp rgeom.in geom.in
+		    fi
 		else
 		    # quad approximation
 		    ppcodes="1 0 0 0"
@@ -122,7 +130,7 @@ for ntest in $ntests;do
 		#cat geom.in
 		#exit
 	    elif [[ $geom = 3 ]];then # equilaterial
-		dx=`echo $l0 $n0 | gawk '{print($1/$2)}'`
+		dx=`echo $l0 $no | gawk '{print($1/$2*2)}'`
 		makefault -strike $strike -dip $dip -l $l0 -z $z -w $w0  |  \
 		    patch2vertices | ../src/util/quad2trimesh.sh -$dx -1 | tri2patch 20 > geom.in
 		glabel="etri"
@@ -203,7 +211,9 @@ EOF
 
 	    oname=$angle.$geom.$ntest
 	    if [[ $force_run -eq 0 && -s  geoms/geom.$oname.in && -s flt_dat/flt.$oname.dat ]];then
-		echo $0: reusing output $oname
+		echo
+		echo $0: reusing output geom $geom $oname  `lc geoms/geom.$oname.in` elements
+		echo
 	    else
 		#flags="-sv "
 		flags=""
@@ -238,7 +248,8 @@ EOF
 	    #echo $0: plotting
 	    if [ $combine_plots -eq 1 ];then
 		if [ $pf = 0 ];then
-		    ../plotting/plot_fault_solution flt_dat/flt.$oname geoms/geom.$oname.in "$label" $reg $rscale $adjust 2> /dev/null &
+		    ../plotting/plot_fault_solution flt_dat/flt.$oname geoms/geom.$oname.in \
+						    "$label" $reg $rscale $adjust $show_edges 2> /dev/null &
 		    fs="$fs  flt_dat/flt.$oname.ps"
 		else
 		    if [ $ft = 1 ];then

@@ -6,6 +6,7 @@ reg=${4-"-R-10/10/-10/10/-4/0"}
 scale=${5-.3}
 #reg=-R-2/2/-2/2/-2/0;scale=2
 adjust=${6-1}			# 0: fixed 1: adjust 2: read from file
+swow_edges=${7-0}
 
 if [ ! -s $ff.dat ];then
     echo $0: slip solution $ff.dat not found
@@ -74,8 +75,11 @@ for prop in 0 1 2 10 11 12;do
     makecpt $tstring  -C$cmp > $tmpn.cpt
 
     ofile=$ff.$prop.ps
-    #psxyz $reg $proj $ann -P $tmpn.1.$prop -C$tmpn.cpt -m -L -K -W0.25 > $ofile
-    psxyz $reg $proj $ann -P $tmpn.1.$prop -C$tmpn.cpt -m -L -K  > $ofile
+    if [ $swho_edges -eq 1 ];then
+	psxyz $reg $proj $ann -P $tmpn.1.$prop -C$tmpn.cpt -m -L -K -W0.25 > $ofile
+    else
+	psxyz $reg $proj $ann -P $tmpn.1.$prop -C$tmpn.cpt -m -L -K  > $ofile
+    fi
     if [ $pc = 1 ];then
 	echo 0 1.1 50 0 29 LM "$tlabel" | pstext -R0/1/0/1 -JX5 -O -Gwhite -K -N >>$ofile
 
