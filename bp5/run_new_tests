@@ -1,21 +1,25 @@
 #!/bin/bash
+# style of H mat, 1,3,4
 hmat=${1-0}
-
 ress=${2-"1km 0.5km 0.25km"}
 ncore=${3-24}
 
-tmax=500
+#tmax=500
+tmax=3000			# to get better read on matvec
 
 export OMP_NUM_THREADS=1
+#
+# set the tolerance flags, and try to make comparable to each other
+#
 if [ $hmat = 0 ];then
     tol_flag=""
     epsv=inf
 elif [ $hmat = 1 ];then		# htools
     epsv="1e-3 7e-4 5e-4 1e-4 1e-5"
-    tol_flag="-mat_htool_epsilon"
+    tol_flag="-mat_htool_eta 3 -mat_htool_epsilon" # make eta comparable
 elif [ $hmat = 3 ];then		# hacapk
     epsv="1e-2 1e-3 1e-4 1e-5 "
-    tol_flag="-hacapk_ztol"
+    tol_flag="-hacapk_inorm 1 -hacapk_ztol" # switch to absolute norm
 elif [ $hmat = 4 ];then		# HMMVP
     epsv="1e-3 5e-4 1e-4 1e-5 1e-6"
     tol_flag="-hmmvp_tol"

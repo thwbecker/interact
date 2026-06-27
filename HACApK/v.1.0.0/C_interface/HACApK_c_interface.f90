@@ -67,8 +67,10 @@ CONTAINS
          hacapk_int_handle%st_bemv, MPI_COMM_WORLD)
     !lrtrn = HACApK_init(st_bemv%nd,st_ctl,st_bemv)
     !
-    ! H matrix parameters
+    ! H matrix parameters, these are the defaults, we have routines to override them
     !
+    ! H-matrix : dicision param of distance 2.0
+    hacapk_int_handle%st_ctl%param(51) = 2.0
     ! param(61): ACA norm mode 1:MREM(absolute ACA_EPS) 3:norm(relative).
     ! interact's Green's function entries are tiny in absolute terms for some
     ! geometries (e.g. BP1 antiplane strips, ~1e-9), so the absolute zero-block
@@ -76,9 +78,8 @@ CONTAINS
     ! HACApK_aca 3"). use the relative norm mode (3) with param(72)=1e-6,
     ! matching HBI, so the threshold scales with the block norm.
     !
-    !hacapk_int_handle%st_ctl%param(61) = 3            ! matrix normalization (relative)
-
-    hacapk_int_handle%st_ctl%param(61) = 1            ! matrix normalization (absolute)
+    hacapk_int_handle%st_ctl%param(61) = 3            ! matrix normalization (relative) - default in HBI
+    !hacapk_int_handle%st_ctl%param(61) = 1            ! matrix normalization (absolute)
     
     hacapk_int_handle%st_ctl%param(72) = 1.0e-6       ! ACA_EPS multiplier
     !
@@ -136,6 +137,44 @@ CONTAINS
     end do
     lf_struct%coord_init = .true. 
   END SUBROUTINE cset_hacapk_struct_coord
+
+  !
+  ! override the admissibility distance parameter param(51) (zeta). a block
+  ! pair is treated as admissible (far-field, low-rank) when the cluster size
+  ! is at most zeta times the inter-cluster distance, so larger eta admits more
+  ! pairs into the compressed far field and shrinks the dense near field. must
+  ! be called after cinit_hacapk_struct and before cmake_hacapk_struct_hmat,
+  ! since HACApK_generate reads param(51) when it builds the block structure.
+  ! the HACApk default is 2.0.
+  !
+  SUBROUTINE cset_hacapk_eta(c_pointer, eta) &
+       BIND(C, name='cset_hacapk_eta')
+    TYPE(C_PTR), value, INTENT(in) :: c_pointer
+    real(c_double), value, intent(in) :: eta
+    TYPE(hacapk_chandle_struct), POINTER :: lf_struct
+    call c_f_pointer(c_pointer, lf_struct) ! Associate the C handle with a Fortran pointer.
+    if(.not.lf_struct%init)then
+       print *,'cset_hacapk_eta: structure not initialized'
+       stop
+    end if
+    lf_struct%st_ctl%param(51) = eta
+  END SUBROUTINE cset_hacapk_eta
+  
+  ! hacapack norm style
+  ! ACA norm 1:MREM  2:test 3:norm
+
+  SUBROUTINE cset_hacapk_inorm(c_pointer, inorm) &
+       BIND(C, name='cset_hacapk_inorm')
+    TYPE(C_PTR), value, INTENT(in) :: c_pointer
+    integer(c_int), value, intent(in) :: inorm
+    TYPE(hacapk_chandle_struct), POINTER :: lf_struct
+    call c_f_pointer(c_pointer, lf_struct) ! Associate the C handle with a Fortran pointer.
+    if(.not.lf_struct%init)then
+       print *,'cset_hacapk_inorm: structure not initialized'
+       stop
+    end if
+    lf_struct%st_ctl%param(61) = inorm
+  END SUBROUTINE cset_hacapk_inorm
 
   !
   ! get pointer to coordinates, dim = 0,1,2

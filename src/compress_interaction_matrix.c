@@ -436,9 +436,15 @@ int main(int argc, char **argv)
 #ifdef USE_HACAPK
       hacapk_handle = cinit_hacapk_struct((int)m,(void *)ictx);
       cset_hacapk_struct_coord(hacapk_handle,xc,yc,zc);
-      fprintf(stderr,"%s: core %03i/%03i: assigning HACApK m %i n %i ztol %g\n",
-	      argv[0],medium->comm_rank,medium->comm_size,m,n,(double)medium->hacapk_ztol);
+      cset_hacapk_eta(hacapk_handle,(double)medium->hacapk_eta); /* override param(51) before the build, eta */
+      cset_hacapk_inorm(hacapk_handle,medium->hacapk_inorm);     /* error norm mode */
+      
+      fprintf(stderr,"%s: core %03i/%03i: assigning HACApK m %i n %i ztol %g eta %g inorm: %i\n",
+	      argv[0],medium->comm_rank,medium->comm_size,m,n,(double)medium->hacapk_ztol,
+	      (double)medium->hacapk_eta,medium->hacapk_inorm);
+
       cmake_hacapk_struct_hmat(hacapk_handle,(double)medium->hacapk_ztol);
+
       hsc_h = (hacapk_shell_ctx *)malloc(sizeof(hacapk_shell_ctx));
       hsc_h->handle = hacapk_handle;
       hsc_h->ball = (double *)malloc(sizeof(double)*m);

@@ -122,7 +122,9 @@ integer function HACApK_init(nd,st_ctl,st_bemv,icomma)
  st_ctl%param(22)=1.0;      ! cluster : max leaf size 1.0*nffc
  st_ctl%param(51)=2.0;      ! H-matrix : dicision param of distance 2.0
  st_ctl%param(60)=1         ! 1:ACA  2:ACA+
- st_ctl%param(61)=1         ! ACA norm 1:MREM  2:test 3:norm
+ ! default in HBI
+ st_ctl%param(61)=3         ! ACA norm 1:MREM  2:test 3:norm
+ ! st_ctl%param(61)=1         ! ACA norm 1:MREM  2:test 3:norm
  st_ctl%param(62)=7         ! ACA : predictive average of k
  st_ctl%param(63)=1000;     ! ACA : k-max of R_k-matrix 30
  st_ctl%param(64)=1;        ! ACA : minimun kt

@@ -20,7 +20,7 @@ for hmat in 1 3 4;do
 	#reg=-R0/500/-10/1;xann=a200f20;xl=50
 	#reg=-R220/250/-10/1;xann=a5f1;xl=240 # first event
 	#reg=-R440/480/-10/1;xann=a5f1;xl=445 # second event
-	reg=-R430/480/-10/1;xann=a5f1;xl=445 # second event
+	reg=-R435/480/-10/1;xann=a5f1;xl=446 # second event
 	proj=-JX7/5
 	psbasemap $reg $proj -K -P "-B"$xann:"time [yr]":/a2f.2:"log@-10@-(max(v) [m/s])"::."$label, $res": > $ofile
 	gawk '{print($3,$5)}' ntest.0/rsf_monitor.$res.0.inf.dat | psxy $reg $proj -O -K -W5,gray >> $ofile # dense
@@ -29,10 +29,19 @@ for hmat in 1 3 4;do
 	epsa=`ls $dir/rsf_monitor.$res.$hmat.*.dat | gawk -F. '{print($(NF-1))}' | sort -gr`
 	pc=1
 	for eps in $epsa;do
+	    if [ -s $dir/log.$res.$hmat.$eps.dat ];then
+		# columns out 
+		# backend N stored_scalars mbytes build_wall_s total_wall_s matvec_ms
+		gawk -f extract_hmat_info.awk $dir/log.$res.$hmat.$eps.dat  > tmp.dat
+		read backend N stored_scalars mbytes build_wall_s total_wall_s matvec_ms < tmp.dat ; rm tmp.dat
+		echo $backend $N $stored_scalars $mbytes $build_wall_s $total_wall_s $matvec_ms
+	    else
+		mbytes=NaN
+	    fi
 	    col=`platecolor $pc`
 	    gawk '{print($3,$5)}' $dir/rsf_monitor.$res.$hmat.$eps.dat | psxy $reg $proj -O -K -W1,$col >> $ofile
 	    labele=`echo $eps | gawk -Fe '{print($1,$2)}' | gawk '{printf("@[\\\\epsilon = %.0f\\\\cdot 10^{%i}@[",$1,$2)}'`
-	    echo $xl $yl 20 0 29 LM "$labele" | pstext $reg $proj -O -K -F+f$col >> $ofile;	((yl=yl-1))
+	    echo $xl $yl 20 0 29 LM "$labele, $mbytes" | pstext $reg $proj -O -K -F+f$col >> $ofile;	((yl=yl-1))
 	    ((pc=pc+1))
 	done
 	psxy -O -T >> $ofile

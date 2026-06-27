@@ -534,8 +534,12 @@ PetscErrorCode calc_petsc_Isn_matrices(struct med *medium, struct flt *fault,
 	      mode,ictx->rec_stress_mode);
     hacapk_handle = cinit_hacapk_struct((int)m,(void *)ictx);
     cset_hacapk_struct_coord(hacapk_handle,xc,yc,zc);
-    fprintf(stderr,"core %03i/%03i: assigning HACApK m %i n %i ztol %g\n",
-	    medium->comm_rank,medium->comm_size,m,n,(double)medium->hacapk_ztol);
+    cset_hacapk_eta(hacapk_handle,(double)medium->hacapk_eta); /* override param(51) before the build, eta */
+    cset_hacapk_inorm(hacapk_handle,medium->hacapk_inorm);     /* error norm mode */
+    
+    fprintf(stderr,"core %03i/%03i: assigning HACApK m %i n %i ztol %g eta %g inorm: %i\n",
+	    medium->comm_rank,medium->comm_size,m,n,(double)medium->hacapk_ztol,
+	    (double)medium->hacapk_eta,medium->hacapk_inorm);
     cmake_hacapk_struct_hmat(hacapk_handle,(double)medium->hacapk_ztol);
     hctx = (hacapk_shell_ctx *)malloc(sizeof(hacapk_shell_ctx));
     hctx->handle = hacapk_handle;
@@ -832,6 +836,11 @@ PetscErrorCode set_hmat_defaults_and_options(struct med *medium, int hmat) /*  t
     /* hacapl */
     medium->hacapk_ztol = 1.0e-4; /* seems like a solid choice */
     PetscCall(PetscOptionsGetReal(NULL,NULL,"-hacapk_ztol",&medium->hacapk_ztol,NULL));
+    medium->hacapk_eta = 2.0; /* admissibility distance param(51); larger admits more far-field, HACApk default 2 */
+    PetscCall(PetscOptionsGetReal(NULL,NULL,"-hacapk_eta",&medium->hacapk_eta,NULL));
+    /* error norm, 1 (absolute) or 3 (relative) (HBI default) */
+    medium->hacapk_inorm = 3;
+    PetscCall(PetscOptionsGetInt(NULL,NULL,"-hacapk_inorm",&medium->hacapk_inorm,NULL));
 #else
     HEADNODE
       fprintf(stderr,"set_hmat_defaults_and_options: HACApk requested but not compiled in (see USE_HACAPK and makefile.petc)\n");
