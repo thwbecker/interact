@@ -1,0 +1,250 @@
+Fri Jun 26 02:53:51 PM CDT 2026
+../../bin/rsf_solve: found and using Petsc options in /home/twb/progs/src/interact/petsc_settings.yaml
+set_hmat_defaults_and_options: initializing for HTOOL
+../../bin/rsf_solve: read geometry from ../geom_bp5_0.25km.in, 64000 patches, on 24 cores
+../../bin/rsf_solve: G 3.204000e+10 Pa cs 3464 m/s eta 4.624711e+06 f0 0.6 dc 0.14 m v0 1.000e-06 vpl 1.000e-09 m/s
+../../bin/rsf_solve: sigma0 2.500000e+07 tau0 1.500000e+07 Pa vinit 1.000e-09 m/s rand_amp 0
+../../bin/rsf_solve: rtol 1.0e-04 dt_init 1 s dt_max 1e+10 s stop 500 yr
+read_rsf: read a and b values, on averag 0.0321756 and 0.03
+../../bin/rsf_solve: read per-cell initial tau,vel from ../ic_bp5_0.25km.in
+../../bin/rsf_solve: read per-cell D_c from ../dc_bp5_0.25km.in
+set_hmat_defaults_and_options: initializing for HTOOL
+calc_petsc_Isn_matrices: creating HTOOL matrix for stress mode 0 stress type 0
+calc_petsc_Isn_matrices: core 000/024: assigning HTOOL  row     0 to  2667, lm 2667 ln 2667 m 64000 n 64000
+calc_petsc_Isn_matrices: core 005/024: assigning HTOOL  row 13335 to 16002, lm 2667 ln 2667 m 64000 n 64000
+calc_petsc_Isn_matrices: core 008/024: assigning HTOOL  row 21336 to 24003, lm 2667 ln 2667 m 64000 n 64000
+calc_petsc_Isn_matrices: core 009/024: assigning HTOOL  row 24003 to 26670, lm 2667 ln 2667 m 64000 n 64000
+calc_petsc_Isn_matrices: core 011/024: assigning HTOOL  row 29337 to 32004, lm 2667 ln 2667 m 64000 n 64000
+calc_petsc_Isn_matrices: core 012/024: assigning HTOOL  row 32004 to 34671, lm 2667 ln 2667 m 64000 n 64000
+calc_petsc_Isn_matrices: core 014/024: assigning HTOOL  row 37338 to 40005, lm 2667 ln 2667 m 64000 n 64000
+calc_petsc_Isn_matrices: core 015/024: assigning HTOOL  row 40005 to 42672, lm 2667 ln 2667 m 64000 n 64000
+calc_petsc_Isn_matrices: core 016/024: assigning HTOOL  row 42672 to 45338, lm 2666 ln 2666 m 64000 n 64000
+calc_petsc_Isn_matrices: core 021/024: assigning HTOOL  row 56002 to 58668, lm 2666 ln 2666 m 64000 n 64000
+calc_petsc_Isn_matrices: core 022/024: assigning HTOOL  row 58668 to 61334, lm 2666 ln 2666 m 64000 n 64000
+calc_petsc_Isn_matrices: core 023/024: assigning HTOOL  row 61334 to 64000, lm 2666 ln 2666 m 64000 n 64000
+calc_petsc_Isn_matrices: core 001/024: assigning HTOOL  row  2667 to  5334, lm 2667 ln 2667 m 64000 n 64000
+calc_petsc_Isn_matrices: core 002/024: assigning HTOOL  row  5334 to  8001, lm 2667 ln 2667 m 64000 n 64000
+calc_petsc_Isn_matrices: core 003/024: assigning HTOOL  row  8001 to 10668, lm 2667 ln 2667 m 64000 n 64000
+calc_petsc_Isn_matrices: core 004/024: assigning HTOOL  row 10668 to 13335, lm 2667 ln 2667 m 64000 n 64000
+calc_petsc_Isn_matrices: core 006/024: assigning HTOOL  row 16002 to 18669, lm 2667 ln 2667 m 64000 n 64000
+calc_petsc_Isn_matrices: core 007/024: assigning HTOOL  row 18669 to 21336, lm 2667 ln 2667 m 64000 n 64000
+calc_petsc_Isn_matrices: core 010/024: assigning HTOOL  row 26670 to 29337, lm 2667 ln 2667 m 64000 n 64000
+calc_petsc_Isn_matrices: core 013/024: assigning HTOOL  row 34671 to 37338, lm 2667 ln 2667 m 64000 n 64000
+calc_petsc_Isn_matrices: core 017/024: assigning HTOOL  row 45338 to 48004, lm 2666 ln 2666 m 64000 n 64000
+calc_petsc_Isn_matrices: core 018/024: assigning HTOOL  row 48004 to 50670, lm 2666 ln 2666 m 64000 n 64000
+calc_petsc_Isn_matrices: core 019/024: assigning HTOOL  row 50670 to 53336, lm 2666 ln 2666 m 64000 n 64000
+calc_petsc_Isn_matrices: core 020/024: assigning HTOOL  row 53336 to 56002, lm 2666 ln 2666 m 64000 n 64000
+Mat Object: 24 MPI processes
+  type: htool
+  rows=64000, cols=64000
+    symmetry: N
+    scaling: 3.204e+06
+    maximal cluster leaf size: 10
+    epsilon: 0.0005
+    eta: 100.
+    minimum target depth: 0
+    minimum source depth: 0
+    compressor: sympartialACA
+    clustering: PCARegular
+    compression ratio: 38.529904
+    space saving: 0.974046
+    block tree consistency: TRUE
+    recompression: FALSE
+    number of dense (resp. low rank) matrices: 103709 (resp. 35885)
+    (minimum, mean, maximum) dense block sizes: (25, 83.963639, 441)
+    (minimum, mean, maximum) low rank block sizes: (100, 113899.741257, 7112889)
+    (minimum, mean, maximum) ranks: (3, 10.073875, 23)
+calc_petsc_Isn_matrices: hmat_storage backend HTOOL m 64000 n 64000 stored_scalars NA dense_ratio NA mbytes NA
+rsf_solve: Is (shear) interaction matrix build wall =       5.3753 s
+Mat Object: 24 MPI processes
+  type: htool
+  symmetry: N
+  scaling: 3.204e+06
+  maximal cluster leaf size: 10
+  epsilon: 0.0005
+  eta: 100.
+  minimum target depth: 0
+  minimum source depth: 0
+  compressor: sympartialACA
+  clustering: PCARegular
+  compression ratio: 38.529904
+  space saving: 0.974046
+  block tree consistency: TRUE
+  recompression: FALSE
+  number of dense (resp. low rank) matrices: 103709 (resp. 35885)
+  (minimum, mean, maximum) dense block sizes: (25, 83.963639, 441)
+  (minimum, mean, maximum) low rank block sizes: (100, 113899.741257, 7112889)
+  (minimum, mean, maximum) ranks: (3, 10.073875, 23)
+rsf_finalize_monitor_and_event: tracked 6 events (|v| through 1.000e-03 m/s)
+TS Object: 24 MPI processes
+  type: rk
+    RK type 3bs
+    Order: 3
+    FSAL property: yes
+    Abscissa c =  0.000000  0.500000  0.750000  1.000000 
+  initial time step=1.
+  maximum steps=2000000
+  maximum time=1.57788e+10
+  total number of RHS function evaluations=46085
+  total number of rejected steps=96
+  using relative error tolerance of 0.0001, using vector of absolute error tolerances
+  TSAdapt Object: 24 MPI processes
+    type: basic
+    safety factor 0.9
+    extra safety factor after step rejection 0.5
+    clip fastest increase 2.
+    clip fastest decrease 0.5
+    maximum allowed timestep 1.57788e+08
+    minimum allowed timestep 0.
+    maximum solution absolute value to be ignored -1.
+****************************************************************************************************************************************************************
+***                                WIDEN YOUR WINDOW TO 160 CHARACTERS.  Use 'enscript -r -fCourier9' to print this document                                 ***
+****************************************************************************************************************************************************************
+
+------------------------------------------------------------------ PETSc Performance Summary: ------------------------------------------------------------------
+
+../../bin/rsf_solve on a  named theo6 with 24 processes, by twb on Fri Jun 26 14:59:30 2026
+Using PETSc Release Version 3.25.2, unknown
+
+                         Max       Max/Min     Avg       Total
+Time (sec):           3.396e+02     1.000   3.396e+02
+Objects:              0.000e+00     0.000   0.000e+00
+Flops:                5.533e+09     1.000   5.533e+09  1.328e+11
+Flops/sec:            1.630e+07     1.000   1.629e+07  3.911e+08
+MPI Msg Count:        0.000e+00     0.000   0.000e+00  0.000e+00
+MPI Msg Len (bytes):  3.569e+08     1.000   0.000e+00  8.565e+09
+MPI Reductions:       1.312e+05     1.000
+
+Flop counting convention: 1 flop = 1 real number operation of type (multiply/divide/add/subtract)
+                            e.g., VecAXPY() for real vectors of length N --> 2N flops
+                            and VecAXPY() for complex vectors of length N --> 8N flops
+
+Summary of Stages:   ----- Time ------  ----- Flop ------  --- Messages ---  -- Message Lengths --  -- Reductions --
+                        Avg     %Total     Avg     %Total    Count   %Total     Avg         %Total    Count   %Total
+ 0:      Main Stage: 3.3957e+02 100.0%  1.3279e+11 100.0%  0.000e+00   0.0%  0.000e+00      100.0%  1.312e+05 100.0%
+
+------------------------------------------------------------------------------------------------------------------------
+See the 'Profiling' chapter of the users' manual for details on interpreting output.
+Phase summary info:
+   Count: number of times phase was executed
+   Time and Flop: Max - maximum over all processes
+                  Ratio - ratio of maximum to minimum over all processes
+   Mess: number of messages sent
+   AvgLen: average message length (bytes)
+   Reduct: number of global reductions
+   Global: entire computation
+   Stage: stages of a computation. Set stages with PetscLogStagePush() and PetscLogStagePop().
+      %T - percent time in this phase         %F - percent flop in this phase
+      %M - percent messages in this phase     %L - percent message lengths in this phase
+      %R - percent reductions in this phase
+   Total Mflop/s: 1e-6 * (sum of flop over all processes)/(max time over all processes)
+------------------------------------------------------------------------------------------------------------------------
+Event                Count      Time (sec)     Flop                              --- Global ---  --- Stage ----  Total
+                   Max Ratio  Max     Ratio   Max  Ratio  Mess   AvgLen  Reduct  %T %F %M %L %R  %T %F %M %L %R Mflop/s
+------------------------------------------------------------------------------------------------------------------------
+
+--- Event Stage 0: Main Stage
+
+PetscBarrier           2 1.0 1.0435e+00 111.4 0.00e+00 0.0 0.0e+00 0.0e+00 0.0e+00  0  0  0  0  0   0  0  0  0  0     0
+BuildTwoSided          2 1.0 1.9449e-04 3.1 0.00e+00 0.0 0.0e+00 0.0e+00 0.0e+00  0  0  0  0  0   0  0  0  0  0     0
+BuildTwoSidedF         2 1.0 2.0001e-04 2.9 0.00e+00 0.0 0.0e+00 0.0e+00 0.0e+00  0  0  0  0  0   0  0  0  0  0     0
+MatMult            46086 1.0 2.7703e+02 1.5 1.23e+08 1.0 0.0e+00 0.0e+00 4.6e+04 76  2  0  0 35  76  2  0  0 35    11
+MatScale               1 1.0 1.1420e-06 3.1 0.00e+00 0.0 0.0e+00 0.0e+00 0.0e+00  0  0  0  0  0   0  0  0  0  0     0
+MatAssemblyBegin       1 1.0 1.1730e-06 3.4 0.00e+00 0.0 0.0e+00 0.0e+00 0.0e+00  0  0  0  0  0   0  0  0  0  0     0
+MatAssemblyEnd         1 1.0 5.3659e+00 1.5 0.00e+00 0.0 0.0e+00 0.0e+00 0.0e+00  1  0  0  0  0   1  0  0  0  0     0
+MatView                2 1.0 1.6782e+00 4204.8 0.00e+00 0.0 0.0e+00 0.0e+00 0.0e+00  0  0  0  0  0   0  0  0  0  0     0
+VecNorm            30532 1.0 4.2411e-01 1.3 6.51e+08 1.0 0.0e+00 0.0e+00 0.0e+00  0 12  0  0  0   0 12  0  0  0 36858
+VecScale           46086 1.0 1.2166e-01 1.6 1.23e+08 1.0 0.0e+00 0.0e+00 0.0e+00  0  2  0  0  0   0  2  0  0  0 24243
+VecCopy           117085 1.0 1.0514e+00 1.2 0.00e+00 0.0 0.0e+00 0.0e+00 0.0e+00  0  0  0  0  0   0  0  0  0  0     0
+VecSet                 2 1.0 1.2984e-05 2.3 0.00e+00 0.0 0.0e+00 0.0e+00 0.0e+00  0  0  0  0  0   0  0  0  0  0     0
+VecWAXPY           15266 1.0 1.3837e-01 1.2 1.63e+08 1.0 0.0e+00 0.0e+00 0.0e+00  0  3  0  0  0   0  3  0  0  0 28245
+VecMAXPY           76898 1.0 8.4999e-01 1.5 4.60e+09 1.0 0.0e+00 0.0e+00 0.0e+00  0 83  0  0  0   0 83  0  0  0 129764
+VecAssemblyBegin       2 1.0 2.1479e-04 2.5 0.00e+00 0.0 0.0e+00 0.0e+00 0.0e+00  0  0  0  0  0   0  0  0  0  0     0
+VecAssemblyEnd         2 1.0 4.2880e-06 1.4 0.00e+00 0.0 0.0e+00 0.0e+00 0.0e+00  0  0  0  0  0   0  0  0  0  0     0
+VecScatterBegin     8365 1.0 2.5897e-01 2.1 0.00e+00 0.0 0.0e+00 0.0e+00 8.4e+03  0  0  0 100  6   0  0  0 100  6     0
+VecScatterEnd       8365 1.0 2.7447e+00 3.3 0.00e+00 0.0 0.0e+00 0.0e+00 0.0e+00  0  0  0  0  0   0  0  0  0  0     0
+SFSetUp                2 1.0 2.3774e-05 2.8 0.00e+00 0.0 0.0e+00 0.0e+00 0.0e+00  0  0  0  0  0   0  0  0  0  0     0
+SFPack              8365 1.0 3.2990e-03 2.8 0.00e+00 0.0 0.0e+00 0.0e+00 0.0e+00  0  0  0  0  0   0  0  0  0  0     0
+SFUnpack            8365 1.0 2.1901e-03 1.7 0.00e+00 0.0 0.0e+00 0.0e+00 0.0e+00  0  0  0  0  0   0  0  0  0  0     0
+TSStep             15265 1.0 3.2923e+02 1.1 4.72e+09 1.0 0.0e+00 0.0e+00 1.1e+05 96 85  0  0 82  96 85  0  0 82   344
+TSFunctionEval     46085 1.0 2.8481e+02 1.4 1.23e+08 1.0 0.0e+00 0.0e+00 4.6e+04 78  2  0  0 35  78  2  0  0 35    10
+------------------------------------------------------------------------------------------------------------------------
+
+Object Type          Creations   Destructions. Reports information only for process 0.
+
+--- Event Stage 0: Main Stage
+
+           Container     5              4
+              Matrix     6              5
+              Viewer     2              2
+              Vector 15285          15285
+           Index Set     2              2
+   Star Forest Graph     6              6
+         PetscRandom     1              1
+             TSAdapt     1              1
+                  TS     1              1
+                DMTS     1              1
+    Distributed Mesh     2              2
+     Discrete System     2              2
+           Weak Form     2              2
+                SNES     1              1
+              DMSNES     3              3
+      SNESLineSearch     1              1
+       Krylov Solver     1              1
+      Preconditioner     1              1
+========================================================================================================================
+Average time to get PetscTime(): 3.41e-08
+Average time for MPI_Barrier(): 9.103e-06
+Average time for zero size MPI_Send(): 7.93354e-06
+#PETSc Option Table entries:
+-dc 0.14 # (source: command line)
+-f0 0.6 # (source: command line)
+-geom_file ../geom_bp5_0.25km.in # (source: command line)
+-ksp_max_it 10000 # (source: file)
+-ksp_rtol 1.0e-8 # (source: file)
+-ksp_type fgmres # (source: file)
+-log_view # (source: command line)
+-mat_htool_compressor sympartialACA # (source: code)
+-mat_htool_epsilon 5e-4 # (source: command line)
+-mat_htool_eta 100 # (source: code)
+-pc_type jacobi # (source: file)
+-print_interval_yr 0.02 # (source: command line)
+-rsf_dc_file ../dc_bp5_0.25km.in # (source: command line)
+-rsf_file ../rsf_bp5_0.25km.dat # (source: command line)
+-rsf_ic_file ../ic_bp5_0.25km.in # (source: command line)
+-rtol 1e-4 # (source: command line)
+-s_wave_speed 3464 # (source: command line)
+-shear_modulus 3.204e10 # (source: command line)
+-sigma_init 25e6 # (source: command line)
+-stop_time_yr 500 # (source: command line)
+-ts_adapt_wnormtype infinity # (source: code)
+-ts_max_steps 2000000 # (source: command line)
+-ts_rk_type 3bs # (source: command line)
+-use_hmatrix 1 # (source: command line)
+-v0 1e-6 # (source: command line)
+-vpl 1e-9 # (source: command line)
+#End of PETSc Option Table entries
+Compiled without FORTRAN kernels
+Compiled with full precision matrices (default)
+sizeof(short) 2 sizeof(int) 4 sizeof(long) 8 sizeof(void*) 8 sizeof(PetscScalar) 8 sizeof(PetscInt) 4
+Configure options: COPTFLAGS="-march=x86-64-v3 -O3" CXXOPTFLAGS="-march=x86-64-v3 -O3" FOPTFLAGS="-march=x86-64-v3 -O3" --prefix=/home/twb/progs/src/petsc/build/ --download-suitesparse --download-mumps --download-scalapack --download-parmetis --download-metis --download-pardiso -download-bison --download-cmake --download-h2opus --download-thrust --download-mpich --download-htool --download-elemental --with-debugging=no --force
+-----------------------------------------
+Libraries compiled on 2026-06-16 19:47:58 on walter
+Machine characteristics: Linux-6.8.0-110-generic-x86_64-with-glibc2.35
+Using PETSc directory: /home/twb/progs/src/petsc/build
+Using PETSc arch: 
+-----------------------------------------
+
+Using C compiler: /home/twb/progs/src/petsc/build/bin/mpicc  -Wall -Wwrite-strings -Wno-unknown-pragmas -Wno-lto-type-mismatch -Wno-stringop-overflow -fstack-protector -fvisibility=hidden -march=x86-64-v3 -O3 
+Using Fortran compiler: /home/twb/progs/src/petsc/build/bin/mpif90  -Wall -ffree-line-length-none -ffree-line-length-0 -Wno-lto-type-mismatch -Wno-unused-dummy-argument -march=x86-64-v3 -O3  
+-----------------------------------------
+
+Using include paths: -I/home/twb/progs/src/petsc/build/include -I/home/twb/progs/src/petsc/build/include/suitesparse
+-----------------------------------------
+
+Using C linker: /home/twb/progs/src/petsc/build/bin/mpicc
+Using Fortran linker: /home/twb/progs/src/petsc/build/bin/mpif90
+Using libraries: -Wl,-rpath,/home/twb/progs/src/petsc/build/lib -L/home/twb/progs/src/petsc/build/lib -lpetsc -Wl,-rpath,/home/twb/progs/src/petsc/build/lib -L/home/twb/progs/src/petsc/build/lib -Wl,-rpath,/usr/lib/gcc/x86_64-linux-gnu/11 -L/usr/lib/gcc/x86_64-linux-gnu/11 -lspqr -lumfpack -lklu -lcholmod -lamd -lEl -lElSuiteSparse -lpmrrr -lsmumps -ldmumps -lcmumps -lzmumps -lmumps_common -lpord -lpthread -lscalapack -lh2opus -llapack -lblas -lparmetis -lmetis -lm -lX11 -lmpifort -lmpi -lgfortran -lm -lgfortran -lm -lgcc_s -lquadmath -lstdc++
+-----------------------------------------
+
+Fri Jun 26 02:59:30 PM CDT 2026

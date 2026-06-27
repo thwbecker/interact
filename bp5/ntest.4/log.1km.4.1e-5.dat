@@ -1,0 +1,218 @@
+Fri Jun 26 02:41:46 PM CDT 2026
+../../bin/rsf_solve: found and using Petsc options in /home/twb/progs/src/interact/petsc_settings.yaml
+set_hmat_defaults_and_options: initializing for HMMVP
+../../bin/rsf_solve: read geometry from ../geom_bp5_1km.in, 4000 patches, on 24 cores
+../../bin/rsf_solve: G 3.204000e+10 Pa cs 3464 m/s eta 4.624711e+06 f0 0.6 dc 0.14 m v0 1.000e-06 vpl 1.000e-09 m/s
+../../bin/rsf_solve: sigma0 2.500000e+07 tau0 1.500000e+07 Pa vinit 1.000e-09 m/s rand_amp 0
+../../bin/rsf_solve: rtol 1.0e-04 dt_init 1 s dt_max 1e+10 s stop 500 yr
+read_rsf: read a and b values, on averag 0.03217 and 0.03
+../../bin/rsf_solve: read per-cell initial tau,vel from ../ic_bp5_1km.in
+../../bin/rsf_solve: read per-cell D_c from ../dc_bp5_1km.in
+set_hmat_defaults_and_options: initializing for HMMVP
+calc_petsc_Isn_matrices: creating HMMVP matrix for stress mode 0 stress type 0 MPI mode
+calc_petsc_Isn_matrices: hmmvp MPI compress to /tmp/hmmvp_interact_968271.hm (tol 1e-05 eta 3)
+Estimate ||B||_F: 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 48 49 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66 67 68 69 70 71 72 73 74 75 76 77 78 79 80 81 82 83 84 85 86 87 88 89 90 91 92 93 94 95 96 97 98 99 100
+est 6.840523e+02
+prec 1
+prec 1
+prec 1
+prec 1
+prec 1
+prec 1
+prec 1
+prec 1
+prec 1
+prec 1
+prec 1
+prec 1
+prec 1
+prec 1
+prec 1
+prec 1
+prec 1
+prec 1
+prec 1
+prec 1
+prec 1
+prec 1
+prec 1
+prec 1
+Compress: 1 3 4 5 6 7 8 10 11 13 15 17 23 25 26 28 29 30 31 32 34 35 36 37 38 39 40 41 42 48 49 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66 67 68 69 70 71 72 73 74 75 76 77 78 79 80 81 82 83 84 85 86 87 88 89 90 91 92 93 94 95 96 97 98 99 pid  0:  old B 0  old QR 0  scratch B 0  scratch SVD 0  scratch ACA 0
+         B help SVD 0  B help ACA 0  UV help ACA 0
+         no help B 0  no help SVD 0  no help ACA 0
+hmmvp(MPI) 4000 by 4000, 1923205 stored scalars, compression ratio 8.3194
+calc_petsc_Isn_matrices: hmat_storage backend HMMVP m 4000 n 4000 stored_scalars 1923205 dense_ratio 8.31945 mbytes 14.6729
+rsf_solve: Is (shear) interaction matrix build wall =       0.4464 s
+Mat Object: 24 MPI processes
+  type: shell
+TS Object: 24 MPI processes
+  type: rk
+    RK type 3bs
+    Order: 3
+    FSAL property: yes
+    Abscissa c =  0.000000  0.500000  0.750000  1.000000 
+  initial time step=1.
+  maximum steps=2000000
+  maximum time=1.57788e+10
+  total number of RHS function evaluations=10923
+  total number of rejected steps=115
+  using relative error tolerance of 0.0001, using vector of absolute error tolerances
+  TSAdapt Object: 24 MPI processes
+    type: basic
+    safety factor 0.9
+    extra safety factor after step rejection 0.5
+  rsf_finalize_monitor_and_event: tracked 6 events (|v| through 1.000e-03 m/s)
+  clip fastest increase 2.
+    clip fastest decrease 0.5
+    maximum allowed timestep 1.57788e+08
+    minimum allowed timestep 0.
+    maximum solution absolute value to be ignored -1.
+****************************************************************************************************************************************************************
+***                                WIDEN YOUR WINDOW TO 160 CHARACTERS.  Use 'enscript -r -fCourier9' to print this document                                 ***
+****************************************************************************************************************************************************************
+
+------------------------------------------------------------------ PETSc Performance Summary: ------------------------------------------------------------------
+
+../../bin/rsf_solve on a  named walter with 24 processes, by twb on Fri Jun 26 14:41:51 2026
+Using PETSc Release Version 3.25.2, unknown
+
+                         Max       Max/Min     Avg       Total
+Time (sec):           4.742e+00     1.000   4.742e+00
+Objects:              0.000e+00     0.000   0.000e+00
+Flops:                8.224e+07     1.006   8.208e+07  1.970e+09
+Flops/sec:            1.734e+07     1.006   1.731e+07  4.154e+08
+MPI Msg Count:        0.000e+00     0.000   0.000e+00  0.000e+00
+MPI Msg Len (bytes):  1.939e+07     1.006   0.000e+00  4.644e+08
+MPI Reductions:       4.176e+04     1.000
+
+Flop counting convention: 1 flop = 1 real number operation of type (multiply/divide/add/subtract)
+                            e.g., VecAXPY() for real vectors of length N --> 2N flops
+                            and VecAXPY() for complex vectors of length N --> 8N flops
+
+Summary of Stages:   ----- Time ------  ----- Flop ------  --- Messages ---  -- Message Lengths --  -- Reductions --
+                        Avg     %Total     Avg     %Total    Count   %Total     Avg         %Total    Count   %Total
+ 0:      Main Stage: 4.7417e+00 100.0%  1.9699e+09 100.0%  0.000e+00   0.0%  0.000e+00      100.0%  4.174e+04  99.9%
+
+------------------------------------------------------------------------------------------------------------------------
+See the 'Profiling' chapter of the users' manual for details on interpreting output.
+Phase summary info:
+   Count: number of times phase was executed
+   Time and Flop: Max - maximum over all processes
+                  Ratio - ratio of maximum to minimum over all processes
+   Mess: number of messages sent
+   AvgLen: average message length (bytes)
+   Reduct: number of global reductions
+   Global: entire computation
+   Stage: stages of a computation. Set stages with PetscLogStagePush() and PetscLogStagePop().
+      %T - percent time in this phase         %F - percent flop in this phase
+      %M - percent messages in this phase     %L - percent message lengths in this phase
+      %R - percent reductions in this phase
+   Total Mflop/s: 1e-6 * (sum of flop over all processes)/(max time over all processes)
+------------------------------------------------------------------------------------------------------------------------
+Event                Count      Time (sec)     Flop                              --- Global ---  --- Stage ----  Total
+                   Max Ratio  Max     Ratio   Max  Ratio  Mess   AvgLen  Reduct  %T %F %M %L %R  %T %F %M %L %R Mflop/s
+------------------------------------------------------------------------------------------------------------------------
+
+--- Event Stage 0: Main Stage
+
+PetscBarrier           2 1.0 2.1428e-02 416.4 0.00e+00 0.0 0.0e+00 0.0e+00 0.0e+00  0  0  0  0  0   0  0  0  0  0     0
+BuildTwoSided          2 1.0 1.3320e-04 3.1 0.00e+00 0.0 0.0e+00 0.0e+00 0.0e+00  0  0  0  0  0   0  0  0  0  0     0
+BuildTwoSidedF         2 1.0 1.3842e-04 2.7 0.00e+00 0.0 0.0e+00 0.0e+00 0.0e+00  0  0  0  0  0   0  0  0  0  0     0
+MatMult            10924 1.0 3.2538e+00 1.1 1.82e+06 1.0 0.0e+00 0.0e+00 2.2e+04 67  2  0 75 52  67  2  0 75 52    13
+MatScale               1 1.0 8.5100e-07 3.0 0.00e+00 0.0 0.0e+00 0.0e+00 0.0e+00  0  0  0  0  0   0  0  0  0  0     0
+MatAssemblyBegin       1 1.0 3.0000e-07 2.7 0.00e+00 0.0 0.0e+00 0.0e+00 0.0e+00  0  0  0  0  0   0  0  0  0  0     0
+MatAssemblyEnd         1 1.0 1.8230e-06 2.3 0.00e+00 0.0 0.0e+00 0.0e+00 0.0e+00  0  0  0  0  0   0  0  0  0  0     0
+MatView                1 1.0 1.4687e-05 12.0 0.00e+00 0.0 0.0e+00 0.0e+00 0.0e+00  0  0  0  0  0   0  0  0  0  0     0
+VecNorm             7046 1.0 6.7547e-02 1.1 9.41e+06 1.0 0.0e+00 0.0e+00 0.0e+00  1 11  0  0  0   1 11  0  0  0  3335
+VecScale           10924 1.0 2.7585e-03 1.4 1.82e+06 1.0 0.0e+00 0.0e+00 0.0e+00  0  2  0  0  0   0  2  0  0  0 15840
+VecCopy            28756 1.0 9.6783e-03 1.4 0.00e+00 0.0 0.0e+00 0.0e+00 0.0e+00  0  0  0  0  0   0  0  0  0  0     0
+VecSet                 2 1.0 8.5950e-06 4.0 0.00e+00 0.0 0.0e+00 0.0e+00 0.0e+00  0  0  0  0  0   0  0  0  0  0     0
+VecWAXPY            3525 1.0 1.8088e-03 1.6 2.35e+06 1.0 0.0e+00 0.0e+00 0.0e+00  0  3  0  0  0   0  3  0  0  0 31180
+VecMAXPY           18306 1.0 9.8943e-03 1.5 6.87e+07 1.0 0.0e+00 0.0e+00 0.0e+00  0 83  0  0  0   0 83  0  0  0 166205
+VecAssemblyBegin       2 1.0 1.6396e-04 2.3 0.00e+00 0.0 0.0e+00 0.0e+00 0.0e+00  0  0  0  0  0   0  0  0  0  0     0
+VecAssemblyEnd         2 1.0 5.9410e-06 3.2 0.00e+00 0.0 0.0e+00 0.0e+00 0.0e+00  0  0  0  0  0   0  0  0  0  0     0
+VecScatterBegin    23644 1.0 2.8192e-01 9.3 0.00e+00 0.0 0.0e+00 0.0e+00 2.4e+04  1  0  0 100 57   1  0  0 100 57     0
+VecScatterEnd      23644 1.0 1.1669e+00 11.5 0.00e+00 0.0 0.0e+00 0.0e+00 0.0e+00 12  0  0  0  0  12  0  0  0  0     0
+SFSetUp                3 1.0 4.0054e-05 3.1 0.00e+00 0.0 0.0e+00 0.0e+00 0.0e+00  0  0  0  0  0   0  0  0  0  0     0
+SFPack             23644 1.0 2.3705e-03 1.5 0.00e+00 0.0 0.0e+00 0.0e+00 0.0e+00  0  0  0  0  0   0  0  0  0  0     0
+SFUnpack           23644 1.0 2.2505e-03 1.5 0.00e+00 0.0 0.0e+00 0.0e+00 0.0e+00  0  0  0  0  0   0  0  0  0  0     0
+TSStep              3524 1.0 4.0436e+00 1.1 7.05e+07 1.0 0.0e+00 0.0e+00 3.6e+04 85 86  0 75 87  85 86  0 75 87   417
+TSFunctionEval     10923 1.0 3.4149e+00 1.1 1.82e+06 1.0 0.0e+00 0.0e+00 2.2e+04 70  2  0 75 52  70  2  0 75 52    13
+------------------------------------------------------------------------------------------------------------------------
+
+Object Type          Creations   Destructions. Reports information only for process 0.
+
+--- Event Stage 0: Main Stage
+
+           Container     4              4
+              Matrix     6              3
+              Vector  3546           3545
+           Index Set     3              3
+   Star Forest Graph     7              6
+              Viewer     1              1
+         PetscRandom     1              1
+             TSAdapt     1              1
+                  TS     1              1
+                DMTS     1              1
+    Distributed Mesh     2              2
+     Discrete System     2              2
+           Weak Form     2              2
+                SNES     1              1
+              DMSNES     3              3
+      SNESLineSearch     1              1
+       Krylov Solver     1              1
+      Preconditioner     1              1
+========================================================================================================================
+Average time to get PetscTime(): 3.41e-08
+Average time for MPI_Barrier(): 1.06638e-05
+Average time for zero size MPI_Send(): 4.18946e-06
+#PETSc Option Table entries:
+-dc 0.14 # (source: command line)
+-f0 0.6 # (source: command line)
+-geom_file ../geom_bp5_1km.in # (source: command line)
+-hmmvp_tol 1e-5 # (source: command line)
+-ksp_max_it 10000 # (source: file)
+-ksp_rtol 1.0e-8 # (source: file)
+-ksp_type fgmres # (source: file)
+-log_view # (source: command line)
+-pc_type jacobi # (source: file)
+-print_interval_yr 0.02 # (source: command line)
+-rsf_dc_file ../dc_bp5_1km.in # (source: command line)
+-rsf_file ../rsf_bp5_1km.dat # (source: command line)
+-rsf_ic_file ../ic_bp5_1km.in # (source: command line)
+-rtol 1e-4 # (source: command line)
+-s_wave_speed 3464 # (source: command line)
+-shear_modulus 3.204e10 # (source: command line)
+-sigma_init 25e6 # (source: command line)
+-stop_time_yr 500 # (source: command line)
+-ts_adapt_wnormtype infinity # (source: code)
+-ts_max_steps 2000000 # (source: command line)
+-ts_rk_type 3bs # (source: command line)
+-use_hmatrix 4 # (source: command line)
+-v0 1e-6 # (source: command line)
+-vpl 1e-9 # (source: command line)
+#End of PETSc Option Table entries
+Compiled without FORTRAN kernels
+Compiled with full precision matrices (default)
+sizeof(short) 2 sizeof(int) 4 sizeof(long) 8 sizeof(void*) 8 sizeof(PetscScalar) 8 sizeof(PetscInt) 4
+Configure options: COPTFLAGS="-march=x86-64-v3 -O3" CXXOPTFLAGS="-march=x86-64-v3 -O3" FOPTFLAGS="-march=x86-64-v3 -O3" --prefix=/home/twb/progs/src/petsc/build/ --download-suitesparse --download-mumps --download-scalapack --download-parmetis --download-metis --download-pardiso -download-bison --download-cmake --download-h2opus --download-thrust --download-mpich --download-htool --download-elemental --with-debugging=no --force
+-----------------------------------------
+Libraries compiled on 2026-06-16 19:47:58 on walter
+Machine characteristics: Linux-6.8.0-110-generic-x86_64-with-glibc2.35
+Using PETSc directory: /home/twb/progs/src/petsc/build
+Using PETSc arch: 
+-----------------------------------------
+
+Using C compiler: /home/twb/progs/src/petsc/build/bin/mpicc  -Wall -Wwrite-strings -Wno-unknown-pragmas -Wno-lto-type-mismatch -Wno-stringop-overflow -fstack-protector -fvisibility=hidden -march=x86-64-v3 -O3 
+Using Fortran compiler: /home/twb/progs/src/petsc/build/bin/mpif90  -Wall -ffree-line-length-none -ffree-line-length-0 -Wno-lto-type-mismatch -Wno-unused-dummy-argument -march=x86-64-v3 -O3  
+-----------------------------------------
+
+Using include paths: -I/home/twb/progs/src/petsc/build/include -I/home/twb/progs/src/petsc/build/include/suitesparse
+-----------------------------------------
+
+Using C linker: /home/twb/progs/src/petsc/build/bin/mpicc
+Using Fortran linker: /home/twb/progs/src/petsc/build/bin/mpif90
+Using libraries: -Wl,-rpath,/home/twb/progs/src/petsc/build/lib -L/home/twb/progs/src/petsc/build/lib -lpetsc -Wl,-rpath,/home/twb/progs/src/petsc/build/lib -L/home/twb/progs/src/petsc/build/lib -Wl,-rpath,/usr/lib/gcc/x86_64-linux-gnu/11 -L/usr/lib/gcc/x86_64-linux-gnu/11 -lspqr -lumfpack -lklu -lcholmod -lamd -lEl -lElSuiteSparse -lpmrrr -lsmumps -ldmumps -lcmumps -lzmumps -lmumps_common -lpord -lpthread -lscalapack -lh2opus -llapack -lblas -lparmetis -lmetis -lm -lX11 -lmpifort -lmpi -lgfortran -lm -lgfortran -lm -lgcc_s -lquadmath -lstdc++
+-----------------------------------------
+
+Fri Jun 26 02:41:51 PM CDT 2026
