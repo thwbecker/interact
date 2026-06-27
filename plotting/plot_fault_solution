@@ -6,7 +6,7 @@ reg=${4-"-R-10/10/-10/10/-4/0"}
 scale=${5-.3}
 #reg=-R-2/2/-2/2/-2/0;scale=2
 adjust=${6-1}			# 0: fixed 1: adjust 2: read from file
-swow_edges=${7-0}
+show_edges=${7-0}		# for the third plot (to not overwhelm others)
 
 if [ ! -s $ff.dat ];then
     echo $0: slip solution $ff.dat not found
@@ -18,6 +18,7 @@ if [ ! -s $gf ];then
 fi
     
 echo $0: plotting results from $ff.dat and $gf
+echo $0: tlabel $tlabel reg $reg scale $scale adjust $adjust show_edges $show_edges
 
 proj="-Jx$scale/$scale -Jz$scale  -E130/30"
 ann=-Ba5f.5:"x":/a5f.5:"y":/a1f.2:"z":WESNZ+
@@ -25,7 +26,7 @@ tmpn=`mktemp`
 trap "rm -f $tmpn*" EXIT
 
 for prop in 0 1 2 10 11 12;do
-    cat $gf | patch2xyz $ff.dat $prop > $tmpn.1.$prop &
+    cat $gf | patch2xyz $ff.dat $prop > $tmpn.1.$prop 2> /dev/null &
 done
 wait
 pc=1
@@ -57,10 +58,13 @@ for prop in 0 1 2 10 11 12;do
 
     if [[ $adjust -ne 0 ]];then
 	if [[ $adjust -eq 1  || ! -s last_rms.$prop.dat ]];then
-	    rms=`grep "\-Z" $tmpn.1.$prop | gawk '{print(substr($2,3))}' | gawk -f rms.awk`
+	    rms=`grep "\-Z" $tmpn.1.$prop | gawk '{print(substr($2,3))}' | gawk -f rms.awk | gawk '{printf("%.5e\n",$1)}'`
 	    echo $rms > last_rms.$prop.dat
+	    echo $0: adjust RMS $rms 
 	else
 	    read rms < last_rms.$prop.dat
+	    echo $0: read RMS $rms from last_rms.$prop.dat
+	    
 	fi
     else
 	if [ $disp -eq 1 ];then
@@ -72,16 +76,16 @@ for prop in 0 1 2 10 11 12;do
     tstring=`echo $rms | gawk '{r=$1;if(r<1e-5)r=1;printf("-T%g/%g/%g",-2.5*r,2.5*r,r*5/21)}'`
     lspc=`echo $rms | gawk '{r=$1;if(r<1e-5)r=1;printf("%g",r);}'`
 
-    makecpt $tstring  -C$cmp > $tmpn.cpt
+    makecpt $tstring "-C"$cmp"+h0" > $tmpn.cpt
 
     ofile=$ff.$prop.ps
-    if [ $swho_edges -eq 1 ];then
+    if [[ $show_edges -eq 1 && $pc = 3 ]];then
 	psxyz $reg $proj $ann -P $tmpn.1.$prop -C$tmpn.cpt -m -L -K -W0.25 > $ofile
     else
 	psxyz $reg $proj $ann -P $tmpn.1.$prop -C$tmpn.cpt -m -L -K  > $ofile
     fi
     if [ $pc = 1 ];then
-	echo 0 1.1 50 0 29 LM "$tlabel" | pstext -R0/1/0/1 -JX5 -O -Gwhite -K -N >>$ofile
+	echo 0 1.1 32 0 29 LM "$tlabel" | pstext -R0/1/0/1 -JX5 -O -Gwhite -K -N >>$ofile
 
     fi
 	

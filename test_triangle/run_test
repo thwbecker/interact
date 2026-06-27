@@ -62,9 +62,9 @@ for ntest in $ntests;do
 	gc=1
 	for geom in $geoms;do
 	    if [[ $gc = 1 ]];then
-		adjust=1
+		adjust=1	# compute and save RMS for the first geometry
 	    else
-		adjust=2
+		adjust=2	# read in RMS 
 	    fi
 	    if [ $bumpy -eq 0 ];then
 		if [ $geom != 3 ];then
@@ -248,8 +248,11 @@ EOF
 	    #echo $0: plotting
 	    if [ $combine_plots -eq 1 ];then
 		if [ $pf = 0 ];then
+		    echo 
+		    echo $0: plotting with geom $geom adjust $adjust ntest $ntest
+		    echo 
 		    ../plotting/plot_fault_solution flt_dat/flt.$oname geoms/geom.$oname.in \
-						    "$label" $reg $rscale $adjust $show_edges 2> /dev/null &
+						    "$label" $reg $rscale $adjust $show_edges 
 		    fs="$fs  flt_dat/flt.$oname.ps"
 		else
 		    if [ $ft = 1 ];then
@@ -265,7 +268,10 @@ EOF
 		fi
 	    else
 		if [ $pf = 0 ];then
-		    ../plotting/plot_fault_solution flt_dat/flt.$oname geoms/geom.$oname.in "$label" $reg $rscale $adjust
+		    echo 
+		    echo $0: plotting with geom $geom adjust $adjust ntest $ntest
+		    echo 
+		    ../plotting/plot_fault_solution flt_dat/flt.$oname geoms/geom.$oname.in "$label" $reg $rscale $adjust $show_edges 
 		    #gv flt.$oname.ps &
 		#else
 		    #../plotting/plot_displacement_and_stress $oname "0 -3 -6" "$label"
