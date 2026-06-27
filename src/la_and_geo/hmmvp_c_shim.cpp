@@ -46,14 +46,14 @@ extern "C" {
   double ckernel_func(int, int, void *);
 
   void *chmmvp_compress_in_memory(int, double *, double *, double *,
-				  double, double, int, void *);
+				  double, double, int, int, void *);
   void chmmvp_mvp(void *, double *, double *);
   void chmmvp_get_info(void *, int *, int *, long *);
   void chmmvp_delete(void *);
 
   /* MPI interface (distributed assembly to file + MpiHmat matvec) */
   int   chmmvp_compress_to_file(int, double *, double *, double *,
-				double, double, void *, const char *);
+				double, double, int, void *, const char *);
   void *chmmvp_mpi_load(const char *, int);
   void  chmmvp_mpi_mvp(void *, double *, double *);
   void  chmmvp_mpi_get_info(void *, int *, int *, long *);
@@ -99,7 +99,7 @@ private:
   context kctx; returns an opaque hmmvp::Hmat handle (NULL on error)
 */
 void *chmmvp_compress_in_memory(int n, double *x, double *y, double *z,
-				double tol, double eta, int nthreads,
+				double tol, double eta, int inorm, int nthreads,
 				void *kctx)
 {
   try {
@@ -112,10 +112,20 @@ void *chmmvp_compress_in_memory(int n, double *x, double *y, double *z,
     hmmvp::Hd *hd = hmmvp::NewHd(D, NULL, eta);
     InteractGF gf(kctx);
     hmmvp::Compressor *c = hmmvp::NewCompressor(hd, &gf);
-    c->SetTolMethod(hmmvp::Compressor::tm_mrem_fro);
-    c->SetBfroEstimate(c->EstimateBfro()); /* operator is diagonally
-					      dominant, so this
-					      estimate is reliable */
+    /* inorm selects the tolerance norm so this can be made comparable to the
+       other backends (see -hacapk_inorm): 1 = block-relative (tm_brem_fro,
+       block-local), otherwise matrix-relative Frobenius (tm_mrem_fro, global,
+       the hmmvp default). MREM bounds ||B-A||_F <= tol ||B||_F against the
+       whole-matrix norm and needs a ||B||_F estimate; BREM enforces the bound
+       per block and does not. BREM is costlier (factors of ~1.5 to 4). */
+    hmmvp::Compressor::TolMethod tm =
+      (inorm == 1) ? hmmvp::Compressor::tm_brem_fro
+		   : hmmvp::Compressor::tm_mrem_fro;
+    c->SetTolMethod(tm);
+    if (tm == hmmvp::Compressor::tm_mrem_fro)
+      c->SetBfroEstimate(c->EstimateBfro()); /* operator is diagonally
+						dominant, so this
+						estimate is reliable */
     c->SetTol(tol);
     c->SetOmpNthreads(nthreads);
     c->AvoidRedundantGfCalls(true);
@@ -173,7 +183,7 @@ void chmmvp_delete(void *hm)
 /* build the H matrix with MPI-distributed assembly and write it to
    hmat_fn (collective); returns 0 on success, -1 on error */
 int chmmvp_compress_to_file(int n, double *x, double *y, double *z,
-			    double tol, double eta, void *kctx,
+			    double tol, double eta, int inorm, void *kctx,
 			    const char *hmat_fn)
 {
   try {
@@ -186,8 +196,14 @@ int chmmvp_compress_to_file(int n, double *x, double *y, double *z,
     hmmvp::Hd *hd = hmmvp::NewHd(D, NULL, eta);
     InteractGF gf(kctx);
     hmmvp::Compressor *c = hmmvp::NewCompressor(hd, &gf);
-    c->SetTolMethod(hmmvp::Compressor::tm_mrem_fro);
-    c->SetBfroEstimate(c->EstimateBfro());
+    /* see chmmvp_compress_in_memory: inorm 1 = block-local (tm_brem_fro),
+       else matrix-relative global (tm_mrem_fro), which needs ||B||_F */
+    hmmvp::Compressor::TolMethod tm =
+      (inorm == 1) ? hmmvp::Compressor::tm_brem_fro
+		   : hmmvp::Compressor::tm_mrem_fro;
+    c->SetTolMethod(tm);
+    if (tm == hmmvp::Compressor::tm_mrem_fro)
+      c->SetBfroEstimate(c->EstimateBfro());
     c->SetTol(tol);
     c->AvoidRedundantGfCalls(true);
     c->CompressToFile(hmat_fn);	/* collective; MPI-distributed blocks */
