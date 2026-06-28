@@ -1,39 +1,40 @@
-Fri Jun 26 11:05:35 AM CDT 2026
+Sat Jun 27 12:09:16 PM CDT 2026
 ../../bin/rsf_solve: found and using Petsc options in /home/twb/progs/src/interact/petsc_settings.yaml
 ../../bin/rsf_solve: read geometry from ../geom_bp5_1km.in, 4000 patches, on 24 cores
 ../../bin/rsf_solve: G 3.204000e+10 Pa cs 3464 m/s eta 4.624711e+06 f0 0.6 dc 0.14 m v0 1.000e-06 vpl 1.000e-09 m/s
 ../../bin/rsf_solve: sigma0 2.500000e+07 tau0 1.500000e+07 Pa vinit 1.000e-09 m/s rand_amp 0
-../../bin/rsf_solve: rtol 1.0e-04 dt_init 1 s dt_max 1e+10 s stop 500 yr
+../../bin/rsf_solve: rtol 1.0e-04 dt_init 1 s dt_max 1e+10 s stop 3000 yr
 read_rsf: read a and b values, on averag 0.03217 and 0.03
 ../../bin/rsf_solve: read per-cell initial tau,vel from ../ic_bp5_1km.in
 ../../bin/rsf_solve: read per-cell D_c from ../dc_bp5_1km.in
 calc_petsc_Isn_matrices: creating dense matrix for stress mode 0 stress type 0
 calc_petsc_Isn_matrices: core 000/024: assigning dense row     0 to   167
-calc_petsc_Isn_matrices: core 011/024: assigning dense row  1837 to  2004
-calc_petsc_Isn_matrices: core 021/024: assigning dense row  3502 to  3668
-calc_petsc_Isn_matrices: core 004/024: assigning dense row   668 to   835
-calc_petsc_Isn_matrices: core 012/024: assigning dense row  2004 to  2171
-calc_petsc_Isn_matrices: core 015/024: assigning dense row  2505 to  2672
-calc_petsc_Isn_matrices: core 019/024: assigning dense row  3170 to  3336
-calc_petsc_Isn_matrices: core 022/024: assigning dense row  3668 to  3834
 calc_petsc_Isn_matrices: core 001/024: assigning dense row   167 to   334
 calc_petsc_Isn_matrices: core 002/024: assigning dense row   334 to   501
 calc_petsc_Isn_matrices: core 003/024: assigning dense row   501 to   668
+calc_petsc_Isn_matrices: core 004/024: assigning dense row   668 to   835
 calc_petsc_Isn_matrices: core 005/024: assigning dense row   835 to  1002
 calc_petsc_Isn_matrices: core 006/024: assigning dense row  1002 to  1169
 calc_petsc_Isn_matrices: core 007/024: assigning dense row  1169 to  1336
 calc_petsc_Isn_matrices: core 008/024: assigning dense row  1336 to  1503
 calc_petsc_Isn_matrices: core 009/024: assigning dense row  1503 to  1670
 calc_petsc_Isn_matrices: core 010/024: assigning dense row  1670 to  1837
+calc_petsc_Isn_matrices: core 011/024: assigning dense row  1837 to  2004
+calc_petsc_Isn_matrices: core 012/024: assigning dense row  2004 to  2171
 calc_petsc_Isn_matrices: core 013/024: assigning dense row  2171 to  2338
 calc_petsc_Isn_matrices: core 014/024: assigning dense row  2338 to  2505
+calc_petsc_Isn_matrices: core 015/024: assigning dense row  2505 to  2672
 calc_petsc_Isn_matrices: core 016/024: assigning dense row  2672 to  2838
 calc_petsc_Isn_matrices: core 017/024: assigning dense row  2838 to  3004
 calc_petsc_Isn_matrices: core 018/024: assigning dense row  3004 to  3170
+calc_petsc_Isn_matrices: core 019/024: assigning dense row  3170 to  3336
 calc_petsc_Isn_matrices: core 020/024: assigning dense row  3336 to  3502
+calc_petsc_Isn_matrices: core 021/024: assigning dense row  3502 to  3668
+calc_petsc_Isn_matrices: core 022/024: assigning dense row  3668 to  3834
 calc_petsc_Isn_matrices: core 023/024: assigning dense row  3834 to  4000
-rsf_solve: Is (shear) interaction matrix build wall =       0.7198 s
-rsf_finalize_monitor_and_event: tracked 6 events (|v| through 1.000e-03 m/s)
+calc_petsc_Isn_matrices: hmat_storage backend dense m 4000 n 4000 stored_scalars 16000000 dense_ratio 1 mbytes 122.07
+rsf_solve: Is (shear) interaction matrix build wall =       0.6755 s
+rsf_finalize_monitor_and_event: tracked 26 events (|v| through 1.000e-03 m/s)
 TS Object: 24 MPI processes
   type: rk
     RK type 3bs
@@ -42,9 +43,9 @@ TS Object: 24 MPI processes
     Abscissa c =  0.000000  0.500000  0.750000  1.000000 
   initial time step=1.
   maximum steps=2000000
-  maximum time=1.57788e+10
-  total number of RHS function evaluations=10913
-  total number of rejected steps=114
+  maximum time=9.46728e+10
+  total number of RHS function evaluations=58557
+  total number of rejected steps=654
   using relative error tolerance of 0.0001, using vector of absolute error tolerances
   TSAdapt Object: 24 MPI processes
     type: basic
@@ -61,17 +62,17 @@ TS Object: 24 MPI processes
 
 ------------------------------------------------------------------ PETSc Performance Summary: ------------------------------------------------------------------
 
-../../bin/rsf_solve on a  named theo6 with 24 processes, by twb on Fri Jun 26 11:05:39 2026
+../../bin/rsf_solve on a  named theo6 with 24 processes, by twb on Sat Jun 27 12:09:29 2026
 Using PETSc Release Version 3.25.2, unknown
 
                          Max       Max/Min     Avg       Total
-Time (sec):           2.991e+00     1.000   2.991e+00
+Time (sec):           1.276e+01     1.000   1.276e+01
 Objects:              0.000e+00     0.000   0.000e+00
-Flops:                1.462e+10     1.006   1.459e+10  3.501e+11
-Flops/sec:            4.888e+09     1.006   4.878e+09  1.171e+11
+Flops:                7.843e+10     1.006   7.827e+10  1.879e+12
+Flops/sec:            6.149e+09     1.006   6.137e+09  1.473e+11
 MPI Msg Count:        0.000e+00     0.000   0.000e+00  0.000e+00
-MPI Msg Len (bytes):  4.791e+06     1.006   0.000e+00  1.148e+08
-MPI Reductions:       3.081e+04     1.000
+MPI Msg Len (bytes):  2.863e+07     1.006   0.000e+00  6.856e+08
+MPI Reductions:       1.662e+05     1.000
 
 Flop counting convention: 1 flop = 1 real number operation of type (multiply/divide/add/subtract)
                             e.g., VecAXPY() for real vectors of length N --> 2N flops
@@ -79,7 +80,7 @@ Flop counting convention: 1 flop = 1 real number operation of type (multiply/div
 
 Summary of Stages:   ----- Time ------  ----- Flop ------  --- Messages ---  -- Message Lengths --  -- Reductions --
                         Avg     %Total     Avg     %Total    Count   %Total     Avg         %Total    Count   %Total
- 0:      Main Stage: 2.9910e+00 100.0%  3.5014e+11 100.0%  0.000e+00   0.0%  0.000e+00      100.0%  3.079e+04  99.9%
+ 0:      Main Stage: 1.2755e+01 100.0%  1.8786e+12 100.0%  0.000e+00   0.0%  0.000e+00      100.0%  1.662e+05 100.0%
 
 ------------------------------------------------------------------------------------------------------------------------
 See the 'Profiling' chapter of the users' manual for details on interpreting output.
@@ -103,29 +104,29 @@ Event                Count      Time (sec)     Flop                             
 
 --- Event Stage 0: Main Stage
 
-PetscBarrier           2 1.0 1.4891e-03 6.5 0.00e+00 0.0 0.0e+00 0.0e+00 0.0e+00  0  0  0  0  0   0  0  0  0  0     0
-BuildTwoSided          3 1.0 9.1049e-03 89.3 0.00e+00 0.0 0.0e+00 0.0e+00 0.0e+00  0  0  0  0  0   0  0  0  0  0     0
-BuildTwoSidedF         3 1.0 9.1137e-03 82.3 0.00e+00 0.0 0.0e+00 0.0e+00 0.0e+00  0  0  0  0  0   0  0  0  0  0     0
-MatMult            10914 1.0 1.3758e+00 1.1 1.45e+10 1.0 0.0e+00 0.0e+00 1.1e+04 45 99  0  0 35  45 99  0  0 35 253098
-MatScale               1 1.0 3.3474e-04 2.2 6.68e+05 1.0 0.0e+00 0.0e+00 0.0e+00  0  0  0  0  0   0  0  0  0  0 47798
-MatAssemblyBegin       1 1.0 9.0732e-03 123.7 0.00e+00 0.0 0.0e+00 0.0e+00 0.0e+00  0  0  0  0  0   0  0  0  0  0     0
-MatAssemblyEnd         1 1.0 6.9130e-06 1.7 0.00e+00 0.0 0.0e+00 0.0e+00 0.0e+00  0  0  0  0  0   0  0  0  0  0     0
-VecNorm             7043 1.0 5.5663e-02 1.0 9.40e+06 1.0 0.0e+00 0.0e+00 0.0e+00  2  0  0  0  0   2  0  0  0  0  4046
-VecCopy            28738 1.0 7.1761e-03 1.1 0.00e+00 0.0 0.0e+00 0.0e+00 0.0e+00  0  0  0  0  0   0  0  0  0  0     0
-VecSet                 2 1.0 1.1321e-05 2.1 0.00e+00 0.0 0.0e+00 0.0e+00 0.0e+00  0  0  0  0  0   0  0  0  0  0     0
-VecWAXPY            3523 1.0 1.1323e-03 1.2 2.35e+06 1.0 0.0e+00 0.0e+00 0.0e+00  0  0  0  0  0   0  0  0  0  0 49783
-VecMAXPY           18291 1.0 7.3960e-03 1.2 6.86e+07 1.0 0.0e+00 0.0e+00 0.0e+00  0  0  0  0  0   0  0  0  0  0 222164
-VecAssemblyBegin       2 1.0 6.7436e-05 1.6 0.00e+00 0.0 0.0e+00 0.0e+00 0.0e+00  0  0  0  0  0   0  0  0  0  0     0
-VecAssemblyEnd         2 1.0 2.8150e-06 2.2 0.00e+00 0.0 0.0e+00 0.0e+00 0.0e+00  0  0  0  0  0   0  0  0  0  0     0
-VecScatterBegin     1794 1.0 1.0744e-02 2.4 0.00e+00 0.0 0.0e+00 0.0e+00 1.8e+03  0  0  0 100  6   0  0  0 100  6     0
-VecScatterEnd       1794 1.0 4.3738e-02 30.8 0.00e+00 0.0 0.0e+00 0.0e+00 0.0e+00  0  0  0  0  0   0  0  0  0  0     0
-SFSetUp                3 1.0 4.7189e-05 2.9 0.00e+00 0.0 0.0e+00 0.0e+00 0.0e+00  0  0  0  0  0   0  0  0  0  0     0
-SFBcastBegin       10914 1.0 3.8926e-02 1.2 0.00e+00 0.0 0.0e+00 0.0e+00 1.1e+04  1  0  0  0 35   1  0  0  0 35     0
-SFBcastEnd         10914 1.0 3.1905e-01 1.3 0.00e+00 0.0 0.0e+00 0.0e+00 0.0e+00 10  0  0  0  0  10  0  0  0  0     0
-SFPack             12708 1.0 9.7254e-04 1.2 0.00e+00 0.0 0.0e+00 0.0e+00 0.0e+00  0  0  0  0  0   0  0  0  0  0     0
-SFUnpack           12708 1.0 1.0720e-03 1.3 0.00e+00 0.0 0.0e+00 0.0e+00 0.0e+00  0  0  0  0  0   0  0  0  0  0     0
-TSStep              3522 1.0 2.0576e+00 1.2 1.46e+10 1.0 0.0e+00 0.0e+00 2.5e+04 68 100  0  0 83  68 100  0  0 83 170007
-TSFunctionEval     10913 1.0 1.4902e+00 1.1 1.45e+10 1.0 0.0e+00 0.0e+00 1.1e+04 49 99  0  0 35  49 99  0  0 35 233639
+PetscBarrier           2 1.0 2.7256e-03 57.5 0.00e+00 0.0 0.0e+00 0.0e+00 0.0e+00  0  0  0  0  0   0  0  0  0  0     0
+BuildTwoSided          3 1.0 1.0391e-02 121.5 0.00e+00 0.0 0.0e+00 0.0e+00 0.0e+00  0  0  0  0  0   0  0  0  0  0     0
+BuildTwoSidedF         3 1.0 1.0400e-02 112.1 0.00e+00 0.0 0.0e+00 0.0e+00 0.0e+00  0  0  0  0  0   0  0  0  0  0     0
+MatMult            58558 1.0 7.3608e+00 1.1 7.80e+10 1.0 0.0e+00 0.0e+00 5.9e+04 56 99  0  0 35  56 99  0  0 35 253809
+MatScale               1 1.0 3.1810e-04 2.1 6.68e+05 1.0 0.0e+00 0.0e+00 0.0e+00  0  0  0  0  0   0  0  0  0  0 50298
+MatAssemblyBegin       1 1.0 1.0379e-02 156.6 0.00e+00 0.0 0.0e+00 0.0e+00 0.0e+00  0  0  0  0  0   0  0  0  0  0     0
+MatAssemblyEnd         1 1.0 8.6260e-06 2.0 0.00e+00 0.0 0.0e+00 0.0e+00 0.0e+00  0  0  0  0  0   0  0  0  0  0     0
+VecNorm            37709 1.0 2.7401e-01 1.0 5.03e+07 1.0 0.0e+00 0.0e+00 0.0e+00  2  0  0  0  0   2  0  0  0  0  4401
+VecCopy           154112 1.0 4.2807e-02 1.2 0.00e+00 0.0 0.0e+00 0.0e+00 0.0e+00  0  0  0  0  0   0  0  0  0  0     0
+VecSet                 2 1.0 1.2624e-05 3.0 0.00e+00 0.0 0.0e+00 0.0e+00 0.0e+00  0  0  0  0  0   0  0  0  0  0     0
+VecWAXPY           18861 1.0 6.6791e-03 1.2 1.26e+07 1.0 0.0e+00 0.0e+00 0.0e+00  0  0  0  0  0   0  0  0  0  0 45182
+VecMAXPY           98211 1.0 3.4156e-02 1.1 3.68e+08 1.0 0.0e+00 0.0e+00 0.0e+00  0  0  0  0  0   0  0  0  0  0 258352
+VecAssemblyBegin       2 1.0 6.0714e-05 1.6 0.00e+00 0.0 0.0e+00 0.0e+00 0.0e+00  0  0  0  0  0   0  0  0  0  0     0
+VecAssemblyEnd         2 1.0 2.1950e-06 1.4 0.00e+00 0.0 0.0e+00 0.0e+00 0.0e+00  0  0  0  0  0   0  0  0  0  0     0
+VecScatterBegin    10714 1.0 8.1952e-02 3.0 0.00e+00 0.0 0.0e+00 0.0e+00 1.1e+04  0  0  0 100  6   0  0  0 100  6     0
+VecScatterEnd      10714 1.0 2.6938e-01 32.5 0.00e+00 0.0 0.0e+00 0.0e+00 0.0e+00  0  0  0  0  0   0  0  0  0  0     0
+SFSetUp                3 1.0 8.7874e-05 5.5 0.00e+00 0.0 0.0e+00 0.0e+00 0.0e+00  0  0  0  0  0   0  0  0  0  0     0
+SFBcastBegin       58558 1.0 2.0905e-01 1.2 0.00e+00 0.0 0.0e+00 0.0e+00 5.9e+04  2  0  0  0 35   2  0  0  0 35     0
+SFBcastEnd         58558 1.0 1.6594e+00 1.3 0.00e+00 0.0 0.0e+00 0.0e+00 0.0e+00 12  0  0  0  0  12  0  0  0  0     0
+SFPack             69272 1.0 4.8545e-03 1.1 0.00e+00 0.0 0.0e+00 0.0e+00 0.0e+00  0  0  0  0  0   0  0  0  0  0     0
+SFUnpack           69272 1.0 5.1548e-03 1.1 0.00e+00 0.0 0.0e+00 0.0e+00 0.0e+00  0  0  0  0  0   0  0  0  0  0     0
+TSStep             18860 1.0 1.1135e+01 1.2 7.84e+10 1.0 0.0e+00 0.0e+00 1.4e+05 86 100  0  0 82  86 100  0  0 82 168568
+TSFunctionEval     58557 1.0 7.9869e+00 1.1 7.80e+10 1.0 0.0e+00 0.0e+00 5.9e+04 61 99  0  0 35  61 99  0  0 35 233908
 ------------------------------------------------------------------------------------------------------------------------
 
 Object Type          Creations   Destructions. Reports information only for process 0.
@@ -134,7 +135,7 @@ Object Type          Creations   Destructions. Reports information only for proc
 
            Container     3              3
               Matrix     6              6
-              Vector  3543           3543
+              Vector 18881          18881
    Star Forest Graph     7              7
            Index Set     2              2
          PetscRandom     1              1
@@ -151,9 +152,9 @@ Object Type          Creations   Destructions. Reports information only for proc
       Preconditioner     1              1
               Viewer     1              1
 ========================================================================================================================
-Average time to get PetscTime(): 3.41e-08
-Average time for MPI_Barrier(): 9.4636e-06
-Average time for zero size MPI_Send(): 7.25937e-06
+Average time to get PetscTime(): 3.4e-08
+Average time for MPI_Barrier(): 1.31924e-05
+Average time for zero size MPI_Send(): 7.78117e-06
 #PETSc Option Table entries:
 -dc 0.14 # (source: command line)
 -f0 0.6 # (source: command line)
@@ -171,7 +172,7 @@ Average time for zero size MPI_Send(): 7.25937e-06
 -s_wave_speed 3464 # (source: command line)
 -shear_modulus 3.204e10 # (source: command line)
 -sigma_init 25e6 # (source: command line)
--stop_time_yr 500 # (source: command line)
+-stop_time_yr 3000 # (source: command line)
 -ts_adapt_wnormtype infinity # (source: code)
 -ts_max_steps 2000000 # (source: command line)
 -ts_rk_type 3bs # (source: command line)
@@ -202,4 +203,4 @@ Using Fortran linker: /home/twb/progs/src/petsc/build/bin/mpif90
 Using libraries: -Wl,-rpath,/home/twb/progs/src/petsc/build/lib -L/home/twb/progs/src/petsc/build/lib -lpetsc -Wl,-rpath,/home/twb/progs/src/petsc/build/lib -L/home/twb/progs/src/petsc/build/lib -Wl,-rpath,/usr/lib/gcc/x86_64-linux-gnu/11 -L/usr/lib/gcc/x86_64-linux-gnu/11 -lspqr -lumfpack -lklu -lcholmod -lamd -lEl -lElSuiteSparse -lpmrrr -lsmumps -ldmumps -lcmumps -lzmumps -lmumps_common -lpord -lpthread -lscalapack -lh2opus -llapack -lblas -lparmetis -lmetis -lm -lX11 -lmpifort -lmpi -lgfortran -lm -lgfortran -lm -lgcc_s -lquadmath -lstdc++
 -----------------------------------------
 
-Fri Jun 26 11:05:39 AM CDT 2026
+Sat Jun 27 12:09:29 PM CDT 2026

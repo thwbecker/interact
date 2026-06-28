@@ -1,49 +1,49 @@
-Fri Jun 26 06:10:51 PM CDT 2026
+Sat Jun 27 12:09:21 PM CDT 2026
 ../../bin/rsf_solve: found and using Petsc options in /home/twb/progs/src/interact/petsc_settings.yaml
 set_hmat_defaults_and_options: initializing for HACApk
 ../../bin/rsf_solve: read geometry from ../geom_bp5_1km.in, 4000 patches, on 24 cores
 ../../bin/rsf_solve: G 3.204000e+10 Pa cs 3464 m/s eta 4.624711e+06 f0 0.6 dc 0.14 m v0 1.000e-06 vpl 1.000e-09 m/s
 ../../bin/rsf_solve: sigma0 2.500000e+07 tau0 1.500000e+07 Pa vinit 1.000e-09 m/s rand_amp 0
-../../bin/rsf_solve: rtol 1.0e-04 dt_init 1 s dt_max 1e+10 s stop 500 yr
+../../bin/rsf_solve: rtol 1.0e-04 dt_init 1 s dt_max 1e+10 s stop 3000 yr
 read_rsf: read a and b values, on averag 0.03217 and 0.03
 ../../bin/rsf_solve: read per-cell initial tau,vel from ../ic_bp5_1km.in
 ../../bin/rsf_solve: read per-cell D_c from ../dc_bp5_1km.in
 set_hmat_defaults_and_options: initializing for HACApk
 calc_petsc_Isn_matrices: creating HACAPK matrix for stress mode 0 stress type 0
-core 007/024: assigning HACApK m 4000 n 4000 ztol 0.01
-core 018/024: assigning HACApK m 4000 n 4000 ztol 0.01
-core 013/024: assigning HACApK m 4000 n 4000 ztol 0.01
-core 006/024: assigning HACApK m 4000 n 4000 ztol 0.01
-core 012/024: assigning HACApK m 4000 n 4000 ztol 0.01
-core 021/024: assigning HACApK m 4000 n 4000 ztol 0.01
-core 016/024: assigning HACApK m 4000 n 4000 ztol 0.01
-core 000/024: assigning HACApK m 4000 n 4000 ztol 0.01
+core 005/024: assigning HACApK m 4000 n 4000 ztol 0.01 eta 2 inorm: 1
+core 003/024: assigning HACApK m 4000 n 4000 ztol 0.01 eta 2 inorm: 1
+core 012/024: assigning HACApK m 4000 n 4000 ztol 0.01 eta 2 inorm: 1
+core 016/024: assigning HACApK m 4000 n 4000 ztol 0.01 eta 2 inorm: 1
+core 004/024: assigning HACApK m 4000 n 4000 ztol 0.01 eta 2 inorm: 1
+core 010/024: assigning HACApK m 4000 n 4000 ztol 0.01 eta 2 inorm: 1
+core 019/024: assigning HACApK m 4000 n 4000 ztol 0.01 eta 2 inorm: 1
+core 011/024: assigning HACApK m 4000 n 4000 ztol 0.01 eta 2 inorm: 1
+core 008/024: assigning HACApK m 4000 n 4000 ztol 0.01 eta 2 inorm: 1
+core 002/024: assigning HACApK m 4000 n 4000 ztol 0.01 eta 2 inorm: 1
+core 015/024: assigning HACApK m 4000 n 4000 ztol 0.01 eta 2 inorm: 1
+core 007/024: assigning HACApK m 4000 n 4000 ztol 0.01 eta 2 inorm: 1
+core 020/024: assigning HACApK m 4000 n 4000 ztol 0.01 eta 2 inorm: 1
+core 017/024: assigning HACApK m 4000 n 4000 ztol 0.01 eta 2 inorm: 1
+core 013/024: assigning HACApK m 4000 n 4000 ztol 0.01 eta 2 inorm: 1
+core 018/024: assigning HACApK m 4000 n 4000 ztol 0.01 eta 2 inorm: 1
+core 021/024: assigning HACApK m 4000 n 4000 ztol 0.01 eta 2 inorm: 1
+core 014/024: assigning HACApK m 4000 n 4000 ztol 0.01 eta 2 inorm: 1
+core 006/024: assigning HACApK m 4000 n 4000 ztol 0.01 eta 2 inorm: 1
+core 000/024: assigning HACApK m 4000 n 4000 ztol 0.01 eta 2 inorm: 1
  ***************** HACApK start ********************
+core 001/024: assigning HACApK m 4000 n 4000 ztol 0.01 eta 2 inorm: 1
 nd=      4000 nofc=      4000 nffc=         1
 nrank=        24 nth=         1
-core 002/024: assigning HACApK m 4000 n 4000 ztol 0.01
-core 011/024: assigning HACApK m 4000 n 4000 ztol 0.01
-core 008/024: assigning HACApK m 4000 n 4000 ztol 0.01
-core 010/024: assigning HACApK m 4000 n 4000 ztol 0.01
-core 001/024: assigning HACApK m 4000 n 4000 ztol 0.01
-core 005/024: assigning HACApK m 4000 n 4000 ztol 0.01
-core 014/024: assigning HACApK m 4000 n 4000 ztol 0.01
-core 020/024: assigning HACApK m 4000 n 4000 ztol 0.01
-core 023/024: assigning HACApK m 4000 n 4000 ztol 0.01
-core 009/024: assigning HACApK m 4000 n 4000 ztol 0.01
-core 017/024: assigning HACApK m 4000 n 4000 ztol 0.01
-core 003/024: assigning HACApK m 4000 n 4000 ztol 0.01
-core 004/024: assigning HACApK m 4000 n 4000 ztol 0.01
-core 022/024: assigning HACApK m 4000 n 4000 ztol 0.01
-core 019/024: assigning HACApK m 4000 n 4000 ztol 0.01
-core 015/024: assigning HACApK m 4000 n 4000 ztol 0.01
+core 022/024: assigning HACApK m 4000 n 4000 ztol 0.01 eta 2 inorm: 1
+core 009/024: assigning HACApK m 4000 n 4000 ztol 0.01 eta 2 inorm: 1
+core 023/024: assigning HACApK m 4000 n 4000 ztol 0.01 eta 2 inorm: 1
 No. of cluster=         575
  No. of nsmtx        1458        4312        1923
     1:Rk-matrix 2: dense-mat 3:H-matrix
 ncpc=     2282420  ncpc/nrank=       95100
- time_supermatrix             =   2.4419489999445432E-003
- time_fill_hmtx               =  0.13508279600000606     
- time_construction_Hmatrix    =  0.13753393199999664     
+ time_supermatrix             =   6.4800840000316384E-003
+ time_fill_hmtx               =  0.24350540000000365     
+ time_construction_Hmatrix    =  0.24999949000005017     
  Memory of the H-matrix=   16.395530700683594      (Mbyte)
  Memory compression v.s. dense matrix=   13.431218750000001      (%)
  Maximun memory of sub-matrices for a MPI=   1.0141754150390625      (Mbyte)
@@ -52,20 +52,21 @@ ncpc=     2282420  ncpc/nrank=       95100
  lnp=        1000         370         180         260         285         120        1000         300         150         260         370         210        1015         145         240         320         190         240         120        1000         300         380         190         240
  lsp=           1         131         321         501         716         881        1001        1201        1351        1501        1631        1791        1986        2116        2261        2441        2571        2761        2881        3001        3201        3381        3571        3761
 calc_petsc_Isn_matrices: hmat_storage backend HACApk m 4000 n 4000 stored_scalars 2143225 dense_ratio 7.46539 mbytes 16.3515
-rsf_solve: Is (shear) interaction matrix build wall =       0.1669 s
+rsf_solve: Is (shear) interaction matrix build wall =       0.2581 s
 Mat Object: 24 MPI processes
   type: shell
 TS Object: 24 MPI processes
   type: rk
+rsf_finalize_monitor_and_event: tracked 26 events (|v| through 1.000e-03 m/s)
     RK type 3bs
     Order: 3
     FSAL property: yes
     Abscissa c =  0.000000  0.500000  0.750000  1.000000 
   initial time step=1.
   maximum steps=2000000
-  maximum time=1.57788e+10
-  total number of RHS function evaluations=11509
-  total number of rejected steps=335
+  maximum time=9.46728e+10
+  total number of RHS function evaluations=63095
+  total number of rejected steps=2231
   using relative error tolerance of 0.0001, using vector of absolute error tolerances
   TSAdapt Object: 24 MPI processes
     type: basic
@@ -76,24 +77,23 @@ TS Object: 24 MPI processes
     maximum allowed timestep 1.57788e+08
     minimum allowed timestep 0.
     maximum solution absolute value to be ignored -1.
-rsf_finalize_monitor_and_event: tracked 6 events (|v| through 1.000e-03 m/s)
 ****************************************************************************************************************************************************************
 ***                                WIDEN YOUR WINDOW TO 160 CHARACTERS.  Use 'enscript -r -fCourier9' to print this document                                 ***
 ****************************************************************************************************************************************************************
 
 ------------------------------------------------------------------ PETSc Performance Summary: ------------------------------------------------------------------
 
-../../bin/rsf_solve on a  named theo6 with 24 processes, by twb on Fri Jun 26 18:10:55 2026
+../../bin/rsf_solve on a  named walter with 24 processes, by twb on Sat Jun 27 12:09:47 2026
 Using PETSc Release Version 3.25.2, unknown
 
                          Max       Max/Min     Avg       Total
-Time (sec):           4.219e+00     1.000   4.219e+00
+Time (sec):           2.561e+01     1.000   2.561e+01
 Objects:              0.000e+00     0.000   0.000e+00
-Flops:                8.712e+07     1.006   8.694e+07  2.087e+09
-Flops/sec:            2.065e+07     1.006   2.061e+07  4.946e+08
+Flops:                4.784e+08     1.006   4.775e+08  1.146e+10
+Flops/sec:            1.868e+07     1.006   1.865e+07  4.475e+08
 MPI Msg Count:        0.000e+00     0.000   0.000e+00  0.000e+00
-MPI Msg Len (bytes):  4.770e+06     1.006   0.000e+00  1.142e+08
-MPI Reductions:       3.218e+04     1.000
+MPI Msg Len (bytes):  2.857e+07     1.006   0.000e+00  6.843e+08
+MPI Reductions:       1.768e+05     1.000
 
 Flop counting convention: 1 flop = 1 real number operation of type (multiply/divide/add/subtract)
                             e.g., VecAXPY() for real vectors of length N --> 2N flops
@@ -101,7 +101,7 @@ Flop counting convention: 1 flop = 1 real number operation of type (multiply/div
 
 Summary of Stages:   ----- Time ------  ----- Flop ------  --- Messages ---  -- Message Lengths --  -- Reductions --
                         Avg     %Total     Avg     %Total    Count   %Total     Avg         %Total    Count   %Total
- 0:      Main Stage: 4.2189e+00 100.0%  2.0866e+09 100.0%  0.000e+00   0.0%  0.000e+00      100.0%  3.216e+04  99.9%
+ 0:      Main Stage: 2.5608e+01 100.0%  1.1459e+10 100.0%  0.000e+00   0.0%  0.000e+00      100.0%  1.767e+05 100.0%
 
 ------------------------------------------------------------------------------------------------------------------------
 See the 'Profiling' chapter of the users' manual for details on interpreting output.
@@ -125,29 +125,29 @@ Event                Count      Time (sec)     Flop                             
 
 --- Event Stage 0: Main Stage
 
-PetscBarrier           2 1.0 1.3496e-03 56.6 0.00e+00 0.0 0.0e+00 0.0e+00 0.0e+00  0  0  0  0  0   0  0  0  0  0     0
-BuildTwoSided          2 1.0 7.2786e-05 1.7 0.00e+00 0.0 0.0e+00 0.0e+00 0.0e+00  0  0  0  0  0   0  0  0  0  0     0
-BuildTwoSidedF         2 1.0 7.6753e-05 1.6 0.00e+00 0.0 0.0e+00 0.0e+00 0.0e+00  0  0  0  0  0   0  0  0  0  0     0
-MatMult            11510 1.0 3.1892e+00 1.1 1.92e+06 1.0 0.0e+00 0.0e+00 1.2e+04 74  2  0  0 36  74  2  0  0 36    14
-MatScale               1 1.0 7.7100e-07 2.6 0.00e+00 0.0 0.0e+00 0.0e+00 0.0e+00  0  0  0  0  0   0  0  0  0  0     0
-MatAssemblyBegin       1 1.0 1.5100e-07 1.4 0.00e+00 0.0 0.0e+00 0.0e+00 0.0e+00  0  0  0  0  0   0  0  0  0  0     0
-MatAssemblyEnd         1 1.0 1.6330e-06 4.1 0.00e+00 0.0 0.0e+00 0.0e+00 0.0e+00  0  0  0  0  0   0  0  0  0  0     0
-MatView                1 1.0 1.4167e-05 8.9 0.00e+00 0.0 0.0e+00 0.0e+00 0.0e+00  0  0  0  0  0   0  0  0  0  0     0
-VecNorm             7000 1.0 5.1773e-02 1.0 9.34e+06 1.0 0.0e+00 0.0e+00 0.0e+00  1 11  0  0  0   1 11  0  0  0  4323
-VecScale           11510 1.0 3.3954e-03 1.3 1.92e+06 1.0 0.0e+00 0.0e+00 0.0e+00  0  2  0  0  0   0  2  0  0  0 13559
-VecCopy            29670 1.0 8.4193e-03 1.2 0.00e+00 0.0 0.0e+00 0.0e+00 0.0e+00  0  0  0  0  0   0  0  0  0  0     0
-VecSet                 2 1.0 8.5750e-06 3.4 0.00e+00 0.0 0.0e+00 0.0e+00 0.0e+00  0  0  0  0  0   0  0  0  0  0     0
-VecWAXPY            3501 1.0 1.4813e-03 1.5 2.34e+06 1.0 0.0e+00 0.0e+00 0.0e+00  0  3  0  0  0   0  3  0  0  0 37815
-VecMAXPY           19508 1.0 8.5304e-03 1.3 7.35e+07 1.0 0.0e+00 0.0e+00 0.0e+00  0 84  0  0  0   0 84  0  0  0 206405
-VecAssemblyBegin       2 1.0 8.9206e-05 1.5 0.00e+00 0.0 0.0e+00 0.0e+00 0.0e+00  0  0  0  0  0   0  0  0  0  0     0
-VecAssemblyEnd         2 1.0 3.4560e-06 1.8 0.00e+00 0.0 0.0e+00 0.0e+00 0.0e+00  0  0  0  0  0   0  0  0  0  0     0
-VecScatterBegin    13296 1.0 5.3415e-02 1.3 0.00e+00 0.0 0.0e+00 0.0e+00 1.3e+04  1  0  0 100 41   1  0  0 100 41     0
-VecScatterEnd      13296 1.0 3.5764e-01 1.4 0.00e+00 0.0 0.0e+00 0.0e+00 0.0e+00  7  0  0  0  0   7  0  0  0  0     0
-SFSetUp                3 1.0 3.7499e-05 2.8 0.00e+00 0.0 0.0e+00 0.0e+00 0.0e+00  0  0  0  0  0   0  0  0  0  0     0
-SFPack             13296 1.0 1.0525e-03 1.2 0.00e+00 0.0 0.0e+00 0.0e+00 0.0e+00  0  0  0  0  0   0  0  0  0  0     0
-SFUnpack           13296 1.0 1.1465e-03 1.3 0.00e+00 0.0 0.0e+00 0.0e+00 0.0e+00  0  0  0  0  0   0  0  0  0  0     0
-TSStep              3500 1.0 3.8502e+00 1.1 7.54e+07 1.0 0.0e+00 0.0e+00 2.7e+04 91 87  0  0 83  91 87  0  0 83   469
-TSFunctionEval     11509 1.0 3.3082e+00 1.1 1.92e+06 1.0 0.0e+00 0.0e+00 1.2e+04 77  2  0  0 36  77  2  0  0 36    14
+PetscBarrier           2 1.0 8.7947e-03 300.4 0.00e+00 0.0 0.0e+00 0.0e+00 0.0e+00  0  0  0  0  0   0  0  0  0  0     0
+BuildTwoSided          2 1.0 1.1937e-04 1.8 0.00e+00 0.0 0.0e+00 0.0e+00 0.0e+00  0  0  0  0  0   0  0  0  0  0     0
+BuildTwoSidedF         2 1.0 1.2610e-04 1.7 0.00e+00 0.0 0.0e+00 0.0e+00 0.0e+00  0  0  0  0  0   0  0  0  0  0     0
+MatMult            63096 1.0 1.9951e+01 1.0 1.05e+07 1.0 0.0e+00 0.0e+00 6.3e+04 76  2  0  0 36  76  2  0  0 36    13
+MatScale               1 1.0 1.2320e-06 2.4 0.00e+00 0.0 0.0e+00 0.0e+00 0.0e+00  0  0  0  0  0   0  0  0  0  0     0
+MatAssemblyBegin       1 1.0 2.7000e-07 1.9 0.00e+00 0.0 0.0e+00 0.0e+00 0.0e+00  0  0  0  0  0   0  0  0  0  0     0
+MatAssemblyEnd         1 1.0 2.3940e-06 2.6 0.00e+00 0.0 0.0e+00 0.0e+00 0.0e+00  0  0  0  0  0   0  0  0  0  0     0
+MatView                1 1.0 2.9565e-05 8.6 0.00e+00 0.0 0.0e+00 0.0e+00 0.0e+00  0  0  0  0  0   0  0  0  0  0     0
+VecNorm            37582 1.0 3.1019e-01 1.0 5.02e+07 1.0 0.0e+00 0.0e+00 0.0e+00  1 10  0  0  0   1 10  0  0  0  3874
+VecScale           63096 1.0 1.9087e-02 1.3 1.05e+07 1.0 0.0e+00 0.0e+00 0.0e+00  0  2  0  0  0   0  2  0  0  0 13223
+VecCopy           161488 1.0 4.7689e-02 1.2 0.00e+00 0.0 0.0e+00 0.0e+00 0.0e+00  0  0  0  0  0   0  0  0  0  0     0
+VecSet                 2 1.0 1.4136e-05 2.6 0.00e+00 0.0 0.0e+00 0.0e+00 0.0e+00  0  0  0  0  0   0  0  0  0  0     0
+VecWAXPY           18797 1.0 7.5312e-03 1.3 1.26e+07 1.0 0.0e+00 0.0e+00 0.0e+00  0  3  0  0  0   0  3  0  0  0 39934
+VecMAXPY          107354 1.0 4.3815e-02 1.1 4.05e+08 1.0 0.0e+00 0.0e+00 0.0e+00  0 85  0  0  0   0 85  0  0  0 221478
+VecAssemblyBegin       2 1.0 1.4103e-04 1.4 0.00e+00 0.0 0.0e+00 0.0e+00 0.0e+00  0  0  0  0  0   0  0  0  0  0     0
+VecAssemblyEnd         2 1.0 5.9810e-06 1.6 0.00e+00 0.0 0.0e+00 0.0e+00 0.0e+00  0  0  0  0  0   0  0  0  0  0     0
+VecScatterBegin    73789 1.0 3.1362e-01 1.2 0.00e+00 0.0 0.0e+00 0.0e+00 7.4e+04  1  0  0 100 42   1  0  0 100 42     0
+VecScatterEnd      73789 1.0 2.0614e+00 1.2 0.00e+00 0.0 0.0e+00 0.0e+00 0.0e+00  7  0  0  0  0   7  0  0  0  0     0
+SFSetUp                3 1.0 1.2023e-04 4.3 0.00e+00 0.0 0.0e+00 0.0e+00 0.0e+00  0  0  0  0  0   0  0  0  0  0     0
+SFPack             73789 1.0 5.9902e-03 1.2 0.00e+00 0.0 0.0e+00 0.0e+00 0.0e+00  0  0  0  0  0   0  0  0  0  0     0
+SFUnpack           73789 1.0 6.6570e-03 1.3 0.00e+00 0.0 0.0e+00 0.0e+00 0.0e+00  0  0  0  0  0   0  0  0  0  0     0
+TSStep             18796 1.0 2.4294e+01 1.1 4.16e+08 1.0 0.0e+00 0.0e+00 1.5e+05 94 87  0  0 83  94 87  0  0 83   410
+TSFunctionEval     63095 1.0 2.0631e+01 1.0 1.05e+07 1.0 0.0e+00 0.0e+00 6.3e+04 79  2  0  0 36  79  2  0  0 36    12
 ------------------------------------------------------------------------------------------------------------------------
 
 Object Type          Creations   Destructions. Reports information only for process 0.
@@ -156,7 +156,7 @@ Object Type          Creations   Destructions. Reports information only for proc
 
            Container     4              4
               Matrix     6              3
-              Vector  3522           3521
+              Vector 18818          18817
            Index Set     3              3
    Star Forest Graph     7              6
               Viewer     1              1
@@ -173,13 +173,14 @@ Object Type          Creations   Destructions. Reports information only for proc
        Krylov Solver     1              1
       Preconditioner     1              1
 ========================================================================================================================
-Average time to get PetscTime(): 3.51e-08
-Average time for MPI_Barrier(): 7.514e-06
-Average time for zero size MPI_Send(): 4.90788e-06
+Average time to get PetscTime(): 3.41e-08
+Average time for MPI_Barrier(): 8.025e-06
+Average time for zero size MPI_Send(): 5.67387e-06
 #PETSc Option Table entries:
 -dc 0.14 # (source: command line)
 -f0 0.6 # (source: command line)
 -geom_file ../geom_bp5_1km.in # (source: command line)
+-hacapk_inorm 1 # (source: command line)
 -hacapk_ztol 1e-2 # (source: command line)
 -ksp_max_it 10000 # (source: file)
 -ksp_rtol 1.0e-8 # (source: file)
@@ -194,7 +195,7 @@ Average time for zero size MPI_Send(): 4.90788e-06
 -s_wave_speed 3464 # (source: command line)
 -shear_modulus 3.204e10 # (source: command line)
 -sigma_init 25e6 # (source: command line)
--stop_time_yr 500 # (source: command line)
+-stop_time_yr 3000 # (source: command line)
 -ts_adapt_wnormtype infinity # (source: code)
 -ts_max_steps 2000000 # (source: command line)
 -ts_rk_type 3bs # (source: command line)
@@ -225,4 +226,4 @@ Using Fortran linker: /home/twb/progs/src/petsc/build/bin/mpif90
 Using libraries: -Wl,-rpath,/home/twb/progs/src/petsc/build/lib -L/home/twb/progs/src/petsc/build/lib -lpetsc -Wl,-rpath,/home/twb/progs/src/petsc/build/lib -L/home/twb/progs/src/petsc/build/lib -Wl,-rpath,/usr/lib/gcc/x86_64-linux-gnu/11 -L/usr/lib/gcc/x86_64-linux-gnu/11 -lspqr -lumfpack -lklu -lcholmod -lamd -lEl -lElSuiteSparse -lpmrrr -lsmumps -ldmumps -lcmumps -lzmumps -lmumps_common -lpord -lpthread -lscalapack -lh2opus -llapack -lblas -lparmetis -lmetis -lm -lX11 -lmpifort -lmpi -lgfortran -lm -lgfortran -lm -lgcc_s -lquadmath -lstdc++
 -----------------------------------------
 
-Fri Jun 26 06:10:55 PM CDT 2026
+Sat Jun 27 12:09:47 PM CDT 2026
