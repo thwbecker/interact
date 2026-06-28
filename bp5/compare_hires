@@ -12,22 +12,39 @@ for hmat in 1 3 4;do
     elif [ $hmat = 4 ];then
 	label="HMMVP"
     fi
-    
+    tmode=3
     for res in $ress;do
-	
+	if [ ! -s ntest.0/rsf_events.$res.0.inf.dat ];then
+	    echo $0: 	ntest.0/rsf_events.$res.0.inf.dat not found
+	    exit
+	fi
+
 	ofile=bp5_hires.$res.$hmat.ps
-    
-	#reg=-R0/500/-10/1;xann=a200f20;xl=50
-	#reg=-R220/250/-10/1;xann=a5f1;xl=240 # first event
-	#reg=-R440/480/-10/1;xann=a5f1;xl=445 # second event
-	reg=-R435/480/-10/1;xann=a5f1;xl=436 # second event
+	if [ $tmode = 1 ];then	# all
+	    reg=-R0/3000/-11/1;xann=a500f50;xl=50
+	elif [ $tmode = 2 ];then
+	    reg=-R435/480/-11/1;xann=a5f1;xl=436 # second event
+	else					 # 10th event
+	    awk -v e=10 '{if(NR==1+e)printf("%.0f %.0f",$2*0.975,$2*1.025)}' ntest.0/rsf_events.$res.0.inf.dat > tmp.dat
+	    read tmin tmax < tmp.dat ;rm tmp.dat
+	    reg=-R$tmin/$tmax/-11/1;xann=a5f1;xl=`echo $tmin | gawk '{printf($1+1)}'`
+	fi
+	echo $0: $reg $xl 
+	#
+	# dense para
+	#
+	gawk -f extract_hmat_info.awk ntest.0/log.$res.0.inf.dat > tmp.dat
+	read backend N stored_scalars mbytes build_wall_s total_wall_s matvec_ms < tmp.dat ; rm tmp.dat
+	mbytess=`echo $mbytes | gawk '{printf("%.0fM",$1)}'`
+	matvecss=`echo $matvec_ms | gawk '{printf("%.1f ms",$1)}'`
+
 	proj=-JX7/5
-	psbasemap $reg $proj -K -P "-B"$xann:"time [yr]":/a2f.2:"log@-10@-(max(v) [m/s])"::."$label, $res": > $ofile
-	gawk '{print($3,$5)}' ntest.0/rsf_monitor.$res.0.inf.dat | psxy $reg $proj -O -K -W5,gray >> $ofile # dense
+	psbasemap $reg $proj -K -P "-B"$xann:"time [yr]":/a2f.2:"log@-10@-(max(v) [m/s])"::."$label, $res, N = $N": > $ofile
+	gawk '{print($3,$5)}' ntest.0/rsf_monitor.$res.0.inf.dat | psxy $reg $proj -O -K -W5,gray >> $ofile 
 	yl=0
-	echo $xl $yl 20 0 29 LM "dense" | pstext $reg $proj -O -K  >> $ofile;((yl=yl-1))
+	echo $xl $yl 20 0 29 LM "dense, $mbytess, $matvecss" | pstext $reg $proj -O -K  >> $ofile;((yl=yl-1))
 	epsa=`ls $dir/rsf_monitor.$res.$hmat.*.dat | gawk -F. '{print($(NF-1))}' | sort -gr`
-	pc=1
+	pc=1;off=0
 	for eps in $epsa;do
 	    if [ -s $dir/log.$res.$hmat.$eps.dat ];then
 		# columns out 
@@ -41,13 +58,15 @@ for hmat in 1 3 4;do
 		mbytess=NaN;matvecss=NaN
 	    fi
 	    col=`platecolor $pc`
-	    gawk '{print($3,$5)}' $dir/rsf_monitor.$res.$hmat.$eps.dat | psxy $reg $proj -O -K -W1,$col >> $ofile
+	    gawk -v off=$off '{print($3,$5+off)}' $dir/rsf_monitor.$res.$hmat.$eps.dat | psxy $reg $proj -O -K -W1,$col >> $ofile
 	    labele=`echo $eps | gawk -Fe '{print($1,$2)}' | gawk '{printf("@[\\\\epsilon = %.0f\\\\cdot 10^{%i}@[",$1,$2)}'`
 	    echo $xl $yl 20 0 29 LM "$labele, $mbytess, $matvecss" | pstext $reg $proj -O -K -F+f$col >> $ofile;	((yl=yl-1))
+	    off=`echo $off | gawk '{print($1-0.1)}'`
 	    ((pc=pc+1))
 	done
 	psxy -O -T >> $ofile
 	modifybb $ofile
+	#gv $ofile; exit
 	fs="$fs $ofile"
     done
 done
