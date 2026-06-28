@@ -1,0 +1,57 @@
+Sun Jun 28 08:06:11 AM CDT 2026
+../../bin/rsf_solve: found and using Petsc options in /home/twb/progs/src/interact/petsc_settings.yaml
+set_hmat_defaults_and_options: initializing for HACApk
+../../bin/rsf_solve: read geometry from ../geom_bp5_0.25km.in, 64000 patches, on 24 cores
+../../bin/rsf_solve: G 3.204000e+10 Pa cs 3464 m/s eta 4.624711e+06 f0 0.6 dc 0.14 m v0 1.000e-06 vpl 1.000e-09 m/s
+../../bin/rsf_solve: sigma0 2.500000e+07 tau0 1.500000e+07 Pa vinit 1.000e-09 m/s rand_amp 0
+../../bin/rsf_solve: rtol 1.0e-04 dt_init 1 s dt_max 1e+10 s stop 3000 yr
+read_rsf: read a and b values, on averag 0.0321756 and 0.03
+../../bin/rsf_solve: read per-cell initial tau,vel from ../ic_bp5_0.25km.in
+../../bin/rsf_solve: read per-cell D_c from ../dc_bp5_0.25km.in
+set_hmat_defaults_and_options: initializing for HACApk
+calc_petsc_Isn_matrices: creating HACAPK matrix for stress mode 0 stress type 0
+core 002/024: assigning HACApK m 64000 n 64000 ztol 1e-06 eta 2 inorm: 1
+core 011/024: assigning HACApK m 64000 n 64000 ztol 1e-06 eta 2 inorm: 1
+core 017/024: assigning HACApK m 64000 n 64000 ztol 1e-06 eta 2 inorm: 1
+core 000/024: assigning HACApK m 64000 n 64000 ztol 1e-06 eta 2 inorm: 1
+core 003/024: assigning HACApK m 64000 n 64000 ztol 1e-06 eta 2 inorm: 1
+core 006/024: assigning HACApK m 64000 n 64000 ztol 1e-06 eta 2 inorm: 1
+core 012/024: assigning HACApK m 64000 n 64000 ztol 1e-06 eta 2 inorm: 1
+core 014/024: assigning HACApK m 64000 n 64000 ztol 1e-06 eta 2 inorm: 1
+core 021/024: assigning HACApK m 64000 n 64000 ztol 1e-06 eta 2 inorm: 1
+core 007/024: assigning HACApK m 64000 n 64000 ztol 1e-06 eta 2 inorm: 1
+core 016/024: assigning HACApK m 64000 n 64000 ztol 1e-06 eta 2 inorm: 1
+core 019/024: assigning HACApK m 64000 n 64000 ztol 1e-06 eta 2 inorm: 1
+core 023/024: assigning HACApK m 64000 n 64000 ztol 1e-06 eta 2 inorm: 1
+core 004/024: assigning HACApK m 64000 n 64000 ztol 1e-06 eta 2 inorm: 1
+core 005/024: assigning HACApK m 64000 n 64000 ztol 1e-06 eta 2 inorm: 1
+core 008/024: assigning HACApK m 64000 n 64000 ztol 1e-06 eta 2 inorm: 1
+core 009/024: assigning HACApK m 64000 n 64000 ztol 1e-06 eta 2 inorm: 1
+core 001/024: assigning HACApK m 64000 n 64000 ztol 1e-06 eta 2 inorm: 1
+core 010/024: assigning HACApK m 64000 n 64000 ztol 1e-06 eta 2 inorm: 1
+core 015/024: assigning HACApK m 64000 n 64000 ztol 1e-06 eta 2 inorm: 1
+core 022/024: assigning HACApK m 64000 n 64000 ztol 1e-06 eta 2 inorm: 1
+core 020/024: assigning HACApK m 64000 n 64000 ztol 1e-06 eta 2 inorm: 1
+ ***************** HACApK start ********************
+core 018/024: assigning HACApK m 64000 n 64000 ztol 1e-06 eta 2 inorm: 1
+core 013/024: assigning HACApK m 64000 n 64000 ztol 1e-06 eta 2 inorm: 1
+nd=     64000 nofc=     64000 nffc=         1
+nrank=        24 nth=         1
+No. of cluster=        9215
+ No. of nsmtx       33042       75952       36331
+    1:Rk-matrix 2: dense-mat 3:H-matrix
+ncpc=    66991820  ncpc/nrank=     2791325
+ time_supermatrix             =  0.10050183799995693     
+ time_fill_hmtx               =   106.51422696499998     
+ time_construction_Hmatrix    =   106.61474694699996     
+ Memory of the H-matrix=   2514.5150070190430      (Mbyte)
+ Memory compression v.s. dense matrix=   8.0464480224609378      (%)
+ Maximun memory of sub-matrices for a MPI=   616.91748046875000      (Mbyte)
+ Minimun memory of sub-matrices for a MPI=   36.124572753906250      (Mbyte)
+ Minimun memory/Maximun memory=   5.8556571822957357E-002
+ lnp=       16000        5500        2530        4000        4870        2120       16000        5000        2465        4000        5620        3000       16015        5900        3500        4650        6370        3945       17060        2620        4000        5000        6240        3500
+ lsp=           1        2501        5471        8001       11131       13881       16001       19001       21536       24001       26381       29001       31986       34101       36501       39351       41631       44056       46941       49381       52001       55001       57761       60501
+calc_petsc_Isn_matrices: hmat_storage backend HACApk m 64000 n 64000 stored_scalars 329473515 dense_ratio 12.432 mbytes 2513.68
+rsf_solve: Is (shear) interaction matrix build wall =     106.6263 s
+Mat Object: 24 MPI processes
+  type: shell
