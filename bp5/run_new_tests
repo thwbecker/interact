@@ -15,14 +15,14 @@ if [ $hmat = 0 ];then
     tol_flag=""
     epsv=inf
 elif [ $hmat = 1 ];then		# htools
-    epsv="1e-3 7e-4 5e-4 1e-4 1e-5"
+    epsv="1e-3 1e-4 1e-5 1e-6"
     tol_flag="-mat_htool_eta 3 -mat_htool_epsilon" # make eta comparable
 elif [ $hmat = 3 ];then		# hacapk
-    epsv="1e-2 1e-3 1e-4 1e-5 "
-    tol_flag="-hacapk_inorm 1 -hacapk_ztol" # switch to absolute norm
+    epsv="1e-3 1e-4 1e-5 1e-6"
+    tol_flag="-hacapk_inorm 1 -hacapk_ztol" # switch to local, absolute norm 
 elif [ $hmat = 4 ];then		# HMMVP
-    epsv="1e-3 5e-4 1e-4 1e-5 1e-6"
-    tol_flag="-hmmvp_inorm 1  -hmmvp_tol" # swith to absolute norm
+    epsv="1e-2 1e-3 1e-4 1e-5 1e-6"
+    tol_flag="-hmmvp_inorm 1  -hmmvp_tol" # switch to local norm
 else
     echo $0: error
     exit

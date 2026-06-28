@@ -799,7 +799,14 @@ PetscErrorCode set_hmat_defaults_and_options(struct med *medium, int hmat) /*  t
     /* epsilon */
     PetscCall(PetscOptionsHasName(NULL,NULL,"-mat_htool_epsilon",&flg));
     if(!flg)
-      PetscCall(PetscOptionsSetValue(NULL,"-mat_htool_epsilon","1e-5"));
+      PetscCall(PetscOptionsSetValue(NULL,"-mat_htool_epsilon","1e-4")); /* 1e-4
+									    seems
+									    like
+									    a
+									    good
+									    compromise
+									    at
+									    eta=3 */
     /* compressor */
     PetscCall(PetscOptionsHasName(NULL,NULL,"-mat_htool_compressor",&flg));
     if(!flg)			/* this is a symmetric compressor, a
@@ -834,11 +841,17 @@ PetscErrorCode set_hmat_defaults_and_options(struct med *medium, int hmat) /*  t
   case IHMAT_TYPE_HACAPK:
 #ifdef USE_HACAPK
     /* hacapl */
-    medium->hacapk_ztol = 1.0e-4; /* seems like a solid choice */
+    medium->hacapk_ztol = 1.0e-4; /* seems like a solid choice for inorm=1 */
     PetscCall(PetscOptionsGetReal(NULL,NULL,"-hacapk_ztol",&medium->hacapk_ztol,NULL));
     medium->hacapk_eta = 2.0; /* admissibility distance param(51); larger admits more far-field, HACApk default 2 */
     PetscCall(PetscOptionsGetReal(NULL,NULL,"-hacapk_eta",&medium->hacapk_eta,NULL));
-    /* error norm, 1 (absolute) or 3 (relative) (HBI default) */
+    /* 
+       error norm:
+       
+       1 (absolute) (preferred for cycle)
+       3 (global, relative) (HBI default) 
+
+    */
     medium->hacapk_inorm = 3;
     PetscCall(PetscOptionsGetInt(NULL,NULL,"-hacapk_inorm",&medium->hacapk_inorm,NULL));
 #else
@@ -850,12 +863,15 @@ PetscErrorCode set_hmat_defaults_and_options(struct med *medium, int hmat) /*  t
   case IHMAT_TYPE_HMMVP:
 #ifdef USE_HMMVP
     /* hmmvp */
-    medium->hmmvp_tol = 1.0e-6;	/* 1e-5 OK for low res, high res might need 1-6*/
+    medium->hmmvp_tol = 1.0e-3;	/* 1e-3 works fro inorm=1 */
     medium->hmmvp_eta = 3.0;
     medium->hmmvp_nthreads = 1;
     medium->hmmvp_inorm = 3;	/* tolerance norm mode, kept comparable with -hacapk_inorm:
-				   1 = block-local (tm_brem_fro), else matrix-global (tm_mrem_fro,
-				   the hmmvp default and the prior hardcoded behavior) */
+				   
+				   1 = block-local (tm_brem_fro) - seems preferred for cycle
+				   3 or else: matrix-global (tm_mrem_fro,
+				   the hmmvp default and the prior hardcoded behavior) 
+				*/
     
     PetscCall(PetscOptionsGetReal(NULL,NULL,"-hmmvp_tol",&medium->hmmvp_tol,NULL));
     PetscCall(PetscOptionsGetReal(NULL,NULL,"-hmmvp_eta",&medium->hmmvp_eta,NULL));

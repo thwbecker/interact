@@ -676,6 +676,36 @@ int main(int argc, char **argv)
 				   loops above are pure timing and leave
 				   b, bh from their last random x, so
 				   recompute with x=1 here) */
+      /* generic accuracy: relative matvec error on a random x, an estimate
+         of the operator error ||A_h-A||/||A|| in a typical direction, the
+         fundamental b = A x quality decoupled from the x=1 coherent/loading
+         direction reported just below. one shared random x feeds both
+         operators (x to dense, xh to H, mirroring the x=1 path), so the
+         difference is meaningful; this assumes the dense and H column layouts
+         match, which they do here (default PetscLayout over n on one comm). */
+      {
+        Vec        dr;
+        PetscReal  nb, nd, re, sum_re = 0.0, max_re = 0.0;
+        PetscInt   k, nacc;
+        nacc = (nrandom < 1) ? 1 : ((nrandom > 20) ? 20 : nrandom);
+        PetscCall(VecDuplicate(b, &dr));
+        for(k=0;k<nacc;k++){
+          PetscCall(VecSetRandom(x, rand_str));
+          PetscCall(VecCopy(x, xh));
+          PetscCall(MatMult(Adense, x,  b));
+          PetscCall(MatMult(AH,     xh, bh));
+          PetscCall(VecCopy(b, dr));
+          PetscCall(VecAXPY(dr, -1.0, bh));
+          PetscCall(VecNorm(b,  NORM_2, &nb));
+          PetscCall(VecNorm(dr, NORM_2, &nd));
+          re = (nb > 0.0) ? nd/nb : 0.0;
+          sum_re += re; if(re > max_re) max_re = re;
+        }
+        PetscCall(VecDestroy(&dr));
+        HEADNODE
+          fprintf(stdout,"%s: random-x rel err: mean = %20.10e max = %20.10e over %d vectors\n",
+                  argv[0], (double)(sum_re/nacc), (double)max_re, (int)nacc);
+      }
       PetscCall(VecSet(x, 1.0));
       PetscCall(VecSet(xh,1.0));
       PetscCall(MatMult(Adense, x, b));
