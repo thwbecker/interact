@@ -3,7 +3,7 @@
 hmat=${1-0}
 ress=${2-"1km 0.5km 0.25km"}
 ncore=${3-24}
-
+# local_norm
 #tmax=500
 tmax=3000			# to get better read on matvec
 
