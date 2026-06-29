@@ -31,7 +31,7 @@
 # Output: hmat_bAx.<res>.dat with columns
 #   backend imode eps generic_err coherent_err stored_scalars mbytes matvec_ms
 
-for res in 1km 0.5km 0.25km;do                # 1km | 0.5km | 0.25km
+res=1km                 # 1km | 0.5km | 0.25km
 ncore=24
 nrandom=100
 
@@ -90,4 +90,3 @@ done
 echo "wrote $out"
 echo "plot stored_scalars and matvec_ms (cost) vs generic_err (accuracy): the"
 echo "lowest curve at a target generic_err is the best b = A x backend on that cost."
-done
