@@ -845,13 +845,13 @@ PetscErrorCode set_hmat_defaults_and_options(struct med *medium, int hmat) /*  t
     PetscCall(PetscOptionsGetReal(NULL,NULL,"-hacapk_ztol",&medium->hacapk_ztol,NULL));
     medium->hacapk_eta = 2.0; /* admissibility distance param(51); larger admits more far-field, HACApk default 2 */
     PetscCall(PetscOptionsGetReal(NULL,NULL,"-hacapk_eta",&medium->hacapk_eta,NULL));
-    /* 
-       error norm:
-       
-       1 (absolute) (preferred for cycle)
-       3 (global, relative) (HBI default) 
-
-    */
+    /* error-norm mode (param(61)):
+         1 = absolute threshold (scale-dependent; can be worse than mode 3 at
+             loose ztol on fine meshes, so not reliably better even for cycles)
+         3 = matrix-relative (HBI default, the robust choice for this kernel)
+       block-local would be ideal for the coherent loading response, but
+       HACApK's mode 1 is absolute rather than block-relative; prefer mode 3.
+       See test_hmatrix/hmat_backend_evaluation.md. */
     medium->hacapk_inorm = 3;
     PetscCall(PetscOptionsGetInt(NULL,NULL,"-hacapk_inorm",&medium->hacapk_inorm,NULL));
 #else
@@ -863,15 +863,24 @@ PetscErrorCode set_hmat_defaults_and_options(struct med *medium, int hmat) /*  t
   case IHMAT_TYPE_HMMVP:
 #ifdef USE_HMMVP
     /* hmmvp */
-    medium->hmmvp_tol = 1.0e-3;	/* 1e-3 works fro inorm=1 */
+    medium->hmmvp_tol = 1.0e-3;	/* 1e-3 is the sweet spot for inorm=1 (BREM):
+				   on fine meshes do NOT tighten, storage explodes
+				   for negligible accuracy gain. */
     medium->hmmvp_eta = 3.0;
     medium->hmmvp_nthreads = 1;
-    medium->hmmvp_inorm = 3;	/* tolerance norm mode, kept comparable with -hacapk_inorm:
-				   
-				   1 = block-local (tm_brem_fro) - seems preferred for cycle
-				   3 or else: matrix-global (tm_mrem_fro,
-				   the hmmvp default and the prior hardcoded behavior) 
-				*/
+    medium->hmmvp_inorm = 3;	/* tolerance norm mode:
+				   1 = block-local (tm_brem_fro): STRONGLY preferred
+				       for earthquake-cycle / rsf_solve use; its
+				       coherent (uniform-slip) error is 100x to
+				       10000x below mode 3 at matched tol. also use
+				       for tight generic b=Ax accuracy.
+				   3 or else = matrix-global (tm_mrem_fro, hmmvp's
+				       own default): only for loose-to-moderate
+				       generic b=Ax at minimum storage, where eps
+				       reads out as the operator error.
+				   default left at 3 (hmmvp's default); cycle runs
+				   set -hmmvp_inorm 1. See
+				   test_hmatrix/hmat_backend_evaluation.md */
     
     PetscCall(PetscOptionsGetReal(NULL,NULL,"-hmmvp_tol",&medium->hmmvp_tol,NULL));
     PetscCall(PetscOptionsGetReal(NULL,NULL,"-hmmvp_eta",&medium->hmmvp_eta,NULL));

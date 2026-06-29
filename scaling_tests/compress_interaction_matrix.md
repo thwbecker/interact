@@ -1,8 +1,8 @@
 # Testing H-matrix backends with `compress_interaction_matrix`
 
 `compress_interaction_matrix` builds the (strike-stress, by default)
-fault interaction operator twice — once dense, once with a hierarchical
-matrix backend constructed from the *same* Green's function kernel —
+fault interaction operator twice - once dense, once with a hierarchical
+matrix backend constructed from the *same* Green's function kernel - 
 and compares the two for the forward product `b = A x` (always) and
 optionally the inverse solve `x = A\b`. It is the fast way to choose
 H-matrix settings for a given geometry before committing to long
@@ -76,22 +76,29 @@ Forward `b = Ax`, error tracks the tolerance for HTOOL and HACApK:
 
 | setting | N=400 | N=1600 | N=6400 | N=10000 |
 |---|---|---|---|---|
-| HTOOL eps 1e-3 (ACA) | 5.8e-4* | 5.8e-4 | — | — |
-| HTOOL eps 1e-4 (ACA, eta 100) | — | 7.0e-5 | 2.1e-4 | — |
-| HTOOL eps 3e-5 (ACA, eta 10) | — | 3.2e-7 | 5.8e-7 | 8.8e-6 |
-| HTOOL eps 1e-8 | 1e-15 (= dense) | — | — | — |
-| H2OPUS (maxrank 256) | 2.3e-3 | 2.3e-3 | 2.6e-3 | — |
-| HACApK ztol 1e-4 | 2.0e-6 | 4.7e-6 | — | 1.8e-5 |
-| HACApK ztol 1e-5 | — | 2.5e-7 | 3.5e-7 | 6.2e-7 |
-| hmmvp tol 1e-5 | 7.3e-6 | 3.3e-5 | 1.6e-4 | — |
-| hmmvp tol 1e-6 | — | — | 1.1e-5 | — |
+| HTOOL eps 1e-3 (ACA) | 5.8e-4* | 5.8e-4 | - | - |
+| HTOOL eps 1e-4 (ACA, eta 100) | - | 7.0e-5 | 2.1e-4 | - |
+| HTOOL eps 3e-5 (ACA, eta 10) | - | 3.2e-7 | 5.8e-7 | 8.8e-6 |
+| HTOOL eps 1e-8 | 1e-15 (= dense) | - | - | - |
+| H2OPUS (maxrank 256) | 2.3e-3 | 2.3e-3 | 2.6e-3 | - |
+| HACApK ztol 1e-4 | 2.0e-6 | 4.7e-6 | - | 1.8e-5 |
+| HACApK ztol 1e-5 | - | 2.5e-7 | 3.5e-7 | 6.2e-7 |
+| hmmvp tol 1e-5 | 7.3e-6 | 3.3e-5 | 1.6e-4 | - |
+| hmmvp tol 1e-6 | - | - | 1.1e-5 | - |
 
-hmmvp's -hmmvp_tol is a WHOLE-MATRIX relative Frobenius bound
-(the MREM method) - the only backend whose tolerance directly bounds
-a global error. note that the x=1 test vector used for the error rows
-above suffers cancellation in the row sums of this sign-structured
-kernel, which inflates the measured relative error somewhat above the
-operator-norm error for all backends alike.
+hmmvp's `-hmmvp_tol` defaults to a WHOLE-MATRIX relative Frobenius
+bound (MREM): tol bounds the global operator error directly. As of the
+norm-mode work it can also run block-local (`-hmmvp_inorm 1`, BREM),
+which is strongly preferred for earthquake-cycle use; the norm mode
+changes the achieved error by orders of magnitude, so tol is not
+comparable across modes or libraries. The x=1 test vector used for the
+error rows above is the coherent (uniform-slip) direction: it suffers
+cancellation in the row sums of this sign-structured kernel and so
+reads higher than the generic random-x operator error (by roughly 7x
+to 10x here), and it is the direction that sets cycle timing. The tool
+now reports both. See `../test_hmatrix/hmat_backend_evaluation.md` for
+the comparison-at-equal-error methodology and current per-package
+recommendations, which supersede the per-tolerance tables here.
 
 (*N=400 value at eta=100; the eps 1e-3 row is representative.)
 
@@ -103,7 +110,7 @@ KSP/MATSHELL path, H2OPUS 8.1e-4 (floor, see below).
 
 | N=10000 | err | H assembly | matvec total | vs dense matvec |
 |---|---|---|---|---|
-| dense | — | ~85 s | 25.6 s | 1x |
+| dense | - | ~85 s | 25.6 s | 1x |
 | HTOOL (ACA eps 3e-5, eta 10) | 8.8e-6 | ~19 s | 6.6 s | 3.9x |
 | **HACApK ztol 1e-5** | **6.2e-7** | **11.7 s** | **3.8 s** | **6.7x** |
 | hmmvp tol 1e-6 (N=6400) | 1.1e-5 | 7.3 s | 1.5 s/300 | fastest matvec at 6400 |
@@ -236,8 +243,11 @@ configuration.
 - **HACApK (`-use_hmatrix 3`) performed best for this operator in our
   serial tests**:
   index-based kernel interface, robust default ACA (no reliability
-  tuning needed; `param(61)=1` normalization is set by the interface),
-  fastest assembly and matvec at matched error. Use `-hacapk_ztol`
+  tuning needed; the interface sets `param(61)=3`, matrix-relative,
+  HACApK's robust default for this kernel; its absolute mode
+  `-hacapk_inorm 1` is scale-dependent and not reliably better, see
+  `../test_hmatrix/hmat_backend_evaluation.md`), fastest assembly and
+  matvec at matched error in the serial tests. Use `-hacapk_ztol`
   ~3-10x below the error target (1e-5 gives <1e-6 everywhere tested).
 - **HTOOL (`-use_hmatrix 1`)**: use `sympartialACA` (default) with
   **eta = 10 (default)** and eps ~3x below the target. Caution: large
@@ -247,7 +257,7 @@ configuration.
   eps 3e-5 gave 3.1e-4 with eta=100 vs 8.8e-6 with eta=10. The
   reliable eta=10 costs more assembly (70 s vs 10 s at N=6400). The
   fullACA/SVD compressors are reliable and compress best but have
-  O(N^2) assembly — only for operators reused over >~1e5 matvecs.
+  O(N^2) assembly - only for operators reused over >~1e5 matvecs.
 - **H2OPUS (`-use_hmatrix 2`)**: construction is via sampling of the
   assembled dense operator (`MatCreateH2OpusFromMat`), because the
   kernel interface (Chebyshev interpolation at arbitrary points) is

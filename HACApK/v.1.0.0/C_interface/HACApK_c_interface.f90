@@ -160,9 +160,14 @@ CONTAINS
     lf_struct%st_ctl%param(51) = eta
   END SUBROUTINE cset_hacapk_eta
   
-  ! hacapack norm style
-  ! ACA norm 1:MREM  2:test 3:norm
-  ! 1: relative 3: absolute (HBI default)
+  ! HACApK ACA stopping-norm mode, sets param(61):
+  !   1 = absolute (absolute ACA_EPS threshold; scale-dependent)
+  !   3 = matrix-relative (threshold scales with the matrix norm; HBI default,
+  !       and the robust choice for this kernel, see hmat_backend_evaluation.md)
+  ! For the coherent uniform-slip (earthquake-loading) response a block-local
+  ! measure is preferable, but HACApK's mode 1 is absolute rather than
+  ! block-relative, so it can be worse than mode 3 at loose tolerance on fine
+  ! meshes. Prefer mode 3 unless at tight tolerance.
 
   SUBROUTINE cset_hacapk_inorm(c_pointer, inorm) &
        BIND(C, name='cset_hacapk_inorm')
