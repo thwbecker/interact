@@ -27,6 +27,8 @@
   infinity error norm and rtol = eps_r as in HBI's rkqs, step growth
   limited to 2x, shrink to 0.5x per rejection
 
+  alternative: use 3bs, pretty good performance, fewer rejected steps
+
   units are SI: Pa, m, s; geometry input (geom.in) must hence be in meters
 
 */
@@ -73,9 +75,9 @@ int main(int argc,char **argv)
 /*
    the solver proper: read geometry, build the interaction matrices,
    set the initial state, configure the TS integrator and the output,
-   integrate to the stop time, and clean up.  All configuration arrives
-   through struct rsf_solve_settings; the body below is the original driver
-   logic with the settings copied back into locals
+   integrate to the stop time, and clean up.  All configuration
+   arrives through struct rsf_solve_settings; the body below is the
+   original driver logic with the settings copied back into locals
 */
 PetscErrorCode rsf_solve_run(int argc,char **argv,struct interact_ctx *par,
 			     struct rsf_solve_settings *set)

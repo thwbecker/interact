@@ -62,7 +62,7 @@ typedef struct{
   PetscInt nelt;
   double bscale;
 #endif
-} hacapk_shell_ctx;
+} hmat_helper_shell_ctx;
 
 /* 
    
@@ -364,7 +364,7 @@ struct med{
   PetscReal bigwham_eta, bigwham_eps_aca; /* admissibility, ACA tolerance */
   PetscInt bigwham_max_leaf, bigwham_nthreads;
 #endif
-  hacapk_shell_ctx *Is_hctx,*In_hctx;
+  hmat_helper_shell_ctx *Is_hctx,*In_hctx;
   
 #else
   unsigned int comm_size,comm_rank;

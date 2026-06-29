@@ -48,12 +48,12 @@ PetscErrorCode rsf_init_monitor_and_event(struct rsf_out_ctx *uc,struct interact
   uc->old_time = t_init - 2.0*dt_monitor;
   uc->fout_monitor = uc->fout_stats = uc->fout_event = NULL;
   if(medium->comm_rank == 0){
-    uc->fout_monitor = fopen("rsf_monitor.dat","w");
+    uc->fout_monitor = myopen("rsf_monitor.dat","w");
     fprintf(uc->fout_monitor,"# step time[s] time[yr] dt[s] log10(max|v|[m/s]) mean_slip[m] mean_mu max_sigma[Pa] min_sigma[Pa]\n");
-    uc->fout_stats = fopen("rsf_stats.dat","w");
+    uc->fout_stats = myopen("rsf_stats.dat","w");
     fprintf(uc->fout_stats,"# time[yr] mean_vel std_vel min_vel max_vel mean_slip\n");
     if(uc->track_events){
-      uc->fout_event = fopen("rsf_events.dat","w");
+      uc->fout_event = myopen("rsf_events.dat","w");
       fprintf(uc->fout_event,"# time[s] time[yr] onset(1)/arrest(-1) log10(max|v|[m/s]) mean_slip[m] mean_mu, |v| threshold %.3e m/s\n",
 	      uc->vel_event);
     }
@@ -61,7 +61,7 @@ PetscErrorCode rsf_init_monitor_and_event(struct rsf_out_ctx *uc,struct interact
       int ierr_dir = system("mkdir -p tmp_rsf");
       if(ierr_dir)
 	fprintf(stderr,"rsf_init_monitor_and_event: WARNING: could not make tmp_rsf directory\n");
-      uc->fout_field_times = fopen("rsf_vel.times","w");
+      uc->fout_field_times = myopen("rsf_vel.times","w");
       if(uc->fout_field_times){
 	fprintf(uc->fout_field_times,"# frame step time[yr] time[s] log10(max|v|[m/s])\n");
 	fprintf(uc->fout_field_times,"# field per group in tmp_rsf/rsf_vel.gGGG.NNNNNN.bin (float32 along_strike,down_dip,log10|v| triples, xyz2grd -bi3f); geometry rsf_geom.gGGG.dat\n");
@@ -221,7 +221,7 @@ PetscErrorCode rsf_TS_Monitor(TS ts,PetscInt step,PetscReal time,Vec X,void *ptr
 	    fprintf(stderr,"rsf_TS_Monitor: WARNING: error making tmp_rsf output directory\n");
 	}
 	snprintf(vel_file,STRLEN,"tmp_rsf/vel-%012.5e-%06i-gmt",time/sec_per_year,uc->field_out);
-	fout2 = fopen(vel_file,"w");
+	fout2 = myopen(vel_file,"w");
 	if(fout2){
 	  for(i=0;i < n;i++)
 	    print_patch_geometry_and_bc(i,fault,PSXYZ_STRIKE_DISP_OUT_MODE,time,FALSE,fout2,FALSE,&du1);
@@ -270,7 +270,7 @@ PetscErrorCode rsf_TS_Monitor(TS ts,PetscInt step,PetscReal time,Vec X,void *ptr
 	  g->buf[3*k+2] = (float)log10(vv);
 	}
 	snprintf(ffile,STRLEN,"tmp_rsf/rsf_vel.g%03d.%06i.bin",g->id,uc->field_frame);
-	fb = fopen(ffile,"wb");
+	fb = myopen(ffile,"wb");
 	if(fb){
 	  fwrite(g->buf,sizeof(float),(size_t)3*(size_t)g->np,fb);
 	  fclose(fb);
@@ -340,7 +340,7 @@ void rsf_write_group_geometry(const struct rsf_group_grid *g,struct flt *fault,
   FILE *out;int k;
   if(g->np < 1)
     return;
-  out=fopen(fname,"w");
+  out=myopen(fname,"w");
   if(!out){
     fprintf(stderr,"rsf_write_group_geometry: cannot open %s for writing\n",fname);
     return;

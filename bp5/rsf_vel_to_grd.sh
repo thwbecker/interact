@@ -20,11 +20,9 @@
 times=rsf_vel.times              # frame index
 outdir=tmp_rsf                   # where the .bin frames are and the .grd go
 
-make_png=1                       # 1: also render a PNG per group per frame, 0: just .grd
-cpt_low=-12                      # color range, log10|v| [m/s]
-cpt_high=1
-cpt_step=0.5
-proj=-JX15c/-7.5c                # down_dip increases downward (negative y height)
+make_png=2                       # 1: also render a PNG per group per frame, 0: just .grd 2: make png and delete grid
+
+proj=-Jx.125/-.125                # down_dip increases downward (negative y height)
 
 # -R / -I are read per group from each rsf_geom.gGGG.dat header, so no
 # region needs to be set here.  override below only if a header lacks a
@@ -38,8 +36,8 @@ if [ ! -f "$times" ]; then
     echo "$0: $times not found; run rsf_solve with -field_step_interval N > 0 first" 1>&2
     exit 1
 fi
-if [ "$make_png" -eq 1 ]; then
-    gmt makecpt -Chot -T${cpt_low}/${cpt_high}/${cpt_step} -Z > $outdir/rsf_vel.cpt
+if [ "$make_png" -ne 0 ]; then
+    gmt makecpt -Croma -T-11/0/0.5 -I > $outdir/rsf_vel.cpt
 fi
 
 # loop over fault groups
@@ -50,7 +48,11 @@ for geom in rsf_geom.g*.dat; do
     fi
     tag=`echo "$geom" | sed -n 's/^rsf_geom\.\(g[0-9]*\)\.dat$/\1/p'`
     reg=`awk '/^# gmt_region/{print $3; exit}' "$geom"`
+    regp=`echo $reg | gawk -f reg2wesn.awk | gawk '{printf("-R%g/%g/%g/%g",$1/1e3,$2/1e3,$3/1e3,$4/1e3)}'`
     inc=`awk '/^# gmt_inc/{print $3; exit}' "$geom"`
+    echo
+    echo $reg $regp $inc
+    echo
     if [ -n "$reg_override" ]; then reg=$reg_override; fi
     if [ -n "$inc_override" ]; then inc=$inc_override; fi
     if [ -z "$reg" ] || [ -z "$inc" ]; then
@@ -61,21 +63,31 @@ for geom in rsf_geom.g*.dat; do
 
     # loop frames for this group
     grep -v '^#' "$times" | while read frame step tyr tsec lmax rest; do
+	tyrs=`echo $tyr | gawk '{printf("%06.1f",$1)}'`
 	f=`printf "%06d" "$frame"`
 	bin=$outdir/rsf_vel.$tag.$f.bin
 	grd=$outdir/rsf_vel.$tag.$f.grd
 	if [ ! -f "$bin" ]; then
 	    continue
 	fi
-	gmt xyz2grd "$bin" -bi3f $reg $inc -G"$grd"
-	if [ "$make_png" -eq 1 ]; then
-	    gmt begin $outdir/rsf_vel.$tag.$f png
-	      gmt grdimage "$grd" -C$outdir/rsf_vel.cpt $proj -Baf -BWSen+t"$tag  step $step  t = $tyr yr"
-	      gmt colorbar -C$outdir/rsf_vel.cpt -Bxaf+l"log@-10@-|v| [m/s]"
-	    gmt end
+	gmt xyz2grd "$bin" -bi3f $reg $inc -G"$grd" -r
+	grdinfo $grd
+	if [ "$make_png" -ne 0 ]; then
+	    ofile=$outdir/rsf_vel.$tag.$f.ps
+	    
+ 	    grdimage "$grd" $regp -Ba5f1:"x [km]":/a5f1:"z [km]"::."$tag, step $f, t = $tyrs yr":WesN $proj -C$outdir/rsf_vel.cpt  -P -K > $ofile
+ 	    psscale -E -C$outdir/rsf_vel.cpt -D6/-.25/4/.15h -B2/:"log@-10@-(|v| [m/s])": -O >> $ofile
+	    modifybb $ofile 2
+
+	    echo $0: written to $outdir/rsf_vel.$tag.$f.png
+
+	fi
+	if [ "$make_png" -eq 2 ]; then
+	    rm $grd
 	fi
     done
 done
 
 echo "$0: wrote $outdir/rsf_vel.gGGG.NNNNNN.grd"
 echo "to animate one group, e.g.:  ffmpeg -framerate 12 -pattern_type glob -i '$outdir/rsf_vel.g000.*.png' rsf_vel.g000.mp4"
+ffmpeg -framerate 12 -pattern_type glob -i '$outdir/rsf_vel.g000.*.png' $HOME/Dropbox/tmp/rsf_vel.g000.mp4

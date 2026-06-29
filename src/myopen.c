@@ -1,9 +1,8 @@
 /*
   interact: model fault interactions using dislocations in a 
             halfspace
-  (C) Thorsten Becker, becker@eps.harvard.edu
+  (C) Thorsten Becker, thwbecker@post.harvard.edu
 
-  $Id: myopen.c,v 2.2 2002/10/08 19:24:44 tbecker Exp $
 */
 #include "interact.h"
 /*

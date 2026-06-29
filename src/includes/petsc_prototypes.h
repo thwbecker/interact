@@ -26,7 +26,7 @@ PetscReal vel_from_rsf(PetscReal, PetscReal, PetscReal, PetscReal,PetscReal,
 const char *hmat_backend_name(int );
 
 PetscErrorCode interact_petsc_initialize(int *, char ***);
-PetscErrorCode calc_petsc_Isn_matrices(struct med *, struct flt *,PetscInt ,PetscReal, int, Mat *,hacapk_shell_ctx *);
+PetscErrorCode calc_petsc_Isn_matrices(struct med *, struct flt *,PetscInt ,PetscReal, int, Mat *,hmat_helper_shell_ctx *);
 PetscErrorCode set_hmat_defaults_and_options(struct med *,int);
 
 
@@ -120,7 +120,7 @@ extern void  cbigwham_delete(void *);
 /* interact-side BigWham driver (petsc_interact.c) */
 PetscErrorCode MatMult_bigwham(Mat, Vec, Vec);
 PetscErrorCode setup_bigwham_matshell(struct med *, struct flt *, PetscReal, int,
-				      Mat *, hacapk_shell_ctx **);
+				      Mat *, hmat_helper_shell_ctx **);
 #endif
 
 

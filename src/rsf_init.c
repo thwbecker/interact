@@ -63,6 +63,7 @@ PetscErrorCode rsf_get_settings(int argc,char **argv,struct interact_ctx *par,
   PetscBool have_ic=PETSC_FALSE,have_dc=PETSC_FALSE;
   PetscBool read_value;
   struct rsf_vars *rsf;
+  PetscInt field_step_interval=0;PetscReal field_tmin_yr=0.0;PetscBool fset=PETSC_FALSE;
   PetscFunctionBeginUser;
   /* 
      default frictional and loading parameters, can be overridden via
@@ -116,11 +117,20 @@ PetscErrorCode rsf_get_settings(int argc,char **argv,struct interact_ctx *par,
      for a cycle-scale view, and clean tmp_rsf between runs either way.
   */
   medium->slip_line_dt = 1.0e9*sec_per_year;	      /* OFF; opt in via -slip_line_dt_yr */
-  /* options for this code: 
+  /* 
+     field output settings 
+  */
+  field_step_interval=0;
+  field_tmin_yr=0.0;
+  
+  /* 
+     H matrix
+
+     options for this code: 
      0 dense 1 htools 2 h2opus 
      3 hacapk 4 hmmvp 5 BIGWHAM, 
      see petsc_prototypes.h 
-*/
+  */
   PetscCall(PetscOptionsGetInt(NULL, NULL, "-use_hmatrix", &use_hmatrix,&read_value));
   /* HTOOL (use_hmatrix==IHMAT_TYPE_HTOOLS ) 
      compressor default: prefer sympartialACA over
@@ -214,15 +224,15 @@ PetscErrorCode rsf_get_settings(int argc,char **argv,struct interact_ctx *par,
      nucleation and rupture, coarse through the interseismic) rather
      than model time.  -field_tmin_yr optionally suppresses early frames
   */
-  {
-    PetscInt field_step_interval=0;PetscReal field_tmin_yr=0.0;PetscBool fset=PETSC_FALSE;
-    PetscCall(PetscOptionsGetInt(NULL,NULL,"-field_step_interval",&field_step_interval,&fset));
-    PetscCall(PetscOptionsGetReal(NULL,NULL,"-field_tmin_yr",&field_tmin_yr,NULL));
-    set->field_step_interval = (fset && (field_step_interval > 0))?(field_step_interval):(0);
-    set->field_enable = (set->field_step_interval > 0)?(PETSC_TRUE):(PETSC_FALSE);
-    set->field_tmin = field_tmin_yr * sec_per_year;
-  }
-  /* hand the gathered settings to the solver routine */
+  PetscCall(PetscOptionsGetInt(NULL,NULL,"-field_step_interval",&field_step_interval,&fset));
+  PetscCall(PetscOptionsGetReal(NULL,NULL,"-field_tmin_yr",&field_tmin_yr,NULL));
+  set->field_step_interval = (fset && (field_step_interval > 0))?(field_step_interval):(0);
+  set->field_enable = (set->field_step_interval > 0)?(PETSC_TRUE):(PETSC_FALSE);
+  set->field_tmin = field_tmin_yr * sec_per_year;
+
+  /* 
+     hand the gathered settings to the solver routine 
+  */
   set->shear_modulus_si = shear_modulus_si;
   set->s_wave_speed_si  = s_wave_speed_si;
   set->sigma_init = sigma_init;

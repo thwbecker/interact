@@ -73,7 +73,7 @@ PetscErrorCode interact_petsc_initialize(int *argc, char ***argv)
 */
 PetscErrorCode MatMult_hmmvp(Mat A, Vec x, Vec y)
 {
-  hacapk_shell_ctx *hctx;	/* same context layout as HACApK */
+  hmat_helper_shell_ctx *hctx;	/* same context layout as HACApK */
   const PetscScalar *xa;
   PetscScalar *ya;
   PetscInt i;
@@ -138,7 +138,7 @@ PetscErrorCode MatMult_hmmvp(Mat A, Vec x, Vec y)
 */
 PetscErrorCode MatMult_HACApK(Mat A, Vec x, Vec y)
 {
-  hacapk_shell_ctx *hctx;
+  hmat_helper_shell_ctx *hctx;
   const PetscScalar *xa;
   PetscScalar *ya;
   PetscInt i;
@@ -192,7 +192,7 @@ PetscErrorCode MatMult_HACApK(Mat A, Vec x, Vec y)
 /* y = A x through BigWham, strike-slip -> strike-shear projection */
 PetscErrorCode MatMult_bigwham(Mat A, Vec x, Vec y)
 {
-  hacapk_shell_ctx *hctx;
+  hmat_helper_shell_ctx *hctx;
   const PetscScalar *xa;
   PetscScalar *ya;
   PetscInt i,n,lo,hi;
@@ -234,9 +234,9 @@ PetscErrorCode MatMult_bigwham(Mat A, Vec x, Vec y)
 */
 PetscErrorCode setup_bigwham_matshell(struct med *medium, struct flt *fault,
 				      PetscReal scale, int mode,
-				      Mat *this_mat, hacapk_shell_ctx **hctx_out)
+				      Mat *this_mat, hmat_helper_shell_ctx **hctx_out)
 {
-  hacapk_shell_ctx *hctx;
+  hmat_helper_shell_ctx *hctx;
   Vec xd;
   PetscInt i,k,m,n;
   double *coor; int *conn;
@@ -277,7 +277,7 @@ PetscErrorCode setup_bigwham_matshell(struct med *medium, struct flt *fault,
     fprintf(stderr,"bigwham %i by %i (3 x %i patches), compression ratio %.5g\n",
 	    bm,bn,(int)n,comp);
 
-  hctx = (hacapk_shell_ctx *)malloc(sizeof(hacapk_shell_ctx));
+  hctx = (hmat_helper_shell_ctx *)malloc(sizeof(hmat_helper_shell_ctx));
   hctx->handle = handle;
   hctx->nelt   = n;
   hctx->x3     = (double *)malloc(sizeof(double)*3*(size_t)n);
@@ -335,7 +335,7 @@ void report_hmat_storage(struct med *medium, const char *backend,
 
 PetscErrorCode calc_petsc_Isn_matrices(struct med *medium, struct flt *fault,
 				       PetscInt use_hmatrix,PetscReal scale, int mode,
-				       Mat *this_mat, hacapk_shell_ctx *hctx)
+				       Mat *this_mat, hmat_helper_shell_ctx *hctx)
 {
   /* context */
   struct interact_ctx ictx[1];
@@ -541,7 +541,7 @@ PetscErrorCode calc_petsc_Isn_matrices(struct med *medium, struct flt *fault,
 	    medium->comm_rank,medium->comm_size,m,n,(double)medium->hacapk_ztol,
 	    (double)medium->hacapk_eta,medium->hacapk_inorm);
     cmake_hacapk_struct_hmat(hacapk_handle,(double)medium->hacapk_ztol);
-    hctx = (hacapk_shell_ctx *)malloc(sizeof(hacapk_shell_ctx));
+    hctx = (hmat_helper_shell_ctx *)malloc(sizeof(hmat_helper_shell_ctx));
     hctx->handle = hacapk_handle;
     hctx->ball = (double *)malloc(sizeof(double)*m);
     PetscCall(MatCreateShell(PETSC_COMM_WORLD,PETSC_DECIDE,PETSC_DECIDE,m,n,(void *)hctx,this_mat));
@@ -600,7 +600,7 @@ PetscErrorCode calc_petsc_Isn_matrices(struct med *medium, struct flt *fault,
     HEADNODE
       fprintf(stderr,"hmmvp(MPI) %i by %i, %ld stored scalars, compression ratio %.5g\n",
 	      hmm,hmn,hmmvp_nnz,(double)((double)m*(double)n/(double)hmmvp_nnz));
-    hctx = (hacapk_shell_ctx *)malloc(sizeof(hacapk_shell_ctx));
+    hctx = (hmat_helper_shell_ctx *)malloc(sizeof(hmat_helper_shell_ctx));
     hctx->handle = hmmvp_handle;
     hctx->ball = (double *)malloc(sizeof(double)*m); /* full y on every rank */
     PetscCall(MatCreateShell(PETSC_COMM_WORLD,PETSC_DECIDE,PETSC_DECIDE,m,n,
@@ -628,7 +628,7 @@ PetscErrorCode calc_petsc_Isn_matrices(struct med *medium, struct flt *fault,
 	      hmm,hmn,hmmvp_nnz,
 	      (double)((double)m*(double)n/(double)hmmvp_nnz));
     
-    hctx = (hacapk_shell_ctx *)malloc(sizeof(hacapk_shell_ctx));
+    hctx = (hmat_helper_shell_ctx *)malloc(sizeof(hmat_helper_shell_ctx));
     hctx->handle = hmmvp_handle;
     hctx->ball = (double *)malloc(sizeof(double)*m);
     PetscCall(MatCreateShell(PETSC_COMM_WORLD,PETSC_DECIDE,PETSC_DECIDE,m,n,

@@ -84,7 +84,7 @@ int main(int argc, char **argv)
   /* optional external dumps (see -dump_matrix / -dump_coords below) */
   char dump_matrix_file[STRLEN]="",dump_coords_file[STRLEN]="";
   PetscBool do_dump_matrix=PETSC_FALSE,do_dump_coords=PETSC_FALSE;
-  hacapk_shell_ctx *hsc_dense,*hsc_h;
+  hmat_helper_shell_ctx *hsc_dense,*hsc_h;
 #if ( defined(USE_HMMVP) || defined(USE_HACAPK) )
   double *xc,*yc,*zc;
   Vec xd;
@@ -445,7 +445,7 @@ int main(int argc, char **argv)
 
       cmake_hacapk_struct_hmat(hacapk_handle,(double)medium->hacapk_ztol);
 
-      hsc_h = (hacapk_shell_ctx *)malloc(sizeof(hacapk_shell_ctx));
+      hsc_h = (hmat_helper_shell_ctx *)malloc(sizeof(hmat_helper_shell_ctx));
       hsc_h->handle = hacapk_handle;
       hsc_h->ball = (double *)malloc(sizeof(double)*m);
       PetscCall(MatCreateShell(PETSC_COMM_WORLD,PETSC_DECIDE,PETSC_DECIDE,m,n,
@@ -500,7 +500,7 @@ int main(int argc, char **argv)
 	fprintf(stderr,"%s: hmmvp(MPI) %i by %i, %ld stored scalars, compression ratio %.5g\n",
 		argv[0],hmm,hmn,hmmvp_nnz,(double)((double)m*(double)n/(double)hmmvp_nnz));
       }
-      hsc_h = (hacapk_shell_ctx *)malloc(sizeof(hacapk_shell_ctx));
+      hsc_h = (hmat_helper_shell_ctx *)malloc(sizeof(hmat_helper_shell_ctx));
       hsc_h->handle = hmmvp_handle;
       hsc_h->ball = (double *)malloc(sizeof(double)*m); /* full y on every rank */
       PetscCall(MatCreateShell(PETSC_COMM_WORLD,PETSC_DECIDE,PETSC_DECIDE,m,n,
@@ -534,7 +534,7 @@ int main(int argc, char **argv)
 	fprintf(stderr,"%s: hmmvp %i by %i, %ld stored scalars, compression ratio %.5g\n",
 		argv[0],hmm,hmn,hmmvp_nnz,
 		(double)((double)m*(double)n/(double)hmmvp_nnz));
-      hsc_h = (hacapk_shell_ctx *)malloc(sizeof(hacapk_shell_ctx));
+      hsc_h = (hmat_helper_shell_ctx *)malloc(sizeof(hmat_helper_shell_ctx));
       hsc_h->handle = hmmvp_handle;
       hsc_h->ball = (double *)malloc(sizeof(double)*m);
       PetscCall(MatCreateShell(PETSC_COMM_WORLD,PETSC_DECIDE,PETSC_DECIDE,m,n,
