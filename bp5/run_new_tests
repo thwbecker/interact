@@ -19,10 +19,10 @@ elif [ $hmat = 1 ];then		# htools
     tol_flag="-mat_htool_eta 3 -mat_htool_epsilon" # make eta comparable
 elif [ $hmat = 3 ];then		# hacapk
     epsv="1e-3 1e-4 1e-5 1e-6"
-    tol_flag="-hacapk_inorm 1 -hacapk_ztol" # switch to local, absolute norm 
+    tol_flag="-hacapk_inorm 3 -hacapk_ztol" # matrix-relative norm: better coherent (loading) response here than hacapk's absolute mode 1
 elif [ $hmat = 4 ];then		# HMMVP
     epsv="1e-2 1e-3 1e-4 1e-5 1e-6"
-    tol_flag="-hmmvp_inorm 1  -hmmvp_tol" # switch to local norm
+    tol_flag="-hmmvp_inorm 1  -hmmvp_tol" # block-local BREM: preserves coherent loading / recurrence timing (now the code default too)
 else
     echo $0: error
     exit

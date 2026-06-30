@@ -114,6 +114,76 @@ not blow up but pays in coherent accuracy. The practical operating point at fine
 resolution is block-local at a loose eps (1e-3 gives coherent 2.7e-5 at 73M and
 5.1 ms), reserving 1e-6 only when a near-dense operator is genuinely required.
 
+## Result 4: a two-fault operator confirms the ranking and the scaling
+
+The single-fault tests above use one BP5 plane. To check that the ranking is not
+specific to a single compact cluster, `make_two_fault.py` builds a controlled
+two-fault geometry (two parallel 2:1 L:W faults, separated 0.5 W in the
+fault-normal direction and offset 0.05 W along strike, same strike), and
+`sweep_hmat_bAx_2fault.sh` runs the same metrics at total sizes N = 3600, 14400,
+57600, 90000 (chosen to bracket the single-fault 0.5km and 0.25km counts). This
+operator has two separated clusters and a coherent cross-fault far-field, which
+is the structure a matrix-relative tolerance tends to discard. Results are for
+this geometry on a 24-rank node; another configuration may differ.
+
+Scaling at eps=1e-3 (`hmat_2f_scaling.png`). Storage is near-linear for every
+backend and mode (about N^1.17 to N^1.31 over this range), with hmmvp
+matrix-relative smallest in absolute terms, the block-local modes of hmmvp and
+HACApK together in the middle, and HTOOL largest. The matvec is where they
+separate: hmmvp scales near-linearly (block-local about N^1.1, matrix-relative
+about N^1.0), HACApK about N^1.2, and HTOOL steepest at roughly N^1.5. HTOOL has
+the fastest matvec at the smallest size but the worst scaling, so it crosses
+above hmmvp by N of a few times 10^4; at production size hmmvp has both the
+smallest matrix and the fastest matvec. The fitted exponents are approximate
+(four sizes, with parallel-overhead noise at N=3600), but the ordering is clear.
+
+Cost versus error per size is in `hmat_2f_size_vs_error.png` and
+`hmat_2f_matvec_vs_error.png`. The picture matches the single-fault frontier:
+hmmvp owns the envelope, block-local is needed for accuracy and the coherent
+direction, and block-local over-resolving at tight eps worsens with N (stored
+scalars at N=90000 run 129M at 1e-3, 296M at 1e-4, 821M at 1e-5, 1050M at 1e-6).
+
+### Single versus two-fault at matched total N
+
+Comparing the matched-size pairs directly (single 0.5km against two-fault j60 at
+N near 16000, and single 0.25km against two-fault j120 at N near 64000;
+`hmat_1f_vs_2f_size_per_dof.png`) isolates what the second fault changes. Three
+points stand out.
+
+Compressibility. In the block-local modes the two-fault operator stores about 10
+to 20 percent more scalars per DOF than the single fault at matched generic
+error (for example hmmvp block-local at eps=1e-3 holds about 875 scalars/DOF on
+the single 0.5km fault versus about 1050 on two-fault j60, and about 1140 versus
+1315 at the larger pair). That extra content is the genuine cross-fault coupling,
+the admissible-but-nonzero blocks between the two clusters. In matrix-relative
+mode (hmmvp i3) the per-DOF storage is essentially identical between the two
+geometries (about 333 versus 334, and 421 versus 427), because matrix-relative
+drops exactly those small cross-fault blocks. The storage scaling exponent is
+unchanged by the second fault; only the prefactor shifts up slightly.
+
+Matvec. At matched N the per-matvec times are comparable and track total stored
+scalars in both geometries; the residual differences are within the spread set
+by N not being exactly equal between the pairs and by differing cluster
+locality, and should not be over-read.
+
+Coherent direction. The uniform-slip (coherent) direction is amplified relative
+to a generic direction in both geometries, and the amplification grows with
+resolution: the median coherent-to-generic ratio runs about 7, 10, 14 on the
+single fault over 1km, 0.5km, 0.25km, and about 5, 8, 11, 13 on the two-fault
+over N = 3600 to 90000. At matched N the two-fault ratio is in fact slightly
+lower than the single fault, not higher: spreading the slip over two partially
+separated planes makes the uniform-slip loading marginally less coherent than on
+one compact plane. Either way the coherent direction is amplified by roughly an
+order of magnitude over a generic one, so matrix-relative mode, which targets the
+generic Frobenius error, under-resolves it badly in both cases (mode 3 coherent
+error about 2e-2 at eps=1e-3).
+
+The operating point is unchanged from the single-fault case: hmmvp block-local at
+eps=1e-3 at every size. The only regime where another package wins is generic
+accuracy near 1e-7 at the largest N (HTOOL fastest matvec, HACApK smallest),
+where hmmvp block-local has over-resolved; the earthquake-cycle application does
+not need that accuracy.
+
 ## Per-package recommended settings
 
 hmmvp (`-use_hmatrix 4`): the strongest overall, and the clear choice at
@@ -122,7 +192,8 @@ production scale, where it is smallest and has the fastest matvec.
 - norm mode: use block-local (`-hmmvp_inorm 1`, BREM) for `rsf_solve`
   earthquake-cycle work, where the coherent loading direction sets the timing,
   and whenever a tight generic accuracy is needed. Use matrix-relative
-  (`-hmmvp_inorm 3`, MREM, hmmvp's own default) only when loose-to-moderate
+  (`-hmmvp_inorm 3`, MREM, the hmmvp library's own default but no longer
+  interact's) only when loose-to-moderate
   generic `b = A x` accuracy at minimum storage is all that is wanted; there eps
   reads out directly as the operator error.
 - eps: on fine meshes operate block-local at a loose tolerance (1e-3, perhaps
@@ -156,6 +227,14 @@ sizes.
 - eta: `-hacapk_eta 2` (`param(51)`, HACApK's default). ztol is conservative for
   this smooth Okada operator, so a loose ztol already gives high accuracy.
 
+These recommendations are now the defaults in `set_hmat_defaults_and_options`
+(`src/petsc_interact.c`), shared by `compress_interaction_matrix`, the PETSc
+matvec path, and `rsf_solve` (via `rsf_init`): hmmvp `inorm=1` (block-local) at
+`tol=1e-3`, `eta=3`; HTOOL `eta=3` (previously 100) at `epsilon=1e-4`; HACApK
+`inorm=3` at `ztol=1e-4`, `eta=2`. Any of these can still be overridden on the
+command line. `bp5/run_new_tests` applies the same per-package modes for cycle
+comparisons (it now uses HACApK `inorm=3` rather than the absolute mode 1).
+
 ## How to reproduce
 
 `sweep_hmat_bAx.sh` sweeps both modes and writes
@@ -167,6 +246,12 @@ environment loaded as for `run_new_tests`, then plot the two costs against
 `compress_interaction_matrix` (it prints `random-x rel err: mean = ...`
 alongside the x=1 coherent error). `sweep_coherent_error.sh` is the
 coherent-only variant kept for the cycle-timing question.
+
+The two-fault case (Result 4) is generated by `make_two_fault.py` (the 2:1,
+0.5 W separation, 0.05 W offset geometry; resolution set by `jmax`, total
+N = 4*jmax^2) and swept by `sweep_hmat_bAx_2fault.sh`, which writes
+`hmat_bAx_2f.j<jmax>.dat` in the same column layout. `jmax = 60` and `120`
+bracket the single-fault 0.5km and 0.25km counts for the matched-N comparison.
 
 eta was held fixed per package in these sweeps; a dedicated eta sweep would
 refine the size/accuracy trade but the norm-mode and per-library differences
