@@ -795,7 +795,7 @@ PetscErrorCode set_hmat_defaults_and_options(struct med *medium, int hmat) /*  t
     /* htools */
     PetscCall(PetscOptionsHasName(NULL,NULL,"-mat_htool_eta",&flg));
     if(!flg)
-      PetscCall(PetscOptionsSetValue(NULL,"-mat_htool_eta","100")); 
+      PetscCall(PetscOptionsSetValue(NULL,"-mat_htool_eta","3")); 
     /* epsilon */
     PetscCall(PetscOptionsHasName(NULL,NULL,"-mat_htool_epsilon",&flg));
     if(!flg)
@@ -806,7 +806,8 @@ PetscErrorCode set_hmat_defaults_and_options(struct med *medium, int hmat) /*  t
 									    good
 									    compromise
 									    at
-									    eta=3 */
+									    eta=3; eta near 100 is not recommended for this sign-structured
+									    kernel (mis-converging ACA on large blocks) */
     /* compressor */
     PetscCall(PetscOptionsHasName(NULL,NULL,"-mat_htool_compressor",&flg));
     if(!flg)			/* this is a symmetric compressor, a
@@ -841,7 +842,7 @@ PetscErrorCode set_hmat_defaults_and_options(struct med *medium, int hmat) /*  t
   case IHMAT_TYPE_HACAPK:
 #ifdef USE_HACAPK
     /* hacapl */
-    medium->hacapk_ztol = 1.0e-4; /* seems like a solid choice for inorm=1 */
+    medium->hacapk_ztol = 1.0e-4; /* conservative for this smooth Okada kernel, so already accurate; pairs with inorm=3 */
     PetscCall(PetscOptionsGetReal(NULL,NULL,"-hacapk_ztol",&medium->hacapk_ztol,NULL));
     medium->hacapk_eta = 2.0; /* admissibility distance param(51); larger admits more far-field, HACApk default 2 */
     PetscCall(PetscOptionsGetReal(NULL,NULL,"-hacapk_eta",&medium->hacapk_eta,NULL));
@@ -868,7 +869,7 @@ PetscErrorCode set_hmat_defaults_and_options(struct med *medium, int hmat) /*  t
 				   for negligible accuracy gain. */
     medium->hmmvp_eta = 3.0;
     medium->hmmvp_nthreads = 1;
-    medium->hmmvp_inorm = 3;	/* tolerance norm mode:
+    medium->hmmvp_inorm = 1;	/* tolerance norm mode:
 				   1 = block-local (tm_brem_fro): STRONGLY preferred
 				       for earthquake-cycle / rsf_solve use; its
 				       coherent (uniform-slip) error is 100x to
@@ -878,8 +879,8 @@ PetscErrorCode set_hmat_defaults_and_options(struct med *medium, int hmat) /*  t
 				       own default): only for loose-to-moderate
 				       generic b=Ax at minimum storage, where eps
 				       reads out as the operator error.
-				   default left at 3 (hmmvp's default); cycle runs
-				   set -hmmvp_inorm 1. See
+				   now defaults to 1 (block-local) for the cycle application;
+				   set inorm 3 only for loose generic b=Ax at min storage. See
 				   test_hmatrix/hmat_backend_evaluation.md */
     
     PetscCall(PetscOptionsGetReal(NULL,NULL,"-hmmvp_tol",&medium->hmmvp_tol,NULL));
