@@ -19,7 +19,8 @@ export OMP_NUM_THREADS=1
 binary=../../bin/rsf_solve       # rsf_solve, relative to each per-resolution run dir
 generator=../make_thrust.py      # geometry generator, relative to each run dir
 ncore=24                         # MPI ranks
-resolutions="2.0 1.0 0.5"        # cell sizes [km] for the convergence sweep; extend downward
+#resolutions="2.0 1.0 0.5"        # cell sizes [km] for the convergence sweep; extend downward
+resolutions="0.5 0.25 0.1"        # cell sizes [km] for the convergence sweep; extend downward
 
 # backend: 0 dense, 3 HACApK, 4 hmmvp. Dense is fine at 2 km; use an H-matrix
 # backend for the finer meshes. This mirrors the BP5 create_run default.
@@ -76,8 +77,8 @@ for res in $resolutions; do
         -stop_time_yr $stop_time_yr -print_interval_yr $print_interval_yr \
         -field_step_interval $field_step_interval \
         -rsf_catalog -rsf_rupture_time -rupture_vth $rupture_vth \
-        -ts_max_steps 20000000 #>> $lfile 2>> $lfile
-    exit
+        -ts_max_steps 20000000 >> $lfile 2>> $lfile
+    #exit
     date >> $lfile
 
     echo "  done. event catalog:"
