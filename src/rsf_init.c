@@ -47,6 +47,118 @@ void init_medium_rsf(struct med *medium)
   rsf->dim = 4;/* psi,tau,sigma,u(slip) per patch */
 }
 /*
+  print a grouped summary of the rsf_solve command-line options and a few
+  relevant PETSc options, then the caller exits.  triggered by -h.  kept here
+  next to rsf_get_settings so the two stay in step: when an option is added to
+  the parser above, add its line here too.  defaults shown match the values set
+  in init_medium_rsf and rsf_get_settings.
+*/
+void rsf_print_help(const char *prog)
+{
+  printf("\n");
+  printf("rsf_solve: quasi-dynamic rate-and-state earthquake-cycle solver (PETSc TS)\n");
+  printf("usage: %s [options]   (options may also be placed in petsc_settings.yaml)\n",prog);
+  printf("\n");
+
+  printf("geometry and input files\n");
+  printf("  -geom_file <file>       fault geometry, one patch per row (default geom.in)\n");
+  printf("  -rsf_file <file>        per-cell a b friction parameters (default rsf.dat)\n");
+  printf("  -rsf_ic_file <file>     per-cell initial tau[Pa] vel[m/s]; overrides uniform IC\n");
+  printf("  -rsf_dc_file <file>     per-cell D_c[m]; overrides uniform -dc\n");
+  printf("  -rsf_sigma_file <file>  per-cell initial sigma0[Pa]; overrides uniform -sigma_init\n");
+  printf("  -full_space <bool>      whole-space Green functions (default 0 = half space)\n");
+  printf("  -tv <int>               triangular patch evaluation mode (default 0)\n");
+  printf("\n");
+
+  printf("elastic and rate-and-state parameters\n");
+  printf("  -shear_modulus <Pa>     shear modulus G (default 32.04e9)\n");
+  printf("  -s_wave_speed <m/s>     shear wave speed c_s, sets radiation damping (default 3464)\n");
+  printf("  -f0 <val>               reference friction f0 (default 0.6)\n");
+  printf("  -dc <m>                 characteristic slip distance D_c (default 0.008)\n");
+  printf("  -v0 <m/s>               reference velocity (default 1e-6)\n");
+  printf("  -vpl <m/s>              plate loading rate (default 1e-9)\n");
+  printf("  -rsf_slip_mode <0|1>    slip direction: 0 strike (default), 1 dip (thrust/normal)\n");
+  printf("\n");
+
+  printf("initial conditions\n");
+  printf("  -sigma_init <Pa>        uniform initial normal stress (default 50e6)\n");
+  printf("  -tau_init <Pa>          uniform initial shear stress (default f0*sigma_init)\n");
+  printf("  -vel_init <m/s>         uniform initial slip rate (default vpl)\n");
+  printf("  -rand_amp <val>         random initial-state multiplier amplitude (default 0)\n");
+  printf("\n");
+
+  printf("normal-stress evolution and limiter (for dip slip / nonplanar faults)\n");
+  printf("  -calc_sigma_dot <bool>  evolve normal stress via the In matrix (default 0 = off)\n");
+  printf("  -limit_sigma <bool>     clamp sigma to [min,max], as HBI limitsigma (default 0)\n");
+  printf("  -min_sigma <Pa>         limiter floor (default 1e6)\n");
+  printf("  -max_sigma <Pa>         limiter ceiling (default 300e6)\n");
+  printf("\n");
+
+  printf("time stepping\n");
+  printf("  -rtol <val>             ODE relative tolerance (default 1e-4)\n");
+  printf("  -atol_slip <m>          absolute tolerance for slip entries (default 1e-3)\n");
+  printf("  -dt_init <s>            initial step size (default 1)\n");
+  printf("  -dt_max <s>             maximum step size (default 1e10)\n");
+  printf("  -stop_time_yr <yr>      integration stop time (default 3000)\n");
+  printf("\n");
+
+  printf("monitor and event detection\n");
+  printf("  -print_interval_yr <yr> averaged-property output cadence (default 0.1)\n");
+  printf("  -dt_monitor_yr <yr>     monitor cadence, also caps the step (default 5)\n");
+  printf("  -rdx_monitor <val>      relative state-change monitor trigger (default 1e-4)\n");
+  printf("  -adx_monitor <val>      absolute state-change trigger, <=0 off (default 0)\n");
+  printf("  -monitor_tmin_yr <yr>   suppress monitor output before this time (default 0)\n");
+  printf("  -track_events <bool>    locate slip-rate threshold crossings (default 1 = on)\n");
+  printf("  -vel_event <m/s>        event onset threshold (default 1e-3)\n");
+  printf("  -vel_event_hyst <val>   arrest at vel_event*hyst, debounces (default 0.5)\n");
+  printf("  -event_tmin_yr <yr>     suppress event output before this time (default 0)\n");
+  printf("\n");
+
+  printf("optional outputs (all default off)\n");
+  printf("  -rsf_catalog            write rsf_catalog.dat (per-event slip, drop, M0, Mw)\n");
+  printf("  -rsf_rupture_time       write rsf_rupture_time.dat (first event front times)\n");
+  printf("  -slip_budget            write rsf_slip_budget.dat (slip vs plate-rate reference)\n");
+  printf("  -rupture_vth <m/s>      rupture-front threshold for the two above (default vel_event)\n");
+  printf("  -field_step_interval <n> slip-rate field frame every n accepted steps (0 = off)\n");
+  printf("  -field_tmin_yr <yr>     suppress field frames before this time (default 0)\n");
+  printf("  -slip_line_dt_yr <yr>   tmp_rsf slip-line snapshot cadence (default off)\n");
+  printf("\n");
+
+  printf("interaction-matrix backend\n");
+  printf("  -use_hmatrix <0..5>     0 dense (default) 1 HTOOL 2 H2OPUS 3 HACApK 4 hmmvp 5 BigWham\n");
+  printf("  -hacapk_ztol <val>      HACApK compression tolerance\n");
+  printf("  -hacapk_eta <val>       HACApK admissibility eta\n");
+  printf("  -hacapk_inorm <int>     HACApK tolerance norm (1 = block-local)\n");
+  printf("  -hmmvp_tol <val>        hmmvp compression tolerance\n");
+  printf("  -hmmvp_eta <val>        hmmvp admissibility eta\n");
+  printf("  -hmmvp_inorm <int>      hmmvp tolerance norm\n");
+  printf("  -hmmvp_nthreads <int>   hmmvp compression threads\n");
+  printf("\n");
+
+  printf("relevant PETSc options (a full list is printed by -help)\n");
+  printf("  -ts_rk_type <3bs|5dp|...>   Runge-Kutta variant (rsf uses an explicit RK)\n");
+  printf("  -ts_adapt_type <basic|none> step-size adaptation\n");
+  printf("  -ts_max_steps <n>           cap the number of accepted steps\n");
+  printf("  -ts_monitor                 print time and step at every accepted step\n");
+  printf("  -log_view                   PETSc performance and timing summary at the end\n");
+  printf("  -mat_htool_compressor <SVD|fullACA|partialACA>  HTOOL compressor choice\n");
+  printf("  -options_file <file>        read options from a file (petsc_settings.yaml auto-read)\n");
+  printf("  -help                       PETSc's full registered-option dump\n");
+  printf("\n");
+
+  printf("examples\n");
+  printf("  strike-slip BP5 at 2 km, dense, with an event catalog:\n");
+  printf("    %s -geom_file geom_bp5_2km.in -rsf_file rsf_bp5_2km.dat \\\n",prog);
+  printf("       -rsf_ic_file ic_bp5_2km.in -rsf_dc_file dc_bp5_2km.in \\\n");
+  printf("       -sigma_init 25e6 -dc 0.14 -stop_time_yr 240 -rsf_catalog\n");
+  printf("  dip-slip thrust with evolving normal stress, hmmvp backend:\n");
+  printf("    %s -geom_file geom_thrust.in -rsf_file rsf_thrust.dat -rsf_ic_file ic_thrust.in \\\n",prog);
+  printf("       -sigma_init 58e6 -dc 0.02 -rsf_slip_mode 1 -calc_sigma_dot -limit_sigma \\\n");
+  printf("       -use_hmatrix 4 -hmmvp_tol 1e-4 -rsf_catalog\n");
+  printf("\n");
+}
+
+/*
    gather all run settings: defaults, then PetscOptions overrides (which
    also pick up the optional petsc_settings.yaml read in main).  Fills
    struct rsf_solve_settings and the medium fields that have a home there, so
@@ -74,6 +186,21 @@ PetscErrorCode rsf_get_settings(int argc,char **argv,struct interact_ctx *par,
   PetscBool cat_enable=PETSC_FALSE,rup_enable=PETSC_FALSE,budget_enable=PETSC_FALSE;
   PetscReal rupture_vth=-1.0;
   PetscFunctionBeginUser;
+  /* -h prints the grouped option summary and exits (before any setup).  PETSc's
+     own -help still works and dumps the full registered-option list. */
+  {
+    PetscBool help=PETSC_FALSE;
+    PetscCall(PetscOptionsHasName(NULL,NULL,"-h",&help));
+    if(help){
+      int rank=0;
+      MPI_Comm_rank(PETSC_COMM_WORLD,&rank);
+      if(rank==0)
+	rsf_print_help(argv[0]);
+      fflush(stdout);
+      PetscCall(PetscFinalize());
+      exit(0);
+    }
+  }
   /* 
      default frictional and loading parameters, can be overridden via
      options below; defaults follow the SEAS BP1 benchmark / HBI
