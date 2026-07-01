@@ -100,13 +100,13 @@ struct rsf_solve_settings{
   PetscInt field_step_interval;			    /* compact field output cadence [steps] */
   PetscReal field_tmin;				    /* [s] field output time floor */
   PetscBool field_enable;
-  PetscBool have_ic,have_dc;
+  PetscBool have_ic,have_dc,have_sigma;
   /* Task 1 outputs (all default off) */
   PetscBool cat_enable;		/* -rsf_catalog */
   PetscBool rup_enable;		/* -rsf_rupture_time */
   PetscBool budget_enable;	/* -slip_budget */
   PetscReal rupture_vth;	/* -rupture_vth [m/s]; <=0 means use vel_event */
-  char geom_file[STRLEN],rsf_file[STRLEN],rsf_ic_file[STRLEN],rsf_dc_file[STRLEN];
+  char geom_file[STRLEN],rsf_file[STRLEN],rsf_ic_file[STRLEN],rsf_dc_file[STRLEN],rsf_sigma_file[STRLEN];
 };
 
 

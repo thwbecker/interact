@@ -335,6 +335,7 @@ void report_hmat_storage(struct med *medium, const char *backend,
 
 PetscErrorCode calc_petsc_Isn_matrices(struct med *medium, struct flt *fault,
 				       PetscInt use_hmatrix,PetscReal scale, int mode,
+				       int slip_dir,
 				       Mat *this_mat, hmat_helper_shell_ctx *hctx)
 {
   /* context */
@@ -369,13 +370,15 @@ PetscErrorCode calc_petsc_Isn_matrices(struct med *medium, struct flt *fault,
   const PetscInt ndim = 3;
   ictx->medium = medium;
   ictx->fault = fault;
-  /* defines how to slip */
-  ictx->src_slip_mode = 0;
+  /* defines how to slip: STRIKE (0) or DIP (1); the shear component of the
+     Is matrix (mode 0) is resolved onto the same direction, while the In
+     matrix (mode 1) always resolves onto the fault normal */
+  ictx->src_slip_mode = slip_dir;
   /*  */
   m = n = medium->nrflt;
 
   if(mode==0){
-    ictx->rec_stress_mode = STRIKE;
+    ictx->rec_stress_mode = slip_dir;
   }else{
     ictx->rec_stress_mode = NORMAL;
   }

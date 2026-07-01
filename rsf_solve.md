@@ -539,3 +539,63 @@ versus 309 ruptured cells, `Mw` 7.486 versus 7.491 at `ztol` 1e-1). All of this
 is specific to the tested 2 km configuration; the absolute event size at 2 km is
 coarse and under-resolved, so the numbers are for validating the machinery, not
 for benchmark comparison, which needs 1 km or finer.
+
+---
+
+## Task 2 (2026-07): dip-slip mode and the normal-stress path
+
+`rsf_solve` was strike-slip only: the source slip and the shear interaction
+matrix `Is` were fixed to the strike direction, so the normal-stress evolution
+`-calc_sigma_dot` (the `In` matrix) was only ever "normal stress due to strike
+slip", which is small on a planar fault and never exercised by the BP5 setup.
+A thrust or normal fault is dip slip, and that is the case where slip genuinely
+changes the normal stress, so a slip-direction option was added.
+
+| flag | meaning |
+|----|----|
+| `-rsf_slip_mode <0\|1>` | slip direction the rate-and-state solve operates on: 0 strike (default, unchanged), 1 dip. Sets the source slip direction and makes the `Is` shear matrix resolve onto `t_dip`; `In` is unaffected |
+| `-calc_sigma_dot` | evolve the normal stress (`dsigma/dt` from `In`). Was previously settable only in code; now a command-line boolean |
+| `-rsf_sigma_file FILE` | optional per-cell initial normal stress `sigma0` [Pa], geometry order, one value per patch. Overrides the uniform `-sigma_init`. Companion to a dipping fault where `sigma0` varies with depth (item 6a) |
+
+Mechanically the change is confined to the slip-direction argument now threaded
+through `calc_petsc_Isn_matrices`: for the shear matrix (`mode` 0) the source
+slip and the resolved stress component both follow `-rsf_slip_mode`, while the
+normal matrix (`mode` 1) always resolves onto the fault normal. The backslip
+loading (`sinc`) and the RHS need no separate change, since they are just `Is`
+and `In` applied to the plate rate, so they inherit the dip direction
+automatically. At the default `slip_mode = strike` every call reduces to the
+original strike-slip path, so the strike-slip results are unchanged (verified:
+BP5 2 km is byte-identical in `rsf_events.dat` and the event catalog).
+
+### Thrust test and validation
+
+`thrust/make_thrust.py` generates a surface-breaking, listric thrust in the
+spirit of Ozawa et al. (2023): about 50 km along strike and 20 km down the
+(curved) dip path, with the dip tapering from 30 degrees at the surface to 10
+degrees at depth, following the `calc_quad_base_vecs` convention (for strike 0
+the down-dip direction is `(cos t, 0, -sin t)` and the normal is
+`(sin t, 0, cos t)`). It writes the geometry, `a`/`b`, initial conditions, and an
+optional depth-dependent `sigma0` file, with a seeded interior nucleation patch
+so that slip, and therefore a normal-stress change, actually occurs.
+
+The geometry was checked numerically: the shallow row breaks the surface (top
+edge at `x = 0`, `z = 0`), the rows tile the curve continuously (row-to-row edge
+gaps at the millimetre level from rounding), the dip-path length is 20 km, the
+dip runs 30 to 10 degrees, and the along-strike extent is 50 km centred on the
+origin.
+
+The normal-stress path was validated as an on/off contrast on the 2 km thrust
+with `-rsf_slip_mode 1` (`thrust/test_thrust.sh`): with `-calc_sigma_dot` the
+`In` matrix is built and the normal stress moves away from the uniform 58 MPa as
+the seed slips (a spread of about 1.2 MPa on this coarse mesh, with both clamping
+and unclamping, consistent with dip slip on a bending, surface-breaking fault);
+without the flag the `In` matrix is not built and the normal stress stays pinned
+at 58 MPa for the whole run. The `-rsf_sigma_file` path was checked separately by
+confirming that a depth-dependent `sigma0` file is honoured at `t = 0`.
+
+These results are specific to the tested configuration. At 1 km cells with the
+Ozawa-like `D_c` the cohesive zone is only marginally resolved, so this is a
+validation of the dip-slip and normal-stress machinery, not a converged
+benchmark; quantitative comparison to a published thrust would need a finer mesh
+and a matched parameter set, and any difference from another code may reflect
+resolution or kernel choices rather than a defect in either code.

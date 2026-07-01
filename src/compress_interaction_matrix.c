@@ -565,8 +565,8 @@ int main(int argc, char **argv)
     /* 
        use external routines 
     */
-    calc_petsc_Isn_matrices(medium, fault,0,                  1.0,0,&Adense,hsc_dense); /* dense */
-    calc_petsc_Isn_matrices(medium, fault,medium->use_hmatrix,1.0,0,&AH,hsc_h); /* Htools, H2opus, HACApK, or HMVVP */
+    calc_petsc_Isn_matrices(medium, fault,0,                  1.0,0,STRIKE,&Adense,hsc_dense); /* dense */
+    calc_petsc_Isn_matrices(medium, fault,medium->use_hmatrix,1.0,0,STRIKE,&AH,hsc_h); /* Htools, H2opus, HACApK, or HMVVP */
   }
 
   /* 

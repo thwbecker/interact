@@ -30,6 +30,12 @@ void init_medium_rsf(struct med *medium)
    rsf->dc.  Used for the BP5 nucleation patch (reduced D_RS) and
    read in the RHS, so it lives at file scope alongside the statics above */
   rsf->dc_vec = NULL;
+  /* optional per-cell initial normal stress sigma0 [Pa] (geometry order);
+     NULL => uniform sigma_init.  Read in the driver alongside dc_vec */
+  rsf->sigma_vec = NULL;
+  /* slip direction: 0 = strike (default, unchanged), 1 = dip (thrust / normal
+     fault).  Parsed below as -rsf_slip_mode */
+  rsf->slip_mode = STRIKE;
   /* 
    parameters for optional normal stress limiter, cf. HBI limitsigma
    (file scope since they are only used by the driver and RHS here) 
@@ -59,8 +65,8 @@ PetscErrorCode rsf_get_settings(int argc,char **argv,struct interact_ctx *par,
   PetscReal sigma_init,tau_init,vel_init,rtol,atol_slip,dt_init,dt_max,rand_amp,tmp;
   PetscReal dt_monitor,rdx_monitor,adx_monitor,monitor_tmin,vel_event,vel_event_hyst,event_tmin;
   PetscBool track_events;
-  char geom_file[STRLEN]="geom.in",rsf_file[STRLEN]="rsf.dat",rsf_ic_file[STRLEN]="",rsf_dc_file[STRLEN]="";
-  PetscBool have_ic=PETSC_FALSE,have_dc=PETSC_FALSE;
+  char geom_file[STRLEN]="geom.in",rsf_file[STRLEN]="rsf.dat",rsf_ic_file[STRLEN]="",rsf_dc_file[STRLEN]="",rsf_sigma_file[STRLEN]="";
+  PetscBool have_ic=PETSC_FALSE,have_dc=PETSC_FALSE,have_sigma=PETSC_FALSE;
   PetscBool read_value;
   struct rsf_vars *rsf;
   PetscInt field_step_interval=0;PetscReal field_tmin_yr=0.0;PetscBool fset=PETSC_FALSE;
@@ -172,9 +178,30 @@ PetscErrorCode rsf_get_settings(int argc,char **argv,struct interact_ctx *par,
      overrides the uniform -dc per cell, e.g. the reduced D_RS in the
      SEAS BP5 nucleation patch */
   PetscCall(PetscOptionsGetString(NULL,NULL,"-rsf_dc_file",rsf_dc_file,STRLEN,&have_dc));
+  /* optional per-cell initial normal stress file (one sigma0[Pa] per patch,
+     geometry order); overrides uniform -sigma_init per cell.  Natural companion
+     to -calc_sigma_dot for a dipping or nonplanar fault where sigma0 varies */
+  PetscCall(PetscOptionsGetString(NULL,NULL,"-rsf_sigma_file",rsf_sigma_file,STRLEN,&have_sigma));
   PetscCall(PetscOptionsGetReal(NULL,NULL,"-rand_amp",&rand_amp,NULL));
   if(tau_init < 0)
     tau_init = rsf->f0 * sigma_init;
+  /* evolve normal stress (dsigma/dt from the In interaction matrix)?  Off by
+     default; needed for nonplanar or dipping faults where slip changes the
+     normal stress.  Previously only settable in code */
+  PetscCall(PetscOptionsGetBool(NULL,NULL,"-calc_sigma_dot",&rsf->calc_sigma_dot,NULL));
+  /* slip direction for the rate-and-state solve: 0 strike (default), 1 dip.
+     Dip slip is what a thrust or normal fault needs and is the case that
+     exercises the normal-stress path meaningfully */
+  {
+    PetscInt sm = rsf->slip_mode;
+    PetscCall(PetscOptionsGetInt(NULL,NULL,"-rsf_slip_mode",&sm,NULL));
+    if((sm != STRIKE) && (sm != DIP)){
+      fprintf(stderr,"rsf_get_settings: -rsf_slip_mode must be %i (strike) or %i (dip); got %i\n",
+	      STRIKE,DIP,(int)sm);
+      exit(-1);
+    }
+    rsf->slip_mode = (int)sm;
+  }
   /* normal stress limiter as in HBI's limitsigma (default off here,
      irrelevant for planar faults) */
   PetscCall(PetscOptionsGetBool(NULL,NULL,"-limit_sigma",&rsf->limit_sigma,NULL));
@@ -211,6 +238,19 @@ PetscErrorCode rsf_get_settings(int argc,char **argv,struct interact_ctx *par,
   PetscCall(PetscOptionsGetReal(NULL,NULL,"-vel_event_hyst",&vel_event_hyst,NULL));
   PetscCall(PetscOptionsGetReal(NULL,NULL,"-event_tmin_yr",&event_tmin,NULL));
   PetscCall(PetscOptionsGetBool(NULL,NULL,"-track_events",&track_events,NULL));
+  /* Task 1 outputs (default off); rides on the -track_events crossings */
+  {
+    PetscBool cat_enable=PETSC_FALSE,rup_enable=PETSC_FALSE,budget_enable=PETSC_FALSE;
+    PetscReal rupture_vth=-1.0;
+    PetscCall(PetscOptionsGetBool(NULL,NULL,"-rsf_catalog",&cat_enable,NULL));
+    PetscCall(PetscOptionsGetBool(NULL,NULL,"-rsf_rupture_time",&rup_enable,NULL));
+    PetscCall(PetscOptionsGetBool(NULL,NULL,"-slip_budget",&budget_enable,NULL));
+    PetscCall(PetscOptionsGetReal(NULL,NULL,"-rupture_vth",&rupture_vth,NULL));
+    set->cat_enable = cat_enable;
+    set->rup_enable = rup_enable;
+    set->budget_enable = budget_enable;
+    set->rupture_vth = rupture_vth;
+  }
   /* triangular patch evaluation scheme, cf. -tv of interact */
   PetscCall(PetscOptionsGetInt(NULL,NULL,"-tv",&tvmode,NULL));
   medium->tri_eval_mode = (MODE_TYPE)tvmode;
@@ -253,10 +293,12 @@ PetscErrorCode rsf_get_settings(int argc,char **argv,struct interact_ctx *par,
   set->track_events   = track_events;
   set->have_ic = have_ic;
   set->have_dc = have_dc;
+  set->have_sigma = have_sigma;
   strncpy(set->geom_file,  geom_file,  STRLEN);
   strncpy(set->rsf_file,   rsf_file,   STRLEN);
   strncpy(set->rsf_ic_file,rsf_ic_file,STRLEN);
   strncpy(set->rsf_dc_file,rsf_dc_file,STRLEN);
+  strncpy(set->rsf_sigma_file,rsf_sigma_file,STRLEN);
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 

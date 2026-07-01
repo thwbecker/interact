@@ -83,6 +83,18 @@ struct rsf_vars{
      gets init in init_medium_rsf
   */
   PetscReal *dc_vec;
+  /* optional per-cell initial normal stress sigma0 [Pa] (geometry order);
+     NULL => use uniform sigma_init.  Read in the driver where s[NORMAL] is
+     set, analogous to dc_vec.  Companion to the calc_sigma_dot path: lets the
+     normal-stress evolution start from a depth-dependent or otherwise
+     nonuniform sigma (e.g. a dipping thrust) rather than a single value */
+  PetscReal *sigma_vec;
+  /* slip direction the rate-and-state solve operates on: STRIKE (0, default,
+     the BP-style strike-slip case) or DIP (1, for a thrust or normal fault).
+     Selects the source slip direction and the shear component of the Is
+     interaction matrix; the In (normal-stress) matrix is unaffected.  Set via
+     -rsf_slip_mode; STRIKE reproduces the original behavior exactly */
+  int slip_mode;
   /* 
    parameters for optional normal stress limiter, cf. HBI limitsigma
    (file scope since they are only used by the driver and RHS here) 

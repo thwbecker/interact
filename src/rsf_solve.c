@@ -115,13 +115,15 @@ PetscErrorCode rsf_solve_run(int argc,char **argv,struct interact_ctx *par,
   PetscReal adx_monitor = set->adx_monitor, monitor_tmin = set->monitor_tmin;
   PetscReal vel_event = set->vel_event, vel_event_hyst = set->vel_event_hyst, event_tmin = set->event_tmin;
   PetscBool track_events = set->track_events, have_ic = set->have_ic, have_dc = set->have_dc;
+  PetscBool have_sigma = set->have_sigma;
   
-  char geom_file[STRLEN],rsf_file[STRLEN],rsf_ic_file[STRLEN],rsf_dc_file[STRLEN];
+  char geom_file[STRLEN],rsf_file[STRLEN],rsf_ic_file[STRLEN],rsf_dc_file[STRLEN],rsf_sigma_file[STRLEN];
   PetscFunctionBeginUser;
   strncpy(geom_file,  set->geom_file,  STRLEN);
   strncpy(rsf_file,   set->rsf_file,   STRLEN);
   strncpy(rsf_ic_file,set->rsf_ic_file,STRLEN);
   strncpy(rsf_dc_file,set->rsf_dc_file,STRLEN);
+  strncpy(rsf_sigma_file,set->rsf_sigma_file,STRLEN);
   /* get the geometry */
   read_geometry(geom_file,&medium,&par->fault,TRUE,FALSE,FALSE,FALSE);
   fault = par->fault;
@@ -178,6 +180,25 @@ PetscErrorCode rsf_solve_run(int argc,char **argv,struct interact_ctx *par,
     HEADNODE
       fprintf(stderr,"%s: read per-cell D_c from %s\n",argv[0],rsf_dc_file);
   }
+  /* optional per-cell initial normal stress sigma0 [Pa] (e.g. depth-dependent
+     sigma on a dipping thrust); companion to -calc_sigma_dot */
+  if(have_sigma){
+    rsf->sigma_vec=(PetscReal *)malloc((size_t)n*sizeof(PetscReal));
+    if(!rsf->sigma_vec){
+      fprintf(stderr,"%s: per-cell sigma alloc failed\n",argv[0]);
+      exit(-1);
+    }
+    iin=myopen(rsf_sigma_file,"r");
+    for(ii=0;ii < n;ii++)
+      if(fscanf(iin,"%lf",(rsf->sigma_vec+ii))!=1){
+	fprintf(stderr,"%s: error reading sigma0 for patch %i from %s\n",
+		argv[0],ii,rsf_sigma_file);
+	exit(-1);
+      }
+    fclose(iin);
+    HEADNODE
+      fprintf(stderr,"%s: read per-cell initial normal stress from %s\n",argv[0],rsf_sigma_file);
+  }
   /* 
      create and calculate interaction matrices, scaled from interact's
      internal shear modulus to SI
@@ -198,7 +219,7 @@ PetscErrorCode rsf_solve_run(int argc,char **argv,struct interact_ctx *par,
   PetscCall(PetscBarrier(NULL));
   PetscCall(PetscTime(&tb0));
   calc_petsc_Isn_matrices(medium,fault,use_hmatrix,
-			  shear_modulus_si/SHEAR_MODULUS,0,&medium->Is,medium->Is_hctx); /* shear stress */
+			  shear_modulus_si/SHEAR_MODULUS,0,rsf->slip_mode,&medium->Is,medium->Is_hctx); /* shear stress */
   PetscCall(PetscBarrier(NULL));
   PetscCall(PetscTime(&tb1));
   HEADNODE
@@ -207,7 +228,7 @@ PetscErrorCode rsf_solve_run(int argc,char **argv,struct interact_ctx *par,
     PetscCall(PetscBarrier(NULL));
     PetscCall(PetscTime(&tb0));
     calc_petsc_Isn_matrices(medium,fault,use_hmatrix,
-			    -shear_modulus_si/SHEAR_MODULUS,1,&medium->In,medium->In_hctx); /* normal stress, compression positive */
+			    -shear_modulus_si/SHEAR_MODULUS,1,rsf->slip_mode,&medium->In,medium->In_hctx); /* normal stress, compression positive */
     PetscCall(PetscBarrier(NULL));
     PetscCall(PetscTime(&tb1));
     HEADNODE
@@ -269,7 +290,7 @@ PetscErrorCode rsf_solve_run(int argc,char **argv,struct interact_ctx *par,
     PetscCall(PetscRandomSetInterval(prand,1.0-rand_amp,1.0+rand_amp)); 
   for (i = medium->rs,j=i*rsf->dim; i < medium->re; i++,j+=rsf->dim){
     PetscCall(PetscRandomGetValue(prand,&rand_fac));
-    fault[i].s[NORMAL] = sigma_init;	/* compression positive */
+    fault[i].s[NORMAL] = (rsf->sigma_vec)?(rsf->sigma_vec[i]):(sigma_init);	/* compression positive */
     if(have_ic){
       fault[i].s[STRIKE] = ic_tau[i];	/* per-cell initial shear stress [Pa] */
       fault[i].u[0]      = ic_vel[i];	/* per-cell initial slip velocity [m/s] */
@@ -448,6 +469,8 @@ PetscErrorCode rsf_solve_run(int argc,char **argv,struct interact_ctx *par,
 				       track_events,medium->time,x,vel_init,
 				       set->field_enable,set->field_step_interval,set->field_tmin,
 				       rsf_groups,rsf_ngroup,rsf_vbuf));
+  /* Task 1 (re-added): SEAS catalog, rupture-time, slip-budget; reads x0 for the seeded event */
+  PetscCall(rsf_init_catalog(uc,par,set,shear_modulus_si,rsf->vpl,x,medium->time));
   PetscCall(TSMonitorSet(ts,rsf_TS_Monitor,(void *)uc,NULL));
   if(track_events){
     PetscCall(TSSetEventHandler(ts,1,event_direction,event_terminate,
@@ -470,6 +493,7 @@ PetscErrorCode rsf_solve_run(int argc,char **argv,struct interact_ctx *par,
   PetscCall(TSSolve(ts, x));
   PetscCall(TSGetSolveTime(ts,&(medium->time)));
   PetscCall(rsf_finalize_monitor_and_event(uc));
+  PetscCall(rsf_finalize_catalog(uc));
   
   /*View information about the time-stepping method and the solution at the end time.*/
   PetscCall(TSView(ts, PETSC_VIEWER_STDOUT_WORLD));
