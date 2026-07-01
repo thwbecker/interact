@@ -19,10 +19,16 @@
 
 times=rsf_vel.times              # frame index
 outdir=tmp_rsf                   # where the .bin frames are and the .grd go
+wdir=`pwd`
+tdir=`basename $wdir`
 
 make_png=2                       # 1: also render a PNG per group per frame, 0: just .grd 2: make png and delete grid
 
 proj=-Jx.125/-.125                # down_dip increases downward (negative y height)
+
+proj2=-JX12.5/3
+y2min=-9.25;y2max=0.25
+reg2=-R0/3000/$y2min/$y2max
 
 # -R / -I are read per group from each rsf_geom.gGGG.dat header, so no
 # region needs to be set here.  override below only if a header lacks a
@@ -70,17 +76,26 @@ for geom in rsf_geom.g*.dat; do
 	if [ ! -f "$bin" ]; then
 	    continue
 	fi
-	gmt xyz2grd "$bin" -bi3f $reg $inc -G"$grd" -r
-	grdinfo $grd
+	gmt xyz2grd "$bin" -bi3f $reg $inc -G"$grd" -r -V
+	grdedit $grd $regp -fc	# rescale to km
+	grdinfo -C $grd
 	if [ "$make_png" -ne 0 ]; then
 	    ofile=$outdir/rsf_vel.$tag.$f.ps
 	    
- 	    grdimage "$grd" $regp -Ba5f1:"x [km]":/a5f1:"z [km]"::."$tag, step $f, t = $tyrs yr":WesN $proj -C$outdir/rsf_vel.cpt  -P -K > $ofile
- 	    psscale -E -C$outdir/rsf_vel.cpt -D6/-.25/4/.15h -B2/:"log@-10@-(|v| [m/s])": -O >> $ofile
+ 	    grdimage "$grd" $regp -Ba5f1:"x [km]":/a5f1:"z [km]"::."$tag, step $f, t = $tyrs yr":WesN -Y5 $proj -C$outdir/rsf_vel.cpt  -P -K > $ofile
+ 	    psscale -E -C$outdir/rsf_vel.cpt -D6/-.25/4/.15h -B2/:"log@-10@-(|v| [m/s])": -O -K >> $ofile
+	    psbasemap -Y-4 $proj2 $reg2 -Ba500f100:"time [yr]":/a2f.2:"log@-10@-(@~\341@~|v| [m/s]@~\361@~)":WeSn -O -K >> $ofile
+	    cat <<EOF | psxy $reg2 $proj2 -W4,gray -O -K >> $ofile
+$tyr $y2min
+$tyr $y2max
+
+EOF
+	    gawk '{print($3,$5)}' rsf_monitor.dat  | psxy $reg2 $proj2 -W1,blue -O -K >> $ofile
+	    psxy -T -O >> $ofile
 	    modifybb $ofile 2
 
 	    echo $0: written to $outdir/rsf_vel.$tag.$f.png
-
+	    #eog  $outdir/rsf_vel.$tag.$f.png; exit
 	fi
 	if [ "$make_png" -eq 2 ]; then
 	    rm $grd
@@ -89,5 +104,7 @@ for geom in rsf_geom.g*.dat; do
 done
 
 echo "$0: wrote $outdir/rsf_vel.gGGG.NNNNNN.grd"
-echo "to animate one group, e.g.:  ffmpeg -framerate 12 -pattern_type glob -i '$outdir/rsf_vel.g000.*.png' rsf_vel.g000.mp4"
-ffmpeg -framerate 12 -pattern_type glob -i '$outdir/rsf_vel.g000.*.png' $HOME/Dropbox/tmp/rsf_vel.g000.mp4
+echo "to animate one group, e.g.:  ffmpeg -framerate 12 -pattern_type glob -i '$outdir/rsf_vel.g000.*.png' rsf_vel.g000.$tdir.mp4"
+rm  rsf_vel.g000.$tdir.mp4
+ffmpeg -framerate 12 -pattern_type glob -i '$outdir/rsf_vel.g000.*.png' rsf_vel.g000.$tdir.mp4
+cp rsf_vel.g000.$tdir.mp4 $HOME/Dropbox/tmp/
