@@ -1,89 +1,128 @@
 #!/usr/bin/env python3
 """
-Generate a surface-breaking, listric (curved) thrust for rsf_solve, to exercise
-and validate the normal-stress path (-calc_sigma_dot) with dip slip
-(-rsf_slip_mode 1).  The geometry follows Ozawa et al. (2023) in spirit: a thrust
-that is about 50 km along strike and 20 km down dip, breaking the surface, with
-the dip decreasing with depth (listric), so that dip slip produces genuine
-normal-stress changes concentrated near the bend and the free surface.
+Generate a surface-breaking, listric (curved) thrust for rsf_solve.
 
-interact geometry convention (verified against calc_quad_base_vecs), for
-strike = 0:
-  strike direction   = (0, 1, 0)          (+y, along strike)
-  down-dip direction = (cos t, 0, -sin t) (+x and downward, t = dip)
+Two cases are provided, selected by the `case` parameter below (or by a second
+command-line argument):
+
+  "ozawa"      Faithful to Ozawa et al. (2023, GJI 232, 1471; arXiv 2110.12165),
+               their Fig 4 thrust: 50 km along strike, 20 km along the dip path,
+               dip tapering from 30 deg at the surface to 10 deg at depth,
+               surface-breaking, half-space. b = 0.020 fixed, with a-b = -0.01 in
+               the velocity-weakening interior and a-b = +0.01 on the
+               velocity-strengthening edges (Fig 4), d_c = 0.02 m uniform,
+               initial normal and
+               shear tractions uniform at 58 MPa and 100 MPa, backslip loading at
+               V_pl = 1e-9 m/s for both shear and normal (the normal loading and
+               evolution come from running with -calc_sigma_dot). Run with dip
+               slip (-rsf_slip_mode 1). Two interpretation choices are noted
+               below where the paper does not pin them down: the initial slip
+               velocity, and the exact a-b map of their Fig 4.
+
+  "validation" The original normal-stress-path check: a near-steady-state
+               background with a seeded nucleation patch, used to show that
+               sigma evolves with -calc_sigma_dot and stays pinned without it.
+
+interact geometry convention (verified against calc_quad_base_vecs), strike 0:
+  strike direction   = (0, 1, 0)
+  down-dip direction = (cos t, 0, -sin t)   (t = dip)
   fault normal       = (sin t, 0, cos t)
-So the thrust breaks the surface along y at x = 0, z = 0, and dips toward +x.
 
 Outputs (interact native formats, geometry order):
   geom_thrust.in    x y z strike dip L W group   (meters, degrees; L,W HALF-lengths)
-  rsf_thrust.dat    a  b                          (per patch)
-  ic_thrust.in      tau[Pa]  v[m/s]               (per patch, for -rsf_ic_file)
-  sigma_thrust.in   sigma0[Pa]                    (per patch, for -rsf_sigma_file;
-                                                   depth-dependent, OPTIONAL demo)
+  rsf_thrust.dat    a  b
+  ic_thrust.in      tau[Pa]  v[m/s]              (for -rsf_ic_file)
+  sigma_thrust.in   sigma0[Pa]                   (uniform 58 MPa in the ozawa case,
+                                                  depth-dependent in the validation
+                                                  case; only used with -rsf_sigma_file)
 
-All parameters are hardcoded below.  Note the resolution: at ds = 1 km with the
-Ozawa-like D_c the cohesive zone is only marginally resolved, so this is a
-machinery / path validation, not a converged benchmark; use a finer ds for
-quantitative work.
+Optional command line: make_thrust.py [ds_km] [case] overrides the two most
+useful knobs so a run script can sweep resolution for the mesh-convergence study
+without editing this file.
+
+Interpretation notes for the ozawa case:
+  1. The paper gives a uniform initial shear traction of 100 MPa, which is well
+     above the velocity-weakening steady-state level (about 37 MPa here), so the
+     fault starts strongly overstressed and the first event is an initialization
+     transient. Analyze the stabilized later cycles, not the first event. The
+     initial slip velocity is set to V_pl (a locked, high-stress start); the
+     paper does not state it explicitly.
+  2. The a-b map follows Fig 4: a velocity-weakening interior at a-b = -0.01 and
+     velocity-strengthening edges at a-b = +0.01. The one remaining choice is the
+     width of the strengthening edge band (frame_km); set it to match the figure.
 """
-import math
+import sys, math
 
 # ---- parameters (edit here) ------------------------------------------------
+case     = "ozawa"    # "ozawa" or "validation"
 ds       = 1.0        # cell size along strike and along the dip path [km]
+
+# geometry (both cases)
 Lstrike  = 50.0       # along-strike length [km]
-Ldip     = 20.0       # down-dip length measured along the (curved) dip path [km]
+Ldip     = 20.0       # down-dip length along the curved dip path [km]
 dip_top  = 30.0       # dip at the surface [deg]
 dip_bot  = 10.0       # dip at the deepest row [deg]
 
-# rate-and-state (Ozawa-like); VW interior with a VS frame to keep nucleation in
-a_vw     = 0.015      # a in the velocity-weakening interior
-a_vs     = 0.025      # a in the velocity-strengthening frame (a > b)
+# rate-and-state (both cases): b fixed, a-b from Ozawa Fig 4
+#   interior (velocity-weakening):     a-b = -0.01  -> a = 0.010
+#   edges    (velocity-strengthening): a-b = +0.01  -> a = 0.030
+# (the paper text quotes a/b = 0.75, but Fig 4 shows a-b = -0.01 in the interior;
+#  the figure values are used here)
 b0       = 0.020      # b everywhere
-frame_km = 3.0        # width of the VS frame on each edge [km]
+a_vw     = 0.010      # a in the velocity-weakening interior (a-b = -0.01)
+a_vs     = 0.030      # a in the velocity-strengthening edges (a-b = +0.01)
+frame_km = 3.0        # width of the VS edge band on each side [km]; set to match Fig 4
+dc       = 0.02       # characteristic slip distance [m] (used only in the printout)
 
-sigma0   = 58.0e6     # uniform initial normal stress [Pa]
 f0       = 0.6        # reference friction
 v0       = 1.0e-6     # reference velocity [m/s]
 vpl      = 1.0e-9     # loading (plate) rate [m/s]
 
-# seeded nucleation patch (interior), to trigger slip so sigma actually evolves
-nuc_halfstrike = 4.0  # half-size along strike [km]
-nuc_halfdip    = 4.0  # half-size along dip   [km]
-nuc_center_y   = 0.0  # along-strike center [km]
-nuc_center_s   = 10.0 # down-dip path distance of the patch center [km]
-Vnuc           = 1.0e-2   # nucleation-patch initial velocity [m/s]
+# ozawa case: uniform initial tractions, no seed
+sigma0_ozawa = 58.0e6  # uniform initial normal stress [Pa]
+tau0_ozawa   = 100.0e6 # uniform initial shear stress  [Pa]
 
-# optional depth-dependent sigma0 for the -rsf_sigma_file demo (not used by the
-# default validation run, which keeps sigma uniform so any spread is purely from
-# calc_sigma_dot).  Linear increase with depth from sigma_surf to sigma_deep.
-sigma_surf = 40.0e6   # [Pa] at the surface
-sigma_deep = 70.0e6   # [Pa] at the deepest row
+# validation case: near-steady-state background with a seeded nucleation patch
+sigma0_val   = 58.0e6
+nuc_halfstrike = 4.0   # [km]
+nuc_halfdip    = 4.0   # [km]
+nuc_center_y   = 0.0   # [km]
+nuc_center_s   = 10.0  # down-dip path distance of the patch center [km]
+Vnuc           = 1.0e-2
+
+# depth-dependent sigma for the validation -rsf_sigma_file demo
+sigma_surf = 40.0e6
+sigma_deep = 70.0e6
 # ---------------------------------------------------------------------------
 
+# optional command-line overrides: ds [km], case
+if len(sys.argv) > 1:
+    ds = float(sys.argv[1])
+if len(sys.argv) > 2:
+    case = sys.argv[2]
+if case not in ("ozawa", "validation"):
+    sys.exit(f"make_thrust.py: unknown case '{case}' (use ozawa or validation)")
+
 KM = 1.0e3
-Ns = int(round(Lstrike/ds))     # columns along strike
-Nd = int(round(Ldip/ds))        # rows down dip
-ds_strike = Lstrike/Ns          # actual along-strike cell size [km]
-w = Ldip/Nd                     # down-dip width per row [km]
-Lhalf = ds_strike/2.0*KM        # half strike-length [m]
-Whalf = w/2.0*KM                # half down-dip width [m]
+Ns = int(round(Lstrike/ds))
+Nd = int(round(Ldip/ds))
+ds_strike = Lstrike/Ns
+w = Ldip/Nd
+Lhalf = ds_strike/2.0*KM
+Whalf = w/2.0*KM
 
-# steady-state prestress at v = vpl in the VW interior: mu_ss = f0 + (a-b)ln(vpl/v0)
-def tau_ss(a):
-    return (f0 + (a-b0)*math.log(vpl/v0))*sigma0
+def tau_ss(a, sigma):
+    return (f0 + (a-b0)*math.log(vpl/v0))*sigma
 
-rows = []          # (theta_deg, x_center_km, z_center_km, s_center_km)
-x_top, z_top = 0.0, 0.0     # top edge of current row in the (x,z) dip plane [km]
-s_top = 0.0                 # down-dip path distance to the top edge [km]
+# build the curved rows: (dip_deg, x_center_km, z_center_km, s_center_km)
+rows = []
+x_top, z_top, s_top = 0.0, 0.0, 0.0
 for r in range(Nd):
     frac = 0.0 if Nd == 1 else r/(Nd-1)
-    theta = dip_top + (dip_bot-dip_top)*frac      # dip decreases with depth
+    theta = dip_top + (dip_bot-dip_top)*frac
     tr = math.radians(theta)
     cx, sx = math.cos(tr), math.sin(tr)
-    x_c = x_top + 0.5*w*cx
-    z_c = z_top - 0.5*w*sx
-    s_c = s_top + 0.5*w
-    rows.append((theta, x_c, z_c, s_c))
+    rows.append((theta, x_top + 0.5*w*cx, z_top - 0.5*w*sx, s_top + 0.5*w))
     x_top += w*cx
     z_top -= w*sx
     s_top += w
@@ -94,15 +133,12 @@ fi = open("ic_thrust.in","w")
 fsig = open("sigma_thrust.in","w")
 
 nvw = nnuc = 0
-# geometry order: row-major (down-dip outer, along-strike inner), matching a
-# natural grid; any consistent order is fine as long as all files agree
 for r in range(Nd):
     theta, x_c, z_c, s_c = rows[r]
-    depth = -z_c                                   # positive down [km]
+    depth = -z_c
     for c in range(Ns):
-        y_c = (c + 0.5)*ds_strike - Lstrike/2.0    # centered along strike [km]
+        y_c = (c + 0.5)*ds_strike - Lstrike/2.0
 
-        # VS frame near the outer edges (in strike and in down-dip path)
         edge_strike = min(y_c + Lstrike/2.0, Lstrike/2.0 - y_c)
         edge_dip    = min(s_c, Ldip - s_c)
         in_frame = (edge_strike < frame_km) or (edge_dip < frame_km)
@@ -110,22 +146,25 @@ for r in range(Nd):
         if not in_frame:
             nvw += 1
 
-        # seeded nucleation patch (interior)
-        is_nuc = (abs(y_c - nuc_center_y) < nuc_halfstrike) and \
-                 (abs(s_c - nuc_center_s) < nuc_halfdip) and (not in_frame)
-        if is_nuc:
-            tau = f0*sigma0          # at reference friction, above VW steady state
-            v   = Vnuc
-            nnuc += 1
-        else:
-            tau = tau_ss(a)
+        if case == "ozawa":
+            tau = tau0_ozawa           # uniform overstressed start, no seed
             v   = vpl
+            sig = sigma0_ozawa
+        else:
+            is_nuc = (abs(y_c - nuc_center_y) < nuc_halfstrike) and \
+                     (abs(s_c - nuc_center_s) < nuc_halfdip) and (not in_frame)
+            if is_nuc:
+                tau = f0*sigma0_val
+                v   = Vnuc
+                nnuc += 1
+            else:
+                tau = tau_ss(a, sigma0_val)
+                v   = vpl
+            sig = sigma_surf + (sigma_deep-sigma_surf)*(depth/max(1e-9,(-rows[-1][2])))
 
         fg.write(f"{x_c*KM:.6e} {y_c*KM:.6e} {z_c*KM:.6e} 0.0 {theta:.6f} {Lhalf:.1f} {Whalf:.1f} 0\n")
         fr.write(f"{a:.6e} {b0:.6e}\n")
         fi.write(f"{tau:.8e} {v:.6e}\n")
-        # depth-dependent sigma (optional demo); depth runs 0 at surface to max
-        sig = sigma_surf + (sigma_deep-sigma_surf)*(depth/max(1e-9,(-rows[-1][2])))
         fsig.write(f"{sig:.8e}\n")
 
 for f in (fg,fr,fi,fsig):
@@ -133,7 +172,11 @@ for f in (fg,fr,fi,fsig):
 
 zmax = -rows[-1][2]
 xmax = rows[-1][1] + 0.5*w*math.cos(math.radians(rows[-1][0]))
-print(f"thrust: {Ns} x {Nd} = {Ns*Nd} patches ; ds_strike={ds_strike:g} km w={w:g} km")
+print(f"case={case} : {Ns} x {Nd} = {Ns*Nd} patches ; ds_strike={ds_strike:g} km w={w:g} km")
 print(f"  dip {dip_top:g}->{dip_bot:g} deg ; surface-breaking ; max depth ~{zmax:.2f} km ; +x extent ~{xmax:.2f} km")
-print(f"  VW cells={nvw} ; nucleation cells={nnuc} ; uniform sigma0={sigma0:g} Pa")
-print(f"  files: geom_thrust.in rsf_thrust.dat ic_thrust.in sigma_thrust.in")
+if case == "ozawa":
+    Lb = 3.204e10*dc/(b0*sigma0_ozawa)
+    print(f"  uniform tau0={tau0_ozawa:g} Pa sigma0={sigma0_ozawa:g} Pa ; VW cells={nvw}")
+    print(f"  d_c={dc:g} m ; cohesive zone Lb = G dc/(b sigma0) ~ {Lb:.0f} m (keep ds below ~Lb/3 for convergence)")
+else:
+    print(f"  VW cells={nvw} ; nucleation cells={nnuc} ; validation start (seeded)")
