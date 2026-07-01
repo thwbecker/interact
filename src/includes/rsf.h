@@ -38,14 +38,14 @@ struct rsf_out_ctx{
   FILE *fout_event;
   /*
      compact per-fault slip-rate field output for later GMT
-     visualization (see rsf_build_groups / rsf_TS_Monitor).  Geometry is
-     written once per group to rsf_geom.gGGG.dat; the per-frame log10|v|
-     field goes to tmp_rsf/rsf_vel.gGGG.NNNNNN.bin as xyz2grd-ready
-     float triples, and rsf_vel.times indexes frames by step and time.
-     The cadence is a fixed number of accepted steps rather than model
-     time, so frames densify automatically through nucleation and
-     rupture (many small steps) and thin out through the long
-     interseismic (few large steps)
+     visualization (see rsf_build_groups / rsf_TS_Monitor).  Geometry
+     is written once per group to rsf_geom.gGGG.dat; the per-frame
+     log10|v| field goes to tmp_rsf/rsf_vel.gGGG.NNNNNN.bin as
+     xyz2grd-ready float triples, and rsf_vel.times indexes frames by
+     step and time.  The cadence is a fixed number of accepted steps
+     rather than model time, so frames densify automatically through
+     nucleation and rupture (many small steps) and thin out through
+     the long interseismic (few large steps)
   */
   PetscBool field_enable;
   PetscInt field_step_interval;	/* write a frame every this many accepted steps */
@@ -55,6 +55,32 @@ struct rsf_out_ctx{
   struct rsf_group_grid *groups;	/* rank 0: one per fault group */
   int ngroup;
   double *vbuf;			/* rank 0: per-patch |v| scratch, length nrflt */
+  /*
+    Task 1: SEAS-style event catalog, rupture-time field, and slip-budget
+    diagnostic.  All three are opt-in and default off; when off none of the
+    arrays below are allocated and the monitor/event hooks are no-ops.  The
+    per-cell arrays are rank-local, length medium->rn (owned patches), indexed
+    by local k with global patch i = medium->rs + k.
+  */
+  PetscBool cat_enable;		/* -rsf_catalog: write rsf_catalog.dat */
+  PetscBool rup_enable;		/* -rsf_rupture_time: write rsf_rupture_time.dat (event 1) */
+  PetscBool budget_enable;	/* -slip_budget: write rsf_slip_budget.dat */
+  PetscReal rupture_vth;	/* [m/s] rupture-front threshold (default = vel_event) */
+  PetscReal shear_modulus;	/* [Pa] G, for the seismic-moment sum */
+  PetscReal vpl;		/* [m/s] plate rate, for the slip budget */
+  PetscReal total_area;		/* [m^2] summed patch area, for the slip budget */
+  FILE *fout_catalog;
+  FILE *fout_budget;
+  PetscReal *snap_tau0;		/* [Pa] onset shear-stress snapshot, length rn */
+  PetscReal *snap_slip0;	/* [m]  onset slip snapshot, length rn */
+  int       *cell_ruptured;	/* 1 if cell exceeded rupture_vth this event, length rn */
+  PetscReal *rup_time;		/* [s] first-crossing time after event-1 onset, or -1; length rn */
+  PetscReal peakv_local;	/* running max |v| this event on this rank [m/s] */
+  PetscReal onset_time;		/* [s] onset time of the current event */
+  PetscBool ev_open;		/* an onset snapshot is captured; event is open */
+  int ncat;			/* completed catalog events (arrests written) */
+  PetscBool rup_armed;		/* event-1 rupture-time capture is active */
+  PetscBool rup_done;		/* event 1 finished; rup_time is frozen */
 };
 /*
    all run settings gathered up front by rsf_get_settings and consumed
@@ -75,6 +101,11 @@ struct rsf_solve_settings{
   PetscReal field_tmin;				    /* [s] field output time floor */
   PetscBool field_enable;
   PetscBool have_ic,have_dc;
+  /* Task 1 outputs (all default off) */
+  PetscBool cat_enable;		/* -rsf_catalog */
+  PetscBool rup_enable;		/* -rsf_rupture_time */
+  PetscBool budget_enable;	/* -slip_budget */
+  PetscReal rupture_vth;	/* -rupture_vth [m/s]; <=0 means use vel_event */
   char geom_file[STRLEN],rsf_file[STRLEN],rsf_ic_file[STRLEN],rsf_dc_file[STRLEN];
 };
 

@@ -31,7 +31,29 @@ PetscErrorCode rsf_init_monitor_and_event(struct rsf_out_ctx *uc,struct interact
   uc->vel_event = vel_event;
   uc->vel_event_hyst = vel_event_hyst;
   uc->track_events = track_events;
-  uc->slipping = (vel_init > vel_event)?(PETSC_TRUE):(PETSC_FALSE);
+  /*
+    Initialize the slipping state from the TRUE initial maximum slip rate over
+    the fault, not from the scalar vel_init.  With a per-cell initial-condition
+    file (e.g. the BP5 nucleation patch seeded at 3e-2 m/s) the scalar vel_init
+    is only the background rate (vpl), so the old vel_init > vel_event test
+    mislabeled the decaying seed as a spurious onset then arrest.  Computing the
+    real field maximum here makes the seeded first event an in-progress event
+    from t=0, which is what the catalog/rupture-time capture and rsf_events.dat
+    both want.  This changes only the labeling of the initial seeded transient;
+    the spontaneous recurrence times are unaffected.
+  */
+  {
+    const PetscScalar *x0a;PetscInt ii,jj;PetscReal vv,d1,d2,d3,lv=0.0,gv=0.0;
+    struct rsf_vars *rsfv = medium->rsf;struct flt *fltv = par->fault;
+    PetscCall(VecGetArrayRead(X0,&x0a));
+    for(ii=medium->rs,jj=0;ii<medium->re;ii++,jj+=rsfv->dim){
+      vv = fabs(vel_from_rsf(x0a[jj+1],x0a[jj+2],x0a[jj],fltv[ii].mu_s,rsfv->v0,&d1,&d2,&d3,medium));
+      if(vv > lv)lv = vv;
+    }
+    PetscCall(VecRestoreArrayRead(X0,&x0a));
+    PetscCallMPI(MPI_Allreduce(&lv,&gv,1,MPIU_REAL,MPI_MAX,PETSC_COMM_WORLD));
+    uc->slipping = (gv > vel_event)?(PETSC_TRUE):(PETSC_FALSE);
+  }
   uc->nevent = 0;
   uc->field_out = 0;
   uc->next_print_time = t_init;	/* fields at start, then every print_interval */
@@ -44,6 +66,18 @@ PetscErrorCode rsf_init_monitor_and_event(struct rsf_out_ctx *uc,struct interact
   uc->groups = groups;
   uc->ngroup = ngroup;
   uc->vbuf = vbuf;
+  /* Task 1 fields: safe defaults; real setup happens in rsf_init_catalog,
+     which is called next in the driver.  Nulling here guarantees the
+     monitor/event hooks are inert even if catalog setup is skipped. */
+  uc->cat_enable = uc->rup_enable = uc->budget_enable = PETSC_FALSE;
+  uc->rup_armed = uc->rup_done = PETSC_FALSE;
+  uc->fout_catalog = uc->fout_budget = NULL;
+  uc->snap_tau0 = uc->snap_slip0 = uc->rup_time = NULL;
+  uc->cell_ruptured = NULL;
+  uc->rupture_vth = vel_event;
+  uc->shear_modulus = uc->vpl = uc->total_area = 0.0;
+  uc->peakv_local = 0.0;
+  uc->onset_time = 0.0;
   /* force the first monitor call to log */
   uc->old_time = t_init - 2.0*dt_monitor;
   uc->fout_monitor = uc->fout_stats = uc->fout_event = NULL;
@@ -104,6 +138,204 @@ PetscErrorCode rsf_finalize_monitor_and_event(struct rsf_out_ctx *uc)
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+/*
+  Task 1 setup: SEAS-style event catalog, rupture-time field, and slip-budget
+  diagnostic.  Called by the driver right after rsf_init_monitor_and_event.
+  Allocates the rank-local per-cell scratch only for the features that are on,
+  opens the rank-0 output files, and stashes G, vpl, the rupture-front
+  threshold, and the total patch area (needed for the moment sum and the slip
+  budget) on the context.  With all three features off this is nearly a no-op.
+*/
+PetscErrorCode rsf_init_catalog(struct rsf_out_ctx *uc,struct interact_ctx *par,
+				struct rsf_solve_settings *set,
+				PetscReal shear_modulus_si,PetscReal vpl,
+				Vec x0,PetscReal t_init)
+{
+  struct med *medium = par->medium;
+  struct flt *fault = par->fault;
+  PetscInt i,rn = medium->rn;
+  PetscReal larea,garea;
+  PetscFunctionBeginUser;
+  uc->cat_enable    = set->cat_enable;
+  uc->rup_enable    = set->rup_enable;
+  uc->budget_enable = set->budget_enable;
+  uc->shear_modulus = shear_modulus_si;
+  uc->vpl           = vpl;
+  /* rupture-front threshold: default to the event threshold if not set */
+  uc->rupture_vth   = (set->rupture_vth > 0.0)?(set->rupture_vth):(uc->vel_event);
+  uc->peakv_local   = 0.0;
+  uc->onset_time    = t_init;
+  uc->ev_open       = PETSC_FALSE;
+  uc->ncat          = 0;
+  uc->rup_armed     = PETSC_FALSE;
+  uc->rup_done      = PETSC_FALSE;
+  uc->snap_tau0 = uc->snap_slip0 = uc->rup_time = NULL;
+  uc->cell_ruptured = NULL;
+  uc->fout_catalog = uc->fout_budget = NULL;
+  /*
+    The catalog and the rupture-time field are built on the SAME onset/arrest
+    crossings that the event tracker (rsf_events.dat) already detects, so they
+    require -track_events (on by default).  They do not re-detect events; they
+    only add the per-event quantities that rsf_events.dat does not carry (the
+    coseismic slip and stress drop from the onset-to-arrest state difference,
+    the peak slip rate over the event, the ruptured area and seismic moment,
+    and the rupture-time field).  If event tracking is off, disable them.
+  */
+  if((uc->cat_enable || uc->rup_enable) && (!uc->track_events)){
+    if(medium->comm_rank == 0)
+      fprintf(stderr,"rsf_init_catalog: WARNING: -rsf_catalog/-rsf_rupture_time need -track_events; disabling them\n");
+    uc->cat_enable = uc->rup_enable = PETSC_FALSE;
+  }
+  /* total patch area = sum over ALL patches of 4*l*w (l,w are half-lengths);
+     summed locally then reduced so it is correct in parallel */
+  larea = 0.0;
+  for(i = medium->rs;i < medium->re;i++)
+    larea += 4.0*fault[i].l*fault[i].w;
+  PetscCallMPI(MPI_Allreduce(&larea,&garea,1,MPIU_REAL,MPI_SUM,PETSC_COMM_WORLD));
+  uc->total_area = garea;
+  /* per-cell rank-local scratch for the catalog and the rupture-time field */
+  if(uc->cat_enable || uc->rup_enable){
+    if(rn > 0){
+      uc->cell_ruptured = (int *)      calloc((size_t)rn,sizeof(int));
+      uc->rup_time      = (PetscReal *)malloc((size_t)rn*sizeof(PetscReal));
+      if((!uc->cell_ruptured)||(!uc->rup_time)){
+	fprintf(stderr,"rsf_init_catalog: per-cell scratch alloc failed (rn=%i)\n",(int)rn);
+	exit(-1);
+      }
+      for(i=0;i < rn;i++)uc->rup_time[i] = -1.0; /* sentinel: never ruptured */
+    }
+    if(uc->cat_enable && (rn > 0)){
+      uc->snap_tau0  = (PetscReal *)malloc((size_t)rn*sizeof(PetscReal));
+      uc->snap_slip0 = (PetscReal *)malloc((size_t)rn*sizeof(PetscReal));
+      if((!uc->snap_tau0)||(!uc->snap_slip0)){
+	fprintf(stderr,"rsf_init_catalog: snapshot alloc failed (rn=%i)\n",(int)rn);
+	exit(-1);
+      }
+    }
+  }
+  if(medium->comm_rank == 0){
+    if(uc->cat_enable){
+      uc->fout_catalog = myopen("rsf_catalog.dat","w");
+      fprintf(uc->fout_catalog,
+	      "# SEAS-style event catalog from rsf_solve; complements rsf_events.dat\n");
+      fprintf(uc->fout_catalog,
+	      "# same onset/arrest events as rsf_events.dat (needs -track_events); rows are per completed event\n");
+      fprintf(uc->fout_catalog,
+	      "# onset/arrest |v| threshold = %.3e m/s ; rupture-front |v| threshold = %.3e m/s\n",
+	      uc->vel_event,uc->rupture_vth);
+      fprintf(uc->fout_catalog,
+	      "# stress drop = tau_onset - tau_arrest (positive = drop); slip/drop means are over ruptured cells\n");
+      fprintf(uc->fout_catalog,
+	      "# ev onset[yr] arrest[yr] duration[s] n_ruptured area_ruptured[m^2] mean_slip[m] max_slip[m] mean_drop[MPa] max_drop[MPa] peak_sliprate[m/s] M0[Nm] Mw\n");
+    }
+    if(uc->budget_enable){
+      uc->fout_budget = myopen("rsf_slip_budget.dat","w");
+      fprintf(uc->fout_budget,
+	      "# long-term slip budget: on-fault area-integrated slip vs plate-rate reference\n");
+      fprintf(uc->fout_budget,
+	      "# total area = %.6e m^2 ; vpl = %.3e m/s\n",uc->total_area,uc->vpl);
+      fprintf(uc->fout_budget,
+	      "# time[yr] slip_integral[m*m^2] vpl_t_area[m*m^2] residual[m*m^2] residual_over_ref\n");
+    }
+    if(uc->cat_enable)
+      fprintf(stderr,"rsf_init_catalog: event catalog on (rupture-front |v| = %.3e m/s)\n",uc->rupture_vth);
+    if(uc->rup_enable)
+      fprintf(stderr,"rsf_init_catalog: rupture-time field on (event 1, |v| = %.3e m/s)\n",uc->rupture_vth);
+    if(uc->budget_enable)
+      fprintf(stderr,"rsf_init_catalog: slip-budget diagnostic on\n");
+  }
+  /*
+    Seeded-start case: if the fault is already above the event threshold at
+    t_init (e.g. the BP5 nucleation patch), there is no onset crossing for the
+    first event, so open it here from the initial state and arm the rupture-time
+    capture, so that event 1 is the seeded rupture, matching the benchmark.
+  */
+  if((uc->cat_enable || uc->rup_enable) && uc->slipping){
+    const PetscScalar *x0a;
+    PetscInt j,k;
+    PetscCall(VecGetArrayRead(x0,&x0a));
+    for(i = medium->rs, j=0, k=0; i < medium->re; i++, j+=medium->rsf->dim, k++){
+      if(uc->snap_tau0) uc->snap_tau0[k]  = x0a[j+1];
+      if(uc->snap_slip0)uc->snap_slip0[k] = x0a[j+3];
+    }
+    PetscCall(VecRestoreArrayRead(x0,&x0a));
+    uc->ev_open    = PETSC_TRUE;
+    uc->onset_time = t_init;
+    uc->peakv_local = 0.0;
+    if(uc->rup_enable)uc->rup_armed = PETSC_TRUE;
+  }
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+/*
+  Task 1 teardown: gather the event-1 rupture-time field to rank 0 in geometry
+  order and write it, close the catalog/budget files, and free the per-cell
+  scratch.  The gather uses a Vec with the interaction-matrix row layout (patch
+  i owned by the rank whose [rs,re) contains it), scattered to rank 0, so the
+  written order matches the geometry file.
+*/
+PetscErrorCode rsf_finalize_catalog(struct rsf_out_ctx *uc)
+{
+  struct med *medium = uc->par->medium;
+  struct flt *fault = uc->par->fault;
+  PetscFunctionBeginUser;
+  if(uc->rup_enable){
+    /* pack local rup_time into a row-layout Vec, gather to rank 0 */
+    Vec rvec,rgath;VecScatter rsc;
+    PetscInt i,k;PetscScalar *ra;
+    PetscCall(VecCreate(PETSC_COMM_WORLD,&rvec));
+    PetscCall(VecSetSizes(rvec,medium->rn,medium->nrflt));
+    PetscCall(VecSetFromOptions(rvec));
+    PetscCall(VecGetArray(rvec,&ra));
+    for(k=0;k < medium->rn;k++)
+      ra[k] = (uc->rup_time)?(uc->rup_time[k]):(-1.0);
+    PetscCall(VecRestoreArray(rvec,&ra));
+    PetscCall(VecScatterCreateToZero(rvec,&rsc,&rgath));
+    PetscCall(VecScatterBegin(rsc,rvec,rgath,INSERT_VALUES,SCATTER_FORWARD));
+    PetscCall(VecScatterEnd(  rsc,rvec,rgath,INSERT_VALUES,SCATTER_FORWARD));
+    if(medium->comm_rank == 0){
+      const PetscScalar *g;
+      FILE *out = myopen("rsf_rupture_time.dat","w");
+      int nrup=0;
+      PetscReal t0=1e300;	/* initiation = earliest crossing */
+      PetscCall(VecGetArrayRead(rgath,&g));
+      for(i=0;i < medium->nrflt;i++)
+	if(((PetscReal)g[i] >= 0.0) && ((PetscReal)g[i] < t0))t0 = (PetscReal)g[i];
+      if(t0 > 1e299)t0 = 0.0;	/* no cell ruptured */
+      fprintf(out,"# rupture-time field for event 1 (first tracked event)\n");
+      fprintf(out,"# rupture-front |v| threshold = %.3e m/s ; t is seconds after initiation (earliest crossing)\n",uc->rupture_vth);
+      fprintf(out,"# ip xc[m] yc[m] zc[m] t_rupture[s] ruptured(1/0)\n");
+      for(i=0;i < medium->nrflt;i++){
+	PetscReal ta = (PetscReal)g[i];
+	int rup = (ta >= 0.0)?(1):(0);
+	PetscReal tr = rup?(ta - t0):(-1.0);
+	if(rup)nrup++;
+	fprintf(out,"%6i %14.6e %14.6e %14.6e %15.7e %2i\n",
+		(int)i,fault[i].x[INT_X],fault[i].x[INT_Y],fault[i].x[INT_Z],tr,rup);
+      }
+      PetscCall(VecRestoreArrayRead(rgath,&g));
+      fclose(out);
+      fprintf(stderr,"rsf_finalize_catalog: wrote rupture-time field for event 1 (%i/%i cells ruptured)\n",
+	      nrup,(int)medium->nrflt);
+    }
+    PetscCall(VecScatterDestroy(&rsc));
+    PetscCall(VecDestroy(&rgath));
+    PetscCall(VecDestroy(&rvec));
+  }
+  if(medium->comm_rank == 0){
+    if(uc->fout_catalog){
+      fclose(uc->fout_catalog);
+      fprintf(stderr,"rsf_finalize_catalog: wrote event catalog (%i completed events)\n",uc->ncat);
+    }
+    if(uc->fout_budget)fclose(uc->fout_budget);
+  }
+  if(uc->snap_tau0){free(uc->snap_tau0);uc->snap_tau0=NULL;}
+  if(uc->snap_slip0){free(uc->snap_slip0);uc->snap_slip0=NULL;}
+  if(uc->cell_ruptured){free(uc->cell_ruptured);uc->cell_ruptured=NULL;}
+  if(uc->rup_time){free(uc->rup_time);uc->rup_time=NULL;}
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 
 
 
@@ -135,6 +367,33 @@ PetscErrorCode rsf_TS_Monitor(TS ts,PetscInt step,PetscReal time,Vec X,void *ptr
   fault = uc->par->fault;
   if(step < 0)	      /* negative indicates an interpolated solution */
     PetscFunctionReturn(PETSC_SUCCESS);
+  /*
+    Task 1 tracking: while an event is in progress (uc->slipping), sample every
+    accepted step to build the per-cell peak slip rate, the ruptured mask, and
+    (for event 1) the rupture-time field.  This runs OUTSIDE the change-triggered
+    monitor gate below, so it uses the solver's own step density, which collapses
+    through the coseismic phase and therefore resolves the rupture front well.
+    It reads the state only and never touches the integrator.
+  */
+  if((uc->cat_enable || uc->rup_enable) && uc->slipping){
+    const PetscScalar *xt;
+    PetscInt k;
+    PetscReal vv,d1t,d2t,d3t;
+    PetscCall(VecGetArrayRead(X,&xt));
+    for(i = medium->rs, j=0, k=0; i < medium->re; i++, j+=rsf->dim, k++){
+      vv = fabs(vel_from_rsf(xt[j+1],xt[j+2],xt[j],fault[i].mu_s,rsf->v0,&d1t,&d2t,&d3t,medium));
+      if(vv > uc->peakv_local)uc->peakv_local = vv;
+      if(vv >= uc->rupture_vth){
+	if(uc->cell_ruptured)uc->cell_ruptured[k] = 1;
+	/* first crossing time for event 1 only (absolute; referenced to the
+	   earliest crossing, i.e. the initiation time, when written) */
+	if(uc->rup_enable && uc->rup_armed && (!uc->rup_done) &&
+	   uc->rup_time && (uc->rup_time[k] < 0.0))
+	  uc->rup_time[k] = time;
+      }
+    }
+    PetscCall(VecRestoreArrayRead(X,&xt));
+  }
   if(time >= uc->monitor_tmin){
     /* change since the last logged state */
     PetscCall(VecNorm(X,NORM_2,&x_norm));
@@ -193,6 +452,7 @@ PetscErrorCode rsf_TS_Monitor(TS ts,PetscInt step,PetscReal time,Vec X,void *ptr
     if(medium->comm_rank == 0){
       PetscScalar *values;
       PetscReal sum[3],vmin,vmax,vmean,vstd,smean,du1,du2,du3;
+      PetscReal slip_integral=0.0;	/* Task 1 slip budget: sum area_i*slip_i */
       FILE *fout2;
       char vel_file[STRLEN];
       int n = medium->nrflt,ierr2;
@@ -208,12 +468,20 @@ PetscErrorCode rsf_TS_Monitor(TS ts,PetscInt step,PetscReal time,Vec X,void *ptr
 	sum[0] += fault[i].u[STRIKE];
 	sum[1] += fault[i].u[STRIKE] * fault[i].u[STRIKE];
 	sum[2] += values[j+3];				     /* slip */
+	if(uc->budget_enable)
+	  slip_integral += 4.0*fault[i].l*fault[i].w*values[j+3]; /* area*slip */
       }
       vstd = (n > 1)?(sqrt(((PetscReal)n * sum[1] - sum[0]*sum[0])/((PetscReal)n*(PetscReal)(n-1)))):(0.0);
       vmean = sum[0]/(PetscReal)n;
       smean = sum[2]/(PetscReal)n;
       if(uc->fout_stats)
 	fprintf(uc->fout_stats,"%.8f %e %e %e %e %e\n",time/sec_per_year,vmean,vstd,vmin,vmax,smean);
+      if(uc->budget_enable && uc->fout_budget){
+	PetscReal ref = uc->vpl*time*uc->total_area; /* cumulative slip*area at plate rate */
+	PetscReal resid = slip_integral - ref;
+	fprintf(uc->fout_budget,"%.8f %.8e %.8e %.8e %.6e\n",
+		time/sec_per_year,slip_integral,ref,resid,(ref!=0.0)?(resid/ref):(0.0));
+      }
       if(time - medium->slip_line_time > medium->slip_line_dt){
 	if(!uc->field_out){
 	  ierr2 = system("mkdir -p tmp_rsf");
@@ -324,6 +592,71 @@ PetscErrorCode rsf_post_event(TS ts,PetscInt nevents,PetscInt event_list[],
 	      log10((gvmax > 1e-300)?(gvmax):(1e-300)),
 	      gsum[0]/(PetscReal)medium->nrflt,gsum[1]/(PetscReal)medium->nrflt);
       fflush(uc->fout_event);
+    }
+  }
+  /*
+    Task 1 catalog capture, on the SAME crossing this event handler just logged
+    to rsf_events.dat.  After the toggle above, uc->slipping == TRUE means this
+    crossing is an onset, FALSE means an arrest.  Snapshots are captured on onset
+    and differenced on arrest; the reduces are collective so all ranks enter.
+    This runs regardless of event_tmin so onset/arrest stay paired; only the
+    written catalog row is gated by event_tmin.
+  */
+  if(uc->cat_enable || uc->rup_enable){
+    const PetscScalar *xc;
+    PetscInt ii,jj,kk;
+    if(uc->slipping){
+      /* ONSET: snapshot tau,slip; reset the per-event trackers */
+      PetscCall(VecGetArrayRead(X,&xc));
+      for(ii=medium->rs,jj=0,kk=0; ii<medium->re; ii++,jj+=rsf->dim,kk++){
+	if(uc->snap_tau0) uc->snap_tau0[kk]  = xc[jj+1];
+	if(uc->snap_slip0)uc->snap_slip0[kk] = xc[jj+3];
+	if(uc->cell_ruptured)uc->cell_ruptured[kk] = 0;
+      }
+      PetscCall(VecRestoreArrayRead(X,&xc));
+      uc->ev_open     = PETSC_TRUE;
+      uc->onset_time  = t;
+      uc->peakv_local = 0.0;
+      if(uc->rup_enable && (!uc->rup_done) && (!uc->rup_armed))
+	uc->rup_armed = PETSC_TRUE; /* arm the rupture-time field for event 1 */
+    }else if(uc->ev_open){
+      /* ARREST: coseismic slip and stress drop over the ruptured cells */
+      PetscReal lred[5],gred[5],lmx[2],gmx[2],gpeak;
+      /* lred: 0 sum dslip, 1 sum ddrop, 2 count, 3 area, 4 moment */
+      lred[0]=lred[1]=lred[2]=lred[3]=lred[4]=0.0;
+      lmx[0]=lmx[1]=0.0;	/* max dslip, max ddrop */
+      PetscCall(VecGetArrayRead(X,&xc));
+      for(ii=medium->rs,jj=0,kk=0; ii<medium->re; ii++,jj+=rsf->dim,kk++){
+	if(uc->cell_ruptured && uc->cell_ruptured[kk]){
+	  PetscReal dslip = xc[jj+3] - (uc->snap_slip0?uc->snap_slip0[kk]:0.0);
+	  PetscReal ddrop = (uc->snap_tau0?uc->snap_tau0[kk]:0.0) - xc[jj+1];
+	  PetscReal area  = 4.0*fault[ii].l*fault[ii].w;
+	  lred[0]+=dslip; lred[1]+=ddrop; lred[2]+=1.0; lred[3]+=area;
+	  lred[4]+=uc->shear_modulus*area*dslip;
+	  if(dslip > lmx[0])lmx[0]=dslip;
+	  if(ddrop > lmx[1])lmx[1]=ddrop;
+	}
+      }
+      PetscCall(VecRestoreArrayRead(X,&xc));
+      PetscCallMPI(MPI_Reduce(lred,gred,5,MPIU_REAL,MPI_SUM,0,PETSC_COMM_WORLD));
+      PetscCallMPI(MPI_Reduce(lmx,gmx,2,MPIU_REAL,MPI_MAX,0,PETSC_COMM_WORLD));
+      PetscCallMPI(MPI_Reduce(&uc->peakv_local,&gpeak,1,MPIU_REAL,MPI_MAX,0,PETSC_COMM_WORLD));
+      if((medium->comm_rank == 0) && uc->fout_catalog && (t >= uc->event_tmin)){
+	PetscReal cnt_r     = gred[2];
+	PetscReal mean_slip = (cnt_r>0.0)?(gred[0]/cnt_r):(0.0);
+	PetscReal mean_drop = (cnt_r>0.0)?(gred[1]/cnt_r):(0.0);
+	PetscReal M0        = gred[4];
+	PetscReal Mw        = (M0>0.0)?((2.0/3.0)*(log10(M0)-9.05)):(-99.0);
+	uc->ncat++;
+	fprintf(uc->fout_catalog,
+		"%5i %17.10f %17.10f %13.6e %8i %14.6e %13.6e %13.6e %12.6e %12.6e %13.6e %13.6e %8.4f\n",
+		uc->ncat,uc->onset_time/sec_per_year,t/sec_per_year,t-uc->onset_time,
+		(int)cnt_r,gred[3],mean_slip,gmx[0],mean_drop/1e6,gmx[1]/1e6,gpeak,M0,Mw);
+	fflush(uc->fout_catalog);
+      }
+      uc->ev_open = PETSC_FALSE;
+      if(uc->rup_enable && uc->rup_armed && (!uc->rup_done))
+	uc->rup_done = PETSC_TRUE; /* freeze the event-1 rupture-time field */
     }
   }
   PetscFunctionReturn(PETSC_SUCCESS);
