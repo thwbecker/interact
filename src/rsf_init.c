@@ -70,6 +70,9 @@ PetscErrorCode rsf_get_settings(int argc,char **argv,struct interact_ctx *par,
   PetscBool read_value;
   struct rsf_vars *rsf;
   PetscInt field_step_interval=0;PetscReal field_tmin_yr=0.0;PetscBool fset=PETSC_FALSE;
+  /* output defaults */
+  PetscBool cat_enable=PETSC_FALSE,rup_enable=PETSC_FALSE,budget_enable=PETSC_FALSE;
+  PetscReal rupture_vth=-1.0;
   PetscFunctionBeginUser;
   /* 
      default frictional and loading parameters, can be overridden via
@@ -238,19 +241,12 @@ PetscErrorCode rsf_get_settings(int argc,char **argv,struct interact_ctx *par,
   PetscCall(PetscOptionsGetReal(NULL,NULL,"-vel_event_hyst",&vel_event_hyst,NULL));
   PetscCall(PetscOptionsGetReal(NULL,NULL,"-event_tmin_yr",&event_tmin,NULL));
   PetscCall(PetscOptionsGetBool(NULL,NULL,"-track_events",&track_events,NULL));
-  /* Task 1 outputs (default off); rides on the -track_events crossings */
-  {
-    PetscBool cat_enable=PETSC_FALSE,rup_enable=PETSC_FALSE,budget_enable=PETSC_FALSE;
-    PetscReal rupture_vth=-1.0;
-    PetscCall(PetscOptionsGetBool(NULL,NULL,"-rsf_catalog",&cat_enable,NULL));
-    PetscCall(PetscOptionsGetBool(NULL,NULL,"-rsf_rupture_time",&rup_enable,NULL));
-    PetscCall(PetscOptionsGetBool(NULL,NULL,"-slip_budget",&budget_enable,NULL));
-    PetscCall(PetscOptionsGetReal(NULL,NULL,"-rupture_vth",&rupture_vth,NULL));
-    set->cat_enable = cat_enable;
-    set->rup_enable = rup_enable;
-    set->budget_enable = budget_enable;
-    set->rupture_vth = rupture_vth;
-  }
+  /* other outputs */
+  PetscCall(PetscOptionsGetBool(NULL,NULL,"-rsf_catalog",&cat_enable,NULL));
+  PetscCall(PetscOptionsGetBool(NULL,NULL,"-rsf_rupture_time",&rup_enable,NULL));
+  PetscCall(PetscOptionsGetBool(NULL,NULL,"-slip_budget",&budget_enable,NULL));
+  PetscCall(PetscOptionsGetReal(NULL,NULL,"-rupture_vth",&rupture_vth,NULL));
+
   /* triangular patch evaluation scheme, cf. -tv of interact */
   PetscCall(PetscOptionsGetInt(NULL,NULL,"-tv",&tvmode,NULL));
   medium->tri_eval_mode = (MODE_TYPE)tvmode;
@@ -269,7 +265,11 @@ PetscErrorCode rsf_get_settings(int argc,char **argv,struct interact_ctx *par,
   set->field_step_interval = (fset && (field_step_interval > 0))?(field_step_interval):(0);
   set->field_enable = (set->field_step_interval > 0)?(PETSC_TRUE):(PETSC_FALSE);
   set->field_tmin = field_tmin_yr * sec_per_year;
-
+  /* cat output */
+  set->cat_enable = cat_enable;
+  set->rup_enable = rup_enable;
+  set->budget_enable = budget_enable;
+  set->rupture_vth = rupture_vth;
   /* 
      hand the gathered settings to the solver routine 
   */

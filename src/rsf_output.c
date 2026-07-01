@@ -66,9 +66,6 @@ PetscErrorCode rsf_init_monitor_and_event(struct rsf_out_ctx *uc,struct interact
   uc->groups = groups;
   uc->ngroup = ngroup;
   uc->vbuf = vbuf;
-  /* Task 1 fields: safe defaults; real setup happens in rsf_init_catalog,
-     which is called next in the driver.  Nulling here guarantees the
-     monitor/event hooks are inert even if catalog setup is skipped. */
   uc->cat_enable = uc->rup_enable = uc->budget_enable = PETSC_FALSE;
   uc->rup_armed = uc->rup_done = PETSC_FALSE;
   uc->fout_catalog = uc->fout_budget = NULL;
@@ -139,12 +136,13 @@ PetscErrorCode rsf_finalize_monitor_and_event(struct rsf_out_ctx *uc)
 }
 
 /*
-  Task 1 setup: SEAS-style event catalog, rupture-time field, and slip-budget
-  diagnostic.  Called by the driver right after rsf_init_monitor_and_event.
-  Allocates the rank-local per-cell scratch only for the features that are on,
-  opens the rank-0 output files, and stashes G, vpl, the rupture-front
-  threshold, and the total patch area (needed for the moment sum and the slip
-  budget) on the context.  With all three features off this is nearly a no-op.
+   SEAS-style event catalog, rupture-time field, and slip-budget
+  diagnostic.  Called by the driver right after
+  rsf_init_monitor_and_event.  Allocates the rank-local per-cell
+  scratch only for the features that are on, opens the rank-0 output
+  files, and stashes G, vpl, the rupture-front threshold, and the
+  total patch area (needed for the moment sum and the slip budget) on
+  the context.  With all three features off this is nearly a no-op.
 */
 PetscErrorCode rsf_init_catalog(struct rsf_out_ctx *uc,struct interact_ctx *par,
 				struct rsf_solve_settings *set,
@@ -213,7 +211,7 @@ PetscErrorCode rsf_init_catalog(struct rsf_out_ctx *uc,struct interact_ctx *par,
       }
     }
   }
-  HEANODE{
+  HEADNODE{
     if(uc->cat_enable){
       uc->fout_catalog = myopen("rsf_catalog.dat","w");
       fprintf(uc->fout_catalog,
@@ -268,11 +266,11 @@ PetscErrorCode rsf_init_catalog(struct rsf_out_ctx *uc,struct interact_ctx *par,
 }
 
 /*
-  Task 1 teardown: gather the event-1 rupture-time field to rank 0 in geometry
-  order and write it, close the catalog/budget files, and free the per-cell
-  scratch.  The gather uses a Vec with the interaction-matrix row layout (patch
-  i owned by the rank whose [rs,re) contains it), scattered to rank 0, so the
-  written order matches the geometry file.
+  gather the event-1 rupture-time field to rank 0 in geometry order
+  and write it, close the catalog/budget files, and free the per-cell
+  scratch.  The gather uses a Vec with the interaction-matrix row
+  layout (patch i owned by the rank whose [rs,re) contains it),
+  scattered to rank 0, so the written order matches the geometry file.
 */
 PetscErrorCode rsf_finalize_catalog(struct rsf_out_ctx *uc)
 {
@@ -368,12 +366,13 @@ PetscErrorCode rsf_TS_Monitor(TS ts,PetscInt step,PetscReal time,Vec X,void *ptr
   if(step < 0)	      /* negative indicates an interpolated solution */
     PetscFunctionReturn(PETSC_SUCCESS);
   /*
-    Task 1 tracking: while an event is in progress (uc->slipping), sample every
-    accepted step to build the per-cell peak slip rate, the ruptured mask, and
-    (for event 1) the rupture-time field.  This runs OUTSIDE the change-triggered
-    monitor gate below, so it uses the solver's own step density, which collapses
-    through the coseismic phase and therefore resolves the rupture front well.
-    It reads the state only and never touches the integrator.
+    while an event is in progress (uc->slipping), sample every
+    accepted step to build the per-cell peak slip rate, the ruptured
+    mask, and (for event 1) the rupture-time field.  This runs OUTSIDE
+    the change-triggered monitor gate below, so it uses the solver's
+    own step density, which collapses through the coseismic phase and
+    therefore resolves the rupture front well.  It reads the state
+    only and never touches the integrator.
   */
   if((uc->cat_enable || uc->rup_enable) && uc->slipping){
     const PetscScalar *xt;
@@ -452,7 +451,7 @@ PetscErrorCode rsf_TS_Monitor(TS ts,PetscInt step,PetscReal time,Vec X,void *ptr
     HEADNODE{
       PetscScalar *values;
       PetscReal sum[3],vmin,vmax,vmean,vstd,smean,du1,du2,du3;
-      PetscReal slip_integral=0.0;	/* Task 1 slip budget: sum area_i*slip_i */
+      PetscReal slip_integral=0.0;	/* slip budget: sum area_i*slip_i */
       FILE *fout2;
       char vel_file[STRLEN];
       int n = medium->nrflt,ierr2;
@@ -595,12 +594,13 @@ PetscErrorCode rsf_post_event(TS ts,PetscInt nevents,PetscInt event_list[],
     }
   }
   /*
-    Task 1 catalog capture, on the SAME crossing this event handler just logged
-    to rsf_events.dat.  After the toggle above, uc->slipping == TRUE means this
-    crossing is an onset, FALSE means an arrest.  Snapshots are captured on onset
-    and differenced on arrest; the reduces are collective so all ranks enter.
-    This runs regardless of event_tmin so onset/arrest stay paired; only the
-    written catalog row is gated by event_tmin.
+    catalog capture, on the SAME crossing this event handler just
+    logged to rsf_events.dat.  After the toggle above, uc->slipping ==
+    TRUE means this crossing is an onset, FALSE means an arrest.
+    Snapshots are captured on onset and differenced on arrest; the
+    reduces are collective so all ranks enter.  This runs regardless
+    of event_tmin so onset/arrest stay paired; only the written
+    catalog row is gated by event_tmin.
   */
   if(uc->cat_enable || uc->rup_enable){
     const PetscScalar *xc;
