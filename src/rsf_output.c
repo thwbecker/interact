@@ -655,7 +655,7 @@ PetscErrorCode rsf_post_event(TS ts,PetscInt nevents,PetscInt event_list[],
 	  PetscReal mean_slip = gred[0]/gcnt;
 	  PetscReal mean_drop = gred[1]/gcnt;
 	  PetscReal M0        = gred[4];
-	  PetscReal Mw        = (M0>0.0)?((2.0/3.0)*(log10(M0)-9.1)):(-99.0);
+	  PetscReal Mw        = (M0>0.0)?((2.0/3.0)*(log10(M0)-9.05)):(-99.0);
 	  uc->ncat++;
 	  fprintf(uc->fout_catalog,
 		  "%5i %17.10f %17.10f %13.6e %8i %14.6e %13.6e %13.6e %12.6e %12.6e %13.6e %13.6e %8.4f\n",
