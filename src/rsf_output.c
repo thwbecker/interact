@@ -744,8 +744,10 @@ double rsf_min_pos_spacing(const double *v,int n)
 */
 void rsf_group_coords(struct med *medium,struct flt *fault,struct rsf_group_grid *g)
 {
-  int k,ref;
-  double ts[3],td[3],xmin=1e30,ymin=1e30,xmax=-1e30,ymax=-1e30;
+  int k,l,ref,nlev;
+  double ts[3],td[3],xmin=1e30,xmax=-1e30,arctot;
+  double *pdip,*lev,*cx,*cy,*cz;
+  int *lidx,*lcnt;
   (void)medium;
   if(g->np < 1)
     return;
@@ -754,25 +756,77 @@ void rsf_group_coords(struct med *medium,struct flt *fault,struct rsf_group_grid
     ts[k]=(double)fault[ref].t_strike[k];
     td[k]=(double)fault[ref].t_dip[k];
   }
+  pdip=(double *)malloc((size_t)g->np*sizeof(double));
+  lidx=(int *)   malloc((size_t)g->np*sizeof(int));
+  /* along-strike coordinate: projection onto the reference strike axis. This is
+     regular as long as the strike is constant, which holds for a fault that
+     bends only in dip. The dip-axis projection pdip is used only to identify and
+     order the down-dip rows below, not as the coordinate itself. */
   for(k=0;k<g->np;k++){
     int ip=g->idx[k];
     g->xs[k]=fault[ip].x[INT_X]*ts[INT_X]+fault[ip].x[INT_Y]*ts[INT_Y]+fault[ip].x[INT_Z]*ts[INT_Z];
-    g->ys[k]=fault[ip].x[INT_X]*td[INT_X]+fault[ip].x[INT_Y]*td[INT_Y]+fault[ip].x[INT_Z]*td[INT_Z];
+    pdip[k]=fault[ip].x[INT_X]*td[INT_X]+fault[ip].x[INT_Y]*td[INT_Y]+fault[ip].x[INT_Z]*td[INT_Z];
     if(g->xs[k]<xmin)xmin=g->xs[k];
-    if(g->ys[k]<ymin)ymin=g->ys[k];
   }
   for(k=0;k<g->np;k++){
     g->xs[k]-=xmin;
-    g->ys[k]-=ymin;
     if(g->xs[k]>xmax)xmax=g->xs[k];
-    if(g->ys[k]>ymax)ymax=g->ys[k];
   }
-  g->xmin=0.0;g->xmax=xmax;g->ymin=0.0;g->ymax=ymax;
+  g->xmin=0.0;g->xmax=xmax;
   g->dx=rsf_min_pos_spacing(g->xs,g->np);
-  g->dy=rsf_min_pos_spacing(g->ys,g->np);
   g->nx=(g->dx>0.0)?((int)floor(xmax/g->dx+0.5)+1):(0);
-  g->ny=(g->dy>0.0)?((int)floor(ymax/g->dy+0.5)+1):(0);
+  /*
+    down-dip coordinate: the old code projected every patch onto the dip axis of
+    the reference patch, which is only correct for a planar (constant-dip) fault.
+    On a listric fault the dip changes down dip, so that projection compresses
+    the deeper rows unevenly and the grid is (wrongly) flagged irregular. Here
+    the down-dip rows are identified by their dip-axis projection (constant
+    within a row), ordered, and the coordinate is set to the true arc length
+    along the fault (cumulative centroid-to-centroid distance), laid out on a
+    uniform down-dip increment so the grid is exactly regular. For a planar fault
+    this reduces to the original behavior.
+  */
+  {
+    double tol,*sp;
+    sp=(double *)malloc((size_t)g->np*sizeof(double));
+    for(k=0;k<g->np;k++)sp[k]=pdip[k];
+    qsort(sp,(size_t)g->np,sizeof(double),rsf_dcmp);	/* ascending */
+    tol=rsf_min_pos_spacing(pdip,g->np)*0.25;		/* below one row gap */
+    if(tol<=0.0)tol=1e-3;
+    lev=(double *)malloc((size_t)g->np*sizeof(double));
+    nlev=0;
+    for(k=0;k<g->np;k++)
+      if((nlev==0)||(sp[k]-lev[nlev-1]>tol))lev[nlev++]=sp[k];
+    cx=(double *)calloc((size_t)nlev,sizeof(double));
+    cy=(double *)calloc((size_t)nlev,sizeof(double));
+    cz=(double *)calloc((size_t)nlev,sizeof(double));
+    lcnt=(int *)calloc((size_t)nlev,sizeof(int));
+    for(k=0;k<g->np;k++){
+      int ip=g->idx[k],best=0;
+      double bd=fabs(pdip[k]-lev[0]);
+      for(l=1;l<nlev;l++){
+	double d=fabs(pdip[k]-lev[l]);
+	if(d<bd){bd=d;best=l;}
+      }
+      lidx[k]=best;
+      cx[best]+=fault[ip].x[INT_X];cy[best]+=fault[ip].x[INT_Y];cz[best]+=fault[ip].x[INT_Z];
+      lcnt[best]++;
+    }
+    for(l=0;l<nlev;l++)
+      if(lcnt[l]>0){cx[l]/=lcnt[l];cy[l]/=lcnt[l];cz[l]/=lcnt[l];}
+    arctot=0.0;
+    for(l=1;l<nlev;l++){
+      double ddx=cx[l]-cx[l-1],ddy=cy[l]-cy[l-1],ddz=cz[l]-cz[l-1];
+      arctot+=sqrt(ddx*ddx+ddy*ddy+ddz*ddz);
+    }
+    g->dy=(nlev>1)?(arctot/(double)(nlev-1)):(0.0);
+    for(k=0;k<g->np;k++)g->ys[k]=(double)lidx[k]*g->dy;
+    g->ymin=0.0;g->ymax=(nlev>1)?(arctot):(0.0);
+    g->ny=nlev;
+    free(sp);free(lev);free(cx);free(cy);free(cz);free(lcnt);
+  }
   g->regular=((g->nx>0)&&(g->ny>0)&&(g->nx*g->ny==g->np));
+  free(pdip);free(lidx);
 }
 /*
   collect the distinct fault groups, gather each group's patch indices
