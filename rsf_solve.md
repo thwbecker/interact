@@ -473,3 +473,69 @@ once per interval and are *not* purged between runs, so for long, fine-grid runs
 0.5 km / N=16000, ~1 MB per frame) they accumulate quickly and can fill the working disk;
 clean `tmp_rsf` between runs, and note that a full disk makes the snapshot and
 `rsf_monitor.dat` writes fail, which can look like a solver stall.
+
+---
+
+## Task 1 (2026-07): SEAS-style event catalog, rupture-time field, slip budget
+
+Three optional, default-off outputs that complement the existing `rsf_events.dat`
+event tracker rather than replace it. They ride on the same slip-rate threshold
+crossings that `-track_events` already detects (so `-track_events`, on by
+default, is required), and add only the per-event quantities that
+`rsf_events.dat` does not carry. All three are inert unless explicitly enabled,
+so a run without the new flags is unchanged (verified: no new files, identical
+behavior).
+
+| flag | output | contents |
+|----|----|----|
+| `-rsf_catalog` | `rsf_catalog.dat` | one row per completed event: onset/arrest time, duration, ruptured-cell count and area, mean and max coseismic slip, mean and max static stress drop, peak slip rate, seismic moment `M0` and `Mw` |
+| `-rsf_rupture_time` | `rsf_rupture_time.dat` | per-cell time of first crossing of the rupture-front threshold during event 1, referenced to the earliest crossing (the initiation time), with a ruptured flag; the Jiang et al. (2022) Fig 4 / Fig 7 diagnostic |
+| `-slip_budget` | `rsf_slip_budget.dat` | area-integrated on-fault slip versus the plate-rate reference `vpl*t*area` at each stats interval, a long-term loading-consistency check |
+| `-rupture_vth <v>` | | rupture-front threshold [m/s] for the catalog and rupture-time field; defaults to the event onset threshold `vel_event`. The benchmark uses a distinct, larger value (0.1 or 0.03 m/s), passed here |
+
+Definitions, so the values are unambiguous: coseismic slip and stress drop are
+per-cell differences between the onset snapshot and the arrest state, with the
+drop signed so a stress decrease is positive; the mean is over ruptured cells
+only (cells that exceeded `rupture_vth` at any accepted step during the event),
+the max is over the same set; `M0 = G * sum(area_i * coseismic_slip_i)` over
+ruptured cells, `Mw = (2/3)(log10 M0 - 9.05)`; peak slip rate is the maximum over
+cells and over accepted steps within the event. These are threshold-dependent
+and, for stress drop, domain-dependent, so they are reported relative to the
+chosen thresholds rather than as resolution-independent quantities.
+
+Implementation is confined to `rsf_output.c` (setup, per-step tracking in the
+monitor, and the onset-snapshot / arrest-reduction in the event handler),
+`rsf.h` (context and settings fields, prototypes), `rsf_init.c` (option
+parsing), and `rsf_solve.c` (two calls). The per-cell tracking runs every
+accepted step while an event is in progress, outside the change-triggered
+monitor gate, so it follows the solver's own step density, which collapses
+through the coseismic phase and resolves the rupture front. The rupture-time
+field is gathered to rank 0 in geometry order through a row-layout `Vec` scatter,
+so it is correct in parallel.
+
+One associated fix went in with this work: the event tracker previously
+initialized its slipping state from the scalar `vel_init`, which for a per-cell
+initial-condition file (the BP5 nucleation patch is seeded at 3e-2 m/s while
+`vel_init` is the background `vpl`) mislabeled the decaying seed as a spurious
+onset then arrest. The slipping state is now initialized from the true initial
+maximum slip rate over the fault, so the seeded first event is treated as an
+event already in progress at t=0, which is what both `rsf_events.dat` and the
+new catalog want. This changes only the labeling of the initial seeded
+transient; the spontaneous recurrence times used for the HBI cross-check are
+unaffected.
+
+### Verification
+
+On the BP5 2 km dense test to a few years (long enough for the seeded event 1 to
+arrest), the standalone reducer unit test (`test_hmatrix/catalog_unit_test.c`,
+compiled and run outside the interact build) reproduces the catalog arithmetic
+(mean/max coseismic slip, signed stress drop, ruptured area, `M0`/`Mw`, peak slip
+rate, and the initiation-referenced rupture time) against hand-computed values,
+including the degenerate no-rupture case. The end-to-end run produces a coherent
+outward-propagating rupture-time field (initiation at 0 s at the nucleation
+patch, growing with distance), and the HACApK backend reproduces the catalog to
+within the expected sub-percent compression-level differences (for example 307
+versus 309 ruptured cells, `Mw` 7.486 versus 7.491 at `ztol` 1e-1). All of this
+is specific to the tested 2 km configuration; the absolute event size at 2 km is
+coarse and under-resolved, so the numbers are for validating the machinery, not
+for benchmark comparison, which needs 1 km or finer.
