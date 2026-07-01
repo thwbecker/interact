@@ -33,3 +33,6 @@
 #define NUMREC_ISWAP(a,b) {itemp=(a);(a)=(b);(b)=itemp;}
 
 
+#ifndef NAN 
+#define NAN nan("")
+#endif

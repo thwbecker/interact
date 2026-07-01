@@ -81,7 +81,7 @@ PetscErrorCode rsf_init_monitor_and_event(struct rsf_out_ctx *uc,struct interact
   /* force the first monitor call to log */
   uc->old_time = t_init - 2.0*dt_monitor;
   uc->fout_monitor = uc->fout_stats = uc->fout_event = NULL;
-  if(medium->comm_rank == 0){
+  HEADNODE{
     uc->fout_monitor = myopen("rsf_monitor.dat","w");
     fprintf(uc->fout_monitor,"# step time[s] time[yr] dt[s] log10(max|v|[m/s]) mean_slip[m] mean_mu max_sigma[Pa] min_sigma[Pa]\n");
     uc->fout_stats = myopen("rsf_stats.dat","w");
@@ -115,7 +115,7 @@ PetscErrorCode rsf_finalize_monitor_and_event(struct rsf_out_ctx *uc)
   struct med *medium;
   PetscFunctionBeginUser;
   medium = uc->par->medium;
-  if(medium->comm_rank == 0){
+  HEADNODE{
     if(uc->fout_monitor)fclose(uc->fout_monitor);
     if(uc->fout_stats)fclose(uc->fout_stats);
     if(uc->fout_event){
@@ -182,7 +182,7 @@ PetscErrorCode rsf_init_catalog(struct rsf_out_ctx *uc,struct interact_ctx *par,
     and the rupture-time field).  If event tracking is off, disable them.
   */
   if((uc->cat_enable || uc->rup_enable) && (!uc->track_events)){
-    if(medium->comm_rank == 0)
+    HEADNODE
       fprintf(stderr,"rsf_init_catalog: WARNING: -rsf_catalog/-rsf_rupture_time need -track_events; disabling them\n");
     uc->cat_enable = uc->rup_enable = PETSC_FALSE;
   }
@@ -213,7 +213,7 @@ PetscErrorCode rsf_init_catalog(struct rsf_out_ctx *uc,struct interact_ctx *par,
       }
     }
   }
-  if(medium->comm_rank == 0){
+  HEANODE{
     if(uc->cat_enable){
       uc->fout_catalog = myopen("rsf_catalog.dat","w");
       fprintf(uc->fout_catalog,
@@ -293,7 +293,7 @@ PetscErrorCode rsf_finalize_catalog(struct rsf_out_ctx *uc)
     PetscCall(VecScatterCreateToZero(rvec,&rsc,&rgath));
     PetscCall(VecScatterBegin(rsc,rvec,rgath,INSERT_VALUES,SCATTER_FORWARD));
     PetscCall(VecScatterEnd(  rsc,rvec,rgath,INSERT_VALUES,SCATTER_FORWARD));
-    if(medium->comm_rank == 0){
+    HEADNODE{
       const PetscScalar *g;
       FILE *out = myopen("rsf_rupture_time.dat","w");
       int nrup=0;
@@ -322,7 +322,7 @@ PetscErrorCode rsf_finalize_catalog(struct rsf_out_ctx *uc)
     PetscCall(VecDestroy(&rgath));
     PetscCall(VecDestroy(&rvec));
   }
-  if(medium->comm_rank == 0){
+  HEADNODE{
     if(uc->fout_catalog){
       fclose(uc->fout_catalog);
       fprintf(stderr,"rsf_finalize_catalog: wrote event catalog (%i completed events)\n",uc->ncat);
@@ -449,7 +449,7 @@ PetscErrorCode rsf_TS_Monitor(TS ts,PetscInt step,PetscReal time,Vec X,void *ptr
       uc->next_print_time += medium->print_interval;
     PetscCall(VecScatterBegin(uc->gather,X,uc->gathered,INSERT_VALUES,SCATTER_FORWARD));
     PetscCall(VecScatterEnd(uc->gather,X,uc->gathered,INSERT_VALUES,SCATTER_FORWARD));
-    if(medium->comm_rank == 0){
+    HEADNODE{
       PetscScalar *values;
       PetscReal sum[3],vmin,vmax,vmean,vstd,smean,du1,du2,du3;
       PetscReal slip_integral=0.0;	/* Task 1 slip budget: sum area_i*slip_i */
@@ -514,7 +514,7 @@ PetscErrorCode rsf_TS_Monitor(TS ts,PetscInt step,PetscReal time,Vec X,void *ptr
     PetscScalar *fvals;
     PetscCall(VecScatterBegin(uc->gather,X,uc->gathered,INSERT_VALUES,SCATTER_FORWARD));
     PetscCall(VecScatterEnd(  uc->gather,X,uc->gathered,INSERT_VALUES,SCATTER_FORWARD));
-    if(medium->comm_rank == 0){
+    HEADNODE{
       PetscReal du1,du2,du3,vmax=0.0;
       int ig,k,ip,nf = medium->nrflt;
       PetscCall(VecGetArray(uc->gathered,&fvals));
@@ -655,7 +655,7 @@ PetscErrorCode rsf_post_event(TS ts,PetscInt nevents,PetscInt event_list[],
 	  PetscReal mean_slip = gred[0]/gcnt;
 	  PetscReal mean_drop = gred[1]/gcnt;
 	  PetscReal M0        = gred[4];
-	  PetscReal Mw        = (M0>0.0)?((2.0/3.0)*(log10(M0)-9.05)):(-99.0);
+	  PetscReal Mw        = (M0>0.0)?((2.0/3.0)*(log10(M0)-9.1)):(-99.0);
 	  uc->ncat++;
 	  fprintf(uc->fout_catalog,
 		  "%5i %17.10f %17.10f %13.6e %8i %14.6e %13.6e %13.6e %12.6e %12.6e %13.6e %13.6e %8.4f\n",
