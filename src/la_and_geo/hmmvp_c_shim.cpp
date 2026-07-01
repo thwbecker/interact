@@ -112,6 +112,7 @@ void *chmmvp_compress_in_memory(int n, double *x, double *y, double *z,
     hmmvp::Hd *hd = hmmvp::NewHd(D, NULL, eta);
     InteractGF gf(kctx);
     hmmvp::Compressor *c = hmmvp::NewCompressor(hd, &gf);
+    c->SetOutputLevel(0);	/* silence hmmvp's per-rank "prec"/"Compress" chatter */
     /* inorm selects the tolerance norm so this can be made comparable to the
        other backends (see -hacapk_inorm): 1 = block-relative (tm_brem_fro,
        block-local), otherwise matrix-relative Frobenius (tm_mrem_fro, global,
@@ -196,6 +197,7 @@ int chmmvp_compress_to_file(int n, double *x, double *y, double *z,
     hmmvp::Hd *hd = hmmvp::NewHd(D, NULL, eta);
     InteractGF gf(kctx);
     hmmvp::Compressor *c = hmmvp::NewCompressor(hd, &gf);
+    c->SetOutputLevel(0);	/* silence hmmvp's per-rank "prec"/"Compress" chatter */
     /* see chmmvp_compress_in_memory: inorm 1 = block-local (tm_brem_fro),
        else matrix-relative global (tm_mrem_fro), which needs ||B||_F */
     hmmvp::Compressor::TolMethod tm =
