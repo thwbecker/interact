@@ -69,7 +69,8 @@ C
       DIMENSION  U(12),DUA(12),DUB(12),DUC(12)                          
       DATA  F0/0.D0/                                                    
 C-----                                                                  
-      IF(Z.GT.0.0) then
+      IF((IFULLSPACE.EQ.0).AND.(Z.GT.0.)) then
+c      IF(Z.GT.0.0) then
          print *,'POSITIVE Z WAS GIVEN IN SUB-DC3D0'
          print *,z
          stop
