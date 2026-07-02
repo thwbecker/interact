@@ -105,6 +105,6 @@ done
 
 echo "$0: wrote $outdir/rsf_vel.gGGG.NNNNNN.grd"
 echo "to animate one group, e.g.:  ffmpeg -framerate 12 -pattern_type glob -i '$outdir/rsf_vel.g000.*.png' rsf_vel.g000.$tdir.mp4"
-rm  rsf_vel.g000.$tdir.mp4
-ffmpeg -framerate 12 -pattern_type glob -i '$outdir/rsf_vel.g000.*.png' rsf_vel.g000.$tdir.mp4
+rm  -f rsf_vel.g000.$tdir.mp4
+ffmpeg -framerate 12 -pattern_type glob -i "$outdir/rsf_vel.g000.*.png" rsf_vel.g000.$tdir.mp4
 cp rsf_vel.g000.$tdir.mp4 $HOME/Dropbox/tmp/

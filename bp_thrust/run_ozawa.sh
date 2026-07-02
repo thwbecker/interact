@@ -20,12 +20,11 @@ binary=../../bin/rsf_solve       # rsf_solve, relative to each per-resolution ru
 generator=../make_thrust.py      # geometry generator, relative to each run dir
 ncore=24                         # MPI ranks
 #resolutions="2.0 1.0 0.5"        # cell sizes [km] for the convergence sweep; extend downward
-resolutions="0.5 0.25 0.1"        # cell sizes [km] for the convergence sweep; extend downward
+resolutions="1.0 0.5 0.25 0.1"        # cell sizes [km] for the convergence sweep; extend downward
 
 # backend: 0 dense, 3 HACApK, 4 hmmvp. Dense is fine at 2 km; use an H-matrix
 # backend for the finer meshes. This mirrors the BP5 create_run default.
-hmat=4
-hmat_flag="-use_hmatrix 4 -hmmvp_tol 1e-4"
+hmat=4;hmat_flag="-use_hmatrix 4 -hmmvp_tol 1e-4"
 
 # elastic and rate-and-state parameters (Ozawa et al. 2023)
 shear_modulus=3.204e10           # mu [Pa]  (32.04 GPa)
