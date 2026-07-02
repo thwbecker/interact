@@ -46,6 +46,7 @@ if [ "$make_png" -ne 0 ]; then
     gmt makecpt -Croma -T-11/0/0.5 -I > $outdir/rsf_vel.cpt
 fi
 
+tags=""
 # loop over fault groups
 for geom in rsf_geom.g*.dat; do
     if [ ! -f "$geom" ]; then
@@ -57,8 +58,9 @@ for geom in rsf_geom.g*.dat; do
     regp=`echo $reg | gawk -f reg2wesn.awk | gawk '{printf("-R%g/%g/%g/%g",$1/1e3,$2/1e3,$3/1e3,$4/1e3)}'`
     inc=`awk '/^# gmt_inc/{print $3; exit}' "$geom"`
     echo
-    echo $reg $regp $inc
+    echo $reg $regp $inc $tag
     echo
+    tags="$tags $tag"
     if [ -n "$reg_override" ]; then reg=$reg_override; fi
     if [ -n "$inc_override" ]; then inc=$inc_override; fi
     if [ -z "$reg" ] || [ -z "$inc" ]; then
@@ -105,6 +107,8 @@ done
 
 echo "$0: wrote $outdir/rsf_vel.gGGG.NNNNNN.grd"
 echo "to animate one group, e.g.:  ffmpeg -framerate 12 -pattern_type glob -i '$outdir/rsf_vel.g000.*.png' rsf_vel.g000.$tdir.mp4"
-rm  -f rsf_vel.g000.$tdir.mp4
-ffmpeg -framerate 12 -pattern_type glob -i "$outdir/rsf_vel.g000.*.png" rsf_vel.g000.$tdir.mp4
-cp rsf_vel.g000.$tdir.mp4 $HOME/Dropbox/tmp/
+for tag in $tags;do
+    rm  -f rsf_vel.$tag.$tdir.mp4
+    ffmpeg -framerate 12 -pattern_type glob -i "$outdir/rsf_vel.$tag.*.png" rsf_vel.$tag.$tdir.mp4
+    cp rsf_vel.$tag.$tdir.mp4 $HOME/Dropbox/tmp/
+done

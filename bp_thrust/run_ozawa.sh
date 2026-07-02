@@ -18,9 +18,9 @@ export OMP_NUM_THREADS=1
 # ---- run configuration (edit here) -----------------------------------------
 binary=../../bin/rsf_solve       # rsf_solve, relative to each per-resolution run dir
 generator=../make_thrust.py      # geometry generator, relative to each run dir
-ncore=24                         # MPI ranks
+ncore=$NR_CPUS                         # MPI ranks
 #resolutions="2.0 1.0 0.5"        # cell sizes [km] for the convergence sweep; extend downward
-resolutions="1.0 0.5 0.25 0.1"        # cell sizes [km] for the convergence sweep; extend downward
+resolutions="0.25 0.1"        # cell sizes [km] for the convergence sweep; extend downward
 
 # backend: 0 dense, 3 HACApK, 4 hmmvp. Dense is fine at 2 km; use an H-matrix
 # backend for the finer meshes. This mirrors the BP5 create_run default.
