@@ -34,13 +34,13 @@ import sys, numpy as np
 ds      = float(sys.argv[1]) if len(sys.argv) > 1 else 0.5     # cell size [km]
 Lstrike = float(sys.argv[2]) if len(sys.argv) > 2 else 100.0   # along-strike domain [km]
 
-# The full-space Okada kernel is translation invariant, but the underlying
-# half-space DC3D routine requires z <= 0. BP4 is symmetric about x3 = 0, which
-# would put half the fault above z = 0, so the whole fault is shifted DOWN by
-# z_off (its center placed at depth z_off). In a whole space this changes
-# nothing physically; for output/plotting the true BP4 down-dip coordinate is
-# x3 = depth - z_off (so x3 = 0 sits at depth z_off).
-z_off = float(sys.argv[3]) if len(sys.argv) > 3 else 50.0     # fault-center depth [km]
+# With the full-space fixes to eval_okada and dc3d.F, the Okada kernel accepts
+# patches at any z, so the fault is placed at its true position, symmetric about
+# x3 = 0 (z_off = 0), and the BP4 down-dip coordinate x3 is recovered directly as
+# x3 = -z with no offset. z_off is kept only as a fallback: on a kernel that still
+# rejects z > 0, set z_off > Wf to push the whole fault below z = 0 (a whole-space
+# shift changes nothing physically), and then x3 = depth - z_off.
+z_off = float(sys.argv[3]) if len(sys.argv) > 3 else 0.0     # fault-center depth [km]
 
 # --- BP4-QD Table 1 parameters (whole space) ---
 a0, a_max = 0.0065, 0.025   # a in VW core / VS exterior
@@ -105,5 +105,8 @@ fg.close(); fr.close(); fi.close()
 print(f"BP4 ds={ds:g} km, Lstrike={Lstrike:g} km : {imax}x{jmax} = {imax*jmax} cells")
 print(f"  VW cells={nvw} nucleation cells={nnuc} ; uniform tau0={tau0:.4f} MPa (bump {tau_bump:g}x)")
 print(f"  x3 in [-{Wf:g},{Wf:g}] km (symmetric) ; nucleation center ({nuc_x2:g},{nuc_x3:g}) km")
-print(f"  fault shifted to depth center z_off={z_off:g} km for the DC3D kernel (BP4 x3 = depth - {z_off:g})")
+if z_off == 0.0:
+    print(f"  fault at true position, symmetric about z=0 (needs the full-space z fix in eval_okada/dc3d.F)")
+else:
+    print(f"  fault shifted to depth center z_off={z_off:g} km (fallback for kernels rejecting z>0; BP4 x3 = depth - {z_off:g})")
 print(f"  run with -full_space -dc {dc:g} -sigma_init {sig*1e6:g} -shear_modulus {G*1e9:g} -s_wave_speed {cs*1e3:g}")

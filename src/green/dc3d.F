@@ -616,8 +616,9 @@ C
       DIMENSION  U(12),DU(12),DUA(12),DUB(12),DUC(12)                   
       DATA  F0,EPS/ 0.D0, EPS_DC3D_PREC /                                       
 C-----                                                                  
-      IF(Z.GT.0.) then
-         print *,' ** POSITIVE Z WAS GIVEN IN SUB-DC3D'
+      IF((IFULLSPACE.EQ.0).AND.(Z.GT.0.)) then
+c      IF(Z.GT.0.0) then
+         print *,' ** POSITIVE Z WAS GIVEN IN SUB-DC3D FOR HALF SPACE'
          print *,z
          stop
       endif
