@@ -82,8 +82,8 @@ void eval_okada(COMP_PRECISION *x,struct flt *fault,
 	    cpdip);
     exit(-1);
   }
-  if(fault->x[INT_Z] >0){
-    fprintf(stderr,"eval_okada: error: fault z: %g (needs to be <=0)\n",
+  if(!fullspace && (fault->x[INT_Z] > 0)){
+    fprintf(stderr,"eval_okada: error: fault z: %g (needs to be <=0) for half space\n",
 	    fault->x[INT_Z]);
     exit(-1);
   }
@@ -204,8 +204,8 @@ void eval_okada_basic(COMP_PRECISION *x,
   al1 = (double)-l;al2 = (double)l;
   aw1 = (double)-w;aw2 = (double)w;
   //#ifdef DEBUG
-  if((depth < 0)||(x[INT_Z]>0)){
-    fprintf(stderr,"eval_okada_basic: error: depth: %g (has to be >0) z: %g (has to be <0)\n",
+  if(!fullspace *&& ((depth < 0)||(x[INT_Z]>0))){
+    fprintf(stderr,"eval_okada_basic: error: depth: %g (has to be >0) z: %g (has to be <0) for half space\n",
 	    depth,x[INT_Z]);
     exit(-1);
   }
