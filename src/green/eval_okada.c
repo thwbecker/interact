@@ -204,7 +204,7 @@ void eval_okada_basic(COMP_PRECISION *x,
   al1 = (double)-l;al2 = (double)l;
   aw1 = (double)-w;aw2 = (double)w;
   //#ifdef DEBUG
-  if(!fullspace *&& ((depth < 0)||(x[INT_Z]>0))){
+  if(!fullspace && ((depth < 0)||(x[INT_Z]>0))){
     fprintf(stderr,"eval_okada_basic: error: depth: %g (has to be >0) z: %g (has to be <0) for half space\n",
 	    depth,x[INT_Z]);
     exit(-1);

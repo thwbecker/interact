@@ -71,7 +71,7 @@ C
 C-----                                                                  
       IF((IFULLSPACE.EQ.0).AND.(Z.GT.0.)) then
 c      IF(Z.GT.0.0) then
-         print *,'POSITIVE Z WAS GIVEN IN SUB-DC3D0'
+         print *,'POSITIVE Z WAS GIVEN IN SUB-DC3D0 FOR HALF SPACE'
          print *,z
          stop
       endif
