@@ -369,9 +369,13 @@ void read_geometry(char *patch_filename,struct med **medium,
       exit(-1);
     }
 #endif
-    if((*fault+i)->x[INT_Z] > 0){
+    /* z < 0 is required only for the half-space Okada kernel, whose free
+       surface sits at z = 0. In full-space mode the kernel is the
+       translation-invariant infinite medium, so patches above z = 0 are
+       legitimate (e.g. the whole-space SEAS BP4 fault, symmetric about x3 = 0). */
+    if((!(*medium)->full_space) && ((*fault+i)->x[INT_Z] > 0)){
       if((*medium)->comm_rank == 0)
-	fprintf(stderr,"read_geometry: patch %03i: z has to be < 0, mid point z: %g\n",
+	fprintf(stderr,"read_geometry: patch %03i: z has to be < 0 (half-space), mid point z: %g\n",
 		i,(*fault+i)->x[INT_Z]);
       exit(-1);
     }
@@ -457,9 +461,9 @@ void read_geometry(char *patch_filename,struct med **medium,
 							   half */
       for(j=0; j < nvert_of_patch((*fault+i));j++){ /* loop through all vertices */
 	//
-	// check depth alignment
+	// check depth alignment (half-space only; full space has no surface)
 	//
-	if(vertex[j*3+INT_Z] > eps_for_z){
+	if((!(*medium)->full_space) && (vertex[j*3+INT_Z] > eps_for_z)){
 	  if((*medium)->comm_rank == 0){
 	    fprintf(stderr,"read_geometry: patch %i, vertex %i above surface, z: %20.10e (eps: %g)\n",
 		    i,j,vertex[j*3+INT_Z],eps_for_z);

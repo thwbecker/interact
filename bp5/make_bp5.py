@@ -56,7 +56,7 @@ for i in range(imax):
         if a < 0.01: nvw += 1
         # steady-state-at-Vpl initial stress evaluated at the local velocity v
         # (independent of D_RS; D_RS enters only the aging-law evolution rate)
-        tau = sig*(a*np.arcsinh(0.5*v/V0*np.exp((f0 + b0*np.log(V0/Vpl))/a)) + eta*v)
+        tau = sig*a*np.arcsinh(0.5*v/V0*np.exp((f0 + b0*np.log(V0/Vpl))/a)) + eta*v
         # interact geometry: strike=0 => strike dir +y, dip=90 => normal +x, dip +z(up)
         #   so BP5 along-strike -> interact y, depth -> z=-dep, fault plane at x=0
         fg.write(f"0.0 {x*1e3:.6e} {-dep*1e3:.6e} 0.0 90.0 {half:.1f} {half:.1f} 0\n")
