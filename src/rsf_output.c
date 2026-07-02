@@ -820,7 +820,12 @@ void rsf_group_coords(struct med *medium,struct flt *fault,struct rsf_group_grid
       arctot+=sqrt(ddx*ddx+ddy*ddy+ddz*ddz);
     }
     g->dy=(nlev>1)?(arctot/(double)(nlev-1)):(0.0);
-    for(k=0;k<g->np;k++)g->ys[k]=(double)lidx[k]*g->dy;
+    /* reference the down-dip coordinate to the shallow (surface) end: index 0
+       from the sort above is the deepest row (smallest up-dip projection), so
+       flip it here.  down_dip then increases with depth from 0 at the surface,
+       which is what the plotting script's positive-down y axis expects, so cross
+       sections come out with the surface at the top */
+    for(k=0;k<g->np;k++)g->ys[k]=(double)((nlev-1)-lidx[k])*g->dy;
     g->ymin=0.0;g->ymax=(nlev>1)?(arctot):(0.0);
     g->ny=nlev;
     free(sp);free(lev);free(cx);free(cy);free(cz);free(lcnt);
