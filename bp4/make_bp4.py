@@ -8,10 +8,12 @@ A vertical strike-slip fault is embedded in a homogeneous whole space (run with
 -full_space), symmetric about x3 = 0.  The rate-and-state region is |x3| <= Wf
 and is meshed here; outside it creeps at the plate rate.  A velocity-weakening
 rectangle (|x3| <= H, |x2| <= l/2) sits at the center, surrounded by a transition
-strip of width h to velocity strengthening.  The first event is seeded not by a
-high initial velocity (as in BP5) but by a 10 percent higher initial shear stress
-(tau0_i = 1.1 tau0) in a square favorable zone at one corner of the VW patch, at
-uniform initial slip rate Vinit.
+strip of width h to velocity strengthening.  The first event is seeded in a square
+favorable zone at one corner of the VW patch.  Two seed options are provided (see
+nuc_seed below): a higher initial slip rate Vi with the background state unchanged,
+which matches Jiang et al. 2022 and gives immediate initiation (default), or the
+BP4 description PDF variant of a 1.1 tau0 prestress bump at Vinit, which nucleates
+slowly near 200 yr.  The recurrence interval is the same either way.
 
 BP4 differs from BP5 in nearly every number (see Table 1 of each benchmark), so
 the parameters below are BP4's, not BP5's.
@@ -62,7 +64,16 @@ h   = 3.0                   # VW-VS transition width
 Wf  = 40.0                  # fault half-height (RSF region |x3| <= Wf = 80 km tall)
 wi  = 12.0                  # favorable nucleation square width
 hi  = 1.5                   # offset of nucleation square from the VW corner
-tau_bump = 1.1              # nucleation prestress factor (tau0_i = 1.1 tau0)
+# nucleation seed. "velocity" matches Jiang et al. 2022 and the other benchmark
+# participants: a higher initial slip rate Vi is imposed in the square with the
+# background state left unchanged, giving immediate initiation of the first event
+# so simulated event times line up with the published runs. "prestress" is the
+# BP4 description PDF variant (a 1.1 tau0 bump at Vinit), which nucleates slowly,
+# near 200 yr. The recurrence interval is the same either way; only the timing of
+# the first event differs.
+nuc_seed = "velocity"
+Vi       = 0.03            # nucleation slip rate [m/s] (velocity seed)
+tau_bump = 1.1             # nucleation prestress factor (prestress seed)
 
 # nucleation square, at one VW corner offset hi inward; centered here at
 # (x2, x3) = (-lVW/2 + hi + wi/2, -H + hi + wi/2) = (-22.5, -7.5), matching the
@@ -91,19 +102,26 @@ for i in range(imax):
         r = max(abs(x3) - H, abs(x2) - lVW/2.0)/h
         a = min(a0 + max(0.0, r)*(a_max - a0), a_max)
         if a < 0.5*(a0 + b0): nvw += 1
-        tau = tau0
+        tau = tau0; v = Vinit
         if abs(x2 - nuc_x2) < wi/2.0 and abs(x3 - nuc_x3) < wi/2.0:
-            tau = tau_bump*tau0
+            if nuc_seed == "velocity":
+                # higher slip rate Vi with the background state left unchanged; the
+                # consistent prestress follows from the friction law (BP5-style seed)
+                v   = Vi
+                tau = sig*a*np.arcsinh((Vi/Vinit)*np.sinh((tau0 - eta*Vinit)/(sig*a))) + eta*Vi
+            else:
+                tau = tau_bump*tau0
             nnuc += 1
         # interact geometry: x1=0 fault plane, x2->y, x3->z=-(x3+z_off) so the
         # whole symmetric fault sits below z=0 (see z_off note above); strike=0,
         # dip=90 (vertical)
         fg.write(f"0.0 {x2*1e3:.6e} {-(x3+z_off)*1e3:.6e} 0.0 90.0 {half:.1f} {half:.1f} 0\n")
         fr.write(f"{a:.6e} {b0:.6e}\n")
-        fi.write(f"{tau*1e6:.8e} {Vinit:.6e}\n")     # MPa -> Pa
+        fi.write(f"{tau*1e6:.8e} {v:.6e}\n")     # MPa -> Pa
 fg.close(); fr.close(); fi.close()
 print(f"BP4 ds={ds:g} km, Lstrike={Lstrike:g} km : {imax}x{jmax} = {imax*jmax} cells")
-print(f"  VW cells={nvw} nucleation cells={nnuc} ; uniform tau0={tau0:.4f} MPa (bump {tau_bump:g}x)")
+seed_desc = f"velocity seed Vi={Vi:g} m/s (immediate)" if nuc_seed == "velocity" else f"prestress bump {tau_bump:g}x (slow)"
+print(f"  VW cells={nvw} nucleation cells={nnuc} ; uniform tau0={tau0:.4f} MPa ; {seed_desc}")
 print(f"  x3 in [-{Wf:g},{Wf:g}] km (symmetric) ; nucleation center ({nuc_x2:g},{nuc_x3:g}) km")
 if z_off == 0.0:
     print(f"  fault at true position, symmetric about z=0 (needs the full-space z fix in eval_okada/dc3d.F)")
