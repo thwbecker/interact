@@ -46,7 +46,7 @@ PetscReal vel_from_rsf(PetscReal tau, PetscReal sigma, PetscReal state, PetscRea
 PetscErrorCode rsf_ODE_RHSFunction(TS ts,PetscReal time,Vec X,Vec F,void *ptr)
 {
   PetscScalar *f,*vel,cosh_fac,mu,scaled_tau,exp_fac,pre_fac;
-  PetscScalar dvdtau,dvdsigma,dvdstate,a,b,sdot,vabs,psi_ss;
+  PetscScalar dvdtau,dvdsigma,dvdstate,a,b,sdot,vabs,psi_ss,epsi,omega,gate,lomega;
   const PetscScalar *x,*tau_dot,*sigma_dot,*velr;
   struct med *medium;struct flt *fault;
   PetscInt i,j,k,ln;
@@ -126,8 +126,36 @@ PetscErrorCode rsf_ODE_RHSFunction(TS ts,PetscReal time,Vec X,Vec F,void *ptr)
        slip law (state_law 1):
          d psi/dt = -(|v|/dc) (psi - psi_ss),  psi_ss = f0 - b ln(|v|/v0)
 
-       both relax psi to the same steady state psi_ss, which corresponds to the
-       usual f_ss = f0 + (a-b) ln(|v|/v0); they differ only in the relaxation.
+       PRZ law (state_law 2; Perrin, Rice and Zheng, 1995), in the normalization
+       with Omega = |v| theta/dc and Omega_ss = 1:
+         d theta/dt = 1/2 ( 1 - (|v| theta/dc)^2 )
+       Substituting theta = (dc/v0) exp((psi-f0)/b) gives
+         d psi/dt = b/(2 dc) ( v0 exp((f0-psi)/b) - v^2/v0 exp((psi-f0)/b) )
+
+       All three laws share the steady state psi_ss = f0 - b ln(|v|/v0), i.e. the
+       usual f_ss = f0 + (a-b) ln(|v|/v0), and all three have the same
+       linearization about it (d theta/dt ~ -(Omega-1)), so they agree on linear
+       stability and differ only away from steady state. Note that theta carries a
+       constant-factor arbitrariness: PRZ is sometimes written
+       d theta/dt = 1 - (|v| theta/(2 dc))^2, which is the same law under
+       theta -> theta/2 but puts theta_ss at 2 dc/|v|, shifting psi_ss by b ln 2
+       and making it NOT directly comparable to aging and slip at equal dc. The
+       Omega_ss = 1 form above is used here so that all three laws are comparable.
+
+       Sato-type law (state_law 3) and the Kato and Tullis composite law
+       (state_law 4): both are the slip law plus the aging law's healing term
+       gated so that healing only operates near stationary contact,
+         d theta/dt = gate - Omega ln Omega,   Omega = |v| theta/dc
+       with gate = exp(-Omega/sato_beta) for the Sato-type law and
+       gate = exp(-|v|/kt_vc) for Kato and Tullis. In psi,
+         d psi/dt = b/dc ( v0 exp((f0-psi)/b) gate - |v| ln Omega )
+       whose second term is exactly the slip law. sato_beta and kt_vc are held
+       fixed (see rsf_init.c). Steady state: the Sato gate is negligible at
+       Omega ~ 1 so Omega_ss = 1 as for the other laws, whereas the Kato and
+       Tullis gate does not vanish for |v| << kt_vc, which shifts psi_ss up by
+       b W(1) = 0.567 b there (the composite law's known steady-state offset);
+       see rsf_solve.md.
+
        |v| is used (not v) for the sinh regularization, which allows v < 0. In
        the slip law |v| is floored at vmin_state so ln(|v|/v0) stays finite as
        v -> 0 (where the slip law's d psi/dt -> 0 in any case).
@@ -139,6 +167,34 @@ PetscErrorCode rsf_ODE_RHSFunction(TS ts,PetscReal time,Vec X,Vec F,void *ptr)
 	  vabs = rsf->vmin_state;
 	psi_ss = rsf->f0 - b * PetscLogReal(vabs/rsf->v0);
 	f[j] = -(vabs/((rsf->dc_vec)?(rsf->dc_vec[i]):(rsf->dc))) * (x[j] - psi_ss);
+      }else if(rsf->state_law == RSF_PRZ_LAW){
+	vabs = fabs(velr[k]);
+	epsi  = PetscExpReal((x[j] - rsf->f0)/b); /* exp((psi-f0)/b) */
+	f[j] = (b/(2.0*((rsf->dc_vec)?(rsf->dc_vec[i]):(rsf->dc)))) *
+	  (rsf->v0/epsi - (vabs*vabs/rsf->v0)*epsi);
+      }else if((rsf->state_law == RSF_SATO_LAW) || (rsf->state_law == RSF_KT_LAW)){
+	/*
+	  the two gated (composite) laws. Both are the slip law plus the aging
+	  law's healing term multiplied by a gate that shuts the healing off away
+	  from stationary contact; they differ only in what the gate keys on:
+
+	    Sato-type (state_law 3): gate = exp(-Omega/sato_beta)   (keys on Omega)
+	    Kato and Tullis (state_law 4, composite law):
+	                             gate = exp(-|v|/kt_vc)         (keys on |v|)
+
+	  In theta form, d theta/dt = gate - Omega ln Omega, with Omega = |v| theta/dc.
+	*/
+	vabs = fabs(velr[k]);
+	if(vabs < rsf->vmin_state)
+	  vabs = rsf->vmin_state;
+	epsi  = PetscExpReal((x[j] - rsf->f0)/b);       /* exp((psi-f0)/b)   */
+	omega = (vabs/rsf->v0) * epsi;			/* Omega = |v| th/dc */
+	gate  = (rsf->state_law == RSF_SATO_LAW)?
+	  (PetscExpReal(-omega/rsf->sato_beta)):
+	  (PetscExpReal(-vabs/rsf->kt_vc));
+	lomega = PetscLogReal(vabs/rsf->v0) + (x[j] - rsf->f0)/b;  /* ln Omega */
+	f[j] = (b/((rsf->dc_vec)?(rsf->dc_vec[i]):(rsf->dc))) *
+	  ((rsf->v0/epsi)*gate - vabs*lomega);
       }else{			/* aging law */
 	f[j] = (b/((rsf->dc_vec)?(rsf->dc_vec[i]):(rsf->dc))) *
 	  (rsf->v0 * PetscExpReal((rsf->f0 - x[j])/b) - fabs(velr[k]));
@@ -213,10 +269,10 @@ PetscErrorCode rsf_domain_check(TS ts,PetscReal time,Vec X,PetscBool *accept)
     if(PetscIsInfOrNanReal(x[j]) || PetscIsInfOrNanReal(x[j+1]) || PetscIsInfOrNanReal(x[j+3])){lok = 0;break;}
     if(fabs(x[j+1]/(x[j+2]*a)) > arg_max){lok = 0;break;} /* sinh(tau/(sigma a)) */
     if(fabs(x[j]/a) > arg_max){lok = 0;break;}		  /* exp(-psi/a) */
-    /* the exp((f0-psi)/b) overflow test only applies to the aging law; the slip
-       law has no such exponential */
-    if((rsf->state_law == RSF_AGING_LAW) && (b != 0.0) &&
-       (fabs((rsf->f0 - x[j])/b) > arg_max)){lok = 0;break;} /* aging law exp */
+    /* the exp(+-(f0-psi)/b) overflow test applies to the aging law and to PRZ,
+       both of which exponentiate (psi-f0)/b; the slip law has no such term */
+    if((rsf->state_law != RSF_SLIP_LAW) && (b != 0.0) &&
+       (fabs((rsf->f0 - x[j])/b) > arg_max)){lok = 0;break;} /* aging/PRZ exp */
   }
   PetscCall(VecRestoreArrayRead(X,&x));
   PetscCallMPI(MPI_Allreduce(&lok,&gok,1,MPIU_INT,MPI_MIN,PETSC_COMM_WORLD));

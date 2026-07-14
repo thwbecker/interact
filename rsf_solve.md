@@ -98,6 +98,11 @@ The state is carried in the regularized variable `psi`, with
   `d psi/dt = b/dc (v0 exp((f0-psi)/b) - |v|)`
 - `-state_law 1`, the slip (Ruina) law:
   `d psi/dt = -(|v|/dc) (psi - psi_ss)`
+- `-state_law 2`, the PRZ law (Perrin, Rice and Zheng, 1995), written with
+  `Omega = |v| theta/dc` so that `Omega_ss = 1`:
+  `d theta/dt = 1/2 ( 1 - (|v| theta/dc)^2 )`; substituting
+  `theta = (dc/v0) exp((psi-f0)/b)` gives
+  `d psi/dt = b/(2 dc) ( v0 exp((f0-psi)/b) - v^2/v0 exp((psi-f0)/b) )`
 
 Both share the same steady state, `psi_ss = f0 - b ln(|v|/v0)`, which corresponds
 to the usual `f_ss = f0 + (a-b) ln(|v|/v0)`; the laws differ only in how `psi`
@@ -725,3 +730,63 @@ generalization is `sqrt(v_strike^2 + v_dip^2)`, and the statistics block is wher
 that would go. For the same reason the gathered field now stores the solved
 velocity in `fault[].u[slip_mode]` rather than always in `fault[].u[STRIKE]`, so a
 dip-slip run is not mislabelled for anything downstream that reads `fault[].u`.
+
+#### The gated (composite) laws: Sato-type and Kato and Tullis
+
+Two further laws are available, both of which are the slip law plus the aging
+law's healing term multiplied by a gate that shuts healing off away from
+stationary contact. In `theta` form,
+
+    d theta/dt = gate - Omega ln Omega,     Omega = |v| theta/dc
+
+- `-state_law 3`, Sato-type: `gate = exp(-Omega/beta)`, keyed on `Omega`
+- `-state_law 4`, Kato and Tullis (2001) composite law: `gate = exp(-|v|/Vc)`,
+  keyed on `|v|`
+
+In `psi` both become
+
+    d psi/dt = b/dc ( v0 exp((f0-psi)/b) gate - |v| ln Omega )
+
+whose second term is exactly the slip law and whose first is the aging law's
+healing term times the gate. The two constants are held fixed for now, at the
+values of the MATLAB reference implementation: `beta = 1e-2` and `Vc = v0/100`.
+They are set in `rsf_init.c` and are not exposed as command-line options.
+
+The steady states differ, and this matters when comparing runs. The Sato gate is
+negligible near `Omega = 1`, so `Omega_ss = 1` and its steady state coincides with
+aging, slip and PRZ; reproducing the steady-state canon is the point of that form.
+The Kato and Tullis gate, keyed on `|v|` rather than `Omega`, does not vanish for
+`|v| << Vc`, so there `Omega ln Omega = 1` and `Omega_ss = e^W(1) = 1.763`, raising
+`psi_ss` by `b W(1) = 0.567 b` (about 0.007 for `b = 0.013`). This is the composite
+law's well known steady-state offset, not an artifact of this implementation, and
+it means a Kato and Tullis run is not directly comparable at low slip rate to the
+other laws at equal `dc`. For `|v| >> Vc` the gate vanishes and the offset goes
+away.
+
+The `psi` forms of all five laws were checked against an independent MATLAB
+implementation in the Gu et al. (1984) nondimensionalization, and agree to machine
+precision. Note the numbering differs by one: MATLAB `evol` 1 to 5 correspond to
+`-state_law` 0 to 4.
+
+#### Normalization of PRZ, and comparability of the three laws
+
+All three laws share the steady state `psi_ss = f0 - b ln(|v|/v0)`, i.e. the usual
+`f_ss = f0 + (a-b) ln(|v|/v0)`, and all three have the same linearization about it
+(`d theta/dt ~ -(Omega-1)`). They therefore agree on linear stability and differ
+only away from steady state, and a comparison at equal `dc` is like-for-like.
+
+This depends on the normalization of `theta`, which carries a constant-factor
+arbitrariness. PRZ is also written `d theta/dt = 1 - (|v| theta/(2 dc))^2`, which
+is the same law under `theta -> theta/2` but places `theta_ss` at `2 dc/|v|`,
+shifting `psi_ss` by `b ln 2` (about 0.009 for `b = 0.013`) and making the fault
+stronger at steady state than under aging or slip at the same `dc`. The
+`Omega_ss = 1` form above is used here so that the three laws remain directly
+comparable; anyone porting results in or out should check which convention the
+other code uses.
+
+A note on resolution: in a short BP4 test at 2 km, PRZ produced many more catalog
+events than the aging law, as the slip law also does at that spacing. The process
+zone `Lb` is only about one cell there, so this is consistent with the
+under-resolution behavior documented above rather than with a defect in the law,
+but it has not been checked at adequate resolution and should not be read as a
+result.

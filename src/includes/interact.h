@@ -243,6 +243,9 @@ singular value will be set to zero
 /* rate-and-state state evolution laws, for rsf->state_law (-state_law) */
 #define RSF_AGING_LAW 0
 #define RSF_SLIP_LAW  1
+#define RSF_PRZ_LAW   2
+#define RSF_SATO_LAW  3
+#define RSF_KT_LAW    4
 #define NORMAL 2
 
 #define INT_X 0

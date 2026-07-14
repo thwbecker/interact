@@ -43,6 +43,11 @@ void init_medium_rsf(struct med *medium)
   rsf->limit_sigma = PETSC_FALSE;
   rsf->state_law = RSF_AGING_LAW;  /* 0 aging (default), 1 slip law */
   rsf->vmin_state = 1e-16;         /* |v| floor in the slip law's ln(|v|/v0) */
+  /* fixed constants of the two gated laws, at the values of the MATLAB reference
+     implementation (Omega threshold 0.01, and Vc = v0/100). Not exposed as
+     options for now; edit here if they need to change */
+  rsf->sato_beta = 1e-2;
+  rsf->kt_vc     = -1.0;		/* set from v0 below, after -v0 has been read */
   rsf->min_sigma = 1e6;
   rsf->max_sigma = 300e6; /* Pa */
 
@@ -97,11 +102,27 @@ void rsf_print_help(const char *prog)
   printf("\n");
 
   printf("state evolution\n");
-  printf("  -state_law <0|1>        state evolution law: 0 aging (default), 1 slip\n");
+  printf("  -state_law <0..4>       state evolution law: 0 aging (default), 1 slip, 2 PRZ,\n");
+  printf("                          3 Sato-type, 4 Kato and Tullis composite\n");
   printf("                          aging: d psi/dt = b/dc (v0 exp((f0-psi)/b) - |v|)\n");
   printf("                          slip:  d psi/dt = -(|v|/dc) (psi - psi_ss)\n");
   printf("                          with psi_ss = f0 - b ln(|v|/v0); both share this\n");
   printf("                          steady state, i.e. f_ss = f0 + (a-b) ln(|v|/v0)\n");
+  printf("                          PRZ (Perrin, Rice and Zheng 1995), theta form\n");
+  printf("                          d theta/dt = 1/2 (1 - (|v| theta/dc)^2):\n");
+  printf("                          d psi/dt = b/(2 dc) (v0 exp((f0-psi)/b)\n");
+  printf("                                              - v^2/v0 exp((psi-f0)/b))\n");
+  printf("                          aging, slip and PRZ share psi_ss = f0 - b ln(|v|/v0)\n");
+  printf("                          and the same linearization: comparable at equal dc\n");
+  printf("                          Sato (3) and Kato-Tullis (4) are the slip law plus a\n");
+  printf("                          gated aging healing term, d theta/dt = gate\n");
+  printf("                          - Omega ln Omega, Omega = |v| theta/dc, with\n");
+  printf("                          gate = exp(-Omega/beta), beta = 1e-2      (Sato)\n");
+  printf("                          gate = exp(-|v|/Vc),     Vc   = v0/100    (Kato-Tullis)\n");
+  printf("                          beta and Vc are fixed in rsf_init.c for now. NOTE the\n");
+  printf("                          Kato-Tullis gate does not vanish at |v| << Vc, which\n");
+  printf("                          raises psi_ss there by b*W(1) = 0.567 b (its known\n");
+  printf("                          steady-state offset); Sato (3) has no such shift\n");
   printf("  -vmin_state <m/s>       |v| floor in the slip law's ln(|v|/v0) (default 1e-16)\n");
   printf("\n");
 
@@ -371,12 +392,16 @@ PetscErrorCode rsf_get_settings(int argc,char **argv,struct interact_ctx *par,
   /* state evolution law: 0 aging (default), 1 slip */
   PetscCall(PetscOptionsGetInt(NULL,NULL,"-state_law",&rsf->state_law,NULL));
   PetscCall(PetscOptionsGetReal(NULL,NULL,"-vmin_state",&rsf->vmin_state,NULL)); /* [m/s] */
-  if((rsf->state_law != RSF_AGING_LAW) && (rsf->state_law != RSF_SLIP_LAW)){
+  if((rsf->state_law < RSF_AGING_LAW) || (rsf->state_law > RSF_KT_LAW)){
     if(medium->comm_rank == 0)
-      fprintf(stderr,"rsf_get_settings: -state_law has to be %i (aging) or %i (slip), not %i\n",
-	      RSF_AGING_LAW,RSF_SLIP_LAW,(int)rsf->state_law);
+      fprintf(stderr,"rsf_get_settings: -state_law has to be %i (aging), %i (slip), %i (PRZ), %i (Sato) or %i (Kato-Tullis), not %i\n",
+	      RSF_AGING_LAW,RSF_SLIP_LAW,RSF_PRZ_LAW,RSF_SATO_LAW,RSF_KT_LAW,(int)rsf->state_law);
     exit(-1);
   }
+  /* Kato and Tullis Vc scales with the reference velocity, so it has to be set
+     after -v0 has been parsed */
+  if(rsf->kt_vc < 0)
+    rsf->kt_vc = 1e-2 * rsf->v0;
   
   PetscCall(PetscOptionsGetReal(NULL,NULL,"-rtol",&rtol,NULL));
   PetscCall(PetscOptionsGetReal(NULL,NULL,"-atol_slip",&atol_slip,NULL));

@@ -106,6 +106,11 @@ struct rsf_vars{
      vmin_state floors |v| inside the slip law's ln(|v|/v0) so that v -> 0 is safe. */
   PetscInt  state_law;
   PetscReal vmin_state;
+  /* extra constants of the two gated (composite) laws, held fixed for now at the
+     values used in the MATLAB reference implementation (see rsf_solve.md):
+     sato_beta  dimensionless Omega threshold of the Sato-type law
+     kt_vc      [m/s] velocity threshold Vc of the Kato and Tullis composite law */
+  PetscReal sato_beta,kt_vc;
   /*  */
   short int dim;
 };
