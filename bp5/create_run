@@ -1,7 +1,7 @@
 #!/bin/bash
 res=${1-0.5km}
 
-ncore=$NR_CPUS
+ncore=${2-$NR_CPUS}
 
 tmax=3000			# to get better read on matvec
 
