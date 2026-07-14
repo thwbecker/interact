@@ -157,6 +157,21 @@ void rsf_print_help(const char *prog)
   printf("  -help                       PETSc's full registered-option dump\n");
   printf("\n");
 
+  printf("output files\n");
+  printf("  rsf_monitor.dat         time series on the adaptive monitor cadence (-dt_monitor,\n");
+  printf("                          -adx_monitor, -rdx_monitor): step, time[s], time[yr], dt[s],\n");
+  printf("                          log10(max|v|), mean_slip, mean_mu, max_sigma, min_sigma.\n");
+  printf("                          Flushed as it is written\n");
+  printf("  rsf_vel.times           one row per field frame (-field_step_interval): frame, step,\n");
+  printf("                          time[yr], time[s], log10(max|v|), mean|v|, std|v|, min|v|,\n");
+  printf("                          mean_slip. The |v| statistics are slip SPEEDS (v is signed).\n");
+  printf("                          This is the index for the tmp_rsf/rsf_vel.gGGG.NNNNNN.bin\n");
+  printf("                          frames and replaces the former rsf_stats.dat\n");
+  printf("  rsf_events.dat          one row per slip-rate threshold crossing (-vel_event)\n");
+  printf("  rsf_catalog.dat         one row per completed event (with -rsf_catalog)\n");
+  printf("  rsf_geom.gGGG.dat       per-group patch geometry for the field frames\n");
+  printf("\n");
+
   printf("examples\n");
   printf("  strike-slip BP5 at 2 km, dense, with an event catalog:\n");
   printf("    %s -geom_file geom_bp5_2km.in -rsf_file rsf_bp5_2km.dat \\\n",prog);

@@ -30,7 +30,6 @@ struct rsf_out_ctx{
   int field_out;
   VecScatter gather;
   Vec gathered;
-  FILE *fout_stats;
   /* slip velocity threshold crossing events */
   PetscBool track_events,slipping;
   PetscReal vel_event,vel_event_hyst,event_tmin;

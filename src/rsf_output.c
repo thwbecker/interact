@@ -77,12 +77,10 @@ PetscErrorCode rsf_init_monitor_and_event(struct rsf_out_ctx *uc,struct interact
   uc->onset_time = 0.0;
   /* force the first monitor call to log */
   uc->old_time = t_init - 2.0*dt_monitor;
-  uc->fout_monitor = uc->fout_stats = uc->fout_event = NULL;
+  uc->fout_monitor = uc->fout_event = NULL;
   HEADNODE{
     uc->fout_monitor = myopen("rsf_monitor.dat","w");
     fprintf(uc->fout_monitor,"# step time[s] time[yr] dt[s] log10(max|v|[m/s]) mean_slip[m] mean_mu max_sigma[Pa] min_sigma[Pa]\n");
-    uc->fout_stats = myopen("rsf_stats.dat","w");
-    fprintf(uc->fout_stats,"# time[yr] mean_vel std_vel min_vel max_vel mean_slip\n");
     if(uc->track_events){
       uc->fout_event = myopen("rsf_events.dat","w");
       fprintf(uc->fout_event,"# time[s] time[yr] onset(1)/arrest(-1) log10(max|v|[m/s]) mean_slip[m] mean_mu, |v| threshold %.3e m/s\n",
@@ -94,7 +92,7 @@ PetscErrorCode rsf_init_monitor_and_event(struct rsf_out_ctx *uc,struct interact
 	fprintf(stderr,"rsf_init_monitor_and_event: WARNING: could not make tmp_rsf directory\n");
       uc->fout_field_times = myopen("rsf_vel.times","w");
       if(uc->fout_field_times){
-	fprintf(uc->fout_field_times,"# frame step time[yr] time[s] log10(max|v|[m/s])\n");
+	fprintf(uc->fout_field_times,"# frame step time[yr] time[s] log10(max|v|[m/s]) mean|v|[m/s] std|v|[m/s] min|v|[m/s] mean_slip[m]\n");
 	fprintf(uc->fout_field_times,"# field per group in tmp_rsf/rsf_vel.gGGG.NNNNNN.bin (float32 along_strike,down_dip,log10|v| triples, xyz2grd -bi3f); geometry rsf_geom.gGGG.dat\n");
       }
     }
@@ -114,7 +112,6 @@ PetscErrorCode rsf_finalize_monitor_and_event(struct rsf_out_ctx *uc)
   medium = uc->par->medium;
   HEADNODE{
     if(uc->fout_monitor)fclose(uc->fout_monitor);
-    if(uc->fout_stats)fclose(uc->fout_stats);
     if(uc->fout_event){
       fclose(uc->fout_event);
       fprintf(stderr,"rsf_finalize_monitor_and_event: tracked %i events (|v| through %.3e m/s)\n",
@@ -432,6 +429,8 @@ PetscErrorCode rsf_TS_Monitor(TS ts,PetscInt step,PetscReal time,Vec X,void *ptr
 		log10(gminmax[0]),gsum[0]/(PetscReal)medium->nrflt,
 		gsum[1]/(PetscReal)medium->nrflt,
 		gminmax[1],-gminmax[2]);
+	fflush(uc->fout_monitor); /* so a long run does not look dead: the file is
+				     otherwise buffered and appears empty while running */
       }
       /* store last logged state */
       uc->old_time = time;
@@ -450,31 +449,27 @@ PetscErrorCode rsf_TS_Monitor(TS ts,PetscInt step,PetscReal time,Vec X,void *ptr
     PetscCall(VecScatterEnd(uc->gather,X,uc->gathered,INSERT_VALUES,SCATTER_FORWARD));
     HEADNODE{
       PetscScalar *values;
-      PetscReal sum[3],vmin,vmax,vmean,vstd,smean,du1,du2,du3;
+      PetscReal sum[3],du1,du2,du3;
       PetscReal slip_integral=0.0;	/* slip budget: sum area_i*slip_i */
       FILE *fout2;
       char vel_file[STRLEN];
       int n = medium->nrflt,ierr2;
       PetscCall(VecGetArray(uc->gathered,&values));
-      for(sum[0]=sum[1]=sum[2]=0.,vmin=1e20,vmax=-1e20,
-	    i=0,j=0;i < n;i++,j += rsf->dim){
+      for(sum[2]=0.,i=0,j=0;i < n;i++,j += rsf->dim){
 	fault[i].s[STRIKE] = values[j+1]; /* shear stress */
 	fault[i].s[NORMAL] = values[j+2]; /* normal stress */
-	fault[i].u[STRIKE] = vel_from_rsf(values[j+1],values[j+2],values[j],fault[i].mu_s,
-					  rsf->v0,&du1,&du2,&du3,medium);
-	if(fault[i].u[STRIKE] < vmin)vmin = fault[i].u[STRIKE];
-	if(fault[i].u[STRIKE] > vmax)vmax = fault[i].u[STRIKE];
-	sum[0] += fault[i].u[STRIKE];
-	sum[1] += fault[i].u[STRIKE] * fault[i].u[STRIKE];
+	/* the rate-and-state solve carries ONE slip component (rsf->dim = 4:
+	   psi,tau,sigma,slip), and rsf->slip_mode says whether it is strike or
+	   dip. vel_from_rsf returns that component, so store it in the matching
+	   slot rather than always in u[STRIKE], which would mislabel a dip-slip
+	   run for anything downstream reading fault[].u */
+	fault[i].u[rsf->slip_mode] =
+	  vel_from_rsf(values[j+1],values[j+2],values[j],fault[i].mu_s,
+		       rsf->v0,&du1,&du2,&du3,medium);
 	sum[2] += values[j+3];				     /* slip */
 	if(uc->budget_enable)
 	  slip_integral += 4.0*fault[i].l*fault[i].w*values[j+3]; /* area*slip */
       }
-      vstd = (n > 1)?(sqrt(((PetscReal)n * sum[1] - sum[0]*sum[0])/((PetscReal)n*(PetscReal)(n-1)))):(0.0);
-      vmean = sum[0]/(PetscReal)n;
-      smean = sum[2]/(PetscReal)n;
-      if(uc->fout_stats)
-	fprintf(uc->fout_stats,"%.8f %e %e %e %e %e\n",time/sec_per_year,vmean,vstd,vmin,vmax,smean);
       if(uc->budget_enable && uc->fout_budget){
 	PetscReal ref = uc->vpl*time*uc->total_area; /* cumulative slip*area at plate rate */
 	PetscReal resid = slip_integral - ref;
@@ -514,16 +509,30 @@ PetscErrorCode rsf_TS_Monitor(TS ts,PetscInt step,PetscReal time,Vec X,void *ptr
     PetscCall(VecScatterBegin(uc->gather,X,uc->gathered,INSERT_VALUES,SCATTER_FORWARD));
     PetscCall(VecScatterEnd(  uc->gather,X,uc->gathered,INSERT_VALUES,SCATTER_FORWARD));
     HEADNODE{
-      PetscReal du1,du2,du3,vmax=0.0;
+      PetscReal du1,du2,du3,vmax=0.0,vmin=1e30,vsum=0.0,vsqsum=0.0,ssum=0.0,vmean,vstd;
       int ig,k,ip,nf = medium->nrflt;
       PetscCall(VecGetArray(uc->gathered,&fvals));
       for(ip=0;ip < nf;ip++){
-	PetscReal vv = vel_from_rsf(fvals[ip*rsf->dim+1],fvals[ip*rsf->dim+2],
-				    fvals[ip*rsf->dim+0],fault[ip].mu_s,rsf->v0,
-				    &du1,&du2,&du3,medium);
+	PetscReal vabs,vv = vel_from_rsf(fvals[ip*rsf->dim+1],fvals[ip*rsf->dim+2],
+					 fvals[ip*rsf->dim+0],fault[ip].mu_s,rsf->v0,
+					 &du1,&du2,&du3,medium);
 	uc->vbuf[ip] = (double)vv;
-	if(fabs(vv) > vmax)vmax = fabs(vv);
+	/* statistics are on the slip SPEED |v|: vel_from_rsf is signed (the sinh
+	   regularization admits v < 0), and a signed mean or max would not be a
+	   meaningful summary of how fast the fault is going.  This is the single
+	   solved slip component, whose direction is rsf->slip_mode; if the solve
+	   is ever generalized to carry strike and dip simultaneously, the speed
+	   here becomes sqrt(v_strike^2 + v_dip^2) */
+	vabs = fabs(vv);
+	if(vabs > vmax)vmax = vabs;
+	if(vabs < vmin)vmin = vabs;
+	vsum   += vabs;
+	vsqsum += vabs*vabs;
+	ssum   += fvals[ip*rsf->dim+3];	/* slip */
       }
+      vmean = (nf > 0)?(vsum/(PetscReal)nf):(0.0);
+      vstd  = (nf > 1)?(sqrt(fabs((PetscReal)nf*vsqsum - vsum*vsum)/
+			     ((PetscReal)nf*(PetscReal)(nf-1)))):(0.0);
       for(ig=0;ig < uc->ngroup;ig++){
 	struct rsf_group_grid *g = uc->groups+ig;
 	char ffile[STRLEN];FILE *fb;
@@ -543,9 +552,14 @@ PetscErrorCode rsf_TS_Monitor(TS ts,PetscInt step,PetscReal time,Vec X,void *ptr
 	  fclose(fb);
 	}
       }
-      if(uc->fout_field_times)
-	fprintf(uc->fout_field_times,"%6i %9i %.8f %.8e %.6f\n",
-		uc->field_frame,(int)step,time/sec_per_year,time,log10((vmax>0.0)?(vmax):(1e-30)));
+      if(uc->fout_field_times){
+	fprintf(uc->fout_field_times,"%6i %9i %.8f %.8e %.6f %14.6e %14.6e %14.6e %14.6e\n",
+		uc->field_frame,(int)step,time/sec_per_year,time,
+		log10((vmax>0.0)?(vmax):(1e-30)),
+		vmean,vstd,(vmin<1e30)?(vmin):(0.0),
+		(nf>0)?(ssum/(PetscReal)nf):(0.0));
+	fflush(uc->fout_field_times);
+      }
       PetscCall(VecRestoreArray(uc->gathered,&fvals));
       uc->field_frame++;
     }

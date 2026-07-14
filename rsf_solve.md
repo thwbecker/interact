@@ -34,7 +34,7 @@ rsf state is global.
 | `src/rsf_solve.c` | driver | `main`; `rsf_solve_run` (geometry, interaction matrices, backslip loading, initial conditions, TS setup, solve, teardown); `rsf_event_function` (slip-rate threshold crossing for event onset/arrest) |
 | `src/rsf_init.c` | setup | `init_medium_rsf` (allocate `medium->rsf`, set `dim`); `rsf_get_settings` (all option parsing, unit conversions, defaults, H-matrix backend selection) |
 | `src/rsf_engine.c` | physics | `vel_from_rsf` (invert the regularized friction law for slip rate); `rsf_ODE_RHSFunction` (the quasi-dynamic aging-law RHS, where the `Is` matvec and the backslip `sinc` loading enter); `rsf_domain_check` (per-step validity gate) |
-| `src/rsf_output.c` | output | `rsf_init_monitor_and_event` and `rsf_finalize_monitor_and_event` (set up and tear down the TS monitor, event detector, gather, and output files); `rsf_TS_Monitor` (state-change logging to `rsf_monitor.dat`, periodic stats, optional per-group GMT slip-rate fields); `rsf_post_event`; and the field-output group helpers (`rsf_build_groups`, `rsf_group_coords`, `rsf_write_group_geometry`, `rsf_free_groups`, `rsf_dcmp`) |
+| `src/rsf_output.c` | output | `rsf_init_monitor_and_event` and `rsf_finalize_monitor_and_event` (set up and tear down the TS monitor, event detector, gather, and output files); `rsf_TS_Monitor` (state-change logging to `rsf_monitor.dat`, per-frame field output and its `rsf_vel.times` index, optional per-group GMT slip-rate fields); `rsf_post_event`; and the field-output group helpers (`rsf_build_groups`, `rsf_group_coords`, `rsf_write_group_geometry`, `rsf_free_groups`, `rsf_dcmp`) |
 | `src/includes/rsf.h` | header | the output/grid/settings structs (`rsf_out_ctx`, `rsf_group_grid`, `rsf_solve_settings`), the rsf prototypes, and the single shared `rsf_par_static` (the geometry pointer the domain check reads) |
 
 The build links all four objects via `RSF_SOLVE_OBJS` in the makefile:
@@ -695,3 +695,33 @@ catalog, and to be aware that a mesh that looks adequate under the aging law may
 not be under the slip law, which localizes more strongly. Fragmented or one-cell
 events in the catalog should be read as a resolution diagnostic rather than as
 something to be filtered away in post-processing.
+
+---
+
+## Output files
+
+| file | cadence | contents |
+|---|---|---|
+| `rsf_monitor.dat` | adaptive (`-dt_monitor`, `-adx_monitor`, `-rdx_monitor`) | `step time[s] time[yr] dt[s] log10(max|v|) mean_slip mean_mu max_sigma min_sigma`. The main time series: dense through an event, sparse in the interseismic. Computed from the distributed solution with two reductions, so it is cheap and needs no gather. Flushed on every write, so a running job's progress is visible |
+| `rsf_vel.times` | one row per field frame (`-field_step_interval`) | `frame step time[yr] time[s] log10(max|v|) mean|v| std|v| min|v| mean_slip`. The index for the `tmp_rsf/rsf_vel.gGGG.NNNNNN.bin` frames: every row corresponds to a frame on disk |
+| `rsf_events.dat` | one row per slip-rate threshold crossing | `time[s] time[yr] onset(1)/arrest(-1) log10(max|v|) mean_slip mean_mu`. A raw crossing log; see the note on resolution above before reading events off it directly |
+| `rsf_catalog.dat` | one row per completed event (`-rsf_catalog`) | onset and arrest time, duration, ruptured-cell count and area, mean and max coseismic slip, mean and max static stress drop, peak slip rate, `M0`, `Mw` |
+| `rsf_geom.gGGG.dat` | once | per-group patch geometry for the field frames |
+
+The velocity statistics in `rsf_vel.times` (`mean|v|`, `std|v|`, `min|v|`) were
+previously written to a separate `rsf_stats.dat`. That file has been removed. It
+duplicated the time and maximum slip rate already present elsewhere, and its
+statistics could only be formed on the gathered solution, which is exactly what
+the field-frame path already does, so the columns now ride along with the frame
+they describe and every row indexes a frame that exists on disk.
+
+Note that these are slip *speeds*. `vel_from_rsf` returns a signed velocity, since
+the sinh regularization admits `v < 0`, and a signed mean or maximum would not
+summarize how fast the fault is moving; the statistics are therefore formed on
+`|v|`. The rate-and-state solve carries a single slip component whose direction is
+set by `-rsf_slip_mode`, so `|v|` is the speed in that direction. Should the solve
+ever be generalized to carry strike and dip slip simultaneously, the natural
+generalization is `sqrt(v_strike^2 + v_dip^2)`, and the statistics block is where
+that would go. For the same reason the gathered field now stores the solved
+velocity in `fault[].u[slip_mode]` rather than always in `fault[].u[STRIKE]`, so a
+dip-slip run is not mislabelled for anything downstream that reads `fault[].u`.
