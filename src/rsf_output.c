@@ -620,56 +620,74 @@ PetscErrorCode rsf_post_event(TS ts,PetscInt nevents,PetscInt event_list[],
       if(uc->rup_enable && (!uc->rup_done) && (!uc->rup_armed))
 	uc->rup_armed = PETSC_TRUE; /* arm the rupture-time field for event 1 */
     }else if(uc->ev_open){
-      /* ARREST: coseismic slip and stress drop over the ruptured cells */
-      PetscReal lred[5],gred[5],lmx[2],gmx[2],gpeak,gcnt;
-      /* lred: 0 sum dslip, 1 sum ddrop, 2 count, 3 area, 4 moment */
-      lred[0]=lred[1]=lred[2]=lred[3]=lred[4]=0.0;
-      lmx[0]=lmx[1]=0.0;	/* max dslip, max ddrop */
-      PetscCall(VecGetArrayRead(X,&xc));
-      for(ii=medium->rs,jj=0,kk=0; ii<medium->re; ii++,jj+=rsf->dim,kk++){
-	if(uc->cell_ruptured && uc->cell_ruptured[kk]){
-	  PetscReal dslip = xc[jj+3] - (uc->snap_slip0?uc->snap_slip0[kk]:0.0);
-	  PetscReal ddrop = (uc->snap_tau0?uc->snap_tau0[kk]:0.0) - xc[jj+1];
-	  PetscReal area  = 4.0*fault[ii].l*fault[ii].w;
-	  lred[0]+=dslip; lred[1]+=ddrop; lred[2]+=1.0; lred[3]+=area;
-	  lred[4]+=uc->shear_modulus*area*dslip;
-	  if(dslip > lmx[0])lmx[0]=dslip;
-	  if(ddrop > lmx[1])lmx[1]=ddrop;
-	}
-      }
-      PetscCall(VecRestoreArrayRead(X,&xc));
-      /* global ruptured-cell count on every rank, so the real-event decision
-	 below is identical on all ranks (the collective reductions and the
-	 rup_done flag must stay consistent across ranks) */
-      PetscCallMPI(MPI_Allreduce(&lred[2],&gcnt,1,MPIU_REAL,MPI_SUM,PETSC_COMM_WORLD));
-      /* a bracket where no cell reached rupture_vth (gcnt == 0) is afterslip or
-	 a sub-threshold transient, not a rupture: skip it. These empty brackets
-	 come from the global max|v| chattering across the onset/arrest band in the
-	 messy post-event phase and get more frequent at higher resolution.
-	 rupture_vth is the definition of rupture, so gcnt == 0 is not an event. */
-      if(gcnt > 0.0){
-	PetscCallMPI(MPI_Reduce(lred,gred,5,MPIU_REAL,MPI_SUM,0,PETSC_COMM_WORLD));
-	PetscCallMPI(MPI_Reduce(lmx,gmx,2,MPIU_REAL,MPI_MAX,0,PETSC_COMM_WORLD));
-	PetscCallMPI(MPI_Reduce(&uc->peakv_local,&gpeak,1,MPIU_REAL,MPI_MAX,0,PETSC_COMM_WORLD));
-	if((medium->comm_rank == 0) && uc->fout_catalog && (t >= uc->event_tmin)){
-	  PetscReal mean_slip = gred[0]/gcnt;
-	  PetscReal mean_drop = gred[1]/gcnt;
-	  PetscReal M0        = gred[4];
-	  PetscReal Mw        = (M0>0.0)?((2.0/3.0)*(log10(M0)-9.05)):(-99.0);
-	  uc->ncat++;
-	  fprintf(uc->fout_catalog,
-		  "%5i %17.10f %17.10f %13.6e %8i %14.6e %13.6e %13.6e %12.6e %12.6e %13.6e %13.6e %8.4f\n",
-		  uc->ncat,uc->onset_time/sec_per_year,t/sec_per_year,t-uc->onset_time,
-		  (int)gcnt,gred[3],mean_slip,gmx[0],mean_drop/1e6,gmx[1]/1e6,gpeak,M0,Mw);
-	  fflush(uc->fout_catalog);
-	}
-	/* the rupture-time field is for the first real rupture; freeze it here */
-	if(uc->rup_enable && uc->rup_armed && (!uc->rup_done))
-	  uc->rup_done = PETSC_TRUE;
-      }
-      uc->ev_open = PETSC_FALSE;
+      /* ARREST: close the event out and write its catalog row */
+      PetscCall(rsf_finalize_event(uc,t,X));
     }
   }
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+/*
+  Close out an event and write its catalog row: coseismic slip and stress drop
+  summed over the cells that reached rupture_vth between onset and arrest.  t_arr
+  is the model time of the arrest that ended the event and X the solution there.
+  Collective: all ranks must enter.
+*/
+PetscErrorCode rsf_finalize_event(struct rsf_out_ctx *uc,PetscReal t_arr,Vec X)
+{
+  const PetscScalar *xc;
+  struct med *medium;struct flt *fault;struct rsf_vars *rsf;
+  PetscInt ii,jj,kk;
+  PetscReal lred[5],gred[5],lmx[2],gmx[2],gpeak,gcnt;
+  const PetscReal sec_per_year = 365.25*24.*60.*60.;
+  PetscFunctionBeginUser;
+  medium = uc->par->medium;fault = uc->par->fault;rsf = medium->rsf;
+  if(!uc->ev_open)
+    PetscFunctionReturn(PETSC_SUCCESS);
+  /* lred: 0 sum dslip, 1 sum ddrop, 2 count, 3 area, 4 moment */
+  lred[0]=lred[1]=lred[2]=lred[3]=lred[4]=0.0;
+  lmx[0]=lmx[1]=0.0;		/* max dslip, max ddrop */
+  PetscCall(VecGetArrayRead(X,&xc));
+  for(ii=medium->rs,jj=0,kk=0; ii<medium->re; ii++,jj+=rsf->dim,kk++){
+    if(uc->cell_ruptured && uc->cell_ruptured[kk]){
+      PetscReal dslip = xc[jj+3] - (uc->snap_slip0?uc->snap_slip0[kk]:0.0);
+      PetscReal ddrop = (uc->snap_tau0?uc->snap_tau0[kk]:0.0) - xc[jj+1];
+      PetscReal area  = 4.0*fault[ii].l*fault[ii].w;
+      lred[0]+=dslip; lred[1]+=ddrop; lred[2]+=1.0; lred[3]+=area;
+      lred[4]+=uc->shear_modulus*area*dslip;
+      if(dslip > lmx[0])lmx[0]=dslip;
+      if(ddrop > lmx[1])lmx[1]=ddrop;
+    }
+  }
+  PetscCall(VecRestoreArrayRead(X,&xc));
+  /* global ruptured-cell count on every rank, so the real-event decision below is
+     identical on all ranks (the collective reductions and the rup_done flag must
+     stay consistent across ranks) */
+  PetscCallMPI(MPI_Allreduce(&lred[2],&gcnt,1,MPIU_REAL,MPI_SUM,PETSC_COMM_WORLD));
+  /* a bracket where no cell reached rupture_vth (gcnt == 0) is afterslip or a
+     sub-threshold transient, not a rupture: skip it.  rupture_vth is the
+     definition of rupture, so gcnt == 0 is not an event. */
+  if(gcnt > 0.0){
+    PetscCallMPI(MPI_Reduce(lred,gred,5,MPIU_REAL,MPI_SUM,0,PETSC_COMM_WORLD));
+    PetscCallMPI(MPI_Reduce(lmx,gmx,2,MPIU_REAL,MPI_MAX,0,PETSC_COMM_WORLD));
+    PetscCallMPI(MPI_Reduce(&uc->peakv_local,&gpeak,1,MPIU_REAL,MPI_MAX,0,PETSC_COMM_WORLD));
+    if((medium->comm_rank == 0) && uc->fout_catalog && (t_arr >= uc->event_tmin)){
+      PetscReal mean_slip = gred[0]/gcnt;
+      PetscReal mean_drop = gred[1]/gcnt;
+      PetscReal M0        = gred[4];
+      PetscReal Mw        = (M0>0.0)?((2.0/3.0)*(log10(M0)-9.05)):(-99.0);
+      uc->ncat++;
+      fprintf(uc->fout_catalog,
+	      "%5i %17.10f %17.10f %13.6e %8i %14.6e %13.6e %13.6e %12.6e %12.6e %13.6e %13.6e %8.4f\n",
+	      uc->ncat,uc->onset_time/sec_per_year,t_arr/sec_per_year,t_arr-uc->onset_time,
+	      (int)gcnt,gred[3],mean_slip,gmx[0],mean_drop/1e6,gmx[1]/1e6,gpeak,M0,Mw);
+      fflush(uc->fout_catalog);
+    }
+    /* the rupture-time field is for the first real rupture; freeze it here */
+    if(uc->rup_enable && uc->rup_armed && (!uc->rup_done))
+      uc->rup_done = PETSC_TRUE;
+  }
+  uc->ev_open = PETSC_FALSE;
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 /*

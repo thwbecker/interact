@@ -46,7 +46,7 @@ PetscReal vel_from_rsf(PetscReal tau, PetscReal sigma, PetscReal state, PetscRea
 PetscErrorCode rsf_ODE_RHSFunction(TS ts,PetscReal time,Vec X,Vec F,void *ptr)
 {
   PetscScalar *f,*vel,cosh_fac,mu,scaled_tau,exp_fac,pre_fac;
-  PetscScalar dvdtau,dvdsigma,dvdstate,a,b,sdot;
+  PetscScalar dvdtau,dvdsigma,dvdstate,a,b,sdot,vabs,psi_ss;
   const PetscScalar *x,*tau_dot,*sigma_dot,*velr;
   struct med *medium;struct flt *fault;
   PetscInt i,j,k,ln;
@@ -118,15 +118,32 @@ PetscErrorCode rsf_ODE_RHSFunction(TS ts,PetscReal time,Vec X,Vec F,void *ptr)
     /* a = fault[].mu_s, b = fault[].mu_d as read by read_rsf */
     a = fault[i].mu_s;b = fault[i].mu_d;
     /* 
-       d psi/dt = b/dc (v0 exp((f0-psi)/b) - |v|)
-       
-       aging law; HBI uses |v|, important for the sinh regularization
-       which allows v < 0
+       state evolution, in the psi variable used throughout:
+
+       aging law (state_law 0, default):
+         d psi/dt = b/dc (v0 exp((f0-psi)/b) - |v|)
+
+       slip law (state_law 1):
+         d psi/dt = -(|v|/dc) (psi - psi_ss),  psi_ss = f0 - b ln(|v|/v0)
+
+       both relax psi to the same steady state psi_ss, which corresponds to the
+       usual f_ss = f0 + (a-b) ln(|v|/v0); they differ only in the relaxation.
+       |v| is used (not v) for the sinh regularization, which allows v < 0. In
+       the slip law |v| is floored at vmin_state so ln(|v|/v0) stays finite as
+       v -> 0 (where the slip law's d psi/dt -> 0 in any case).
     */
-    if(b != 0.0)		/* b == 0 guard as in HBI */
-      f[j] = (b/((rsf->dc_vec)?(rsf->dc_vec[i]):(rsf->dc))) *
-	(rsf->v0 * PetscExpReal((rsf->f0 - x[j])/b) - fabs(velr[k]));
-    else
+    if(b != 0.0){		/* b == 0 guard as in HBI */
+      if(rsf->state_law == RSF_SLIP_LAW){
+	vabs = fabs(velr[k]);
+	if(vabs < rsf->vmin_state)
+	  vabs = rsf->vmin_state;
+	psi_ss = rsf->f0 - b * PetscLogReal(vabs/rsf->v0);
+	f[j] = -(vabs/((rsf->dc_vec)?(rsf->dc_vec[i]):(rsf->dc))) * (x[j] - psi_ss);
+      }else{			/* aging law */
+	f[j] = (b/((rsf->dc_vec)?(rsf->dc_vec[i]):(rsf->dc))) *
+	  (rsf->v0 * PetscExpReal((rsf->f0 - x[j])/b) - fabs(velr[k]));
+      }
+    }else
       f[j] = 0.0;
     /* 
        d sigma/dt, compression positive (In was scaled by -1)
@@ -196,7 +213,10 @@ PetscErrorCode rsf_domain_check(TS ts,PetscReal time,Vec X,PetscBool *accept)
     if(PetscIsInfOrNanReal(x[j]) || PetscIsInfOrNanReal(x[j+1]) || PetscIsInfOrNanReal(x[j+3])){lok = 0;break;}
     if(fabs(x[j+1]/(x[j+2]*a)) > arg_max){lok = 0;break;} /* sinh(tau/(sigma a)) */
     if(fabs(x[j]/a) > arg_max){lok = 0;break;}		  /* exp(-psi/a) */
-    if((b != 0.0) && (fabs((rsf->f0 - x[j])/b) > arg_max)){lok = 0;break;} /* aging law exp */
+    /* the exp((f0-psi)/b) overflow test only applies to the aging law; the slip
+       law has no such exponential */
+    if((rsf->state_law == RSF_AGING_LAW) && (b != 0.0) &&
+       (fabs((rsf->f0 - x[j])/b) > arg_max)){lok = 0;break;} /* aging law exp */
   }
   PetscCall(VecRestoreArrayRead(X,&x));
   PetscCallMPI(MPI_Allreduce(&lok,&gok,1,MPIU_INT,MPI_MIN,PETSC_COMM_WORLD));

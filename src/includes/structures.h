@@ -101,6 +101,11 @@ struct rsf_vars{
   */
   PetscBool limit_sigma;
   PetscReal min_sigma , max_sigma;
+  /* state evolution law: 0 = aging (default), 1 = slip law. Both share the same
+     steady state psi_ss = f0 - b ln(|v|/v0); they differ in how psi relaxes to it.
+     vmin_state floors |v| inside the slip law's ln(|v|/v0) so that v -> 0 is safe. */
+  PetscInt  state_law;
+  PetscReal vmin_state;
   /*  */
   short int dim;
 };

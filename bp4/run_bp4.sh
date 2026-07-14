@@ -41,7 +41,7 @@ configs=(
     "0.25 150 4"
 )
 
-export OMP_NUM_THREADS=1
+export O/MP_NUM_THREADS=1
 
 for cfg in "${configs[@]}"; do
     set -- $cfg

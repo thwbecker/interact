@@ -41,6 +41,8 @@ void init_medium_rsf(struct med *medium)
    (file scope since they are only used by the driver and RHS here) 
   */
   rsf->limit_sigma = PETSC_FALSE;
+  rsf->state_law = RSF_AGING_LAW;  /* 0 aging (default), 1 slip law */
+  rsf->vmin_state = 1e-16;         /* |v| floor in the slip law's ln(|v|/v0) */
   rsf->min_sigma = 1e6;
   rsf->max_sigma = 300e6; /* Pa */
 
@@ -82,7 +84,7 @@ void rsf_print_help(const char *prog)
 
   printf("initial conditions\n");
   printf("  -sigma_init <Pa>        uniform initial normal stress (default 50e6)\n");
-  printf("  -tau_init <Pa>          uniform initial shear stress (default f0*sigma_init)\n");
+  printf("  -tau_init <Pa>          uniform initial shear stress (default f0*sigma_init + eta*vel_init)\n");
   printf("  -vel_init <m/s>         uniform initial slip rate (default vpl)\n");
   printf("  -rand_amp <val>         random initial-state multiplier amplitude (default 0)\n");
   printf("\n");
@@ -92,6 +94,15 @@ void rsf_print_help(const char *prog)
   printf("  -limit_sigma <bool>     clamp sigma to [min,max], as HBI limitsigma (default 0)\n");
   printf("  -min_sigma <Pa>         limiter floor (default 1e6)\n");
   printf("  -max_sigma <Pa>         limiter ceiling (default 300e6)\n");
+  printf("\n");
+
+  printf("state evolution\n");
+  printf("  -state_law <0|1>        state evolution law: 0 aging (default), 1 slip\n");
+  printf("                          aging: d psi/dt = b/dc (v0 exp((f0-psi)/b) - |v|)\n");
+  printf("                          slip:  d psi/dt = -(|v|/dc) (psi - psi_ss)\n");
+  printf("                          with psi_ss = f0 - b ln(|v|/v0); both share this\n");
+  printf("                          steady state, i.e. f_ss = f0 + (a-b) ln(|v|/v0)\n");
+  printf("  -vmin_state <m/s>       |v| floor in the slip law's ln(|v|/v0) (default 1e-16)\n");
   printf("\n");
 
   printf("time stepping\n");
@@ -313,8 +324,13 @@ PetscErrorCode rsf_get_settings(int argc,char **argv,struct interact_ctx *par,
      to -calc_sigma_dot for a dipping or nonplanar fault where sigma0 varies */
   PetscCall(PetscOptionsGetString(NULL,NULL,"-rsf_sigma_file",rsf_sigma_file,STRLEN,&have_sigma));
   PetscCall(PetscOptionsGetReal(NULL,NULL,"-rand_amp",&rand_amp,NULL));
-  if(tau_init < 0)
-    tau_init = rsf->f0 * sigma_init;
+  if(tau_init < 0){
+    /* default uniform prestress from the quasi-dynamic strength balance,
+       tau = sigma f + eta v, with f = f0 at v = v0. The radiation-damping term
+       eta*vel_init is added here for consistency; it is tiny at plate rate
+       (eta*vpl ~ 5e-3 Pa) but matters if vel_init is set to a seismic rate */
+    tau_init = rsf->f0 * sigma_init + rsf->shear_mod_over_2cs_si * vel_init;
+  }
   /* evolve normal stress (dsigma/dt from the In interaction matrix)?  Off by
      default; needed for nonplanar or dipping faults where slip changes the
      normal stress.  Previously only settable in code */
@@ -337,6 +353,15 @@ PetscErrorCode rsf_get_settings(int argc,char **argv,struct interact_ctx *par,
   PetscCall(PetscOptionsGetBool(NULL,NULL,"-limit_sigma",&rsf->limit_sigma,NULL));
   PetscCall(PetscOptionsGetReal(NULL,NULL,"-min_sigma",&rsf->min_sigma,NULL)); /* [Pa] */
   PetscCall(PetscOptionsGetReal(NULL,NULL,"-max_sigma",&rsf->max_sigma,NULL)); /* [Pa] */
+  /* state evolution law: 0 aging (default), 1 slip */
+  PetscCall(PetscOptionsGetInt(NULL,NULL,"-state_law",&rsf->state_law,NULL));
+  PetscCall(PetscOptionsGetReal(NULL,NULL,"-vmin_state",&rsf->vmin_state,NULL)); /* [m/s] */
+  if((rsf->state_law != RSF_AGING_LAW) && (rsf->state_law != RSF_SLIP_LAW)){
+    if(medium->comm_rank == 0)
+      fprintf(stderr,"rsf_get_settings: -state_law has to be %i (aging) or %i (slip), not %i\n",
+	      RSF_AGING_LAW,RSF_SLIP_LAW,(int)rsf->state_law);
+    exit(-1);
+  }
   
   PetscCall(PetscOptionsGetReal(NULL,NULL,"-rtol",&rtol,NULL));
   PetscCall(PetscOptionsGetReal(NULL,NULL,"-atol_slip",&atol_slip,NULL));

@@ -115,6 +115,7 @@ PetscErrorCode rsf_solve_run(int,char **,struct interact_ctx *,struct rsf_solve_
 int rsf_build_groups(struct med *,struct flt *,struct rsf_group_grid **);
 void rsf_free_groups(struct rsf_group_grid *,int);
 void rsf_write_group_geometry(const struct rsf_group_grid *,struct flt *,double,const char *);
+PetscErrorCode rsf_finalize_event(struct rsf_out_ctx *,PetscReal,Vec);
 PetscErrorCode rsf_init_monitor_and_event(struct rsf_out_ctx *,struct interact_ctx *,
 						 PetscReal,PetscReal,PetscReal,PetscReal,
 						 PetscReal,PetscReal,PetscReal,PetscBool,
