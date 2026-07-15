@@ -31,6 +31,131 @@ PetscReal vel_from_rsf(PetscReal tau, PetscReal sigma, PetscReal state, PetscRea
 
 
 
+/*
+   shared state evolution rate S = d psi/dt for global patch i, given
+   psi and the SIGNED velocity vin, with the same expressions, guards,
+   and floors as previously inlined in rsf_ODE_RHSFunction (see the
+   long comment there for the laws and references).  If dSdpsi/dSdvabs
+   are non-NULL, also return the partial derivatives of S with respect
+   to psi (at fixed |v|) and with respect to |v| (at fixed psi); the
+   floored-velocity branches return dSdvabs = 0 there, consistent with
+   the floor.
+*/
+PetscReal rsf_state_rate(PetscInt i, PetscReal psi, PetscReal vin,
+			 struct interact_ctx *par,
+			 PetscReal *dSdpsi, PetscReal *dSdvabs)
+{
+  PetscReal S,vabs,psi_ss,epsi,omega,gate,lomega,b,D;
+  PetscBool floored = PETSC_FALSE;
+  struct rsf_vars *rsf;
+  rsf = par->medium->rsf;
+  b = par->fault[i].mu_d;
+  if(b == 0.0){			/* b == 0 guard as in HBI */
+    if(dSdpsi)*dSdpsi = 0.0;
+    if(dSdvabs)*dSdvabs = 0.0;
+    return 0.0;
+  }
+  D = (rsf->dc_vec)?(rsf->dc_vec[i]):(rsf->dc);
+  if(rsf->state_law == RSF_SLIP_LAW){
+    vabs = fabs(vin);
+    if(vabs < rsf->vmin_state){
+      vabs = rsf->vmin_state;floored = PETSC_TRUE;
+    }
+    psi_ss = rsf->f0 - b * PetscLogReal(vabs/rsf->v0);
+    S = -(vabs/D) * (psi - psi_ss);
+    if(dSdpsi)
+      *dSdpsi = -vabs/D;
+    if(dSdvabs)
+      *dSdvabs = (floored)?(0.0):(-(psi - psi_ss)/D - b/D);
+  }else if(rsf->state_law == RSF_PRZ_LAW){
+    vabs = fabs(vin);
+    epsi  = PetscExpReal((psi - rsf->f0)/b); /* exp((psi-f0)/b) */
+    S = (b/(2.0*D)) * (rsf->v0/epsi - (vabs*vabs/rsf->v0)*epsi);
+    if(dSdpsi)
+      *dSdpsi = -(1.0/(2.0*D)) * (rsf->v0/epsi + (vabs*vabs/rsf->v0)*epsi);
+    if(dSdvabs)
+      *dSdvabs = -(b/D) * (vabs/rsf->v0) * epsi;
+  }else if((rsf->state_law == RSF_SATO_LAW) || (rsf->state_law == RSF_KT_LAW)){
+    vabs = fabs(vin);
+    if(vabs < rsf->vmin_state){
+      vabs = rsf->vmin_state;floored = PETSC_TRUE;
+    }
+    epsi  = PetscExpReal((psi - rsf->f0)/b);       /* exp((psi-f0)/b)   */
+    omega = (vabs/rsf->v0) * epsi;		   /* Omega = |v| th/dc */
+    gate  = (rsf->state_law == RSF_SATO_LAW)?
+      (PetscExpReal(-omega/rsf->sato_beta)):
+      (PetscExpReal(-vabs/rsf->kt_vc));
+    lomega = PetscLogReal(vabs/rsf->v0) + (psi - rsf->f0)/b;  /* ln Omega */
+    S = (b/D) * ((rsf->v0/epsi)*gate - vabs*lomega);
+    if(dSdpsi){
+      /* d/dpsi[(v0/epsi) gate] = (v0/epsi)(dgate/dpsi - gate/b);
+	 Sato: dgate/dpsi = -gate omega/(b sato_beta); KT: 0 */
+      *dSdpsi = (b/D) * ((rsf->v0/epsi) *
+			 (((rsf->state_law == RSF_SATO_LAW)?
+			   (-gate*omega/(b*rsf->sato_beta)):(0.0)) - gate/b)
+			 - vabs/b);
+    }
+    if(dSdvabs){
+      if(floored)
+	*dSdvabs = 0.0;
+      else
+	*dSdvabs = (b/D) * ((rsf->v0/epsi) *
+			    ((rsf->state_law == RSF_SATO_LAW)?
+			     (-gate*epsi/(rsf->v0*rsf->sato_beta)):
+			     (-gate/rsf->kt_vc))
+			    - lomega - 1.0);
+    }
+  }else{			/* aging law */
+    epsi = PetscExpReal((rsf->f0 - psi)/b); /* exp((f0-psi)/b), NOT the epsi above */
+    S = (b/D) * (rsf->v0 * epsi - fabs(vin));
+    if(dSdpsi)
+      *dSdpsi = -(rsf->v0/D) * epsi;
+    if(dSdvabs)
+      *dSdvabs = -b/D;
+  }
+  return S;
+}
+/*
+   fill rsf->vel from the state vector X and apply the interaction
+   matvec(s) into rsf->tau_dot (and rsf->sigma_dot if enabled); shared
+   between the monolithic RHS and the IMEX explicit RHS.  Includes the
+   layout consistency check formerly at the top of rsf_ODE_RHSFunction.
+*/
+PetscErrorCode rsf_compute_vel_and_stressing(Vec X, struct interact_ctx *par)
+{
+  PetscScalar *vel,mu,scaled_tau,exp_fac;
+  const PetscScalar *x;
+  struct med *medium;struct flt *fault;
+  PetscInt i,j,k,ln;
+  struct rsf_vars *rsf;
+  PetscFunctionBeginUser;
+  medium = par->medium;fault = par->fault;rsf = medium->rsf;
+  PetscCall(VecGetLocalSize(X, &ln));
+  if(ln != rsf->dim*medium->rn){
+    fprintf(stderr,"rsf_compute_vel_and_stressing: layout mismatch, local %i vs %i x %i\n",
+	    (int)ln,rsf->dim,(int)medium->rn);
+    exit(-1);
+  }
+  PetscCall(VecGetArrayRead(X,&x));
+  PetscCall(VecGetArray(rsf->vel,&vel));
+  /* i global patch, j local x offset, k local patch */
+  for (i = medium->rs, j=0, k=0; i < medium->re; i++, j+=rsf->dim, k++) {
+    /* local x layout: state = x[j], tau = x[j+1], sigma = x[j+2], slip = x[j+3] */
+    vel[k] = vel_from_rsf(x[j+1],x[j+2],x[j],fault[i].mu_s,rsf->v0,
+			  &mu, &scaled_tau, &exp_fac, medium);
+  }
+  PetscCall(VecRestoreArray(rsf->vel,&vel));
+  PetscCall(VecRestoreArrayRead(X,&x));
+  /*
+     stressing rates from all slipping faults, dense or H matrix;
+     background backslip loading (sinc) is added by the caller
+  */
+  PetscCall(MatMult(medium->Is, rsf->vel, rsf->tau_dot));
+  if(rsf->calc_sigma_dot)
+    PetscCall(MatMult(medium->In, rsf->vel, rsf->sigma_dot));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 /* 
    compute time-derivatives for the state vector
    x = (psi1,tau1,sigma1,s1,psi2,tau2,sigma2,s2,....) of size medium->rsf->dim*n
@@ -45,11 +170,11 @@ PetscReal vel_from_rsf(PetscReal tau, PetscReal sigma, PetscReal state, PetscRea
 */
 PetscErrorCode rsf_ODE_RHSFunction(TS ts,PetscReal time,Vec X,Vec F,void *ptr)
 {
-  PetscScalar *f,*vel,cosh_fac,mu,scaled_tau,exp_fac,pre_fac;
-  PetscScalar dvdtau,dvdsigma,dvdstate,a,b,sdot,vabs,psi_ss,epsi,omega,gate,lomega;
+  PetscScalar *f,cosh_fac,mu,scaled_tau,exp_fac,pre_fac;
+  PetscScalar dvdtau,dvdsigma,dvdstate,a,sdot;
   const PetscScalar *x,*tau_dot,*sigma_dot,*velr;
   struct med *medium;struct flt *fault;
-  PetscInt i,j,k,ln;
+  PetscInt i,j,k;
   struct interact_ctx *par;
   struct rsf_vars *rsf;
   
@@ -59,51 +184,9 @@ PetscErrorCode rsf_ODE_RHSFunction(TS ts,PetscReal time,Vec X,Vec F,void *ptr)
   fault = par->fault;
   rsf = medium->rsf;
   
-  /* consistency check of the layout alignment (cheap) */
-  PetscCall(VecGetLocalSize(X, &ln));
-  if(ln != rsf->dim*medium->rn){
-    fprintf(stderr,"rsf_ODE_RHSFunction: layout mismatch, local %i vs %i x %i\n",
-	    (int)ln,rsf->dim,(int)medium->rn);
-    exit(-1);
-  }
+  /* layout consistency is checked inside rsf_compute_vel_and_stressing */
+  PetscCall(rsf_compute_vel_and_stressing(X,par));
   PetscCall(VecGetArrayRead(X,&x));
-  /* 
-     compute the slip rate vector
-     v = 2 v0 exp(-psi/a) sinh(tau/(sigma a)) 
-  */
-  /* 
-     NOTE (possible optimization, intentionally NOT applied here):
-     this loop and the derivative loop below share per-cell factors.
-     vel_from_rsf returns mu = tau/sigma, scaled_tau = mu/a and
-     exp_fac = exp(-psi/a); the derivative loop then recomputes all three
-     and additionally calls cosh(scaled_tau).  One could instead form
-     exp(scaled_tau) ONCE here, get both sinh and cosh from it
-     (sinh=(e-1/e)/2, cosh=(e+1/e)/2), and stash the single combination the
-     derivative loop needs, cosh_fac = cosh(scaled_tau)*exp(-psi/a), in a
-     scratch array sized to medium->rn for reuse below.  On a BP5 2 km dense
-     serial test that made the RHS *arithmetic* ~1.6-1.7x faster, machine-
-     precision-identical (first-event time unchanged to ~1e-9 yr).  The
-     end-to-end effect is small here because the matvec dominates the step;
-     it would matter more where the matvec is cheap (H-matrix, high core
-     count).  It is left explicit on purpose: the gain is modest and a
-     precomputed/stashed form is easy to get subtly wrong if the friction
-     formulation is later changed, so clarity is preferred for now.
-  */
-  PetscCall(VecGetArray(rsf->vel,&vel));
-  /* i global patch, j local x offset, k local patch */
-  for (i = medium->rs, j=0, k=0; i < medium->re; i++, j+=rsf->dim, k++) {
-    /* local x layout: state = x[j], tau = x[j+1], sigma = x[j+2], slip = x[j+3] */
-    vel[k] = vel_from_rsf(x[j+1],x[j+2],x[j],fault[i].mu_s,rsf->v0,
-			  &mu, &scaled_tau, &exp_fac, medium);
-  }
-  PetscCall(VecRestoreArray(rsf->vel,&vel));
-  /* 
-     stressing rates from all slipping faults, this works for dense
-     and H matrix; background backslip loading (sinc) is added below
-  */
-  PetscCall(MatMult(medium->Is, rsf->vel, rsf->tau_dot));
-  if(rsf->calc_sigma_dot)
-    PetscCall(MatMult(medium->In, rsf->vel, rsf->sigma_dot));
   /* 
      compute derivatives 
   */
@@ -115,10 +198,10 @@ PetscErrorCode rsf_ODE_RHSFunction(TS ts,PetscReal time,Vec X,Vec F,void *ptr)
   /*  */
   PetscCall(VecGetArray(F,&f));
   for (i = medium->rs, j=0, k=0; i < medium->re; i++, j+=rsf->dim, k++) {
-    /* a = fault[].mu_s, b = fault[].mu_d as read by read_rsf */
-    a = fault[i].mu_s;b = fault[i].mu_d;
+    a = fault[i].mu_s;	/* b = fault[].mu_d is used inside rsf_state_rate */
     /* 
-       state evolution, in the psi variable used throughout:
+       state evolution, in the psi variable used throughout
+       (implemented in rsf_state_rate above, shared with the IMEX path):
 
        aging law (state_law 0, default):
          d psi/dt = b/dc (v0 exp((f0-psi)/b) - |v|)
@@ -160,47 +243,9 @@ PetscErrorCode rsf_ODE_RHSFunction(TS ts,PetscReal time,Vec X,Vec F,void *ptr)
        the slip law |v| is floored at vmin_state so ln(|v|/v0) stays finite as
        v -> 0 (where the slip law's d psi/dt -> 0 in any case).
     */
-    if(b != 0.0){		/* b == 0 guard as in HBI */
-      if(rsf->state_law == RSF_SLIP_LAW){
-	vabs = fabs(velr[k]);
-	if(vabs < rsf->vmin_state)
-	  vabs = rsf->vmin_state;
-	psi_ss = rsf->f0 - b * PetscLogReal(vabs/rsf->v0);
-	f[j] = -(vabs/((rsf->dc_vec)?(rsf->dc_vec[i]):(rsf->dc))) * (x[j] - psi_ss);
-      }else if(rsf->state_law == RSF_PRZ_LAW){
-	vabs = fabs(velr[k]);
-	epsi  = PetscExpReal((x[j] - rsf->f0)/b); /* exp((psi-f0)/b) */
-	f[j] = (b/(2.0*((rsf->dc_vec)?(rsf->dc_vec[i]):(rsf->dc)))) *
-	  (rsf->v0/epsi - (vabs*vabs/rsf->v0)*epsi);
-      }else if((rsf->state_law == RSF_SATO_LAW) || (rsf->state_law == RSF_KT_LAW)){
-	/*
-	  the two gated (composite) laws. Both are the slip law plus the aging
-	  law's healing term multiplied by a gate that shuts the healing off away
-	  from stationary contact; they differ only in what the gate keys on:
-
-	    Sato-type (state_law 3): gate = exp(-Omega/sato_beta)   (keys on Omega)
-	    Kato and Tullis (state_law 4, composite law):
-	                             gate = exp(-|v|/kt_vc)         (keys on |v|)
-
-	  In theta form, d theta/dt = gate - Omega ln Omega, with Omega = |v| theta/dc.
-	*/
-	vabs = fabs(velr[k]);
-	if(vabs < rsf->vmin_state)
-	  vabs = rsf->vmin_state;
-	epsi  = PetscExpReal((x[j] - rsf->f0)/b);       /* exp((psi-f0)/b)   */
-	omega = (vabs/rsf->v0) * epsi;			/* Omega = |v| th/dc */
-	gate  = (rsf->state_law == RSF_SATO_LAW)?
-	  (PetscExpReal(-omega/rsf->sato_beta)):
-	  (PetscExpReal(-vabs/rsf->kt_vc));
-	lomega = PetscLogReal(vabs/rsf->v0) + (x[j] - rsf->f0)/b;  /* ln Omega */
-	f[j] = (b/((rsf->dc_vec)?(rsf->dc_vec[i]):(rsf->dc))) *
-	  ((rsf->v0/epsi)*gate - vabs*lomega);
-      }else{			/* aging law */
-	f[j] = (b/((rsf->dc_vec)?(rsf->dc_vec[i]):(rsf->dc))) *
-	  (rsf->v0 * PetscExpReal((rsf->f0 - x[j])/b) - fabs(velr[k]));
-      }
-    }else
-      f[j] = 0.0;
+    /* state evolution rate; laws and derivatives implemented once in
+       rsf_state_rate (shared with the IMEX path) */
+    f[j] = rsf_state_rate(i,x[j],velr[k],par,NULL,NULL);
     /* 
        d sigma/dt, compression positive (In was scaled by -1)
     */

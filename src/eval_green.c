@@ -352,13 +352,13 @@ void eval_green_basic(COMP_PRECISION *x,struct flt *fault,
   eval_okada(x,fault,disp,u_global,sm_global,iret,GC_DISP_AND_STRESS,full_space);
 #endif
 }
-#ifdef USE_HACAPK
+#if defined(USE_HACAPK) || defined(USE_HMMVP)
 
 /* 
    entry callback, called from m_HACApK_calc_entry_ij.f90 with 0-based
-   indices: A[i][j] = rec_stress_mode stress at receiver patch i due to
-   unit src_slip_mode slip on source patch j, identical to the dense
-   fill and the htool kernel
+   indices, and also used by the hmmvp shim: A[i][j] = rec_stress_mode
+   stress at receiver patch i due to unit src_slip_mode slip on source
+   patch j, identical to the dense fill and the htool kernel
 */
 double ckernel_func(int i, int j, void *par)
 {

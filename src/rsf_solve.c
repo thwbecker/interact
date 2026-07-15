@@ -83,6 +83,7 @@ PetscErrorCode rsf_solve_run(int argc,char **argv,struct interact_ctx *par,
 			     struct rsf_solve_settings *set)
 {
   TS ts;			/* timestepping context */
+  Mat Jimex = NULL;		/* IMEX implicit Jacobian, only with -imex */
   TSAdapt adapt;
   PetscReal *values = NULL;
   const PetscReal sec_per_year = 365.25*24.*60.*60.;
@@ -341,6 +342,16 @@ PetscErrorCode rsf_solve_run(int argc,char **argv,struct interact_ctx *par,
   PetscCall(TSCreate(PETSC_COMM_WORLD,&ts));
   PetscCall(TSSetProblemType(ts,TS_NONLINEAR));
   PetscCall(TSSetSolution(ts,x));
+  if(set->use_imex){
+    /*
+      IMEX (-imex): TSARKIMEX with the local state terms implicit and
+      the stress-transfer matvec explicit; the integrator choice is the
+      ONLY difference to the default path, the ODE is identical.  See
+      rsf_imex.c for the split, the block-diagonal implicit Jacobian,
+      and the solver defaults (all overridable after TSSetFromOptions).
+    */
+    PetscCall(rsf_IMEX_setup(ts,par,&Jimex));
+  }else{
   PetscCall(TSSetRHSFunction(ts, NULL, rsf_ODE_RHSFunction,par));
   /*
     adaptive embedded Runge-Kutta; HBI uses Cash-Karp RK5(4), which
@@ -349,6 +360,7 @@ PetscErrorCode rsf_solve_run(int argc,char **argv,struct interact_ctx *par,
   */
   PetscCall(TSSetType(ts,TSRK));
   PetscCall(TSRKSetType(ts,TSRK5DP));
+  }
   /*
      NOTE on the integrator order: after the step-size controller (see the
      longer note further down), the RK order is the other large production
@@ -510,6 +522,8 @@ PetscErrorCode rsf_solve_run(int argc,char **argv,struct interact_ctx *par,
   PetscCall(VecDestroy(&vatol));
 
   /*  */
+  if(Jimex)
+    PetscCall(MatDestroy(&Jimex));
   PetscCall(TSDestroy(&ts)); 
   PetscFunctionReturn(PETSC_SUCCESS);
 }

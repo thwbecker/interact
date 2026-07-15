@@ -100,6 +100,7 @@ struct rsf_solve_settings{
   PetscReal field_tmin;				    /* [s] field output time floor */
   PetscBool field_enable;
   PetscBool have_ic,have_dc,have_sigma;
+  PetscBool use_imex;		/* -imex: ARKIMEX with implicit local state terms (rsf_imex.c) */
   /* Task 1 outputs (all default off) */
   PetscBool cat_enable;		/* -rsf_catalog */
   PetscBool rup_enable;		/* -rsf_rupture_time */

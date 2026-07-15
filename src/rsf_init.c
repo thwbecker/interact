@@ -131,6 +131,9 @@ void rsf_print_help(const char *prog)
   printf("  -atol_slip <m>          absolute tolerance for slip entries (default 1e-3)\n");
   printf("  -dt_init <s>            initial step size (default 1)\n");
   printf("  -dt_max <s>             maximum step size (default 1e10)\n");
+  printf("  -imex                   IMEX (ARKIMEX) integration: local state terms implicit,\n");
+  printf("                          stress transfer explicit; helps stiff laws (e.g. PRZ)\n");
+  printf("                          during coseismic phases (default off = explicit RK)\n");
   printf("  -stop_time_yr <yr>      integration stop time (default 3000)\n");
   printf("\n");
 
@@ -433,6 +436,8 @@ PetscErrorCode rsf_get_settings(int argc,char **argv,struct interact_ctx *par,
   PetscCall(PetscOptionsGetReal(NULL,NULL,"-vel_event_hyst",&vel_event_hyst,NULL));
   PetscCall(PetscOptionsGetReal(NULL,NULL,"-event_tmin_yr",&event_tmin,NULL));
   PetscCall(PetscOptionsGetBool(NULL,NULL,"-track_events",&track_events,NULL));
+  set->use_imex = PETSC_FALSE;
+  PetscCall(PetscOptionsGetBool(NULL,NULL,"-imex",&set->use_imex,NULL));
   /* other outputs */
   PetscCall(PetscOptionsGetBool(NULL,NULL,"-rsf_catalog",&cat_enable,NULL));
   PetscCall(PetscOptionsGetBool(NULL,NULL,"-rsf_rupture_time",&rup_enable,NULL));
