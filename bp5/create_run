@@ -9,7 +9,7 @@ export OMP_NUM_THREADS=1
 
 
 hmat=4;
-hmat_flag="-use_hmatrix $hmat -hmmvp_tol 1e-4"
+hmat_flags="-use_hmatrix $hmat -hmmvp_tol 1e-4"
 
 
 oname=lr.$res.$hmat
