@@ -446,6 +446,17 @@ PetscErrorCode rsf_solve_run(int argc,char **argv,struct interact_ctx *par,
   PetscCall(TSSetFunctionDomainError(ts,rsf_domain_check));
   PetscCall(TSSetFromOptions(ts));
   /*
+     TSSetFromOptions resets the SNES KSP/PC to PETSc defaults (an iterative
+     KSP over the full, elastically coupled operator), which discards the
+     block-diagonal stage solver rsf_IMEX_setup installed and makes the implicit
+     stages iterate against the dense/H stress-transfer matrix, orders of
+     magnitude slower.  Reassert the intended per-cell direct solve here, after
+     the options have been read, so it is the default while still overridable by
+     an explicit -ksp_type/-pc_type on the command line (which we honor by only
+     forcing it when the user did not set those). */
+  if(set->use_imex)
+    PetscCall(rsf_IMEX_set_stage_solver(ts));
+  /*
      compact slip-rate field output: build the per-group grids and write
      each group's static geometry once (rank 0 only).  n fault groups
      give n separate grids, written to rsf_geom.gGGG.dat.  The group

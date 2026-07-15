@@ -248,9 +248,6 @@ PetscErrorCode rsf_IMEX_IJacobian(TS ts,PetscReal time,Vec X,Vec Xdot,PetscReal 
 PetscErrorCode rsf_IMEX_setup(TS ts, struct interact_ctx *par, Mat *Jimex)
 {
   Mat J;
-  SNES snes;
-  KSP ksp;
-  PC pc;
   PetscInt *d_nnz,ln,k,c;
   struct med *medium;
   struct rsf_vars *rsf;
@@ -274,18 +271,40 @@ PetscErrorCode rsf_IMEX_setup(TS ts, struct interact_ctx *par, Mat *Jimex)
   PetscCall(TSSetRHSFunction(ts,NULL,rsf_IMEX_RHSFunction,par));
   PetscCall(TSSetIFunction(ts,NULL,rsf_IMEX_IFunction,par));
   PetscCall(TSSetIJacobian(ts,J,J,rsf_IMEX_IJacobian,par));
-  /* the stage systems are block diagonal: preonly + block Jacobi ILU(0)
-     is a direct solve; overridable via -ksp_type/-pc_type after
-     TSSetFromOptions in the driver */
-  PetscCall(TSGetSNES(ts,&snes));
-  PetscCall(SNESGetKSP(snes,&ksp));
-  PetscCall(KSPSetType(ksp,KSPPREONLY));
-  PetscCall(KSPGetPC(ksp,&pc));
-  PetscCall(PCSetType(pc,PCBJACOBI));
+  /* the block-diagonal stage solver (preonly + block Jacobi/ILU) is installed
+     by rsf_IMEX_set_stage_solver, which the driver calls again after
+     TSSetFromOptions so the options pass cannot silently revert it to an
+     iterative Krylov solve over the full elastic operator */
+  PetscCall(rsf_IMEX_set_stage_solver(ts));
   HEADNODE{
     fprintf(stderr,"rsf_IMEX_setup: IMEX (ARKIMEX) time integration: implicit local state terms, explicit stress transfer\n");
   }
   *Jimex = J;
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+/*
+  Install the stage linear solver for the IMEX implicit systems. Those systems
+  are block diagonal (one 4x4 block per cell, no inter-cell coupling), so the
+  exact solve is preonly + block Jacobi with a per-block ILU(0), and it needs no
+  global matvec. This is set both in rsf_IMEX_setup and again from the driver
+  after TSSetFromOptions, because that call resets the SNES KSP/PC to PETSc
+  defaults. To keep a command-line override working, only force the types when
+  the user has NOT set -ksp_type / -pc_type explicitly.
+*/
+PetscErrorCode rsf_IMEX_set_stage_solver(TS ts)
+{
+  SNES snes;KSP ksp;PC pc;PetscBool kset,pcset;
+  PetscFunctionBeginUser;
+  PetscCall(TSGetSNES(ts,&snes));
+  PetscCall(SNESGetKSP(snes,&ksp));
+  PetscCall(KSPGetPC(ksp,&pc));
+  PetscCall(PetscOptionsHasName(NULL,NULL,"-ksp_type",&kset));
+  PetscCall(PetscOptionsHasName(NULL,NULL,"-pc_type",&pcset));
+  if(!kset)
+    PetscCall(KSPSetType(ksp,KSPPREONLY));
+  if(!pcset)
+    PetscCall(PCSetType(pc,PCBJACOBI));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 #endif

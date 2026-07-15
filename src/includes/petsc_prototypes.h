@@ -21,6 +21,7 @@ PetscErrorCode rsf_IMEX_RHSFunction(TS, PetscReal, Vec, Vec, void*);
 PetscErrorCode rsf_IMEX_IFunction(TS, PetscReal, Vec, Vec, Vec, void*);
 PetscErrorCode rsf_IMEX_IJacobian(TS, PetscReal, Vec, Vec, PetscReal, Mat, Mat, void*);
 PetscErrorCode rsf_IMEX_setup(TS, struct interact_ctx *, Mat *);
+PetscErrorCode rsf_IMEX_set_stage_solver(TS);
 
 PetscErrorCode print_petsc_matrix(Mat , PetscInt , PetscInt ,char *);
 /* kernel function */
