@@ -146,15 +146,15 @@ rsf_solve:
 	selected with -state_law; writing Omega = |v| theta/D_RS (so
 	that Omega = 1 is steady state), their theta forms are:
 
-	  0  aging (Dieterich), the default:
+	  1  aging (Dieterich), the default:
 	     d theta/dt = 1 - Omega
 	     heals at stationary contact; state rate bounded by
 	     b |v|/D_RS above steady state
-	  1  slip (Ruina):
+	  2  slip (Ruina):
 	     d theta/dt = -Omega ln(Omega)
 	     no healing at rest; rate grows linearly in the log
 	     distance from steady state
-	  2  PRZ (Perrin, Rice and Zheng, 1995), normalized so that
+	  3  PRZ (Perrin, Rice and Zheng, 1995), normalized so that
 	     Omega_ss = 1:
 	     d theta/dt = (1 - Omega^2)/2
 	     heals at rest like aging, but the rate grows like
@@ -162,19 +162,19 @@ rsf_solve:
 	     explicit integration at rupture fronts and expensive at
 	     fine resolution in the configurations tested so far (see
 	     rsf_solve.md, including the -imex option)
-	  3  Sato-type gated composite:
+	  4  Sato-type gated composite:
 	     d theta/dt = exp(-Omega/beta) - Omega ln(Omega)
 	     slip law plus aging-type healing shut off by a gate keyed
 	     on Omega (beta = 1e-2, currently compile-time); steady
 	     state effectively coincides with laws 0 to 2
-	  4  Kato and Tullis (2001) composite:
+	  5  Kato and Tullis (2001) composite:
 	     d theta/dt = exp(-|v|/Vc) - Omega ln(Omega)
 	     same construction with the gate keyed on slip rate
 	     (Vc = v0/100, currently compile-time); its low-speed
 	     steady state sits at Omega_ss = 1.763 rather than 1,
 	     which matters when comparing runs across laws
 
-	Laws 0 to 3 share the steady state psi_ss = f0 - b ln(|v|/v0),
+	Laws 1 to 4 share the steady state psi_ss = f0 - b ln(|v|/v0),
 	i.e. f_ss = f0 + (a-b) ln(|v|/v0). The psi-space forms actually
 	integrated, the velocity floors, and further notes (PRZ
 	normalization, the Kato and Tullis offset) are documented in

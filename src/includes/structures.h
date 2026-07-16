@@ -111,9 +111,6 @@ struct rsf_vars{
      sato_beta  dimensionless Omega threshold of the Sato-type law
      kt_vc      [m/s] velocity threshold Vc of the Kato and Tullis composite law */
   PetscReal sato_beta,kt_vc;
-  PetscInt prz_norm;		/* PRZ normalization: 0 (default) (1-Omega^2)/2,
-				   1 gives 1-Omega^2 (rest healing matched to
-				   aging, relaxation doubled); see rsf_engine.c */
   /*  */
   short int dim;
 };

@@ -25,7 +25,6 @@ regenerated rather than quoted for other setups.
 | aging   | 142.3           | 12.7       | 0.95         | 65           |
 | slip    | 135.9           | 12.4       | 2.6          | 16           |
 | prz     | 136.5           | 14.2       | 3.3          | 6.5          |
-| przn1   | 138.8           | 14.5       | 3.5          | 5.6          |
 | sato    | 142.1           | 14.7       | 3.1          | 9.6          |
 | kt      | 143.3           | 14.7       | 3.1          | 15           |
 
@@ -36,10 +35,12 @@ aging-like healing) but only weakly in recurrence (spread under about 5
 percent).  The much larger recurrence differences seen on BP5 (about 235
 versus 172 yr at 2 km) are therefore not a zero-dimensional property of the
 laws; they emerge from the spatially extended dynamics (partial ruptures,
-arrest levels, front behavior).  The PRZ normalization variant (`-prz_norm 1`,
-healing matched to aging) lengthens the slider recurrence by 2.3 yr, under
-2 percent, consistent with the estimate that the healing normalization is a
-minor contributor to recurrence differences.
+arrest levels, front behavior).  An alternative PRZ normalization
+(d theta/dt = 1 - Omega^2, healing matched to aging at the cost of a doubled
+relaxation rate) was also tested here and lengthened the slider recurrence by
+2.3 yr, under 2 percent, consistent with the estimate that the healing
+normalization is a minor contributor to recurrence differences; the runtime
+option for it was subsequently removed as not useful.
 
 ## Solvers (work-precision, phase error of matched events)
 
@@ -56,8 +57,11 @@ dominated by explicit 3bs on this problem everywhere it was tested: it costs
 more per step (implicit function evaluations two to three times the RHS
 count), its error stagnates near 1e-2 yr for aging instead of improving from
 rtol 1e-5 to 1e-6, it loses events or wedges at loose tolerances (the aging
-runs at rtol 1e-3 and 1e-4 stall at the first nucleation with dt of order
-1 s), and the PRZ IMEX runs timed out mid-series at all tolerances tried.
+runs at rtol 1e-3 and 1e-4 stall at the first nucleation in a domain-check
+rejection storm, about 2e5 rejected attempts per 1e2 accepted steps, which
+appears not to count toward any PETSc rejection limit; the step ceiling in
+run_slider now terminates such runs within seconds and the analysis flags
+them), and the PRZ IMEX runs timed out mid-series at all tolerances tried.
 This reproduces, on the simplest possible system and for the AGING law, the
 stage-problem pathology diagnosed on BP5: without the cell's elastic
 self-stiffness in the implicit part, the per-cell stage problem loses its

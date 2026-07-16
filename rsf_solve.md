@@ -81,8 +81,8 @@ The groups, in the order `-h` prints them, are:
 - initial conditions: `-sigma_init`, `-tau_init`, `-vel_init`, `-rand_amp`.
 - normal-stress evolution and limiter: `-calc_sigma_dot`, `-limit_sigma`,
   `-min_sigma`, `-max_sigma`.
-- state evolution: `-state_law` (0 aging, the default; 1 slip; 2 PRZ; 3 Sato;
-  4 Kato and Tullis; see the law notes at the end of this file) and
+- state evolution: `-state_law` (1 aging, the default; 2 slip; 3 PRZ; 4 Sato;
+  5 Kato and Tullis; see the law notes at the end of this file) and
   `-vmin_state`.  The gated-law parameters (sato_beta, kt_vc) currently have
   compile-time defaults only (1e-2 and 1e-2 v0) and are not yet runtime
   options.
@@ -109,25 +109,47 @@ line should be added to the help.
 ### State evolution law (`-state_law`)
 
 The state is carried in the regularized variable `psi`, with
-`v = 2 v0 exp(-psi/a) sinh(tau/(sigma a))`. Two evolution laws are available:
+`v = 2 v0 exp(-psi/a) sinh(tau/(sigma a))`. Five evolution laws are available,
+all implemented in one place, `rsf_state_rate` in `src/rsf_engine.c` (together
+with their analytic partial derivatives, which the IMEX path uses), so both
+integrator paths see identical formulas. Throughout, `Omega = |v| theta/dc`
+with `theta = (dc/v0) exp((psi-f0)/b)`, so `Omega = 1` is the classical steady
+state.
 
-- `-state_law 0`, the aging (Dieterich) law, and the default:
-  `d psi/dt = b/dc (v0 exp((f0-psi)/b) - |v|)`
-- `-state_law 1`, the slip (Ruina) law:
-  `d psi/dt = -(|v|/dc) (psi - psi_ss)`
-- `-state_law 2`, the PRZ law (Perrin, Rice and Zheng, 1995), written with
-  `Omega = |v| theta/dc` so that `Omega_ss = 1`:
-  `d theta/dt = 1/2 ( 1 - (|v| theta/dc)^2 )`; substituting
-  `theta = (dc/v0) exp((psi-f0)/b)` gives
-  `d psi/dt = b/(2 dc) ( v0 exp((f0-psi)/b) - v^2/v0 exp((psi-f0)/b) )`
+- `-state_law 1`, the aging (Dieterich) law, and the default. In `theta` form
+  `d theta/dt = 1 - Omega`; in `psi`:
+  `d psi/dt = b/dc ( v0 exp((f0-psi)/b) - |v| )`.
+  Heals at stationary contact; the state rate is bounded by `b|v|/dc` above
+  steady state.
+- `-state_law 2`, the slip (Ruina) law. In `theta` form
+  `d theta/dt = -Omega ln Omega`; in `psi`:
+  `d psi/dt = -(|v|/dc) (psi - psi_ss)`.
+  Heals only while slipping; the rate grows linearly in the `psi` lag.
+- `-state_law 3`, the PRZ law (Perrin, Rice and Zheng, 1995), normalized so
+  that `Omega_ss = 1`:
+  `d theta/dt = (1 - Omega^2)/2`; in `psi`:
+  `d psi/dt = b/(2 dc) ( v0 exp((f0-psi)/b) - v^2/v0 exp((psi-f0)/b) )`.
+  Heals at rest, but at HALF the aging rate under this normalization (see the
+  normalization note at the end of this file for the trade-off).  Above
+  steady state the rate grows like `Omega^2`, which is what makes PRZ stiff
+  for explicit integrators at rupture fronts (see the IMEX section) and slow
+  to run at fine resolution.
+- `-state_law 4`, the Sato-type gated composite law:
+  `d theta/dt = exp(-Omega/beta) - Omega ln Omega`, the slip law plus aging
+  healing shut off by a gate keyed on `Omega` (`beta = 1e-2`, compile-time).
+- `-state_law 5`, the Kato and Tullis (2001) composite law:
+  `d theta/dt = exp(-|v|/Vc) - Omega ln Omega`, the same construction with the
+  gate keyed on `|v|` (`Vc = v0/100`, compile-time); its low-speed steady
+  state sits at `Omega_ss = 1.763` rather than 1, see the law notes at the
+  end of this file.
 
-Both share the same steady state, `psi_ss = f0 - b ln(|v|/v0)`, which corresponds
-to the usual `f_ss = f0 + (a-b) ln(|v|/v0)`; the laws differ only in how `psi`
-relaxes toward it, with the slip law healing only while slipping. `|v|` (not `v`)
-is used in both, as in HBI, which matters for the sinh regularization that permits
-`v < 0`. In the slip law `|v|` is floored at `-vmin_state` (default 1e-16 m/s) so
-that `ln(|v|/v0)` stays finite as `v` approaches zero, where `d psi/dt` tends to
-zero in any case.
+Laws 1 to 4 share the same steady state, `psi_ss = f0 - b ln(|v|/v0)`,
+corresponding to the usual `f_ss = f0 + (a-b) ln(|v|/v0)`; the laws differ in
+how `psi` relaxes toward it. `|v|` (not `v`) is used throughout, as in HBI,
+which matters for the sinh regularization that permits `v < 0`. In the slip,
+Sato, and Kato and Tullis laws `|v|` is floored at `-vmin_state` (default
+1e-16 m/s) so that `ln(|v|/v0)` stays finite as `v` approaches zero, where
+`d psi/dt` tends to zero in any case; `b = 0` cells return a zero state rate.
 
 In a test on the SEAS BP4-QD setup at 2 km, run in this sandbox with an otherwise
 identical configuration, the slip law gave shorter recurrence and more frequent
@@ -727,7 +749,7 @@ Runge-Kutta (TSRK) to a PETSc additive Runge-Kutta IMEX method (TSARKIMEX,
 type 3, L-stable third order).  The ODE system is unchanged: the implicit and
 explicit parts sum to the same right hand side as `rsf_ODE_RHSFunction`, so
 the option changes the integrator, not the physics.  The motivation is the
-state-evolution stiffness of some laws, most severely PRZ (`-state_law 2`),
+state-evolution stiffness of some laws, most severely PRZ (`-state_law 3`),
 whose theta rate grows like Omega^2 above steady state: at rupture fronts the
 state lags steady state by many e-folds regardless of law, and the stable
 EXPLICIT step then collapses like 2 dc/(|v| Omega) (about 3e-8 s in the BP5
@@ -860,8 +882,8 @@ stationary contact. In `theta` form,
 
     d theta/dt = gate - Omega ln Omega,     Omega = |v| theta/dc
 
-- `-state_law 3`, Sato-type: `gate = exp(-Omega/beta)`, keyed on `Omega`
-- `-state_law 4`, Kato and Tullis (2001) composite law: `gate = exp(-|v|/Vc)`,
+- `-state_law 4`, Sato-type: `gate = exp(-Omega/beta)`, keyed on `Omega`
+- `-state_law 5`, Kato and Tullis (2001) composite law: `gate = exp(-|v|/Vc)`,
   keyed on `|v|`
 
 In `psi` both become
@@ -889,25 +911,45 @@ implementation in the Gu et al. (1984) nondimensionalization, and agree to machi
 precision. Note the numbering differs by one: MATLAB `evol` 1 to 5 correspond to
 `-state_law` 0 to 4.
 
-#### Normalization of PRZ, and comparability of the three laws
+#### Normalization of PRZ, and comparability of the laws
 
-All three laws share the steady state `psi_ss = f0 - b ln(|v|/v0)`, i.e. the usual
-`f_ss = f0 + (a-b) ln(|v|/v0)`, and all three have the same linearization about it
-(`d theta/dt ~ -(Omega-1)`). They therefore agree on linear stability and differ
-only away from steady state, and a comparison at equal `dc` is like-for-like.
+All laws share the steady state `psi_ss = f0 - b ln(|v|/v0)`, i.e. the usual
+`f_ss = f0 + (a-b) ln(|v|/v0)`, and in the normalization used here,
+`d theta/dt = (1 - Omega^2)/2`, PRZ also shares the linearization about it
+(`d theta/dt ~ -(Omega - 1)`), so the laws agree on linear stability and `h*`
+at equal `dc`.
 
-This depends on the normalization of `theta`, which carries a constant-factor
-arbitrariness. PRZ is also written `d theta/dt = 1 - (|v| theta/(2 dc))^2`, which
-is the same law under `theta -> theta/2` but places `theta_ss` at `2 dc/|v|`,
-shifting `psi_ss` by `b ln 2` (about 0.009 for `b = 0.013`) and making the fault
-stronger at steady state than under aging or slip at the same `dc`. The
-`Omega_ss = 1` form above is used here so that the three laws remain directly
-comparable; anyone porting results in or out should check which convention the
-other code uses.
+That choice has a consequence away from steady state that matters for cycle
+comparisons: the rest healing rate.  At `v -> 0`, aging heals with
+`d theta/dt -> 1` while `(1 - Omega^2)/2 -> 1/2`, so PRZ restrengthens a
+locked fault at HALF the aging rate.  No constant rescaling of PRZ can match
+aging in all three properties at once (steady state, linearized relaxation,
+rest healing); the convention here matches the first two.  The alternative,
+`d theta/dt = 1 - Omega^2`, matches steady state and rest healing but DOUBLES
+the linearized relaxation rate, i.e. behaves like `dc/2` for stability and
+nucleation and thus halves `h*`.
 
-A note on resolution: in a short BP4 test at 2 km, PRZ produced many more catalog
-events than the aging law, as the slip law also does at that spacing. The process
-zone `Lb` is only about one cell there, so this is consistent with the
-under-resolution behavior documented above rather than with a defect in the law,
-but it has not been checked at adequate resolution and should not be read as a
-result.
+The healing difference appears to be a modest effect for cycle recurrence.
+The onset strength is lowered by about `sigma b ln 2` (0.52 MPa at BP5
+parameters), of order 10 percent of recurrence against BP5-like reloading
+rates, and a direct test of the alternative normalization on the
+single-patch slider benchmark (see slider/README.md) shifted the slider
+recurrence by 2.3 yr, under 2 percent; a runtime option for the alternative
+was tried and removed as not useful.  In a 2 km, 600 yr, dense, serial BP5
+test (one configuration; other setups may differ), the measured full-rupture
+(Mw >= 7) recurrence was 234.6 yr for aging versus 172.1 yr for PRZ (a
+factor 0.73), while the mean coseismic stress drop was 7.60 MPa versus
+3.38 MPa (a factor 0.44), with PRZ also producing about 190 small partial
+events (median Mw about 5.3) between mainshocks.  The shorter PRZ recurrence
+is therefore dominated by the law's coseismic behavior (strong weakening,
+roughly half the stress drop, arrest at higher residual stress, plus stress
+pre-release by the partial-event activity) rather than by the healing
+normalization.  Caveat: the partial-event population is exactly the feature
+most sensitive to under-resolution at 2 km (the process zone is about one
+cell there), so the recurrence ratio should be checked at adequate
+resolution before being treated as a property of the law.
+
+PRZ is also written `d theta/dt = 1 - (|v| theta/(2 dc))^2`, the same law
+under `theta -> theta/2`, which places `theta_ss` at `2 dc/|v|` and shifts
+`psi_ss` by `b ln 2`; anyone porting results in or out should check which
+convention the other code uses.
