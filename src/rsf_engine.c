@@ -51,12 +51,24 @@ PetscReal rsf_state_rate(PetscInt i, PetscReal psi, PetscReal vin,
   rsf = par->medium->rsf;
   b = par->fault[i].mu_d;
   if(b == 0.0){			/* b == 0 guard as in HBI */
-    if(dSdpsi)*dSdpsi = 0.0;
-    if(dSdvabs)*dSdvabs = 0.0;
+    if(dSdpsi)
+      *dSdpsi = 0.0;
+    if(dSdvabs)
+      *dSdvabs = 0.0;
     return 0.0;
   }
+  /* fixed or variable D_c? */
   D = (rsf->dc_vec)?(rsf->dc_vec[i]):(rsf->dc);
-  if(rsf->state_law == RSF_SLIP_LAW){
+  switch(rsf->state_law){
+  case RSF_AGING_LAW:			/* Dieterich aging  law */
+    epsi = PetscExpReal((rsf->f0 - psi)/b); /* exp((f0-psi)/b), NOT the epsi above */
+    S = (b/D) * (rsf->v0 * epsi - fabs(vin));
+    if(dSdpsi)
+      *dSdpsi = -(rsf->v0/D) * epsi;
+    if(dSdvabs)
+      *dSdvabs = -b/D;
+    break;
+  case RSF_SLIP_LAW:		/* Ruina slip law */
     vabs = fabs(vin);
     if(vabs < rsf->vmin_state){
       vabs = rsf->vmin_state;floored = PETSC_TRUE;
@@ -67,7 +79,8 @@ PetscReal rsf_state_rate(PetscInt i, PetscReal psi, PetscReal vin,
       *dSdpsi = -vabs/D;
     if(dSdvabs)
       *dSdvabs = (floored)?(0.0):(-(psi - psi_ss)/D - b/D);
-  }else if(rsf->state_law == RSF_PRZ_LAW){
+    break;
+  case RSF_PRZ_LAW:
     vabs = fabs(vin);
     epsi  = PetscExpReal((psi - rsf->f0)/b); /* exp((psi-f0)/b) */
     S = (b/(2.0*D)) * (rsf->v0/epsi - (vabs*vabs/rsf->v0)*epsi);
@@ -75,7 +88,9 @@ PetscReal rsf_state_rate(PetscInt i, PetscReal psi, PetscReal vin,
       *dSdpsi = -(1.0/(2.0*D)) * (rsf->v0/epsi + (vabs*vabs/rsf->v0)*epsi);
     if(dSdvabs)
       *dSdvabs = -(b/D) * (vabs/rsf->v0) * epsi;
-  }else if((rsf->state_law == RSF_SATO_LAW) || (rsf->state_law == RSF_KT_LAW)){
+    break;
+  case RSF_SATO_LAW:
+  case RSF_KT_LAW:
     vabs = fabs(vin);
     if(vabs < rsf->vmin_state){
       vabs = rsf->vmin_state;floored = PETSC_TRUE;
@@ -105,14 +120,14 @@ PetscReal rsf_state_rate(PetscInt i, PetscReal psi, PetscReal vin,
 			     (-gate/rsf->kt_vc))
 			    - lomega - 1.0);
     }
-  }else{			/* aging law */
-    epsi = PetscExpReal((rsf->f0 - psi)/b); /* exp((f0-psi)/b), NOT the epsi above */
-    S = (b/D) * (rsf->v0 * epsi - fabs(vin));
-    if(dSdpsi)
-      *dSdpsi = -(rsf->v0/D) * epsi;
-    if(dSdvabs)
-      *dSdvabs = -b/D;
+    break;
+   
+
+  default:
+    fprintf(stderr,"rsf_state_rate: state law %i undefined\n",rsf->state_law );
+    exit(-1);
   }
+
   return S;
 }
 /*
