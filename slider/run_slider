@@ -1,0 +1,62 @@
+#!/bin/bash
+#
+# single-patch (spring-slider) benchmark for rsf_solve: compares the
+# state evolution laws (physics) and the ODE solvers (cost for given
+# accuracy) on a 10 x 10 km Okada patch loaded by backslip, which
+# cycles with ~142 yr recurrence at the parameters below.
+#
+# produces results/<variant>_<solver>_<rtol>/ run directories plus a
+# reference run per law variant; analyze_slider.py turns these into a
+# physics table and work-precision data.
+#
+# all parameters are set here as plain assignments
+#
+bindir=../bin
+geom=geom_slider10.in		# 10 km patch, half-lengths in meters
+rsf=rsf_slider.in		# a = 0.004, b = 0.03 (BP5 VW values)
+tmax=450			# [yr]
+maxsteps=5000000
+common="-shear_modulus 3.204e10 -s_wave_speed 3464 -f0 0.6 -dc 0.14 -vpl 1e-9 -v0 1e-6 -sigma_init 25e6 -rsf_catalog -rupture_vth 0.1 -ts_max_reject 200"
+#
+# law variants: label, -state_law, extra flags
+variants="aging:1: slip:2: prz:3: przn1:3:-prz_norm,1 sato:4: kt:5:"
+# solvers: label, flags (imex stage solvers keep their built-in defaults)
+solvers="3bs:-ts_rk_type,3bs imex:-imex"
+rtols="1e-3 1e-4 1e-5 1e-6"
+# reference: 5dp at tight tolerance, one per law variant
+ref_rtol=1e-9
+#
+mkdir -p results
+for v in $variants;do
+    lab=`echo $v | cut -d: -f1`;law=`echo $v | cut -d: -f2`
+    extra=`echo $v | cut -d: -f3 | tr ',' ' '`
+    #
+    # reference run
+    d=results/${lab}_ref
+    if [ ! -s $d/DONE ];then
+	mkdir -p $d
+	(cd $d;timeout 130 mpirun --allow-run-as-root -np 1 ../../$bindir/rsf_solve -geom_file ../../$geom \
+	     -rsf_file ../../$rsf -state_law $law $extra $common \
+	     -ts_rk_type 5dp -rtol $ref_rtol -stop_time_yr $tmax \
+	     -ts_max_steps $maxsteps > log.dat 2>&1; echo $? > DONE)
+	echo done reference $lab
+    fi
+    #
+    # solver x tolerance matrix
+    for s in $solvers;do
+	slab=`echo $s | cut -d: -f1`
+	sflag=`echo $s | cut -d: -f2 | tr ',' ' '`
+	for rtol in $rtols;do
+	    d=results/${lab}_${slab}_${rtol}
+	    if [ ! -s $d/DONE ];then
+		mkdir -p $d
+		(cd $d;timeout 130 mpirun --allow-run-as-root -np 1 ../../$bindir/rsf_solve -geom_file ../../$geom \
+		     -rsf_file ../../$rsf -state_law $law $extra $common \
+		     $sflag -rtol $rtol -stop_time_yr $tmax \
+		     -ts_max_steps $maxsteps > log.dat 2>&1; echo $? > DONE)
+		echo done $lab $slab $rtol
+	    fi
+	done
+    done
+done
+echo all runs complete
