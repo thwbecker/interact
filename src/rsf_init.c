@@ -41,8 +41,10 @@ void init_medium_rsf(struct med *medium)
    (file scope since they are only used by the driver and RHS here) 
   */
   rsf->limit_sigma = PETSC_FALSE;
-  rsf->state_law = RSF_AGING_LAW;  /* 0 aging (default), 1 slip law */
+  rsf->state_law = RSF_AGING_LAW;  /* 1 aging (default), 2 slip law 3 PRZ 4: Sato 5: Tullis */
+
   rsf->vmin_state = 1e-16;         /* |v| floor in the slip law's ln(|v|/v0) */
+
   /* fixed constants of the two gated laws, at the values of the MATLAB reference
      implementation (Omega threshold 0.01, and Vc = v0/100). Not exposed as
      options for now; edit here if they need to change */
@@ -62,154 +64,155 @@ void init_medium_rsf(struct med *medium)
 */
 void rsf_print_help(const char *prog)
 {
-  printf("\n");
-  printf("rsf_solve: quasi-dynamic rate-and-state earthquake-cycle solver (PETSc TS)\n");
-  printf("usage: %s [options]   (options may also be placed in petsc_settings.yaml)\n",prog);
-  printf("\n");
+  fprintf(stderr,"\n");
+  fprintf(stderr,"rsf_solve: quasi-dynamic rate-and-state earthquake-cycle solver (PETSc TS)\n");
+  fprintf(stderr,"usage: %s [options]   (options may also be placed in petsc_settings.yaml)\n",prog);
+  fprintf(stderr,"\n");
 
-  printf("geometry and input files\n");
-  printf("  -geom_file <file>       fault geometry, one patch per row (default geom.in)\n");
-  printf("  -rsf_file <file>        per-cell a b friction parameters (default rsf.dat)\n");
-  printf("  -rsf_ic_file <file>     per-cell initial tau[Pa] vel[m/s]; overrides uniform IC\n");
-  printf("  -rsf_dc_file <file>     per-cell D_c[m]; overrides uniform -dc\n");
-  printf("  -rsf_sigma_file <file>  per-cell initial sigma0[Pa]; overrides uniform -sigma_init\n");
-  printf("  -full_space <bool>      whole-space Green functions (default 0 = half space)\n");
-  printf("  -tv <int>               triangular patch evaluation mode (default 0)\n");
-  printf("\n");
+  fprintf(stderr,"geometry and input files\n");
+  fprintf(stderr,"  -geom_file <file>       fault geometry, one patch per row (default geom.in)\n");
+  fprintf(stderr,"  -rsf_file <file>        per-cell a b friction parameters (default rsf.dat)\n");
+  fprintf(stderr,"  -rsf_ic_file <file>     per-cell initial tau[Pa] vel[m/s]; overrides uniform IC\n");
+  fprintf(stderr,"  -rsf_dc_file <file>     per-cell D_c[m]; overrides uniform -dc\n");
+  fprintf(stderr,"  -rsf_sigma_file <file>  per-cell initial sigma0[Pa]; overrides uniform -sigma_init\n");
+  fprintf(stderr,"  -full_space <bool>      whole-space Green functions (default 0 = half space)\n");
+  fprintf(stderr,"  -tv <int>               triangular patch evaluation mode (default 0)\n");
+  fprintf(stderr,"\n");
 
-  printf("elastic and rate-and-state parameters\n");
-  printf("  -shear_modulus <Pa>     shear modulus G (default 32.04e9)\n");
-  printf("  -s_wave_speed <m/s>     shear wave speed c_s, sets radiation damping (default 3464)\n");
-  printf("  -f0 <val>               reference friction f0 (default 0.6)\n");
-  printf("  -dc <m>                 characteristic slip distance D_c (default 0.008)\n");
-  printf("  -v0 <m/s>               reference velocity (default 1e-6)\n");
-  printf("  -vpl <m/s>              plate loading rate (default 1e-9)\n");
-  printf("  -rsf_slip_mode <0|1>    slip direction: 0 strike (default), 1 dip (thrust/normal)\n");
-  printf("\n");
+  fprintf(stderr,"elastic and rate-and-state parameters\n");
+  fprintf(stderr,"  -shear_modulus <Pa>     shear modulus G (default 32.04e9)\n");
+  fprintf(stderr,"  -s_wave_speed <m/s>     shear wave speed c_s, sets radiation damping (default 3464)\n");
+  fprintf(stderr,"  -f0 <val>               reference friction f0 (default 0.6)\n");
+  fprintf(stderr,"  -dc <m>                 characteristic slip distance D_c (default 0.008)\n");
+  fprintf(stderr,"  -v0 <m/s>               reference velocity (default 1e-6)\n");
+  fprintf(stderr,"  -vpl <m/s>              plate loading rate (default 1e-9)\n");
+  fprintf(stderr,"  -rsf_slip_mode <0|1>    slip direction: 0 strike (default), 1 dip (thrust/normal)\n");
+  fprintf(stderr,"\n");
 
-  printf("initial conditions\n");
-  printf("  -sigma_init <Pa>        uniform initial normal stress (default 50e6)\n");
-  printf("  -tau_init <Pa>          uniform initial shear stress (default f0*sigma_init + eta*vel_init)\n");
-  printf("  -vel_init <m/s>         uniform initial slip rate (default vpl)\n");
-  printf("  -rand_amp <val>         random initial-state multiplier amplitude (default 0)\n");
-  printf("\n");
+  fprintf(stderr,"initial conditions\n");
+  fprintf(stderr,"  -sigma_init <Pa>        uniform initial normal stress (default 50e6)\n");
+  fprintf(stderr,"  -tau_init <Pa>          uniform initial shear stress (default f0*sigma_init + eta*vel_init)\n");
+  fprintf(stderr,"  -vel_init <m/s>         uniform initial slip rate (default vpl)\n");
+  fprintf(stderr,"  -rand_amp <val>         random initial-state multiplier amplitude (default 0)\n");
+  fprintf(stderr,"\n");
 
-  printf("normal-stress evolution and limiter (for dip slip / nonplanar faults)\n");
-  printf("  -calc_sigma_dot <bool>  evolve normal stress via the In matrix (default 0 = off)\n");
-  printf("  -limit_sigma <bool>     clamp sigma to [min,max], as HBI limitsigma (default 0)\n");
-  printf("  -min_sigma <Pa>         limiter floor (default 1e6)\n");
-  printf("  -max_sigma <Pa>         limiter ceiling (default 300e6)\n");
-  printf("\n");
+  fprintf(stderr,"normal-stress evolution and limiter (for dip slip / nonplanar faults)\n");
+  fprintf(stderr,"  -calc_sigma_dot <bool>  evolve normal stress via the In matrix (default 0 = off)\n");
+  fprintf(stderr,"  -limit_sigma <bool>     clamp sigma to [min,max], as HBI limitsigma (default 0)\n");
+  fprintf(stderr,"  -min_sigma <Pa>         limiter floor (default 1e6)\n");
+  fprintf(stderr,"  -max_sigma <Pa>         limiter ceiling (default 300e6)\n");
+  fprintf(stderr,"\n");
 
-  printf("state evolution\n");
-  printf("  -state_law <0..4>       state evolution law: 0 aging (default), 1 slip, 2 PRZ,\n");
-  printf("                          3 Sato-type, 4 Kato and Tullis composite\n");
-  printf("                          aging: d psi/dt = b/dc (v0 exp((f0-psi)/b) - |v|)\n");
-  printf("                          slip:  d psi/dt = -(|v|/dc) (psi - psi_ss)\n");
-  printf("                          with psi_ss = f0 - b ln(|v|/v0); both share this\n");
-  printf("                          steady state, i.e. f_ss = f0 + (a-b) ln(|v|/v0)\n");
-  printf("                          PRZ (Perrin, Rice and Zheng 1995), theta form\n");
-  printf("                          d theta/dt = 1/2 (1 - (|v| theta/dc)^2):\n");
-  printf("                          d psi/dt = b/(2 dc) (v0 exp((f0-psi)/b)\n");
-  printf("                                              - v^2/v0 exp((psi-f0)/b))\n");
-  printf("                          aging, slip and PRZ share psi_ss = f0 - b ln(|v|/v0)\n");
-  printf("                          and the same linearization: comparable at equal dc\n");
-  printf("                          Sato (3) and Kato-Tullis (4) are the slip law plus a\n");
-  printf("                          gated aging healing term, d theta/dt = gate\n");
-  printf("                          - Omega ln Omega, Omega = |v| theta/dc, with\n");
-  printf("                          gate = exp(-Omega/beta), beta = 1e-2      (Sato)\n");
-  printf("                          gate = exp(-|v|/Vc),     Vc   = v0/100    (Kato-Tullis)\n");
-  printf("                          beta and Vc are fixed in rsf_init.c for now. NOTE the\n");
-  printf("                          Kato-Tullis gate does not vanish at |v| << Vc, which\n");
-  printf("                          raises psi_ss there by b*W(1) = 0.567 b (its known\n");
-  printf("                          steady-state offset); Sato (3) has no such shift\n");
-  printf("  -vmin_state <m/s>       |v| floor in the slip law's ln(|v|/v0) (default 1e-16)\n");
-  printf("\n");
+  fprintf(stderr,"state evolution\n");
+  fprintf(stderr,"  -state_law n            state evolution law: %i aging (default), %i slip, %i PRZ,\n",
+	 RSF_AGING_LAW,RSF_SLIP_LAW,RSF_PRZ_LAW);
+  fprintf(stderr,"                          %i Sato-type, %i Kato and Tullis composite\n",RSF_SATO_LAW,RSF_KT_LAW);
+  fprintf(stderr,"                          aging: d psi/dt = b/dc (v0 exp((f0-psi)/b) - |v|)\n");
+  fprintf(stderr,"                          slip:  d psi/dt = -(|v|/dc) (psi - psi_ss)\n");
+  fprintf(stderr,"                          with psi_ss = f0 - b ln(|v|/v0); both share this\n");
+  fprintf(stderr,"                          steady state, i.e. f_ss = f0 + (a-b) ln(|v|/v0)\n");
+  fprintf(stderr,"                          PRZ (Perrin, Rice and Zheng 1995), theta form\n");
+  fprintf(stderr,"                          d theta/dt = 1/2 (1 - (|v| theta/dc)^2):\n");
+  fprintf(stderr,"                          d psi/dt = b/(2 dc) (v0 exp((f0-psi)/b)\n");
+  fprintf(stderr,"                                              - v^2/v0 exp((psi-f0)/b))\n");
+  fprintf(stderr,"                          aging, slip and PRZ share psi_ss = f0 - b ln(|v|/v0)\n");
+  fprintf(stderr,"                          and the same linearization: comparable at equal dc\n");
+  fprintf(stderr,"                          Sato and Kato-Tullis are the slip law plus a\n");
+  fprintf(stderr,"                          gated aging healing term, d theta/dt = gate\n");
+  fprintf(stderr,"                          - Omega ln Omega, Omega = |v| theta/dc, with\n");
+  fprintf(stderr,"                          gate = exp(-Omega/beta), beta = 1e-2      (Sato)\n");
+  fprintf(stderr,"                          gate = exp(-|v|/Vc),     Vc   = v0/100    (Kato-Tullis)\n");
+  fprintf(stderr,"                          beta and Vc are fixed in rsf_init.c for now. NOTE the\n");
+  fprintf(stderr,"                          Kato-Tullis gate does not vanish at |v| << Vc, which\n");
+  fprintf(stderr,"                          raises psi_ss there by b*W(1) = 0.567 b (its known\n");
+  fprintf(stderr,"                          steady-state offset); Sato has no such shift\n");
+  fprintf(stderr,"  -vmin_state <m/s>       |v| floor in the slip law's ln(|v|/v0) (default 1e-16)\n");
+  fprintf(stderr,"\n");
 
-  printf("time stepping\n");
-  printf("  -rtol <val>             ODE relative tolerance (default 1e-4)\n");
-  printf("  -atol_slip <m>          absolute tolerance for slip entries (default 1e-3)\n");
-  printf("  -dt_init <s>            initial step size (default 1)\n");
-  printf("  -dt_max <s>             maximum step size (default 1e10)\n");
-  printf("  -imex                   IMEX (ARKIMEX) integration: local state terms implicit,\n");
-  printf("                          stress transfer explicit; helps stiff laws (e.g. PRZ)\n");
-  printf("                          during coseismic phases (default off = explicit RK).\n");
-  printf("                          The stage solvers use the options prefix imex_ (e.g.\n");
-  printf("                          -imex_ksp_type); unprefixed ksp/pc/snes options,\n");
-  printf("                          including those from petsc_settings.yaml, do not\n");
-  printf("                          affect them.\n");
-  printf("  -stop_time_yr <yr>      integration stop time (default 3000)\n");
-  printf("\n");
+  fprintf(stderr,"time stepping\n");
+  fprintf(stderr,"  -rtol <val>             ODE relative tolerance (default 1e-4)\n");
+  fprintf(stderr,"  -atol_slip <m>          absolute tolerance for slip entries (default 1e-3)\n");
+  fprintf(stderr,"  -dt_init <s>            initial step size (default 1)\n");
+  fprintf(stderr,"  -dt_max <s>             maximum step size (default 1e10)\n");
+  fprintf(stderr,"  -imex                   IMEX (ARKIMEX) integration: local state terms implicit,\n");
+  fprintf(stderr,"                          stress transfer explicit; helps stiff laws (e.g. PRZ)\n");
+  fprintf(stderr,"                          during coseismic phases (default off = explicit RK).\n");
+  fprintf(stderr,"                          The stage solvers use the options prefix imex_ (e.g.\n");
+  fprintf(stderr,"                          -imex_ksp_type); unprefixed ksp/pc/snes options,\n");
+  fprintf(stderr,"                          including those from petsc_settings.yaml, do not\n");
+  fprintf(stderr,"                          affect them.\n");
+  fprintf(stderr,"  -stop_time_yr <yr>      integration stop time (default 3000)\n");
+  fprintf(stderr,"\n");
 
-  printf("monitor and event detection\n");
-  printf("  -print_interval_yr <yr> averaged-property output cadence (default 0.1)\n");
-  printf("  -dt_monitor_yr <yr>     monitor cadence, also caps the step (default 5)\n");
-  printf("  -rdx_monitor <val>      relative state-change monitor trigger (default 1e-4)\n");
-  printf("  -adx_monitor <val>      absolute state-change trigger, <=0 off (default 0)\n");
-  printf("  -monitor_tmin_yr <yr>   suppress monitor output before this time (default 0)\n");
-  printf("  -track_events <bool>    locate slip-rate threshold crossings (default 1 = on)\n");
-  printf("  -vel_event <m/s>        event onset threshold (default 1e-3)\n");
-  printf("  -vel_event_hyst <val>   arrest at vel_event*hyst, debounces (default 0.5)\n");
-  printf("  -event_tmin_yr <yr>     suppress event output before this time (default 0)\n");
-  printf("\n");
+  fprintf(stderr,"monitor and event detection\n");
+  fprintf(stderr,"  -print_interval_yr <yr> averaged-property output cadence (default 0.1)\n");
+  fprintf(stderr,"  -dt_monitor_yr <yr>     monitor cadence, also caps the step (default 5)\n");
+  fprintf(stderr,"  -rdx_monitor <val>      relative state-change monitor trigger (default 1e-4)\n");
+  fprintf(stderr,"  -adx_monitor <val>      absolute state-change trigger, <=0 off (default 0)\n");
+  fprintf(stderr,"  -monitor_tmin_yr <yr>   suppress monitor output before this time (default 0)\n");
+  fprintf(stderr,"  -track_events <bool>    locate slip-rate threshold crossings (default 1 = on)\n");
+  fprintf(stderr,"  -vel_event <m/s>        event onset threshold (default 1e-3)\n");
+  fprintf(stderr,"  -vel_event_hyst <val>   arrest at vel_event*hyst, debounces (default 0.5)\n");
+  fprintf(stderr,"  -event_tmin_yr <yr>     suppress event output before this time (default 0)\n");
+  fprintf(stderr,"\n");
 
-  printf("optional outputs (all default off)\n");
-  printf("  -rsf_catalog            write rsf_catalog.dat (per-event slip, drop, M0, Mw)\n");
-  printf("  -rsf_rupture_time       write rsf_rupture_time.dat (first event front times)\n");
-  printf("  -slip_budget            write rsf_slip_budget.dat (slip vs plate-rate reference)\n");
-  printf("  -rupture_vth <m/s>      rupture-front threshold for the two above (default vel_event)\n");
-  printf("  -field_step_interval <n> slip-rate field frame every n accepted steps (0 = off)\n");
-  printf("  -field_tmin_yr <yr>     suppress field frames before this time (default 0)\n");
-  printf("  -slip_line_dt_yr <yr>   tmp_rsf slip-line snapshot cadence (default off)\n");
-  printf("\n");
+  fprintf(stderr,"optional outputs (all default off)\n");
+  fprintf(stderr,"  -rsf_catalog            write rsf_catalog.dat (per-event slip, drop, M0, Mw)\n");
+  fprintf(stderr,"  -rsf_rupture_time       write rsf_rupture_time.dat (first event front times)\n");
+  fprintf(stderr,"  -slip_budget            write rsf_slip_budget.dat (slip vs plate-rate reference)\n");
+  fprintf(stderr,"  -rupture_vth <m/s>      rupture-front threshold for the two above (default vel_event)\n");
+  fprintf(stderr,"  -field_step_interval <n> slip-rate field frame every n accepted steps (0 = off)\n");
+  fprintf(stderr,"  -field_tmin_yr <yr>     suppress field frames before this time (default 0)\n");
+  fprintf(stderr,"  -slip_line_dt_yr <yr>   tmp_rsf slip-line snapshot cadence (default off)\n");
+  fprintf(stderr,"\n");
 
-  printf("interaction-matrix backend\n");
-  printf("  -use_hmatrix <0..5>     0 dense (default) 1 HTOOL 2 H2OPUS 3 HACApK 4 hmmvp 5 BigWham\n");
-  printf("  -hacapk_ztol <val>      HACApK compression tolerance\n");
-  printf("  -hacapk_eta <val>       HACApK admissibility eta\n");
-  printf("  -hacapk_inorm <int>     HACApK tolerance norm (1 = block-local)\n");
-  printf("  -hmmvp_tol <val>        hmmvp compression tolerance\n");
-  printf("  -hmmvp_eta <val>        hmmvp admissibility eta\n");
-  printf("  -hmmvp_inorm <int>      hmmvp tolerance norm\n");
-  printf("  -hmmvp_nthreads <int>   hmmvp compression threads\n");
-  printf("\n");
+  fprintf(stderr,"interaction-matrix backend\n");
+  fprintf(stderr,"  -use_hmatrix <0..5>     0 dense (default) 1 HTOOL 2 H2OPUS 3 HACApK 4 hmmvp 5 BigWham\n");
+  fprintf(stderr,"  -hacapk_ztol <val>      HACApK compression tolerance\n");
+  fprintf(stderr,"  -hacapk_eta <val>       HACApK admissibility eta\n");
+  fprintf(stderr,"  -hacapk_inorm <int>     HACApK tolerance norm (1 = block-local)\n");
+  fprintf(stderr,"  -hmmvp_tol <val>        hmmvp compression tolerance\n");
+  fprintf(stderr,"  -hmmvp_eta <val>        hmmvp admissibility eta\n");
+  fprintf(stderr,"  -hmmvp_inorm <int>      hmmvp tolerance norm\n");
+  fprintf(stderr,"  -hmmvp_nthreads <int>   hmmvp compression threads\n");
+  fprintf(stderr,"\n");
 
-  printf("relevant PETSc options (a full list is printed by -help)\n");
-  printf("  -ts_rk_type <3bs|5dp|...>   Runge-Kutta variant (rsf uses an explicit RK)\n");
-  printf("  -ts_adapt_type <basic|none> step-size adaptation\n");
-  printf("  -ts_max_steps <n>           cap the number of accepted steps\n");
-  printf("  -ts_monitor                 print time and step at every accepted step\n");
-  printf("  -log_view                   PETSc performance and timing summary at the end\n");
-  printf("  -mat_htool_compressor <SVD|fullACA|partialACA>  HTOOL compressor choice\n");
-  printf("  -options_file <file>        read options from a file (petsc_settings.yaml auto-read)\n");
-  printf("  -help                       PETSc's full registered-option dump\n");
-  printf("\n");
+  fprintf(stderr,"relevant PETSc options (a full list is printed by -help)\n");
+  fprintf(stderr,"  -ts_rk_type <3bs|5dp|...>   Runge-Kutta variant (rsf uses an explicit RK)\n");
+  fprintf(stderr,"  -ts_adapt_type <basic|none> step-size adaptation\n");
+  fprintf(stderr,"  -ts_max_steps <n>           cap the number of accepted steps\n");
+  fprintf(stderr,"  -ts_monitor                 print time and step at every accepted step\n");
+  fprintf(stderr,"  -log_view                   PETSc performance and timing summary at the end\n");
+  fprintf(stderr,"  -mat_htool_compressor <SVD|fullACA|partialACA>  HTOOL compressor choice\n");
+  fprintf(stderr,"  -options_file <file>        read options from a file (petsc_settings.yaml auto-read)\n");
+  fprintf(stderr,"  -help                       PETSc's full registered-option dump\n");
+  fprintf(stderr,"\n");
 
-  printf("output files\n");
-  printf("  rsf_monitor.dat         time series on the adaptive monitor cadence (-dt_monitor,\n");
-  printf("                          -adx_monitor, -rdx_monitor): step, time[s], time[yr], dt[s],\n");
-  printf("                          log10(max|v|), mean_slip, mean_mu, max_sigma, min_sigma.\n");
-  printf("                          Flushed as it is written\n");
-  printf("  rsf_vel.times           one row per field frame (-field_step_interval): frame, step,\n");
-  printf("                          time[yr], time[s], log10(max|v|), mean|v|, std|v|, min|v|,\n");
-  printf("                          mean_slip. The |v| statistics are slip SPEEDS (v is signed).\n");
-  printf("                          This is the index for the tmp_rsf/rsf_vel.gGGG.NNNNNN.bin\n");
-  printf("                          frames and replaces the former rsf_stats.dat\n");
-  printf("  rsf_events.dat          one row per slip-rate threshold crossing (-vel_event)\n");
-  printf("  rsf_catalog.dat         one row per completed event (with -rsf_catalog)\n");
-  printf("  rsf_geom.gGGG.dat       per-group patch geometry for the field frames\n");
-  printf("\n");
+  fprintf(stderr,"output files\n");
+  fprintf(stderr,"  rsf_monitor.dat         time series on the adaptive monitor cadence (-dt_monitor,\n");
+  fprintf(stderr,"                          -adx_monitor, -rdx_monitor): step, time[s], time[yr], dt[s],\n");
+  fprintf(stderr,"                          log10(max|v|), mean_slip, mean_mu, max_sigma, min_sigma.\n");
+  fprintf(stderr,"                          Flushed as it is written\n");
+  fprintf(stderr,"  rsf_vel.times           one row per field frame (-field_step_interval): frame, step,\n");
+  fprintf(stderr,"                          time[yr], time[s], log10(max|v|), mean|v|, std|v|, min|v|,\n");
+  fprintf(stderr,"                          mean_slip. The |v| statistics are slip SPEEDS (v is signed).\n");
+  fprintf(stderr,"                          This is the index for the tmp_rsf/rsf_vel.gGGG.NNNNNN.bin\n");
+  fprintf(stderr,"                          frames and replaces the former rsf_stats.dat\n");
+  fprintf(stderr,"  rsf_events.dat          one row per slip-rate threshold crossing (-vel_event)\n");
+  fprintf(stderr,"  rsf_catalog.dat         one row per completed event (with -rsf_catalog)\n");
+  fprintf(stderr,"  rsf_geom.gGGG.dat       per-group patch geometry for the field frames\n");
+  fprintf(stderr,"\n");
 
-  printf("examples\n");
-  printf("  strike-slip BP5 at 2 km, dense, with an event catalog:\n");
-  printf("    %s -geom_file geom_bp5_2km.in -rsf_file rsf_bp5_2km.dat \\\n",prog);
-  printf("       -rsf_ic_file ic_bp5_2km.in -rsf_dc_file dc_bp5_2km.in \\\n");
-  printf("       -sigma_init 25e6 -dc 0.14 -stop_time_yr 240 -rsf_catalog\n");
-  printf("  dip-slip thrust with evolving normal stress, hmmvp backend:\n");
-  printf("    %s -geom_file geom_thrust.in -rsf_file rsf_thrust.dat -rsf_ic_file ic_thrust.in \\\n",prog);
-  printf("       -sigma_init 58e6 -dc 0.02 -rsf_slip_mode 1 -calc_sigma_dot -limit_sigma \\\n");
-  printf("       -use_hmatrix 4 -hmmvp_tol 1e-4 -rsf_catalog\n");
-  printf("\n");
+  fprintf(stderr,"examples\n");
+  fprintf(stderr,"  strike-slip BP5 at 2 km, dense, with an event catalog:\n");
+  fprintf(stderr,"    %s -geom_file geom_bp5_2km.in -rsf_file rsf_bp5_2km.dat \\\n",prog);
+  fprintf(stderr,"       -rsf_ic_file ic_bp5_2km.in -rsf_dc_file dc_bp5_2km.in \\\n");
+  fprintf(stderr,"       -sigma_init 25e6 -dc 0.14 -stop_time_yr 240 -rsf_catalog\n");
+  fprintf(stderr,"  dip-slip thrust with evolving normal stress, hmmvp backend:\n");
+  fprintf(stderr,"    %s -geom_file geom_thrust.in -rsf_file rsf_thrust.dat -rsf_ic_file ic_thrust.in \\\n",prog);
+  fprintf(stderr,"       -sigma_init 58e6 -dc 0.02 -rsf_slip_mode 1 -calc_sigma_dot -limit_sigma \\\n");
+  fprintf(stderr,"       -use_hmatrix 4 -hmmvp_tol 1e-4 -rsf_catalog\n");
+  fprintf(stderr,"\n");
 }
 
 /*
@@ -231,7 +234,8 @@ PetscErrorCode rsf_get_settings(int argc,char **argv,struct interact_ctx *par,
   PetscReal sigma_init,tau_init,vel_init,rtol,atol_slip,dt_init,dt_max,rand_amp,tmp;
   PetscReal dt_monitor,rdx_monitor,adx_monitor,monitor_tmin,vel_event,vel_event_hyst,event_tmin;
   PetscBool track_events;
-  char geom_file[STRLEN]="geom.in",rsf_file[STRLEN]="rsf.dat",rsf_ic_file[STRLEN]="",rsf_dc_file[STRLEN]="",rsf_sigma_file[STRLEN]="";
+  char geom_file[STRLEN]="geom.in",rsf_file[STRLEN]="rsf.dat",rsf_ic_file[STRLEN]="",
+    rsf_dc_file[STRLEN]="",rsf_sigma_file[STRLEN]="";
   PetscBool have_ic=PETSC_FALSE,have_dc=PETSC_FALSE,have_sigma=PETSC_FALSE;
   PetscBool read_value;
   struct rsf_vars *rsf;
@@ -396,7 +400,7 @@ PetscErrorCode rsf_get_settings(int argc,char **argv,struct interact_ctx *par,
   PetscCall(PetscOptionsGetBool(NULL,NULL,"-limit_sigma",&rsf->limit_sigma,NULL));
   PetscCall(PetscOptionsGetReal(NULL,NULL,"-min_sigma",&rsf->min_sigma,NULL)); /* [Pa] */
   PetscCall(PetscOptionsGetReal(NULL,NULL,"-max_sigma",&rsf->max_sigma,NULL)); /* [Pa] */
-  /* state evolution law: 0 aging (default), 1 slip */
+  /* state evolution law: 1,2,3,4,5, 1 default ageing */
   PetscCall(PetscOptionsGetInt(NULL,NULL,"-state_law",&rsf->state_law,NULL));
   PetscCall(PetscOptionsGetReal(NULL,NULL,"-vmin_state",&rsf->vmin_state,NULL)); /* [m/s] */
   if((rsf->state_law < RSF_AGING_LAW) || (rsf->state_law > RSF_KT_LAW)){
