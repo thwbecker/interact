@@ -13,16 +13,23 @@
 #
 bindir=../bin
 geom=geom_slider10.in		# 10 km patch, half-lengths in meters
-rsf=rsf_slider.in		# a = 0.004, b = 0.03 (BP5 VW values)
+# lab inspired
+rsf=rsf_slider.in		# a = 0.01, b = 0.015
+echo 0.01 0.015 > $rsf
+pars="-f0 0.6 -dc 0.008 -vpl 1e-9 -v0 1e-6 -sigma_init 50e6"
+#
 tmax=450			# [yr]
-maxsteps=5000000
-common="-shear_modulus 3.204e10 -s_wave_speed 3464 -f0 0.6 -dc 0.14 -vpl 1e-9 -v0 1e-6 -sigma_init 25e6 -rsf_catalog -rupture_vth 0.1 -ts_max_reject 200"
+maxsteps=200000		# generous (~15x the costliest legitimate run);
+				# also terminates the domain-check rejection
+				# storms of some imex runs within seconds
+				# instead of letting them grind
+common="-shear_modulus 3.204e10 $pars -s_wave_speed 3464 -rsf_catalog -rupture_vth 0.1"
 #
 # law variants: label, -state_law, extra flags
-variants="aging:1: slip:2: prz:3: przn1:3:-prz_norm,1 sato:4: kt:5:"
+variants="aging:1: slip:2: prz:3: sato:4: kt:5:"
 # solvers: label, flags (imex stage solvers keep their built-in defaults)
 solvers="3bs:-ts_rk_type,3bs imex:-imex"
-rtols="1e-3 1e-4 1e-5 1e-6"
+rtols="1e-4 1e-5 1e-6"
 # reference: 5dp at tight tolerance, one per law variant
 ref_rtol=1e-9
 #
@@ -35,7 +42,7 @@ for v in $variants;do
     d=results/${lab}_ref
     if [ ! -s $d/DONE ];then
 	mkdir -p $d
-	(cd $d;timeout 130 mpirun --allow-run-as-root -np 1 ../../$bindir/rsf_solve -geom_file ../../$geom \
+	(cd $d;timeout 130 mpirun  -np 1 ../../$bindir/rsf_solve -geom_file ../../$geom \
 	     -rsf_file ../../$rsf -state_law $law $extra $common \
 	     -ts_rk_type 5dp -rtol $ref_rtol -stop_time_yr $tmax \
 	     -ts_max_steps $maxsteps > log.dat 2>&1; echo $? > DONE)
@@ -50,7 +57,7 @@ for v in $variants;do
 	    d=results/${lab}_${slab}_${rtol}
 	    if [ ! -s $d/DONE ];then
 		mkdir -p $d
-		(cd $d;timeout 130 mpirun --allow-run-as-root -np 1 ../../$bindir/rsf_solve -geom_file ../../$geom \
+		(cd $d;timeout 130 mpirun  -np 1 ../../$bindir/rsf_solve -geom_file ../../$geom \
 		     -rsf_file ../../$rsf -state_law $law $extra $common \
 		     $sflag -rtol $rtol -stop_time_yr $tmax \
 		     -ts_max_steps $maxsteps > log.dat 2>&1; echo $? > DONE)

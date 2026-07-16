@@ -1,0 +1,22 @@
+#!/bin/bash
+
+ofile=slider.ps
+reg=-R200/270/-16/1
+#reg=-R100/450/-65/1
+proj=-JX7/4
+eps=1e-6
+psbasemap $reg $proj -K -P -Ba5f1:"time [years]":/a5f1:"@~\341@~log@-10@-(v [m/s])@~\361@~": > $ofile
+pc=1;
+yl=0;xl=202
+for sl in aging slip prz sato kt;do
+    col=`platecolor $pc`
+    gawk '{if(NR>1)print($3,$5)}' "results/"$sl"_3bs_"$eps"/rsf_monitor.dat" | \
+	psxy -W1,$col $reg $proj -O -K >> $ofile
+    gawk '{if(NR>1)print($3,$5)}' "results/"$sl"_imex_"$eps"/rsf_monitor.dat" | \
+	psxy -W3,$col,. $reg $proj -O -K >> $ofile
+    echo $xl $yl 18 0 29 LM $sl | pstext -R -J -O -K -F+f$col >> $ofile
+    ((yl=yl-2))
+    ((pc=pc+1))
+done
+psxy -T -O >> $ofile
+modifybb $ofile 1
