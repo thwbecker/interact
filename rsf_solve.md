@@ -746,7 +746,22 @@ something to be filtered away in post-processing.
 
 `-imex` switches the time integrator from the default explicit embedded
 Runge-Kutta (TSRK) to a PETSc additive Runge-Kutta IMEX method (TSARKIMEX,
-type 3, L-stable third order).  The ODE system is unchanged: the implicit and
+tableau `l2`: L-stable, second order, stage order 2; `-ts_arkimex_type`
+overrides).  The tableau default matters for CORRECTNESS here, not just
+efficiency: the nominally more accurate ARKIMEX3 suffers stiff stage-order
+reduction on these stage problems, its embedded error estimator
+underestimates the state-variable error through fast transitions, and the
+controller then accepts steps whose true error is far above the requested
+tolerance.  On the single-patch slider benchmark at rtol 1e-6 this cost a
+factor of about 50 in event-time accuracy relative to `l2` (about 8e-2
+versus 2e-3 yr RMS, uniformly across the evolution laws), ARKIMEX4 was worse
+still, and ars443 numerically quenched the stick-slip cycle outright (seven
+events became zero); see slider/README.md.  The price of `l2` is second
+order: at rtol 1e-4 on the BP5 2 km aging problem it needs about ten times
+the steps of ARKIMEX3 for the same (correct) first event, which further
+reinforces that the default explicit path remains the production tool and
+`-imex` is infrastructure for stiff local physics.  The ODE system is
+unchanged: the implicit and
 explicit parts sum to the same right hand side as `rsf_ODE_RHSFunction`, so
 the option changes the integrator, not the physics.  The motivation is the
 state-evolution stiffness of some laws, most severely PRZ (`-state_law 3`),

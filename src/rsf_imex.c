@@ -267,7 +267,21 @@ PetscErrorCode rsf_IMEX_setup(TS ts, struct interact_ctx *par, Mat *Jimex)
   PetscCall(MatSetOption(J,MAT_NO_OFF_PROC_ENTRIES,PETSC_TRUE));
   /*  */
   PetscCall(TSSetType(ts,TSARKIMEX));
-  PetscCall(TSARKIMEXSetType(ts,TSARKIMEX3)); /* L-stable 3rd order default, -ts_arkimex_type to override */
+  /* tableau default: ARKIMEX L2 (L-stable, 2nd order, stage order 2).
+     The nominally more accurate ARKIMEX3 suffers stiff stage-order
+     reduction on the rate-state stage problems: its embedded error
+     estimator underestimates the state-variable error through fast
+     transitions, so the controller accepts steps whose true error is
+     far above the requested tolerance.  On the single-patch slider
+     benchmark at rtol 1e-6 this cost a factor of about 50 in
+     event-time accuracy relative to L2 (about 8e-2 versus 2e-3 yr RMS,
+     uniformly across the evolution laws), with ARKIMEX4 worse still
+     and ars443 numerically quenching the stick-slip cycle outright, so
+     tableau choice here affects correctness, not just efficiency.
+     L2 needs more steps (2nd order), which is the acceptable
+     direction of the trade-off for a default; -ts_arkimex_type
+     overrides for experimentation.  See slider/README.md. */
+  PetscCall(TSARKIMEXSetType(ts,TSARKIMEXL2));
   PetscCall(TSSetRHSFunction(ts,NULL,rsf_IMEX_RHSFunction,par));
   PetscCall(TSSetIFunction(ts,NULL,rsf_IMEX_IFunction,par));
   PetscCall(TSSetIJacobian(ts,J,J,rsf_IMEX_IJacobian,par));
@@ -294,7 +308,7 @@ PetscErrorCode rsf_IMEX_setup(TS ts, struct interact_ctx *par, Mat *Jimex)
      iterative Krylov solve over the full elastic operator */
   PetscCall(rsf_IMEX_set_stage_solver(ts));
   HEADNODE{
-    fprintf(stderr,"rsf_IMEX_setup: IMEX (ARKIMEX) time integration: implicit local state terms, explicit stress transfer\n");
+    fprintf(stderr,"rsf_IMEX_setup: IMEX (ARKIMEX, tableau l2) time integration: implicit local state terms, explicit stress transfer\n");
   }
   *Jimex = J;
   PetscFunctionReturn(PETSC_SUCCESS);

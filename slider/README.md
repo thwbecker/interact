@@ -62,6 +62,22 @@ rejection storm, about 2e5 rejected attempts per 1e2 accepted steps, which
 appears not to count toward any PETSc rejection limit; the step ceiling in
 run_slider now terminates such runs within seconds and the analysis flags
 them), and the PRZ IMEX runs timed out mid-series at all tolerances tried.
+
+Two later findings from runs at the lab-inspired parameter set (a = 0.010,
+b = 0.015, dc = 0.008 m, sigma = 50 MPa), where all laws cycle with about
+56 to 67 yr recurrence and the IMEX nucleation storms of the BP5 parameters
+do not occur.  First, the ARKIMEX tableau controls IMEX correctness on this
+problem: at rtol 1e-6 the RMS event-time error was about 8e-2 yr with
+ARKIMEX3 (uniformly across laws; the embedded estimator is deceived by stiff
+stage-order reduction and the controller accepts inaccurate steps), worse
+with ARKIMEX4, about 2e-3 yr with `l2` (on par with explicit 3bs at the same
+tolerance, at second-order step counts), and ars443 numerically quenched the
+stick-slip cycle entirely.  The rsf_solve `-imex` default is therefore `l2`.
+Second, on this slider the explicit 5dp method dominated 3bs in
+work-precision (about 3x fewer steps and 3 to 25x smaller phase error at
+rtol 1e-6, law-dependent); note however that on the BP5 problem 3bs has been
+found preferable in practice, so this ranking is configuration-specific and
+should be rechecked per problem rather than generalized.
 This reproduces, on the simplest possible system and for the AGING law, the
 stage-problem pathology diagnosed on BP5: without the cell's elastic
 self-stiffness in the implicit part, the per-cell stage problem loses its
