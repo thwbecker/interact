@@ -81,13 +81,27 @@ PetscReal rsf_state_rate(PetscInt i, PetscReal psi, PetscReal vin,
       *dSdvabs = (floored)?(0.0):(-(psi - psi_ss)/D - b/D);
     break;
   case RSF_PRZ_LAW:
+    /* default normalization d theta/dt = (1 - Omega^2)/2: Omega_ss = 1
+       AND the linearized relaxation about steady state matches the
+       aging and slip laws (same h*), but the rest healing rate is 1/2
+       of aging.  -prz_norm 1 selects d theta/dt = 1 - Omega^2 instead:
+       rest healing matches aging (steady state is still Omega = 1),
+       at the cost of DOUBLING the linearized relaxation rate, i.e. an
+       effective dc/2 for stability and nucleation.  No scaling matches
+       aging in all three properties at once; see rsf_solve.md */
     vabs = fabs(vin);
     epsi  = PetscExpReal((psi - rsf->f0)/b); /* exp((psi-f0)/b) */
     S = (b/(2.0*D)) * (rsf->v0/epsi - (vabs*vabs/rsf->v0)*epsi);
-    if(dSdpsi)
+    if(rsf->prz_norm == 1)
+      S *= 2.0;
+    if(dSdpsi){
       *dSdpsi = -(1.0/(2.0*D)) * (rsf->v0/epsi + (vabs*vabs/rsf->v0)*epsi);
-    if(dSdvabs)
+      if(rsf->prz_norm == 1)*dSdpsi *= 2.0;
+    }
+    if(dSdvabs){
       *dSdvabs = -(b/D) * (vabs/rsf->v0) * epsi;
+      if(rsf->prz_norm == 1)*dSdvabs *= 2.0;
+    }
     break;
   case RSF_SATO_LAW:
   case RSF_KT_LAW:

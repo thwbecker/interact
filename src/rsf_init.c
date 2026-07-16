@@ -49,6 +49,7 @@ void init_medium_rsf(struct med *medium)
      implementation (Omega threshold 0.01, and Vc = v0/100). Not exposed as
      options for now; edit here if they need to change */
   rsf->sato_beta = 1e-2;
+  rsf->prz_norm = 0;
   rsf->kt_vc     = -1.0;		/* set from v0 below, after -v0 has been read */
   rsf->min_sigma = 1e6;
   rsf->max_sigma = 300e6; /* Pa */
@@ -110,6 +111,9 @@ void rsf_print_help(const char *prog)
   fprintf(stderr,"                          aging: d psi/dt = b/dc (v0 exp((f0-psi)/b) - |v|)\n");
   fprintf(stderr,"                          slip:  d psi/dt = -(|v|/dc) (psi - psi_ss)\n");
   fprintf(stderr,"                          with psi_ss = f0 - b ln(|v|/v0); both share this\n");
+  fprintf(stderr,"  -prz_norm <0|1>         PRZ normalization: 0 (default) (1-Omega^2)/2 (matches\n");
+  fprintf(stderr,"                          aging h*, half its rest healing); 1 gives 1-Omega^2\n");
+  fprintf(stderr,"                          (matches aging rest healing, halves h*)\n");
   fprintf(stderr,"                          steady state, i.e. f_ss = f0 + (a-b) ln(|v|/v0)\n");
   fprintf(stderr,"                          PRZ (Perrin, Rice and Zheng 1995), theta form\n");
   fprintf(stderr,"                          d theta/dt = 1/2 (1 - (|v| theta/dc)^2):\n");
@@ -402,6 +406,8 @@ PetscErrorCode rsf_get_settings(int argc,char **argv,struct interact_ctx *par,
   PetscCall(PetscOptionsGetReal(NULL,NULL,"-max_sigma",&rsf->max_sigma,NULL)); /* [Pa] */
   /* state evolution law: 1,2,3,4,5, 1 default ageing */
   PetscCall(PetscOptionsGetInt(NULL,NULL,"-state_law",&rsf->state_law,NULL));
+  /* PRZ normalization variant, see rsf_engine.c and rsf_solve.md */
+  PetscCall(PetscOptionsGetInt(NULL,NULL,"-prz_norm",&rsf->prz_norm,NULL));
   PetscCall(PetscOptionsGetReal(NULL,NULL,"-vmin_state",&rsf->vmin_state,NULL)); /* [m/s] */
   if((rsf->state_law < RSF_AGING_LAW) || (rsf->state_law > RSF_KT_LAW)){
     if(medium->comm_rank == 0)
