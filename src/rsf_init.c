@@ -133,7 +133,11 @@ void rsf_print_help(const char *prog)
   printf("  -dt_max <s>             maximum step size (default 1e10)\n");
   printf("  -imex                   IMEX (ARKIMEX) integration: local state terms implicit,\n");
   printf("                          stress transfer explicit; helps stiff laws (e.g. PRZ)\n");
-  printf("                          during coseismic phases (default off = explicit RK)\n");
+  printf("                          during coseismic phases (default off = explicit RK).\n");
+  printf("                          The stage solvers use the options prefix imex_ (e.g.\n");
+  printf("                          -imex_ksp_type); unprefixed ksp/pc/snes options,\n");
+  printf("                          including those from petsc_settings.yaml, do not\n");
+  printf("                          affect them.\n");
   printf("  -stop_time_yr <yr>      integration stop time (default 3000)\n");
   printf("\n");
 

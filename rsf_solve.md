@@ -33,13 +33,23 @@ rsf state is global.
 |----|----|----|
 | `src/rsf_solve.c` | driver | `main`; `rsf_solve_run` (geometry, interaction matrices, backslip loading, initial conditions, TS setup, solve, teardown); `rsf_event_function` (slip-rate threshold crossing for event onset/arrest) |
 | `src/rsf_init.c` | setup | `init_medium_rsf` (allocate `medium->rsf`, set `dim`); `rsf_get_settings` (all option parsing, unit conversions, defaults, H-matrix backend selection) |
-| `src/rsf_engine.c` | physics | `vel_from_rsf` (invert the regularized friction law for slip rate); `rsf_ODE_RHSFunction` (the quasi-dynamic aging-law RHS, where the `Is` matvec and the backslip `sinc` loading enter); `rsf_domain_check` (per-step validity gate) |
+| `src/rsf_engine.c` | physics | `vel_from_rsf` (invert the regularized friction law for slip rate); `rsf_state_rate` (the state evolution rate for all five laws, with optional analytic partial derivatives; the single place a new law is added, shared by both integrator paths); `rsf_compute_vel_and_stressing` (fill the slip-rate vector from the state and apply the `Is` and, if enabled, `In` matvecs; shared by both paths); `rsf_ODE_RHSFunction` (the monolithic quasi-dynamic RHS used by the default explicit integrator, where the backslip `sinc` loading enters); `rsf_domain_check` (per-step validity gate) |
+| `src/rsf_imex.c` | IMEX variant (`-imex`) | `rsf_IMEX_RHSFunction` (explicit part: matvec stressing rates and the non-stiff local terms); `rsf_IMEX_IFunction` (implicit part: state evolution and the radiation-damping correction, purely local, no matvec); `rsf_IMEX_IJacobian` (exact analytic per-cell block Jacobian); `rsf_IMEX_setup` (switch a TS to ARKIMEX with these functions, create the block-diagonal Jacobian matrix, set the `imex_` options prefix and stage-solver defaults); `rsf_IMEX_set_stage_solver` (assert the exact block stage solve after the options pass) |
 | `src/rsf_output.c` | output | `rsf_init_monitor_and_event` and `rsf_finalize_monitor_and_event` (set up and tear down the TS monitor, event detector, gather, and output files); `rsf_TS_Monitor` (state-change logging to `rsf_monitor.dat`, per-frame field output and its `rsf_vel.times` index, optional per-group GMT slip-rate fields); `rsf_post_event`; and the field-output group helpers (`rsf_build_groups`, `rsf_group_coords`, `rsf_write_group_geometry`, `rsf_free_groups`, `rsf_dcmp`) |
 | `src/includes/rsf.h` | header | the output/grid/settings structs (`rsf_out_ctx`, `rsf_group_grid`, `rsf_solve_settings`), the rsf prototypes, and the single shared `rsf_par_static` (the geometry pointer the domain check reads) |
 
 The build links all four objects via `RSF_SOLVE_OBJS` in the makefile:
 
-    RSF_SOLVE_OBJS = $(ODIR)/rsf_solve.o $(ODIR)/rsf_engine.o $(ODIR)/rsf_init.o $(ODIR)/rsf_output.o
+    RSF_SOLVE_OBJS = $(ODIR)/rsf_solve.o $(ODIR)/rsf_engine.o $(ODIR)/rsf_imex.o $(ODIR)/rsf_init.o $(ODIR)/rsf_output.o
+
+(`rsf_imex.o` was added with the IMEX option, 2026-07, see the IMEX section
+below.  The state-law formulas that used to be inlined in the RHS moved to the
+shared `rsf_state_rate` at the same time; the default explicit path calls the
+same helper.  The refactor was verified to be bit-identical for the aging law
+over a 0.2 yr BP5 test; the PRZ trajectory was identical for 297 monitor rows
+before diverging by one unit in the ninth digit of dt, consistent with a
+floating-point contraction difference from the function extraction rather than
+a formula change.)
 
 One build caveat worth flagging: this split also moved three `Vec` fields out of
 `struct med` and added the `medium->rsf` pointer, which shifts the offsets of
@@ -71,8 +81,15 @@ The groups, in the order `-h` prints them, are:
 - initial conditions: `-sigma_init`, `-tau_init`, `-vel_init`, `-rand_amp`.
 - normal-stress evolution and limiter: `-calc_sigma_dot`, `-limit_sigma`,
   `-min_sigma`, `-max_sigma`.
-- state evolution: `-state_law` (0 aging, the default, 1 slip) and `-vmin_state`.
-- time stepping: `-rtol`, `-atol_slip`, `-dt_init`, `-dt_max`, `-stop_time_yr`.
+- state evolution: `-state_law` (0 aging, the default; 1 slip; 2 PRZ; 3 Sato;
+  4 Kato and Tullis; see the law notes at the end of this file) and
+  `-vmin_state`.  The gated-law parameters (sato_beta, kt_vc) currently have
+  compile-time defaults only (1e-2 and 1e-2 v0) and are not yet runtime
+  options.
+- time stepping: `-rtol`, `-atol_slip`, `-dt_init`, `-dt_max`, `-stop_time_yr`,
+  and `-imex` to switch from the default explicit Runge-Kutta to the IMEX
+  (ARKIMEX) formulation (see the IMEX section below; its stage solvers are
+  tunable under the `imex_` options prefix, e.g. `-imex_ksp_type`).
 - monitor and event detection: `-print_interval_yr`, `-dt_monitor_yr`,
   `-rdx_monitor`, `-adx_monitor`, `-monitor_tmin_yr`, `-track_events`,
   `-vel_event`, `-vel_event_hyst`, `-event_tmin_yr`.
@@ -700,6 +717,110 @@ catalog, and to be aware that a mesh that looks adequate under the aging law may
 not be under the slip law, which localizes more strongly. Fragmented or one-cell
 events in the catalog should be read as a resolution diagnostic rather than as
 something to be filtered away in post-processing.
+
+---
+
+## Task 3 (2026-07): IMEX time integration (`-imex`)
+
+`-imex` switches the time integrator from the default explicit embedded
+Runge-Kutta (TSRK) to a PETSc additive Runge-Kutta IMEX method (TSARKIMEX,
+type 3, L-stable third order).  The ODE system is unchanged: the implicit and
+explicit parts sum to the same right hand side as `rsf_ODE_RHSFunction`, so
+the option changes the integrator, not the physics.  The motivation is the
+state-evolution stiffness of some laws, most severely PRZ (`-state_law 2`),
+whose theta rate grows like Omega^2 above steady state: at rupture fronts the
+state lags steady state by many e-folds regardless of law, and the stable
+EXPLICIT step then collapses like 2 dc/(|v| Omega) (about 3e-8 s in the BP5
+tests at 1 to 2 km), while the nonlocal stress transfer is not stiff on those
+scales.
+
+### The split
+
+Per cell, with X = (psi, tau, sigma, slip), v the regularized flow-law slip
+rate, eta = G/(2 cs), and denom = 1 + eta dv/dtau:
+
+- explicit `G` (in `rsf_IMEX_RHSFunction`): the `Is`/`In` matvec stressing
+  rates plus backslip, the dv/dsigma damping term, and the slip rate;
+- implicit `F = Xdot - Fimpl` (in `rsf_IMEX_IFunction`): the state rate
+  S(psi, |v|) and the radiation-damping correction -eta (dv/dpsi) S / denom.
+
+The implicit part is purely local: the IFunction performs no matvec, and the
+IJacobian (`rsf_IMEX_IJacobian`) is analytic, exact (verified against finite
+differences to about six digits, including at states where the stage solves
+are difficult; `-imex_check_jacobian` re-runs that verification), and block
+diagonal with one small block per cell.  Block Jacobi with ILU(0) is an exact
+factorization for this sparsity pattern, so the default stage linear solve
+(`preonly` + `bjacobi`) is direct, costs per-cell work only, and adds no
+matvecs.
+
+### Options and the `imex_` prefix
+
+- `-imex` enables the formulation (default off).
+- The stage solvers (SNES, KSP, PC) live under the options prefix `imex_`:
+  deliberate overrides are `-imex_snes_type`, `-imex_ksp_type`,
+  `-imex_pc_type`, `-imex_snes_max_it`, and so on.  UNPREFIXED solver options
+  do not reach them.  This is intentional: `petsc_settings.yaml` is read
+  automatically and its entries are indistinguishable from command-line
+  options, and a yaml tuned for the dense solves of the interact main program
+  (`ksp_type fgmres`, `pc_type jacobi`, `ksp_rtol 1e-8`) was observed to
+  silently replace the exact block stage solve, producing about 780 linear
+  iterations per Newton solve, 594 nonlinear failures, and a factor of order
+  30 to 100 slowdown of an aging BP5 2 km run on 32 cores (8.1e6 linear
+  iterations, 146 s, versus seconds when configured as intended).  With the
+  prefix, the same yaml is harmless.  A correctly configured run reports
+  `total number of linear solver iterations` EQUAL to the nonlinear count in
+  the TS summary; a larger ratio means the stage solve has been overridden.
+- ARKIMEX flavor and adaptivity remain tunable through the usual TS options
+  (`-ts_arkimex_type`, `-ts_adapt_type`, ...).
+
+### Validation (single core, dense operator, PETSc 3.19.6, rtol 1e-4, BP5)
+
+The following was observed in one configuration and other systems may differ
+in detail; the qualitative picture is expected to carry over.
+
+- Aging, 2 km: 1 yr in 358 IMEX steps versus 427 explicit (3bs), with the
+  first event's onset, arrest, and peak slip rate agreeing to all printed
+  digits.  100 yr completes in 468 steps in under a second of wall time.
+- Slip law, 2 km: 2693 IMEX steps versus 3420 explicit for 1 yr, event
+  identical to printed precision.
+- PRZ (ssvinit IC), 2 km: 1 yr in about 18000 steps for BOTH integrators, with
+  the same double event (peak rates 3.48/5.99 versus 3.48/6.01 m/s explicit)
+  and the event phase shifted by about 0.0007 yr, comparable to the
+  documented 3bs-versus-5dp phase sensitivity.  Pre-event trajectories agree
+  to 4 to 6 digits at matched times.
+
+### When to use it, honestly
+
+At 2 km the in-event step is ACCURACY-limited, not stability-limited, so IMEX
+cannot reduce the step count there, and each IMEX step costs several explicit
+steps (four explicit stage evaluations with matvecs plus four local implicit
+solves); for production 2 km runs of any law the default explicit path is the
+faster tool.  The intended regime is PRZ at about 1 km and finer, where the
+explicit integrator is stability-limited: there `-imex` improved the in-event
+step from about 3e-8 s to about 2.6e-5 s in the test configuration, roughly a
+factor 1000, but remains about a factor 50 short of the estimated accuracy
+limit because the Newton stage solves fail during coseismic phases and cap dt.
+The cause is characterized: at large stage dt the damping-only implicit
+per-cell problem undergoes a saddle-node (a nucleating cell has no local
+elastic feedback to arrest it within a stage), Newton converges to the fold
+with a nonzero residual, and TS retries with a smaller step.  Fine-resolution
+PRZ production runs are therefore NOT yet practical with either integrator; a
+per-cell stage solver that can cross the instability jump (with the cell
+self-stiffness moved into the implicit part) exists as an experimental patch
+and is parked pending further work, as is the alternative of an operator-split
+analytic state update outside the TS framework.
+
+### File and interface notes
+
+The IMEX code lives in `src/rsf_imex.c` (see the source layout table above);
+the state laws themselves are in the shared `rsf_state_rate` in
+`src/rsf_engine.c`, together with their analytic partial derivatives, so a new
+evolution law is added in exactly one place and both integrator paths pick it
+up.  The `use_imex` flag lives in `rsf_solve_settings`, the per-run fields
+(`imex_cap_efolds`, reserved for the parked stage-solver work) in
+`struct rsf_vars`.  The driver branches once, at TS setup in `rsf_solve.c`;
+monitor, event detection, domain check, tolerances, and adaptivity are shared
+with the explicit path unchanged.
 
 ---
 

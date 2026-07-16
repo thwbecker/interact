@@ -271,6 +271,23 @@ PetscErrorCode rsf_IMEX_setup(TS ts, struct interact_ctx *par, Mat *Jimex)
   PetscCall(TSSetRHSFunction(ts,NULL,rsf_IMEX_RHSFunction,par));
   PetscCall(TSSetIFunction(ts,NULL,rsf_IMEX_IFunction,par));
   PetscCall(TSSetIJacobian(ts,J,J,rsf_IMEX_IJacobian,par));
+  /* the IMEX stage solvers get their own options prefix so that
+     UNQUALIFIED global solver options (command line or the auto-read
+     petsc_settings.yaml, which is tuned for the dense solves of the
+     interact main program) cannot reach them; without this, a yaml
+     containing e.g. ksp_type fgmres / pc_type jacobi / ksp_rtol 1e-8
+     silently replaces the exact per-cell block solve with hundreds of
+     poorly preconditioned Krylov iterations per stage, each with a
+     global reduction, and degrades the Newton directions enough to
+     cause step rejections (observed: an aging BP5 2 km run at 8.1e6
+     linear iterations, 594 nonlinear failures, 146 s on 32 cores,
+     versus seconds when configured as intended).  Deliberate overrides
+     remain available as -imex_snes_*, -imex_ksp_*, -imex_pc_* */
+  {
+    SNES snes;
+    PetscCall(TSGetSNES(ts,&snes));
+    PetscCall(SNESSetOptionsPrefix(snes,"imex_"));
+  }
   /* the block-diagonal stage solver (preonly + block Jacobi/ILU) is installed
      by rsf_IMEX_set_stage_solver, which the driver calls again after
      TSSetFromOptions so the options pass cannot silently revert it to an
@@ -289,8 +306,9 @@ PetscErrorCode rsf_IMEX_setup(TS ts, struct interact_ctx *par, Mat *Jimex)
   exact solve is preonly + block Jacobi with a per-block ILU(0), and it needs no
   global matvec. This is set both in rsf_IMEX_setup and again from the driver
   after TSSetFromOptions, because that call resets the SNES KSP/PC to PETSc
-  defaults. To keep a command-line override working, only force the types when
-  the user has NOT set -ksp_type / -pc_type explicitly.
+  defaults. To keep a deliberate override working, only force the types when
+  the user has NOT set -imex_ksp_type / -imex_pc_type explicitly (the stage
+  solvers live under the "imex_" options prefix, see rsf_IMEX_setup).
 */
 PetscErrorCode rsf_IMEX_set_stage_solver(TS ts)
 {
@@ -299,8 +317,8 @@ PetscErrorCode rsf_IMEX_set_stage_solver(TS ts)
   PetscCall(TSGetSNES(ts,&snes));
   PetscCall(SNESGetKSP(snes,&ksp));
   PetscCall(KSPGetPC(ksp,&pc));
-  PetscCall(PetscOptionsHasName(NULL,NULL,"-ksp_type",&kset));
-  PetscCall(PetscOptionsHasName(NULL,NULL,"-pc_type",&pcset));
+  PetscCall(PetscOptionsHasName(NULL,NULL,"-imex_ksp_type",&kset));
+  PetscCall(PetscOptionsHasName(NULL,NULL,"-imex_pc_type",&pcset));
   if(!kset)
     PetscCall(KSPSetType(ksp,KSPPREONLY));
   if(!pcset)
