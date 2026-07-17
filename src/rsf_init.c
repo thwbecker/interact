@@ -81,7 +81,13 @@ void rsf_print_help(const char *prog)
 
   fprintf(stderr,"elastic and rate-and-state parameters\n");
   fprintf(stderr,"  -shear_modulus <Pa>     shear modulus G (default 32.04e9)\n");
-  fprintf(stderr,"  -s_wave_speed <m/s>     shear wave speed c_s, sets radiation damping (default 3464)\n");
+  fprintf(stderr,"  -s_wave_speed <m/s>     shear wave speed c_s, sets radiation damping eta = G/(2 c_s)\n");
+  fprintf(stderr,"                          (default 3464; note smaller c_s means MORE damping)\n");
+  fprintf(stderr,"  -rd_fac <fac>           scale the radiation damping coefficient (default 1;\n");
+  fprintf(stderr,"                          0 switches damping off, i.e. the c_s -> infinity limit;\n");
+  fprintf(stderr,"                          caution: without damping the quasi-dynamic coseismic\n");
+  fprintf(stderr,"                          phase is unregularized and integrators will fail at\n");
+  fprintf(stderr,"                          instabilities; > 1 gives enhanced damping)\n");
   fprintf(stderr,"  -f0 <val>               reference friction f0 (default 0.6)\n");
   fprintf(stderr,"  -dc <m>                 characteristic slip distance D_c (default 0.008)\n");
   fprintf(stderr,"  -v0 <m/s>               reference velocity (default 1e-6)\n");
@@ -243,6 +249,7 @@ PetscErrorCode rsf_get_settings(int argc,char **argv,struct interact_ctx *par,
   /* output defaults */
   PetscBool cat_enable=PETSC_FALSE,rup_enable=PETSC_FALSE,budget_enable=PETSC_FALSE;
   PetscReal rupture_vth=-1.0;
+  PetscReal rd_fac ;
   PetscFunctionBeginUser;
   /* -h prints the grouped option summary and exits (before any setup).  PETSc's
      own -help still works and dumps the full registered-option list. */
@@ -292,6 +299,8 @@ PetscErrorCode rsf_get_settings(int argc,char **argv,struct interact_ctx *par,
 				   the rapid coseismic acceleration */
   event_tmin = 0.0;		/* [yr] suppress event output before */
 
+  rd_fac = 1.0;			/* full damping by default */
+  
   medium->time = medium->slip_line_time = 0.;
   medium->stop_time = 3000*sec_per_year;	      /* stop time */
   /* output */
@@ -352,8 +361,26 @@ PetscErrorCode rsf_get_settings(int argc,char **argv,struct interact_ctx *par,
   PetscCall(PetscOptionsGetReal(NULL,NULL,"-dc",&rsf->dc,NULL));     /* [m] */
   PetscCall(PetscOptionsGetReal(NULL,NULL,"-vpl",&rsf->vpl,NULL));   /* [m/s] */
   PetscCall(PetscOptionsGetReal(NULL,NULL,"-v0",&rsf->v0,NULL));     /* reference velocity [m/s] */
-  /* G/(2 c_s) radiation damping factor */
-  rsf->shear_mod_over_2cs_si = shear_modulus_si /(2.0*s_wave_speed_si);
+  /* radiation damping coefficient eta = rd_fac G/(2 c_s).  -rd_fac
+     scales it: 1 (default) is the standard quasi-dynamic damping, 0
+     switches damping off (the c_s -> infinity limit; note that
+     SMALL c_s means MORE damping, so vs = 0 is not the off switch),
+     values > 1 give enhanced damping.  CAUTION with rd_fac = 0 on
+     velocity-weakening faults: the damping is what regularizes the
+     coseismic phase in the quasi-dynamic approximation, and without
+     it the slip rate is unbounded during instabilities, so expect the
+     integrator to fail at events; intended use is stable sliding,
+     nucleation, or slow-slip studies. */
+  PetscCall(PetscOptionsGetReal(NULL,NULL,"-rd_fac",&rd_fac,NULL));
+  if(rd_fac < 0){
+    SETERRQ(PETSC_COMM_WORLD,PETSC_ERR_ARG_OUTOFRANGE,"-rd_fac must be >= 0, got %g",(double)rd_fac);
+  }
+  if(rd_fac != 1.0)
+    HEADNODE
+      fprintf(stderr,"rsf_get_settings: radiation damping scaled by rd_fac = %g (eta = %.4e Pa s/m)\n",
+	      (double)rd_fac,(double)rsf->shear_mod_over_2cs_si);
+
+  rsf->shear_mod_over_2cs_si = rd_fac * shear_modulus_si /(2.0*s_wave_speed_si);  
  
   PetscCall(PetscOptionsGetReal(NULL,NULL,"-sigma_init",&sigma_init,NULL));
   PetscCall(PetscOptionsGetReal(NULL,NULL,"-tau_init",&tau_init,NULL));

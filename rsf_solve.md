@@ -76,7 +76,17 @@ The groups, in the order `-h` prints them, are:
 - geometry and input files: `-geom_file`, `-rsf_file`, the optional per-cell
   files `-rsf_ic_file`, `-rsf_dc_file`, `-rsf_sigma_file`, plus `-full_space`
   and `-tv`.
-- elastic and rate-and-state parameters: `-shear_modulus`, `-s_wave_speed`,
+- elastic and rate-and-state parameters: `-shear_modulus`, `-s_wave_speed`
+  (these two set the radiation damping coefficient `eta = G/(2 c_s)`; note
+  that a SMALLER wave speed means MORE damping, so `c_s = 0` is not a way to
+  switch damping off), `-rd_fac` (scales the damping coefficient: 1 is the
+  standard quasi-dynamic value and the default, 0 switches damping off, the
+  `c_s -> infinity` limit, values above 1 give enhanced damping; caution:
+  with damping off the quasi-dynamic coseismic phase is unregularized and
+  the slip rate is unbounded at instabilities, so integrators fail there,
+  and the intended use is stable sliding, nucleation, or slow-slip studies,
+  verified on the slider: creep runs cleanly with `-rd_fac 0`, stick-slip
+  runs stall at the first event),
   `-f0`, `-dc`, `-v0`, `-vpl`, and `-rsf_slip_mode` (0 strike, 1 dip).
 - initial conditions: `-sigma_init`, `-tau_init`, `-vel_init`, `-rand_amp`.
 - normal-stress evolution and limiter: `-calc_sigma_dot`, `-limit_sigma`,
