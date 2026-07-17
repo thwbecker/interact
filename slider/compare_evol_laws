@@ -17,7 +17,7 @@ proj=-JX7/4
 #
 # vel vs time for 3bs and IMEX solves
 #
-psbasemap $reg $proj -Y12 -K -P -Ba10f1:"time [years]":/a2f.5:"@~\341@~log@-10@-(v [m/s])@~\361@~": > $ofile
+psbasemap $reg $proj -Y12 -K -P -Ba10f1:"time [years]":/a2f.5:"@~\341@~log@-10@-(v [m/s])@~\361@~"::."quasi 1D slider test": > $ofile
 pc=1;
 yl=0;xl=202
 for sl in $laws ;do

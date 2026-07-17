@@ -1,0 +1,28 @@
+#!/bin/bash
+sl=${1-aging}
+res=${2-0.5km}
+imex=${3-0}
+base=${4-bp5}
+
+if [ $sl = aging ];then
+    dir=$base
+elif [ $sl = slip ];then
+    dir=$base"_"sl
+else
+    dir=$base"_"$sl
+fi
+if [ $imex = 1 ];then
+    dir=$dir"_imex"
+fi
+if [ ! -s $dir ];then
+    echo $0: base dir not found > /dev/stderr
+    exit
+fi
+ls -d $dir/*.$res/ > tmp.$$.dat
+if [ `lc tmp.$$.dat` -ne 1 ];then
+    echo $0: error > /dev/stderr
+    cat tmp.$$.dat > /dev/stderr
+else
+    cat tmp.$$.dat
+fi
+rm tmp.$$.dat
