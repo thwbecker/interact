@@ -1,0 +1,100 @@
+#!/bin/bash
+rd_fac=${1-1.0}
+if [ $rd_fac = 1.0 ];then
+    odir=results
+else
+    odir=results.rdf.$rd_fac
+fi
+
+laws="aging slip prz sato kt"
+plaws="aging slip prz sato"
+eps=1e-8
+ofile=slider.ps
+
+reg=-R200/270/-16/1
+#reg=-R200/270/-16/1
+proj=-JX7/4
+#
+# vel vs time for 3bs and IMEX solves
+#
+psbasemap $reg $proj -Y12 -K -P -Ba10f1:"time [years]":/a2f.5:"@~\341@~log@-10@-(v [m/s])@~\361@~": > $ofile
+pc=1;
+yl=0;xl=202
+for sl in $laws ;do
+    sll=`echo $sl | gawk '{print(toupper($1))}'`
+    col=`platecolor $pc`
+    gawk '{if(NR>1)print($3,$5)}' $odir/$sl"_5dp_"$eps/rsf_monitor.dat | \
+	psxy -W2,$col,- $reg $proj -O -K >> $ofile
+    gawk '{if(NR>1)print($3,$5)}' $odir/$sl"_3bs_"$eps/rsf_monitor.dat | \
+	psxy -W1,$col $reg $proj -O -K >> $ofile
+    gawk '{if(NR>1)print($3,$5)}' $odir/$sl"_imex_"$eps/rsf_monitor.dat | \
+	psxy -W3,$col,. $reg $proj -O -K >> $ofile
+    echo $xl $yl 18 0 29 LM $sll | pstext -R -J -O -K -F+f$col >> $ofile
+    ((yl=yl-2))
+    ((pc=pc+1))
+done
+pc=1;xl=0.52;xl2=0.53;yl=-2
+reg=-R0.515/0.69/-15/1		# phase space
+#reg=-R0.5/0.69/-16/3		# phase space
+
+
+by_color=0			# colored lines single plot, 0: several plots
+pc=1
+type_for_phase=5dp
+
+if [ $by_color = 1 ];then
+    proj=-JX7/4
+    psbasemap $reg $proj -Y-5 -K -O -Ba.05f0.005:"friction @~m@~":/a2f.5:"@~\341@~log@-10@-(v [m/s])@~\361@~": >> $ofile
+
+    for sl in $laws ;do
+	sll=`echo $sl | gawk '{print(toupper($1))}'`
+	col=`platecolor $pc`
+	gawk '{if(NR>1)if($3>300)print($7,$5)}' $odir/$sl"_"$type_for_phase"_"$eps/rsf_monitor.dat | \
+	    psxy -W1,$col $reg $proj -O -K >> $ofile
+	echo $xl $yl 18 0 29 LM $sll | pstext -R -J -O -K -F+f$col >> $ofile
+	yl=$(bc <<< "$yl - 1.5")
+	((pc=pc+1))
+    done
+else
+    makecpt -Croma -T0/1/0.01 > time.cpt
+    #makecpt -Csplit -T0/1/0.05 > time.cpt
+    proj=-JX3.4/4
+    for sl in $plaws;do
+	sll=`echo $sl | gawk '{print(toupper($1))}'`
+	if [ $pc -eq 1 ];then
+	    ae=WesN;off="-Y-5"
+	elif [ $pc -eq 2 ];then
+	    ae=wEsN;off="-X3.5"
+	elif [ $pc -eq 3 ];then
+	    ae=WeSn;off="-X-3.5 -Y-4.75"
+	elif [ $pc -eq 4 ];then
+	    ae=wESn;off="-X3.5"
+	fi
+	psbasemap $reg $proj $off -K -O -Ba.05f0.005g0.05:"friction @~m@~":/g3a3f.5:"@~\341@~log@-10@-(v [m/s])@~\361@~":$ae >> $ofile
+	sym=-SC
+	# find the right time to adjust
+	gawk '{if($3==-1)print($2)}' $odir/$sl"_"$type_for_phase"_"$eps/rsf_events.dat | \
+	    tail -2 | gawk -f torow.awk > tmp.val
+	read t1 t2 < tmp.val
+	echo $sl $t1 $t2
+	gawk -v t1=$t1 -v t2=$t2 '{if(NR>1)if($3>=t1)if($3<t2)print($7,$5,($3-t1)/(t2-t1))}' \
+	     $odir/$sl"_"$type_for_phase"_"$eps/rsf_monitor.dat > tmp.dat
+	
+	if [ $pc -eq 1 ];then
+	    gawk '{print($1,$2)}' tmp.dat > tmp.back
+	fi
+	psxy tmp.back -W3,gray $reg $proj -O -K >> $ofile
+	gawk -f xyval2seg.awk tmp.dat | psxy -m  $reg $proj -O -K -W2 -Ctime.cpt >> $ofile
+	psxy tmp.dat $sym".1" $reg $proj -O -K -Ctime.cpt >> $ofile
+	if [ $pc -eq 2 ];then
+	    psscale -D0/-0.25/4/.15h -Ctime.cpt -O -K -B0.2/:"t/T": >> $ofile
+	fi
+	echo 0.63 -14 22 0 29 LM "$sll" | pstext -R -O -Gwhite -J -K >> $ofile
+	rm tmp.dat
+	((pc=pc+1))
+    done
+    rm tmp.back
+fi
+
+psxy -T -O >> $ofile
+modifybb $ofile 1

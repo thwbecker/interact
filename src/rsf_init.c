@@ -49,7 +49,7 @@ void init_medium_rsf(struct med *medium)
      implementation (Omega threshold 0.01, and Vc = v0/100). Not exposed as
      options for now; edit here if they need to change */
   rsf->sato_beta = 1e-2;
-  rsf->domain_check_max_reject = 1000;
+  rsf->domain_check_max_reject = 5000;
   rsf->domain_check_nreject = 0;
   rsf->kt_vc     = -1.0;		/* set from v0 below, after -v0 has been read */
   rsf->min_sigma = 1e6;
@@ -85,10 +85,6 @@ void rsf_print_help(const char *prog)
   fprintf(stderr,"  -shear_modulus <Pa>     shear modulus G (default 32.04e9)\n");
   fprintf(stderr,"  -s_wave_speed <m/s>     shear wave speed c_s, sets radiation damping eta = G/(2 c_s)\n");
   fprintf(stderr,"                          (default 3464; note smaller c_s means MORE damping)\n");
-  fprintf(stderr,"  -domain_check_max_reject <n>  abort after n CONSECUTIVE out-of-domain trial\n");
-  fprintf(stderr,"                          steps (default 1000; <= 0 disables). Such rejection\n");
-  fprintf(stderr,"                          storms bypass the PETSc rejection limits and can\n");
-  fprintf(stderr,"                          otherwise grind a run indefinitely\n");
   fprintf(stderr,"  -rd_fac <fac>           scale the radiation damping coefficient (default 1;\n");
   fprintf(stderr,"                          0 switches damping off, i.e. the c_s -> infinity limit;\n");
   fprintf(stderr,"                          caution: without damping the quasi-dynamic coseismic\n");
@@ -154,6 +150,11 @@ void rsf_print_help(const char *prog)
   fprintf(stderr,"                          including those from petsc_settings.yaml, do not\n");
   fprintf(stderr,"                          affect them.\n");
   fprintf(stderr,"  -stop_time_yr <yr>      integration stop time (default 3000)\n");
+  fprintf(stderr,"  -domain_check_max_reject <n>  abort after n CONSECUTIVE out-of-domain trial\n");
+  fprintf(stderr,"                          steps (default 5000; <= 0 disables). Such rejection\n");
+  fprintf(stderr,"                          storms bypass the PETSc rejection limits and can\n");
+  fprintf(stderr,"                          otherwise grind a run indefinitely\n");
+
   fprintf(stderr,"\n");
 
   fprintf(stderr,"monitor and event detection\n");
