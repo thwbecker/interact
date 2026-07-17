@@ -3,7 +3,6 @@
             halfspace
   (C) Thorsten Becker, thwbecker@post.harvard.edu
 
-  $Id: rupture.c,v 2.25 2002/10/08 19:24:44 tbecker Exp $
 
 */
 #include "interact.h"
@@ -267,3 +266,4 @@ void fault_criterion(int flt,struct flt *fault,struct med *medium)
   }}
   return;
 }
+

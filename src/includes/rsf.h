@@ -1,3 +1,4 @@
+#ifndef __READ_RSF_HEADER__
 /* 
    context for the monitor and event functions, following the layout
    in hmatrix_test/ode_solve_test.c; the RHS keeps using the plain
@@ -89,6 +90,7 @@ struct rsf_out_ctx{
    slip_line_dt, use_hmatrix, full_space, tri_eval_mode) are stored
    there and not duplicated here
 */
+
 struct rsf_solve_settings{
   PetscReal shear_modulus_si,s_wave_speed_si;	    /* G [Pa], c_s [m/s] */
   PetscReal sigma_init,tau_init,vel_init,rand_amp;  /* initial conditions */
@@ -130,3 +132,5 @@ PetscErrorCode rsf_post_event(TS,PetscInt,PetscInt[],PetscReal,Vec,PetscBool,voi
 
 /* context access for the domain check, whose callback has no user pointer */
 extern struct interact_ctx *rsf_par_static;
+#define __READ_RSF_HEADER__
+#endif

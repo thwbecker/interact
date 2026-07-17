@@ -133,13 +133,14 @@ PetscErrorCode rsf_finalize_monitor_and_event(struct rsf_out_ctx *uc)
 }
 
 /*
-   SEAS-style event catalog, rupture-time field, and slip-budget
+  SEAS-style event catalog, rupture-time field, and slip-budget
   diagnostic.  Called by the driver right after
   rsf_init_monitor_and_event.  Allocates the rank-local per-cell
   scratch only for the features that are on, opens the rank-0 output
   files, and stashes G, vpl, the rupture-front threshold, and the
   total patch area (needed for the moment sum and the slip budget) on
-  the context.  With all three features off this is nearly a no-op.
+  the context.
+
 */
 PetscErrorCode rsf_init_catalog(struct rsf_out_ctx *uc,struct interact_ctx *par,
 				struct rsf_solve_settings *set,
@@ -298,7 +299,8 @@ PetscErrorCode rsf_finalize_catalog(struct rsf_out_ctx *uc)
 	if(((PetscReal)g[i] >= 0.0) && ((PetscReal)g[i] < t0))t0 = (PetscReal)g[i];
       if(t0 > 1e299)t0 = 0.0;	/* no cell ruptured */
       fprintf(out,"# rupture-time field for event 1 (first tracked event)\n");
-      fprintf(out,"# rupture-front |v| threshold = %.3e m/s ; t is seconds after initiation (earliest crossing)\n",uc->rupture_vth);
+      fprintf(out,"# rupture-front |v| threshold = %.3e m/s ; t is seconds after initiation (earliest crossing)\n",
+	      uc->rupture_vth);
       fprintf(out,"# ip xc[m] yc[m] zc[m] t_rupture[s] ruptured(1/0)\n");
       for(i=0;i < medium->nrflt;i++){
 	PetscReal ta = (PetscReal)g[i];
@@ -330,7 +332,6 @@ PetscErrorCode rsf_finalize_catalog(struct rsf_out_ctx *uc)
   if(uc->rup_time){free(uc->rup_time);uc->rup_time=NULL;}
   PetscFunctionReturn(PETSC_SUCCESS);
 }
-
 
 
 
@@ -689,7 +690,7 @@ PetscErrorCode rsf_finalize_event(struct rsf_out_ctx *uc,PetscReal t_arr,Vec X)
       PetscReal mean_slip = gred[0]/gcnt;
       PetscReal mean_drop = gred[1]/gcnt;
       PetscReal M0        = gred[4];
-      PetscReal Mw        = (M0>0.0)?((2.0/3.0)*(log10(M0)-9.05)):(-99.0);
+      PetscReal Mw        = mwfromm0(M0);
       uc->ncat++;
       fprintf(uc->fout_catalog,
 	      "%5i %17.10f %17.10f %13.6e %8i %14.6e %13.6e %13.6e %12.6e %12.6e %13.6e %13.6e %8.4f\n",
@@ -736,10 +737,10 @@ void rsf_write_group_geometry(const struct rsf_group_grid *g,struct flt *fault,
     int ip=g->idx[k];
     fprintf(out,"%6d %14.6e %14.6e %14.6e %14.6e %14.6e %8.3f %8.3f %12.5e %12.5e %12.5e %5d %12.6e %12.6e %12.6e\n",
 	    ip,g->xs[k],g->ys[k],
-	    (double)fault[ip].x[INT_X],(double)fault[ip].x[INT_Y],(double)fault[ip].x[INT_Z],
-	    (double)fault[ip].strike,(double)fault[ip].dip,
-	    (double)fault[ip].l,(double)fault[ip].w,(double)fault[ip].area,
-	    fault[ip].group,(double)fault[ip].mu_s,(double)fault[ip].mu_d,sigma0);
+	    fault[ip].x[INT_X],fault[ip].x[INT_Y],fault[ip].x[INT_Z],
+	    fault[ip].strike,fault[ip].dip,
+	    fault[ip].l,fault[ip].w,fault[ip].area,
+	    fault[ip].group,fault[ip].mu_s,fault[ip].mu_d,sigma0);
   }
   fclose(out);
 }

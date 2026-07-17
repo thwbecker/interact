@@ -1,5 +1,6 @@
 #include <petscksp.h>
 #include "petscts.h"
+#include "rsf.h"
 
 /* mode descriptions */
 #define IHMAT_TYPE_DENSE 0
@@ -9,6 +10,10 @@
 #define IHMAT_TYPE_HMMVP 4
 #define IHMAT_TYPE_BIGWHAM 5
 
+PetscErrorCode rsf_finalize_catalog(struct rsf_out_ctx *);
+PetscErrorCode rsf_init_catalog(struct rsf_out_ctx *,struct interact_ctx *,
+				struct rsf_solve_settings *,PetscReal ,PetscReal ,
+				Vec ,PetscReal );
 PetscErrorCode rsf_ODE_RHSFunction(TS, PetscReal, Vec, Vec, void*);
 PetscErrorCode rsf_TS_Monitor(TS, PetscInt, PetscReal, Vec, void*);
 PetscErrorCode rsf_domain_check(TS, PetscReal, Vec, PetscBool*);

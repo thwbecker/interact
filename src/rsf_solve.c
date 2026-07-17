@@ -3,9 +3,9 @@
 /*
   
   quasi-dynamic rate-and-state earthquake sequence solver using PETSc
-  TS time steppers, set up to solve the same ODE system as HBI (Ozawa
-  et al., 2023, https://github.com/sozawa94/hbi, main_LH.f90) in the
-  aging-law, no-fluid, backslip-loading case:
+  TS time steppers, originally set up to solve the same ODE system as
+  HBI (Ozawa et al., 2023, https://github.com/sozawa94/hbi,
+  main_LH.f90) in the aging-law, no-fluid, backslip-loading case:
 
   state vector per patch:  (psi, tau, sigma, slip), where
 
@@ -27,7 +27,10 @@
   infinity error norm and rtol = eps_r as in HBI's rkqs, step growth
   limited to 2x, shrink to 0.5x per rejection
 
-  alternative: use 3bs, pretty good performance, fewer rejected steps
+  alternative: use 3bs, shows good performance, fewer rejected steps -
+  might be a better defaults these is also an implicit version, see
+  -imex and rsf_solve.md for more general comments, as well as
+  rsf_solve -h for options
 
   units are SI: Pa, m, s; geometry input (geom.in) must hence be in meters
 
@@ -137,8 +140,8 @@ PetscErrorCode rsf_solve_run(int argc,char **argv,struct interact_ctx *par,
 	    rsf->f0,rsf->dc,rsf->v0,rsf->vpl);
     fprintf(stderr,"%s: sigma0 %.6e tau0 %.6e Pa vinit %.3e m/s rand_amp %g\n",
 	    argv[0],sigma_init,tau_init,vel_init,rand_amp);
-    fprintf(stderr,"%s: rtol %.1e dt_init %g s dt_max %g s stop %g yr\n",
-	    argv[0],rtol,dt_init,dt_max,medium->stop_time/sec_per_year);
+    fprintf(stderr,"%s: rtol %.1e dt_init %g s dt_max %g s stop %g yr evol law: %i\n",
+	    argv[0],rtol,dt_init,dt_max,medium->stop_time/sec_per_year,rsf->state_law);
   }
   /* 
      now, read in a,b variations (stored in fault[].mu_s, fault[].mu_d)
@@ -202,7 +205,8 @@ PetscErrorCode rsf_solve_run(int argc,char **argv,struct interact_ctx *par,
   }
   /* 
      create and calculate interaction matrices, scaled from interact's
-     internal shear modulus to SI
+     internal shear modulus to SI - see compress_interaction_matrix
+     for ways how to test H matrix packages and such
 
      NOTE on conventions: interact uses the physics (extension
      positive) convention for stress.  the RSF formulation, like HBI,
@@ -212,28 +216,26 @@ PetscErrorCode rsf_solve_run(int argc,char **argv,struct interact_ctx *par,
      traction on the slipping patch (negative diagonal), so backslip
      -vpl produces positive loading
   */
-  /* instrument the interaction-matrix build so its wall time can be
-     compared directly against the MatAssemblyEnd event in -log_view.
-     the two should agree; if the build wall is small but -log_view
-     still charges a large MatAssemblyEnd, the cost is deferred. */
   
   PetscCall(PetscBarrier(NULL));
   PetscCall(PetscTime(&tb0));
   calc_petsc_Isn_matrices(medium,fault,use_hmatrix,
-			  shear_modulus_si/SHEAR_MODULUS,0,rsf->slip_mode,&medium->Is,medium->Is_hctx); /* shear stress */
+			  shear_modulus_si/SHEAR_MODULUS,0,rsf->slip_mode,
+			  &medium->Is,medium->Is_hctx); /* shear stress */
   PetscCall(PetscBarrier(NULL));
   PetscCall(PetscTime(&tb1));
   HEADNODE
-    fprintf(stderr,"rsf_solve: Is (shear) interaction matrix build wall = %12.4f s\n",(double)(tb1-tb0));
+    fprintf(stderr,"rsf_solve: Is (shear) interaction matrix build wall = %12.4f s\n",(tb1-tb0));
   if(rsf->calc_sigma_dot){
     PetscCall(PetscBarrier(NULL));
     PetscCall(PetscTime(&tb0));
     calc_petsc_Isn_matrices(medium,fault,use_hmatrix,
-			    -shear_modulus_si/SHEAR_MODULUS,1,rsf->slip_mode,&medium->In,medium->In_hctx); /* normal stress, compression positive */
+			    -shear_modulus_si/SHEAR_MODULUS,1,rsf->slip_mode,
+			    &medium->In,medium->In_hctx); /* normal stress, compression positive */
     PetscCall(PetscBarrier(NULL));
     PetscCall(PetscTime(&tb1));
     HEADNODE
-      fprintf(stderr,"rsf_solve: In (normal) interaction matrix build wall = %12.4f s\n",(double)(tb1-tb0));
+      fprintf(stderr,"rsf_solve: In (normal) interaction matrix build wall = %12.4f s\n",(tb1-tb0));
   }
 
   if(use_hmatrix)		/* this should only print simple info,
@@ -352,14 +354,15 @@ PetscErrorCode rsf_solve_run(int argc,char **argv,struct interact_ctx *par,
     */
     PetscCall(rsf_IMEX_setup(ts,par,&Jimex));
   }else{
-  PetscCall(TSSetRHSFunction(ts, NULL, rsf_ODE_RHSFunction,par));
-  /*
-    adaptive embedded Runge-Kutta; HBI uses Cash-Karp RK5(4), which
-    PETSc does not provide, Dormand-Prince 5(4) is the equivalent
-    default here (override with -ts_rk_type)
-  */
-  PetscCall(TSSetType(ts,TSRK));
-  PetscCall(TSRKSetType(ts,TSRK5DP));
+    PetscCall(TSSetRHSFunction(ts, NULL, rsf_ODE_RHSFunction,par));
+    /*
+      adaptive embedded Runge-Kutta; HBI uses Cash-Karp RK5(4), which
+      PETSc does not provide, Dormand-Prince 5(4) is the equivalent
+      default here (override with -ts_rk_type) (see comments above,
+      3bs might be better
+    */
+    PetscCall(TSSetType(ts,TSRK));
+    PetscCall(TSRKSetType(ts,TSRK5DP));
   }
   /*
      NOTE on the integrator order: after the step-size controller (see the
@@ -463,25 +466,30 @@ PetscErrorCode rsf_solve_run(int argc,char **argv,struct interact_ctx *par,
      structures and scratch are handed to the monitor context and freed
      in the finalize routine
   */
-  if(set->field_enable && (medium->comm_rank == 0)){
-    int ig;
-    char gfile[STRLEN];
-    rsf_ngroup = rsf_build_groups(medium,fault,&rsf_groups);
-    rsf_vbuf = (double *)malloc((size_t)n*sizeof(double));
-    if((rsf_ngroup < 1)||(!rsf_groups)||(!rsf_vbuf)){
-      fprintf(stderr,"%s: field-output setup failed, disabling field output\n",argv[0]);
-      if(rsf_vbuf){free(rsf_vbuf);rsf_vbuf=NULL;}
-      rsf_free_groups(rsf_groups,rsf_ngroup);rsf_groups=NULL;rsf_ngroup=0;
-      set->field_enable = PETSC_FALSE;
-    }else{
-      for(ig=0;ig < rsf_ngroup;ig++){
-	snprintf(gfile,STRLEN,"rsf_geom.g%03d.dat",rsf_groups[ig].id);
-	rsf_write_group_geometry(rsf_groups+ig,fault,sigma_init,gfile);
+  HEADNODE
+    if(set->field_enable){
+      rsf_ngroup = rsf_build_groups(medium,fault,&rsf_groups);
+      rsf_vbuf = (double *)malloc((size_t)n*sizeof(double));
+      if((rsf_ngroup < 1)||(!rsf_groups)||(!rsf_vbuf)){
+	fprintf(stderr,"%s: field-output setup failed, disabling field output\n",argv[0]);
+	if(rsf_vbuf){
+	  free(rsf_vbuf);
+	  rsf_vbuf=NULL;
+	}
+	rsf_free_groups(rsf_groups,rsf_ngroup);
+	rsf_groups=NULL;
+	rsf_ngroup=0;
+	set->field_enable = PETSC_FALSE;
+      }else{
+	for(ii=0;ii < rsf_ngroup;ii++){
+	  snprintf(geom_file,STRLEN,"rsf_geom.g%03d.dat",rsf_groups[ii].id);
+	  rsf_write_group_geometry(rsf_groups+ii,fault,sigma_init,geom_file);
+	}
+	fprintf(stderr,"%s: field output on, %i fault group(s), one frame every %i accepted steps\n",
+		argv[0],rsf_ngroup,set->field_step_interval);
       }
-      fprintf(stderr,"%s: field output on, %i fault group(s), one frame every %i accepted steps\n",
-	      argv[0],rsf_ngroup,set->field_step_interval);
     }
-  }
+  
   /* 
      set up the change/time triggered state monitor, the periodic
      field output, and the velocity threshold event tracker,

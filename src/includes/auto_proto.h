@@ -3,6 +3,7 @@ void adjust_time_step(struct flt *, struct med *);
 /* block_checkflt.c */
 /* block_compute_vel_from_omega.c */
 /* block_eval_geokada.c */
+COMP_PRECISION mwfromm0(COMP_PRECISION );
 void block_eval_geookada(double *, double *, double *, double [3][3], double, double, double, double, double, double, double, double, double, double, double, int *, unsigned char, unsigned char);
 void block_save_solution_and_faults(double *, int, int, struct bflt *, double *, struct prj *, FILE *, unsigned char, unsigned char);
 void block_load_solution_and_faults(double **, int *, int *, struct bflt **, double **, struct prj **, FILE *, unsigned char *, unsigned char *);

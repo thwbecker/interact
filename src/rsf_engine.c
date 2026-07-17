@@ -358,7 +358,7 @@ PetscErrorCode rsf_domain_check(TS ts,PetscReal time,Vec X,PetscBool *accept)
 	      "this is a rejection storm, not a recoverable episode. "
 	      "Try a tighter -rtol, a different -ts_rk_type (3bs has been the most robust), "
 	      "or raise/disable the guard with -domain_check_max_reject (<= 0 disables).",
-	      (int)rsf->domain_check_nreject,(double)time);
+	      (int)rsf->domain_check_nreject,time);
     }
   }
   PetscFunctionReturn(PETSC_SUCCESS);

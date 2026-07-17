@@ -117,7 +117,7 @@ void rsf_print_help(const char *prog)
 
   fprintf(stderr,"state evolution\n");
   fprintf(stderr,"  -state_law n            state evolution law: %i aging (default), %i slip, %i PRZ,\n",
-	 RSF_AGING_LAW,RSF_SLIP_LAW,RSF_PRZ_LAW);
+	  RSF_AGING_LAW,RSF_SLIP_LAW,RSF_PRZ_LAW);
   fprintf(stderr,"                          %i Sato-type, %i Kato and Tullis composite\n",RSF_SATO_LAW,RSF_KT_LAW);
   fprintf(stderr,"                          aging: d psi/dt = b/dc (v0 exp((f0-psi)/b) - |v|)\n");
   fprintf(stderr,"                          slip:  d psi/dt = -(|v|/dc) (psi - psi_ss)\n");
@@ -379,12 +379,12 @@ PetscErrorCode rsf_get_settings(int argc,char **argv,struct interact_ctx *par,
      nucleation, or slow-slip studies. */
   PetscCall(PetscOptionsGetReal(NULL,NULL,"-rd_fac",&rd_fac,NULL));
   if(rd_fac < 0){
-    SETERRQ(PETSC_COMM_WORLD,PETSC_ERR_ARG_OUTOFRANGE,"-rd_fac must be >= 0, got %g",(double)rd_fac);
+    SETERRQ(PETSC_COMM_WORLD,PETSC_ERR_ARG_OUTOFRANGE,"-rd_fac must be >= 0, got %g",rd_fac);
   }
   if(rd_fac != 1.0)
     HEADNODE
       fprintf(stderr,"rsf_get_settings: radiation damping scaled by rd_fac = %g (eta = %.4e Pa s/m)\n",
-	      (double)rd_fac,(double)rsf->shear_mod_over_2cs_si);
+	      rd_fac,rsf->shear_mod_over_2cs_si);
 
   rsf->shear_mod_over_2cs_si = rd_fac * shear_modulus_si /(2.0*s_wave_speed_si);  
  
