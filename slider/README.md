@@ -78,6 +78,34 @@ work-precision (about 3x fewer steps and 3 to 25x smaller phase error at
 rtol 1e-6, law-dependent); note however that on the BP5 problem 3bs has been
 found preferable in practice, so this ranking is configuration-specific and
 should be rechecked per problem rather than generalized.
+
+A full tolerance sweep (rtol 1e-4 to 1e-9, all laws, one configuration)
+sharpened this picture in four ways.  (1) The cost scalings match the nominal
+orders exactly (steps per tolerance decade: about 1.9x for 3bs, 1.4x for 5dp,
+3.16x = 10^(1/2) for the l2 IMEX), and the l2 IMEX shows the cleanest
+tolerance proportionality of the three, delivered error tracking rtol over
+five decades with near-zero rejections throughout; at equal delivered error
+it costs roughly 10 to 30 times the RHS evaluations of 5dp here, which
+prices the IMEX option for non-stiff physics.  (2) 5dp has a FAILURE BAND at
+loose to moderate tolerances: at rtol 1e-4 to 1e-5 several laws died at the
+first nucleation in the same uncounted domain-check rejection storm
+described above, and 5dp sustains a roughly 30 percent rejection rate at
+EVERY tolerance (even 1e-9) while 3bs drops below 1 percent beyond 1e-7:
+fifth order means long steps that overshoot violently at stiff transitions,
+so the method permanently rides the rejection edge.  3bs completed every run
+in the sweep.  Practical guidance from this configuration: 5dp only at rtol
+1e-6 or tighter, 3bs as the robust default; storms now abort quickly and
+loudly via -domain_check_max_reject (see the rsf_solve help) instead of
+grinding.  (3) A physics result: the reference recurrence orders exactly by
+rest-healing content, aging 66.7 and KT 66.7 (full healing at rest), Sato
+63.0 (gate-reduced), PRZ 60.6 (half), slip 56.2 (none), and the aging-PRZ
+gap of 9 percent matches the sigma b ln2 / drop estimate of 8 percent, an
+independent quantitative check of the healing analysis in rsf_solve.md.
+(4) Metrology: err values at or below about 2e-6 yr are at the floor set by
+the reference's own accuracy (independent 1e-9 runs of different methods
+differ by about 1.4e-6 yr); analyze_slider.py now flags the
+reference-vs-itself row (=ref) and prints the per-variant floor, and numbers
+at that level should not be quoted as method differences.
 This reproduces, on the simplest possible system and for the AGING law, the
 stage-problem pathology diagnosed on BP5: without the cell's elastic
 self-stiffness in the implicit part, the per-cell stage problem loses its

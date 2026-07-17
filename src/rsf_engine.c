@@ -337,6 +337,30 @@ PetscErrorCode rsf_domain_check(TS ts,PetscReal time,Vec X,PetscBool *accept)
   PetscCall(VecRestoreArrayRead(X,&x));
   PetscCallMPI(MPI_Allreduce(&lok,&gok,1,MPIU_INT,MPI_MIN,PETSC_COMM_WORLD));
   *accept = (gok)?(PETSC_TRUE):(PETSC_FALSE);
+  /* rejection-storm guard.  Domain-check rejections do not count toward
+     any PETSc rejection limit, so a step-size controller that keeps
+     producing out-of-domain trial states can retry indefinitely
+     (observed: about 2e5 rejected attempts per 1e2 accepted steps, for
+     the 5dp explicit method at loose tolerances on the slider problem
+     and for some IMEX configurations).  The reduced accept flag is
+     identical on all ranks, so this counter and the error are
+     collective.  A healthy rejection episode resolves within a few dt
+     halvings; hitting the limit indicates a storm, and failing loudly
+     beats grinding silently. */
+  if(gok){
+    rsf->domain_check_nreject = 0;
+  }else{
+    rsf->domain_check_nreject++;
+    if((rsf->domain_check_max_reject > 0) &&
+       (rsf->domain_check_nreject >= rsf->domain_check_max_reject)){
+      SETERRQ(PETSC_COMM_WORLD,PETSC_ERR_CONV_FAILED,
+	      "rsf_domain_check: %d consecutive out-of-domain trial steps at t = %g s: "
+	      "this is a rejection storm, not a recoverable episode. "
+	      "Try a tighter -rtol, a different -ts_rk_type (3bs has been the most robust), "
+	      "or raise/disable the guard with -domain_check_max_reject (<= 0 disables).",
+	      (int)rsf->domain_check_nreject,(double)time);
+    }
+  }
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 #endif

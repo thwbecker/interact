@@ -97,9 +97,18 @@ The groups, in the order `-h` prints them, are:
   compile-time defaults only (1e-2 and 1e-2 v0) and are not yet runtime
   options.
 - time stepping: `-rtol`, `-atol_slip`, `-dt_init`, `-dt_max`, `-stop_time_yr`,
-  and `-imex` to switch from the default explicit Runge-Kutta to the IMEX
+  `-imex` to switch from the default explicit Runge-Kutta to the IMEX
   (ARKIMEX) formulation (see the IMEX section below; its stage solvers are
-  tunable under the `imex_` options prefix, e.g. `-imex_ksp_type`).
+  tunable under the `imex_` options prefix, e.g. `-imex_ksp_type`), and
+  `-domain_check_max_reject` (abort after that many CONSECUTIVE
+  out-of-domain trial steps, default 1000, `<= 0` disables; such rejection
+  storms bypass the PETSc rejection limits and previously could grind a run
+  indefinitely).  One solver caution from the slider benchmark, specific to
+  the configurations tested there: the 5dp method showed a failure band at
+  loose tolerances (rtol 1e-4 to 1e-5), dying at nucleation in exactly such
+  storms, and generally runs at a much higher rejection rate than 3bs, which
+  completed every benchmark run; where robustness matters, 3bs has been the
+  safer choice, consistent with experience on BP5.
 - monitor and event detection: `-print_interval_yr`, `-dt_monitor_yr`,
   `-rdx_monitor`, `-adx_monitor`, `-monitor_tmin_yr`, `-track_events`,
   `-vel_event`, `-vel_event_hyst`, `-event_tmin_yr`.

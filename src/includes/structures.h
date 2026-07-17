@@ -111,6 +111,10 @@ struct rsf_vars{
      sato_beta  dimensionless Omega threshold of the Sato-type law
      kt_vc      [m/s] velocity threshold Vc of the Kato and Tullis composite law */
   PetscReal sato_beta,kt_vc;
+  PetscInt domain_check_max_reject;  /* abort after this many CONSECUTIVE
+					domain-check rejections (storm guard,
+					-domain_check_max_reject, <= 0 off) */
+  PetscInt domain_check_nreject;     /* running count, reset on accept */
   /*  */
   short int dim;
 };

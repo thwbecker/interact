@@ -82,12 +82,14 @@ hdr = (f"{'variant':8s} {'solver':6s} {'rtol':>6s} {'steps':>8s} {'rej':>7s} {'r
        f"{'ifunc':>8s} {'err_rms[yr]':>12s} {'err_max[yr]':>12s} {'n':>4s}")
 print(hdr)
 fw = open("slider_wp.dat","w"); fw.write("# "+hdr+"\n")
+floor = {}   # per-variant metric floor: tightest cross-method run vs the reference
 for d in sorted(glob.glob(f"{rdir}/*_*_1e-*")):
     b = os.path.basename(d)
     v,slab,rtol = b.rsplit("_",2)
     if v not in ref_ev: continue
     c = events(d); s = logstats(d)
     flag = ""
+    selfref = (slab == "5dp" and rtol == "1e-9")  # same method and tolerance as the reference run
     if c is None or len(c) == 0:
         err = errm = np.nan; n = 0
     else:
@@ -96,8 +98,15 @@ for d in sorted(glob.glob(f"{rdir}/*_*_1e-*")):
         if len(on) != len(ref): flag = "n<" if len(on) < len(ref) else "n>"
         dt = np.abs(on[:n]-ref[:n])
         err, errm = np.sqrt((dt**2).mean()), dt.max()
+        if selfref: flag = "=ref"       # identical configuration: err is 0 by construction
+        elif slab != "5dp" and rtol == "1e-9" and n > 0 and not flag:
+            floor[v] = err              # independent method at the reference tolerance
     line = (f"{v:8s} {slab:6s} {rtol:>6s} {s['steps']:8.0f} {s['rej']:7.0f} {s['rhs']:8.0f} "
             f"{s['ifunc']:8.0f} {err:12.4e} {errm:12.4e} {n:3d}{flag}")
     print(line); fw.write(line+"\n")
 fw.close()
+if floor:
+    print("\nmetric floor (reference uncertainty, from independent methods at the")
+    print("reference tolerance; err values at or below these are not meaningful):")
+    for v in sorted(floor): print(f"  {v:8s} {floor[v]:.2e} yr")
 print("\nwrote slider_physics.dat and slider_wp.dat")

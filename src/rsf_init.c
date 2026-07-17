@@ -49,6 +49,8 @@ void init_medium_rsf(struct med *medium)
      implementation (Omega threshold 0.01, and Vc = v0/100). Not exposed as
      options for now; edit here if they need to change */
   rsf->sato_beta = 1e-2;
+  rsf->domain_check_max_reject = 1000;
+  rsf->domain_check_nreject = 0;
   rsf->kt_vc     = -1.0;		/* set from v0 below, after -v0 has been read */
   rsf->min_sigma = 1e6;
   rsf->max_sigma = 300e6; /* Pa */
@@ -83,6 +85,10 @@ void rsf_print_help(const char *prog)
   fprintf(stderr,"  -shear_modulus <Pa>     shear modulus G (default 32.04e9)\n");
   fprintf(stderr,"  -s_wave_speed <m/s>     shear wave speed c_s, sets radiation damping eta = G/(2 c_s)\n");
   fprintf(stderr,"                          (default 3464; note smaller c_s means MORE damping)\n");
+  fprintf(stderr,"  -domain_check_max_reject <n>  abort after n CONSECUTIVE out-of-domain trial\n");
+  fprintf(stderr,"                          steps (default 1000; <= 0 disables). Such rejection\n");
+  fprintf(stderr,"                          storms bypass the PETSc rejection limits and can\n");
+  fprintf(stderr,"                          otherwise grind a run indefinitely\n");
   fprintf(stderr,"  -rd_fac <fac>           scale the radiation damping coefficient (default 1;\n");
   fprintf(stderr,"                          0 switches damping off, i.e. the c_s -> infinity limit;\n");
   fprintf(stderr,"                          caution: without damping the quasi-dynamic coseismic\n");
@@ -430,6 +436,8 @@ PetscErrorCode rsf_get_settings(int argc,char **argv,struct interact_ctx *par,
   /* state evolution law: 1,2,3,4,5, 1 default ageing */
   PetscCall(PetscOptionsGetInt(NULL,NULL,"-state_law",&rsf->state_law,NULL));
   PetscCall(PetscOptionsGetReal(NULL,NULL,"-vmin_state",&rsf->vmin_state,NULL)); /* [m/s] */
+  /* rejection-storm guard, see rsf_domain_check in rsf_engine.c */
+  PetscCall(PetscOptionsGetInt(NULL,NULL,"-domain_check_max_reject",&rsf->domain_check_max_reject,NULL));
   if((rsf->state_law < RSF_AGING_LAW) || (rsf->state_law > RSF_KT_LAW)){
     if(medium->comm_rank == 0)
       fprintf(stderr,"rsf_get_settings: -state_law has to be %i (aging), %i (slip), %i (PRZ), %i (Sato) or %i (Kato-Tullis), not %i\n",
