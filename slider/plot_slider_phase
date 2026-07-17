@@ -13,6 +13,8 @@ pc=1;
 yl=0;xl=202
 for sl in $laws ;do
     col=`platecolor $pc`
+    gawk '{if(NR>1)print($3,$5)}' "results/"$sl"_5dp_"$eps"/rsf_monitor.dat" | \
+	psxy -W2,$col,- $reg $proj -O -K >> $ofile
     gawk '{if(NR>1)print($3,$5)}' "results/"$sl"_3bs_"$eps"/rsf_monitor.dat" | \
 	psxy -W1,$col $reg $proj -O -K >> $ofile
     gawk '{if(NR>1)print($3,$5)}' "results/"$sl"_imex_"$eps"/rsf_monitor.dat" | \
