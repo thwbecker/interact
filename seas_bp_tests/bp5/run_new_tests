@@ -44,7 +44,7 @@ for res in $ress;do
 	    fi
 	    
 	    date > $lfile
-	    mpirun -np $ncore  ../../bin/rsf_solve  \
+	    mpirun -np $ncore  ../../../bin/rsf_solve  \
 		   -geom_file   ../"geom_bp5_"$res".in" -rsf_file    ../"rsf_bp5_"$res".dat"   \
 		   -rsf_ic_file ../"ic_bp5_"$res".in"   -rsf_dc_file ../"dc_bp5_"$res".in"   \
 		   -use_hmatrix $hmat $flags -shear_modulus 3.204e10 -s_wave_speed 3464 \

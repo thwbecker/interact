@@ -13,17 +13,16 @@
 set -u
 
 # ============================ CONFIG =======================================
-RB=${RB:-../bin/rsf_solve}                 # path to rsf_solve binary
+RB=${RB:-../../bin/rsf_solve}                 # path to rsf_solve binary
 BP5=${BP5:-../bp5}                          # dir with the BP5 input files
-#RES=${RES:-1km}                            # resolution tag: 1km (4000) or 2km (1000)
-RES=${RES:-0.5km}                            # resolution tag: 1km (4000) or 2km (1000)
-NPLIST=${NPLIST:-"1 2 4 8 16 24 48"}          # MPI rank counts to test
+RES=0.5km                            # resolution tag: 1km (4000) or 2km (1000)
+NPLIST="1 2 4 8 16 24 48"          # MPI rank counts to test
 BACKENDS=${BACKENDS:-"dense htool hacapk"} # subset of {dense,htool,hacapk}
-STOP_YR=${1:-${STOP_YR:-60}}              # short run: assembly + steady matvec timing
-RTOL=${RTOL:-1e-4}
-ZTOL=${ZTOL:-1e-4}                         # HACApK -hacapk_ztol
-HEPS=${HEPS:-1e-4}                         # HTOOL  -mat_htool_epsilon
-MPIRUN=${MPIRUN:-$PETSC_DIR/build/bin/mpirun}                   # set to "mpirun --oversubscribe" to test
+STOP_YR=60              # short run: assembly + steady matvec timing
+RTOL=-1e-4
+ZTOL=-1e-4                         # HACApK -hacapk_ztol
+HEPS=1e-4                         # HTOOL  -mat_htool_epsilon
+MPIRUN=mpirun                   # set to "mpirun --oversubscribe" to test
                                            #   more ranks than physical cores
 EXTRA_MPI=${EXTRA_MPI:-}                   # e.g. "--bind-to core --map-by core"
 # If PETSc shared libs aren't on the loader path, set them here:

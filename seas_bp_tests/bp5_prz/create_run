@@ -1,0 +1,44 @@
+#!/bin/bash
+# PRZ version, using the steady-state-at-local-velocity IC file
+# (ic_bp5_ssvinit_*), see bp5/make_bp5.py for why the spec IC is
+# unsuitable for the PRZ law
+res=${1-0.5km}
+
+ncore=${2-$NR_CPUS}
+
+tmax=3000			# to get better read on matvec
+
+export OMP_NUM_THREADS=1
+
+
+hmat=4;
+hmat_flags="-use_hmatrix $hmat -hmmvp_tol 1e-4"
+
+
+oname=lr.$res.$hmat
+
+wdir=$HOST.$res
+
+mkdir -p $wdir
+cd $wdir
+
+lfile=log.$oname.dat
+if [ ! -s $lfile ];then    
+    echo $0: in `pwd`, writing to $lfile deleting output
+    rm -r tmp_rsf/*
+    date > $lfile
+    mpirun -np $ncore  ../../../bin/rsf_solve  \
+	   -geom_file   ../../bp5/"geom_bp5_"$res".in" -rsf_file    ../../bp5/"rsf_bp5_"$res".dat"   \
+	   -rsf_ic_file ../../bp5/"ic_bp5_ssvinit_"$res".in"   -rsf_dc_file ../../bp5/"dc_bp5_"$res".in"   \
+	   $hmat_flags -shear_modulus 3.204e10 -s_wave_speed 3464 \
+	   -f0 0.6 -dc 0.14 -vpl 1e-9 -v0 1e-6 -sigma_init 25e6  -state_law 3 -slip_line_dt_yr 5\
+	   -rtol 1e-4 -ts_rk_type 3bs -stop_time_yr $tmax \
+	   -ts_max_steps 2000000  -rsf_catalog -rsf_rupture_time \
+	   -print_interval_yr 0.02  -rupture_vth 0.1 -log_view 2>> $lfile >> $lfile
+    date >> $lfile
+    cd ..
+else
+    echo $0: found $lfile in $wdir
+fi
+
+
