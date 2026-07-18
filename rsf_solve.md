@@ -774,8 +774,22 @@ controller then accepts steps whose true error is far above the requested
 tolerance.  On the single-patch slider benchmark at rtol 1e-6 this cost a
 factor of about 50 in event-time accuracy relative to `l2` (about 8e-2
 versus 2e-3 yr RMS, uniformly across the evolution laws), ARKIMEX4 was worse
-still, and ars443 numerically quenched the stick-slip cycle outright (seven
-events became zero); see slider/README.md.  The price of `l2` is second
+still, and ars443 and bpr3 numerically quenched the stick-slip cycle
+outright (seven events became zero); see slider/README.md.  A cheaper
+stage-order-2 sub-family (`2c`/`2d`/`2e`, about 3.4x fewer steps than `l2`
+at equal tolerance) passed every slider test, including event-time accuracy,
+but was REJECTED as a default after a fault-scale check: on the BP5 0.5 km
+PRZ problem at rtol 1e-4, `2d` produced numerous spurious small events
+absent from the explicit and `l2` solutions, i.e. it altered the event
+statistics at the operating tolerance by exciting marginally stable
+partial-rupture modes that the single-patch benchmark cannot represent.
+`l2` therefore remains the default (slower, statistics-faithful); the cheap
+tableaus stay available via `-ts_arkimex_type` but should only be used with
+a fault-scale event-statistics verification (for example against an
+explicit or `l2` run, or at demonstrably converged tolerance).  The general
+lesson is recorded in slider/README.md: the slider validates phase accuracy
+and robustness, not the stability of marginal spatial modes, so tableau or
+solver changes need one fault-scale statistics check before adoption.  The price of `l2` is second
 order: at rtol 1e-4 on the BP5 2 km aging problem it needs about ten times
 the steps of ARKIMEX3 for the same (correct) first event, which further
 reinforces that the default explicit path remains the production tool and

@@ -86,7 +86,19 @@ orders exactly (steps per tolerance decade: about 1.9x for 3bs, 1.4x for 5dp,
 tolerance proportionality of the three, delivered error tracking rtol over
 five decades with near-zero rejections throughout; at equal delivered error
 it costs roughly 10 to 30 times the RHS evaluations of 5dp here, which
-prices the IMEX option for non-stiff physics.  (2) 5dp has a FAILURE BAND at
+prices the IMEX option for non-stiff physics.  A tableau sweep (laws 1 to
+3, rtol 1e-4 to 1e-7) additionally found a cheap stage-order-2 sub-family
+(2c/2d/2e, about 3.4x fewer steps than l2 at equal tolerance, 2d the most
+accurate of the three, all robust here), and bpr3 joining ars443 in
+quenching the cycle.  IMPORTANT NEGATIVE RESULT AND BENCHMARK LIMITATION:
+2d passed every slider criterion but, on the BP5 0.5 km PRZ problem at
+rtol 1e-4, produced numerous spurious small events absent from the explicit
+and l2 solutions.  The marginally stable partial-rupture modes responsible
+are a property of the spatially extended fault and cannot exist on a single
+patch, so this benchmark validates phase accuracy and robustness but NOT
+event statistics; integrator changes that pass here still need one
+fault-scale statistics check before adoption.  l2 remains the -imex
+default for that reason.  (2) 5dp has a FAILURE BAND at
 loose to moderate tolerances: at rtol 1e-4 to 1e-5 several laws died at the
 first nucleation in the same uncounted domain-check rejection storm
 described above, and 5dp sustains a roughly 30 percent rejection rate at
