@@ -51,10 +51,14 @@ int read_fltdat(char *filename,struct flt *fault,struct med *medium,
   /* 
      read two header lines
   */
-  nread  = getline(&line,&size_dummy,in);free(line);line=NULL;
-  nread += getline(&line,&size_dummy,in);free(line);line=NULL;
-  if(nread==0){
-    fprintf(stderr,"read_fltdat: error reading two header lines\n");
+  nread = getline(&line,&size_dummy,in);free(line);line=NULL;
+  if(nread < 0){
+    fprintf(stderr,"read_fltdat: error reading header lines\n");
+    exit(-1);
+  }
+  nread = getline(&line,&size_dummy,in);free(line);line=NULL;
+  if(nread < 0){
+    fprintf(stderr,"read_fltdat: error reading header lines\n");
     exit(-1);
   }
   for(grp=0;grp<medium->nrgrp;grp++)

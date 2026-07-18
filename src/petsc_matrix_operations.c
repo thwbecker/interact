@@ -351,7 +351,7 @@ PetscErrorCode calc_petsc_Isn_matrices(struct med *medium, struct flt *fault,
   Mat dtmp;
 #endif
 #if ( defined(USE_HMMVP) || defined(USE_HACAPK) )
-  double *xc,*yc,*zc;
+  double *xc=NULL,*yc=NULL,*zc=NULL;
   Vec xd;
 #endif
 #ifdef USE_HMMVP
