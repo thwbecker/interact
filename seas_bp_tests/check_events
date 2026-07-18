@@ -1,0 +1,14 @@
+#!/bin/bash
+
+for res in 0.5km 0.25km;do
+    for law in aging slip prz sato;do
+
+	for i in 0 1;do
+	    dir=`./find_directory $law $res $i`
+
+	    echo $res $law i $i `lc $dir/rsf_events.dat`
+	    head $dir/rsf_events.dat
+
+	done
+    done
+done

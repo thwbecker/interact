@@ -13,7 +13,7 @@ ofile=bp5_evol.ps
 
 reg=-R1000/1250/-10/1;xann=a50f5;xl=1010
 #reg=-R200/270/-16/1
-proj=-JX7/4
+proj=-JX7/3.5
 #
 # vel vs time for 3bs and IMEX solves
 #
@@ -37,12 +37,12 @@ done
 #exit
 
 pc=1;xl=0.52;xl2=0.5;yl=-2
-reg=-R0.48/0.6/-10/1.5		# phase space
+reg=-R0.49/0.6/-10/1.5		# phase space
 by_color=0			# colored lines single plot, 0: several plots
 pc=1
 if [ $by_color = 1 ];then
     proj=-JX7/4
-    psbasemap $reg $proj -Y-5 -K -O -Ba.025f0.0025:"mean friction @~\341m\361@~":/a2f.5:"@~\341@~log@-10@-(v [m/s])@~\361@~": >> $ofile
+    psbasemap $reg $proj -Y-5.25 -K -O -Ba.025f0.0025:"mean friction @~\341m\361@~":/a2f.5:"@~\341@~log@-10@-(v [m/s])@~\361@~": >> $ofile
 
     for sl in $laws ;do
 	dir=`./find_directory $sl $res 0`
@@ -55,27 +55,28 @@ if [ $by_color = 1 ];then
 	((pc=pc+1))
     done
 else
-    makecpt -Croma -I -T0/1/0.01 > time.cpt
-    #makecpt -Csplit -T0/1/0.05 > time.cpt
-    proj=-JX3.4/4
+    makecpt -Croma -I -T0/1/0.05 > time.cpt
+    #makecpt -Croma -I -Q -T-2/1/0.1 > time.cpt
+
+    proj=-JX3.35/3.8
     for sl in $plaws;do
 	dir=`./find_directory $sl $res 0`
 	sll=`echo $sl | gawk '{print(toupper($1))}'`
 	if [ $pc -eq 1 ];then
-	    ae=WesN;off="-Y-5"
+	    ae=WesN;off="-Y-5.25"
 	elif [ $pc -eq 2 ];then
-	    ae=wEsN;off="-X3.5"
+	    ae=wEsN;off="-X3.55"
 	elif [ $pc -eq 3 ];then
-	    ae=WeSn;off="-X-3.5 -Y-4.75"
+	    ae=WeSn;off="-X-3.55 -Y-4.75"
 	elif [ $pc -eq 4 ];then
-	    ae=wESn;off="-X3.5"
+	    ae=wESn;off="-X3.55"
 	fi
 	psbasemap $reg $proj $off -K -O \
 		  -Ba.025f0.005g0.025:"mean friction @~\341m\361@~":/g3a3f.5:"@~\341@~log@-10@-(v [m/s])@~\361@~":$ae >> $ofile
 	sym=-SC
 	# find the right time to adjust
 	#gawk '{if($3==-1)print($2)}' $dir/rsf_events.dat | tail -2 | gawk -f torow.awk > tmp.val
-	tail -2 $dir/rsf_catalog.dat | gawk '{if(NR==1)print($3);else print($3)}' | gawk -f torow.awk > tmp.val
+	gawk '!/^#/ && $13>=7{print $3}' $dir/rsf_catalog.dat | tail -2 | gawk -f torow.awk > tmp.val
 	
 	read t1 t2 < tmp.val; rm tmp.val
 	echo $sl $t1 $t2
@@ -87,7 +88,7 @@ else
 	gawk -f xyval2seg.awk tmp.dat | psxy -m  $reg $proj -O -K -W2 -Ctime.cpt >> $ofile
 	psxy tmp.dat $sym".05" $reg $proj -O -K -Ctime.cpt >> $ofile
 	if [ $pc -eq 2 ];then
-	    psscale -D0/-0.25/4/.15h -Ctime.cpt -O -K -B0.2/:"t/T": >> $ofile
+	    psscale -D0/-0.3/4/.15h -Ctime.cpt -O -K -B0.2/:"t/T": >> $ofile
 	fi
 	echo $xl2 -2 22 0 29 LM "$sll" | pstext -R -O -Gwhite -J -K >> $ofile
 	rm tmp.dat

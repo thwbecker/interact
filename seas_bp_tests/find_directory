@@ -2,6 +2,7 @@
 sl=${1-aging}
 res=${2-0.5km}
 imex=${3-0}
+
 base=${4-bp5}
 
 if [ $sl = aging ];then
@@ -15,12 +16,12 @@ if [ $imex = 1 ];then
     dir=$dir"_imex"
 fi
 if [ ! -s $dir ];then
-    echo $0: base dir not found > /dev/stderr
+    echo $0: base dir $dir not found > /dev/stderr
     exit
 fi
 ls -d $dir/*.$res/ > tmp.$$.dat
 if [ `lc tmp.$$.dat` -ne 1 ];then
-    echo $0: error > /dev/stderr
+    echo $0: error, $dir does not hold $res > /dev/stderr
     cat tmp.$$.dat > /dev/stderr
 else
     cat tmp.$$.dat
