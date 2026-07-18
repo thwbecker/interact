@@ -43,7 +43,7 @@ PETSC_LIBADD := $(shell pkg-config --libs-only-l $(PACKAGES)) -lm
 # C interface library first (cd HACApK/v.1.0.0/C_interface; make; 
 # ar rcs libhacapk.a m_*.o HACApK_*.o) then uncomment:
 HACAPK_DEFINES = -DUSE_HACAPK
-HACAPK_LIBS = -L./HACApK/v.1.0.0/C_interface -lhacapk -lgfortran -fopenmp $(MATHLIBS)
+HACAPK_LIBS = -L./hmat/HACApK/v.1.0.0/C_interface -lhacapk -lgfortran -fopenmp $(MATHLIBS)
 
 #
 # leave empty if not using
@@ -60,7 +60,7 @@ HACAPK_LIBS = -L./HACApK/v.1.0.0/C_interface -lhacapk -lgfortran -fopenmp $(MATH
 #   libhmmvp_omp -> -fopenmp   (in-memory Hmat path)
 # the shim (hmmvp_c_shim.cpp) selects MpiHmat vs in-memory Hmat on USE_HMMVP_MPI,
 # so this must be passed to its compile rule (see makefile)
-HMMVP_DIR = ./hmmvp/
+HMMVP_DIR = ./hmat/hmmvp/
 HMMVP_DEFINES = -DUSE_HMMVP -DUSE_HMMVP_MPI
 HMMVP_INC = -I$(HMMVP_DIR) -I$(HMMVP_DIR)/hmmvp/include -I$(HMMVP_DIR)/util/include
 HMMVP_LIBS = -L$(HMMVP_DIR)/lib -lhmmvp_mpi -lstdc++ $(MATHLIBS)
@@ -74,7 +74,7 @@ HMMVP_OBJS = $(ODIR)/hmmvp_c_shim.o
 # include path, add its directory to BIGWHAM_INC, e.g. on Debian/Ubuntu
 # -I/usr/include/x86_64-linux-gnu). Leave dir to non existant to build without BigWham.
 BIGWHAM_DIR = xxx
-#BIGWHAM_DIR = ./bigwham/BigWham/
+#BIGWHAM_DIR = ./hmat/bigwham/BigWham/
 ifeq ($(wildcard $(BIGWHAM_DIR)/.),) # does NOT exist
      BIGWHAM_DEFINES =
      BIGWHAM_INC =
