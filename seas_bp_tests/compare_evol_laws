@@ -55,7 +55,7 @@ if [ $by_color = 1 ];then
 	((pc=pc+1))
     done
 else
-    makecpt -Croma -T0/1/0.01 > time.cpt
+    makecpt -Croma -I -T0/1/0.01 > time.cpt
     #makecpt -Csplit -T0/1/0.05 > time.cpt
     proj=-JX3.4/4
     for sl in $plaws;do
@@ -75,11 +75,11 @@ else
 	sym=-SC
 	# find the right time to adjust
 	#gawk '{if($3==-1)print($2)}' $dir/rsf_events.dat | tail -2 | gawk -f torow.awk > tmp.val
-	tail -2 $dir/rsf_catalog.dat | gawk '{print($3)}' | gawk -f torow.awk > tmp.val
+	tail -2 $dir/rsf_catalog.dat | gawk '{if(NR==1)print($3);else print($3)}' | gawk -f torow.awk > tmp.val
 	
 	read t1 t2 < tmp.val; rm tmp.val
 	echo $sl $t1 $t2
-	gawk -v t1=$t1 -v t2=$t2 '{if(NR>1)if($3>=t1)if($3<t2)print($7,$5,($3-t1)/(t2-t1))}' $dir/rsf_monitor.dat > tmp.dat
+	gawk -v t1=$t1 -v t2=$t2 '{if(NR>1)if($3>=t1)if($3<=t2)print($7,$5,($3-t1)/(t2-t1))}' $dir/rsf_monitor.dat > tmp.dat
 	if [ $pc -eq 1 ];then
 	    gawk '{print($1,$2)}' tmp.dat > tmp.back
 	fi
