@@ -25,7 +25,7 @@
   Modify program parameters here on in the other .h files, not in the
   source itself.
 
-  $Id: interact.h,v 2.63 2011/01/09 02:02:43 becker Exp becker $ 
+  part of interact, (C) Thorsten Becker; see README.md and COPYRIGHT
 */
 /* 
    system headers 

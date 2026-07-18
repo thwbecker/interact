@@ -181,7 +181,7 @@ should not be read as a general or converged result.
 The split is validated by reproducing the SEAS BP5-QD benchmark and comparing
 against the single-file predecessor and against HBI (`sozawa94/hbi`).
 
-Setup: `bp5/` 1 km inputs (`geom_bp5_1km.in`, `rsf_bp5_1km.dat`, `ic_bp5_1km.in`,
+Setup: `seas_bp_tests/bp5/` 1 km inputs (`geom_bp5_1km.in`, `rsf_bp5_1km.dat`, `ic_bp5_1km.in`,
 `dc_bp5_1km.in`), dense backend (`-use_hmatrix 0`), `-rtol 1e-4`, run to 250 yr
 (just past the first spontaneous system event). Accuracy is read from the first
 system-event onset in `rsf_events.dat` and the slip-rate trace in
@@ -196,7 +196,7 @@ system-event onset in `rsf_events.dat` and the slip-rate trace in
 The split matches the predecessor to about 1e-4 yr over a 234 yr interval, which
 is time-step accumulation at the ULP level rather than a physics difference, and
 tracks HBI to within roughly 0.14 yr (about 0.06 percent), the same agreement
-documented for the pre-split code (`bp5/README.md`, `bp5_physics_crosscheck.md`).
+documented for the pre-split code (`seas_bp_tests/bp5/README.md`, `bp5_physics_crosscheck.md`).
 The slip-rate traces overlay across the seeded event near t = 0, the interseismic
 plateau at the plate rate (log10 of max slip rate near -9), and the first
 spontaneous event near 234 yr (`bp5_rsf_vs_hbi_split.png`). This is specific to
@@ -211,7 +211,7 @@ Based on the scaling and compression studies (`scaling_tests/rsf_solve_scaling_t
 - Resolution: 1 km is the official BP5 resolution. The cohesive zone
   `L_b = G D_RS / (b sigma)` is about 6 km, so 2 km resolves it with only ~3
   cells: it still runs (recurrence ~236.8 yr versus 234.3 yr at 1 km, see
-  `bp5/README.md`) but is under-resolved, so use 1 km or finer for production
+  `seas_bp_tests/bp5/README.md`) but is under-resolved, so use 1 km or finer for production
   accuracy. (A strongly-coupled two-fault test did stall at 2 km when stepping
   through its first event, but that reflects that more aggressive coupled
   nucleation, not the single BP5 fault.)
@@ -276,7 +276,7 @@ from ~48 s to ~8 s on the BP5 4000-cell test, with no measurable accuracy loss.
 
 ## Benchmark: SEAS BP5-QD, 1 km / 4000 cells, single core
 
-Setup: `bp5/` 1 km inputs, run to just past the first natural event (~234 yr),
+Setup: `seas_bp_tests/bp5/` 1 km inputs, run to just past the first natural event (~234 yr),
 `-rtol 1e-4`. "matvec" is the mean wallclock per `MatMult` from `-log_view`;
 "setup" is total minus time-stepping (dominated by H-matrix assembly); accuracy
 is measured against the dense solution.

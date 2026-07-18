@@ -5,7 +5,7 @@
 
 
 
-  $Id: fit_simple_stress_from_cart.c,v 1.3 2011/01/07 07:19:58 becker Exp $
+  part of interact, (C) Thorsten Becker; see README.md and COPYRIGHT
 
 */
 #include "interact.h"

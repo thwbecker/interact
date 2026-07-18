@@ -776,27 +776,37 @@ $(BDIR)/geo_okada: $(ODIR)/geo_okada.o $(ODIR)/coulomb_stress.o $(GEN_P_INC)  \
 
 proto: 	src/includes/auto_proto.h src/includes/auto_proto.sgl.h
 
-auto_proto.h: 
+# sources scanned for the automatically generated prototypes: the shared
+# top-level files plus the interact, la_and_geo, block, green, and util
+# subdirectories (testing/ and old/ excluded; the rsf_* prototypes are
+# maintained by hand in petsc_prototypes.h, and cproto skips those files
+# anyway since their PETSc includes are not passed here)
+# the PETSc-based translation units (rsf_*.c, petsc_*.c) are excluded:
+# their prototypes are maintained by hand in petsc_prototypes.h, and
+# PETSc types must not leak into auto_proto.h, which is also included
+# by non-PETSc translation units
+PROTO_SRC = $(filter-out src/rsf_%.c src/petsc_%.c,$(wildcard src/*.c)) \
+	src/interact/*.c src/la_and_geo/*.c src/block/*.c \
+	src/green/*.c src/util/*.c
+
+src/includes/auto_proto.h:
 	rm -f src/includes/auto_proto.h 2> /dev/null;\
 	touch src/includes/auto_proto.h;\
-#	cproto  $(DEFINE_FLAGS)  $(GEOPROJECT_INCLUDES) $(PETSC_INCLUDES) \
-	cproto  $(DEFINE_FLAGS)  $(GEOPROJECT_INCLUDES)  \
+	cproto -E "$(CC) -E" $(DEFINE_FLAGS)  $(GEOPROJECT_INCLUDES) $(LOCAL_INCLUDES) $(PETSC_INCLUDES) \
 		$(PGPLOT_DEFINES) $(PGPLOT_INCLUDES) $(MY_PRECISION) \
-		$(SLATEC_INCLUDES)  $(SUPERLU_INCLUDES)  -f2 -q *.c 2> /dev/null | \
-		grep -v "void main("  | grep -v "int main(" > tmp.h; \
+		$(SLATEC_INCLUDES)  $(SUPERLU_INCLUDES)  -f2 -q $(PROTO_SRC) 2> /dev/null | \
+		grep -v "void main("  | grep -v "int main(" | grep -v Petsc > tmp.h; \
 		mv tmp.h src/includes/auto_proto.h
 
-
-
-src/includes/auto_proto.sgl.h: 
+src/includes/auto_proto.sgl.h:
 	rm -f src/includes/auto_proto.sgl.h 2> /dev/null;\
 	touch src/includes/auto_proto.sgl.h;\
-#	cproto  $(DEFINE_FLAGS)  $(GEOPROJECT_INCLUDES)  $(PETSC_INCLUDES) \
-	cproto  $(DEFINE_FLAGS)  $(GEOPROJECT_INCLUDES)  \
+	cproto -E "$(CC) -E" $(DEFINE_FLAGS)  $(GEOPROJECT_INCLUDES) $(LOCAL_INCLUDES) $(PETSC_INCLUDES) \
 		$(PGPLOT_DEFINES) $(PGPLOT_INCLUDES)  \
-		$(SLATEC_INCLUDES)  $(SUPERLU_INCLUDES)  -f2 -q *.c 2> /dev/null  | \
-		grep -v "void main("  | grep -v "int main(" > tmp.h;\
+		$(SLATEC_INCLUDES)  $(SUPERLU_INCLUDES)  -f2 -q $(PROTO_SRC) 2> /dev/null  | \
+		grep -v "void main("  | grep -v "int main(" | grep -v Petsc > tmp.h;\
 	mv tmp.h src/includes/auto_proto.sgl.h
+
 
 
 #

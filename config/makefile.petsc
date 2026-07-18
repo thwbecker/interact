@@ -40,7 +40,7 @@ PETSC_LIBADD := $(shell pkg-config --libs-only-l $(PACKAGES)) -lm
 #HACAPK_LIBS =
 #HACAPK_DEFINES =
 # optional HACApK support for compress_interaction_matrix: build the
-# C interface library first (cd HACApK/v.1.0.0/C_interface; make; 
+# C interface library first (cd hmat/HACApK/v.1.0.0/C_interface; make; 
 # ar rcs libhacapk.a m_*.o HACApK_*.o) then uncomment:
 HACAPK_DEFINES = -DUSE_HACAPK
 HACAPK_LIBS = -L./hmat/HACApK/v.1.0.0/C_interface -lhacapk -lgfortran -fopenmp $(MATHLIBS)

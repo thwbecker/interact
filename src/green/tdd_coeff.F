@@ -21,7 +21,7 @@ c
 c       - the atan problem of the f3 function (see C&S, p. 51)
 c         is dealt with differently
 c       
-c       $Id: tdd_coeff.F,v 1.9 2003/03/09 02:13:23 becker Exp $
+c       part of interact, (C) Thorsten Becker; see README.md and COPYRIGHT
 c
 c       input: 
 c

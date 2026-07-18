@@ -2,7 +2,7 @@
 #include "properties.h"
 //
 // reads in patch format and creates a file for random stress initializarion
-// $Id: create_random_stress_file.c,v 1.15 2003/03/02 01:37:41 becker Exp $
+// part of interact, (C) Thorsten Becker; see README.md and COPYRIGHT
 //
 
 int main(int argc, char **argv)

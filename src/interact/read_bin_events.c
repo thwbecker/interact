@@ -1,7 +1,7 @@
 #include "interact.h"
 /*
 
-  $Id: read_bin_events.c,v 1.11 2003/02/13 22:45:12 becker Exp $
+  part of interact, (C) Thorsten Becker; see README.md and COPYRIGHT
 
   read the binary event file written by interact
 

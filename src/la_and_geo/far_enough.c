@@ -8,7 +8,7 @@ leeway is the fraction distance at the edges,
 set to unity for no increased size
 
 
-$Id: far_enough.c,v 1.6 2005/10/26 01:46:31 becker Exp $
+part of interact, (C) Thorsten Becker; see README.md and COPYRIGHT
 
  */
 //#define SUPER_DEBUG

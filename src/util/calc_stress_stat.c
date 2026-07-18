@@ -3,7 +3,7 @@
   stress and friction initialization files
 
 
-  $Id: calc_stress_stat.c,v 1.10 2003/03/02 01:37:41 becker Exp $
+  part of interact, (C) Thorsten Becker; see README.md and COPYRIGHT
 
 */
 #include "interact.h"

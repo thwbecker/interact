@@ -3,7 +3,7 @@
             halfspace
   (C) Thorsten Becker, becker@eps.harvard.edu
 
-  $Id: adjust_time_step.c,v 1.17 2003/01/13 06:41:01 becker Exp $
+  part of interact, (C) Thorsten Becker; see README.md and COPYRIGHT
 */
 #include "interact.h"
 /*

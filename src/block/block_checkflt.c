@@ -15,7 +15,7 @@ according to the centroid
 output of potentially swapped flt.block file
 
 
-$Id: block_checkflt.c,v 1.4 2004/10/05 01:09:46 becker Exp $
+part of interact, (C) Thorsten Becker; see README.md and COPYRIGHT
 
 
 */

@@ -49,7 +49,7 @@ mapproject.c sources, see there for appropriate copyright, comments,
 etc
 
 
-$Id: geoproject.c,v 1.2 2003/02/13 22:45:12 becker Exp $
+part of interact, (C) Thorsten Becker; see README.md and COPYRIGHT
 
 
 */

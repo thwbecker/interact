@@ -10,7 +10,7 @@ generate a random stress field by superposition of 2-D dislocations
 (might also want to take a look at randomflt.c, which is more sophisticated in terms
 of checking for overlaps and such
 
-$Id: generate_random_2d.c,v 1.1 2005/07/27 00:19:05 becker Exp $
+part of interact, (C) Thorsten Becker; see README.md and COPYRIGHT
 
 
 

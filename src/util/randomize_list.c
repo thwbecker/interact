@@ -3,7 +3,7 @@
 /*
 
 
-  $Id: randomize_list.c,v 1.4 2003/02/13 22:45:12 becker Exp $
+  part of interact, (C) Thorsten Becker; see README.md and COPYRIGHT
 
   generate a random list of integers list(0..N-1) with 
   that contains all integers from 0 to N - 1

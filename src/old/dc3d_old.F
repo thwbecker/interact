@@ -24,7 +24,7 @@ c     - added call to sincos functions
 c
 c     see also rcs logs!
 c
-c $Id: dc3d.F,v 2.25 2011/01/09 02:02:43 becker Exp $ 
+c part of interact, (C) Thorsten Becker; see README.md and COPYRIGHT
 c
 c
 c

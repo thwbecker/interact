@@ -3,7 +3,7 @@
             halfspace
   (C) Thorsten Becker, becker@eps.harvard.edu
 
-  $Id: calc_eigen_from_cart_stress.c,v 1.4 2003/02/13 22:45:12 becker Exp $
+  part of interact, (C) Thorsten Becker; see README.md and COPYRIGHT
 
 */
 #include "interact.h"

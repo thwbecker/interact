@@ -3,7 +3,7 @@
             halfspace
   (C) Thorsten Becker, becker@eps.harvard.edu
 
-  $Id: divide_fault_in_patches.c,v 1.20 2011/01/09 02:02:43 becker Exp $
+  part of interact, (C) Thorsten Becker; see README.md and COPYRIGHT
 */
 #include "properties.h"
 #include "interact.h"

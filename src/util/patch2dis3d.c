@@ -13,7 +13,7 @@ not fully tested
 
 thorsten becker, thwbecker@post.harvard.edu
 
-$Id: patch2dis3d.c,v 1.10 2011/01/09 02:02:43 becker Exp $
+part of interact, (C) Thorsten Becker; see README.md and COPYRIGHT
 
 
 */

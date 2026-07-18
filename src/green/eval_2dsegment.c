@@ -3,7 +3,7 @@
             halfspace
   (C) Thorsten Becker, becker@eps.harvard.edu
 
-  $Id: eval_2dsegment.c,v 1.13 2003-03-01 23:33:40-08 becker Exp tbecker $
+  part of interact, (C) Thorsten Becker; see README.md and COPYRIGHT
 
   evaluate 2-D segment given the solution from Crouch and Starfield
   (1974), p. 91

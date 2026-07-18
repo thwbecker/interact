@@ -3,7 +3,7 @@
   reads in geometry and tries to optimize
   the fault patch ordering so that the 
   resulting i matrix bandwidth is reduced
-  $Id: test_optimize.c,v 1.10 2003/02/13 22:45:12 becker Exp $
+  part of interact, (C) Thorsten Becker; see README.md and COPYRIGHT
 */
 
 int main(int argc,char **argv)

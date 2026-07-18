@@ -11,7 +11,7 @@
   if no_stress_amp_scale is set, will only check for trace == 0,
   else shear magnitude has to be unity
 
-  $Id: read_stress_observations.c,v 1.8 2003/07/10 22:21:22 becker Exp $
+  part of interact, (C) Thorsten Becker; see README.md and COPYRIGHT
     
 */
 #include "interact.h"

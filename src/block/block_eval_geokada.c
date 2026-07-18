@@ -1,7 +1,7 @@
 /*
 
 
-$Id: block_eval_geokada.c,v 1.7 2003/07/02 22:53:12 becker Exp $
+part of interact, (C) Thorsten Becker; see README.md and COPYRIGHT
 
 
 contains the routine to evaluate a fault given a gegraphic location

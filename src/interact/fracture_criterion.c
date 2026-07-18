@@ -3,7 +3,7 @@
             halfspace
   (C) Thorsten Becker, becker@eps.harvard.edu
 
-  $Id: fracture_criterion.c,v 2.40 2003/01/13 06:44:24 becker Exp $
+  part of interact, (C) Thorsten Becker; see README.md and COPYRIGHT
 */
 #include "interact.h"
 #include "properties.h"

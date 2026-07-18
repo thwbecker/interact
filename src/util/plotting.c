@@ -3,7 +3,7 @@
             halfspace
   (C) Thorsten Becker, becker@eps.harvard.edu
 
-  $Id: plotting.c,v 2.13 2004/03/16 01:11:05 becker Exp $
+  part of interact, (C) Thorsten Becker; see README.md and COPYRIGHT
 
 
   several help routines for PGPLOT access

@@ -7,7 +7,7 @@
   in a least squares sense by means of singular value decomposition
 
 
-  $Id: svd.c,v 2.37 2003/12/23 04:04:59 becker Exp $
+  part of interact, (C) Thorsten Becker; see README.md and COPYRIGHT
 
 */
 #include "interact.h"

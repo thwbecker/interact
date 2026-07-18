@@ -74,10 +74,41 @@ clean build, the 1 km case reproduces the first spontaneous recurrence
 at 234.3 yr, matching a patched HBI run (234.3 yr) and the published
 boundary-element cluster to within ~0.01 yr; 2 km matches HBI exactly
 (236.8 yr). Per-cell initial conditions and D_RS are supplied via
--rsf_ic_file / -rsf_dc_file; inputs and a generator are in bp5/.
+-rsf_ic_file / -rsf_dc_file; inputs and a generator are in seas_bp_tests/bp5/.
 
-To compile, edit the `makefile` as described in the INSTALLATION
-document and type `make`. The default might have some extra packages
+### Source layout
+
+Two main programs are built from `src/`: `interact` (static fault
+interaction and static-kinematic, Coulomb-type cycle computations) and
+`rsf_solve` (rate-state-friction quasi-dynamic cycle simulations).
+Their top-level drivers (`interact_main.c`, `rsf_solve.c`) and the code
+SHARED by both (geometry and fault input, Green's function evaluation
+wrappers, interaction-matrix assembly and compression, stress
+utilities) sit directly in `src/`, together with the rsf_solve modules
+(`rsf_*.c`) and the PETSc interface layer (`petsc_*.c`).  The
+subdirectories hold:
+
+    src/interact/    the interact solver internals (activation and
+                     rupture logic, boundary conditions, time stepping,
+                     input/output, help text)
+    src/green/       elastic Green's functions (Okada dc3d, triangular
+                     and segment elements, TGF interfaces)
+    src/la_and_geo/  linear algebra and geometry helpers (SVD, NNLS,
+                     sparse solvers, projections; bundled SLATEC parts)
+    src/block/       the geodetic block-model (blockinvert) code
+    src/util/        standalone utility programs built alongside the
+                     main binaries
+    src/includes/    headers, including the auto-generated
+                     auto_proto.h (regenerate with make proto, needs
+                     cproto)
+    src/testing/     test drivers; src/old/ parked legacy code
+
+External H matrix packages live under `hmat/` (HACApK, hmmvp, and the
+BigWham headers); EISPACK and the TGF triangular dislocation routines
+are bundled in `eispack/` and `tgf/`.
+
+To compile, edit the `makefile` (see the comments there and in
+`config/makefile.gcc` or `config/makefile.petsc`) and type `make`. The default might have some extra packages
 included, and sources a number of other files. For the simplest
 compile, try `make -f makefile.simple`, which should work out of the
 box, without any extra packages besides EISPACK (that should get

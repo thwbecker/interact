@@ -30,7 +30,7 @@
  * NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION
  * WITH THE ACCESS, USE OR PERFORMANCE OF THIS SOFTWARE.
  */
-/* "$Id: netcdf.h,v 1.1 2004/03/20 09:10:44 becker Exp $" */
+/* "part of interact, (C) Thorsten Becker; see README.md and COPYRIGHT" */
 
 #ifndef _NETCDF_
 #define _NETCDF_

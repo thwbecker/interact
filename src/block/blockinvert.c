@@ -15,7 +15,7 @@ the approach of Meade et al. (BSSA, 92, 208, 2002)
 remember to run block_checkflt to check the fault assignment and such
 
 
-$Id: blockinvert.c,v 1.28 2004/10/05 01:09:46 becker Exp $
+part of interact, (C) Thorsten Becker; see README.md and COPYRIGHT
 
 
 */

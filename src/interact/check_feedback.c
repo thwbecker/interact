@@ -4,7 +4,7 @@
 
   reads in patch file and checks for positive 
   feedback between individual patches
-  $Id: check_feedback.c,v 1.13 2003/03/02 01:37:41 becker Exp $
+  part of interact, (C) Thorsten Becker; see README.md and COPYRIGHT
 
 */
 

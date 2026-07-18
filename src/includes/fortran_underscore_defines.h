@@ -3,7 +3,7 @@
   redefine names for compilers where we need underscores
   when calling fortran routines from C
 
-  $Id: fortran_underscore_defines.h,v 1.4 2004/01/26 01:16:41 becker Exp $
+  part of interact, (C) Thorsten Becker; see README.md and COPYRIGHT
 
 
 */

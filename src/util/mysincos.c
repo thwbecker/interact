@@ -3,7 +3,7 @@
             halfspace
   (C) Thorsten Becker, becker@eps.harvard.edu
 
-  $Id: mysincos.c,v 1.5 2011/01/09 02:02:43 becker Exp $
+  part of interact, (C) Thorsten Becker; see README.md and COPYRIGHT
 
   uses SUN's sincos routines that are only available in double precision!?
 */

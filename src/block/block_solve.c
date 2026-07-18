@@ -3,7 +3,7 @@
 block model solution solver related routines
 
 
-$Id: block_solve.c,v 1.6 2011/01/07 07:19:58 becker Exp $
+part of interact, (C) Thorsten Becker; see README.md and COPYRIGHT
 
 
 */

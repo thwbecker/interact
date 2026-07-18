@@ -8,7 +8,7 @@ c     changes by TWB are limited to automatic
 c     adjustment of numerical precision
 c     and a change in the testing for underflow
 c
-c $Id: numrec_svd_routines.F,v 1.8 2004/01/23 06:38:01 becker Exp $
+c part of interact, (C) Thorsten Becker; see README.md and COPYRIGHT
 c     
 #ifdef USE_DOUBLE_PRECISION
 #include "precision_double.h"

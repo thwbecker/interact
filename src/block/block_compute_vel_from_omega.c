@@ -8,7 +8,7 @@ format,
 and write velocities to stdout
 
 
-$Id: block_compute_vel_from_omega.c,v 1.2 2004/03/25 23:48:47 becker Exp $
+part of interact, (C) Thorsten Becker; see README.md and COPYRIGHT
 
 
 */

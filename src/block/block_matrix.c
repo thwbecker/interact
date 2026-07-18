@@ -6,7 +6,7 @@ all matrices are stored FORTRAN style
 
 
 
-$Id: block_matrix.c,v 1.16 2004/10/05 01:09:46 becker Exp $
+part of interact, (C) Thorsten Becker; see README.md and COPYRIGHT
 
 */
 

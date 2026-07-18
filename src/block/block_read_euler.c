@@ -8,7 +8,7 @@ set nrbc to zero
 if constrain_euler == 1: read from file
    constrain_euler == 2: lock last block in list
 
-$Id: block_read_euler.c,v 1.5 2004/10/05 01:09:46 becker Exp $
+part of interact, (C) Thorsten Becker; see README.md and COPYRIGHT
 
 */
 

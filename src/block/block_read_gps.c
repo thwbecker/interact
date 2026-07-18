@@ -15,7 +15,7 @@
 
   constrain_euler will be set to 2 (lock last block) by some remove_net_trans settings
 
-  $Id: block_read_gps.c,v 1.2 2003/12/23 04:05:02 becker Exp $
+  part of interact, (C) Thorsten Becker; see README.md and COPYRIGHT
     
 */
 #include "interact.h"

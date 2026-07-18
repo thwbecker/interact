@@ -4,7 +4,7 @@
             halfspace
   (C) Thorsten Becker, becker@eps.harvard.edu
 
-  $Id: geo_okada.c,v 1.6 2003/03/19 20:06:13 becker Exp $
+  part of interact, (C) Thorsten Becker; see README.md and COPYRIGHT
 
 
   driver routine for eval_geo_green

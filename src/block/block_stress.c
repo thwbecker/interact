@@ -4,7 +4,7 @@
    block inversion type routines 
    that deal with stresses
 
-   $Id: block_stress.c,v 1.3 2003/07/10 22:21:22 becker Exp $
+   part of interact, (C) Thorsten Becker; see README.md and COPYRIGHT
 
 */
 

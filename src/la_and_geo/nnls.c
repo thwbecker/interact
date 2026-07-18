@@ -3,7 +3,7 @@
             halfspace
   (C) Thorsten Becker, becker@eps.harvard.edu
 
-  $Id: nnls.c,v 2.11 2003/01/13 06:45:08 becker Exp $
+  part of interact, (C) Thorsten Becker; see README.md and COPYRIGHT
 */
 #include <math.h>
 #include <stdio.h>

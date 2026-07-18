@@ -19,7 +19,7 @@
   also contains some more harmless functions to print vectors
   
 
-  $Id: matrixio.c,v 1.9 2011/01/07 07:19:58 becker Exp $ 
+  part of interact, (C) Thorsten Becker; see README.md and COPYRIGHT
 
 */
 #include "interact.h"

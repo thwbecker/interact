@@ -15,7 +15,7 @@
 
   on output, val has the eigenvalues, vec the eigenvectors in ascending order
 
-  $Id: eigensystem.c,v 1.5 2003-01-14 07:23:46-08 becker Exp tbecker $
+  part of interact, (C) Thorsten Becker; see README.md and COPYRIGHT
 */
 #include "interact.h"
 

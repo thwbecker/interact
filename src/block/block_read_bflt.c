@@ -5,7 +5,7 @@ resolved at the observational points gx[nrp*DIM]
 
 if calc_intcoeff is false, will just read in faults
 
-$Id: block_read_bflt.c,v 1.7 2011/01/07 07:19:58 becker Exp $
+part of interact, (C) Thorsten Becker; see README.md and COPYRIGHT
 
 
 */

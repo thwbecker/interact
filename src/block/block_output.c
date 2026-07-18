@@ -16,7 +16,7 @@ if use_nullspace is set, will print out velocities without
 the shift in reference frame
 
 
-$Id: block_output.c,v 1.20 2011/01/07 07:19:58 becker Exp $
+part of interact, (C) Thorsten Becker; see README.md and COPYRIGHT
 
 
 */

@@ -27,7 +27,7 @@ and new area are the same, based on a triangular approximation of the,
 possibly, irregular initial rectangle
   
 
-$Id: fit_plane.c,v 1.13 2003/06/27 22:14:28 becker Exp $
+part of interact, (C) Thorsten Becker; see README.md and COPYRIGHT
 
 */
 void fit_plane(int n,

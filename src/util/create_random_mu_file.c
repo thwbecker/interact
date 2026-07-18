@@ -4,7 +4,7 @@
 // reads in patch format and creates a file for random friction initializarion
 // (can also produce regular friction values)
 //
-// $Id: create_random_mu_file.c,v 1.10 2003/03/02 01:37:41 becker Exp $
+// part of interact, (C) Thorsten Becker; see README.md and COPYRIGHT
 //
 
 int main(int argc, char **argv)

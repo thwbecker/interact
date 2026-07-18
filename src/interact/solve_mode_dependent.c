@@ -3,7 +3,7 @@
             halfspace
   (C) Thorsten Becker, thwbecker@post.harvard.edu
 
-  $Id: solve_mode_dependend.c,v 1.28 2003/01/07 02:52:29 tbecker Exp $
+  part of interact, (C) Thorsten Becker; see README.md and COPYRIGHT
 */
 #include "interact.h"
 /*

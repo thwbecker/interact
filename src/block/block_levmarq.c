@@ -5,7 +5,7 @@
 part of blockinvert: handle the levenberg marquardt solution
 iteraction
 
-$Id: block_levmarq.c,v 1.9 2004/03/25 23:48:47 becker Exp $
+part of interact, (C) Thorsten Becker; see README.md and COPYRIGHT
 
 */
 void run_lm(struct bmd *mod,long int *seed,

@@ -11,7 +11,7 @@ block_evaluate_solution solution.bin
 
 
 
-$Id: block_evaluate_solution.c,v 1.8 2011/01/07 07:19:58 becker Exp $
+part of interact, (C) Thorsten Becker; see README.md and COPYRIGHT
 
 
 */

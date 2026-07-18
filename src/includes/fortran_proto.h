@@ -3,13 +3,13 @@
   FORTRAN functions
 
 
-  $Id: fortran_proto.h,v 1.11 2003/03/02 01:38:27 becker Exp becker $
+  part of interact, (C) Thorsten Becker; see README.md and COPYRIGHT
 
 */
 //
 // solver related headers of external functions
 //
-// $Id: fortran_proto.h,v 1.11 2003/03/02 01:38:27 becker Exp becker $
+// part of interact, (C) Thorsten Becker; see README.md and COPYRIGHT
 //
 #include "numrec_svd_routines.h"
 

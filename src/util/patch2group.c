@@ -3,7 +3,7 @@
 /*
   reads in patch file and determines average quantities
   of the groups of faults that the patches form
-  $Id: patch2group.c,v 1.9 2003/03/02 01:37:41 becker Exp $
+  part of interact, (C) Thorsten Becker; see README.md and COPYRIGHT
 */
 
 int main(int argc,char **argv)

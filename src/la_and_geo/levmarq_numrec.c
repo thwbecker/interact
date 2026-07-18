@@ -12,7 +12,7 @@
 
   
 
-  $Id: levmarq_numrec.c,v 1.8 2004/03/25 23:48:47 becker Exp $
+  part of interact, (C) Thorsten Becker; see README.md and COPYRIGHT
 
 
 */
