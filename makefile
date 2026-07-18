@@ -273,11 +273,11 @@ INPUT_OBJS_DEBUG = $(INPUT_OBJS:.o=.dbg.o)
 
 #
 # list of objects for the main program, interact
-INTERACT_OBJS = $(ODIR)/rupture.o $(ODIR)/regular_interact_main.o \
+INTERACT_OBJS = $(ODIR)/rupture.o $(ODIR)/interact_main.o \
 	$(ODIR)/adjust_time_step.o  $(ODIR)/terminate.o \
 	$(ODIR)/calc_stress.o $(MATRIX_SOLVER_OBJS)
 # this is a random noise added version
-INTERACT_NOISE_OBJS = $(ODIR)/rupture.o	$(ODIR)/calc_stress.o $(ODIR)/regular_interact_main.o \
+INTERACT_NOISE_OBJS = $(ODIR)/rupture.o	$(ODIR)/calc_stress.o $(ODIR)/interact_main.o \
 	$(ODIR)/adjust_time_step.o $(MATRIX_SOLVER_OBJS)	\
 	$(ODIR)/coulomb_noise_stress.$(NOISELEVEL).o $(ODIR)/terminate.o
 # debug version
