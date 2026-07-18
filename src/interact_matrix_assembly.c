@@ -409,7 +409,7 @@ void calc_interaction_matrix(struct med *medium,struct flt *fault,
     if((i != medium->nmat1)||
        (j != medium->i_matrix_prec_size)||
        (k != medium->nmat2)||
-       (l != medium->nrflt)||(l != medium->nrmode)){
+       (l != medium->nrflt)||(m != medium->nrmode)){
       fprintf(stderr,"calc_interaction_matrix: mismatch of either nmat1 (%i),prec_size (%i), namt2 (%i), nrflt (%i), or nrmode (%i)\n",
 	      i,j,k,l,m);
       exit(-1);
@@ -424,7 +424,7 @@ void calc_interaction_matrix(struct med *medium,struct flt *fault,
 	for(k=0;k < medium->nrmode;k++)
 	  for(i=0;i < medium->nrflt;i++)
 	    for(l=0;l<3;l++)
-	      if(fread(&ICIM(medium->i,i,j,k,l),medium->i_matrix_prec_size,1,out)!=1){
+	      if(fread(&ICIM(medium->i,i,j,k,l),medium->i_matrix_prec_size,1,medium->i_mat_in)!=1){
 		fprintf(stderr,"calc_interaction_matrix: read error i/j/k/l %i/%i/%i/%i\n",
 			i,j,k,l);
 		exit(-1);

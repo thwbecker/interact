@@ -426,8 +426,9 @@ pgplot_progs:  $(BDIR)/plotevents $(BDIR)/read_bin_events
 
 clean: 
 	rm -rf $(ODIR)/*.o $(ODIR)/*.a  
-dist_clean:
-	rm -rf $(BDIR)/* src/includes/auto_proto.h src/includes/auto_proto.sgl.h
+
+dist_clean:		
+	rm -rf $(BDIR)/* #src/includes/auto_proto.h src/includes/auto_proto.sgl.h
 
 obj_directories:
 	if [ ! -s $(ODIR) ];then \
