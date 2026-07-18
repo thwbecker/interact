@@ -108,10 +108,12 @@
 # src is the main source directory, within it includes with the header files
 # src/green 		holds green's function routines
 # src/la_and_geo 	linear algebra and geometry computation type stuff
-# src/util		helper routines for post-processing and the like
+# src/util		helper routines for post-processing and the like, some soatial statistics
+# serc/testing		testing rotuines for subsets and the like
 # src/block 		is for the routines used for geodetic block modeling in Becker et al. (2005)
+# src/interact		routines specifically used for the interact program 
 #
-VPATH = src src/green src/la_and_geo src/util src/block src/testing/
+VPATH = src src/green src/la_and_geo src/util src/block src/testing/ src/interact
 
 LOCAL_INCLUDES = -Isrc/includes/ -Isrc/util/ -Isrc/block/
 
@@ -180,7 +182,7 @@ endif
 #
 EXT_HMAT_LIBS = $(HACAPK_LIBS) $(HMMVP_LIBS) $(BIGWHAM_LIBS)
 EXT_HMAT_OBJS =  $(HMMVP_OBJS) $(BIGWHAM_OBJS)
-PETSC_OBJS = $(ODIR)/petsc_interact.o $(EXT_HMAT_OBJS)
+PETSC_OBJS = $(ODIR)/petsc_matrix_operations.o $(EXT_HMAT_OBJS)
 
 #
 # add this for superlu support, otherwise comment it out
@@ -247,7 +249,7 @@ PATCH_IO_OBJS = $(ODIR)/divide_fault_in_patches.o $(ODIR)/sparse.o	\
 	$(ODIR)/eval_okada.o $(ODIR)/tdd_coeff.o $(ODIR)/rhs.o		\
 	$(ODIR)/eval_green.o $(ODIR)/eval_triangle_nw.o			\
 	$(ODIR)/eval_iquad.o $(ODIR)/eval_triangle_tgf.o			\
-	$(ODIR)/interact.o  $(ODIR)/kdtree.o   $(ODIR)/mysincos.o 	\
+	$(ODIR)/interact_matrix_assembly.o  $(ODIR)/kdtree.o   $(ODIR)/mysincos.o 	\
 	$(OKROUTINE) $(ODIR)/fracture_criterion.o			\
 	$(ODIR)/myopen.o  $(ODIR)/randgen.o \
 	$(ODIR)/string_compare.o  $(TRI_GREEN_OBJS)
@@ -610,24 +612,24 @@ $(ODIR)/bigwham_shim.o: bigwham_shim.cc
 	-fPIC $(BIGWHAM_INC) $(DEFINE_FLAGS) -c $< -o $(ODIR)/bigwham_shim.o
 
 $(BDIR)/compress_interaction_matrix: $(ODIR)/compress_interaction_matrix.o \
-	$(ODIR)/coulomb_stress.o $(ODIR)/interact.o $(PETSC_OBJS) \
+	$(ODIR)/coulomb_stress.o $(ODIR)/interact_matrix_assembly.o $(PETSC_OBJS) \
 	$(GEN_P_INC)  $(LIBLIST) 
 	$(MPILD)   $(ODIR)/compress_interaction_matrix.o \
-	$(PETSC_OBJS) 	$(ODIR)/coulomb_stress.o $(ODIR)/interact.o  \
+	$(PETSC_OBJS) 	$(ODIR)/coulomb_stress.o $(ODIR)/interact_matrix_assembly.o  \
 	-o $(BDIR)/compress_interaction_matrix $(LIBS) $(PETSC_LIBS) \
 	$(EXT_HMAT_LIBS) $(PGLIBS)   $(LDFLAGS)
 
 $(BDIR)/petsc_simple_solve: $(ODIR)/petsc_simple_solve.o $(ODIR)/coulomb_stress.o \
-	$(ODIR)/interact.o  $(GEN_P_INC) $(LIBLIST) $(PETSC_OBJS)
+	$(ODIR)/interact_matrix_assembly.o  $(GEN_P_INC) $(LIBLIST) $(PETSC_OBJS)
 	$(MPILD)   $(ODIR)/petsc_simple_solve.o $(PETSC_OBJS)    \
-	$(ODIR)/coulomb_stress.o $(ODIR)/interact.o  \
+	$(ODIR)/coulomb_stress.o $(ODIR)/interact_matrix_assembly.o  \
 	-o $(BDIR)/petsc_simple_solve $(LIBS) $(PETSC_LIBS) \
 	$(EXT_HMAT_LIBS) $(PGLIBS)   $(LDFLAGS)
 
 $(BDIR)/rsf_solve: $(RSF_SOLVE_OBJS) $(ODIR)/coulomb_stress.o \
-	$(ODIR)/interact.o  $(PETSC_OBJS) $(GEN_P_INC) $(LIBLIST)   
+	$(ODIR)/interact_matrix_assembly.o  $(PETSC_OBJS) $(GEN_P_INC) $(LIBLIST)   
 	$(MPILD)   $(RSF_SOLVE_OBJS) $(PETSC_OBJS)  \
-	$(ODIR)/coulomb_stress.o $(ODIR)/interact.o  \
+	$(ODIR)/coulomb_stress.o $(ODIR)/interact_matrix_assembly.o  \
 	-o $(BDIR)/rsf_solve $(LIBS) $(PETSC_LIBS)  $(EXT_HMAT_LIBS) $(LDFLAGS)
 
 
