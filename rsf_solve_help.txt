@@ -1,0 +1,146 @@
+
+rsf_solve: quasi-dynamic rate-and-state earthquake-cycle solver (PETSc TS)
+usage: rsf_solve [options]   (options may also be placed in petsc_settings.yaml)
+
+geometry and input files
+  -geom_file <file>       fault geometry, one patch per row (default geom.in)
+  -rsf_file <file>        per-cell a b friction parameters (default rsf.dat)
+  -rsf_ic_file <file>     per-cell initial tau[Pa] vel[m/s]; overrides uniform IC
+  -rsf_dc_file <file>     per-cell D_c[m]; overrides uniform -dc
+  -rsf_sigma_file <file>  per-cell initial sigma0[Pa]; overrides uniform -sigma_init
+  -full_space <bool>      whole-space Green functions (default 0 = half space)
+  -tv <int>               triangular patch evaluation mode (default 0)
+
+elastic and rate-and-state parameters
+  -shear_modulus <Pa>     shear modulus G (default 32.04e9)
+  -s_wave_speed <m/s>     shear wave speed c_s, sets radiation damping eta = G/(2 c_s)
+                          (default 3464; note smaller c_s means MORE damping)
+  -rd_fac <fac>           scale the radiation damping coefficient (default 1;
+                          0 switches damping off, i.e. the c_s -> infinity limit;
+                          caution: without damping the quasi-dynamic coseismic
+                          phase is unregularized and integrators will fail at
+                          instabilities; > 1 gives enhanced damping)
+  -f0 <val>               reference friction f0 (default 0.6)
+  -dc <m>                 characteristic slip distance D_c (default 0.008)
+  -v0 <m/s>               reference velocity (default 1e-6)
+  -vpl <m/s>              plate loading rate (default 1e-9)
+  -rsf_slip_mode <0|1>    slip direction: 0 strike (default), 1 dip (thrust/normal)
+
+initial conditions
+  -sigma_init <Pa>        uniform initial normal stress (default 50e6)
+  -tau_init <Pa>          uniform initial shear stress (default f0*sigma_init + eta*vel_init)
+  -vel_init <m/s>         uniform initial slip rate (default vpl)
+  -rand_amp <val>         random initial-state multiplier amplitude (default 0)
+
+normal-stress evolution and limiter (for dip slip / nonplanar faults)
+  -calc_sigma_dot <bool>  evolve normal stress via the In matrix (default 0 = off)
+  -limit_sigma <bool>     clamp sigma to [min,max], as HBI limitsigma (default 0)
+  -min_sigma <Pa>         limiter floor (default 1e6)
+  -max_sigma <Pa>         limiter ceiling (default 300e6)
+
+state evolution
+  -state_law n            state evolution law: 1 aging (default), 2 slip, 3 PRZ,
+                          4 Sato-type, 5 Kato and Tullis composite
+                          aging: d psi/dt = b/dc (v0 exp((f0-psi)/b) - |v|)
+                          slip:  d psi/dt = -(|v|/dc) (psi - psi_ss)
+                          with psi_ss = f0 - b ln(|v|/v0); both share this
+                          steady state, i.e. f_ss = f0 + (a-b) ln(|v|/v0)
+                          PRZ (Perrin, Rice and Zheng 1995), theta form
+                          d theta/dt = 1/2 (1 - (|v| theta/dc)^2):
+                          d psi/dt = b/(2 dc) (v0 exp((f0-psi)/b)
+                                              - v^2/v0 exp((psi-f0)/b))
+                          aging, slip and PRZ share psi_ss = f0 - b ln(|v|/v0)
+                          and the same linearization: comparable at equal dc
+                          Sato and Kato-Tullis are the slip law plus a
+                          gated aging healing term, d theta/dt = gate
+                          - Omega ln Omega, Omega = |v| theta/dc, with
+                          gate = exp(-Omega/beta), beta = 1e-2      (Sato)
+                          gate = exp(-|v|/Vc),     Vc   = v0/100    (Kato-Tullis)
+                          beta and Vc are fixed in rsf_init.c for now. NOTE the
+                          Kato-Tullis gate does not vanish at |v| << Vc, which
+                          raises psi_ss there by b*W(1) = 0.567 b (its known
+                          steady-state offset); Sato has no such shift
+  -vmin_state <m/s>       |v| floor in the slip law's ln(|v|/v0) (default 1e-16)
+
+time stepping
+  -rtol <val>             ODE relative tolerance (default 1e-4)
+  -atol_slip <m>          absolute tolerance for slip entries (default 1e-3)
+  -dt_init <s>            initial step size (default 1)
+  -dt_max <s>             maximum step size (default 1e10)
+  -imex                   IMEX (ARKIMEX) integration: local state terms implicit,
+                          stress transfer explicit; helps stiff laws (e.g. PRZ)
+                          during coseismic phases (default off = explicit RK).
+                          The stage solvers use the options prefix imex_ (e.g.
+                          -imex_ksp_type); unprefixed ksp/pc/snes options,
+                          including those from petsc_settings.yaml, do not
+                          affect them.
+  -stop_time_yr <yr>      integration stop time (default 3000)
+  -domain_check_max_reject <n>  abort after n CONSECUTIVE out-of-domain trial
+                          steps (default 5000; <= 0 disables). Such rejection
+                          storms bypass the PETSc rejection limits and can
+                          otherwise grind a run indefinitely
+
+monitor and event detection
+  -print_interval_yr <yr> averaged-property output cadence (default 0.1)
+  -dt_monitor_yr <yr>     monitor cadence, also caps the step (default 5)
+  -rdx_monitor <val>      relative state-change monitor trigger (default 1e-4)
+  -adx_monitor <val>      absolute state-change trigger, <=0 off (default 0)
+  -monitor_tmin_yr <yr>   suppress monitor output before this time (default 0)
+  -track_events <bool>    locate slip-rate threshold crossings (default 1 = on)
+  -vel_event <m/s>        event onset threshold (default 1e-3)
+  -vel_event_hyst <val>   arrest at vel_event*hyst, debounces (default 0.5)
+  -event_tmin_yr <yr>     suppress event output before this time (default 0)
+
+optional outputs (all default off)
+  -rsf_catalog            write rsf_catalog.dat (per-event slip, drop, M0, Mw)
+  -rsf_rupture_time       write rsf_rupture_time.dat (first event front times)
+  -slip_budget            write rsf_slip_budget.dat (slip vs plate-rate reference)
+  -rupture_vth <m/s>      rupture-front threshold for the two above (default vel_event)
+  -field_step_interval <n> slip-rate field frame every n accepted steps (0 = off)
+  -field_tmin_yr <yr>     suppress field frames before this time (default 0)
+  -slip_line_dt_yr <yr>   tmp_rsf slip-line snapshot cadence (default off)
+
+interaction-matrix backend
+  -use_hmatrix <0..5>     0 dense (default) 1 HTOOL 2 H2OPUS 3 HACApK 4 hmmvp 5 BigWham
+  -hacapk_ztol <val>      HACApK compression tolerance
+  -hacapk_eta <val>       HACApK admissibility eta
+  -hacapk_inorm <int>     HACApK tolerance norm (1 = block-local)
+  -hmmvp_tol <val>        hmmvp compression tolerance
+  -hmmvp_eta <val>        hmmvp admissibility eta
+  -hmmvp_inorm <int>      hmmvp tolerance norm
+  -hmmvp_nthreads <int>   hmmvp compression threads
+
+relevant PETSc options (a full list is printed by -help)
+  -ts_rk_type <3bs|5dp|...>   Runge-Kutta variant (rsf uses an explicit RK)
+  -ts_adapt_type <basic|none> step-size adaptation
+  -ts_max_steps <n>           cap the number of accepted steps
+  -ts_monitor                 print time and step at every accepted step
+  -log_view                   PETSc performance and timing summary at the end
+  -mat_htool_compressor <SVD|fullACA|partialACA>  HTOOL compressor choice
+  -options_file <file>        read options from a file (petsc_settings.yaml auto-read)
+  -help                       PETSc's full registered-option dump
+
+output files
+  rsf_monitor.dat         time series on the adaptive monitor cadence (-dt_monitor,
+                          -adx_monitor, -rdx_monitor): step, time[s], time[yr], dt[s],
+                          log10(max|v|), mean_slip, mean_mu, max_sigma, min_sigma.
+                          Flushed as it is written
+  rsf_vel.times           one row per field frame (-field_step_interval): frame, step,
+                          time[yr], time[s], log10(max|v|), mean|v|, std|v|, min|v|,
+                          mean_slip. The |v| statistics are slip SPEEDS (v is signed).
+                          This is the index for the tmp_rsf/rsf_vel.gGGG.NNNNNN.bin
+                          frames and replaces the former rsf_stats.dat
+  rsf_events.dat          one row per slip-rate threshold crossing (-vel_event)
+  rsf_catalog.dat         one row per completed event (with -rsf_catalog)
+  rsf_geom.gGGG.dat       per-group patch geometry for the field frames
+
+examples
+  strike-slip BP5 at 2 km, dense, with an event catalog:
+    rsf_solve -geom_file geom_bp5_2km.in -rsf_file rsf_bp5_2km.dat \
+       -rsf_ic_file ic_bp5_2km.in -rsf_dc_file dc_bp5_2km.in \
+       -sigma_init 25e6 -dc 0.14 -stop_time_yr 240 -rsf_catalog
+  dip-slip thrust with evolving normal stress, hmmvp backend:
+    rsf_solve -geom_file geom_thrust.in -rsf_file rsf_thrust.dat -rsf_ic_file ic_thrust.in \
+       -sigma_init 58e6 -dc 0.02 -rsf_slip_mode 1 -calc_sigma_dot -limit_sigma \
+       -use_hmatrix 4 -hmmvp_tol 1e-4 -rsf_catalog
+
