@@ -29,7 +29,6 @@ p_4^x p_4^y p_4^z code
 if code is set
 
 
-
 ...
 
 
@@ -53,7 +52,7 @@ int main(int argc, char **argv)
   COMP_PRECISION *dummy=NULL;
   int i,j,opmode=PATCH_OUT_MODE,nrpatches,seg[2],code;
   long seed = -1;
-  my_boolean adjust_area=TRUE,use_code=FALSE;
+  my_boolean adjust_area=TRUE,use_code=FALSE,fullspace=FALSE;
   int iquad=0,np;
   medium=(struct med *)calloc(1,sizeof(struct med));
 #ifndef ALLOW_NON_3DQUAD_GEOM
@@ -111,8 +110,8 @@ int main(int argc, char **argv)
   nrpatches=0;
   while(read_points_local(x,&code, use_code, stdin,np)==np){
     for(i=0;i < np;i++)
-      if(x[i*3+INT_Z] > 0.0){
-	fprintf(stderr,"%s: rectangle %i: point %i: z should be <= 0 (%g, %g, %g)\n",
+      if((x[i*3+INT_Z] > 0.0)&&(!fullspace)){
+	fprintf(stderr,"%s: element %i: point %i: z should be <= 0 (%g, %g, %g)\n",
 		argv[0],medium->nrflt+1,i+1,x[i*3+INT_X],x[i*3+INT_Y],x[i*3+INT_Z]);
 	exit(-1);
       }

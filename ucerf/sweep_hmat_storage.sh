@@ -1,0 +1,132 @@
+#!/bin/bash
+#
+# Sweep H-matrix storage and measured per-matvec cost vs tolerance for the
+# H-matrix backends on a given geometry, using compress_interaction_matrix
+# with -skip_dense (build and time the operator only, no dense reference,
+# no cycle integration), and report speedup and memory reduction against a
+# dense baseline.
+#
+# Dense baseline logic:
+#   make_dense_reference=1 : run compress_interaction_matrix
+#       -dense_reference_only ONCE (with ncore_dense ranks; each rank's
+#       local block local_rows*n must stay below 2^31 entries, so at large
+#       N this needs correspondingly many ranks; the tool errors out with
+#       the required advice if not), and store the measured assembly time
+#       and per-matvec time in dense_ref_file. Subsequent runs can then
+#       set make_dense_reference=0.
+#   make_dense_reference=0 : if dense_ref_file exists, read the measured
+#       baseline from it; otherwise ESTIMATE the dense matvec as memory
+#       bandwidth bound, N*N*8 bytes / (bw_gbs GB/s), and mark the speedup
+#       column "est". Estimated numbers ignore parallel scaling and cache
+#       effects and are only meant to set the scale.
+#
+# Requires the 2026-07 tool version (-skip_dense honored in the
+# -make_matrix_externally path, hmat_matvec and dense_reference output
+# lines, -dense_reference_only mode).
+#
+# Backend flags mirror the uniform block-local settings of run_new_tests
+# (htool eta 3, hacapk inorm 1 eta 2, hmmvp inorm 1) plus an hmmvp
+# global-MREM row (inorm 3) for contrast.
+#
+# Storage extraction per backend: HMMVP from its assembly line ("stored
+# scalars"); HTOOL from the MatView compression ratio as N*N/ratio;
+# HACApK prints no storage figure (NA).
+#
+# Run from the directory holding the geometry. All parameters are plain
+# assignments below; edit them there (no environment variables).
+
+ncore=24                 # MPI ranks for the H-matrix sweep runs
+ncore_dense=64           # MPI ranks for the one dense reference run
+nrandom=200              # matvec timing applies (0 skips the timing line!)
+bin=../bin/compress_interaction_matrix
+geom=geom.in
+out=hmat_storage.dat
+dense_ref_file=dense_reference.dat
+make_dense_reference=1   # 1: (re)create dense_ref_file first, then sweep
+bw_gbs=200               # node memory bandwidth [GB/s] for the estimate
+
+htool_eps="1e-3 1e-4 1e-5 1e-6"
+hacapk_eps="1e-3 1e-4 1e-5 1e-6"
+hmmvp_eps="1e-3 1e-4 1e-5 1e-6"
+
+# ---------------------------------------------------------------- dense
+if [ $make_dense_reference -eq 1 ]; then
+    mpirun -np $ncore_dense $bin -geom_file $geom -make_matrix_externally \
+	   -use_hmatrix 0 -dense_reference_only -nrandom $nrandom &> log.dense_ref
+    gawk '/dense_reference m/ {
+            for(i=1;i<=NF;i++){
+              if($i=="m")             N=$(i+1)
+              if($i=="assembly_s")    as=$(i+1)
+              if($i=="per_matvec_ms") ms=$(i+1)
+            }
+            printf "# measured dense reference: ncore m assembly_s per_matvec_ms\n%i %i %s %s\n", NC, N, as, ms
+          }' NC=$ncore_dense log.dense_ref > $dense_ref_file
+    if [ ! -s $dense_ref_file ]; then
+	echo "dense reference run failed; see log.dense_ref" ; exit 1
+    fi
+    echo "wrote $dense_ref_file"
+fi
+
+npatch=`grep -cv '^#' $geom`
+if [ -s $dense_ref_file ]; then
+    read d_nc d_n d_as d_ms << EOF
+`grep -v '^#' $dense_ref_file`
+EOF
+    d_tag="meas_np$d_nc"
+else
+    # bandwidth-bound estimate: N*N*8 bytes per apply
+    d_ms=`echo $npatch $bw_gbs | gawk '{printf "%.4f", $1*$1*8/($2*1e9)*1000}'`
+    d_as="NA"
+    d_tag="est_${bw_gbs}GBs"
+fi
+
+# one row from one log: label, eps, stored scalars, MByte, ratio, matvec
+# ms, speedup vs dense. the hmat_matvec line is the success marker.
+extract='
+/hmat_matvec backend/ {
+  for(i=1;i<=NF;i++){
+    if($i=="m")          N=$(i+1)
+    if($i=="per_matvec") ms=$(i+1)
+  }
+  ok=1
+}
+/stored scalars/ {
+  for(i=1;i<=NF;i++) if($(i+1)=="stored") s=$i
+}
+/compression ratio/ { r=$NF }
+END{
+  if(!ok){ printf "# FAILED %s %s (no hmat_matvec line; see log)\n", B, EPS; exit }
+  if(s=="" && r!="" && r+0>0) s=int(N*N/r)
+  if(s!="" && (r=="" || r+0<=0)) r=N*N/s
+  mb=(s!="")?(s*8/1048576):("NA")
+  sp=(ms+0>0)?sprintf("%.1f",DMS/ms):("NA")
+  printf "%s %s %s %s %s %.4f %s %s\n", B, EPS, (s!=""?s:"NA"), mb, (r!=""?r:"NA"), ms, sp, DTAG
+}'
+
+echo "# dense baseline: per_matvec $d_ms ms assembly ${d_as} s [$d_tag]" > $out
+echo "# backend eps stored_scalars mbytes compression_ratio matvec_ms speedup dense_tag  (geom=$geom npatch=$npatch ncore=$ncore nrandom=$nrandom)" >> $out
+
+run_one () {                 # label logfile extra-flags...
+    label=$1; log=$2; shift 2
+    mpirun -np $ncore $bin -geom_file $geom -make_matrix_externally \
+	   -skip_dense -nrandom $nrandom "$@" &> $log
+    gawk -v B=$label -v EPS=$eps -v DMS=$d_ms -v DTAG=$d_tag "$extract" $log >> $out
+}
+
+for eps in $htool_eps; do
+    run_one HTOOL log.$eps.htools -use_hmatrix 1 -mat_htool_eta 3 -mat_htool_epsilon $eps
+done
+
+for eps in $hacapk_eps; do
+    run_one HACApK log.$eps.hacapk -use_hmatrix 3 -hacapk_inorm 1 -hacapk_eta 2 -hacapk_ztol $eps
+done
+
+for eps in $hmmvp_eps; do
+    run_one HMMVP log.$eps.hmmvp -use_hmatrix 4 -hmmvp_inorm 1 -hmmvp_tol $eps
+done
+
+for eps in $hmmvp_eps; do
+    run_one HMMVP_MREM log.$eps.hmmvp_mrem -use_hmatrix 4 -hmmvp_inorm 3 -hmmvp_tol $eps
+done
+
+echo "wrote $out"

@@ -53,6 +53,18 @@ int main(int argc, char **argv)
      m*n entries, which exceeds 32-bit PetscInt and a single rank's memory
      at large N, so this is what lets the assembly be timed on one rank. */
   PetscBool skip_dense=PETSC_FALSE;
+  /* -dense_reference_only: build ONLY the dense operator (external path),
+     time nrandom matvecs on it, print one machine-readable line, and
+     exit. For establishing the dense baseline once at large N (needs
+     enough ranks that local_rows*n stays below PetscInt); the H-matrix
+     sweep then reads the result instead of rebuilding dense each time. */
+  PetscBool dense_reference_only=PETSC_FALSE;
+  PetscReal dt0,dt1;
+  /* for the unified H-operator matvec timing (runs also with -skip_dense) */
+  Vec mvx,mvy;
+  PetscRandom mrnd;
+  PetscReal mt0,mt1;
+  PetscInt ir;
   char geom_file[STRLEN]="geom.in";
   /* optional external dumps (see -dump_matrix / -dump_coords below) */
   char dump_matrix_file[STRLEN]="",dump_coords_file[STRLEN]="";
@@ -107,6 +119,12 @@ int main(int argc, char **argv)
   PetscCall(PetscOptionsGetBool(NULL, NULL, "-test_forward", &test_forward,&read_value));
   PetscCall(PetscOptionsGetBool(NULL, NULL, "-make_matrix_externally", &make_matrix_externally,NULL));
   PetscCall(PetscOptionsGetBool(NULL, NULL, "-skip_dense", &skip_dense,NULL));
+  PetscCall(PetscOptionsGetBool(NULL, NULL, "-dense_reference_only", &dense_reference_only,NULL));
+  if(dense_reference_only && skip_dense){
+    HEADNODE
+      fprintf(stderr,"%s: -dense_reference_only and -skip_dense are mutually exclusive\n",argv[0]);
+    exit(-1);
+  }
   
   PetscCallMPI(MPI_Comm_size(PETSC_COMM_WORLD, &medium->comm_size));
   PetscCallMPI(MPI_Comm_rank(PETSC_COMM_WORLD, &medium->comm_rank));
@@ -550,23 +568,125 @@ int main(int argc, char **argv)
     HEADNODE
       fprintf(stderr,"%s: H matrix assembly took %12.4f s\n",argv[0],t1-t0);
 
-    if(skip_dense){
-      /* assembly timed; nothing to compare against (no dense reference),
-         so clean up and exit before the error/solve section. */
-      HEADNODE
-	fprintf(stderr,"%s: -skip_dense: exiting after H-matrix assembly (no error check)\n",argv[0]);
-      PetscCall(MatDestroy(&AH));
-      PetscCall(MatDestroy(&Adense));
-      PetscCall(PetscFinalize());
-      return 0;
-    }
-
   }else{
     /* 
-       use external routines 
+       use external routines. honor -skip_dense here as well, and apply
+       the same 32-bit dense-block overflow guard as the local branch:
+       the dense reference preallocates local_rows*n AIJ entries inside
+       calc_petsc_Isn_matrices, which overflows PetscInt at large N
+       (e.g. 265k patches on 24 ranks) and previously aborted the run
+       before the H matrix was ever built.
     */
-    calc_petsc_Isn_matrices(medium, fault,0,                  1.0,0,STRIKE,&Adense,hsc_dense); /* dense */
+    if(!skip_dense){
+      PetscInt local_rows=PETSC_DECIDE,glob=m;
+      PetscCall(PetscSplitOwnership(PETSC_COMM_WORLD,&local_rows,&glob));
+      if((PetscInt64)local_rows*(PetscInt64)n > (PetscInt64)PETSC_MAX_INT){
+	if(dense_reference_only){
+	  /* the user explicitly asked for dense; do not silently skip */
+	  HEADNODE
+	    fprintf(stderr,"%s: ERROR: -dense_reference_only, but the dense local block %ld x %i = %lld entries exceeds the PetscInt limit (%lld). Increase the MPI rank count so each rank's block stays under the limit.\n",
+		    argv[0],(long)local_rows,n,
+		    (long long)((PetscInt64)local_rows*(PetscInt64)n),(long long)PETSC_MAX_INT);
+	  exit(-1);
+	}
+	HEADNODE
+	  fprintf(stderr,"%s: WARNING: dense reference local block %ld x %i = %lld entries exceeds the PetscInt limit (%lld); proceeding as if -skip_dense was set. Add MPI ranks so each rank's block stays under the limit if the dense reference and error check are needed.\n",
+		  argv[0],(long)local_rows,n,
+		  (long long)((PetscInt64)local_rows*(PetscInt64)n),(long long)PETSC_MAX_INT);
+	skip_dense = PETSC_TRUE;
+      }
+    }
+    if(!skip_dense){
+      PetscCall(PetscTime(&dt0));
+      calc_petsc_Isn_matrices(medium, fault,0,                  1.0,0,STRIKE,&Adense,hsc_dense); /* dense */
+      PetscCall(PetscTime(&dt1));
+      if(dense_reference_only){
+	/* time matvecs on the dense operator and leave; one line holds
+	   everything the sweep script needs */
+	if(nrandom > 0){
+	  PetscCall(MatCreateVecs(Adense,&mvx,&mvy));
+	  PetscCall(PetscRandomCreate(PETSC_COMM_WORLD,&mrnd));
+	  PetscCall(VecSetRandom(mvx,mrnd));
+	  PetscCall(MatMult(Adense,mvx,mvy)); /* warm up */
+	  PetscCallMPI(MPI_Barrier(PETSC_COMM_WORLD));
+	  PetscCall(PetscTime(&mt0));
+	  for(ir=0;ir < nrandom;ir++)
+	    PetscCall(MatMult(Adense,mvx,mvy));
+	  PetscCallMPI(MPI_Barrier(PETSC_COMM_WORLD));
+	  PetscCall(PetscTime(&mt1));
+	  HEADNODE
+	    fprintf(stderr,"%s: dense_reference m %i n %i assembly_s %.3f applies %i per_matvec_ms %.4f\n",
+		    argv[0],m,n,(double)(dt1-dt0),(int)nrandom,
+		    1000.0*(double)(mt1-mt0)/(double)nrandom);
+	  PetscCall(PetscRandomDestroy(&mrnd));
+	  PetscCall(VecDestroy(&mvx));
+	  PetscCall(VecDestroy(&mvy));
+	}else{
+	  HEADNODE
+	    fprintf(stderr,"%s: dense_reference m %i n %i assembly_s %.3f applies 0 per_matvec_ms 0\n",
+		    argv[0],m,n,(double)(dt1-dt0));
+	}
+	HEADNODE
+	  fprintf(stderr,"%s: -dense_reference_only: exiting after dense assembly and matvec timing\n",argv[0]);
+	PetscCall(MatDestroy(&Adense));
+	PetscCall(PetscFinalize());
+	return 0;
+      }
+    }else{
+      /* row-distribution placeholder instead of the dense reference,
+         as in the local -skip_dense path */
+      PetscCall(MatCreate(PETSC_COMM_WORLD, &Adense));
+      PetscCall(MatSetSizes(Adense, PETSC_DECIDE, PETSC_DECIDE, m, n));
+      PetscCall(MatSetType(Adense, MATAIJ));
+      PetscCall(MatSeqAIJSetPreallocation(Adense, 0, NULL));
+      PetscCall(MatMPIAIJSetPreallocation(Adense, 0, NULL, 0, NULL));
+      PetscCall(MatSetUp(Adense));
+      PetscCall(MatGetLocalSize(Adense, &lm, &ln));
+      PetscCall(MatGetOwnershipRange(Adense, &medium->rs, &medium->re));
+      medium->rn = medium->re - medium->rs;
+      HEADNODE
+	fprintf(stderr,"%s: -skip_dense: no dense reference (H-matrix assembly and matvec timing only)\n",argv[0]);
+    }
     calc_petsc_Isn_matrices(medium, fault,medium->use_hmatrix,1.0,0,STRIKE,&AH,hsc_h); /* Htools, H2opus, HACApK, or HMVVP */
+  }
+
+  /*
+     unified H-operator report: for HTOOL print the operator info (which
+     includes the compression ratio; the other backends print their
+     storage on their own assembly lines), then time nrandom matvecs.
+     This block runs also under -skip_dense, which exits right after,
+     since everything below needs the dense reference.
+  */
+  if(medium->use_hmatrix==IHMAT_TYPE_HTOOLS)
+    PetscCall(MatView(AH,PETSC_VIEWER_STDOUT_WORLD));
+  {
+    if(nrandom > 0){
+      PetscCall(MatCreateVecs(AH,&mvx,&mvy));
+      PetscCall(PetscRandomCreate(PETSC_COMM_WORLD,&mrnd));
+      PetscCall(VecSetRandom(mvx,mrnd));
+      PetscCall(MatMult(AH,mvx,mvy)); /* warm up */
+      PetscCallMPI(MPI_Barrier(PETSC_COMM_WORLD));
+      PetscCall(PetscTime(&mt0));
+      for(ir=0;ir < nrandom;ir++)
+	PetscCall(MatMult(AH,mvx,mvy));
+      PetscCallMPI(MPI_Barrier(PETSC_COMM_WORLD));
+      PetscCall(PetscTime(&mt1));
+      HEADNODE
+	fprintf(stderr,"%s: hmat_matvec backend %i m %i n %i applies %i total %.4f s per_matvec %.4f ms\n",
+		argv[0],(int)medium->use_hmatrix,m,n,(int)nrandom,
+		(double)(mt1-mt0),1000.0*(double)(mt1-mt0)/(double)nrandom);
+      PetscCall(PetscRandomDestroy(&mrnd));
+      PetscCall(VecDestroy(&mvx));
+      PetscCall(VecDestroy(&mvy));
+    }
+  }
+  if(skip_dense){
+    HEADNODE
+      fprintf(stderr,"%s: -skip_dense: exiting after H-matrix assembly and matvec timing (no error check)\n",argv[0]);
+    PetscCall(MatDestroy(&AH));
+    PetscCall(MatDestroy(&Adense));
+    PetscCall(PetscFinalize());
+    return 0;
   }
 
   /* 

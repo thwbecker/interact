@@ -1,0 +1,41 @@
+#!/bin/bash
+#
+# convert ucerf geometry (one triangle per line: three vertices in columns
+# 1-9 [m], section tag in column 13, e.g. nn0.0861) into interact patch
+# format via points2patch.
+#
+# use_grp=1: carry the ucerf section id as the interact group number.
+#            NOTE points2patch reads the code after EVERY point (that is
+#            its documented per-point input format), so the group id must
+#            be emitted after each vertex triple, not once per line;
+#            emitting it once per line makes the %i code read consume the
+#            leading digits of the next vertex's x coordinate and corrupts
+#            the geometry silently (the stream resynchronizes at each
+#            newline, so no error is raised).
+# use_grp=0: no code column; points2patch then assigns each triangle its
+#            own group (group = patch index).
+
+use_grp=1
+
+if [ $use_grp -eq 1 ];then
+    gawk 'BEGIN{s=1e3;}
+      {if(NR>1){
+        grp=substr($13,5)-2;
+        for(i=1;i<=3;i++)
+          printf("%14.7e %14.7e %14.7e %i\n",
+                 $((i-1)*3+1)/s,$((i-1)*3+2)/s,$((i-1)*3+3)/s,grp);
+      }}' geometry.flt > tmp.dat
+    points2patch 0 0 1 2 < tmp.dat > geom.in
+else
+    gawk 'BEGIN{s=1e3;}
+      {if(NR>1){
+        for(i=1;i<=3;i++)
+          printf("%14.7e %14.7e %14.7e\n",
+                 $((i-1)*3+1)/s,$((i-1)*3+2)/s,$((i-1)*3+3)/s);
+      }}' geometry.flt > tmp.dat
+    points2patch 0 0 0 2 < tmp.dat > geom.in
+fi
+
+patch2vtk < geom.in > ucerf.vtk
+rm tmp.dat
+
