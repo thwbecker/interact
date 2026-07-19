@@ -469,7 +469,7 @@ void init_parameters_interact(char **argv, int argc,
       exit(-1);
     }else if(strcmp(argv[i],"-f")==0){// fault friction file
       toggle(read_fault_friction);
-    }else if(strcmp(argv[i],"-r")==0){// fault rake file
+    }else if(strcmp(argv[i],"-rk")==0){// fault rake file
       toggle(read_fault_rake);
     }else if(strcmp(argv[i],"-r")==0){// attempt a restart
       *attempt_restart = TRUE;

@@ -68,15 +68,15 @@ struct flt{
 			   angle from horizontal so that dip=90 
 			   means vertical 
 			*/
-  float r[2];			/* fraction of strike and dip for rake dependence */
+  COMP_PRECISION r[2];			/* fraction of strike and dip for rake dependence */
   double cos_alpha,/* cos and sin alpha, which is
 		      angle counterclockwise from East,
 		      ie. 90 - strike */
     sin_alpha;
-  COMP_PRECISION normal[3],*t_rake,
-    t_strike[3],t_dip[3]; /* normal and tangential 
-			     (strike and dip direction) 
-			     unit vectors */
+  COMP_PRECISION normal[3],t_strike[3],t_dip[3]; /* normal and
+						    tangential (strike
+						    and dip direction)
+						    unit vectors */
   COMP_PRECISION mu_db,mu_sa; /* 
 				 dynamic and static friction coefficients, or b and a
 			      */

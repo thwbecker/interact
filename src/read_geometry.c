@@ -590,21 +590,11 @@ void read_geometry(char *patch_filename,struct med **medium,
   if(read_fault_rake){
     in2 = myopen(FAULT_RAKE_FILE,"r");
     for(i=0;i<(*medium)->nrflt;i++){
-      if(fscanf(in2,"%lf",&rake)!=1){
+      if(fscanf(in2,ONE_CP_FORMAT,&rake)!=1){
 	fprintf(stderr,"read_geometry: error reading rake from %s for patch %i\n",FAULT_RAKE_FILE,i);
 	exit(-1);
       }
-#ifdef USE_DOUBLE_PRECISION
-      my_sincos_degd(&sin_dip,&cos_dip,rake);
-#else
-      my_sincos_deg(&sin_dip,&cos_dip,rake);
-#endif
-      (*fault+i)->r[0] = (float)cos_dip;
-      (*fault+i)->r[1] = (float)sin_dip;
-      (*fault+i)->t_rake = (COMP_PRECISION *)malloc(sizeof(COMP_PRECISION)*3);
-      for(j=0;j<3;j++){
-	(*fault+i)->t_rake[j] = (*fault+i)->r[0] * (*fault+i)->t_strike[j] + (*fault+i)->r[1] * (*fault+i)->t_dip[j];
-      }
+      my_sincos_deg(((*fault+i)->r+1),((*fault+i)->r+0),rake);
     }
     fclose(in2);
     (*medium)->fault_rake_init = TRUE;

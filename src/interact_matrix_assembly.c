@@ -41,10 +41,11 @@ COMP_PRECISION resolve_stress_on_fault_using_ctx(COMP_PRECISION stress[3][3],  s
     sval = dotp_3d(trac,ictx->fault[rfault].normal);
     break;
   case RAKE:
-    sval = dotp_3d(trac,ictx->fault[rfault].t_rake); /* only initialized if rake angles are read */
+    sval  = ictx->fault[rfault].r[0] * dotp_3d(trac,ictx->fault[rfault].t_strike);
+    sval += ictx->fault[rfault].r[1] * dotp_3d(trac,ictx->fault[rfault].t_dip);
     break;
   default:
-    fprintf(stderr,"esolve_stress_on_fault_using_ctx: stress mode %i undefined \n",ictx->rec_stress_mode);
+    fprintf(stderr,"resolve_stress_on_fault_using_ctx: stress mode %i undefined \n",ictx->rec_stress_mode);
     exit(-1);
   }
   return sval;
@@ -606,7 +607,8 @@ COMP_PRECISION interaction_coefficient(int i, int j, int k, int l,
       break;
     }
     case RAKE:{
-      fac=  dotp_3d(trac,fault[i].t_rake);
+      fac  =  fault[i].r[0] * dotp_3d(trac,fault[i].t_strike);
+      fac +=  fault[i].r[1] * dotp_3d(trac,fault[i].t_dip);
       break;
     }
     case NORMAL:{

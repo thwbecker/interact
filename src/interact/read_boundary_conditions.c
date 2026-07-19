@@ -514,21 +514,23 @@ void read_one_step_bc(FILE *in,struct med *medium,struct flt *fault,
 	   SPECIFIED SLIP BOUNDARY CONDITIONS
 	   
 	*/
-      case DIP:
-#ifdef ALLOW_NON_3DQUAD_GEOM
-	if(patch_is_2d(fault[patch_nr].type)){
-	  HEADNODE
-	    fprintf(stderr,"read_boundary_conditions: error, dip slip assigned to 2-D patch %i (use normal)\n",
-		    patch_nr);
-	  exit(-1);
-	}
-#endif
       case RAKE:
 	if(!(medium->fault_rake_init)){
 	  HEADNODE
 	    fprintf(stderr,"read_boundary_conditions: error, rake slip mode, but rake angles not initialized\n");
 	  exit(-1);
 	}
+	/* fallthrough: rake slip includes a dip component, so the 2-D
+	   patch restriction below applies to it as well */
+      case DIP:
+#ifdef ALLOW_NON_3DQUAD_GEOM
+	if(patch_is_2d(fault[patch_nr].type)){
+	  HEADNODE
+	    fprintf(stderr,"read_boundary_conditions: error, dip (or rake) slip assigned to 2-D patch %i (use normal)\n",
+		    patch_nr);
+	  exit(-1);
+	}
+#endif
       case STRIKE:
       case NORMAL:{
 	slip_bc_assigned = TRUE;
