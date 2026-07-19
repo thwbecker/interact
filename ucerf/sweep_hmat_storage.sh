@@ -35,14 +35,14 @@
 # Run from the directory holding the geometry. All parameters are plain
 # assignments below; edit them there (no environment variables).
 
-ncore=24                 # MPI ranks for the H-matrix sweep runs
+ncore=64                 # MPI ranks for the H-matrix sweep runs
 ncore_dense=64           # MPI ranks for the one dense reference run
 nrandom=200              # matvec timing applies (0 skips the timing line!)
 bin=../bin/compress_interaction_matrix
 geom=geom.in
 out=hmat_storage.dat
 dense_ref_file=dense_reference.dat
-make_dense_reference=1   # 1: (re)create dense_ref_file first, then sweep
+make_dense_reference=0   # 1: (re)create dense_ref_file first, then sweep
 bw_gbs=200               # node memory bandwidth [GB/s] for the estimate
 
 htool_eps="1e-3 1e-4 1e-5 1e-6"
@@ -90,10 +90,16 @@ extract='
   }
   ok=1
 }
-/stored scalars/ {
-  for(i=1;i<=NF;i++) if($(i+1)=="stored") s=$i
+/hmat_storage backend/ {      # primary: printed by calc_petsc_Isn_matrices
+  for(i=1;i<=NF;i++){         # for every backend (NA where unavailable)
+    if($i=="stored_scalars" && $(i+1)!="NA") s=$(i+1)
+    if($i=="dense_ratio"    && $(i+1)!="NA") r=$(i+1)
+  }
 }
-/compression ratio/ { r=$NF }
+/stored scalars/ {            # fallback: hmmvp assembly line
+  if(s=="") for(i=1;i<=NF;i++) if($(i+1)=="stored") s=$i
+}
+/compression ratio/ { if(r=="") r=$NF }   # fallback: htool MatView
 END{
   if(!ok){ printf "# FAILED %s %s (no hmat_matvec line; see log)\n", B, EPS; exit }
   if(s=="" && r!="" && r+0>0) s=int(N*N/r)
@@ -106,10 +112,14 @@ END{
 echo "# dense baseline: per_matvec $d_ms ms assembly ${d_as} s [$d_tag]" > $out
 echo "# backend eps stored_scalars mbytes compression_ratio matvec_ms speedup dense_tag  (geom=$geom npatch=$npatch ncore=$ncore nrandom=$nrandom)" >> $out
 
+# resumable: if the log already holds a completed run (hmat_matvec marker),
+# only re-extract; delete the log to force a rerun of that point
 run_one () {                 # label logfile extra-flags...
     label=$1; log=$2; shift 2
-    mpirun -np $ncore $bin -geom_file $geom -make_matrix_externally \
-	   -skip_dense -nrandom $nrandom "$@" &> $log
+    if ! grep -q "hmat_matvec backend" $log 2> /dev/null ; then
+	mpirun -np $ncore $bin -geom_file $geom -make_matrix_externally \
+	       -skip_dense -nrandom $nrandom "$@" &> $log
+    fi
     gawk -v B=$label -v EPS=$eps -v DMS=$d_ms -v DTAG=$d_tag "$extract" $log >> $out
 }
 
