@@ -47,7 +47,7 @@ int main(int argc, char **argv)
   }
   fprintf(stderr,"%s: reading patch format from stdin, writing xyz to stdout. shrink: %i\n",
 	  argv[0],shrink_patches);
-  read_geometry("stdin",&medium,&fault,FALSE,FALSE,FALSE,verbose);
+  read_geometry("stdin",&medium,&fault,FALSE,FALSE,FALSE,FALSE,verbose);
   if(use_scalar){
     if((comp >= use_scalar)||(comp<0)){
       fprintf(stderr,"%s: set to read %i scalars, but component for output is %i\n",argv[0],use_scalar,comp);

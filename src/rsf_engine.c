@@ -24,7 +24,7 @@ PetscReal vel_from_rsf(PetscReal tau, PetscReal sigma, PetscReal state, PetscRea
   PetscReal vel;
   *mu = tau/sigma;
   *scaled_tau = (*mu)/a;
-  *exp_fac = PetscExpReal(-state/a);
+  *exp_fac = exp(-state/a);
   vel =  2.*v0 * (*exp_fac) * PetscSinhReal(*scaled_tau);
   return vel;
 }
@@ -49,7 +49,7 @@ PetscReal rsf_state_rate(PetscInt i, PetscReal psi, PetscReal vin,
   PetscBool floored = PETSC_FALSE;
   struct rsf_vars *rsf;
   rsf = par->medium->rsf;
-  b = par->fault[i].mu_d;
+  b = par->fault[i].mu_db;
   if(b == 0.0){			/* b == 0 guard as in HBI */
     if(dSdpsi)
       *dSdpsi = 0.0;
@@ -61,7 +61,7 @@ PetscReal rsf_state_rate(PetscInt i, PetscReal psi, PetscReal vin,
   D = (rsf->dc_vec)?(rsf->dc_vec[i]):(rsf->dc);
   switch(rsf->state_law){
   case RSF_AGING_LAW:			/* Dieterich aging  law */
-    epsi = PetscExpReal((rsf->f0 - psi)/b); /* exp((f0-psi)/b), NOT the epsi above */
+    epsi = exp((rsf->f0 - psi)/b); /* exp((f0-psi)/b), NOT the epsi above */
     S = (b/D) * (rsf->v0 * epsi - fabs(vin));
     if(dSdpsi)
       *dSdpsi = -(rsf->v0/D) * epsi;
@@ -82,7 +82,7 @@ PetscReal rsf_state_rate(PetscInt i, PetscReal psi, PetscReal vin,
     break;
   case RSF_PRZ_LAW:
     vabs = fabs(vin);
-    epsi  = PetscExpReal((psi - rsf->f0)/b); /* exp((psi-f0)/b) */
+    epsi  = exp((psi - rsf->f0)/b); /* exp((psi-f0)/b) */
     S = (b/(2.0*D)) * (rsf->v0/epsi - (vabs*vabs/rsf->v0)*epsi);
     if(dSdpsi)
       *dSdpsi = -(1.0/(2.0*D)) * (rsf->v0/epsi + (vabs*vabs/rsf->v0)*epsi);
@@ -95,11 +95,11 @@ PetscReal rsf_state_rate(PetscInt i, PetscReal psi, PetscReal vin,
     if(vabs < rsf->vmin_state){
       vabs = rsf->vmin_state;floored = PETSC_TRUE;
     }
-    epsi  = PetscExpReal((psi - rsf->f0)/b);       /* exp((psi-f0)/b)   */
+    epsi  = exp((psi - rsf->f0)/b);       /* exp((psi-f0)/b)   */
     omega = (vabs/rsf->v0) * epsi;		   /* Omega = |v| th/dc */
     gate  = (rsf->state_law == RSF_SATO_LAW)?
-      (PetscExpReal(-omega/rsf->sato_beta)):
-      (PetscExpReal(-vabs/rsf->kt_vc));
+      (exp(-omega/rsf->sato_beta)):
+      (exp(-vabs/rsf->kt_vc));
     lomega = PetscLogReal(vabs/rsf->v0) + (psi - rsf->f0)/b;  /* ln Omega */
     S = (b/D) * ((rsf->v0/epsi)*gate - vabs*lomega);
     if(dSdpsi){
@@ -156,7 +156,7 @@ PetscErrorCode rsf_compute_vel_and_stressing(Vec X, struct interact_ctx *par)
   /* i global patch, j local x offset, k local patch */
   for (i = medium->rs, j=0, k=0; i < medium->re; i++, j+=rsf->dim, k++) {
     /* local x layout: state = x[j], tau = x[j+1], sigma = x[j+2], slip = x[j+3] */
-    vel[k] = vel_from_rsf(x[j+1],x[j+2],x[j],fault[i].mu_s,rsf->v0,
+    vel[k] = vel_from_rsf(x[j+1],x[j+2],x[j],fault[i].mu_sa,rsf->v0,
 			  &mu, &scaled_tau, &exp_fac, medium);
   }
   PetscCall(VecRestoreArray(rsf->vel,&vel));
@@ -186,7 +186,7 @@ PetscErrorCode rsf_compute_vel_and_stressing(Vec X, struct interact_ctx *par)
 PetscErrorCode rsf_ODE_RHSFunction(TS ts,PetscReal time,Vec X,Vec F,void *ptr)
 {
   PetscScalar *f,cosh_fac,mu,scaled_tau,exp_fac,pre_fac;
-  PetscScalar dvdtau,dvdsigma,dvdstate,a,sdot;
+  PetscScalar dvdtau,dvdsigma,dvdstate,sdot;
   const PetscScalar *x,*tau_dot,*sigma_dot,*velr;
   struct med *medium;struct flt *fault;
   PetscInt i,j,k;
@@ -213,7 +213,6 @@ PetscErrorCode rsf_ODE_RHSFunction(TS ts,PetscReal time,Vec X,Vec F,void *ptr)
   /*  */
   PetscCall(VecGetArray(F,&f));
   for (i = medium->rs, j=0, k=0; i < medium->re; i++, j+=rsf->dim, k++) {
-    a = fault[i].mu_s;	/* b = fault[].mu_d is used inside rsf_state_rate */
     /* 
        state evolution, in the psi variable used throughout
        (implemented in rsf_state_rate above, shared with the IMEX path):
@@ -279,13 +278,13 @@ PetscErrorCode rsf_ODE_RHSFunction(TS ts,PetscReal time,Vec X,Vec F,void *ptr)
        eta = G/(2cs)
     */
     mu = x[j+1]/x[j+2];				/* tau/sigma */
-    scaled_tau = mu/a;				/* tau/(sigma a) */
-    exp_fac = PetscExpReal(-x[j]/a);		/* exp(-psi/a) */
-    pre_fac =  2.0*rsf->v0/(a * x[j+2]);	/* 2v0/(a sigma) */
+    scaled_tau = mu/fault[i].mu_sa;				/* tau/(sigma a) */
+    exp_fac = exp(-x[j]/fault[i].mu_sa);		/* exp(-psi/a) */
+    pre_fac =  2.0*rsf->v0/(fault[i].mu_sa * x[j+2]);	/* 2v0/(a sigma) */
     cosh_fac  = PetscCoshReal(scaled_tau) * exp_fac;
     dvdtau   =   pre_fac * cosh_fac;
     dvdsigma =  -pre_fac * cosh_fac * mu;
-    dvdstate = -velr[k]/a;
+    dvdstate = -velr[k]/fault[i].mu_sa;
     f[j+1]  = (tau_dot[k] + fault[i].sinc[0] 
 	       - rsf->shear_mod_over_2cs_si * (dvdsigma * f[j+2] + dvdstate * f[j]));
     f[j+1] /= (1.0 + rsf->shear_mod_over_2cs_si * dvdtau);
@@ -312,7 +311,6 @@ PetscErrorCode rsf_domain_check(TS ts,PetscReal time,Vec X,PetscBool *accept)
   const PetscScalar *x;
   struct med *medium;struct flt *fault;
   PetscInt i,j,lok,gok;
-  PetscReal a,b;
   const PetscReal arg_max = 600.; /* exp/sinh overflow guard */
   struct rsf_vars *rsf;
 
@@ -324,15 +322,14 @@ PetscErrorCode rsf_domain_check(TS ts,PetscReal time,Vec X,PetscBool *accept)
   lok = 1;
   PetscCall(VecGetArrayRead(X,&x));
   for (i = medium->rs, j=0; (i < medium->re) && lok; i++, j+=rsf->dim) {
-    a = fault[i].mu_s;b = fault[i].mu_d;
     if((!PetscIsNormalReal(x[j+2])) || (x[j+2] <= 0.0)){lok = 0;break;} /* sigma */
     if(PetscIsInfOrNanReal(x[j]) || PetscIsInfOrNanReal(x[j+1]) || PetscIsInfOrNanReal(x[j+3])){lok = 0;break;}
-    if(fabs(x[j+1]/(x[j+2]*a)) > arg_max){lok = 0;break;} /* sinh(tau/(sigma a)) */
-    if(fabs(x[j]/a) > arg_max){lok = 0;break;}		  /* exp(-psi/a) */
+    if(fabs(x[j+1]/(x[j+2]*fault[i].mu_sa)) > arg_max){lok = 0;break;} /* sinh(tau/(sigma a)) */
+    if(fabs(x[j]/fault[i].mu_sa) > arg_max){lok = 0;break;}		  /* exp(-psi/a) */
     /* the exp(+-(f0-psi)/b) overflow test applies to the aging law and to PRZ,
        both of which exponentiate (psi-f0)/b; the slip law has no such term */
-    if((rsf->state_law != RSF_SLIP_LAW) && (b != 0.0) &&
-       (fabs((rsf->f0 - x[j])/b) > arg_max)){lok = 0;break;} /* aging/PRZ exp */
+    if((rsf->state_law != RSF_SLIP_LAW) && ( fault[i].mu_db != 0.0) &&
+       (fabs((rsf->f0 - x[j])/ fault[i].mu_db) > arg_max)){lok = 0;break;} /* aging/PRZ exp */
   }
   PetscCall(VecRestoreArrayRead(X,&x));
   PetscCallMPI(MPI_Allreduce(&lok,&gok,1,MPIU_INT,MPI_MIN,PETSC_COMM_WORLD));

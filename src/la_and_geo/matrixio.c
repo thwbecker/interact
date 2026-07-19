@@ -400,7 +400,7 @@ void print_reduced_interaction_matrix(struct med *medium,struct flt *fault)
 	  shear_dip     += ICIM(medium->i,i,j,k,DIP)   *slip[k];
 	}
 	tmpflt=coulomb_stress(sqrt(SQUARE(shear_strike)+SQUARE(shear_dip)),
-			      (COMP_PRECISION)fault[i].mu_s,normal,
+			      (COMP_PRECISION)fault[i].mu_sa,normal,
 			      medium->cohesion);
 	fwrite(&tmpflt,medium->i_matrix_prec_size,1,out);
       }
@@ -419,7 +419,7 @@ void print_reduced_interaction_matrix(struct med *medium,struct flt *fault)
 					     medium->is1,medium->val)   *slip[k];
 	}
 	tmpflt=coulomb_stress(sqrt(SQUARE(shear_strike)+SQUARE(shear_dip)),
-			      (COMP_PRECISION)fault[i].mu_s,normal,
+			      (COMP_PRECISION)fault[i].mu_sa,normal,
 			      medium->cohesion);
 	fwrite(&tmpflt,medium->i_matrix_prec_size,1,out);
       }

@@ -45,7 +45,7 @@ int main(int argc, char **argv)
     break;
   }
   // read in geometry 
-  read_geometry(GEOMETRY_FILE,&medium,&fault,FALSE,FALSE,
+  read_geometry(GEOMETRY_FILE,&medium,&fault,FALSE,FALSE,FALSE,
 		FALSE,FALSE);
   fprintf(stderr,"%s: trying to read stress inits from %s\n",argv[0],
 	  FAULT_STRESS_INIT_FILE);
@@ -85,8 +85,8 @@ int main(int argc, char **argv)
   // read the friction coefficients
   //
   fprintf(stderr,"%s: trying to read friction inits from %s\n",argv[0],
-	   FAULT_PROP_FILE);
-  in=fopen(FAULT_PROP_FILE,"r");
+	    FAULT_SD_FRIC_FILE);
+  in=myopen( FAULT_SD_FRIC_FILE,"r");
   if(!in){
     check_mu = FALSE;
     fprintf(stderr,"%s: file not found\n",argv[0]);
@@ -99,11 +99,11 @@ int main(int argc, char **argv)
     for(j=medium->nrflt,i=0;i<medium->nrflt;i++,j++)
       if(fscanf(in,TWO_CP_FORMAT,(mu+i),(mu+j))!=2){
 	fprintf(stderr,"%s: read error in %s, patch %i\n",
-		argv[0],FAULT_PROP_FILE,i+1);
+		argv[0], FAULT_SD_FRIC_FILE,i+1);
 	exit(-1);
       }else{
-	fault[i].mu_s = (float)mu[i];
-	fault[i].mu_d = (float)mu[j];
+	fault[i].mu_sa = (float)mu[i];
+	fault[i].mu_db = (float)mu[j];
       }
     fclose(in);
   }
@@ -209,12 +209,12 @@ int main(int argc, char **argv)
 	fprintf(out,"%g %g %g %g %g %g %g\n",
 		fault[i].pos[0],fault[i].pos[1],
 		s[i+os[0]],s[i+os[1]],s[i+os[2]],
-		fault[i].mu_s,fault[i].mu_d);
+		fault[i].mu_sa,fault[i].mu_db);
     else if(check_mu)
       for(i=0;i<medium->nrflt;i++)
 	fprintf(out,"%g %g %g %g %g %g %g\n",
 		fault[i].pos[0],fault[i].pos[1],0.,0.,0.,
-		fault[i].mu_s,fault[i].mu_d);
+		fault[i].mu_sa,fault[i].mu_db);
     else if(check_stress)
       for(j=medium->nrflt,k=j+medium->nrflt,
 	    i=0;i<medium->nrflt;i++,j++,k++)

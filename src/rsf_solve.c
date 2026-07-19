@@ -120,7 +120,6 @@ PetscErrorCode rsf_solve_run(int argc,char **argv,struct interact_ctx *par,
   PetscReal vel_event = set->vel_event, vel_event_hyst = set->vel_event_hyst, event_tmin = set->event_tmin;
   PetscBool track_events = set->track_events, have_ic = set->have_ic, have_dc = set->have_dc;
   PetscBool have_sigma = set->have_sigma;
-  
   char geom_file[STRLEN],rsf_file[STRLEN],rsf_ic_file[STRLEN],rsf_dc_file[STRLEN],rsf_sigma_file[STRLEN];
   PetscFunctionBeginUser;
   strncpy(geom_file,  set->geom_file,  STRLEN);
@@ -128,8 +127,8 @@ PetscErrorCode rsf_solve_run(int argc,char **argv,struct interact_ctx *par,
   strncpy(rsf_ic_file,set->rsf_ic_file,STRLEN);
   strncpy(rsf_dc_file,set->rsf_dc_file,STRLEN);
   strncpy(rsf_sigma_file,set->rsf_sigma_file,STRLEN);
-  /* get the geometry */
-  read_geometry(geom_file,&medium,&par->fault,TRUE,FALSE,FALSE,FALSE);
+  /* get the geometry, and rake if selected */
+  read_geometry(geom_file,&medium,&par->fault,FALSE,(rsf->slip_mode==RAKE)?(TRUE):(FALSE),FALSE,FALSE,FALSE);
   fault = par->fault;
   n = medium->nrflt;
   HEADNODE{
@@ -144,7 +143,7 @@ PetscErrorCode rsf_solve_run(int argc,char **argv,struct interact_ctx *par,
 	    argv[0],rtol,dt_init,dt_max,medium->stop_time/sec_per_year,rsf->state_law);
   }
   /* 
-     now, read in a,b variations (stored in fault[].mu_s, fault[].mu_d)
+     now, read in a,b variations (stored in fault[].mu_sa, fault[].mu_db)
   */
   read_rsf(rsf_file,medium,fault);
   /* optional per-cell initial tau,vel (e.g. BP5 nucleation patch) */
@@ -302,7 +301,7 @@ PetscErrorCode rsf_solve_run(int argc,char **argv,struct interact_ctx *par,
       fault[i].u[0] = vel_init;
     }
     /* state consistent with v = vel_init */
-    state = fault[i].mu_s*log(2.0*rsf->v0/fault[i].u[0]*sinh(fault[i].s[STRIKE]/fault[i].s[NORMAL]/fault[i].mu_s));
+    state = fault[i].mu_sa*log(2.0*rsf->v0/fault[i].u[0]*sinh(fault[i].s[STRIKE]/fault[i].s[NORMAL]/fault[i].mu_sa));
     if(rand_amp > 0)
       state *= rand_fac;
     PetscCall(VecSetValue(x, (PetscInt)(j+0),state, INSERT_VALUES));
@@ -312,14 +311,14 @@ PetscErrorCode rsf_solve_run(int argc,char **argv,struct interact_ctx *par,
     /* check discretization against the quasi-static cohesive zone
        size Lb = G dc/(b sigma), using the smallest patch dimension */
     patch_l = 2.0*((fault[i].l < fault[i].w)?(fault[i].l):(fault[i].w));
-    stable_l = shear_modulus_si*(rsf->dc_vec?rsf->dc_vec[i]:rsf->dc)/fault[i].mu_d/fault[i].s[NORMAL];
+    stable_l = shear_modulus_si*(rsf->dc_vec?rsf->dc_vec[i]:rsf->dc)/fault[i].mu_db/fault[i].s[NORMAL];
     if((patch_l > stable_l/3.)&&(!warned)){
-      fprintf(stderr,"%s: WARNING: patch %05i: size %.3e m vs. Lb = G dc/(b sigma) %.3e m, coarser than Lb/3\n",
+      fprintf(stderr,"%s: WARNING: patch %010i: size %.3e m vs. Lb = G dc/(b sigma) %.3e m, coarser than Lb/3\n",
 	      argv[0],i,patch_l,stable_l);
       fprintf(stderr,"%s: a %g b %g tau %.4e sigma %.4e psi %.4e v %.4e (suppressing further warnings)\n",
-	      argv[0],fault[i].mu_s,fault[i].mu_d,fault[i].s[STRIKE],fault[i].s[NORMAL],state,
+	      argv[0],fault[i].mu_sa,fault[i].mu_db,fault[i].s[STRIKE],fault[i].s[NORMAL],state,
 	      vel_from_rsf(fault[i].s[STRIKE], fault[i].s[NORMAL], state,
-			   fault[i].mu_s,rsf->v0,dummy,(dummy+1),(dummy+2),medium));
+			   fault[i].mu_sa,rsf->v0,dummy,(dummy+1),(dummy+2),medium));
       warned = PETSC_TRUE;
     }
   }
@@ -568,7 +567,7 @@ PetscErrorCode rsf_event_function(TS ts,PetscReal t,Vec X,PetscScalar *fvalue,vo
   lvmax = 0.0;
   PetscCall(VecGetArrayRead(X,&x));
   for (i = medium->rs, j=0; i < medium->re; i++, j+=rsf->dim) {
-    v = fabs(vel_from_rsf(x[j+1],x[j+2],x[j],fault[i].mu_s,rsf->v0,&d1,&d2,&d3,medium));
+    v = fabs(vel_from_rsf(x[j+1],x[j+2],x[j],fault[i].mu_sa,rsf->v0,&d1,&d2,&d3,medium));
     if(v > lvmax)lvmax = v;
   }
   PetscCall(VecRestoreArrayRead(X,&x));

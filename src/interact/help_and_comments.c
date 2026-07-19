@@ -219,10 +219,11 @@ void phelp(void)
   PE("");
   PE("   Possible boundary conditions (as indicated by their integer codes) are:");
   PE("");
-  fprintf(stderr,"   (A) %i, %i, %i: slip on fault specified (if called several times, will add up)\n",
-	  STRIKE,DIP,NORMAL);
-  fprintf(stderr,"    %i means strike, %i dip, and %i normal direction\n",
-	  STRIKE,DIP,NORMAL);
+  fprintf(stderr,"   (A) %i, %i, %i, %i: slip on fault specified (if called several times, will add up)\n",
+	  STRIKE,DIP,NORMAL,RAKE);
+  fprintf(stderr,"    %i means strike, %i dip, %i normal, and %i rake direction\n",
+	  STRIKE,DIP,NORMAL,RAKE);
+  PE("    using rake requires reading an additional fault rake file, see -rk");
   PE("");
   PE("    For strike: positive values of slip mean left-lateral fault, negative right-lateral;");
   PE("    \tthis corresponds to a resulting drop resp. increase in the strike component of stress.");
@@ -234,6 +235,7 @@ void phelp(void)
   PE("    \tthis corresponds to a resulting drop resp. increase in the dip component of stress.");
   PE("    For normal: positive values of slip mean explosive source, negative implosive;");
   PE("    \tthis corresponds to a resulting drop resp. increase in the normal component of stress.\n");
+  PE("    For rake: A mixture between strike (rake angle 0) and dip slip (rake angle 90, counted CCW from strike);");
   PE("");
   fprintf(stderr,"   (B) %i, %i, %i or %i, %i, %i or %i, %i, %i: stresses are specified\n",
 	  STRIKE_SLIP,STRIKE_SLIP_LEFTLATERAL,STRIKE_SLIP_RIGHTLATERAL,
@@ -476,16 +478,20 @@ void phelp(void)
 	  name_boolean(TOGV(READ_INITIAL_FAULT_STRESS_DEF)));
   PE("");
 
-  fprintf(stderr," -f  read in fault properties from file \"%s\", so far only parameters for the friction law\n",
-	  FAULT_PROP_FILE);
+  fprintf(stderr," -f  read in fault friction from file \"%s\", so far only parameters for the friction law\n",
+	  FAULT_SD_FRIC_FILE);
   PE("     are supported. Format:\n");
   PE("     mu_static^0 mu_dynamic^0\n     mu_static^1 mu_dynamic^1\n     ...\n");
   PE("     (repeated for each fault). Static and dynamic coefficients of friction for");
   PE("     Coulomb.");
   fprintf(stderr,"     %s by default, if switch is set will be %s.\n",
-	  name_boolean(READ_FAULT_PROPERTIES_DEF),name_boolean(TOGV(READ_FAULT_PROPERTIES_DEF)));
+	  name_boolean(READ_FAULT_FRICTION_DEF),name_boolean(TOGV(READ_FAULT_FRICTION_DEF)));
   PE("");
+  fprintf(stderr," -rk read in fault rake from file \"%s\"\n",FAULT_RAKE_FILE);
+  fprintf(stderr,"     %s by default, if switch is set will be %s.\n",
+	  name_boolean(READ_FAULT_RAKE_DEF),name_boolean(TOGV(READ_FAULT_RAKE_DEF)));
 
+  PE("")
   PE(" -i  suppress all interactions between fault patches except the self-effect of slip on any");
   fprintf(stderr,"     patches within the group that the patch belongs to and the effect of slip\n");
   fprintf(stderr,"     on the number %i master group (this should be the main fault).\n",
@@ -640,12 +646,10 @@ void phelp(void)
 	  name_boolean(TOGV(USE_OLD_AMAT_DEF)));
   PE("");
 
-
-
   PE(" -r  attempts to restart a loading simulation model run based on previous results");
   PE("     WARNING: all result files will be overwritten NOT appended, so save before.");
   fprintf(stderr,"     For this to work, \"%s\" and \"%s\" (and possibly \"%s\" and \"%s\"\n     should not be substantially changed.\n\n",
-	  GEOMETRY_FILE, BC_FILE,FAULT_STRESS_INIT_FILE,FAULT_PROP_FILE);
+	  GEOMETRY_FILE, BC_FILE,FAULT_STRESS_INIT_FILE,FAULT_SD_FRIC_FILE);
   fprintf(stderr,"     Slip events from the previous run in the format as in the output file \"%s\" will be read in\n",
 #ifdef BINARY_PATCH_EVENT_FILE
 	  EVENT_FILE_BINARY);

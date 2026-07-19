@@ -16,6 +16,7 @@ int main(int argc, char **argv)
   int slip_modes=2;		/* 2: strike and dip 1: strike -1: dip */
   COMP_PRECISION u[3],sm[3][3],disp[3],x[3];
   int i,j,k,l,iret,opmode;
+  my_boolean read_rake=FALSE,read_fric=FALSE;
   medium=(struct med *)calloc(1,sizeof(struct med)); /* init as zeros */
   if(argc<3)
     print_help_local2(argv[0],disp_dim,slip_modes);
@@ -31,7 +32,7 @@ int main(int argc, char **argv)
     fprintf(stderr,"%s: bad parameters\n",argv[0]);
     exit(-1);
   }
-  read_geometry(argv[1],&medium,&fault,TRUE,FALSE,FALSE,TRUE);
+  read_geometry(argv[1],&medium,&fault,read_fric,read_rake,FALSE,FALSE,TRUE);
   medium->i_mat_cutoff = I_MAT_CUTOFF_DEF;
   medium->olocnr=0;
   medium->xoloc = (float *)malloc(sizeof(float)*2);
@@ -72,9 +73,9 @@ int main(int argc, char **argv)
 	for(j=0;j < medium->nrflt;j++){
 	  for(k=0;k < slip_modes;k++){
 	    if(opmode == 1)
-	      get_right_slip(disp,k,1.0);
+	      get_right_slip(disp,k,1.0,(fault+j));
 	    else
-	      get_right_slip(disp,DIP,1.0);
+	      get_right_slip(disp,DIP,1.0,(fault+j));
 	    eval_okada(x,(fault+j),disp,u,sm,&iret, GC_DISP_AND_STRESS,medium->full_space);
 	    fprintf(stdout,"%g ",u[l]);
 	  }
@@ -122,9 +123,9 @@ void calc_design_matrix(struct med *medium,struct flt *fault,int disp_dim, int s
     for(j=0;j < medium->nrflt;j++){
       for(k=0;k < slip_modes;k++){
 	if(opmode == 1)
-	  get_right_slip(disp,k,1.0);
+	  get_right_slip(disp,k,1.0,(fault+j));
 	else
-	  get_right_slip(disp,DIP,1.0);
+	  get_right_slip(disp,DIP,1.0,(fault+j));
 	eval_okada(x,(fault+j),disp,u,sm,&iret,GC_DISP_AND_STRESS,medium->full_space);
 	for(l=0;l<disp_dim;l++){
 	  medium->val[((i*disp_dim)+l)*nmod + j*slip_modes +k] = u[l];

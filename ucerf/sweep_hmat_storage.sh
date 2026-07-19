@@ -35,14 +35,15 @@
 # Run from the directory holding the geometry. All parameters are plain
 # assignments below; edit them there (no environment variables).
 
-ncore=64                 # MPI ranks for the H-matrix sweep runs
-ncore_dense=64           # MPI ranks for the one dense reference run
+ncore=48                 # MPI ranks for the H-matrix sweep runs
+ncore_dense=48           # MPI ranks for the one dense reference run
 nrandom=200              # matvec timing applies (0 skips the timing line!)
+nsolve=3                 # Ax=b GMRES(no PC) solves to time per point (0: off)
 bin=../bin/compress_interaction_matrix
 geom=geom.in
 out=hmat_storage.dat
 dense_ref_file=dense_reference.dat
-make_dense_reference=0   # 1: (re)create dense_ref_file first, then sweep
+make_dense_reference=1   # 1: (re)create dense_ref_file first, then sweep
 bw_gbs=200               # node memory bandwidth [GB/s] for the estimate
 
 htool_eps="1e-3 1e-4 1e-5 1e-6"
@@ -52,14 +53,23 @@ hmmvp_eps="1e-3 1e-4 1e-5 1e-6"
 # ---------------------------------------------------------------- dense
 if [ $make_dense_reference -eq 1 ]; then
     mpirun -np $ncore_dense $bin -geom_file $geom -make_matrix_externally \
-	   -use_hmatrix 0 -dense_reference_only -nrandom $nrandom &> log.dense_ref
-    gawk '/dense_reference m/ {
+	   -use_hmatrix 0 -dense_reference_only -nrandom $nrandom -nsolve $nsolve &> log.dense_ref
+    gawk 'BEGIN{si="NA";ss="NA"}
+          /dense_solve m/ {
+            for(i=1;i<=NF;i++){
+              if($i=="its_total")   sits=$(i+1)
+              if($i=="nsolve")      ns=$(i+1)
+              if($i=="per_solve_s") ss=$(i+1)
+            }
+            if(ns+0>0) si=sits/ns
+          }
+          /dense_reference m/ {
             for(i=1;i<=NF;i++){
               if($i=="m")             N=$(i+1)
               if($i=="assembly_s")    as=$(i+1)
               if($i=="per_matvec_ms") ms=$(i+1)
             }
-            printf "# measured dense reference: ncore m assembly_s per_matvec_ms\n%i %i %s %s\n", NC, N, as, ms
+            printf "# measured dense reference: ncore m assembly_s per_matvec_ms solve_its per_solve_s\n%i %i %s %s %s %s\n", NC, N, as, ms, si, ss
           }' NC=$ncore_dense log.dense_ref > $dense_ref_file
     if [ ! -s $dense_ref_file ]; then
 	echo "dense reference run failed; see log.dense_ref" ; exit 1
@@ -69,14 +79,18 @@ fi
 
 npatch=`grep -cv '^#' $geom`
 if [ -s $dense_ref_file ]; then
-    read d_nc d_n d_as d_ms << EOF
+    read d_nc d_n d_as d_ms d_si d_ss << EOF
 `grep -v '^#' $dense_ref_file`
 EOF
+    d_si=${d_si:-NA}
+    d_ss=${d_ss:-NA}
     d_tag="meas_np$d_nc"
 else
     # bandwidth-bound estimate: N*N*8 bytes per apply
     d_ms=`echo $npatch $bw_gbs | gawk '{printf "%.4f", $1*$1*8/($2*1e9)*1000}'`
     d_as="NA"
+    d_si="NA"
+    d_ss="NA"
     d_tag="est_${bw_gbs}GBs"
 fi
 
@@ -89,6 +103,17 @@ extract='
     if($i=="per_matvec") ms=$(i+1)
   }
   ok=1
+}
+/hmat_assembly backend/ {
+  for(i=1;i<=NF;i++) if($i=="assembly_s") as=$(i+1)
+}
+/hmat_solve backend/ {
+  for(i=1;i<=NF;i++){
+    if($i=="its_total")   sits=$(i+1)
+    if($i=="nsolve")      ns=$(i+1)
+    if($i=="per_solve_s") ss=$(i+1)
+  }
+  if(ns+0>0) si=sits/ns
 }
 /hmat_storage backend/ {      # primary: printed by calc_petsc_Isn_matrices
   for(i=1;i<=NF;i++){         # for every backend (NA where unavailable)
@@ -106,11 +131,13 @@ END{
   if(s!="" && (r=="" || r+0<=0)) r=N*N/s
   mb=(s!="")?(s*8/1048576):("NA")
   sp=(ms+0>0)?sprintf("%.1f",DMS/ms):("NA")
-  printf "%s %s %s %s %s %.4f %s %s\n", B, EPS, (s!=""?s:"NA"), mb, (r!=""?r:"NA"), ms, sp, DTAG
+  asp=(as!="" && DAS!="NA" && as+0>0)?sprintf("%.1f",DAS/as):("NA")
+  ssp=(ss!="" && DSS!="NA" && ss+0>0)?sprintf("%.1f",DSS/ss):("NA")
+  printf "%s %s %s %s %s %.4f %s %s %s %s %s %s %s\n", B, EPS, (s!=""?s:"NA"), mb, (r!=""?r:"NA"), ms, sp, (as!=""?as:"NA"), asp, (ss!=""?ss:"NA"), (si!=""?si:"NA"), ssp, DTAG
 }'
 
-echo "# dense baseline: per_matvec $d_ms ms assembly ${d_as} s [$d_tag]" > $out
-echo "# backend eps stored_scalars mbytes compression_ratio matvec_ms speedup dense_tag  (geom=$geom npatch=$npatch ncore=$ncore nrandom=$nrandom)" >> $out
+echo "# dense baseline: per_matvec $d_ms ms assembly ${d_as} s per_solve ${d_ss} s solve_its ${d_si} [$d_tag]" > $out
+echo "# backend eps stored_scalars mbytes compression_ratio matvec_ms matvec_speedup assembly_s assembly_speedup per_solve_s solve_its solve_speedup dense_tag  (geom=$geom npatch=$npatch ncore=$ncore nrandom=$nrandom nsolve=$nsolve)" >> $out
 
 # resumable: if the log already holds a completed run (hmat_matvec marker),
 # only re-extract; delete the log to force a rerun of that point
@@ -118,9 +145,9 @@ run_one () {                 # label logfile extra-flags...
     label=$1; log=$2; shift 2
     if ! grep -q "hmat_matvec backend" $log 2> /dev/null ; then
 	mpirun -np $ncore $bin -geom_file $geom -make_matrix_externally \
-	       -skip_dense -nrandom $nrandom "$@" &> $log
+	       -skip_dense -nrandom $nrandom -nsolve $nsolve "$@" &> $log
     fi
-    gawk -v B=$label -v EPS=$eps -v DMS=$d_ms -v DTAG=$d_tag "$extract" $log >> $out
+    gawk -v B=$label -v EPS=$eps -v DMS=$d_ms -v DAS=$d_as -v DSS=$d_ss -v DTAG=$d_tag "$extract" $log >> $out
 }
 
 for eps in $htool_eps; do

@@ -208,7 +208,8 @@ singular value will be set to zero
   note that some of the defaults are set in properties.h
 
 */
-#define READ_FAULT_PROPERTIES_DEF TRUE
+#define READ_FAULT_FRICTION_DEF FALSE
+#define READ_FAULT_RAKE_DEF FALSE
 #define READ_INITIAL_FAULT_STRESS_DEF TRUE
 #define SUPPRESS_INTERACTIONS_DEF FALSE
 #define WHOLE_FAULT_MODE_DEF FALSE
@@ -241,6 +242,7 @@ singular value will be set to zero
 #define STRIKE 0
 #define DIP 1
 #define NORMAL 2
+#define RAKE 3 
 
 /* 
    rate-and-state state evolution laws, for rsf->state_law (-state_law) 
@@ -318,7 +320,7 @@ singular value will be set to zero
 #define TWO_DIM_SEGMENT_PLANE_STRAIN 30
 #define TWO_DIM_SEGMENT_PLANE_STRESS 40
 #define TWO_DIM_HALFPLANE_PLANE_STRAIN 50
-#define IQUAD 60
+#define IQUAD 60		/* can't go above 256 */
 /* 
    output modes for print_patch_geometry
 */

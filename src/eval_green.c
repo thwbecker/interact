@@ -363,20 +363,14 @@ void eval_green_basic(COMP_PRECISION *x,struct flt *fault,
 double ckernel_func(int i, int j, void *par)
 {
   struct interact_ctx *ictx = (struct interact_ctx *)par;
-  COMP_PRECISION slip[3],disp[3],stress[3][3],trac[3],sval;
+  COMP_PRECISION slip[3],disp[3],stress[3][3],sval;
   int iret;
-  get_right_slip(slip,ictx->src_slip_mode,1.0);
+  get_right_slip(slip,ictx->src_slip_mode,1.0,(ictx->fault+j));
   eval_green_at_receiver(ictx->fault,i,j,slip,disp,stress,&iret,
 			 GC_STRESS_ONLY,FALSE,ictx->medium->full_space); /* operator assembly: single-point */
   if(iret != 0)
     return 0.0;
-  resolve_force(ictx->fault[i].normal,stress,trac);
-  if(ictx->rec_stress_mode == STRIKE)
-    sval = dotp_3d(trac,ictx->fault[i].t_strike);
-  else if(ictx->rec_stress_mode == DIP)
-    sval = dotp_3d(trac,ictx->fault[i].t_dip);
-  else
-    sval = dotp_3d(trac,ictx->fault[i].normal);
+  sval = resolve_stress_on_fault_using_ctx(stress,ictx, i);
   return (double)sval;
 }
 #endif

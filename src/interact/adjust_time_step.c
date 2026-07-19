@@ -38,14 +38,14 @@ void adjust_time_step(struct flt *fault, struct med *medium)
     // obtain the shear stress values at time t and t+dt0
     slip_mode=calc_absolute_shear_stress_and_inc(&abs_tau,&abs_tau1,i,fault);
     // coulomb stress at time t
-    ct=coulomb_stress(abs_tau,(COMP_PRECISION)fault[i].mu_s,
+    ct=coulomb_stress(abs_tau,(COMP_PRECISION)fault[i].mu_sa,
 		      fault[i].s[NORMAL],medium->cohesion);
     // positive coulomb stress
     if(ct >= 0.0){
       // check for the stress drop being below limit
       // if, so continue with loop and don't use this
       // predicted time to failure
-      if(cstress_drop(ct,(COMP_PRECISION)(fault[i].mu_s-fault[i].mu_d),
+      if(cstress_drop(ct,(COMP_PRECISION)(fault[i].mu_sa-fault[i].mu_db),
 		      fault[i].s[NORMAL],medium->cohesion) < 
 	 medium->min_stress_drop)
 	continue;
@@ -66,7 +66,7 @@ void adjust_time_step(struct flt *fault, struct med *medium)
       // normal stress at time t + dt0
       normal_dt0=fault[i].s[NORMAL]+fault[i].sinc[NORMAL];
       // coulomb stress at time t + dt0
-      cdt0=coulomb_stress(abs_tau1,(COMP_PRECISION)fault[i].mu_s,
+      cdt0=coulomb_stress(abs_tau1,(COMP_PRECISION)fault[i].mu_sa,
 			  normal_dt0,medium->cohesion);
       /*
 	the coulomb stress on this fault will be decreasing 

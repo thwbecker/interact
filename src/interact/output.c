@@ -157,7 +157,7 @@ void print_fault_stress_and_slip(struct med *medium,struct flt *fault,
       for(i=0;i<medium->nrflt;i++){
 	// obtain the appropriate absolute shear stress
 	calc_absolute_shear_stress(&abs_tau,i,fault);
-	ctmp = coulomb_stress(abs_tau,(COMP_PRECISION)fault[i].mu_s,
+	ctmp = coulomb_stress(abs_tau,(COMP_PRECISION)fault[i].mu_sa,
 			      fault[i].s[NORMAL],medium->cohesion);
 	// coulomb stress based on s_s and s_d
 	val[fault[i].group][0] += ctmp;
@@ -169,7 +169,7 @@ void print_fault_stress_and_slip(struct med *medium,struct flt *fault,
 #endif
 	// stress drop
 	val[fault[i].group][1] += 
-	  ((COMP_PRECISION)(fault[i].mu_s-fault[i].mu_d)*
+	  ((COMP_PRECISION)(fault[i].mu_sa-fault[i].mu_db)*
 	   fault[i].s[NORMAL]);
 	//
 	// slip components
@@ -240,9 +240,9 @@ void print_fault_data(char *filename,struct med *medium,struct flt *fault)
       if(fault[i].group == grp){
 	calc_absolute_shear_stress(&abs_tau,i,fault);
 	val[0] = // Coulomb stress
-	  coulomb_stress(abs_tau,(COMP_PRECISION)fault[i].mu_s,
+	  coulomb_stress(abs_tau,(COMP_PRECISION)fault[i].mu_sa,
 			 fault[i].s[NORMAL],medium->cohesion);
-	val[1] = ((COMP_PRECISION)fault[i].mu_d)*fault[i].s[NORMAL];
+	val[1] = ((COMP_PRECISION)fault[i].mu_db)*fault[i].s[NORMAL];
 #ifdef ALLOW_NON_3DQUAD_GEOM
 	if(((is_triangular(fault[i].type))||(fault[i].type==IQUAD))&&(rotate)){
 	  calc_global_strike_dip_from_local((fault+i),gstrike, gnormal, gdip);
@@ -714,9 +714,9 @@ void print_solutions(int naflt, int *nameaf,struct flt *fault,struct med *medium
 	    "after t:%11g flt:%3i ss/d/n/c/as/sfn: %10.3e/%10.3e/%10.3e/%10.3e/%10.3e/%10.3e us/d/f: %10.3e/%10.3e/%5.2f, %s\n",  
 	    medium->time,nameaf[i],fault[nameaf[i]].s[STRIKE],
 	    fault[nameaf[i]].s[DIP],fault[nameaf[i]].s[NORMAL],
-	    coulomb_stress(abs_tau,(COMP_PRECISION)fault[nameaf[i]].mu_s,
+	    coulomb_stress(abs_tau,(COMP_PRECISION)fault[nameaf[i]].mu_sa,
 			   fault[nameaf[i]].s[NORMAL],medium->cohesion),
-	    abs_tau,fabs(fault[nameaf[i]].s[NORMAL])*fault[nameaf[i]].mu_d,
+	    abs_tau,fabs(fault[nameaf[i]].s[NORMAL])*fault[nameaf[i]].mu_db,
 	    fault[nameaf[i]].u[STRIKE],fault[nameaf[i]].u[DIP],
 	    fault[nameaf[i]].u[STRIKE]/
 	    ((fabs(fault[nameaf[i]].u[DIP]) > 0)?(fault[nameaf[i]].u[DIP]):(1.0)),
@@ -850,4 +850,21 @@ void time_report(char *sub,char *out_string,struct med *medium)
   
   fprintf(stderr,"%s: %s, %.3f s since init\n",sub,out_string,tsec-tisec);
 
+}
+int  write_patch_event_file(float time, int nriter, int aflt, float mom,
+			    float *slip, FILE *out)
+{
+  int cnt=0;
+#ifdef BINARY_PATCH_EVENT_FILE
+  cnt += fwrite(&time,sizeof(float),1,out);
+  cnt += fwrite(&nriter,sizeof(int),1,out);
+  cnt += fwrite(&aflt,sizeof(int),1,out);
+  cnt += fwrite(slip,sizeof(float),3,out);
+  cnt += fwrite(&mom,sizeof(float),1,out);
+#else
+  cnt = fprintf(out,"%20.15e %3i %6i %14.6e %14.6e %14.6e %14.6e\n",
+		time,nriter,aflt,
+		slip[STRIKE],slip[DIP],slip[NORMAL],mom);
+#endif
+  return cnt;
 }

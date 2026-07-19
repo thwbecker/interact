@@ -220,7 +220,7 @@ void two_dir_slip_check(my_boolean *sma,COMP_PRECISION *tstress_drop,
   //
   // use vector to determine critical shear stress for Coulomb criterion
   //
-  overshoot = coulomb_stress(abs_shear_stress,(COMP_PRECISION)fault[flt].mu_s,
+  overshoot = coulomb_stress(abs_shear_stress,(COMP_PRECISION)fault[flt].mu_sa,
 			     fault[flt].s[NORMAL],medium->cohesion);
 #ifdef SUPER_DEBUG
   fprintf(stderr,"fs: t: %11g it: %2i flt: %2i cs: %20.15e\n",
@@ -236,7 +236,7 @@ void two_dir_slip_check(my_boolean *sma,COMP_PRECISION *tstress_drop,
     if(medium->iter == 1){
       // normal activation
       stress_drop = cstress_drop(overshoot,
-				 (COMP_PRECISION)(fault[flt].mu_s-fault[flt].mu_d),
+				 (COMP_PRECISION)(fault[flt].mu_sa-fault[flt].mu_db),
 				 fault[flt].s[NORMAL],medium->cohesion);
 
     }else{/* this fault became only critical after other patches
@@ -283,17 +283,17 @@ void two_dir_slip_check(my_boolean *sma,COMP_PRECISION *tstress_drop,
       if(fault[flt].s[STRIKE] > 0){// need negative stress drop
 	tstress_drop[STRIKE] = -stress_drop;
 	if(fault[flt].mode[0] >= OS_C_OFFSET)// Coulomb correction
-	  fault[flt].cf[STRIKE]=  (COMP_PRECISION)fault[flt].mu_d;
+	  fault[flt].cf[STRIKE]=  (COMP_PRECISION)fault[flt].mu_db;
       }else{// need the positive stress drop 
 	tstress_drop[STRIKE] = stress_drop;
 	if(fault[flt].mode[0] >= OS_C_OFFSET)// negative Coulomb correction
-	  fault[flt].cf[STRIKE]= -(COMP_PRECISION)fault[flt].mu_d;
+	  fault[flt].cf[STRIKE]= -(COMP_PRECISION)fault[flt].mu_db;
       }
 #ifdef DEBUG
       fprintf(stderr,"fc: strike: t: %11g, %4i/%4i: s_s/d/n/c:%10.6e/%10.6e/%10.6e/%10.6e sd_s: %10.6e\n",
 	      medium->time,flt,fault[flt].group,
 	      fault[flt].s[STRIKE],fault[flt].s[DIP],fault[flt].s[NORMAL],
-	      coulomb_stress(abs_shear_stress,(COMP_PRECISION)fault[flt].mu_s,
+	      coulomb_stress(abs_shear_stress,(COMP_PRECISION)fault[flt].mu_sa,
 			     fault[flt].s[NORMAL],medium->cohesion),
 	      tstress_drop[STRIKE]);
 #endif
@@ -302,17 +302,17 @@ void two_dir_slip_check(my_boolean *sma,COMP_PRECISION *tstress_drop,
       if(fault[flt].s[DIP] > 0){
 	tstress_drop[DIP] = -stress_drop;
 	if(fault[flt].mode[0] >= OS_C_OFFSET)
-	  fault[flt].cf[DIP]=  (COMP_PRECISION)fault[flt].mu_d;
+	  fault[flt].cf[DIP]=  (COMP_PRECISION)fault[flt].mu_db;
       }else{
 	tstress_drop[DIP] = stress_drop;
 	if(fault[flt].mode[0] >= OS_C_OFFSET)
-	  fault[flt].cf[DIP]= -(COMP_PRECISION)fault[flt].mu_d;
+	  fault[flt].cf[DIP]= -(COMP_PRECISION)fault[flt].mu_db;
       }
 #ifdef DEBUG
       fprintf(stderr,"fc: dip : t: %11g, %4i/%4i s_s/d/c:%10.6e/%10.6e/%10.6e sd_d: %10.6e\n",
 	      medium->time,flt,fault[flt].group,fault[flt].s[STRIKE],
 	      fault[flt].s[DIP],coulomb_stress(abs_shear_stress,
-					       (COMP_PRECISION)fault[flt].mu_s,
+					       (COMP_PRECISION)fault[flt].mu_sa,
 					       fault[flt].s[NORMAL],
 					       medium->cohesion),tstress_drop[DIP]);
 #endif
@@ -327,19 +327,19 @@ void two_dir_slip_check(my_boolean *sma,COMP_PRECISION *tstress_drop,
       sma[STRIKE] = sma[DIP] = ACTIVATED;
       if(fault[flt].mode[0] >= OS_C_OFFSET){
 	if(fault[flt].s[STRIKE] > 0)
-	  fault[flt].cf[STRIKE] =  (COMP_PRECISION)fault[flt].mu_d * f1;
+	  fault[flt].cf[STRIKE] =  (COMP_PRECISION)fault[flt].mu_db * f1;
 	else
-	  fault[flt].cf[STRIKE] = -(COMP_PRECISION)fault[flt].mu_d * f1;
+	  fault[flt].cf[STRIKE] = -(COMP_PRECISION)fault[flt].mu_db * f1;
 	if(fault[flt].s[DIP] > 0)
-	  fault[flt].cf[DIP] =     (COMP_PRECISION)fault[flt].mu_d * f2;
+	  fault[flt].cf[DIP] =     (COMP_PRECISION)fault[flt].mu_db * f2;
 	else
-	  fault[flt].cf[DIP] =    -(COMP_PRECISION)fault[flt].mu_d * f2;
+	  fault[flt].cf[DIP] =    -(COMP_PRECISION)fault[flt].mu_db * f2;
       }
 #ifdef DEBUG
     fprintf(stderr,"fc: mixed: t: %11g, %4i/%4i s_s/d/c:%12.5e/%12.5e/%12.5e sd_s/d/f:%12.5e/%12.5e/%5.2f\n",
 	    medium->time,flt,fault[flt].group,fault[flt].s[STRIKE],
 	    fault[flt].s[DIP],coulomb_stress(abs_shear_stress,
-					     (COMP_PRECISION)fault[flt].mu_s,
+					     (COMP_PRECISION)fault[flt].mu_sa,
 					     fault[flt].s[NORMAL],medium->cohesion),
 	    tstress_drop[STRIKE],tstress_drop[DIP],
 	    tstress_drop[STRIKE]/tstress_drop[DIP]);

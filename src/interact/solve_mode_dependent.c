@@ -517,7 +517,7 @@ my_boolean check_coulomb_stress_feedback_4(int nrflt,
   COMP_PRECISION cs_jj,cs_ij,cs_ii,cs_ji;
   if(first_call){
     fprintf(stderr,"check_coulomb_stress_feedback: using cohesion: %g, first fault has mu_s: %g\n",
-	    medium->cohesion,fault[0].mu_s);
+	    medium->cohesion,fault[0].mu_sa);
     first_call=FALSE;
     dist_sqr=SQUARE(max_distance);
   }
@@ -548,52 +548,52 @@ my_boolean check_coulomb_stress_feedback_4(int nrflt,
 	// in memory
 	// calculate coulomb stress for self action
 	cs_jj=coulomb_stress(fabs((COMP_PRECISION)ICIM(medium->i,j,j,mode,mode)),
-			   fault[j].mu_s,(COMP_PRECISION)ICIM(medium->i,j,j,mode,NORMAL),medium->cohesion);
+			   fault[j].mu_sa,(COMP_PRECISION)ICIM(medium->i,j,j,mode,NORMAL),medium->cohesion);
 	// and effect on other fault
 	cs_ij=coulomb_stress(fabs((COMP_PRECISION)ICIM(medium->i,i,j,mode,mode)),
-			   fault[i].mu_s,(COMP_PRECISION)ICIM(medium->i,i,j,mode,NORMAL),medium->cohesion);
+			   fault[i].mu_sa,(COMP_PRECISION)ICIM(medium->i,i,j,mode,NORMAL),medium->cohesion);
 	// and turned around
 	cs_ii=coulomb_stress(fabs((COMP_PRECISION)ICIM(medium->i,i,i,mode,mode)),
-			   fault[i].mu_s,(COMP_PRECISION)ICIM(medium->i,i,i,mode,NORMAL),medium->cohesion);
+			   fault[i].mu_sa,(COMP_PRECISION)ICIM(medium->i,i,i,mode,NORMAL),medium->cohesion);
 	cs_ji=coulomb_stress(fabs((COMP_PRECISION)ICIM(medium->i,j,i,mode,mode)),
-			   fault[j].mu_s,(COMP_PRECISION)ICIM(medium->i,j,i,mode,NORMAL),medium->cohesion);
+			   fault[j].mu_sa,(COMP_PRECISION)ICIM(medium->i,j,i,mode,NORMAL),medium->cohesion);
 #elif defined COMP_MODE_2
 	// from file
 	cs_jj=coulomb_stress(fabs((COMP_PRECISION)ic_from_file(j,j,mode,mode,medium)),
-			   fault[j].mu_s,(COMP_PRECISION)ic_from_file(j,j,mode,NORMAL,medium),medium->cohesion);
+			   fault[j].mu_sa,(COMP_PRECISION)ic_from_file(j,j,mode,NORMAL,medium),medium->cohesion);
 	cs_ij=coulomb_stress(fabs((COMP_PRECISION)ic_from_file(i,j,mode,mode,medium)),
-			   fault[i].mu_s,(COMP_PRECISION)ic_from_file(i,j,mode,NORMAL,medium),medium->cohesion);
+			   fault[i].mu_sa,(COMP_PRECISION)ic_from_file(i,j,mode,NORMAL,medium),medium->cohesion);
 	cs_ii=coulomb_stress(fabs((COMP_PRECISION)ic_from_file(i,i,mode,mode,medium)),
-			   fault[i].mu_s,(COMP_PRECISION)ic_from_file(i,i,mode,NORMAL,medium),medium->cohesion);
+			   fault[i].mu_sa,(COMP_PRECISION)ic_from_file(i,i,mode,NORMAL,medium),medium->cohesion);
 	cs_ji=coulomb_stress(fabs((COMP_PRECISION)ic_from_file(j,i,mode,mode,medium)),
-			   fault[j].mu_s,(COMP_PRECISION)ic_from_file(j,i,mode,NORMAL,medium),medium->cohesion);
+			   fault[j].mu_sa,(COMP_PRECISION)ic_from_file(j,i,mode,NORMAL,medium),medium->cohesion);
 #elif defined COMP_MODE_3
 	// calculate now
 	cs_jj=coulomb_stress(fabs((COMP_PRECISION)interaction_coefficient(j,j,mode,mode,fault,&iret,medium->full_space)),
-			   fault[j].mu_s,(COMP_PRECISION)interaction_coefficient(j,j,mode,NORMAL,fault,&iret,medium->full_space),
+			   fault[j].mu_sa,(COMP_PRECISION)interaction_coefficient(j,j,mode,NORMAL,fault,&iret,medium->full_space),
 			     medium->cohesion);
 	cs_ij=coulomb_stress(fabs((COMP_PRECISION)interaction_coefficient(i,j,mode,mode,fault,&iret,medium->full_space)),
-			   fault[i].mu_s,(COMP_PRECISION)interaction_coefficient(i,j,mode,NORMAL,fault,&iret,medium->full_space),
+			   fault[i].mu_sa,(COMP_PRECISION)interaction_coefficient(i,j,mode,NORMAL,fault,&iret,medium->full_space),
 			     medium->cohesion);
 	cs_ii=coulomb_stress(fabs((COMP_PRECISION)interaction_coefficient(i,i,mode,mode,fault,&iret,medium->full_space)),
-			   fault[i].mu_s,(COMP_PRECISION)interaction_coefficient(i,i,mode,NORMAL,fault,&iret,medium->full_space),
+			   fault[i].mu_sa,(COMP_PRECISION)interaction_coefficient(i,i,mode,NORMAL,fault,&iret,medium->full_space),
 			     medium->cohesion);
 	cs_ji=coulomb_stress(fabs((COMP_PRECISION)interaction_coefficient(j,i,mode,mode,fault,&iret,medium->full_space)),
-			   fault[j].mu_s,(COMP_PRECISION)interaction_coefficient(j,i,mode,NORMAL,fault,&iret,medium->full_space),
+			   fault[j].mu_sa,(COMP_PRECISION)interaction_coefficient(j,i,mode,NORMAL,fault,&iret,medium->full_space),
 			     medium->cohesion);
 #else
 	// sparse storage
 	cs_jj=coulomb_stress(fabs((COMP_PRECISION)get_nrs_sparse_el(POSII(j,mode),POSIJ(j,mode),medium->is1,medium->val)),
-			     fault[j].mu_s,(COMP_PRECISION)get_nrs_sparse_el(POSII(j,mode),POSIJ(j,NORMAL),medium->is1,medium->val),
+			     fault[j].mu_sa,(COMP_PRECISION)get_nrs_sparse_el(POSII(j,mode),POSIJ(j,NORMAL),medium->is1,medium->val),
 			     medium->cohesion);
 	cs_ij=coulomb_stress(fabs((COMP_PRECISION)get_nrs_sparse_el(POSII(j,mode),POSIJ(i,mode),medium->is1,medium->val)),
-			     fault[i].mu_s,(COMP_PRECISION)get_nrs_sparse_el(POSII(j,mode),POSIJ(i,NORMAL),medium->is1,medium->val),
+			     fault[i].mu_sa,(COMP_PRECISION)get_nrs_sparse_el(POSII(j,mode),POSIJ(i,NORMAL),medium->is1,medium->val),
 			     medium->cohesion);
 	cs_ii=coulomb_stress(fabs((COMP_PRECISION)get_nrs_sparse_el(POSII(i,mode),POSIJ(i,mode),medium->is1,medium->val)),
-			     fault[i].mu_s,(COMP_PRECISION)get_nrs_sparse_el(POSII(i,mode),POSIJ(i,NORMAL),medium->is1,medium->val),
+			     fault[i].mu_sa,(COMP_PRECISION)get_nrs_sparse_el(POSII(i,mode),POSIJ(i,NORMAL),medium->is1,medium->val),
 			   medium->cohesion);
 	cs_ji=coulomb_stress(fabs((COMP_PRECISION)get_nrs_sparse_el(POSII(i,mode),POSIJ(j,mode),medium->is1,medium->val)),
-			   fault[j].mu_s,(COMP_PRECISION)get_nrs_sparse_el(POSII(i,mode),POSIJ(j,NORMAL),medium->is1,medium->val),
+			   fault[j].mu_sa,(COMP_PRECISION)get_nrs_sparse_el(POSII(i,mode),POSIJ(j,NORMAL),medium->is1,medium->val),
 			   medium->cohesion);
 #endif
 	if((cs_ij > cs_jj)&&(cs_ji > cs_ii)){// positive feedback

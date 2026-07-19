@@ -14,17 +14,23 @@
 
    initialize the fault structure
 
+   read_fault_properties: 
+   1 read static and dynamic friction
+   2 read rake
+
 */
 
 void read_geometry(char *patch_filename,struct med **medium, 
 		   struct flt **fault,
-		   my_boolean read_fault_properties,
+		   my_boolean read_fault_friction,
+		   my_boolean read_fault_rake,
 		   my_boolean twod_approx_is_plane_stress,
 		   my_boolean half_plane,
 		   my_boolean verbose)
 {
   int i,j,k,tmpint,ic,l,off;
   FILE *in,*in2=NULL;
+  double rake;
   COMP_PRECISION sin_dip,cos_dip,mus_avg,mud_avg,d_mu,vertex[MAX_NR_EL_VERTICES*3],four_points[12],
     lloc,wloc,eps_for_z = EPS_COMP_PREC * 100.0,t_strike[3],t_dip[3],normal[3],area,earea;
 #ifdef DEBUG
@@ -68,22 +74,20 @@ void read_geometry(char *patch_filename,struct med **medium,
     }
     in = stdin;
   }
-  if(read_fault_properties){
-    in2=fopen(FAULT_PROP_FILE,"r");
+  if(read_fault_friction){
+    in2=myopen(FAULT_SD_FRIC_FILE,"r");
     if(in2){
       if((*medium)->comm_rank == 0)
-	fprintf(stderr,"read_geometry: WARNING: reading fault properties from \"%s\"\n",
-		FAULT_PROP_FILE);
+	fprintf(stderr,"read_geometry: WARNING: reading fault static and dynamic friction from \"%s\"\n",
+		FAULT_SD_FRIC_FILE);
     }else{
-#ifdef DEBUG
       if((*medium)->comm_rank == 0)
-	fprintf(stderr,"read_geometry: could not open \"%s\" for fault properties, using defaults\n",
-		FAULT_PROP_FILE);
-#endif
-      read_fault_properties=FALSE;
+	fprintf(stderr,"read_geometry: could not open \"%s\" for fault friction properties\n",
+		FAULT_SD_FRIC_FILE);
+      exit(-1);
     }
   }
-
+ 
  
 #ifdef ALLOW_NON_3DQUAD_GEOM
   //
@@ -504,7 +508,8 @@ void read_geometry(char *patch_filename,struct med **medium,
   
     }
 #endif
-    if(read_fault_properties){
+    if(read_fault_friction){
+      /* read static and dynamic friction coefficient for interact run */
       if(!in2){
 	if((*medium)->comm_rank == 0)
 	  fprintf(stderr,"read_geometry: in2 stream not open?!\n");
@@ -514,16 +519,16 @@ void read_geometry(char *patch_filename,struct med **medium,
 	 frictional properties, static and dynamic 
 	 either read from file (-f switch)
       */
-      if(fscanf(in2,TWO_CP_FORMAT,&(*fault+i)->mu_s,&(*fault+i)->mu_d)!=2){
+      if(fscanf(in2,TWO_CP_FORMAT,&(*fault+i)->mu_sa,&(*fault+i)->mu_db)!=2){
 	if((*medium)->comm_rank == 0){
-	  fprintf(stderr,"read_geometry: read error: properties file: %s\n",
-		  FAULT_PROP_FILE);
+	  fprintf(stderr,"read_geometry: read error: fault friction file: %s\n",
+		  FAULT_SD_FRIC_FILE);
 	  fprintf(stderr,"read_geometry: could not read two parameters for fault %i\n",
 		  i);
 	}
 	exit(-1);
       }
-      d_mu=(*fault+i)->mu_s - (*fault+i)->mu_d;
+      d_mu=(*fault+i)->mu_sa - (*fault+i)->mu_db;
       if(d_mu > 1 || d_mu < 0){
 	if((*medium)->comm_rank == 0)
 	  fprintf(stderr,"read_geometry: WARNING: Delta mu is %g for fault %i\n",
@@ -531,11 +536,11 @@ void read_geometry(char *patch_filename,struct med **medium,
       }
     }else{
       // or use constant values
-      (*fault+i)->mu_s=(float)STATIC_MU;
-      (*fault+i)->mu_d=(float)(STATIC_MU-DELTA_MU);
+      (*fault+i)->mu_sa=(float)STATIC_MU;
+      (*fault+i)->mu_db=(float)(STATIC_MU-DELTA_MU);
     }
-    mus_avg += (COMP_PRECISION)(*fault+i)->mu_s;
-    mud_avg += (COMP_PRECISION)(*fault+i)->mu_d;
+    mus_avg += (COMP_PRECISION)(*fault+i)->mu_sa;
+    mud_avg += (COMP_PRECISION)(*fault+i)->mu_db;
     /* 
        
        initialize some of the fault arrays with zeros 
@@ -566,7 +571,7 @@ void read_geometry(char *patch_filename,struct med **medium,
   */
   if(strcmp(patch_filename,"stdin")!=0)
     fclose(in);
-  if(read_fault_properties)
+  if(read_fault_friction)
     fclose(in2);
   // now we have the number of faults
   (*medium)->nrflt = i;
@@ -577,8 +582,36 @@ void read_geometry(char *patch_filename,struct med **medium,
     }
     exit(-1);
   }
-  *fault=(struct flt *)
-    realloc(*fault,sizeof(struct flt)*(*medium)->nrflt);
+  *fault=(struct flt *)realloc(*fault,sizeof(struct flt)*(*medium)->nrflt);
+  /* 
+
+     check if we need the rake (0 = strike 90 = dip, up from strike, in degrees)
+  */
+  if(read_fault_rake){
+    in2 = myopen(FAULT_RAKE_FILE,"r");
+    for(i=0;i<(*medium)->nrflt;i++){
+      if(fscanf(in2,"%lf",&rake)!=1){
+	fprintf(stderr,"read_geometry: error reading rake from %s for patch %i\n",FAULT_RAKE_FILE,i);
+	exit(-1);
+      }
+#ifdef USE_DOUBLE_PRECISION
+      my_sincos_degd(&sin_dip,&cos_dip,rake);
+#else
+      my_sincos_deg(&sin_dip,&cos_dip,rake);
+#endif
+      (*fault+i)->r[0] = (float)cos_dip;
+      (*fault+i)->r[1] = (float)sin_dip;
+      (*fault+i)->t_rake = (COMP_PRECISION *)malloc(sizeof(COMP_PRECISION)*3);
+      for(j=0;j<3;j++){
+	(*fault+i)->t_rake[j] = (*fault+i)->r[0] * (*fault+i)->t_strike[j] + (*fault+i)->r[1] * (*fault+i)->t_dip[j];
+      }
+    }
+    fclose(in2);
+    (*medium)->fault_rake_init = TRUE;
+  }
+
+
+  
   //
   // determine the number of groups that were assigned and modify triangular evaluation
   //

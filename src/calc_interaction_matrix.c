@@ -14,6 +14,7 @@ int main(int argc, char **argv)
   struct med *medium;
   struct flt *fault;
   int mode=FULL_IMAT_MODE,i;
+  my_boolean read_rake=FALSE,read_fric=FALSE;
   medium=(struct med *)calloc(1,sizeof(struct med));
   medium->nrmode = 2;
   
@@ -32,7 +33,7 @@ int main(int argc, char **argv)
       exit(-1);
     }
   }
-  read_geometry(argv[1],&medium,&fault,TRUE,FALSE,FALSE,FALSE);
+  read_geometry(argv[1],&medium,&fault,read_fric,read_rake,FALSE,FALSE,FALSE);
   medium->i_mat_cutoff = I_MAT_CUTOFF_DEF;
   calc_interaction_matrix(medium,fault,TRUE);
   switch(mode){

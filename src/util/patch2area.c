@@ -20,7 +20,7 @@ int main(int argc, char **argv)
   }
   fprintf(stderr,"%s: reading patch format from stdin, writing geom to stdout\n",
 	  argv[0]); 
-  read_geometry("stdin",&medium,&fault,FALSE,FALSE,FALSE,FALSE);
+  read_geometry("stdin",&medium,&fault,FALSE,FALSE,FALSE,FALSE,FALSE);
   tarea=0;
   for(i=0;i<medium->nrflt;i++){
     tarea += fault[i].area;

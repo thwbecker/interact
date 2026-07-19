@@ -18,6 +18,51 @@
 
 */
 
+
+/* time nsolve GMRES(no PC) solves A x = b with fresh random b each time;
+   returns average per-solve seconds, total iterations, last reason */
+PetscErrorCode time_solves(Mat A, PetscInt nsolve, PetscReal *solve_s,
+			   PetscInt *its_total, KSPConvergedReason *reason)
+{
+  KSP ksp;
+  PC pc;
+  Vec b,x;
+  PetscRandom rnd;
+  PetscReal t0,t1;
+  PetscInt i,it;
+  PetscFunctionBegin;
+  *its_total = 0; *solve_s = 0.0; *reason = KSP_CONVERGED_ITERATING;
+  PetscCall(KSPCreate(PETSC_COMM_WORLD,&ksp));
+  PetscCall(KSPSetOperators(ksp,A,A));
+  PetscCall(KSPSetType(ksp,KSPGMRES));
+  PetscCall(KSPGetPC(ksp,&pc));
+  PetscCall(PCSetType(pc,PCNONE));
+  PetscCall(KSPSetTolerances(ksp,1e-6,PETSC_DEFAULT,PETSC_DEFAULT,10000));
+  PetscCall(KSPSetFromOptions(ksp)); /* -ksp_rtol etc. can override */
+  PetscCall(MatCreateVecs(A,&x,&b));
+  PetscCall(PetscRandomCreate(PETSC_COMM_WORLD,&rnd));
+  for(i=0;i < nsolve;i++){
+    PetscCall(VecSetRandom(b,rnd));
+    PetscCall(VecZeroEntries(x));
+    PetscCallMPI(MPI_Barrier(PETSC_COMM_WORLD));
+    PetscCall(PetscTime(&t0));
+    PetscCall(KSPSolve(ksp,b,x));
+    PetscCallMPI(MPI_Barrier(PETSC_COMM_WORLD));
+    PetscCall(PetscTime(&t1));
+    *solve_s += (t1-t0);
+    PetscCall(KSPGetIterationNumber(ksp,&it));
+    *its_total += it;
+    PetscCall(KSPGetConvergedReason(ksp,reason));
+  }
+  if(nsolve > 0)
+    *solve_s /= (PetscReal)nsolve;
+  PetscCall(PetscRandomDestroy(&rnd));
+  PetscCall(VecDestroy(&x));
+  PetscCall(VecDestroy(&b));
+  PetscCall(KSPDestroy(&ksp));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 int main(int argc, char **argv)
 {
 #ifdef USE_PETSC
@@ -27,7 +72,7 @@ int main(int argc, char **argv)
   /* timing */
   clock_t start_time,stop_time;
   PetscLogDouble t0,t1;
-
+  my_boolean read_rake=FALSE,read_fric=FALSE;
   double *bglobal,cpu_time_used;
 #ifdef USE_PETSC_HMAT		
   MatHtoolKernelFn *htools_kernel = GenKEntries_petsc;
@@ -60,12 +105,20 @@ int main(int argc, char **argv)
      sweep then reads the result instead of rebuilding dense each time. */
   PetscBool dense_reference_only=PETSC_FALSE;
   PetscReal dt0,dt1;
+  /* Ax = b solve timing (-nsolve): GMRES with no preconditioner on the
+     assembled operator, the same settings for dense and H so that
+     time-to-solution comparisons are apples to apples; iteration counts
+     are reported since slightly different operators may converge in
+     slightly different iteration numbers */
+  PetscInt nsolve=0,sits_total;
+  PetscReal solve_s,at0,at1;
+  KSPConvergedReason sreason;
   /* for the unified H-operator matvec timing (runs also with -skip_dense) */
   Vec mvx,mvy;
   PetscRandom mrnd;
   PetscReal mt0,mt1;
   PetscInt ir;
-  char geom_file[STRLEN]="geom.in";
+  char geom_file[STRLEN]=GEOMETRY_FILE;
   /* optional external dumps (see -dump_matrix / -dump_coords below) */
   char dump_matrix_file[STRLEN]="",dump_coords_file[STRLEN]="";
   PetscBool do_dump_matrix=PETSC_FALSE,do_dump_coords=PETSC_FALSE;
@@ -96,7 +149,7 @@ int main(int argc, char **argv)
   medium=(struct med *)calloc(1,sizeof(struct med)); /* make one zero medium structure */
   ictx->medium = medium;
   /*  */
-  ictx->src_slip_mode = STRIKE;	/* slip mode */
+  ictx->src_slip_mode = STRIKE;	/* slip mode (STRIKE, DIP, NORMAL, RAKE */
   ictx->rec_stress_mode = STRIKE; /* recording stress mode */
   
   ndim = 3;
@@ -120,6 +173,7 @@ int main(int argc, char **argv)
   PetscCall(PetscOptionsGetBool(NULL, NULL, "-make_matrix_externally", &make_matrix_externally,NULL));
   PetscCall(PetscOptionsGetBool(NULL, NULL, "-skip_dense", &skip_dense,NULL));
   PetscCall(PetscOptionsGetBool(NULL, NULL, "-dense_reference_only", &dense_reference_only,NULL));
+  PetscCall(PetscOptionsGetInt(NULL, NULL, "-nsolve", &nsolve,NULL));
   if(dense_reference_only && skip_dense){
     HEADNODE
       fprintf(stderr,"%s: -dense_reference_only and -skip_dense are mutually exclusive\n",argv[0]);
@@ -168,7 +222,7 @@ int main(int argc, char **argv)
     else
       fprintf(stderr,"%s: reading geometry from default, %s\n",argv[0],geom_file);
   }
-  read_geometry(geom_file,&medium,&fault,TRUE,FALSE,FALSE,FALSE);
+  read_geometry(geom_file,&medium,&fault,read_fric,read_rake,FALSE,FALSE,FALSE);
   
   ictx->fault = fault;
   /*  */
@@ -544,6 +598,11 @@ int main(int argc, char **argv)
       /* BigWham full-space H matrix as a MATSHELL; builds its own mesh from
 	 the patch geometry and applies the strike-slip -> strike-shear
 	 sub-block of the 3N x 3N operator (see setup_bigwham_matshell). */
+      if(ictx->src_slip_mode != STRIKE){
+	HEADNODE
+	  fprintf(stderr,"bigwham only set up for strike\n");
+	exit(-1);
+      }
       PetscCall(setup_bigwham_matshell(medium,fault,1.0,0,&AH,&hsc_h));
       PetscCall(MatSetOption(AH, MAT_SYMMETRIC, PETSC_FALSE));
 #else
@@ -598,7 +657,7 @@ int main(int argc, char **argv)
     }
     if(!skip_dense){
       PetscCall(PetscTime(&dt0));
-      calc_petsc_Isn_matrices(medium, fault,0,                  1.0,0,STRIKE,&Adense,hsc_dense); /* dense */
+      calc_petsc_Isn_matrices(medium, fault,IHMAT_TYPE_DENSE,1.0,0,ictx->src_slip_mode,&Adense,hsc_dense); /* dense */
       PetscCall(PetscTime(&dt1));
       if(dense_reference_only){
 	/* time matvecs on the dense operator and leave; one line holds
@@ -614,6 +673,12 @@ int main(int argc, char **argv)
 	    PetscCall(MatMult(Adense,mvx,mvy));
 	  PetscCallMPI(MPI_Barrier(PETSC_COMM_WORLD));
 	  PetscCall(PetscTime(&mt1));
+	  if(nsolve > 0){
+	    PetscCall(time_solves(Adense,nsolve,&solve_s,&sits_total,&sreason));
+	    HEADNODE
+	      fprintf(stderr,"%s: dense_solve m %i nsolve %i its_total %i per_solve_s %.4f reason %i\n",
+		      argv[0],m,(int)nsolve,(int)sits_total,(double)solve_s,(int)sreason);
+	  }
 	  HEADNODE
 	    fprintf(stderr,"%s: dense_reference m %i n %i assembly_s %.3f applies %i per_matvec_ms %.4f\n",
 		    argv[0],m,n,(double)(dt1-dt0),(int)nrandom,
@@ -647,7 +712,12 @@ int main(int argc, char **argv)
       HEADNODE
 	fprintf(stderr,"%s: -skip_dense: no dense reference (H-matrix assembly and matvec timing only)\n",argv[0]);
     }
-    calc_petsc_Isn_matrices(medium, fault,medium->use_hmatrix,1.0,0,STRIKE,&AH,hsc_h); /* Htools, H2opus, HACApK, or HMVVP */
+    PetscCall(PetscTime(&at0));
+    calc_petsc_Isn_matrices(medium,fault,medium->use_hmatrix,1.0,0,ictx->src_slip_mode,&AH,hsc_h); /* Htools, H2opus, HACApK, or HMVVP */
+    PetscCall(PetscTime(&at1));
+    HEADNODE
+      fprintf(stderr,"%s: hmat_assembly backend %i m %i assembly_s %.3f\n",
+	      argv[0],(int)medium->use_hmatrix,m,(double)(at1-at0));
   }
 
   /*
@@ -678,6 +748,13 @@ int main(int argc, char **argv)
       PetscCall(PetscRandomDestroy(&mrnd));
       PetscCall(VecDestroy(&mvx));
       PetscCall(VecDestroy(&mvy));
+    }
+    if(nsolve > 0){
+      PetscCall(time_solves(AH,nsolve,&solve_s,&sits_total,&sreason));
+      HEADNODE
+	fprintf(stderr,"%s: hmat_solve backend %i m %i nsolve %i its_total %i per_solve_s %.4f reason %i\n",
+		argv[0],(int)medium->use_hmatrix,m,(int)nsolve,(int)sits_total,
+		(double)solve_s,(int)sreason);
     }
   }
   if(skip_dense){

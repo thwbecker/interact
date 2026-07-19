@@ -24,7 +24,7 @@ void check_parameters_and_init_interact(int argc, char **argv,
 					COMP_PRECISION *a,COMP_PRECISION *b)
 {
   int max_nr_flt_files;
-  my_boolean read_fault_properties,suppress_interactions,whole_fault_mode,
+  my_boolean read_fault_friction,suppress_interactions,whole_fault_mode,read_fault_rake,
     read_stress_relation_factors,use_slip_files,whole_fault_deactivations,
     use_sparse_storage,use_old_imat,use_old_amat,save_imat,save_amat,
     check_for_interaction_feedback,keep_slipping,attempt_restart,
@@ -45,7 +45,7 @@ void check_parameters_and_init_interact(int argc, char **argv,
   
   // initialization phase, get parameters from command
   // line options
-  init_parameters_interact(argv,argc, &read_fault_properties,
+  init_parameters_interact(argv,argc, &read_fault_friction,&read_fault_rake,
 			   read_initial_fault_stress,
 			   &suppress_interactions,&whole_fault_mode,
 			   &med_cohesion,&max_nr_flt_files,
@@ -62,7 +62,7 @@ void check_parameters_and_init_interact(int argc, char **argv,
 			   &((*medium)->no_post_slip_fault_stress_eval),
 			   (*medium)->comm_rank);
   // load files, etc
-  initialize_interact(medium,fault,read_fault_properties,max_nr_flt_files,
+  initialize_interact(medium,fault,read_fault_friction,read_fault_rake,max_nr_flt_files,
 		      suppress_interactions,whole_fault_mode,med_cohesion,a,b,
 		      read_stress_relation_factors,use_slip_files,whole_fault_deactivations,
 		      min_stress_drop,use_sparse_storage,i_mat_cutoff,use_old_imat,
@@ -87,7 +87,7 @@ void check_parameters_and_init_interact(int argc, char **argv,
 
 */
 void initialize_interact(struct med **medium, struct flt **fault,
-			 my_boolean read_fault_properties,int max_nr_flt_files,
+			 my_boolean read_fault_friction,my_boolean read_fault_rake,int max_nr_flt_files,
 			 my_boolean suppress_interactions,my_boolean whole_fault_mode,
 			 COMP_PRECISION med_cohesion,COMP_PRECISION *a,COMP_PRECISION *b,
 			 my_boolean read_stress_relation_factors,my_boolean use_slip_files,
@@ -119,7 +119,7 @@ void initialize_interact(struct med **medium, struct flt **fault,
   (*medium)->tri_eval_mode = tri_eval_mode;
 
   /* all nodes need to know geometry */
-  read_geometry(GEOMETRY_FILE,medium,fault,read_fault_properties,
+  read_geometry(GEOMETRY_FILE,medium,fault,read_fault_friction,read_fault_rake,
 		twod_approx_is_plane_stress,half_plane,TRUE);
   if((*medium)->comm_rank==0)
     fprintf(stderr,"initialize_interact: all stress values are based on a shear modulus of %g\n",
@@ -147,7 +147,7 @@ void initialize_interact(struct med **medium, struct flt **fault,
 	(*medium)->myfaultn = (*medium)->nrflt;
     }
 #ifdef DEBUG
-    fprintf(stderr,"core %03i/%03i: flt %05i to %05i\n",
+    fprintf(stderr,"core %03i/%03i: flt %010i to %010i\n",
 	    (*medium)->comm_rank,(*medium)->comm_size,
 	    (*medium)->myfault0,(*medium)->myfaultn);
 #endif
@@ -388,7 +388,9 @@ void init_files_interact(struct med **medium,struct flt **fault)
 }
 
 
-void init_parameters_interact(char **argv, int argc, my_boolean *read_fault_properties,
+void init_parameters_interact(char **argv, int argc,
+			      my_boolean *read_fault_friction,
+			      my_boolean *read_fault_rake,
 			      my_boolean *read_initial_fault_stress,
 			      my_boolean *suppress_interactions,my_boolean *whole_fault_mode,
 			      COMP_PRECISION *med_cohesion,int *max_nr_flt_files,
@@ -423,7 +425,8 @@ void init_parameters_interact(char **argv, int argc, my_boolean *read_fault_prop
   /* 
      assign default values 
   */
-  *read_fault_properties = READ_FAULT_PROPERTIES_DEF;
+  *read_fault_friction = READ_FAULT_FRICTION_DEF;
+  *read_fault_rake = READ_FAULT_RAKE_DEF;
   *read_initial_fault_stress = READ_INITIAL_FAULT_STRESS_DEF;
   *suppress_interactions = SUPPRESS_INTERACTIONS_DEF;
   *whole_fault_mode = WHOLE_FAULT_MODE_DEF;
@@ -464,8 +467,10 @@ void init_parameters_interact(char **argv, int argc, my_boolean *read_fault_prop
       if(rank==0)
 	phelp();
       exit(-1);
-    }else if(strcmp(argv[i],"-f")==0){// fault prop file
-      toggle(read_fault_properties);
+    }else if(strcmp(argv[i],"-f")==0){// fault friction file
+      toggle(read_fault_friction);
+    }else if(strcmp(argv[i],"-r")==0){// fault rake file
+      toggle(read_fault_rake);
     }else if(strcmp(argv[i],"-r")==0){// attempt a restart
       *attempt_restart = TRUE;
     }else if(strcmp(argv[i],"-ni")==0){// no interactions

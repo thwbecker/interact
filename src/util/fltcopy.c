@@ -40,6 +40,7 @@ void fltcp(struct flt *a, struct flt *b)
   for(i=0;i<2;i++){
     b->pos[i] = a->pos[i];
     b->cf[i] = a->cf[i];
+    b->r[i] = a->r[i];
   }
   b->l = a->l;
   b->w = a->w;
@@ -48,6 +49,7 @@ void fltcp(struct flt *a, struct flt *b)
   b->strike = a->strike;
   b->dip = a->dip;
 
+
   b->sin_alpha = a->sin_alpha;
   b->cos_alpha = a->cos_alpha;
 
@@ -55,8 +57,8 @@ void fltcp(struct flt *a, struct flt *b)
   a_equals_b_vector_3d(b->t_strike,a->t_strike);
   a_equals_b_vector_3d(b->t_dip,a->t_dip);
   
-  b->mu_d = a->mu_d;
-  b->mu_s = a->mu_s;
+  b->mu_db = a->mu_db;
+  b->mu_sa = a->mu_sa;
   b->f_initial = a->f_initial;
   b->taud = a->taud;
 

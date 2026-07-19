@@ -332,11 +332,15 @@ void report_hmat_storage(struct med *medium, const char *backend,
 	      backend,(long)m,(long)n);
   }
 }
-
+/* 
+   compute an interaction matrix for slip_dir 
+   
+   receive_mode 0: in the direction of slip
+                1: in the normal direction
+*/
 PetscErrorCode calc_petsc_Isn_matrices(struct med *medium, struct flt *fault,
-				       PetscInt use_hmatrix,PetscReal scale, int mode,
-				       int slip_dir,
-				       Mat *this_mat, hmat_helper_shell_ctx *hctx)
+				       PetscInt use_hmatrix,PetscReal scale, int receive_mode,
+				       int slip_dir,Mat *this_mat, hmat_helper_shell_ctx *hctx)
 {
   /* context */
   struct interact_ctx ictx[1];
@@ -370,14 +374,15 @@ PetscErrorCode calc_petsc_Isn_matrices(struct med *medium, struct flt *fault,
   const PetscInt ndim = 3;
   ictx->medium = medium;
   ictx->fault = fault;
-  /* defines how to slip: STRIKE (0) or DIP (1); the shear component of the
-     Is matrix (mode 0) is resolved onto the same direction, while the In
-     matrix (mode 1) always resolves onto the fault normal */
+  /* defines how to slip: STRIKE (0), DIP (1), or RAKE (3); the shear
+     component of the Is matrix (receive_mode 0) is resolved onto the
+     same direction, while the In matrix (receive_mode 1) always
+     resolves onto the fault normal */
   ictx->src_slip_mode = slip_dir;
   /*  */
   m = n = medium->nrflt;
 
-  if(mode==0){
+  if(receive_mode==0){
     ictx->rec_stress_mode = slip_dir;
   }else{
     ictx->rec_stress_mode = NORMAL;
@@ -441,7 +446,7 @@ PetscErrorCode calc_petsc_Isn_matrices(struct med *medium, struct flt *fault,
   case IHMAT_TYPE_DENSE :
     HEADNODE
       fprintf(stderr,"calc_petsc_Isn_matrices: creating dense matrix for stress mode %i stress type %i\n",
-	      mode,ictx->rec_stress_mode);
+	      receive_mode,ictx->rec_stress_mode);
     PetscCall(MatSetType(*this_mat, MATDENSE));
     /* 
        assemble dense matrix 
@@ -458,7 +463,7 @@ PetscErrorCode calc_petsc_Isn_matrices(struct med *medium, struct flt *fault,
     /* make the matrix */
     HEADNODE
       fprintf(stderr,"calc_petsc_Isn_matrices: creating HTOOL matrix for stress mode %i stress type %i\n",
-	      mode,ictx->rec_stress_mode);
+	      receive_mode,ictx->rec_stress_mode);
     PetscCall(MatSetType(*this_mat, MATHTOOL));
     /* 
        
@@ -477,7 +482,7 @@ PetscErrorCode calc_petsc_Isn_matrices(struct med *medium, struct flt *fault,
   case IHMAT_TYPE_H2OPUS:
     HEADNODE
       fprintf(stderr,"calc_petsc_Isn_matrices: creating H2OPUS matrix for stress mode %i stress type %i\n",
-	      mode,ictx->rec_stress_mode);
+	      receive_mode,ictx->rec_stress_mode);
     PetscCall(MatSetType(*this_mat, MATH2OPUS));
     /* 
        
@@ -534,7 +539,7 @@ PetscErrorCode calc_petsc_Isn_matrices(struct med *medium, struct flt *fault,
 #ifdef USE_HACAPK
     HEADNODE
       fprintf(stderr,"calc_petsc_Isn_matrices: creating HACAPK matrix for stress mode %i stress type %i\n",
-	      mode,ictx->rec_stress_mode);
+	      receive_mode,ictx->rec_stress_mode);
     hacapk_handle = cinit_hacapk_struct((int)m,(void *)ictx);
     cset_hacapk_struct_coord(hacapk_handle,xc,yc,zc);
     cset_hacapk_eta(hacapk_handle,(double)medium->hacapk_eta); /* override param(51) before the build, eta */
@@ -561,7 +566,7 @@ PetscErrorCode calc_petsc_Isn_matrices(struct med *medium, struct flt *fault,
 #ifdef USE_HMMVP_MPI
     HEADNODE
       fprintf(stderr,"calc_petsc_Isn_matrices: creating HMMVP matrix for stress mode %i stress type %i MPI mode\n",
-	      mode,ictx->rec_stress_mode);
+	      receive_mode,ictx->rec_stress_mode);
     /*
       MPI path: compress with distributed assembly to a temporary file
       (collective over all ranks), then load it as a distributed

@@ -34,7 +34,7 @@ int main(int argc, char **argv)
   Mat Idense;
   PetscBool read_value,flg,test_forward=PETSC_TRUE;
   PetscInt use_hmatrix=0;
-
+  my_boolean read_rake=FALSE,read_fric=FALSE;
   VecScatter ctx;
   /* input file name */
   char geom_file[STRLEN]="geom.in",fault_file[STRLEN]="flt.dat";
@@ -67,7 +67,7 @@ int main(int argc, char **argv)
     else
       fprintf(stderr,"%s: reading geometry from default, %s\n",argv[0],geom_file);
   }
-  read_geometry(geom_file,&medium,&fault,TRUE,FALSE,FALSE,FALSE);
+  read_geometry(geom_file,&medium,&fault,read_fric,read_rake,FALSE,FALSE,FALSE);
 
   m = n = medium->nrflt;
 

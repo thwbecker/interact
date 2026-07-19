@@ -12,7 +12,7 @@ int main(int argc, char **argv)
   struct flt *fault;
   struct med *medium;
   int i,j,os,iter[2],miter[2]={100000,1000},hit,iseed=-1;
-  long seed;
+  long seed; my_boolean read_rake=FALSE,read_fric=FALSE;
   COMP_PRECISION mu0[2]={STATIC_MU,(STATIC_MU-DELTA_MU)},
     std[2]={0.0,0.0},*mu,stat[4],fac[2],mutmp[2];
   medium=(struct med *)calloc(1,sizeof(struct med));
@@ -64,7 +64,7 @@ int main(int argc, char **argv)
   }
   fprintf(stderr,"%s: reading patch format from %s, writing fp.in file to stdout\n",
 	  argv[0],GEOMETRY_FILE);
-  read_geometry(GEOMETRY_FILE,&medium,&fault,FALSE,FALSE,FALSE,
+  read_geometry(GEOMETRY_FILE,&medium,&fault,read_fric,read_rake,FALSE,FALSE,
 		FALSE);
   fprintf(stderr,"%s: starting values mu_s,d: %g %g, STD for mu_s,d: %g, %g\n",
 	  argv[0],mu0[0],mu0[1],std[0],std[1]);

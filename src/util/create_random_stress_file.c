@@ -12,6 +12,7 @@ int main(int argc, char **argv)
   struct med *medium;
   int i,j,os,os1,osnormal,osdip,iter,siter,basei,n1,maxiter=5000,maxbiter=1000,
     *sindex,maxsiter=-1,mode,biter,iseed= -1;
+  my_boolean read_rake=FALSE,read_fric=FALSE;
   my_boolean reject_pos_coulomb=TRUE,hit;
   long seed;
   float *dist;
@@ -115,7 +116,7 @@ int main(int argc, char **argv)
     fprintf(stderr,"%s: rejecting extensional patches only\n",argv[0]);
   //
   // read fault geometry
-  read_geometry(GEOMETRY_FILE,&medium,&fault,FALSE,FALSE,FALSE,
+  read_geometry(GEOMETRY_FILE,&medium,&fault,read_fric,read_rake,FALSE,FALSE,
 		FALSE);
   // allocate memerory
   st=(COMP_PRECISION *)malloc(sizeof(COMP_PRECISION)*3*medium->nrflt);

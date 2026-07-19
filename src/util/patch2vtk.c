@@ -42,7 +42,7 @@ int main(int argc, char **argv)
   fprintf(stderr,"%s: reading patch format from stdin, writing VTK to stdout. shrink: %i scale: %g remove_cetroid: %i\n",
 	  argv[0],shrink_patches,sscale,remove_centroid);
   
-  read_geometry("stdin",&medium,&fault,FALSE,FALSE,FALSE,verbose);
+  read_geometry("stdin",&medium,&fault,FALSE,FALSE,FALSE,FALSE,verbose);
   if(attempt_read_slip)
     read_slip = read_fltdat(argv[1],fault,medium,verbose);
   else

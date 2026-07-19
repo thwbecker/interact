@@ -47,7 +47,7 @@ PetscErrorCode rsf_init_monitor_and_event(struct rsf_out_ctx *uc,struct interact
     struct rsf_vars *rsfv = medium->rsf;struct flt *fltv = par->fault;
     PetscCall(VecGetArrayRead(X0,&x0a));
     for(ii=medium->rs,jj=0;ii<medium->re;ii++,jj+=rsfv->dim){
-      vv = fabs(vel_from_rsf(x0a[jj+1],x0a[jj+2],x0a[jj],fltv[ii].mu_s,rsfv->v0,&d1,&d2,&d3,medium));
+      vv = fabs(vel_from_rsf(x0a[jj+1],x0a[jj+2],x0a[jj],fltv[ii].mu_sa,rsfv->v0,&d1,&d2,&d3,medium));
       if(vv > lv)lv = vv;
     }
     PetscCall(VecRestoreArrayRead(X0,&x0a));
@@ -378,7 +378,7 @@ PetscErrorCode rsf_TS_Monitor(TS ts,PetscInt step,PetscReal time,Vec X,void *ptr
     PetscReal vv,d1t,d2t,d3t;
     PetscCall(VecGetArrayRead(X,&xt));
     for(i = medium->rs, j=0, k=0; i < medium->re; i++, j+=rsf->dim, k++){
-      vv = fabs(vel_from_rsf(xt[j+1],xt[j+2],xt[j],fault[i].mu_s,rsf->v0,&d1t,&d2t,&d3t,medium));
+      vv = fabs(vel_from_rsf(xt[j+1],xt[j+2],xt[j],fault[i].mu_sa,rsf->v0,&d1t,&d2t,&d3t,medium));
       if(vv > uc->peakv_local)uc->peakv_local = vv;
       if(vv >= uc->rupture_vth){
 	if(uc->cell_ruptured)uc->cell_ruptured[k] = 1;
@@ -413,7 +413,7 @@ PetscErrorCode rsf_TS_Monitor(TS ts,PetscInt step,PetscReal time,Vec X,void *ptr
       lminmax[1] = -1e30;		/* max sigma */
       lminmax[2] = -1e30;		/* -min sigma */
       for (i = medium->rs, j=0; i < medium->re; i++, j+=rsf->dim) {
-	v = vel_from_rsf(x[j+1],x[j+2],x[j],fault[i].mu_s,rsf->v0,&d1,&d2,&d3,medium);
+	v = vel_from_rsf(x[j+1],x[j+2],x[j],fault[i].mu_sa,rsf->v0,&d1,&d2,&d3,medium);
 	v = fabs(v);
 	if(v > lminmax[0])lminmax[0] = v;
 	if( x[j+2] > lminmax[1])lminmax[1] =  x[j+2];
@@ -465,7 +465,7 @@ PetscErrorCode rsf_TS_Monitor(TS ts,PetscInt step,PetscReal time,Vec X,void *ptr
 	   slot rather than always in u[STRIKE], which would mislabel a dip-slip
 	   run for anything downstream reading fault[].u */
 	fault[i].u[rsf->slip_mode] =
-	  vel_from_rsf(values[j+1],values[j+2],values[j],fault[i].mu_s,
+	  vel_from_rsf(values[j+1],values[j+2],values[j],fault[i].mu_sa,
 		       rsf->v0,&du1,&du2,&du3,medium);
 	sum[2] += values[j+3];				     /* slip */
 	if(uc->budget_enable)
@@ -515,7 +515,7 @@ PetscErrorCode rsf_TS_Monitor(TS ts,PetscInt step,PetscReal time,Vec X,void *ptr
       PetscCall(VecGetArray(uc->gathered,&fvals));
       for(ip=0;ip < nf;ip++){
 	PetscReal vabs,vv = vel_from_rsf(fvals[ip*rsf->dim+1],fvals[ip*rsf->dim+2],
-					 fvals[ip*rsf->dim+0],fault[ip].mu_s,rsf->v0,
+					 fvals[ip*rsf->dim+0],fault[ip].mu_sa,rsf->v0,
 					 &du1,&du2,&du3,medium);
 	uc->vbuf[ip] = (double)vv;
 	/* statistics are on the slip SPEED |v|: vel_from_rsf is signed (the sinh
@@ -591,7 +591,7 @@ PetscErrorCode rsf_post_event(TS ts,PetscInt nevents,PetscInt event_list[],
     lsum[0]=lsum[1]=0.0;lvmax = 0.0;
     PetscCall(VecGetArrayRead(X,&x));
     for (i = medium->rs, j=0; i < medium->re; i++, j+=rsf->dim) {
-      v = fabs(vel_from_rsf(x[j+1],x[j+2],x[j],fault[i].mu_s,rsf->v0,&d1,&d2,&d3,medium));
+      v = fabs(vel_from_rsf(x[j+1],x[j+2],x[j],fault[i].mu_sa,rsf->v0,&d1,&d2,&d3,medium));
       if(v > lvmax)lvmax = v;
       lsum[0] += x[j+3];	/* slip */
       lsum[1] += x[j+1]/x[j+2];	/* mu */
@@ -740,7 +740,7 @@ void rsf_write_group_geometry(const struct rsf_group_grid *g,struct flt *fault,
 	    fault[ip].x[INT_X],fault[ip].x[INT_Y],fault[ip].x[INT_Z],
 	    fault[ip].strike,fault[ip].dip,
 	    fault[ip].l,fault[ip].w,fault[ip].area,
-	    fault[ip].group,fault[ip].mu_s,fault[ip].mu_d,sigma0);
+	    fault[ip].group,fault[ip].mu_sa,fault[ip].mu_db,sigma0);
   }
   fclose(out);
 }

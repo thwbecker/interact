@@ -14,6 +14,7 @@ int main(int argc,char **argv)
   struct flt *fault;
   int evil_pair[2];
   my_boolean bailout=TRUE;
+  my_boolean read_rake=FALSE,read_fric=FALSE;
   medium=(struct med *)calloc(1,sizeof(struct med));
   switch(argc){
   case 2:{
@@ -34,7 +35,7 @@ int main(int argc,char **argv)
     exit(-1);
   }}
   // read in fault geometry and friction properties
-  read_geometry(argv[1],&medium,&fault,TRUE,FALSE,FALSE,FALSE);
+  read_geometry(argv[1],&medium,&fault,read_fric,read_rake,FALSE,FALSE,FALSE);
   // check all interactions
   if(!check_coulomb_stress_feedback(medium->nrflt,0,
 				    fault,medium, TRUE,

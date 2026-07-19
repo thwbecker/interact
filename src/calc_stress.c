@@ -514,11 +514,11 @@ void calc_fields(struct med *medium,struct flt *fault,
     }
   }
   if(singular_count)
-    sprintf(out_string,"core %03i/%03i fault %05i to %05i: WARNING: %05i values singular",
+    sprintf(out_string,"core %03i/%03i fault %010i to %010i: WARNING: %05i values singular",
 	    medium->comm_rank+1,medium->comm_size,medium->myfault0,medium->myfaultn,
 	    singular_count);
   else
-    sprintf(out_string,"core %03i/%03i fault %05i to %05i: no singular entries",
+    sprintf(out_string,"core %03i/%03i fault %010i to %010i: no singular entries",
 	    medium->comm_rank+1,medium->comm_size,medium->myfault0,medium->myfaultn);
   time_report("calc_fields",out_string,medium);
 

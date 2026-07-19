@@ -26,7 +26,7 @@ int main(int argc, char **argv)
   }
   fprintf(stderr,"%s: reading patch format from stdin, writing coordinates and vectors to stdout\n",
 	  argv[0]);
-  read_geometry("stdin",&medium,&fault,FALSE,FALSE,FALSE,FALSE);
+  read_geometry("stdin",&medium,&fault,FALSE,FALSE,FALSE,FALSE,FALSE);
   for(i=0;i<medium->nrflt;i++)
     print_patch_geometry_and_bc(0,(fault+i),
 				opmode,0.0,TRUE,stdout,FALSE,dummy);

@@ -523,6 +523,12 @@ void read_one_step_bc(FILE *in,struct med *medium,struct flt *fault,
 	  exit(-1);
 	}
 #endif
+      case RAKE:
+	if(!(medium->fault_rake_init)){
+	  HEADNODE
+	    fprintf(stderr,"read_boundary_conditions: error, rake slip mode, but rake angles not initialized\n");
+	  exit(-1);
+	}
       case STRIKE:
       case NORMAL:{
 	slip_bc_assigned = TRUE;
@@ -542,9 +548,15 @@ void read_one_step_bc(FILE *in,struct med *medium,struct flt *fault,
 	// quake, ie. add to fault's own slip and calculate the stress
 	// effect on the slipping fault and all other faults
 	//
-	// initialize 3-D slip vectors and activation flags
-	for(i=0;i < 3;i++)
+	if(bc_code == RAKE){
+	  slip[STRIKE] = fault[patch_nr].r[0] * bc_value;
+	  slip[DIP]    = fault[patch_nr].r[1] * bc_value;
+	  slip[NORMAL] = 0.0;
+	}else{
+	  // initialize 3-D slip vectors and activation flags
+	  for(i=0;i < 3;i++)
 	    slip[i] = (i == bc_code)?(bc_value):(0.0);
+	}
 #ifdef SUPER_DEBUG
 	  HEADNODE
 	    fprintf(stderr,"read_boundary_conditions:  patch %i (s: %g, d: %g) cum. rot. u: s:%g d:%g n:%g\n",
@@ -626,15 +638,15 @@ void read_one_step_bc(FILE *in,struct med *medium,struct flt *fault,
 	// assign strike mode
 	fault[patch_nr].mode[STRIKE]=(MODE_TYPE)bc_code;
 	if(bc_code > OS_C_OFFSET){// need to correct for normal stress changes
-	  if(fault[patch_nr].mu_s == 0.0){
+	  if(fault[patch_nr].mu_sa == 0.0){
 	    HEADNODE
 	      fprintf(stderr,"read_boundary_conditions: for friction adjustment, need mu_s first\n");
 	    exit(-1);
 	  }
 	  if(rhs[patch_nr3+STRIKE]>0)
-	    fault[patch_nr].cf[STRIKE]=  (COMP_PRECISION)fault[patch_nr].mu_d;
+	    fault[patch_nr].cf[STRIKE]=  (COMP_PRECISION)fault[patch_nr].mu_db;
 	  else
-	    fault[patch_nr].cf[STRIKE]= -(COMP_PRECISION)fault[patch_nr].mu_d;
+	    fault[patch_nr].cf[STRIKE]= -(COMP_PRECISION)fault[patch_nr].mu_db;
 	}
 	if(printevery)
 	  HEADNODE
@@ -673,15 +685,15 @@ void read_one_step_bc(FILE *in,struct med *medium,struct flt *fault,
 	fault[patch_nr].mode[DIP]=(MODE_TYPE)bc_code;
 	//
 	if(bc_code > OS_C_OFFSET){// need to correct for normal stress changes
-	  if(fault[patch_nr].mu_s == 0.0){
+	  if(fault[patch_nr].mu_sa == 0.0){
 	    HEADNODE
 	      fprintf(stderr,"read_boundary_conditions: for friction adjustment, need mu_s first\n");
 	    exit(-1);
 	  }
 	  if(rhs[patch_nr3+DIP]>0)
-	    fault[patch_nr].cf[DIP]=  (COMP_PRECISION)fault[patch_nr].mu_d;
+	    fault[patch_nr].cf[DIP]=  (COMP_PRECISION)fault[patch_nr].mu_db;
 	  else
-	    fault[patch_nr].cf[DIP]= -(COMP_PRECISION)fault[patch_nr].mu_d;
+	    fault[patch_nr].cf[DIP]= -(COMP_PRECISION)fault[patch_nr].mu_db;
 	}
 	if(printevery)
 	  HEADNODE
@@ -829,7 +841,7 @@ void read_one_step_bc(FILE *in,struct med *medium,struct flt *fault,
 	    // under compression, obtain strike and dip stress values
 	    //
 
-	    stress_drop=((COMP_PRECISION)fault[patch_nr].mu_s)*
+	    stress_drop=((COMP_PRECISION)fault[patch_nr].mu_sa)*
 			 (-bstress[NORMAL]);
 
 	    if(use_dip){/* decide how to distribute stress in striek and dip 
@@ -859,7 +871,7 @@ void read_one_step_bc(FILE *in,struct med *medium,struct flt *fault,
 	  if(check_for_res_stress_output){
 	    /* local stress projection */
 	    if(rsout)
-	      fprintf(rsout,"%05i %12.5e %12.5e %12.5e\n",patch_nr,bstress[STRIKE],bstress[DIP],bstress[NORMAL]);
+	      fprintf(rsout,"%010i %12.5e %12.5e %12.5e\n",patch_nr,bstress[STRIKE],bstress[DIP],bstress[NORMAL]);
 	  }
 	} /* headode part */
 	break;
@@ -919,7 +931,7 @@ void read_one_step_bc(FILE *in,struct med *medium,struct flt *fault,
     }else{
       gfstress = NULL;
     }
-    fprintf(stderr,"read_boundary_conditions: core %03i adding slip from fault %05i %05i\n",
+    fprintf(stderr,"read_boundary_conditions: core %03i adding slip from fault %010i %010i\n",
 	    medium->comm_rank,medium->myfault0,medium->myfaultn);
     for(i = medium->myfault0, i3=i*3;i < medium->myfaultn;i++, i3+=3){ /* i is slipping */
       //fprintf(stderr,"read_boundary_conditions: core %03i %i %i %i %g %g %g\n",medium->comm_rank,sma[i3], sma[i3+1],sma[i3+2], fault[i].u[0],fault[i].u[1],fault[i].u[2]);

@@ -2,9 +2,20 @@
    FILENAMES AND OUTPUT OPTIONS 
 */
 #define GEOMETRY_FILE "geom.in" // patch geometry input
+
+/* these are for interact modes */
 #define BC_FILE "bc.in" // boundary conditions
-#define FAULT_PROP_FILE "fp.in" // fault properties
+#define FAULT_SD_FRIC_FILE "fp.in" // fault static and dynamic friction file
 #define FAULT_STRESS_INIT_FILE "fsi.in" // stress initialization for faults
+#define FAULT_RAKE_FILE "rake.in"
+/* 
+   rsf_solve stuff
+
+*/
+#define RSF_PAR_FILE "rsf.dat"	/* rate state parameter file */
+
+
+
 #define STRESS_OUT_FILE "stress.out" // stress field output
 #define STRESS_HDR_FILE "stress.hdr" // header file
 #define FAULT_STRESS_OUT_FILE "flt_stress.out" // stress on fault output

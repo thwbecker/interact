@@ -33,7 +33,7 @@ void init_medium_rsf(struct med *medium)
   /* optional per-cell initial normal stress sigma0 [Pa] (geometry order);
      NULL => uniform sigma_init.  Read in the driver alongside dc_vec */
   rsf->sigma_vec = NULL;
-  /* slip direction: 0 = strike (default, unchanged), 1 = dip (thrust / normal
+  /* slip direction: 0 = strike (default, unchanged), 1 = dip (thrust), 4 = rake specified
      fault).  Parsed below as -rsf_slip_mode */
   rsf->slip_mode = STRIKE;
   /* 
@@ -72,8 +72,8 @@ void rsf_print_help(const char *prog)
   fprintf(stderr,"\n");
 
   fprintf(stderr,"geometry and input files\n");
-  fprintf(stderr,"  -geom_file <file>       fault geometry, one patch per row (default geom.in)\n");
-  fprintf(stderr,"  -rsf_file <file>        per-cell a b friction parameters (default rsf.dat)\n");
+  fprintf(stderr,"  -geom_file <file>       fault geometry, one patch per row (default %s)\n",GEOMETRY_FILE);
+  fprintf(stderr,"  -rsf_file <file>        per-cell a b friction parameters (default %s)\n",RSF_PAR_FILE);
   fprintf(stderr,"  -rsf_ic_file <file>     per-cell initial tau[Pa] vel[m/s]; overrides uniform IC\n");
   fprintf(stderr,"  -rsf_dc_file <file>     per-cell D_c[m]; overrides uniform -dc\n");
   fprintf(stderr,"  -rsf_sigma_file <file>  per-cell initial sigma0[Pa]; overrides uniform -sigma_init\n");
@@ -94,7 +94,9 @@ void rsf_print_help(const char *prog)
   fprintf(stderr,"  -dc <m>                 characteristic slip distance D_c (default 0.008)\n");
   fprintf(stderr,"  -v0 <m/s>               reference velocity (default 1e-6)\n");
   fprintf(stderr,"  -vpl <m/s>              plate loading rate (default 1e-9)\n");
-  fprintf(stderr,"  -rsf_slip_mode <0|1>    slip direction: 0 strike (default), 1 dip (thrust/normal)\n");
+  fprintf(stderr,"  -rsf_slip_mode <%i|%i|%i>  slip direction: %i strike (default), %i dip (thrust), %i (rake)\n",
+	  STRIKE,DIP,RAKE,STRIKE,DIP,RAKE);
+  fprintf(stderr,"                          if mode is rake, will read rake angles from %s\n",FAULT_RAKE_FILE);
   fprintf(stderr,"\n");
 
   fprintf(stderr,"initial conditions\n");
@@ -247,7 +249,7 @@ PetscErrorCode rsf_get_settings(int argc,char **argv,struct interact_ctx *par,
   PetscReal sigma_init,tau_init,vel_init,rtol,atol_slip,dt_init,dt_max,rand_amp,tmp;
   PetscReal dt_monitor,rdx_monitor,adx_monitor,monitor_tmin,vel_event,vel_event_hyst,event_tmin;
   PetscBool track_events;
-  char geom_file[STRLEN]="geom.in",rsf_file[STRLEN]="rsf.dat",rsf_ic_file[STRLEN]="",
+  char geom_file[STRLEN]=GEOMETRY_FILE,rsf_file[STRLEN]=RSF_PAR_FILE,rsf_ic_file[STRLEN]="",
     rsf_dc_file[STRLEN]="",rsf_sigma_file[STRLEN]="";
   PetscBool have_ic=PETSC_FALSE,have_dc=PETSC_FALSE,have_sigma=PETSC_FALSE;
   PetscBool read_value;
@@ -422,9 +424,9 @@ PetscErrorCode rsf_get_settings(int argc,char **argv,struct interact_ctx *par,
   {
     PetscInt sm = rsf->slip_mode;
     PetscCall(PetscOptionsGetInt(NULL,NULL,"-rsf_slip_mode",&sm,NULL));
-    if((sm != STRIKE) && (sm != DIP)){
-      fprintf(stderr,"rsf_get_settings: -rsf_slip_mode must be %i (strike) or %i (dip); got %i\n",
-	      STRIKE,DIP,(int)sm);
+    if((sm != STRIKE) && (sm != DIP) && (sm != RAKE)){
+      fprintf(stderr,"rsf_get_settings: -rsf_slip_mode must be %i (strike), %i (dip), r %i (rake); got %i\n",
+	      STRIKE,DIP,RAKE,(int)sm);
       exit(-1);
     }
     rsf->slip_mode = (int)sm;

@@ -123,7 +123,7 @@ int main(int argc, char **argv)
     }
   for(nrpatches=i=0;i<n;i++){
     // need that for coulomb check 
-    fault[i].mu_s=STATIC_MU;
+    fault[i].mu_sa=STATIC_MU;
     fault[i].group=i;
 #ifdef ALLOW_NON_3DQUAD_GEOM
     fault[i].type=OKADA_PATCH;

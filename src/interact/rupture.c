@@ -18,6 +18,7 @@ my_boolean activate_faults(struct flt *fault,struct med *medium)
 {
   int i,old_nr_of_active_groups,nrsweeps,old_active[2];
   my_boolean faults_have_slipped,active_modified,mark_quakes;
+  COMP_PRECISION tmp_dbl;
   // did faults slip at all (not only in last iteration)
   faults_have_slipped=FALSE;
   //
@@ -50,8 +51,9 @@ my_boolean activate_faults(struct flt *fault,struct med *medium)
 	    fault[i].f_initial = -1.0;
 	  // initialize the dynamic friction stress drop
 	  // as |\tau|^i + \mu_d \sigma_n^i
-	  calc_absolute_shear_stress(&fault[i].taud,i,fault);
-	  fault[i].taud += (COMP_PRECISION)fault[i].mu_d * fault[i].s[NORMAL];
+	  calc_absolute_shear_stress(&tmp_dbl,i,fault);
+	  fault[i].taud = (float)tmp_dbl;
+	  fault[i].taud += fault[i].mu_db * fault[i].s[NORMAL];
 	}
       }
       /* 

@@ -144,11 +144,11 @@ void calc_spatial_correlation(float *x,int n, int dim, COMP_PRECISION *y,
 	      xc[o1+l] = fault[j].s[component];
 	      yc[o1+l] = fault[k].s[component];
 	    }else if(component == 3){// stat fric
-	      xc[o1+l] = (COMP_PRECISION)fault[j].mu_s;
-	      yc[o1+l] = (COMP_PRECISION)fault[k].mu_s;
+	      xc[o1+l] = (COMP_PRECISION)fault[j].mu_sa;
+	      yc[o1+l] = (COMP_PRECISION)fault[k].mu_sa;
 	    }else if(component == 4){// dyn fric
-	      xc[o1+l] = (COMP_PRECISION)fault[j].mu_d;
-	      yc[o1+l] = (COMP_PRECISION)fault[k].mu_d;
+	      xc[o1+l] = (COMP_PRECISION)fault[j].mu_db;
+	      yc[o1+l] = (COMP_PRECISION)fault[k].mu_db;
 	    }else{
 	      fprintf(stderr,"calc_spatial_corr: component error, %i undefined\n",
 		      component);

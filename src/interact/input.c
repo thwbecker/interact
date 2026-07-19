@@ -76,23 +76,7 @@ int read_patch_event_file(float *time,int *nriter, int *aflt,  float *mom,
   return(cnt);
 
 }
-int  write_patch_event_file(float time, int nriter, int aflt, float mom,
-			    float *slip, FILE *out)
-{
-  int cnt=0;
-#ifdef BINARY_PATCH_EVENT_FILE
-  cnt += fwrite(&time,sizeof(float),1,out);
-  cnt += fwrite(&nriter,sizeof(int),1,out);
-  cnt += fwrite(&aflt,sizeof(int),1,out);
-  cnt += fwrite(slip,sizeof(float),3,out);
-  cnt += fwrite(&mom,sizeof(float),1,out);
-#else
-  cnt = fprintf(out,"%20.15e %3i %6i %14.6e %14.6e %14.6e %14.6e\n",
-		time,nriter,aflt,
-		slip[STRIKE],slip[DIP],slip[NORMAL],mom);
-#endif
-  return cnt;
-}
+
 /* 
    read in rate state friction parameters 
 */
@@ -104,12 +88,12 @@ void read_rsf(char *filename, struct med *medium, struct flt *fault)
   in = myopen(filename,"r");
   aavg=bavg=0;
   for(i=0;i < medium->nrflt;i++){ /* read a and b */
-    if(fscanf(in,TWO_CP_FORMAT,&(fault[i].mu_s),&(fault[i].mu_d))!=2){
+    if(fscanf(in,TWO_CP_FORMAT,&(fault[i].mu_sa),&(fault[i].mu_db))!=2){
       fprintf(stderr,"read_rsf: error reading a b for patch %i\n",i);
       exit(-1);
     }
-    aavg += fault[i].mu_s;
-    bavg += fault[i].mu_d;
+    aavg += fault[i].mu_sa;
+    bavg += fault[i].mu_db;
   }
   fclose(in);
   aavg /= (COMP_PRECISION)medium->nrflt;

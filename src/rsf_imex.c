@@ -81,7 +81,7 @@ PetscErrorCode rsf_IMEX_RHSFunction(TS ts,PetscReal time,Vec X,Vec G,void *ptr)
     PetscCall(VecGetArrayRead(rsf->sigma_dot,&sigma_dot));
   PetscCall(VecGetArray(G,&g));
   for (i = medium->rs, j=0, k=0; i < medium->re; i++, j+=rsf->dim, k++) {
-    a = fault[i].mu_s;
+    a = fault[i].mu_sa;
     /* state evolution is fully implicit */
     g[j] = 0.0;
     /* d sigma/dt, compression positive (In was scaled by -1) */
@@ -97,7 +97,7 @@ PetscErrorCode rsf_IMEX_RHSFunction(TS ts,PetscReal time,Vec X,Vec G,void *ptr)
     /* explicit part of d tau/dt (no dv/dpsi S term here) */
     mu = x[j+1]/x[j+2];				/* tau/sigma */
     scaled_tau = mu/a;				/* tau/(sigma a) */
-    exp_fac = PetscExpReal(-x[j]/a);		/* exp(-psi/a) */
+    exp_fac = exp(-x[j]/a);		/* exp(-psi/a) */
     pre_fac =  2.0*rsf->v0/(a * x[j+2]);	/* 2v0/(a sigma) */
     cosh_fac  = PetscCoshReal(scaled_tau) * exp_fac;
     dvdtau   =   pre_fac * cosh_fac;
@@ -136,7 +136,7 @@ PetscErrorCode rsf_IMEX_IFunction(TS ts,PetscReal time,Vec X,Vec Xdot,Vec F,void
   PetscCall(VecGetArrayRead(Xdot,&xd));
   PetscCall(VecGetArray(F,&f));
   for (i = medium->rs, j=0; i < medium->re; i++, j+=rsf->dim) {
-    a = fault[i].mu_s;
+    a = fault[i].mu_sa;
     v = vel_from_rsf(x[j+1],x[j+2],x[j],a,rsf->v0,
 		     &mu,&scaled_tau,&exp_fac,medium);
     S = rsf_state_rate(i,x[j],v,par,NULL,NULL);
@@ -179,7 +179,7 @@ PetscErrorCode rsf_IMEX_IJacobian(TS ts,PetscReal time,Vec X,Vec Xdot,PetscReal 
   medium = par->medium;fault = par->fault;rsf = medium->rsf;
   PetscCall(VecGetArrayRead(X,&x));
   for (i = medium->rs, j=0; i < medium->re; i++, j+=rsf->dim) {
-    a = fault[i].mu_s;
+    a = fault[i].mu_sa;
     v = vel_from_rsf(x[j+1],x[j+2],x[j],a,rsf->v0,
 		     &mu,&scaled_tau,&exp_fac,medium);
     S = rsf_state_rate(i,x[j],v,par,&dSdpsi,&dSdvabs);

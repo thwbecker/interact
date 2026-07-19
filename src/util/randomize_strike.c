@@ -257,7 +257,7 @@ int main(int argc, char **argv)
       exit(-1);
     }
     // for now don't check for variable friction
-    fault[nr_inp_flts].mu_s = STATIC_MU;
+    fault[nr_inp_flts].mu_sa = STATIC_MU;
 #ifdef ALLOW_NON_3DQUAD_GEOM
     fault[nr_inp_flts].type=OKADA_PATCH;
 #endif
@@ -298,7 +298,7 @@ int main(int argc, char **argv)
     total number of patches
   */
   for(mindist=FLT_MAX,mu_s=0.0,nrpatches=i=0;i<nr_inp_flts;i++){
-    mu_s += fault[i].mu_s;
+    mu_s += fault[i].mu_sa;
     determine_segments(seg,segn,(fault+i),FALSE,td);
     // determine total number of patches
     nrpatches += segn[0]*segn[1];

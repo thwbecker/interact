@@ -24,7 +24,7 @@ int main(int argc,char **argv)
     exit(-1);
   }}
   // read in patches
-  read_geometry(argv[1],&medium,&fault,FALSE,FALSE,FALSE,FALSE);
+  read_geometry(argv[1],&medium,&fault,FALSE,FALSE,FALSE,FALSE,FALSE);
   /* init group structs */
   if(!(grp=(struct geog *)calloc(medium->nrgrp,
 				 sizeof(struct geog))))

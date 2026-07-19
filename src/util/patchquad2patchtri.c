@@ -31,7 +31,7 @@ int main(int argc, char **argv)
     sscanf(argv[1],"%i",&assign_mode);
 
   fprintf(stderr,"%s: reading patch quad format from stdin, writing patch tri  to stdout, assign_mode: %i\n",argv[0],assign_mode);
-  read_geometry("stdin",&medium,&qfault,FALSE,FALSE,FALSE,verbose);
+  read_geometry("stdin",&medium,&qfault,FALSE,FALSE,FALSE,FALSE,verbose);
   ntflt = medium->nrflt*2;
   tfault[0].xn = (COMP_PRECISION *)malloc(sizeof(COMP_PRECISION)*9);
   tfault[0].type = TRIANGULAR;

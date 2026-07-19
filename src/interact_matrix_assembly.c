@@ -15,7 +15,7 @@
 
   BENCHMARK:
   produce geom.in file with:
-  /usr/bin/time randomflt -f 100 -m 5 -n 5 > geom.in
+  randomflt -f 100 -m 5 -n 5 > geom.in
   bc.in file reads:
   2
   0.01 0.05 70 
@@ -25,7 +25,39 @@
 */
 #include "interact.h"
 
+/* given a stress tensor and context, resolve on fault nfaults */
+COMP_PRECISION resolve_stress_on_fault_using_ctx(COMP_PRECISION stress[3][3],  struct interact_ctx *ictx, int rfault)
+{
+  COMP_PRECISION sval,trac[3];
+  resolve_force(ictx->fault[rfault].normal,stress,trac);
+  switch(ictx->rec_stress_mode){
+  case STRIKE:
+    sval = dotp_3d(trac,ictx->fault[rfault].t_strike);
+    break;
+  case DIP:
+    sval = dotp_3d(trac,ictx->fault[rfault].t_dip);
+    break;
+  case NORMAL:
+    sval = dotp_3d(trac,ictx->fault[rfault].normal);
+    break;
+  case RAKE:
+    sval = dotp_3d(trac,ictx->fault[rfault].t_rake); /* only initialized if rake angles are read */
+    break;
+  default:
+    fprintf(stderr,"esolve_stress_on_fault_using_ctx: stress mode %i undefined \n",ictx->rec_stress_mode);
+    exit(-1);
+  }
+  return sval;
+
+}
+
+
 #ifdef USE_PETSC
+
+
+
+
+
 #ifdef USE_PETSC_HMAT
 #include "petsc_prototypes.h"
 /* 
@@ -42,7 +74,7 @@ PetscScalar GenKEntries_h2opus(PetscInt sdim, PetscReal x[], PetscReal y[], void
   int iret;
   double     target_x[3],target_y[3], sep_x,sep_y;
   PetscScalar sval;
-  COMP_PRECISION slip[3],disp[3],stress[3][3],trac[3];
+  COMP_PRECISION slip[3],disp[3],stress[3][3];
   kd_node    nearest_x,nearest_y;
   struct interact_ctx *ictx;
   ictx = (struct interact_ctx *)kernel_ctx;
@@ -54,28 +86,19 @@ PetscScalar GenKEntries_h2opus(PetscInt sdim, PetscReal x[], PetscReal y[], void
   KDTreeFindNearest(ictx->medium->kdtree,target_x,&nearest_x,&sep_x);
   KDTreeFindNearest(ictx->medium->kdtree,target_y,&nearest_y,&sep_y);
   /*  */
-  i = nearest_x->index;j = nearest_y->index;
+  i = nearest_x->index;	  /* receiving */
+  j = nearest_y->index;	  /* slipping */
   //j = nearest_x->index;i = nearest_y->index;
   /*  */
 
-  get_right_slip(slip,ictx->src_slip_mode,1.0);	/* strike motion */
+  get_right_slip(slip,ictx->src_slip_mode,1.0,(ictx->fault+j));	/* strike motion */
   eval_green_at_receiver(ictx->fault,(int)i,(int)j,slip,disp,stress,&iret,GC_STRESS_ONLY,
 			 FALSE,ictx->medium->full_space);	/* operator assembly: single-point */
   if(iret != 0){
     fprintf(stderr,"GenKentries_h2opus: WARNING: i=%3i j=%3i singular\n",(int)i,(int)j);
     sval = 0.0;
   }else{
-    resolve_force(ictx->fault[i].normal,stress,trac);
-    if(ictx->rec_stress_mode == STRIKE)
-      sval = dotp_3d(trac,ictx->fault[i].t_strike);
-    else if(ictx->rec_stress_mode == DIP)
-      sval = dotp_3d(trac,ictx->fault[i].t_dip);
-    else if(ictx->rec_stress_mode == NORMAL)
-      sval = dotp_3d(trac,ictx->fault[i].normal);
-    else{
-      fprintf(stderr,"GenKentries_h2opus: receive mode %i undefined\n",ictx->rec_stress_mode);
-      exit(-1);
-    }
+    sval = resolve_stress_on_fault_using_ctx(stress,ictx, i);
   }
   return sval;
 }
@@ -99,7 +122,7 @@ PetscErrorCode GenKEntries_petsc(PetscInt sdim, PetscInt M, PetscInt N,
 				 void *kernel_ctx)
 {
   PetscInt  j, k;
-  COMP_PRECISION slip[3],disp[3],stress[3][3],trac[3],sval;
+  COMP_PRECISION slip[3],disp[3],stress[3][3],sval;
   int iret;
   struct interact_ctx *ictx;
   ictx = (struct interact_ctx *)kernel_ctx;
@@ -108,8 +131,7 @@ PetscErrorCode GenKEntries_petsc(PetscInt sdim, PetscInt M, PetscInt N,
   PetscFunctionBeginUser;
 #endif
   
-  //fprintf(stderr,"GenKentries_petsc: slip %i rec %i\n",ictx->src_slip_mode,ictx->rec_stress_mode);
-  get_right_slip(slip,ictx->src_slip_mode,1.0);	/* strike motion */
+
   /* 
      NOTE on convention: for MatMult(A, slip) = stress semantics (and
      consistent with the MATHTOOL convention where the J/row indices
@@ -124,23 +146,14 @@ PetscErrorCode GenKEntries_petsc(PetscInt sdim, PetscInt M, PetscInt N,
   */
   for (j = 0; j < M; j++) {
     for (k = 0; k < N; k++) {
+      get_right_slip(slip,ictx->src_slip_mode,1.0,(ictx->fault+K[k]));	/* strike motion */
       eval_green_at_receiver(ictx->fault,(int)J[j],(int)K[k],slip,disp,stress,&iret,
 			     GC_STRESS_ONLY,FALSE,ictx->medium->full_space); /* operator assembly: single-point */
       if(iret != 0){
 	fprintf(stderr,"GenKentries_petsc: WARNING: i=%3i j=%3i singular\n",(int)j,(int)k);
 	sval = 0.0;
       }else{
-	resolve_force(ictx->fault[J[j]].normal,stress,trac);
-	if(ictx->rec_stress_mode == STRIKE)
-	  sval = dotp_3d(trac,ictx->fault[J[j]].t_strike);
-	else if(ictx->rec_stress_mode == DIP)
-	  sval = dotp_3d(trac,ictx->fault[J[j]].t_dip);
-	else if(ictx->rec_stress_mode == NORMAL)
-	  sval = dotp_3d(trac,ictx->fault[J[j]].normal);
-	else{
-	  fprintf(stderr,"GenKentries_petsc: receive mode %i undefined\n",ictx->rec_stress_mode);
-	  exit(-1);
-	}
+	sval = resolve_stress_on_fault_using_ctx(stress,ictx, J[j]);
       }
       //if(ictx->rec_stress_mode == STRIKE)fprintf(stderr,"GenKEntries_petsc: j %i M %i k %i val %g\n",j,M,k,sval);
       ptr[j + M * k] = sval;
@@ -291,7 +304,7 @@ void calc_interaction_matrix(struct med *medium,struct flt *fault,
 	   different displacement components,
 	   strike, dip, and tension (if not suppressed)
 	*/
-	get_right_slip(disp,k,1.0);
+	get_right_slip(disp,k,1.0,(fault+j));
 	for(i=0;i<medium->nrflt;i++){// loop over observing faults
 	  // evaluate the 'Green's function'
 	  eval_green_at_receiver(fault,i,j,disp,u,sm,&iret,GC_STRESS_ONLY,
@@ -497,7 +510,7 @@ void calc_interaction_matrix(struct med *medium,struct flt *fault,
 	for(k=0;k < medium->nrmode;k++){
 	  if(write_to_screen){
 	    /* if we only have a couple of patches, print out interaction coefficients */
-	    get_right_slip(disp,k,1.0);
+	    get_right_slip(disp,k,1.0,(fault+j)); /* is j rupturing? */
 	    // obtain shear stress and normal stress change
 	    for(normal=shear_strike=shear_dip=0.0,m=0;m<3;m++){
 	      normal        += ICIM(medium->i,i,j,m,NORMAL)*disp[m];
@@ -510,7 +523,7 @@ void calc_interaction_matrix(struct med *medium,struct flt *fault,
 		    i,j,disp[STRIKE],disp[DIP],disp[NORMAL],
 		    ICIM(medium->i,i,j,k,STRIKE),ICIM(medium->i,i,j,k,DIP),
 		    ICIM(medium->i,i,j,k,NORMAL),
-		    coulomb_stress(sqrt(SQUARE(shear_strike)+SQUARE(shear_dip)),(COMP_PRECISION)fault[i].mu_s,
+		    coulomb_stress(sqrt(SQUARE(shear_strike)+SQUARE(shear_dip)),(COMP_PRECISION)fault[i].mu_sa,
 				   normal,medium->cohesion));
 #endif
 	  }
@@ -565,7 +578,7 @@ COMP_PRECISION interaction_coefficient(int i, int j, int k, int l,
      (old_indices[1] != j)||
      (old_indices[2] != k)){
     // obtain appropriate slip vector for slip mode k
-    get_right_slip(disp,k,1.0);
+    get_right_slip(disp,k,1.0,(fault+j));
     /* obtain the stress vector at fault i (centroid) when fault j
        slips with disp[] */
     eval_green_at_receiver(fault,i,j,disp,u,sm,iret,GC_STRESS_ONLY,
@@ -592,6 +605,10 @@ COMP_PRECISION interaction_coefficient(int i, int j, int k, int l,
       fac=  dotp_3d(trac,fault[i].t_dip);
       break;
     }
+    case RAKE:{
+      fac=  dotp_3d(trac,fault[i].t_rake);
+      break;
+    }
     case NORMAL:{
       fac=  dotp_3d(trac,fault[i].normal);
       break;
@@ -615,13 +632,28 @@ COMP_PRECISION interaction_coefficient(int i, int j, int k, int l,
    
    anyways, creates a unity-type slip vector in the dir direction
    using `unity' for 1, ie. one can also use some other value
+   
+   will also consider the rake distribution for rupturing fault rfault
 
 */				       
-void get_right_slip(COMP_PRECISION *disp,int dir,
-		    COMP_PRECISION unity)
+void get_right_slip(COMP_PRECISION *disp,int dir,COMP_PRECISION unity, struct flt *rfault)
 {
   disp[NORMAL]=disp[STRIKE]=disp[DIP]=0.0;
-  disp[dir] = unity;
+  switch(dir){
+  case STRIKE:
+  case DIP:
+  case NORMAL:
+    disp[dir] = unity;
+    break;
+  case RAKE:
+    disp[STRIKE] = unity * rfault->r[0];
+    disp[DIP]    = unity * rfault->r[1];
+    break;
+  default:
+    fprintf(stderr,"get_right_slip: slip mode %i undefined\n",dir);
+    exit(-1);
+    break;
+  }
 }
 
 /* 

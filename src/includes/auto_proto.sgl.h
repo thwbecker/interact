@@ -20,9 +20,10 @@ double ckernel_func(int, int, void *);
 void get_projected_fault_parameters(float [2][2], float, float *, float *, float *, float *, float *, float *);
 /* src/init.c */
 void check_parameters_and_init_interact(int, char **, struct med **, struct flt **, unsigned char *, float *, float *);
-void initialize_interact(struct med **, struct flt **, unsigned char, int, unsigned char, unsigned char, float, float *, float *, unsigned char, unsigned char, unsigned char, float, unsigned char, float, unsigned char, unsigned char, unsigned char, unsigned char, unsigned char, unsigned char, unsigned char, short int, unsigned char, float, unsigned char, unsigned char, unsigned char, unsigned char, unsigned char, unsigned char, float, unsigned char, unsigned char, unsigned char, unsigned char);
+void initialize_interact(struct med **, struct flt **, unsigned char,unsigned char, int, unsigned char, unsigned char, float, float *, float *, unsigned char, unsigned char, unsigned char, float, unsigned char, float, unsigned char, unsigned char, unsigned char, unsigned char, unsigned char, unsigned char, unsigned char, short int, unsigned char, float, unsigned char, unsigned char, unsigned char, unsigned char, unsigned char, unsigned char, float, unsigned char, unsigned char, unsigned char, unsigned char);
 void init_files_interact(struct med **, struct flt **);
-void init_parameters_interact(char **, int, unsigned char *, unsigned char *, unsigned char *, unsigned char *, float *, int *, unsigned char *, unsigned char *, unsigned char *, float *, unsigned char *, float *, unsigned char *, unsigned char *, unsigned char *, unsigned char *, unsigned char *, unsigned char *, unsigned char *, short int *, unsigned char *, float *, unsigned char *, unsigned char *, unsigned char *, unsigned char *, unsigned char *, float *, unsigned char *, unsigned char *, unsigned char *, unsigned char *, unsigned char *, int);
+void init_parameters_interact(char **, int, unsigned char *, unsigned char *, unsigned char *, unsigned char *, unsigned char *, float *, int *, unsigned char *, unsigned char *, unsigned char *, float *, unsigned char *, float *, unsigned char *, unsigned char *, unsigned char *, unsigned char *, unsigned char *, unsigned char *, unsigned char *, short int *, unsigned char *, float *, unsigned char *, unsigned char *, unsigned char *, unsigned char *, unsigned char *, float *, unsigned char *, unsigned char *, unsigned char *, unsigned char *, unsigned char *, int);
+float resolve_stress_on_fault_using_ctx(float [3][3],  struct interact_ctx *, int );
 void advance_argument(int *, int, char **);
 char *name_boolean(unsigned char);
 unsigned char toggle(unsigned char *);
@@ -31,7 +32,7 @@ void read_stress_fac(unsigned char, float *, float *, float, struct med *);
 /* src/interact_matrix_assembly.c */
 void calc_interaction_matrix(struct med *, struct flt *, unsigned char);
 float interaction_coefficient(int, int, int, int, struct flt *, int *, unsigned char);
-void get_right_slip(float *, int, float);
+void get_right_slip(float *, int, float,struct flt *);
 float ic_from_file(int, int, int, int, struct med *);
 float aij_from_file(int, int, int, FILE *);
 int select_i_coeff_calc_mode(struct med *);
@@ -41,7 +42,7 @@ int print_patch_geometry_and_bc(int, struct flt *, int, float, unsigned char, FI
 /* src/read_fltdat.c */
 int read_fltdat(char *, struct flt *, struct med *, unsigned char);
 /* src/read_geometry.c */
-void read_geometry(char *, struct med **, struct flt **, unsigned char, unsigned char, unsigned char, unsigned char);
+void read_geometry(char *, struct med **, struct flt **, unsigned char, unsigned char, unsigned char, unsigned char, unsigned char);
 /* src/read_stress_observations.c */
 void read_stress_observations(struct bmd *, float *, float, unsigned char, float **, float, unsigned char);
 /* src/interact/adjust_time_step.c */

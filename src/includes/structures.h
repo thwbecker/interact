@@ -3,10 +3,105 @@
    and some other stuff, like the two fault group 
 */
 
+
+/*
+
+  FAULT STRUCTURE
+  this structure should hold all variables that are
+  associated with an individual fault patch
+
+
+  WARNING:
+  don't forget to change fltswap and the like if you
+  add components
+
+*/
+
+struct flt{
+  COMP_PRECISION u[3];/* slip on fault in strike, dip, and tensile
+			 direction */
+  COMP_PRECISION s[3];/* stress in strike, dip, and normal direction  */
+  COMP_PRECISION sinc[3]; /* assuming that the background stress
+			     increases linearly, these are the
+			     increments in strike, dip, and normal
+			     direction,s=a*t+b
+
+			     for RSF, [2] are shear and normal
+			  */
+  COMP_PRECISION x[3]; /* 
+			  location of center of patch or point
+			  source or centroid location for 
+			  triangles
+		       */
+#ifdef ALLOW_NON_3DQUAD_GEOM
+  MODE_TYPE type;/* 
+		    element types:
+		    #define OKADA_PATCH 0
+		    #define POINT_SOURCE 10
+
+		    #define TRIANGULAR 20
+		    #define TRIANGULAR_M244 21
+		    #define TRIANGULAR_M236 22
+		    #define TRIANGULAR_HYBR 23
+		    #define TRIANGULAR_MIXED 24
+		    
+		    #define TWO_DIM_SEGMENT_PLANE_STRAIN 30
+		    #define TWO_DIM_SEGMENT_PLANE_STRESS 40
+		    #define TWO_DIM_HALFPLANE_PLANE_STRAIN 50
+		    #define IQUAD 60
+		 */
+  
+  COMP_PRECISION *xn; /* coordinates of the three nodes of the
+			 triangular or irregular quad element */
+#endif
+  float pos[2]; /* position in the group of patches
+		   assuming linear fault */
+  COMP_PRECISION l, w, area;  /* 
+				 fault HALF width and total area for rectangular patches, 
+				 length is area/(4w)
+				 otherwise w and l will hold the area of the triangle
+			      */
+  float strike, dip;    /* 
+			   fault orientation in degrees, 
+			   strike is in degrees clockwise 
+			   from North, dip is in degrees, too, the
+			   angle from horizontal so that dip=90 
+			   means vertical 
+			*/
+  float r[2];			/* fraction of strike and dip for rake dependence */
+  double cos_alpha,/* cos and sin alpha, which is
+		      angle counterclockwise from East,
+		      ie. 90 - strike */
+    sin_alpha;
+  COMP_PRECISION normal[3],*t_rake,
+    t_strike[3],t_dip[3]; /* normal and tangential 
+			     (strike and dip direction) 
+			     unit vectors */
+  COMP_PRECISION mu_db,mu_sa; /* 
+				 dynamic and static friction coefficients, or b and a
+			      */
+  float f_initial,taud;/* initial f ratio and stress drop
+				 */
+  float cf[2];// coulomb correction for normal stress, or rake components
+#ifdef LATENCY
+  float last_activation_time;/* last time of slip for 
+				latency operation mode */
+#endif
+  unsigned int group; /* fault patch can have a 
+			 group assigned */
+  MODE_TYPE mode[3];/* 
+		       activational mode in each direction
+		    */
+  my_boolean active; /* fault is active in the current
+			solver */
+};
+
+
 /*
 
   fault group structure holds all non-local information that interact
-  has about groups of fault patches
+  has about groups of fault patches, such as those making up specific
+  fault surfaces within a set
   
 */
 
@@ -22,22 +117,6 @@ struct fgrp{
   float strike[3], dip[3], normal[3]; /* mean orientation */
 };
 
-/*
-
-  geometrical quantities about a fault group only used to determine
-  fault[].pos[] in interact and to convert from patch format to group
-  format after that, the memory is freed again */
-
-struct geog{
-  int nrflt;
-  /* center of mass (average location of mid point) and min,max and
-    range in strike and dip direction */
-  COMP_PRECISION center[3],
-    pmin[2],pmax[2],prange[2];
-  // average vectors in strike and dip direction
-  // (normalized)
-  COMP_PRECISION strike_vec[3],dip_vec[3];
-};
 #ifdef USE_PETSC
 /* 
    shared MATSHELL context for H matrix libraries whose matvec
@@ -118,16 +197,8 @@ struct rsf_vars{
   /*  */
   short int dim;
 };
+#endif	/* end petsc branch */
 
-
-
-
-
-
-
-
-
-#endif
 
 
 
@@ -208,6 +279,9 @@ struct med{
   // try to restart given a events.bin file
   my_boolean attempt_restart;
 
+  /*  */
+  my_boolean fault_rake_init;
+  
   // count the number of active groups for whole fault 
   // mode search for patches that should be slipping
   int nr_active_groups;
@@ -397,101 +471,41 @@ struct med{
 #endif
 };
 
+
+
 /*
-
-  FAULT STRUCTURE
-  this structure should hold all variables that are
-  associated with an individual fault patch
-
-
-  WARNING:
-  don't forget to change fltswap and the like if you
-  add components
-
+  parameters needed by the derivative function or if we need other
+  stuff to pack everything
 */
-
-struct flt{
-  COMP_PRECISION u[3];/* slup on fault in strike, dip, and tensile
-			 direction */
-  COMP_PRECISION s[3];/* strike, normal and 
-			 dip stress */
-  COMP_PRECISION sinc[3]; /* assuming that the background stress
-			     increases linearly, these are the
-			     increments in strike, dip, and normal
-			     direction,s=a*t+b
-
-			     for RSF, [2] are shear and normal
-			  */
-  COMP_PRECISION x[3]; /* 
-			  location of center of patch or point
-			  source or centroid location for 
-			  triangles
-		       */
-#ifdef ALLOW_NON_3DQUAD_GEOM
-  MODE_TYPE type;/* 
-		    element types:
-
-		    #define OKADA_PATCH 0
-		    #define POINT_SOURCE 1
-		    #define TRIANGULAR 2
-		    #define TWO_DIM_SEGMENT_PLANE_STRAIN 3
-		    #define TWO_DIM_SEGMENT_PLANE_STRESS 4
-		    #define TWO_DIM_HALFPLANE_PLANE_STRAIN 5
-		    #define IQUAD 6
-
-		 */
-  
-  COMP_PRECISION *xn; /* coordinates of the three nodes of the
-			 triangular or irregular quad element */
-#endif
-  float pos[2]; /* position in the group of patches
-		   assuming linear fault */
-  COMP_PRECISION l, w, area;  /* 
-			   fault HALF width and total area for rectangular patches, 
-			   length is area/(4w)
-			   otherwise w and l will hold the area of the triangle
-
-			   
-			*/
-  float strike, dip;    /* 
-			   fault orientation in degrees, 
-			   strike is in degrees clockwise 
-			   from North, dip is in degrees, too, the
-			   angle from horizontal so that dip=90 
-			   means vertical 
-
-			*/
-  double cos_alpha,/* cos and sin alpha, which is
-		      angle counterclockwise from East,
-		      ie. 90 - strike */
-    sin_alpha;
-  COMP_PRECISION normal[3],
-    t_strike[3],t_dip[3]; /* normal and tangential 
-			     (strike and dip direction) 
-			     unit vectors */
-  COMP_PRECISION mu_d,mu_s; /* 
-			       dynamic and static friction coefficients, or a and b
-			    */
-  COMP_PRECISION f_initial,taud;/* initial f ratio and stress drop
-				 */
-  COMP_PRECISION cf[2];// coulomb correction for normal stress
-#ifdef LATENCY
-  float last_activation_time;/* last time of slip for 
-				latency operation mode */
-#endif
-  int group; /* fault patch can have a 
-		group assigned */
-  MODE_TYPE mode[3];/* 
-		     activational mode in each direction
-		  */
-  my_boolean active; /* fault is active in the current
-		     solver */
+struct interact_ctx{
+  struct flt *fault;
+  struct med *medium;
+  int src_slip_mode,rec_stress_mode;
 };
+
+
 
 //  structure needed by plotting routines
 struct pa{
   float x[5],y[5],z[5];
 };
+/*
+
+  geometrical quantities about a fault group only used to determine
+  fault[].pos[] in interact and to convert from patch format to group
+  format after that, the memory is freed again */
+
+struct geog{
+  int nrflt;
+  /* center of mass (average location of mid point) and min,max and
+    range in strike and dip direction */
+  COMP_PRECISION center[3],
+    pmin[2],pmax[2],prange[2];
+  // average vectors in strike and dip direction
+  // (normalized)
+  COMP_PRECISION strike_vec[3],dip_vec[3];
+};
+
 
 /* 
    interaction coefficient structure
@@ -520,15 +534,7 @@ typedef	int tPointi[SEGSEG_DIM];   /* Type integer point */
 typedef	double tPointd[SEGSEG_DIM];   /* Type double point */
 
 
-/*
-  parameters needed by the derivative function or if we need other
-  stuff to pack everything
-*/
-struct interact_ctx{
-  struct flt *fault;
-  struct med *medium;
-  int src_slip_mode,rec_stress_mode;
-};
+
 
 /* the structures for blockinvert type programs */
 #include "blockinvert_structures.h"
