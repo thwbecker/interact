@@ -74,7 +74,7 @@ int print_patch_geometry_and_bc(int flt_offset,struct flt *fault,
     switch(fault[flt_offset].type){
     case POINT_SOURCE:{
       // L' = -aspect_ratio = - L/W , W' = area = 4 L W
-      fprintf(out,"%19.12e %19.12e %19.12e %10.6f %10.6f %19.12e %19.12e %6i\n",
+      fprintf(out,"%19.12e %19.12e %19.12e %10.6f %10.6f %19.12e %19.12e %10i\n",
 	      fault[flt_offset].x[INT_X], fault[flt_offset].x[INT_Y], 
 	      fault[flt_offset].x[INT_Z],fault[flt_offset].strike,
 	      fault[flt_offset].dip,-fault[flt_offset].l/fault[flt_offset].w,
@@ -83,7 +83,7 @@ int print_patch_geometry_and_bc(int flt_offset,struct flt *fault,
     }
     case TWO_DIM_SEGMENT_PLANE_STRAIN:
     case TWO_DIM_SEGMENT_PLANE_STRESS:{// normal rectangular fault, this is the default
-      fprintf(out,"%19.12e %19.12e %19.12e %10.6f %10.6f %19.12e %19.12e %6i\n",
+      fprintf(out,"%19.12e %19.12e %19.12e %10.6f %10.6f %19.12e %19.12e %10i\n",
 	      fault[flt_offset].x[INT_X], fault[flt_offset].x[INT_Y], 
 	      fault[flt_offset].x[INT_Z],fault[flt_offset].strike,
 	      fault[flt_offset].dip,
@@ -94,7 +94,7 @@ int print_patch_geometry_and_bc(int flt_offset,struct flt *fault,
     case TRIANGULAR_M236:
     case TRIANGULAR_HYBR:
     case TRIANGULAR:{// xt has to be assigned and allocated before
-      fprintf(out,"%19.12e %19.12e %19.12e %10.6f %10.6f %19.12e %19.12e %6i ",
+      fprintf(out,"%19.12e %19.12e %19.12e %10.6f %10.6f %19.12e %19.12e %10i ",
 	      fault[flt_offset].x[INT_X],	      fault[flt_offset].x[INT_Y],	      fault[flt_offset].x[INT_Z],
 	      fault[flt_offset].strike,fault[flt_offset].dip,
 	      -fault[flt_offset].l,-fault[flt_offset].w,
@@ -106,7 +106,7 @@ int print_patch_geometry_and_bc(int flt_offset,struct flt *fault,
       break;
     }
     case IQUAD:{// xt has to be assigned and allocated before
-      fprintf(out,"%19.12e %19.12e %19.12e %10.6f %10.6f %19.12e %19.12e %6i ",
+      fprintf(out,"%19.12e %19.12e %19.12e %10.6f %10.6f %19.12e %19.12e %10i ",
 	      fault[flt_offset].x[INT_X],	      fault[flt_offset].x[INT_Y],	      fault[flt_offset].x[INT_Z],
 	      fault[flt_offset].strike,fault[flt_offset].dip,
 	      fault[flt_offset].l,-fault[flt_offset].w,
@@ -119,7 +119,7 @@ int print_patch_geometry_and_bc(int flt_offset,struct flt *fault,
       break;
     }
     case OKADA_PATCH:{
-      fprintf(out,"%19.12e %19.12e %19.12e %10.6f %10.6f %19.12e %19.12e %6i\n",
+      fprintf(out,"%19.12e %19.12e %19.12e %10.6f %10.6f %19.12e %19.12e %10i\n",
 	      fault[flt_offset].x[INT_X], fault[flt_offset].x[INT_Y], fault[flt_offset].x[INT_Z],fault[flt_offset].strike,
 	      fault[flt_offset].dip,fault[flt_offset].l,fault[flt_offset].w,fault[flt_offset].group);
       break;
@@ -132,7 +132,7 @@ int print_patch_geometry_and_bc(int flt_offset,struct flt *fault,
     }
 #else
     // only rectangular
-    fprintf(out,"%19.12e %19.12e %19.12e %10.6f %10.6f %19.12e %19.12e %6i\n",
+    fprintf(out,"%19.12e %19.12e %19.12e %10.6f %10.6f %19.12e %19.12e %10i\n",
 	    fault[flt_offset].x[INT_X], fault[flt_offset].x[INT_Y], fault[flt_offset].x[INT_Z],fault[flt_offset].strike,
 	    fault[flt_offset].dip,fault[flt_offset].l,fault[flt_offset].w,fault[flt_offset].group);
 #endif

@@ -371,10 +371,10 @@ void deactivate_group(int patch, int group, struct flt *fault, struct med *mediu
   for(i=0;i<medium->nrflt;i++){
     if(fault[i].group==group && i != patch){
       if(fault[i].active)
-	fprintf(stderr,"deactivate_group: patch %5i is active at time %11g, will deactivate at next step\n",
+	fprintf(stderr,"deactivate_group: patch %10i is active at time %11g, will deactivate at next step\n",
 		i,medium->time);
       else
-	fprintf(stderr,"deactivate_group: patch %5i is deactivated since in group %i\n",
+	fprintf(stderr,"deactivate_group: patch %10i is deactivated since in group %i\n",
 		i,fault[i].group);
       fault[i].mode[0]=INACTIVE;
     }

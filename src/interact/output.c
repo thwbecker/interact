@@ -107,7 +107,7 @@ void print_fault_geometry_and_normals(struct flt *fault, int nrflt, char *dump_c
   }
   fprintf(fp,"# i x y z strike dip l w area nx ny nz group (centroid, orientation[deg], half-sizes, area, unit normal, group/fault id)\n");
   for(i=0;i < nrflt;i++)
-    fprintf(fp,"%6ld %14.7e %14.7e %14.7e %8.3f %8.3f %12.6e %12.6e %12.6e %10.6f %10.6f %10.6f %5i\n",
+    fprintf(fp,"%6ld %14.7e %14.7e %14.7e %8.3f %8.3f %12.6e %12.6e %12.6e %10.6f %10.6f %10.6f %10i\n",
 	    (long)i,
 	    (double)fault[i].x[INT_X],(double)fault[i].x[INT_Y],(double)fault[i].x[INT_Z],
 	    (double)fault[i].strike,(double)fault[i].dip,
@@ -326,11 +326,11 @@ void print_fault_stress_stat(FILE *out,int grp,struct med *medium,
     fprintf(stderr,"print_fault_stress_stat: no patch found for group %i\n",
 	    grp);
   }else if(n==1){
-    fprintf(out,"%g %5i %g %g %g %g %g %g 0 0 0\n",
+    fprintf(out,"%g %i %g %g %g %g %g %g 0 0 0\n",
 	    medium->time,grp,stat[STRIKE][0],0.0,stat[DIP][0],0.0,
 	    stat[NORMAL][0],0.0);
   }else{
-    fprintf(out,"%12.5e %5i ",medium->time,grp);
+    fprintf(out,"%12.5e %10i ",medium->time,grp);
     for(i=0;i<3;i++){
       stat[i][1] = sqrt((((COMP_PRECISION)n) * stat[i][1] - SQUARE(stat[i][0])) /
 			((((COMP_PRECISION)n)*(((COMP_PRECISION)n)-1.0))));
@@ -693,7 +693,7 @@ void print_equations(int naflt,my_boolean *sma,
     for(j=0;j<3;j++)
       if(sma[i*3+j]){
 	fprintf(stderr,
-		"%s: eq %3i/%3i flt %8i/g:%5i m: %1i o_s: %12.4e sd: %12.4e target_s: %12.4e o_slip: %12.4e\n",
+		"%s: eq %3i/%3i flt %8i/g:%8i m: %1i o_s: %12.4e sd: %12.4e target_s: %12.4e o_slip: %12.4e\n",
 		title, eqc1, nreq, nameaf[i], fault[nameaf[i]].group, j,
 		fault[nameaf[i]].s[j], b[eqc1], b[eqc1]+fault[nameaf[i]].s[j],
 		fault[nameaf[i]].u[j]);
@@ -739,7 +739,7 @@ void flush_moment_stack(struct med *medium)
   for(i=0;i<medium->nrgrp;i++)
     if(medium->fault_group[i].moment != 0.0){
       fprintf(medium->cevents_out,
-	      "%22.15e %5i %10.3e %10.3e\t%10.3e %10.3e %10.3e\t%10.3e %10.3e %10.3e\t%10.3e %10.3e %10.3e\n",
+	      "%22.15e %8i %10.3e %10.3e\t%10.3e %10.3e %10.3e\t%10.3e %10.3e %10.3e\t%10.3e %10.3e %10.3e\n",
 	      medium->old_moment_time,i,// time of old group activation
 	      medium->fault_group[i].moment,// temporaty group moment release
 	      medium->total_moment,// total moment at old time
@@ -757,7 +757,7 @@ void flush_moment_stack(struct med *medium)
 	      medium->fault_group[i].cent[INT_Z]/medium->fault_group[i].sarea);
       if(medium->debug)
 	fprintf(stderr,
-		"event: %22.15e %5i %10.3e %10.3e %10.3e %10.3e %10.3e %10.3e %10.3e %10.3e %10.3e %10.3e\n",
+		"event: %22.15e %8i %10.3e %10.3e %10.3e %10.3e %10.3e %10.3e %10.3e %10.3e %10.3e %10.3e\n",
 		medium->old_moment_time,i,// time of old group activation
 		medium->fault_group[i].moment,// temporary group moment release
 		// weighted slip according to current slip area

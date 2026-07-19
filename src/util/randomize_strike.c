@@ -428,7 +428,7 @@ int main(int argc, char **argv)
       }
       iter ++;
 #ifdef DEBUG
-      fprintf(stderr,"%s: working on fault %5i, patch: %6i, iter: %5i, ici: %5i, ep: %5i and %5i, dist: %10.4e\r",
+      fprintf(stderr,"%s: working on fault %10i, patch: %10i, iter: %5i, ici: %5i, ep: %5i and %5i, dist: %10.4e\r",
 	      argv[0],i,nrpatches,iter,interact_prob,evil_pair[0],evil_pair[1],
 	      (evil_pair[0]!= -1 && evil_pair[1]!=-1)?
 	      (distance_3d(patch[evil_pair[0]].x,patch[evil_pair[1]].x)):(0));

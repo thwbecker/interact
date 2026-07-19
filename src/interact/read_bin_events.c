@@ -132,13 +132,13 @@ int main(int argc, char **argv)
 	slipa[offset] += fabs(slip[STRIKE]);
     }
     /*
-      printf("%10e %5i %5i %5i %12.5e %12.5e  %12.5e %12.5e %12.5e %12.5e\n",
+      printf("%10e %10i %10i %10i %12.5e %12.5e  %12.5e %12.5e %12.5e %12.5e\n",
       time,nriter,aflt,	    fault[aflt].group,
       fault[aflt].pos[0],fault[aflt].pos[1],
       slip[0],slip[1],slip[2],mom);
     */
 #else
-    printf("%10e %5i %5i %5i %12.5e %12.5e  %12.5e %12.5e %12.5e %12.5e\n",
+    printf("%10e %10i %10i %10i %12.5e %12.5e  %12.5e %12.5e %12.5e %12.5e\n",
 	    time,nriter,aflt,	    fault[aflt].group,
 	    fault[aflt].pos[0],fault[aflt].pos[1],
 	    slip[0],slip[1],slip[2],mom);

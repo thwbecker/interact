@@ -110,18 +110,18 @@ int main(void)
     exit(-1);
   } 
   printf("%i\n",nriter);
-  fprintf(stderr,"%10e %5i %5i %5i %10e %10e %10e %10e\n",
+  fprintf(stderr,"%10e %10i %10i %10i %10e %10e %10e %10e\n",
 	  time,nriter,aflt,fault[aflt].group,slip[0],slip[1],slip[2],mom);
-  fprintf(out,   "%10e %5i %5i %5i %10e %10e %10e %10e\n",
+  fprintf(out,   "%10e %10i %10i %10i %10e %10e %10e %10e\n",
 	  time,nriter,aflt,fault[aflt].group,slip[0],slip[1],slip[2],mom);
   
   add_to_plotting_list(aflt,&al,&naf);
   otime=time;
   optime=-1;
   while(read_patch_event_file(&time,&nriter,&aflt,&mom,slip,in,medium)==7){
-    fprintf(stderr,"%10e %5i %5i %5i %10e %10e %10e %10e\n",
+    fprintf(stderr,"%10e %10i %10i %10i %10e %10e %10e %10e\n",
 	    time,nriter,aflt,fault[aflt].group,slip[0],slip[1],slip[2],mom);
-    fprintf(out,"%10e %5i %5i %5i %10e %10e %10e %10e\n",
+    fprintf(out,"%10e %10i %10i %10i %10e %10e %10e %10e\n",
 	    time,nriter,aflt,fault[aflt].group,slip[0],slip[1],slip[2],mom);
   
     if(mom>=mom_thres){/* use only if over threshold */

@@ -362,7 +362,7 @@ void add_quake_stress_4(my_boolean *sma,COMP_PRECISION *slip,
 	  
 	  fault[i].s[k] += 
 	    ((COMP_PRECISION)ICIM(medium->i,i,r_flt,j,k)) * slip[j];
-	  //	  fprintf(stderr,"rupnr: %5i recnr: %5i smode: %i stype: %i ic: %12g slip: %12g\n",
+	  //	  fprintf(stderr,"rupnr: %10i recnr: %10i smode: %i stype: %i ic: %12g slip: %12g\n",
 	  //	  r_flt,i,j,k,ICIM(medium->i,i,r_flt,j,k),slip[j]);
 	}
       }
@@ -405,7 +405,7 @@ void add_quake_stress_4(my_boolean *sma,COMP_PRECISION *slip,
 	    }
 	    if(!iret)
 	      fault[i].s[k] += iadbl * slip[j];
-	    fprintf(stderr,"sparse mode: rupnr: 1x1 %5i recnr: %5i smode: %i stype: %i ic: %12g slip: %12g iret: %i\n",r_flt,i,j,k,iadbl,slip[j],iret);
+	    fprintf(stderr,"sparse mode: rupnr: 1x1 %10i recnr: %10i smode: %i stype: %i ic: %12g slip: %12g iret: %i\n",r_flt,i,j,k,iadbl,slip[j],iret);
 	  }
 	}
       }
@@ -601,7 +601,7 @@ my_boolean check_coulomb_stress_feedback_4(int nrflt,
 	  evil_pair[0]=i;evil_pair[1]=j;
 	  if(call_out_loud)
 	    fprintf(stderr,
-		    "check_coulomb_stress_feedback: two way: mode:%i, i:%5i j:%5i cii:%12.4e < cji:%12.4e cjj:%12.4e < cij:%12.4e\n",
+		    "check_coulomb_stress_feedback: two way: mode:%i, i:%10i j:%10i cii:%12.4e < cji:%12.4e cjj:%12.4e < cij:%12.4e\n",
 		    k,i,j,cs_ii,cs_ji,cs_jj,cs_ij);
 	}
 #ifdef CHECK_CI_ONE_WAY
@@ -615,7 +615,7 @@ my_boolean check_coulomb_stress_feedback_4(int nrflt,
 	  evil_pair[0]=i;evil_pair[1]=j;
 	  if(call_out_loud)
 	    fprintf(stderr,
-		    "check_coulomb_stress_feedback: one way: mode:%i, i:%5i j:%5i cii:%12.4e < cji:%12.4e cjj:%12.4e < cij:%12.4e\n",
+		    "check_coulomb_stress_feedback: one way: mode:%i, i:%10i j:%10i cii:%12.4e < cji:%12.4e cjj:%12.4e < cij:%12.4e\n",
 		    k,i,j,cs_ii,cs_ji,cs_jj,cs_ij);
 	}
 #endif

@@ -121,7 +121,7 @@ void read_boundary_conditions(struct med *medium,
 	  }
 	  inc = -patch_nr;
 	  HEADNODE
-	    fprintf(stderr,"read_boundary_conditions: const. %5i: patches %5i to %5i: activation mode %3i, %s\n",
+	    fprintf(stderr,"read_boundary_conditions: const. %10i: patches %10i to %10i: activation mode %3i, %s\n",
 		    n,start_patch,stop_patch,bc_code,comment_on_code(bc_code));
 	  printevery=FALSE;
 	}else{// single fault mode
@@ -182,7 +182,7 @@ void read_boundary_conditions(struct med *medium,
 	  case MAXSDIR_SLIP:{
 	    if(printevery)
 	      HEADNODE
-		fprintf(stderr,"read_boundary_conditions: const. %5i fault %5i activation mode %3i, %s\n",
+		fprintf(stderr,"read_boundary_conditions: const. %10i fault %10i activation mode %3i, %s\n",
 			n,patch_nr,bc_code,comment_on_code(bc_code));
 	    if(fault[patch_nr].mode[0] != INACTIVE){
 	      HEADNODE{
@@ -195,7 +195,7 @@ void read_boundary_conditions(struct med *medium,
 	    fault[patch_nr].mode[0]=(MODE_TYPE)bc_code;
 #ifdef SUPER_DEBUG
 	    HEADNODE
-	      fprintf(stderr,"read_boundary_conditions: fault %5i: code: %i\n",
+	      fprintf(stderr,"read_boundary_conditions: fault %10i: code: %i\n",
 		      patch_nr,fault[patch_nr].mode[0]);
 #endif
 	    break;
@@ -311,15 +311,15 @@ void read_one_step_bc(FILE *in,struct med *medium,struct flt *fault,
     }
     if(medium->n[INT_Z] >= 0){// normal grid
       HEADNODE{
-	fprintf(stderr,"read_boundary_conditions: xmin: %11g xmax: %11g n: %5i dx: %11g\n",
+	fprintf(stderr,"read_boundary_conditions: xmin: %11g xmax: %11g n: %10i dx: %11g\n",
 		medium->pxmin[INT_X],medium->pxmax[INT_X],
 		medium->n[INT_X],medium->n[INT_X]!=1?(medium->pxmax[INT_X]-medium->pxmin[INT_X])/
 		((COMP_PRECISION)(medium->n[INT_X]-1)):0);
-	fprintf(stderr,"read_boundary_conditions: ymin: %11g ymax: %11g m: %5i dy: %11g\n",
+	fprintf(stderr,"read_boundary_conditions: ymin: %11g ymax: %11g m: %10i dy: %11g\n",
 		medium->pxmin[INT_Y],medium->pxmax[INT_Y],
 		medium->n[INT_Y],medium->n[INT_Y]!=1?(medium->pxmax[INT_Y]-medium->pxmin[INT_Y])/
 		((COMP_PRECISION)(medium->n[INT_Y]-1)):0.0);
-	fprintf(stderr,"read_boundary_conditions: zmin: %11g zmax: %11g o: %5i dz: %11g\n",
+	fprintf(stderr,"read_boundary_conditions: zmin: %11g zmax: %11g o: %10i dz: %11g\n",
 		medium->pxmin[INT_Z],medium->pxmax[INT_Z],
 		medium->n[INT_Z],medium->n[INT_Z]!=1?(medium->pxmax[INT_Z]-medium->pxmin[INT_Z])/
 		((COMP_PRECISION)(medium->n[INT_Z]-1)):0.0);
@@ -443,7 +443,7 @@ void read_one_step_bc(FILE *in,struct med *medium,struct flt *fault,
       }
       printevery = FALSE;
       HEADNODE
-	fprintf(stderr,"read_boundary_conditions: const: %5i, patches %5i to %5i, bcode: %4i, value: %9.6f, %s\n",
+	fprintf(stderr,"read_boundary_conditions: const: %10i, patches %10i to %10i, bcode: %4i, value: %9.6f, %s\n",
 		n,start_patch,stop_patch,bc_code,bc_value,
 		comment_on_code_bc(bc_code,bc_value));
       // check if we have triangular elements and prescribed slip
@@ -577,7 +577,7 @@ void read_one_step_bc(FILE *in,struct med *medium,struct flt *fault,
 	}
 	if(printevery)
 	  HEADNODE
-	    fprintf(stderr,"read_boundary_conditions: const: %5i, flts %5i to %5i, bcode: %4i, value: %9.6f, %s\n",
+	    fprintf(stderr,"read_boundary_conditions: const: %10i, flts %10i to %10i, bcode: %4i, value: %9.6f, %s\n",
 		    n,start_patch,stop_patch,bc_code,bc_value,
 		    comment_on_code_bc(bc_code,bc_value));
 	break;
@@ -619,7 +619,7 @@ void read_one_step_bc(FILE *in,struct med *medium,struct flt *fault,
 	sma[patch_nr3+STRIKE] = ACTIVATED;
 #ifdef SUPER_DEBUG
 	HEADNODE
-	  fprintf(stderr,"read_boundary_conditions: patch: %5i s_strike bc: %12.4e background: %12.4e target: %12.4e\n",
+	  fprintf(stderr,"read_boundary_conditions: patch: %10i s_strike bc: %12.4e background: %12.4e target: %12.4e\n",
 		  patch_nr,bc_value,fault[patch_nr].s[STRIKE],rhs[patch_nr3+STRIKE]);
 #endif
 	//
@@ -638,7 +638,7 @@ void read_one_step_bc(FILE *in,struct med *medium,struct flt *fault,
 	}
 	if(printevery)
 	  HEADNODE
-	    fprintf(stderr,"read_boundary_conditions: const: %5i, flts %5i to %5i, bcode: %4i, value: %9.6f, %s\n",
+	    fprintf(stderr,"read_boundary_conditions: const: %10i, flts %10i to %10i, bcode: %4i, value: %9.6f, %s\n",
 		    n,start_patch,stop_patch,bc_code,bc_value,comment_on_code_bc(bc_code,bc_value));
 	break;
       }
@@ -667,7 +667,7 @@ void read_one_step_bc(FILE *in,struct med *medium,struct flt *fault,
 	sma[patch_nr3+DIP] = ACTIVATED;
 #ifdef SUPER_DEBUG
 	HEADNODE
-	  fprintf(stderr,"read_boundary_conditions: patch: %5i s_dip    bc: %12.4e background: %12.4e target: %12.4e\n",
+	  fprintf(stderr,"read_boundary_conditions: patch: %10i s_dip    bc: %12.4e background: %12.4e target: %12.4e\n",
 		  patch_nr,bc_value,fault[patch_nr].s[DIP],rhs[patch_nr3+DIP]);
 #endif
 	fault[patch_nr].mode[DIP]=(MODE_TYPE)bc_code;
@@ -685,7 +685,7 @@ void read_one_step_bc(FILE *in,struct med *medium,struct flt *fault,
 	}
 	if(printevery)
 	  HEADNODE
-	    fprintf(stderr,"read_boundary_conditions: const: %5i, flts %5i to %5i, bcode: %4i, value: %9.6f, %s\n",
+	    fprintf(stderr,"read_boundary_conditions: const: %10i, flts %10i to %10i, bcode: %4i, value: %9.6f, %s\n",
 		    n,start_patch,stop_patch,bc_code,bc_value,comment_on_code_bc(bc_code,bc_value));
 	break;
       }
@@ -709,14 +709,14 @@ void read_one_step_bc(FILE *in,struct med *medium,struct flt *fault,
 	rhs[patch_nr3+NORMAL] = bc_value - fault[patch_nr].s[NORMAL];
 #ifdef SUPER_DEBUG
 	HEADNODE
-	  fprintf(stderr,"read_boundary_conditions: patch: %5i s_normal bc: %12.4e background: %12.4e target: %12.4e\n",
+	  fprintf(stderr,"read_boundary_conditions: patch: %10i s_normal bc: %12.4e background: %12.4e target: %12.4e\n",
 		  patch_nr,bc_value,fault[patch_nr].s[NORMAL],rhs[patch_nr3+NORMAL]);
 #endif
 	//
 	fault[patch_nr].mode[NORMAL]=(MODE_TYPE)bc_code;
 	if(printevery)
 	  HEADNODE
-	    fprintf(stderr,"read_boundary_conditions: const: %5i, flts %5i to %5i, bcode: %4i, value: %9.6f, %s\n",
+	    fprintf(stderr,"read_boundary_conditions: const: %10i, flts %10i to %10i, bcode: %4i, value: %9.6f, %s\n",
 		    n,start_patch,stop_patch,bc_code,bc_value,
 		    comment_on_code_bc(bc_code,bc_value));
 #endif
@@ -851,9 +851,9 @@ void read_one_step_bc(FILE *in,struct med *medium,struct flt *fault,
 	HEADNODE{
 #ifdef SUPER_DEBUG
 
-	  fprintf(stderr,"read_boundary_conditions: patch: %5i res stress strike:  background: %12.4e target: %12.4e\n",
+	  fprintf(stderr,"read_boundary_conditions: patch: %10i res stress strike:  background: %12.4e target: %12.4e\n",
 		  patch_nr,fault[patch_nr].s[STRIKE],rhs[patch_nr3+STRIKE]);
-	  fprintf(stderr,"read_boundary_conditions: patch: %5i res stress dip:     background: %12.4e target: %12.4e\n",
+	  fprintf(stderr,"read_boundary_conditions: patch: %10i res stress dip:     background: %12.4e target: %12.4e\n",
 		  patch_nr,fault[patch_nr].s[DIP],rhs[patch_nr3+DIP]);
 #endif
 	  if(check_for_res_stress_output){
@@ -1035,7 +1035,7 @@ void read_one_step_bc(FILE *in,struct med *medium,struct flt *fault,
 		&& (rhs[i3+j] > 0))){
 	      HEADNODE
 		fprintf(stderr,
-			"read_boundary_conditions: WARNING: fault: %5i bc_code: %3i dir: %1i might be incompatible with stress: %g\n",
+			"read_boundary_conditions: WARNING: fault: %10i bc_code: %3i dir: %1i might be incompatible with stress: %g\n",
 			i,fault[i].mode[j],j,rhs[i3+j]);
 	    }
 	    if(fault[i].mode[j]==STRIKE_SLIP_RIGHTLATERAL || 
@@ -1060,12 +1060,12 @@ void read_one_step_bc(FILE *in,struct med *medium,struct flt *fault,
 #ifdef SUPER_DEBUG
       HEADNODE{
 	if(sma[i3] || sma[i3+1] || sma[i3+2])
-	  fprintf(stderr,"read_boundary_conditions:    flt %5i: active codes: %i %i %i rhs: %11.4e %11.4e %11.4e\n",
+	  fprintf(stderr,"read_boundary_conditions:    flt %10i: active codes: %i %i %i rhs: %11.4e %11.4e %11.4e\n",
 		  i,sma[i3+0],sma[i3+1],sma[i3+2],rhs[i3+0],rhs[i3+1],rhs[i3+2]);
 	if(medium->sma[medium->naflt*3] || 
 	   medium->sma[medium->naflt*3+1] || 
 	   medium->sma[medium->naflt*3+2])
-	  fprintf(stderr,"read_boundary_conditions: uc flt %5i: medium a.cd.: %i %i %i\n",
+	  fprintf(stderr,"read_boundary_conditions: uc flt %10i: medium a.cd.: %i %i %i\n",
 		  medium->naflt,
 		  medium->sma[medium->naflt*3],
 		  medium->sma[medium->naflt*3+1],
@@ -1073,7 +1073,7 @@ void read_one_step_bc(FILE *in,struct med *medium,struct flt *fault,
 	if(medium->sma_con[medium->naflt_con*3] ||
 	   medium->sma_con[medium->naflt_con*3+1] ||
 	   medium->sma_con[medium->naflt_con*3+2])
-	  fprintf(stderr,"read_boundary_conditions:  c flt %5i: medium a.cd.: %i %i %i\n",
+	  fprintf(stderr,"read_boundary_conditions:  c flt %10i: medium a.cd.: %i %i %i\n",
 		  medium->naflt_con,
 		  medium->sma_con[medium->naflt_con*3],
 		  medium->sma_con[medium->naflt_con*3+1],
@@ -1091,10 +1091,10 @@ void read_one_step_bc(FILE *in,struct med *medium,struct flt *fault,
     HEADNODE{
       if(medium->nreq_con + medium->nreq > 0){
 	fprintf(stderr,
-		"read_boundary_conditions: total of %5i constrained and %5i unconstrained equations\n",
+		"read_boundary_conditions: total of %10i constrained and %10i unconstrained equations\n",
 		medium->nreq_con,medium->nreq);
 	fprintf(stderr,
-		"read_boundary_conditions: with     %5i constrained and %5i unconstrained faults, done with BCs.\n",
+		"read_boundary_conditions: with     %10i constrained and %10i unconstrained faults, done with BCs.\n",
 		medium->naflt_con,medium->naflt);
       }
     }

@@ -104,7 +104,7 @@ void add_to_right_hand_side(COMP_PRECISION bval,A_MATRIX_PREC **b,
   if((*xsol=(A_MATRIX_PREC *)realloc(*xsol,i))==NULL)
     MEMERROR("add_to_right_hand_side:");
 #ifdef SUPER_DUPER_DEBUG
-  fprintf(stderr,"add_to_right_hand_side: adding %20.10e as eq. %5i\n",
+  fprintf(stderr,"add_to_right_hand_side: adding %20.10e as eq. %10i\n",
 	  bval,*nreq);
 #endif
 }
