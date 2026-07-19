@@ -577,9 +577,6 @@ void read_geometry(char *patch_filename,struct med **medium,
     }
     exit(-1);
   }
-  if((*medium)->nrflt > 99998)
-    if((*medium)->comm_rank == 0)
-      fprintf(stderr,"read_geometry: WARNING: parts of the program I/O might not work for more patches than 99999!\n");
   *fault=(struct flt *)
     realloc(*fault,sizeof(struct flt)*(*medium)->nrflt);
   //
