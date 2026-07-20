@@ -105,6 +105,7 @@ PetscErrorCode MatGetDiagonal_hmat_shell(Mat A, Vec d)
   PetscCall(VecRestoreArray(d,&da));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
+#endif
 
 #ifdef USE_HMMVP
 PetscErrorCode MatMult_hmmvp(Mat A, Vec x, Vec y)
