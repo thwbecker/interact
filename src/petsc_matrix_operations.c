@@ -105,7 +105,7 @@ PetscErrorCode MatGetDiagonal_hmat_shell(Mat A, Vec d)
   PetscCall(VecRestoreArray(d,&da));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
-#endif
+
 #ifdef USE_HMMVP
 PetscErrorCode MatMult_hmmvp(Mat A, Vec x, Vec y)
 {
@@ -395,8 +395,13 @@ PetscErrorCode calc_petsc_Isn_matrices(struct med *medium, struct flt *fault,
   Vec xd;
 #endif
 #ifdef USE_HMMVP
-  void *hmmvp_handle;
-  long hmmvp_nnz;
+  /* NULL/sentinel initialization: the handles and counts are assigned in
+     one use_hmatrix branch and read in another; the runtime guards keep
+     that safe, but the compiler cannot prove the correlation
+     (-Wmaybe-uninitialized), and a NULL turns any future logic slip
+     into a deterministic failure instead of undefined behavior */
+  void *hmmvp_handle = NULL;
+  long hmmvp_nnz = -1;
   int hmm,hmn;
 #ifdef USE_HMMVP_MPI
   char hmmvp_tmp[STRLEN],hmmvp_fn[STRLEN];
@@ -405,7 +410,7 @@ PetscErrorCode calc_petsc_Isn_matrices(struct med *medium, struct flt *fault,
 #endif
 #endif 
 #ifdef USE_HACAPK
-  void *hacapk_handle;
+  void *hacapk_handle = NULL;
 #endif
   const PetscInt ndim = 3;
   ictx->medium = medium;

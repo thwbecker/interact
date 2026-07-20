@@ -35,7 +35,7 @@
 # Run from the directory holding the geometry. All parameters are plain
 # assignments below; edit them there (no environment variables).
 
-ncore=24                 # MPI ranks for the H-matrix sweep runs
+ncore=48                 # MPI ranks for the H-matrix sweep runs
 ncore_dense=48           # MPI ranks for the one dense reference run
 nrandom=200              # matvec timing applies (0 skips the timing line!)
 nsolve=3                 # Ax=b GMRES solves to time per point (0: off)
@@ -49,7 +49,7 @@ bin=../bin/compress_interaction_matrix
 geom=geom.in
 out=hmat_storage.dat
 dense_ref_file=dense_reference.dat
-make_dense_reference=0   # 1: (re)create dense_ref_file first, then sweep
+make_dense_reference=1   # 1: (re)create dense_ref_file first, then sweep
 bw_gbs=200               # node memory bandwidth [GB/s] for the estimate
 
 htool_eps="1e-3 1e-4 1e-5 1e-6"
