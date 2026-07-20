@@ -141,6 +141,10 @@ typedef struct{
   PetscInt nelt;
   double bscale;
 #endif
+  /* locally owned diagonal entries (self interactions), precomputed at
+     assembly time while the kernel context is alive, so that
+     MatGetDiagonal (and thus PCJACOBI) works on the shell operators */
+  PetscScalar *diag;
 } hmat_helper_shell_ctx;
 
 /* 

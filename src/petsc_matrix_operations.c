@@ -59,7 +59,7 @@ PetscErrorCode interact_petsc_initialize(int *argc, char ***argv)
 }
 
 
-#ifdef USE_HMMVP
+#if ( defined(USE_HMMVP) || defined(USE_HACAPK) )
 /* 
    hmmvp (A.M. Bradley) support via hmmvp_c_shim.cpp: index-based
    block kernel (same ckernel_func as HACApK), in-memory compression
@@ -71,6 +71,42 @@ PetscErrorCode interact_petsc_initialize(int *argc, char ***argv)
    full H matrix and computes the full product - correct but
    redundant; intended for serial/threaded use)
 */
+/* diagonal of a shell H-matrix operator from the cache precomputed at
+   assembly (see the diag member of hmat_helper_shell_ctx) */
+/* precompute the locally owned diagonal (self interactions) into the
+   shell context via the assembly kernel; must be called while the
+   kernel context ictx is alive, i.e. from within
+   calc_petsc_Isn_matrices */
+void fill_hmat_shell_diagonal(hmat_helper_shell_ctx *hctx, struct interact_ctx *ictx, int sdim)
+{
+  PetscInt i;
+  PetscScalar val;
+  hctx->diag = (PetscScalar *)malloc(sizeof(PetscScalar)*(hctx->re - hctx->rs));
+  for(i=hctx->rs;i < hctx->re;i++){
+    GenKEntries_petsc(sdim,1,1,&i,&i,&val,(void *)ictx);
+    hctx->diag[i - hctx->rs] = val;
+  }
+}
+
+PetscErrorCode MatGetDiagonal_hmat_shell(Mat A, Vec d)
+{
+  hmat_helper_shell_ctx *hctx;
+  PetscScalar *da;
+  PetscInt i,n;
+  PetscFunctionBegin;
+  PetscCall(MatShellGetContext(A,&hctx));
+  if(!hctx->diag)
+    SETERRQ(PETSC_COMM_WORLD,PETSC_ERR_ARG_WRONGSTATE,
+	    "MatGetDiagonal_hmat_shell: diagonal cache not initialized");
+  PetscCall(VecGetLocalSize(d,&n));
+  PetscCall(VecGetArray(d,&da));
+  for(i=0;i < n;i++)
+    da[i] = hctx->diag[i];
+  PetscCall(VecRestoreArray(d,&da));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+#endif
+#ifdef USE_HMMVP
 PetscErrorCode MatMult_hmmvp(Mat A, Vec x, Vec y)
 {
   hmat_helper_shell_ctx *hctx;	/* same context layout as HACApK */
@@ -552,11 +588,14 @@ PetscErrorCode calc_petsc_Isn_matrices(struct med *medium, struct flt *fault,
     hctx = (hmat_helper_shell_ctx *)malloc(sizeof(hmat_helper_shell_ctx));
     hctx->handle = hacapk_handle;
     hctx->ball = (double *)malloc(sizeof(double)*m);
+    hctx->diag = NULL;
     PetscCall(MatCreateShell(PETSC_COMM_WORLD,PETSC_DECIDE,PETSC_DECIDE,m,n,(void *)hctx,this_mat));
     PetscCall(MatShellSetOperation(*this_mat,MATOP_MULT,(void (*)(void))MatMult_HACApK));
+    PetscCall(MatShellSetOperation(*this_mat,MATOP_GET_DIAGONAL,(void (*)(void))MatGetDiagonal_hmat_shell));
     PetscCall(MatCreateVecs(*this_mat,&xd,NULL));
     PetscCall(VecScatterCreateToAll(xd,&hctx->scat,&hctx->xall));
     PetscCall(VecGetOwnershipRange(xd,&hctx->rs,&hctx->re));
+    fill_hmat_shell_diagonal(hctx,ictx,ndim);
     PetscCall(VecDestroy(&xd));
 #endif
     break;
@@ -614,10 +653,12 @@ PetscErrorCode calc_petsc_Isn_matrices(struct med *medium, struct flt *fault,
     PetscCall(MatCreateShell(PETSC_COMM_WORLD,PETSC_DECIDE,PETSC_DECIDE,m,n,
 			     (void *)hctx,this_mat));
     PetscCall(MatShellSetOperation(*this_mat,MATOP_MULT,(void (*)(void))MatMult_hmmvp));
+    PetscCall(MatShellSetOperation(*this_mat,MATOP_GET_DIAGONAL,(void (*)(void))MatGetDiagonal_hmat_shell));
     PetscCall(MatCreateVecs(*this_mat,&xd,NULL));
     /* gather-to-root scatter: xall is full length on rank 0, empty elsewhere */
     PetscCall(VecScatterCreateToZero(xd,&hctx->scat,&hctx->xall));
     PetscCall(VecGetOwnershipRange(xd,&hctx->rs,&hctx->re));
+    fill_hmat_shell_diagonal(hctx,ictx,ndim);
     PetscCall(VecDestroy(&xd));
 #else  /* in-memory OpenMP/serial path */
     HEADNODE
@@ -642,9 +683,11 @@ PetscErrorCode calc_petsc_Isn_matrices(struct med *medium, struct flt *fault,
     PetscCall(MatCreateShell(PETSC_COMM_WORLD,PETSC_DECIDE,PETSC_DECIDE,m,n,
 			     (void *)hctx,this_mat));
     PetscCall(MatShellSetOperation(*this_mat,MATOP_MULT,(void (*)(void))MatMult_hmmvp));
+    PetscCall(MatShellSetOperation(*this_mat,MATOP_GET_DIAGONAL,(void (*)(void))MatGetDiagonal_hmat_shell));
     PetscCall(MatCreateVecs(*this_mat,&xd,NULL));
     PetscCall(VecScatterCreateToAll(xd,&hctx->scat,&hctx->xall));
     PetscCall(VecGetOwnershipRange(xd,&hctx->rs,&hctx->re));
+    fill_hmat_shell_diagonal(hctx,ictx,ndim);
     PetscCall(VecDestroy(&xd));
 #endif /* USE_HMMVP_MPI */
 #endif /* USE_HMMVP */
