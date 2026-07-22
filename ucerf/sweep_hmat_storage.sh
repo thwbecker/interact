@@ -39,12 +39,9 @@ ncore=48                 # MPI ranks for the H-matrix sweep runs
 ncore_dense=48           # MPI ranks for the one dense reference run
 nrandom=200              # matvec timing applies (0 skips the timing line!)
 nsolve=3                 # Ax=b GMRES solves to time per point (0: off)
-solver_pc=jacobi         # KSP preconditioner for the solve timing (jacobi
-                         # or none). jacobi needs the 2026-07 binary, which
-                         # provides MatGetDiagonal on the shell H operators
-                         # via a diagonal cache filled at assembly; without
-                         # convergence (its at the cap) solve times measure
-                         # iteration throughput only
+#solver_pc_strin="-pc_type jacobi"         # KSP preconditioner for the solve timing (jacobi
+solver_pc_string="-pc_type jacobi -ksp_type gmres -ksp_gmres_restart 6000 -ksp_rtol 1e-4"
+
 bin=../bin/compress_interaction_matrix
 geom=geom.in
 out=hmat_storage.dat
@@ -60,7 +57,7 @@ hmmvp_eps="1e-3 1e-4 1e-5 1e-6"
 if [ $make_dense_reference -eq 1 ]; then
     mpirun -np $ncore_dense $bin -geom_file $geom -make_matrix_externally \
 	   -use_hmatrix 0 -dense_reference_only -nrandom $nrandom -nsolve $nsolve \
-	   -pc_type $solver_pc &> log.dense_ref
+	   $solver_pc_string &> log.dense_ref
     gawk 'BEGIN{si="NA";ss="NA"}
           /dense_solve m/ {
             for(i=1;i<=NF;i++){

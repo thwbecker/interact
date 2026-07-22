@@ -105,11 +105,22 @@ int main(int argc, char **argv)
      sweep then reads the result instead of rebuilding dense each time. */
   PetscBool dense_reference_only=PETSC_FALSE;
   PetscReal dt0,dt1;
-  /* Ax = b solve timing (-nsolve): GMRES with no preconditioner on the
-     assembled operator, the same settings for dense and H so that
+  /* Ax = b solve timing (-nsolve): GMRES(30), no preconditioner, rtol
+     1e-6, maxit 10000 by default; -ksp_type/-pc_type/-ksp_* options
+     override. The same settings are used for dense and H so that
      time-to-solution comparisons are apples to apples; iteration counts
      are reported since slightly different operators may converge in
-     slightly different iteration numbers */
+     slightly different iteration numbers, and runs that exit at the
+     iteration cap measure throughput, not time to solution.
+     Solver guidance from our tests (single planar fault vs. UCERF-type
+     network, both N ~ 265k, one configuration each): smooth single
+     faults converged quickly with plain GMRES or BiCGstab; fault
+     networks stagnated under short-restart GMRES regardless of Jacobi
+     (near-constant diagonal on near-uniform meshes) and broke BiCGstab,
+     while a long restart with a moderate tolerance made steady
+     progress, e.g. -ksp_gmres_restart 6000 -ksp_rtol 1e-4. Other
+     geometries may behave differently. See also the iterative solver
+     comments in the top-level makefile. */
   PetscInt nsolve=0,sits_total;
   PetscReal solve_s,at0,at1;
   KSPConvergedReason sreason;

@@ -38,7 +38,10 @@ LDFLAGS = -lssp -fopenmp
 # X 11 only needed for PGPLOT
 X11LIBDIR = /usr/lib/x86_64-linux-gnu/
 #
-MATHLIBS = -L${TACC_MKL_LIB} -lmkl_intel_lp64 -lmkl_sequential -lmkl_core -lpthread  -lm
+#MATHLIBS = -L${TACC_MKL_LIB} -lmkl_intel_lp64 -lmkl_sequential -lmkl_core -lpthread  -lm
+MATHLIBS =  -L${MKLROOT}/lib/intel64     -lmkl_intel_lp64 -lmkl_core      -lmkl_gnu_thread -lpthread   \
+	 -lm -ldl -lmkl_intel_lp64 -lmkl_sequential -lmkl_core -lpthread  -ldl -lm
+
 #
 # warning options
 GCCWOPT = -Wall

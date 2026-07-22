@@ -88,9 +88,23 @@
 # 			     possible LU solvers are
 # 				-pc_factor_mat_solver_type scalapack -mat_type scalapack
 #  				-pc_factor_mat_solver_type elemental -mat_type elemental
-# 		             iterative solver
-# 		 	         -ksp_type fgmres -pc_type none -ksp_max_it 10000 -ksp_rtol 1.0e-8 
-# 		 	         -ksp_type fgmres -pc_type jacobi -ksp_max_it 10000 -ksp_rtol 1.0e-8
+# 		             iterative solvers: in our tests (one configuration each of a
+# 		             single planar fault and a UCERF-type network, both at N ~ 265k),
+# 		             convergence depended strongly on the fault geometry:
+# 		               - single, smooth fault surfaces converged quickly with, e.g.,
+# 		                   -ksp_type bcgs  -pc_type none -ksp_rtol 1.0e-6
+# 		                   -ksp_type gmres -pc_type none -ksp_rtol 1.0e-6
+# 		               - fault networks (many interacting surfaces) appear to make the
+# 		                 operator strongly non-normal: short-restart GMRES stagnated
+# 		                 with and without Jacobi (near-uniform meshes have a near
+# 		                 constant diagonal, so Jacobi acts as a scalar scaling), and
+# 		                 BiCGstab diverged. GMRES with a long restart and a moderate
+# 		                 tolerance did make steady progress, e.g.
+# 		                   -ksp_type gmres -ksp_gmres_restart 6000 -ksp_rtol 1.0e-4
+# 		                 (restart memory per rank is restart * local_rows * 8 bytes).
+# 		             other geometries and sizes may behave differently; when in doubt,
+# 		             check -ksp_converged_reason and the true residual. cycle runs
+# 		             (rsf_solve) only apply the operator forward and are unaffected.
 #                            for this to work, you will have to have  $(PETSC_DIR) and $(PETSC_ARCH) defined
 #
 # to run in parallel for example

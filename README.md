@@ -368,6 +368,24 @@ compress_interaction_matrix:
 	selecting between Petsc dense, HTOOLS, H2OPUS (only symmetric
 	approximation), HACApK and HMMVP H matrix interfaces.
 
+	A note on iterative x = A\b solves with the interaction operator
+	(-nsolve here, or one-step solves in interact): in our tests, at
+	one configuration each of a single planar fault and a UCERF-type
+	fault network (both about 265k patches), convergence depended
+	strongly on geometry. Smooth single faults converged in tens of
+	iterations with plain GMRES or BiCGstab. The fault network
+	appears to make the operator strongly non-normal: short-restart
+	GMRES stagnated with and without Jacobi preconditioning (on a
+	near-uniform mesh the diagonal is near constant, so Jacobi acts
+	as a scalar scaling), and BiCGstab diverged, while GMRES with a
+	long restart and a moderate tolerance made steady progress, e.g.
+	-ksp_type gmres -ksp_gmres_restart 6000 -ksp_rtol 1e-4 (restart
+	memory per rank is restart times local rows times 8 bytes).
+	Other geometries and sizes may behave differently; checking
+	-ksp_converged_reason and the true residual is advisable. Cycle
+	simulations with rsf_solve only apply the operator forward and
+	are not affected by any of this.
+
 ## Parameters
 ________________________________________________________________________________
 
