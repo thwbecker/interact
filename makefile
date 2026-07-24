@@ -105,6 +105,20 @@
 # 		             other geometries and sizes may behave differently; when in doubt,
 # 		             check -ksp_converged_reason and the true residual. cycle runs
 # 		             (rsf_solve) only apply the operator forward and are unaffected.
+#
+# 		             process binding: on the shared-memory hosts we tested, unbound
+# 		             runs showed up to about 2.5x per-rank compute spread from
+# 		             scheduler migrations, which MPI collectives turn into waiting
+# 		             time; mpirun -bind-to core removed the migrations (a residual
+# 		             1.1-1.2x spread from per-core turbo behavior remains) and also
+# 		             improved rank-pair bandwidth through better placement. Binding
+# 		             is recommended for the MPI-only binaries (interact, rsf_solve,
+# 		             compress_interaction_matrix). Do not bind ranks to single cores
+# 		             when a rank runs threads (e.g. hmmvp OpenMP mode with
+# 		             -hmmvp_nthreads > 1); use a map-by spec that grants each rank
+# 		             several cores instead. Behavior may differ on other hosts and
+# 		             schedulers; the utility script mpi_tcp_test.sh measures both
+# 		             the placement and the transport on a given machine.
 #                            for this to work, you will have to have  $(PETSC_DIR) and $(PETSC_ARCH) defined
 #
 # to run in parallel for example

@@ -35,8 +35,8 @@
 # Run from the directory holding the geometry. All parameters are plain
 # assignments below; edit them there (no environment variables).
 
-ncore=48                 # MPI ranks for the H-matrix sweep runs
-ncore_dense=48           # MPI ranks for the one dense reference run
+ncore=64                 # MPI ranks for the H-matrix sweep runs
+ncore_dense=64           # MPI ranks for the one dense reference run
 nrandom=200              # matvec timing applies (0 skips the timing line!)
 nsolve=3                 # Ax=b GMRES solves to time per point (0: off)
 #solver_pc_strin=g"-pc_type jacobi"         # KSP preconditioner for the solve timing (jacobi
@@ -48,7 +48,7 @@ bin=../bin/compress_interaction_matrix
 geom=geom.in
 out=hmat_storage.dat
 dense_ref_file=dense_reference.dat
-make_dense_reference=0   # 1: (re)create dense_ref_file first, then sweep
+make_dense_reference=1   # 1: (re)create dense_ref_file first, then sweep
 bw_gbs=200               # node memory bandwidth [GB/s] for the estimate
 
 htool_eps="1e-3 1e-4 1e-5 1e-6"
@@ -57,7 +57,7 @@ hmmvp_eps="1e-3 1e-4 1e-5 1e-6"
 
 # ---------------------------------------------------------------- dense
 if [ $make_dense_reference -eq 1 ]; then
-    mpirun -np $ncore_dense $bin -geom_file $geom -make_matrix_externally \
+    mpirun -bind-to core -np $ncore_dense $bin -geom_file $geom -make_matrix_externally \
 	   -use_hmatrix 0 -dense_reference_only -nrandom $nrandom -nsolve $nsolve \
 	  -pc_type jacobi  $solver_pc_string &> log.dense_ref
     gawk 'BEGIN{si="NA";ss="NA"}
@@ -150,7 +150,7 @@ echo "# backend eps stored_scalars mbytes compression_ratio matvec_ms matvec_spe
 run_one () {                 # label logfile extra-flags...
     label=$1; log=$2; shift 2
     if ! grep -q "hmat_matvec backend" $log 2> /dev/null ; then
-	mpirun -iface lo -np $ncore $bin -geom_file $geom -make_matrix_externally \
+	mpirun -np $ncore $bin -geom_file $geom -make_matrix_externally \
 	       -skip_dense -nrandom $nrandom -nsolve $nsolve \
 	       $solver_pc_string "$@" &> $log
     fi
