@@ -122,8 +122,12 @@
 #                            for this to work, you will have to have  $(PETSC_DIR) and $(PETSC_ARCH) defined
 #
 # to run in parallel for example
+# for a direct solve 
+#  mpirun -bind-to core -np 8 interact -pc_factor_mat_solver_type scalapack -mat_type scalapack
 #
-#  mpirun -np 8 interact -pc_factor_mat_solver_type scalapack -mat_type scalapack
+# for an iterative solve
+# mpirun -bind-to core -np 8 interact-pc_type none -ksp_type gmres -ksp_gmres_restart 6000 -ksp_rtol 1e-4
+
 # to debug:
 # mpirun -np 1 valgrind --tool=memcheck -q --num-callers=20 --log-file=pmia.%p.log interact -fpetsc -malloc=off
 #

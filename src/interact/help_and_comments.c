@@ -38,13 +38,13 @@ void phelp(void)
   PE("PetSc support was compiled in, providing limited access to parallel solves for one-step problems.");
   PE("      For direct solve, use    \"-pc_factor_mat_solver_type scalapack -mat_type scalapack\" or");
   PE("                           \"-pc_factor_mat_solver_type elemental -mat_type elemental\".");
-  PE("      For iterative solve \"-ksp_type fgmres -pc_type none   -ksp_max_it 10000 -ksp_rtol 1.0e-8\" or");
-  PE("                          \"-ksp_type fgmres -pc_type jacobi -ksp_max_it 10000 -ksp_rtol 1.0e-8\".");
+  PE("      For iterative solve \"-ksp_type fgmres -pc_type none   -ksp_max_it 10000 -ksp_rtol 1.0e-8\", ");
+  PE("                          \"-ksp_type fgmres -pc_type jacobi -ksp_max_it 10000 -ksp_rtol 1.0e-8\", or for complex systems");
+  PE("                          \"-ksp_type gmres  -pc_type none   -ksp_gmres_restart 6000 -ksp_rtol 1e-4\".");
   PE("      Check the makefile for other solver options and MPI settings.");
   PE("      When running a one-step computation, will also compute stress fields in parallel.");
-#ifdef USE_PETSC_HMAT
-  PE("      The code can interface with HTOOLS, H2OPUS, HACApK and HMMVP H matrix packages.");
-#endif
+  PE("      The code can interface with HTOOLS, H2OPUS, HACApK, and HMMVP H matrix packages.");
+  PE("      HTOOLS and H2OPUS have to be provided via Petsc packages, HACApK and HMMVP can be compiled locally.");
 #else
   PE("(Petsc support not compiled in, if parallel support is desired, check makefile.)");
 #endif

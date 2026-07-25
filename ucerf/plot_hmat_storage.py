@@ -170,9 +170,9 @@ for ax, col, ref, ylab, title, right in panels:
 
 fig.suptitle(f"H-matrix backends relative to dense, N = {npatch} [{dense_tag}]",
              fontsize=11)
-fig.subplots_adjust(top=0.90, hspace=0.38, wspace=0.26,
-                    left=0.08, right=0.98, bottom=0.07)
-fig.savefig(outfile)
+fig.subplots_adjust(top=0.90, hspace=0.38, wspace=0.30,
+                    left=0.08, right=0.91, bottom=0.07)
+fig.savefig(outfile, bbox_inches="tight")
 print(f"wrote {outfile}")
 
 if any_capped:

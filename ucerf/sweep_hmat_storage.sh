@@ -59,7 +59,7 @@ hmmvp_eps="1e-3 1e-4 1e-5 1e-6"
 if [ $make_dense_reference -eq 1 ]; then
     mpirun -bind-to core -np $ncore_dense $bin -geom_file $geom -make_matrix_externally \
 	   -use_hmatrix 0 -dense_reference_only -nrandom $nrandom -nsolve $nsolve \
-	  -pc_type jacobi  $solver_pc_string &> log.dense_ref
+	  $solver_pc_string &> log.dense_ref
     gawk 'BEGIN{si="NA";ss="NA"}
           /dense_solve m/ {
             for(i=1;i<=NF;i++){
