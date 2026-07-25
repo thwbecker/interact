@@ -95,43 +95,78 @@ if any_capped:
     solve_title = (f"GMRES(30) throughput at the {maxit}-iteration cap\n"
                    f"(NO run converged; dense: {human_time_s(dense_ss)}/{maxit} its)"
                    if dense_ss else "GMRES (iteration-capped, not converged)")
-    solve_ylab = "iteration-capped GMRES time ratio vs dense (x)"
 else:
-    solve_title = ("Ax=b GMRES solve speedup"
+    solve_title = ("inverse solve x = A\\b (GMRES)"
                    + (f" (dense: {human_time_s(dense_ss)}, {dense_si:.0f} its)"
                       if dense_ss else ""))
-    solve_ylab = "Ax=b solve speedup vs dense (x)"
 
 fig, axs = plt.subplots(2, 2, figsize=(10.5, 8.4))
 (axc, axm), (axa, axsv) = axs
 
+# right-column panels state the operation they time: the top one is the
+# forward product b = A x (a single operator application), the bottom
+# one the inverse solve x = A\b (iterative GMRES solution); their axis
+# labels sit on the right edge to make the pairing visually explicit
 panels = [
     (axc, 1, dense_mb, "storage reduction vs dense (x)",
-     f"compression (dense: {human_mem(dense_mb)})"),
-    (axm, 2, dense_ms, "matvec speedup vs dense (x)",
-     "matvec speedup" + (f" (dense: {human_time_ms(dense_ms)}/apply)"
-                         if dense_ms else "")),
+     f"compression (dense: {human_mem(dense_mb)})", False),
+    (axm, 2, dense_ms, "forward product  b = A x   speedup vs dense (x)",
+     "matvec: forward product b = A x"
+     + (f" (dense: {human_time_ms(dense_ms)}/apply)" if dense_ms else ""), True),
     (axa, 3, dense_as, "assembly speedup vs dense (x)",
      "assembly speedup" + (f" (dense: {human_time_s(dense_as)})"
-                           if dense_as else "")),
-    (axsv, 4, dense_ss, solve_ylab, solve_title),
+                           if dense_as else ""), False),
+    (axsv, 4, dense_ss, "inverse solve  x = A\\b   speedup vs dense (x)",
+     solve_title, True),
 ]
 
-for ax, col, ref, ylab, title in panels:
+for ax, col, ref, ylab, title, right in panels:
+    vlo = 1e30
+    vhi = 0.0
     for b in sorted(data):
         pts = [(r[0], ref / r[col]) for r in sorted(data[b])
                if ref is not None and r[col] is not None and r[col] > 0]
         if pts:
-            ax.plot([p[0] for p in pts], [p[1] for p in pts], "o-", label=b)
-    ax.axhline(1.0, color="k", ls="--", lw=1)
+            ln, = ax.plot([p[0] for p in pts], [p[1] for p in pts],
+                          "o-", label=b)
+            for p in pts:
+                if p[1] < vlo: vlo = p[1]
+                if p[1] > vhi: vhi = p[1]
+            # annotate each backend's best point with its factor
+            pb = max(pts, key=lambda p: p[1])
+            ax.annotate(f"{pb[1]:.0f}x", xy=pb, xytext=(0, 5),
+                        textcoords="offset points", ha="center",
+                        fontsize=7.5, color=ln.get_color())
     ax.set_xscale("log")
     ax.set_yscale("log")
+    if vhi > 0.0:
+        ax.set_ylim(vlo/1.35, vhi*1.45)
+    # limited log range: place explicit 1-2-3-5-7 subdecade ticks within
+    # the data range so the axis stays readable at roughly one order of
+    # magnitude span
+    if vhi > 0.0:
+        tickv = []
+        dec = -2
+        while 10.0**dec < vhi*1.45:
+            for sub in (1.0, 2.0, 3.0, 5.0, 7.0):
+                v = sub*10.0**dec
+                if (v >= vlo/1.35) and (v <= vhi*1.45):
+                    tickv.append(v)
+            dec += 1
+        ax.yaxis.set_major_locator(matplotlib.ticker.FixedLocator(tickv))
+        ax.yaxis.set_major_formatter(matplotlib.ticker.FixedFormatter(
+            [f"{v:g}" for v in tickv]))
+        ax.yaxis.set_minor_locator(matplotlib.ticker.NullLocator())
     ax.set_xlabel("backend tolerance")
     ax.set_ylabel(ylab)
+    if right:
+        ax.yaxis.set_label_position("right")
+        ax.yaxis.tick_right()
+        ax.yaxis.set_ticks_position("both")
     ax.set_title(title, fontsize=9.5)
     ax.grid(alpha=0.3, which="both")
     if ax.get_lines():
-        ax.legend(fontsize=8)
+        ax.legend(fontsize=8, loc="best")
 
 fig.suptitle(f"H-matrix backends relative to dense, N = {npatch} [{dense_tag}]",
              fontsize=11)

@@ -1,2 +1,2 @@
 # measured dense reference: ncore m assembly_s per_matvec_ms solve_its per_solve_s
-48 265464 8812.619 2343.7563 8015.67 19496.0560
+64 265464 6835.076 2129.3288 4968.67 10737.1043
