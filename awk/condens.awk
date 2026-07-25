@@ -2,7 +2,7 @@
 # "condens" several events in an ascii event file to 
 # one group event, sum individual moments
 #
-# $Id: condens.awk,v 1.1 2003/01/17 01:11:32 becker Exp $
+# part of interact, (C) Thorsten Becker; see README.md and COPYRIGHT
 #
 BEGIN{
   tm=0;

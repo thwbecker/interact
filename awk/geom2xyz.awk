@@ -2,7 +2,7 @@
 # for plotting with GMT 
 # parameters i, j pick the coordinates for projection
 #
-# $Id: geom2xyz.awk,v 1.1 2003/01/17 01:12:17 becker Exp $
+# part of interact, (C) Thorsten Becker; see README.md and COPYRIGHT
 # 
 BEGIN{
   f=0.017453293;

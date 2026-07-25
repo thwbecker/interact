@@ -2,7 +2,7 @@
 # count all events in a cevents.dat file that happen 
 # at same time as one event
 #
-# $Id: consolidate_events.awk,v 1.1 2003/01/17 01:12:02 becker Exp $
+# part of interact, (C) Thorsten Becker; see README.md and COPYRIGHT
 #
 #
 BEGIN{

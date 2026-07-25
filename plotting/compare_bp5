@@ -1,0 +1,40 @@
+#!/bin/bash
+
+ofile=bp5.ps
+reg=-R0/500/-10/3;xl=50
+proj=-JX7/5
+psbasemap $reg $proj -Ba50f10:"time [yr]":/a2f.2:"@~\341@~log@-10@-(v [m/s])@~\361@~": -K -P > $ofile
+rc=1;yl=0
+#for r in 2 1 0.5 0.25 0.1;do
+for r in 2 ;do
+#for r in 0.25 0.1;do
+    col=`platecolor $rc`
+    p=0
+    if [ -s "bp5/theo6."$r"km"/rsf_monitor.dat ];then
+	gawk '{if(NR>1)print($3,$5)}' "bp5/theo6."$r"km"/rsf_monitor.dat | \
+	    psxy $reg $proj -W1,$col -O -K >> $ofile
+	((p=p+1))
+	echo age
+    fi
+    if [ -s "bp5_sl/walter."$r"km"/rsf_monitor.dat ];then # slip law
+	gawk '{if(NR>1)print($3,$5+1)}' "bp5_sl/walter."$r"km"/rsf_monitor.dat | \
+	    psxy $reg $proj -W2,$col,. -O -K >> $ofile
+	((p=p+1))
+	echo sl
+    fi
+    if [ -s "bp5_prz/theo5."$r"km"/rsf_monitor.dat ];then # PRZ
+	gawk '{if(NR>1)print($3,$5+2)}' "bp5_prz/theo5."$r"km"/rsf_monitor.dat | \
+	    psxy $reg $proj -W2,$col,- -O -K >> $ofile
+	echo prz 
+	((p=p+1))
+    fi
+    if [ $p -gt 0 ];then
+	echo $xl $yl 18 0 29 LM "@~D@~x = $r km" | \
+	    pstext $reg $proj -O -K -F+f$col >> $ofile
+    fi
+    ((rc=rc+1))
+    ((yl=yl-1))
+done
+
+psxy -T -O >> $ofile
+modifybb $ofile 1

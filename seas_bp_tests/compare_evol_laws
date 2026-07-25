@@ -6,8 +6,8 @@
 laws="aging slip prz sato"
 plaws="$laws"
 
-res=0.5km
-
+#res=0.5km
+res=0.1km
 
 ofile=bp5_evol.ps
 

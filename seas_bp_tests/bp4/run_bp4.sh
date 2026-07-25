@@ -64,7 +64,7 @@ for cfg in "${configs[@]}"; do
         echo "$0: in `pwd`, writing to $lfile"
         rm -rf tmp_rsf/*
         date > $lfile
-        mpirun -np $ncore ../../bin/rsf_solve \
+        mpirun -np $ncore ../../../bin/rsf_solve \
             -geom_file   ../"geom_bp4_"$res"_"$tag".in" -rsf_file ../"rsf_bp4_"$res"_"$tag".dat" \
             -rsf_ic_file ../"ic_bp4_"$res"_"$tag".in" \
             -full_space -use_hmatrix $hmat -hmmvp_tol $hmmvp_tol \

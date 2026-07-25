@@ -1,6 +1,5 @@
 #!/bin/bash
 res=${1-0.5km}
-
 ncore=${2-$NR_CPUS}
 
 tmax=3000			# to get better read on matvec
@@ -24,7 +23,7 @@ if [ ! -s $lfile ];then
     echo $0: in `pwd`, writing to $lfile deleting output
     rm -r tmp_rsf/*
     date > $lfile
-    mpirun -np $ncore  ../../../bin/rsf_solve  \
+    mpirun -bind-to core -map-by socket  -np $ncore  ../../../bin/rsf_solve  \
 	   -geom_file   ../"geom_bp5_"$res".in" -rsf_file    ../"rsf_bp5_"$res".dat"   \
 	   -rsf_ic_file ../"ic_bp5_"$res".in"   -rsf_dc_file ../"dc_bp5_"$res".in"   \
 	   $hmat_flags -shear_modulus 3.204e10 -s_wave_speed 3464 \

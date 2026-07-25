@@ -12,7 +12,7 @@
 #
 # uses the modifybb script to adjust EPS bounding boxes
 # 
-# $Id: pslip,v 1.2 2003/01/21 18:55:26 becker Exp $
+# part of interact, (C) Thorsten Becker; see README.md and COPYRIGHT
 # 
 # file to use
 ifile=${1-flt.dat}

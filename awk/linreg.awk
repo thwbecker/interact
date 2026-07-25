@@ -1,7 +1,7 @@
 #
 # linear regression routine
 #
-# $Id: linreg.awk,v 1.1 2003/01/17 01:12:42 becker Exp becker $
+# part of interact, (C) Thorsten Becker; see README.md and COPYRIGHT
 #
  BEGIN{
 
