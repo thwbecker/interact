@@ -1,7 +1,8 @@
 /*
   interact: model fault interactions using dislocations in a 
             halfspace
-  (C) Thorsten Becker, becker@eps.harvard.edu
+
+	    (C) Thorsten Becker, thwbecker@post.harvard.edu
 
   part of interact, (C) Thorsten Becker; see README.md and COPYRIGHT
 
@@ -20,8 +21,6 @@
   with respect to Dy of Crouch & Starfield, we flip the sign for
   normal direction slip
 
-
-  WARNING: FOR ALL CHANGES, REMEMBER TO FIX THE BASIC VERSIONS!
 
 */
 #include "interact.h"
@@ -46,7 +45,7 @@ void eval_2dsegment_plane_strain(COMP_PRECISION *x,
   COMP_PRECISION u[3],x_local[3],dx[3],sm_local[3][3],f2,f3,f4,f5,f6,f7,
     c1,c12,c2,c22,c3,c32,c4,c42,y2;
   static COMP_PRECISION 
-    pfac1 = 4.0 * 3.141592653589793 * (1.0 - POISSON_NU),
+    pfac1 = 4.0 * PI * (1.0 - POISSON_NU),
     pfac2 = (1.0 -       POISSON_NU), 
     pfac3 = (1.0 - 2.0 * POISSON_NU),
     pfac4 = POISSON_NU;
@@ -196,7 +195,7 @@ void eval_2dsegment_plane_strain_basic(COMP_PRECISION *x,
   COMP_PRECISION f2,f3,f4,f5,f6,f7,c1,c12,c2,c22,c3,c32,c4,
     c42,y2;
   static COMP_PRECISION 
-    pfac1 = 4.0 * 3.141592653589793 * (1.0 - POISSON_NU),
+    pfac1 = 4.0 * PI * (1.0 - POISSON_NU),
     pfac2 = (1.0 -       POISSON_NU), 
     pfac3 = (1.0 - 2.0 * POISSON_NU),
     pfac4 = POISSON_NU;

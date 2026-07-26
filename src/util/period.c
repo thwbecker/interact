@@ -6,7 +6,6 @@
 
 
 
-#define TWOPID 6.2831853071795865
 
 
 #define SWAP(a,b) tempr=(a);(a)=(b);(b)=tempr
@@ -56,7 +55,7 @@ void period(SPECA_PREC *x,SPECA_PREC *y,int n,SPECA_PREC ofac,SPECA_PREC hifac,S
   pymax=0.0;
   pnow=1.0/(xdif*ofac);
   for (j=1;j<=n;j++) {
-    arg=TWOPID*((x[j]-xave)*pnow);
+    arg=TWOPI*((x[j]-xave)*pnow);
     wpr[j] = -2.0*SQR(sin(0.5*arg));
     wpi[j]=sin(arg);
     wr[j]=cos(arg);
@@ -101,7 +100,6 @@ void period(SPECA_PREC *x,SPECA_PREC *y,int n,SPECA_PREC ofac,SPECA_PREC hifac,S
   free(wpi);
   free(wi);
 }
-#undef TWOPID
 
 void avevar(SPECA_PREC *data,int n,SPECA_PREC *ave,SPECA_PREC *var)
 {
