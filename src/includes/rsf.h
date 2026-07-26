@@ -1,5 +1,17 @@
 #ifndef __READ_RSF_HEADER__
 /* 
+
+   default values
+
+*/
+#define RSF_SHEAR_MODULUS_DEF 32.04e9
+#define RSF_S_WAVE_SPEED_DEF 3.464e3
+#define RSF_DEFAULT_FRICTION 0.6
+#define RSF_DEFAULT_DC 0.008
+#define RSF_DEFAULT_VPL 1e-9
+#define RSF_DEFAULT_V0 1e-6
+#define RSF_DEFAULT_NORMAL_STRESS  50e6
+/* 
    context for the monitor and event functions, following the layout
    in hmatrix_test/ode_solve_test.c; the RHS keeps using the plain
    interact_ctx which is shared with the matrix assembly routines

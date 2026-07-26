@@ -155,7 +155,7 @@ typedef struct{
 
 struct rsf_vars{
   /*  */
-  COMP_PRECISION f0,shear_mod_over_2cs_si,dc,v0,vpl,vmin;
+  COMP_PRECISION f0,shear_mod_over_2cs_si_for_damping,dc,v0,vpl,vmin;
   /* preallocated work vectors for the RSF ODE right hand side
      (created once in rsf_solve, layout matching Is/In rows) */
   Vec vel,tau_dot,sigma_dot;

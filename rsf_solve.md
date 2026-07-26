@@ -18,6 +18,26 @@ through several hierarchical-matrix (H-matrix) backends, selected with
 This note focuses on the two production MPI backends, **HTOOL** and **HACApK**,
 benchmarked against the **dense** ground truth.
 
+## Per-patch loading
+
+By default, all patches are loaded by backslip at the uniform plate
+rate `-vpl`, through the interaction matrix products K(-vpl).
+`-rsf_vpl_file <f>` replaces the uniform rate with one value per
+patch [m/s] (one number per line, geometry order); the backslip
+products then use the per-patch rates, and the area-weighted mean is
+used as the effective plate rate in the slip budget diagnostic.
+`-rsf_stress_rate_file <f>` adds external loading rates on top of the
+backslip products: two columns per patch, tau_dot and sigma_dot
+[Pa/s], with sigma_dot ignored unless `-calc_sigma_dot` is on. This
+is the interface for driving the fault system with stressing rates
+from an external model (e.g. mantle flow or a viscoelastic
+relaxation calculation); the loading is constant in time. With a
+uniform-rate file both options reproduce the default run bit
+identically in our tests; on a single-fault test, added stress rates
+shifted recurrence intervals in quantitative agreement with the
+expected T proportional to 1/(k vpl + tau_dot) scaling, and a
+doubled per-patch plate rate approximately halved the recurrence.
+
 ## Checkpoint and restart
 
 `-rsf_checkpoint <N>` writes a restart checkpoint every N accepted

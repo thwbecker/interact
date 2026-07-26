@@ -105,6 +105,14 @@ PetscErrorCode rsf_solve_run(int argc,char **argv,struct interact_ctx *par,
   PetscInt ckpt_every=0,restart_step=0;
   char ckpt_file[300],restart_file[300];
   PetscBool have_restart=PETSC_FALSE;
+  /* per-patch loading */
+  char vpl_file[STRLEN],srate_file[STRLEN];
+  PetscBool have_vplf=PETSC_FALSE,have_sratef=PETSC_FALSE;
+  PetscReal *vpl_cell=NULL,*taud_cell=NULL,*sigd_cell=NULL;
+  PetscReal vpl_wsum,vpl_asum,vpl_eff;
+  PetscInt vrs,vre;
+  PetscScalar *varr;
+  FILE *lin;
   PetscReal restart_t,restart_dt;
   FILE *iin;
   PetscInt ii;
@@ -139,7 +147,7 @@ PetscErrorCode rsf_solve_run(int argc,char **argv,struct interact_ctx *par,
     fprintf(stderr,"%s: read geometry from %s, %i patches, on %i cores\n",
 	    argv[0],geom_file,n,medium->comm_size);
     fprintf(stderr,"%s: G %.6e Pa cs %g m/s eta %.6e f0 %g dc %g m v0 %.3e vpl %.3e m/s\n",
-	    argv[0],shear_modulus_si,s_wave_speed_si,rsf->shear_mod_over_2cs_si,
+	    argv[0],shear_modulus_si,s_wave_speed_si,rsf->shear_mod_over_2cs_si_for_damping,
 	    rsf->f0,rsf->dc,rsf->v0,rsf->vpl);
     fprintf(stderr,"%s: sigma0 %.6e tau0 %.6e Pa vinit %.3e m/s rand_amp %g\n",
 	    argv[0],sigma_init,tau_init,vel_init,rand_amp);
@@ -255,8 +263,52 @@ PetscErrorCode rsf_solve_run(int argc,char **argv,struct interact_ctx *par,
      (normal, compression positive) from slip rate -vpl, made
      available on all nodes
   */
+  /* per-patch loading: -rsf_vpl_file gives one plate rate [m/s] per patch
+     (replacing the uniform -vpl in the backslip loading products), and
+     -rsf_stress_rate_file gives per-patch additive loading rates
+     "tau_dot sigma_dot" [Pa/s] (two columns; sigma_dot is ignored unless
+     -calc_sigma_dot), e.g. from an external mantle flow or viscoelastic
+     model. Both are added to the backslip stressing rates once at setup;
+     loading is constant in time */
+  PetscCall(PetscOptionsGetString(NULL,NULL,"-rsf_vpl_file",vpl_file,STRLEN,&have_vplf));
+  PetscCall(PetscOptionsGetString(NULL,NULL,"-rsf_stress_rate_file",srate_file,STRLEN,&have_sratef));
   PetscCall(MatCreateVecs(medium->Is,&islip_rate_vec,&stress_rate));
-  PetscCall(VecSet(islip_rate_vec,-rsf->vpl));
+  if(have_vplf){
+    /* per-patch plate rate: all ranks read the file (same pattern as the
+       per-cell D_c input), the owned range is placed into the slip rate
+       vector, and the area-weighted mean is kept as the effective vpl
+       for the slip budget reference */
+    vpl_cell = (PetscReal *)malloc((size_t)medium->nrflt*sizeof(PetscReal));
+    if(!vpl_cell){
+      fprintf(stderr,"%s: per-patch vpl alloc failed\n",argv[0]);
+      exit(-1);
+    }
+    lin = myopen(vpl_file,"r");
+    for(i=0;i < medium->nrflt;i++)
+      if(fscanf(lin,"%lf",(vpl_cell+i)) != 1){
+	fprintf(stderr,"%s: error reading vpl for patch %i from %s\n",
+		argv[0],i,vpl_file);
+	exit(-1);
+      }
+    fclose(lin);
+    vpl_wsum = vpl_asum = 0.0;
+    for(i=0;i < medium->nrflt;i++){
+      vpl_wsum += vpl_cell[i]*4.0*fault[i].l*fault[i].w;
+      vpl_asum += 4.0*fault[i].l*fault[i].w;
+    }
+    vpl_eff = (vpl_asum > 0.0) ? (vpl_wsum/vpl_asum) : rsf->vpl;
+    PetscCall(VecGetOwnershipRange(islip_rate_vec,&vrs,&vre));
+    PetscCall(VecGetArray(islip_rate_vec,&varr));
+    for(i=vrs;i < vre;i++)
+      varr[i-vrs] = -vpl_cell[i];
+    PetscCall(VecRestoreArray(islip_rate_vec,&varr));
+    HEADNODE
+      fprintf(stderr,"%s: read per-patch vpl from %s (area-weighted mean %.6e m/s)\n",
+	      argv[0],vpl_file,(double)vpl_eff);
+    rsf->vpl = vpl_eff;		/* budget reference and diagnostics */
+  }else{
+    PetscCall(VecSet(islip_rate_vec,-rsf->vpl));
+  }
   for(i=0;i < ((rsf->calc_sigma_dot)?(2):(1));i++){
     if(i==0)
       PetscCall(MatMult(medium->Is,islip_rate_vec,stress_rate)); /* shear */
@@ -275,6 +327,37 @@ PetscErrorCode rsf_solve_run(int argc,char **argv,struct interact_ctx *par,
   }
   PetscCall(VecDestroy(&stress_rate));
   PetscCall(VecDestroy(&islip_rate_vec));
+  if(have_sratef){
+    /* additive per-patch loading rates on top of the backslip products;
+       two columns tau_dot sigma_dot [Pa/s] per patch, read on all ranks;
+       sinc[] is already global on every rank at this point */
+    taud_cell = (PetscReal *)malloc((size_t)medium->nrflt*sizeof(PetscReal));
+    sigd_cell = (PetscReal *)malloc((size_t)medium->nrflt*sizeof(PetscReal));
+    if((!taud_cell) || (!sigd_cell)){
+      fprintf(stderr,"%s: per-patch stress rate alloc failed\n",argv[0]);
+      exit(-1);
+    }
+    lin = myopen(srate_file,"r");
+    for(i=0;i < medium->nrflt;i++)
+      if(fscanf(lin,"%lf %lf",(taud_cell+i),(sigd_cell+i)) != 2){
+	fprintf(stderr,"%s: error reading tau_dot sigma_dot for patch %i from %s\n",
+		argv[0],i,srate_file);
+	exit(-1);
+      }
+    fclose(lin);
+    for(i=0;i < medium->nrflt;i++){
+      fault[i].sinc[0] += taud_cell[i];
+      if(rsf->calc_sigma_dot)
+	fault[i].sinc[1] += sigd_cell[i];
+    }
+    HEADNODE
+      fprintf(stderr,"%s: added per-patch loading rates from %s%s\n",
+	      argv[0],srate_file,
+	      (rsf->calc_sigma_dot)?(" (tau_dot and sigma_dot)"):(" (tau_dot only; -calc_sigma_dot off, sigma_dot column ignored)"));
+    free(taud_cell);free(sigd_cell);
+  }
+  if(vpl_cell)
+    free(vpl_cell);
 
   /* 
      solution vector: local size has to be rsf->dim times the local

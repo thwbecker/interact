@@ -20,10 +20,10 @@ void init_medium_rsf(struct med *medium)
      options below; defaults follow the SEAS BP1 benchmark / HBI
      conventions where applicable
   */
-  rsf->f0  = 0.6; 		/* f_0 reference friction */
-  rsf->dc = 0.008;		/* D_c [m] */
-  rsf->vpl = 1e-9;		/* plate motion [m/s] */
-  rsf->v0 = 1e-6;		/* reference speed [m/s] (HBI: vref) */
+  rsf->f0  = RSF_DEFAULT_FRICTION; 		/* f_0 reference friction */
+  rsf->dc = RSF_DEFAULT_DC;		/* D_c [m] */
+  rsf->vpl = RSF_DEFAULT_VPL;		/* plate motion [m/s] */
+  rsf->v0 =  RSF_DEFAULT_V0;		/* reference speed [m/s] (HBI: vref) */
   /*  */
   rsf->calc_sigma_dot = FALSE; /* compute normal stress change? */
   /* optional per-cell D_c [m] (geometry order); NULL => use uniform
@@ -68,49 +68,59 @@ void rsf_print_help(const char *prog)
 {
   fprintf(stderr,"\n");
   fprintf(stderr,"rsf_solve: quasi-dynamic rate-and-state earthquake-cycle solver (PETSc TS)\n");
-  fprintf(stderr,"usage: %s [options]   (options may also be placed in petsc_settings.yaml)\n",prog);
+  fprintf(stderr,"usage: %s [options]   (Petsc options can  also be placed in petsc_settings.yaml)\n",prog);
   fprintf(stderr,"\n");
 
   fprintf(stderr,"geometry and input files\n");
   fprintf(stderr,"  -geom_file <file>       fault geometry, one patch per row (default %s)\n",GEOMETRY_FILE);
-  fprintf(stderr,"  -rsf_file <file>        per-cell a b friction parameters (default %s)\n",RSF_PAR_FILE);
-  fprintf(stderr,"  -rsf_ic_file <file>     per-cell initial tau[Pa] vel[m/s]; overrides uniform IC\n");
-  fprintf(stderr,"  -rsf_dc_file <file>     per-cell D_c[m]; overrides uniform -dc\n");
-  fprintf(stderr,"  -rsf_sigma_file <file>  per-cell initial sigma0[Pa]; overrides uniform -sigma_init\n");
   fprintf(stderr,"  -full_space <bool>      whole-space Green functions (default 0 = half space)\n");
   fprintf(stderr,"  -tv <int>               triangular patch evaluation mode (default 0)\n");
   fprintf(stderr,"\n");
 
   fprintf(stderr,"elastic and rate-and-state parameters\n");
-  fprintf(stderr,"  -shear_modulus <Pa>     shear modulus G (default 32.04e9)\n");
+  fprintf(stderr,"  -shear_modulus <Pa>     shear modulus G (default %.4e)\n",RSF_SHEAR_MODULUS_DEF);
   fprintf(stderr,"  -s_wave_speed <m/s>     shear wave speed c_s, sets radiation damping eta = G/(2 c_s)\n");
-  fprintf(stderr,"                          (default 3464; note smaller c_s means MORE damping)\n");
+  fprintf(stderr,"                          (default %.4e; note smaller c_s means MORE damping)\n",
+	  RSF_S_WAVE_SPEED_DEF);
   fprintf(stderr,"  -rd_fac <fac>           scale the radiation damping coefficient (default 1;\n");
   fprintf(stderr,"                          0 switches damping off, i.e. the c_s -> infinity limit;\n");
   fprintf(stderr,"                          caution: without damping the quasi-dynamic coseismic\n");
   fprintf(stderr,"                          phase is unregularized and integrators will fail at\n");
   fprintf(stderr,"                          instabilities; > 1 gives enhanced damping)\n");
-  fprintf(stderr,"  -f0 <val>               reference friction f0 (default 0.6)\n");
-  fprintf(stderr,"  -dc <m>                 characteristic slip distance D_c (default 0.008)\n");
-  fprintf(stderr,"  -v0 <m/s>               reference velocity (default 1e-6)\n");
-  fprintf(stderr,"  -vpl <m/s>              plate loading rate (default 1e-9)\n");
+  fprintf(stderr,"  -f0 <val>               reference friction f0 (default %g)\n",RSF_DEFAULT_FRICTION);
+  fprintf(stderr,"  -dc <m>                 characteristic slip distance D_c (default %g)\n",RSF_DEFAULT_DC);
+  fprintf(stderr,"  -v0 <m/s>               reference velocity (default %.2e)\n",RSF_DEFAULT_V0);
+  fprintf(stderr,"  -vpl <m/s>              plate loading rate (default %.2e)\n",RSF_DEFAULT_VPL);
   fprintf(stderr,"  -rsf_slip_mode <%i|%i|%i>  slip direction: %i strike (default), %i dip (thrust), %i (rake)\n",
 	  STRIKE,DIP,RAKE,STRIKE,DIP,RAKE);
   fprintf(stderr,"                          if mode is rake, will read rake angles from %s\n",FAULT_RAKE_FILE);
   fprintf(stderr,"\n");
 
-  fprintf(stderr,"initial conditions\n");
-  fprintf(stderr,"  -sigma_init <Pa>        uniform initial normal stress (default 50e6)\n");
+  fprintf(stderr,"initial conditions and loading\n");
+  fprintf(stderr,"  -sigma_init <Pa>        uniform initial normal stress (default %.2e)\n",
+	  RSF_DEFAULT_NORMAL_STRESS);
   fprintf(stderr,"  -tau_init <Pa>          uniform initial shear stress (default f0*sigma_init + eta*vel_init)\n");
   fprintf(stderr,"  -vel_init <m/s>         uniform initial slip rate (default vpl)\n");
   fprintf(stderr,"  -rand_amp <val>         random initial-state multiplier amplitude (default 0)\n");
-  fprintf(stderr,"\n");
 
+  fprintf(stderr,"  -rsf_file <file>        per-cell a b friction parameters (default %s)\n",RSF_PAR_FILE);
+  fprintf(stderr,"  -rsf_ic_file <file>     per-cell initial tau[Pa] vel[m/s]; overrides uniform IC\n");
+  fprintf(stderr,"  -rsf_dc_file <file>     per-cell D_c[m]; overrides uniform -dc\n");
+  fprintf(stderr,"  -rsf_sigma_file <file>  per-cell initial sigma0[Pa]; overrides uniform -sigma_init\n");
+  
+  fprintf(stderr,"  -rsf_vpl_file <f>       per-patch plate rate [m/s], one value per patch, replacing\n");
+  fprintf(stderr,"                          the uniform -vpl in the backslip loading products\n");
+  fprintf(stderr,"  -rsf_stress_rate_file <f> per-patch additive loading rates, two columns\n");
+  fprintf(stderr,"                          tau_dot sigma_dot [Pa/s] (sigma_dot ignored unless\n");
+  fprintf(stderr,"                          -calc_sigma_dot), e.g. from an external flow model\n");
+  fprintf(stderr,"\n");
+  
   fprintf(stderr,"normal-stress evolution and limiter (for dip slip / nonplanar faults)\n");
   fprintf(stderr,"  -calc_sigma_dot <bool>  evolve normal stress via the In matrix (default 0 = off)\n");
   fprintf(stderr,"  -limit_sigma <bool>     clamp sigma to [min,max], as HBI limitsigma (default 0)\n");
   fprintf(stderr,"  -min_sigma <Pa>         limiter floor (default 1e6)\n");
   fprintf(stderr,"  -max_sigma <Pa>         limiter ceiling (default 300e6)\n");
+
   fprintf(stderr,"\n");
 
   fprintf(stderr,"state evolution\n");
@@ -249,7 +259,7 @@ PetscErrorCode rsf_get_settings(int argc,char **argv,struct interact_ctx *par,
 {
   struct med *medium = par->medium;
   /* material parameters */
-  PetscReal shear_modulus_si = 32.04e9, s_wave_speed_si = 3.464e3;
+  PetscReal shear_modulus_si =  RSF_SHEAR_MODULUS_DEF, s_wave_speed_si =  RSF_S_WAVE_SPEED_DEF;
   PetscBool use_full_space=PETSC_FALSE;
   PetscInt tvmode = 0;		/* triangle evaluation mode */
   PetscInt use_hmatrix=IHMAT_TYPE_DENSE;
@@ -291,7 +301,7 @@ PetscErrorCode rsf_get_settings(int argc,char **argv,struct interact_ctx *par,
   rsf = medium->rsf;
   
   /* initial conditions, can overwrite below */
-  sigma_init = 50e6;		/* [Pa] */
+  sigma_init = RSF_DEFAULT_NORMAL_STRESS;		/* [Pa] */
   tau_init = -1;		/* [Pa], if < 0, will use f0 * sigma_init */
   vel_init = rsf->vpl;	        /* [m/s] */
   rand_amp = 0;			/* random multiplier amplitude for initial state, e.g. 0.05 */
@@ -393,10 +403,10 @@ PetscErrorCode rsf_get_settings(int argc,char **argv,struct interact_ctx *par,
   }
   if(rd_fac != 1.0)
     HEADNODE
-      fprintf(stderr,"rsf_get_settings: radiation damping scaled by rd_fac = %g (eta = %.4e Pa s/m)\n",
-	      rd_fac,rsf->shear_mod_over_2cs_si);
-
-  rsf->shear_mod_over_2cs_si = rd_fac * shear_modulus_si /(2.0*s_wave_speed_si);  
+      fprintf(stderr,"rsf_get_settings: radiation damping scaled by rd_fac = %g * (eta = %.4e Pa s/m)\n",
+	      rd_fac,shear_modulus_si /(2.0*s_wave_speed_si));
+  /* here is where the radiation damping gets recaled */
+  rsf->shear_mod_over_2cs_si_for_damping = rd_fac * shear_modulus_si /(2.0*s_wave_speed_si);  
  
   PetscCall(PetscOptionsGetReal(NULL,NULL,"-sigma_init",&sigma_init,NULL));
   PetscCall(PetscOptionsGetReal(NULL,NULL,"-tau_init",&tau_init,NULL));
@@ -417,9 +427,9 @@ PetscErrorCode rsf_get_settings(int argc,char **argv,struct interact_ctx *par,
   if(tau_init < 0){
     /* default uniform prestress from the quasi-dynamic strength balance,
        tau = sigma f + eta v, with f = f0 at v = v0. The radiation-damping term
-       eta*vel_init is added here for consistency; it is tiny at plate rate
-       (eta*vpl ~ 5e-3 Pa) but matters if vel_init is set to a seismic rate */
-    tau_init = rsf->f0 * sigma_init + rsf->shear_mod_over_2cs_si * vel_init;
+       rd_fac*eta*vel_init is added here for consistency; it is tiny at plate rate
+       (rd_fac eta*vpl ~ 5e-3 Pa) but matters if vel_init is set to a seismic rate */
+    tau_init = rsf->f0 * sigma_init + rsf->shear_mod_over_2cs_si_for_damping * vel_init;
   }
   /* evolve normal stress (dsigma/dt from the In interaction matrix)?  Off by
      default; needed for nonplanar or dipping faults where slip changes the

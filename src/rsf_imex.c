@@ -103,8 +103,8 @@ PetscErrorCode rsf_IMEX_RHSFunction(TS ts,PetscReal time,Vec X,Vec G,void *ptr)
     dvdtau   =   pre_fac * cosh_fac;
     dvdsigma =  -pre_fac * cosh_fac * mu;
     g[j+1]  = (tau_dot[k] + fault[i].sinc[0]
-	       - rsf->shear_mod_over_2cs_si * (dvdsigma * sdot));
-    g[j+1] /= (1.0 + rsf->shear_mod_over_2cs_si * dvdtau);
+	       - rsf->shear_mod_over_2cs_si_for_damping * (dvdsigma * sdot));
+    g[j+1] /= (1.0 + rsf->shear_mod_over_2cs_si_for_damping * dvdtau);
     /* d slip/dt */
     g[j+3] = velr[k];
   }
@@ -144,9 +144,9 @@ PetscErrorCode rsf_IMEX_IFunction(TS ts,PetscReal time,Vec X,Vec Xdot,Vec F,void
     cosh_fac = PetscCoshReal(scaled_tau) * exp_fac;
     dvdtau   = pre_fac * cosh_fac;
     dvdstate = -v/a;
-    denom = 1.0 + rsf->shear_mod_over_2cs_si * dvdtau;
+    denom = 1.0 + rsf->shear_mod_over_2cs_si_for_damping * dvdtau;
     f[j]   = xd[j]   - S;
-    f[j+1] = xd[j+1] + (rsf->shear_mod_over_2cs_si * dvdstate * S)/denom;
+    f[j+1] = xd[j+1] + (rsf->shear_mod_over_2cs_si_for_damping * dvdstate * S)/denom;
     f[j+2] = xd[j+2];
     f[j+3] = xd[j+3];
   }
@@ -189,7 +189,7 @@ PetscErrorCode rsf_IMEX_IJacobian(TS ts,PetscReal time,Vec X,Vec Xdot,PetscReal 
     dvdtau   =  pre_fac * cosh_fac;
     dvdsigma = -pre_fac * cosh_fac * mu;
     dvdstate = -v/a;
-    E = rsf->shear_mod_over_2cs_si;
+    E = rsf->shear_mod_over_2cs_si_for_damping;
     denom = 1.0 + E * dvdtau;
     Q = E * dvdstate / denom;	/* Fimpl_tau = -Q S, i.e. F_tau = xdot_tau + Q S */
     /* total derivatives of S(psi,|v(psi,tau,sigma)|):

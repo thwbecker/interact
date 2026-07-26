@@ -22,6 +22,12 @@
 #define RSF_RUPTURE_TIME_FILE "rsf_rupture_time.dat"
 #define RSF_SLIP_BUDGET_FILE "rsf_slip_budget.dat"
 
+/* 
+
+
+
+ */
+
 #define STRESS_OUT_FILE "stress.out" // stress field output
 #define STRESS_HDR_FILE "stress.hdr" // header file
 #define FAULT_STRESS_OUT_FILE "flt_stress.out" // stress on fault output

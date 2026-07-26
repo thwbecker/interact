@@ -275,7 +275,7 @@ PetscErrorCode rsf_ODE_RHSFunction(TS ts,PetscReal time,Vec X,Vec F,void *ptr)
     f[j+2] = sdot;
     /* 
        d tau/dt from the quasi-dynamic strength = stress condition,
-       eta = G/(2cs)
+       rsf->shear_mod_over_2cs_si_for_damping  = G/(2cs) * rd_fac 
     */
     mu = x[j+1]/x[j+2];				/* tau/sigma */
     scaled_tau = mu/fault[i].mu_sa;				/* tau/(sigma a) */
@@ -286,8 +286,8 @@ PetscErrorCode rsf_ODE_RHSFunction(TS ts,PetscReal time,Vec X,Vec F,void *ptr)
     dvdsigma =  -pre_fac * cosh_fac * mu;
     dvdstate = -velr[k]/fault[i].mu_sa;
     f[j+1]  = (tau_dot[k] + fault[i].sinc[0] 
-	       - rsf->shear_mod_over_2cs_si * (dvdsigma * f[j+2] + dvdstate * f[j]));
-    f[j+1] /= (1.0 + rsf->shear_mod_over_2cs_si * dvdtau);
+	       - rsf->shear_mod_over_2cs_si_for_damping * (dvdsigma * f[j+2] + dvdstate * f[j]));
+    f[j+1] /= (1.0 + rsf->shear_mod_over_2cs_si_for_damping * dvdtau);
     /* d slip/dt */
     f[j+3] = velr[k];
   }

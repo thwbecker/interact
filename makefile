@@ -376,7 +376,7 @@ GEN_P_INC = src/includes/interact.h src/includes/precision_single.h \
 	src/includes/precision_double.h \
 	src/includes/structures.h src/includes/macros.h \
 	src/includes/auto_proto.h src/includes/auto_proto.sgl.h \
-	src/includes/fortran_proto.h \
+	src/includes/fortran_proto.h src/includes/rsf.h \
 	src/includes/filenames.h src/includes/properties.h \
 	src/block/blockinvert.h src/block/blockinvert_structures.h \
 	src/includes/constants.h
