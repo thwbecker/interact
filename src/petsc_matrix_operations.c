@@ -936,9 +936,7 @@ PetscErrorCode set_hmat_defaults_and_options(struct med *medium, int hmat) /*  t
 				       own default): only for loose-to-moderate
 				       generic b=Ax at minimum storage, where eps
 				       reads out as the operator error.
-				   now defaults to 1 (block-local) for the cycle application;
-				   set inorm 3 only for loose generic b=Ax at min storage. See
-				   test_hmatrix/hmat_backend_evaluation.md */
+				*/
     
     PetscCall(PetscOptionsGetReal(NULL,NULL,"-hmmvp_tol",&medium->hmmvp_tol,NULL));
     PetscCall(PetscOptionsGetReal(NULL,NULL,"-hmmvp_eta",&medium->hmmvp_eta,NULL));

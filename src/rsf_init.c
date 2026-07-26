@@ -188,7 +188,7 @@ void rsf_print_help(const char *prog)
   fprintf(stderr,"  -hacapk_inorm <int>     HACApK tolerance norm (1 = block-local)\n");
   fprintf(stderr,"  -hmmvp_tol <val>        hmmvp compression tolerance\n");
   fprintf(stderr,"  -hmmvp_eta <val>        hmmvp admissibility eta\n");
-  fprintf(stderr,"  -hmmvp_inorm <int>      hmmvp tolerance norm\n");
+  fprintf(stderr,"  -hmmvp_inorm <int>      hmmvp tolerance norm (1 = block, 3 = matrix \n");
   fprintf(stderr,"  -hmmvp_nthreads <int>   hmmvp compression threads\n");
   fprintf(stderr,"\n");
 
