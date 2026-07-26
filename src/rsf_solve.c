@@ -89,7 +89,6 @@ PetscErrorCode rsf_solve_run(int argc,char **argv,struct interact_ctx *par,
   Mat Jimex = NULL;		/* IMEX implicit Jacobian, only with -imex */
   TSAdapt adapt;
   PetscReal *values = NULL;
-  const PetscReal sec_per_year = 365.25*24.*60.*60.;
   VecScatter ctx;
   Vec xout,x,vatol,islip_rate_vec,stress_rate;
   struct med *medium = par->medium;
@@ -102,6 +101,11 @@ PetscErrorCode rsf_solve_run(int argc,char **argv,struct interact_ctx *par,
   PetscBool event_terminate[1] = {PETSC_FALSE};
   PetscLogDouble tb0,tb1;
   struct rsf_out_ctx uc[1];
+  /* checkpoint/restart */
+  PetscInt ckpt_every=0,restart_step=0;
+  char ckpt_file[300],restart_file[300];
+  PetscBool have_restart=PETSC_FALSE;
+  PetscReal restart_t,restart_dt;
   FILE *iin;
   PetscInt ii;
   PetscReal *ic_tau=NULL,*ic_vel=NULL;
@@ -140,7 +144,7 @@ PetscErrorCode rsf_solve_run(int argc,char **argv,struct interact_ctx *par,
     fprintf(stderr,"%s: sigma0 %.6e tau0 %.6e Pa vinit %.3e m/s rand_amp %g\n",
 	    argv[0],sigma_init,tau_init,vel_init,rand_amp);
     fprintf(stderr,"%s: rtol %.1e dt_init %g s dt_max %g s stop %g yr evol law: %i\n",
-	    argv[0],rtol,dt_init,dt_max,medium->stop_time/sec_per_year,rsf->state_law);
+	    argv[0],rtol,dt_init,dt_max,medium->stop_time/SEC_PER_YEAR,rsf->state_law);
   }
   /* 
      now, read in a,b variations (stored in fault[].mu_sa, fault[].mu_db)
@@ -494,6 +498,19 @@ PetscErrorCode rsf_solve_run(int argc,char **argv,struct interact_ctx *par,
      field output, and the velocity threshold event tracker,
      cf. hmatrix_test/ode_solve_test.c
   */
+  /* checkpoint/restart options; state travels entirely in the solution
+     vector, see rsf_write_checkpoint in rsf_output.c */
+  strcpy(ckpt_file,"rsf_checkpoint.bin");
+  PetscCall(PetscOptionsGetInt(NULL,NULL,"-rsf_checkpoint",&ckpt_every,NULL));
+  PetscCall(PetscOptionsGetString(NULL,NULL,"-rsf_checkpoint_file",ckpt_file,300,NULL));
+  PetscCall(PetscOptionsGetString(NULL,NULL,"-rsf_restart",restart_file,300,&have_restart));
+  uc->ckpt_every = ckpt_every;
+  strcpy(uc->ckpt_file,ckpt_file);
+  uc->restarted = have_restart;
+  uc->ckpt_dim = rsf->dim;
+  uc->ckpt_slip_mode = rsf->slip_mode;
+  uc->ckpt_law = rsf->state_law;
+  /* set up monitoring */
   PetscCall(rsf_init_monitor_and_event(uc,par,dt_monitor,adx_monitor,rdx_monitor,
 				       monitor_tmin,event_tmin,vel_event,vel_event_hyst,
 				       track_events,medium->time,x,vel_init,
@@ -520,7 +537,18 @@ PetscErrorCode rsf_solve_run(int argc,char **argv,struct interact_ctx *par,
      and by the event handler
   */
   PetscCall(TSSetMaxTime(ts,medium->stop_time));
+  if(have_restart){
+    PetscCall(rsf_read_checkpoint(restart_file,x,uc,&restart_t,&restart_dt,&restart_step));
+    PetscCall(TSSetTime(ts,restart_t));
+    PetscCall(TSSetStepNumber(ts,restart_step));
+    PetscCall(TSSetTimeStep(ts,restart_dt));
+    HEADNODE
+      fprintf(stderr,"%s: restart: -ts_max_steps counts absolute steps; raise it beyond %ld when chaining\n",
+	      argv[0],(long)restart_step);
+  }
   PetscCall(TSSolve(ts, x));
+  if(ckpt_every > 0)
+    PetscCall(rsf_write_checkpoint(ts,x,uc));
   PetscCall(TSGetSolveTime(ts,&(medium->time)));
   PetscCall(rsf_finalize_monitor_and_event(uc));
   PetscCall(rsf_finalize_catalog(uc));

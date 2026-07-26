@@ -79,10 +79,12 @@ PetscErrorCode rsf_init_monitor_and_event(struct rsf_out_ctx *uc,struct interact
   uc->old_time = t_init - 2.0*dt_monitor;
   uc->fout_monitor = uc->fout_event = NULL;
   HEADNODE{
-    uc->fout_monitor = myopen("rsf_monitor.dat","w");
+    uc->fout_monitor = myopen(RSF_MONITOR_FILE,(uc->restarted)?("a"):("w"));
+    if(uc->restarted) fprintf(uc->fout_monitor,"# restarted\n");
     fprintf(uc->fout_monitor,"# step time[s] time[yr] dt[s] log10(max|v|[m/s]) mean_slip[m] mean_mu max_sigma[Pa] min_sigma[Pa]\n");
     if(uc->track_events){
-      uc->fout_event = myopen("rsf_events.dat","w");
+      uc->fout_event = myopen(RSF_EVENTS_FILE,(uc->restarted)?("a"):("w"));
+      if(uc->restarted) fprintf(uc->fout_event,"# restarted\n");
       fprintf(uc->fout_event,"# time[s] time[yr] onset(1)/arrest(-1) log10(max|v|[m/s]) mean_slip[m] mean_mu, |v| threshold %.3e m/s\n",
 	      uc->vel_event);
     }
@@ -90,7 +92,7 @@ PetscErrorCode rsf_init_monitor_and_event(struct rsf_out_ctx *uc,struct interact
       int ierr_dir = system("mkdir -p tmp_rsf");
       if(ierr_dir)
 	fprintf(stderr,"rsf_init_monitor_and_event: WARNING: could not make tmp_rsf directory\n");
-      uc->fout_field_times = myopen("rsf_vel.times","w");
+      uc->fout_field_times = myopen(RSF_VEL_TIME_FILE,(uc->restarted)?("a"):("w"));
       if(uc->fout_field_times){
 	fprintf(uc->fout_field_times,"# frame step time[yr] time[s] log10(max|v|[m/s]) mean|v|[m/s] std|v|[m/s] min|v|[m/s] mean_slip[m]\n");
 	fprintf(uc->fout_field_times,"# field per group in tmp_rsf/rsf_vel.gGGG.NNNNNN.bin (float32 along_strike,down_dip,log10|v| triples, xyz2grd -bi3f); geometry rsf_geom.gGGG.dat\n");
@@ -211,11 +213,12 @@ PetscErrorCode rsf_init_catalog(struct rsf_out_ctx *uc,struct interact_ctx *par,
   }
   HEADNODE{
     if(uc->cat_enable){
-      uc->fout_catalog = myopen("rsf_catalog.dat","w");
+      uc->fout_catalog = myopen(RSF_CATALOG_FILE,(uc->restarted)?("a"):("w"));
+      if(uc->restarted) fprintf(uc->fout_catalog,"# restarted\n");
       fprintf(uc->fout_catalog,
-	      "# SEAS-style event catalog from rsf_solve; complements rsf_events.dat\n");
+	      "# SEAS-style event catalog from rsf_solve; complements %s\n",RSF_EVENTS_FILE);
       fprintf(uc->fout_catalog,
-	      "# same onset/arrest events as rsf_events.dat (needs -track_events); rows are per completed event\n");
+	      "# same onset/arrest events as %s (needs -track_events); rows are per completed event\n", RSF_EVENTS_FILE);
       fprintf(uc->fout_catalog,
 	      "# onset/arrest |v| threshold = %.3e m/s ; rupture-front |v| threshold = %.3e m/s\n",
 	      uc->vel_event,uc->rupture_vth);
@@ -225,7 +228,8 @@ PetscErrorCode rsf_init_catalog(struct rsf_out_ctx *uc,struct interact_ctx *par,
 	      "# ev onset[yr] arrest[yr] duration[s] n_ruptured area_ruptured[m^2] mean_slip[m] max_slip[m] mean_drop[MPa] max_drop[MPa] peak_sliprate[m/s] M0[Nm] Mw\n");
     }
     if(uc->budget_enable){
-      uc->fout_budget = myopen("rsf_slip_budget.dat","w");
+      uc->fout_budget = myopen(RSF_SLIP_BUDGET_FILE,(uc->restarted)?("a"):("w"));
+      if(uc->restarted) fprintf(uc->fout_budget,"# restarted\n");
       fprintf(uc->fout_budget,
 	      "# long-term slip budget: on-fault area-integrated slip vs plate-rate reference\n");
       fprintf(uc->fout_budget,
@@ -291,7 +295,7 @@ PetscErrorCode rsf_finalize_catalog(struct rsf_out_ctx *uc)
     PetscCall(VecScatterEnd(  rsc,rvec,rgath,INSERT_VALUES,SCATTER_FORWARD));
     HEADNODE{
       const PetscScalar *g;
-      FILE *out = myopen("rsf_rupture_time.dat","w");
+      FILE *out = myopen(RSF_RUPTURE_TIME_FILE,"w");
       int nrup=0;
       PetscReal t0=1e300;	/* initiation = earliest crossing */
       PetscCall(VecGetArrayRead(rgath,&g));
@@ -345,6 +349,129 @@ PetscErrorCode rsf_finalize_catalog(struct rsf_out_ctx *uc)
    unlike ode_solve_test.c the reference state is only updated on
    output, so the criteria decimate relative to accepted steps
 */
+#define RSF_CKPT_MAGIC 20260726.0
+#define RSF_CKPT_VERSION 1.0
+#define RSF_CKPT_NMETA 16
+
+/* write a checkpoint: a 16-entry metadata vector followed by the full
+   solution vector, PETSc binary, crash-safe via write-to-tmp-and-rename;
+   the previous checkpoint is kept as <file>.prev */
+PetscErrorCode rsf_write_checkpoint(TS ts, Vec X, struct rsf_out_ctx *uc)
+{
+  Vec meta;
+  PetscViewer viewer;
+  PetscReal t,dt;
+  PetscInt step;
+  PetscMPIInt rank;
+  char tmpf[350],prevf[350];
+  PetscFunctionBegin;
+  PetscCall(TSGetTime(ts,&t));
+  PetscCall(TSGetTimeStep(ts,&dt));
+  PetscCall(TSGetStepNumber(ts,&step));
+  PetscCall(VecCreate(PETSC_COMM_WORLD,&meta));
+  PetscCall(VecSetSizes(meta,PETSC_DECIDE,RSF_CKPT_NMETA));
+  PetscCall(VecSetFromOptions(meta));
+  PetscCall(VecSet(meta,0.0));
+  PetscCall(VecSetValue(meta,0,RSF_CKPT_MAGIC,INSERT_VALUES));
+  PetscCall(VecSetValue(meta,1,RSF_CKPT_VERSION,INSERT_VALUES));
+  PetscCall(VecSetValue(meta,2,(PetscScalar)uc->par->medium->nrflt,INSERT_VALUES));
+  PetscCall(VecSetValue(meta,3,(PetscScalar)uc->ckpt_dim,INSERT_VALUES));
+  PetscCall(VecSetValue(meta,4,(PetscScalar)uc->ckpt_slip_mode,INSERT_VALUES));
+  PetscCall(VecSetValue(meta,5,(PetscScalar)uc->ckpt_law,INSERT_VALUES));
+  PetscCall(VecSetValue(meta,6,(PetscScalar)step,INSERT_VALUES));
+  PetscCall(VecSetValue(meta,7,(PetscScalar)t,INSERT_VALUES));
+  PetscCall(VecSetValue(meta,8,(PetscScalar)dt,INSERT_VALUES));
+  PetscCall(VecAssemblyBegin(meta));
+  PetscCall(VecAssemblyEnd(meta));
+  snprintf(tmpf,sizeof(tmpf),"%s.tmp",uc->ckpt_file);
+  snprintf(prevf,sizeof(prevf),"%s.prev",uc->ckpt_file);
+  PetscCall(PetscViewerBinaryOpen(PETSC_COMM_WORLD,tmpf,FILE_MODE_WRITE,&viewer));
+  PetscCall(VecView(meta,viewer));
+  PetscCall(VecView(X,viewer));
+  PetscCall(PetscViewerDestroy(&viewer));
+  PetscCall(VecDestroy(&meta));
+  PetscCallMPI(MPI_Comm_rank(PETSC_COMM_WORLD,&rank));
+  if(rank == 0){
+    char tmpi[360],maini[360];
+    rename(uc->ckpt_file,prevf);	/* ok to fail on the first write */
+    snprintf(tmpi,sizeof(tmpi),"%s.info",tmpf);
+    snprintf(maini,sizeof(maini),"%s.info",uc->ckpt_file);
+    rename(tmpi,maini);			/* PETSc viewer companion file */
+    if(rename(tmpf,uc->ckpt_file) != 0)
+      fprintf(stderr,"rsf_write_checkpoint: WARNING: rename to %s failed\n",uc->ckpt_file);
+    else
+      fprintf(stderr,"rsf_write_checkpoint: step %ld t %.8e s dt %.3e s -> %s\n",
+	      (long)step,(double)t,(double)dt,uc->ckpt_file);
+  }
+  PetscCallMPI(MPI_Barrier(PETSC_COMM_WORLD));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+/* load a checkpoint into the (already created, correctly sized)
+   solution vector; validates patch count and dim, warns on law or
+   slip-mode differences; returns time, dt, and step */
+PetscErrorCode rsf_read_checkpoint(const char *file, Vec X, struct rsf_out_ctx *uc,
+				   PetscReal *t, PetscReal *dt, PetscInt *step)
+{
+  Vec meta;
+  PetscViewer viewer;
+  const PetscScalar *mv;
+  Vec mseq;
+  VecScatter scat;
+  PetscReal magic;
+  PetscInt nrflt,dim,slip_mode,law;
+  struct med *medium;
+  PetscFunctionBegin;
+  medium = uc->par->medium;
+  PetscCall(VecCreate(PETSC_COMM_WORLD,&meta));
+  PetscCall(VecSetSizes(meta,PETSC_DECIDE,RSF_CKPT_NMETA));
+  PetscCall(VecSetFromOptions(meta));
+  PetscCall(PetscViewerBinaryOpen(PETSC_COMM_WORLD,file,FILE_MODE_READ,&viewer));
+  PetscCall(VecLoad(meta,viewer));
+  /* every rank needs the metadata */
+  PetscCall(VecScatterCreateToAll(meta,&scat,&mseq));
+  PetscCall(VecScatterBegin(scat,meta,mseq,INSERT_VALUES,SCATTER_FORWARD));
+  PetscCall(VecScatterEnd(scat,meta,mseq,INSERT_VALUES,SCATTER_FORWARD));
+  PetscCall(VecGetArrayRead(mseq,&mv));
+  magic = (PetscReal)mv[0];
+  nrflt = (PetscInt)mv[2];
+  dim = (PetscInt)mv[3];
+  slip_mode = (PetscInt)mv[4];
+  law = (PetscInt)mv[5];
+  *step = (PetscInt)mv[6];
+  *t = (PetscReal)mv[7];
+  *dt = (PetscReal)mv[8];
+  PetscCall(VecRestoreArrayRead(mseq,&mv));
+  PetscCall(VecScatterDestroy(&scat));
+  PetscCall(VecDestroy(&mseq));
+  PetscCall(VecDestroy(&meta));
+  if(magic != RSF_CKPT_MAGIC)
+    SETERRQ(PETSC_COMM_WORLD,PETSC_ERR_FILE_UNEXPECTED,
+	    "rsf_read_checkpoint: %s is not an rsf_solve checkpoint",file);
+  if(nrflt != uc->par->medium->nrflt)
+    SETERRQ(PETSC_COMM_WORLD,PETSC_ERR_ARG_INCOMP,
+	    "rsf_read_checkpoint: checkpoint has %ld patches, geometry has %i",
+	    (long)nrflt,uc->par->medium->nrflt);
+  if(dim != uc->ckpt_dim)
+    SETERRQ(PETSC_COMM_WORLD,PETSC_ERR_ARG_INCOMP,
+	    "rsf_read_checkpoint: checkpoint dim %ld, run dim %ld",
+	    (long)dim,(long)uc->ckpt_dim);
+  HEADNODE{
+    if(slip_mode != uc->ckpt_slip_mode)
+      fprintf(stderr,"rsf_read_checkpoint: WARNING: checkpoint slip mode %ld, run %ld\n",
+	      (long)slip_mode,(long)uc->ckpt_slip_mode);
+    if(law != uc->ckpt_law)
+      fprintf(stderr,"rsf_read_checkpoint: WARNING: checkpoint state law %ld, run %ld\n",
+	      (long)law,(long)uc->ckpt_law);
+  }
+  PetscCall(VecLoad(X,viewer));
+  PetscCall(PetscViewerDestroy(&viewer));
+  HEADNODE
+    fprintf(stderr,"rsf_read_checkpoint: restarting from %s: step %ld t %.8e s (%.4f yr) dt %.3e s\n",
+	    file,(long)*step,(double)*t,(double)(*t)/SEC_PER_YEAR,(double)*dt);
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 PetscErrorCode rsf_TS_Monitor(TS ts,PetscInt step,PetscReal time,Vec X,void *ptr)
 {
   const PetscScalar *x;
@@ -355,8 +482,12 @@ PetscErrorCode rsf_TS_Monitor(TS ts,PetscInt step,PetscReal time,Vec X,void *ptr
   PetscBool bail;
   PetscReal v,lsum[2],gsum[2],lminmax[3],gminmax[3],dt,d1,d2,d3,dx_norm,x_norm;
   struct rsf_vars *rsf;
-  const PetscReal sec_per_year = 365.25*24.*60.*60.;
   PetscFunctionBeginUser;
+  {
+    struct rsf_out_ctx *uc_ck = (struct rsf_out_ctx *)ptr;
+    if((uc_ck->ckpt_every > 0) && (step > 0) && (step % uc_ck->ckpt_every == 0))
+      PetscCall(rsf_write_checkpoint(ts,X,uc_ck));
+  }
   uc = (struct rsf_out_ctx *)ptr;
   medium = uc->par->medium;
   rsf = medium->rsf;
@@ -426,7 +557,7 @@ PetscErrorCode rsf_TS_Monitor(TS ts,PetscInt step,PetscReal time,Vec X,void *ptr
       PetscCallMPI(MPI_Reduce(lminmax,gminmax,3,MPIU_REAL,MPI_MAX,0,PETSC_COMM_WORLD));
       if((medium->comm_rank == 0) && uc->fout_monitor){
 	fprintf(uc->fout_monitor,"%9i %20.8e %17.10f %15.8e %12.7f %15.8e %10.6f %15.8e %15.8e\n",
-		(int)step,time,time/sec_per_year,dt,
+		(int)step,time,time/SEC_PER_YEAR,dt,
 		log10(gminmax[0]),gsum[0]/(PetscReal)medium->nrflt,
 		gsum[1]/(PetscReal)medium->nrflt,
 		gminmax[1],-gminmax[2]);
@@ -475,7 +606,7 @@ PetscErrorCode rsf_TS_Monitor(TS ts,PetscInt step,PetscReal time,Vec X,void *ptr
 	PetscReal ref = uc->vpl*time*uc->total_area; /* cumulative slip*area at plate rate */
 	PetscReal resid = slip_integral - ref;
 	fprintf(uc->fout_budget,"%.8f %.8e %.8e %.8e %.6e\n",
-		time/sec_per_year,slip_integral,ref,resid,(ref!=0.0)?(resid/ref):(0.0));
+		time/SEC_PER_YEAR,slip_integral,ref,resid,(ref!=0.0)?(resid/ref):(0.0));
       }
       if(time - medium->slip_line_time > medium->slip_line_dt){
 	if(!uc->field_out){
@@ -483,7 +614,7 @@ PetscErrorCode rsf_TS_Monitor(TS ts,PetscInt step,PetscReal time,Vec X,void *ptr
 	  if(ierr2)
 	    fprintf(stderr,"rsf_TS_Monitor: WARNING: error making tmp_rsf output directory\n");
 	}
-	snprintf(vel_file,STRLEN,"tmp_rsf/vel-%012.5e-%06i-gmt",time/sec_per_year,uc->field_out);
+	snprintf(vel_file,STRLEN,"tmp_rsf/vel-%012.5e-%06i-gmt",time/SEC_PER_YEAR,uc->field_out);
 	fout2 = myopen(vel_file,"w");
 	if(fout2){
 	  for(i=0;i < n;i++)
@@ -555,7 +686,7 @@ PetscErrorCode rsf_TS_Monitor(TS ts,PetscInt step,PetscReal time,Vec X,void *ptr
       }
       if(uc->fout_field_times){
 	fprintf(uc->fout_field_times,"%6i %9i %.8f %.8e %.6f %14.6e %14.6e %14.6e %14.6e\n",
-		uc->field_frame,(int)step,time/sec_per_year,time,
+		uc->field_frame,(int)step,time/SEC_PER_YEAR,time,
 		log10((vmax>0.0)?(vmax):(1e-30)),
 		vmean,vstd,(vmin<1e30)?(vmin):(0.0),
 		(nf>0)?(ssum/(PetscReal)nf):(0.0));
@@ -581,7 +712,6 @@ PetscErrorCode rsf_post_event(TS ts,PetscInt nevents,PetscInt event_list[],
   struct rsf_vars *rsf;
   PetscInt i,j;
   PetscReal v,lsum[2],gsum[2],lvmax,gvmax,d1,d2,d3;
-  const PetscReal sec_per_year = 365.25*24.*60.*60.;
   PetscFunctionBeginUser;
   uc = (struct rsf_out_ctx *)ctx;
   medium = uc->par->medium;fault = uc->par->fault;
@@ -602,7 +732,7 @@ PetscErrorCode rsf_post_event(TS ts,PetscInt nevents,PetscInt event_list[],
     uc->nevent++;
     if((medium->comm_rank == 0) && uc->fout_event){
       fprintf(uc->fout_event,"%20.8e %17.10f %2i %12.7f %15.8e %10.6f\n",
-	      t,t/sec_per_year,(uc->slipping)?(1):(-1),
+	      t,t/SEC_PER_YEAR,(uc->slipping)?(1):(-1),
 	      log10((gvmax > 1e-300)?(gvmax):(1e-300)),
 	      gsum[0]/(PetscReal)medium->nrflt,gsum[1]/(PetscReal)medium->nrflt);
       fflush(uc->fout_event);
@@ -654,7 +784,6 @@ PetscErrorCode rsf_finalize_event(struct rsf_out_ctx *uc,PetscReal t_arr,Vec X)
   struct med *medium;struct flt *fault;struct rsf_vars *rsf;
   PetscInt ii,jj,kk;
   PetscReal lred[5],gred[5],lmx[2],gmx[2],gpeak,gcnt;
-  const PetscReal sec_per_year = 365.25*24.*60.*60.;
   PetscFunctionBeginUser;
   medium = uc->par->medium;fault = uc->par->fault;rsf = medium->rsf;
   if(!uc->ev_open)
@@ -694,7 +823,7 @@ PetscErrorCode rsf_finalize_event(struct rsf_out_ctx *uc,PetscReal t_arr,Vec X)
       uc->ncat++;
       fprintf(uc->fout_catalog,
 	      "%5i %17.10f %17.10f %13.6e %8i %14.6e %13.6e %13.6e %12.6e %12.6e %13.6e %13.6e %8.4f\n",
-	      uc->ncat,uc->onset_time/sec_per_year,t_arr/sec_per_year,t_arr-uc->onset_time,
+	      uc->ncat,uc->onset_time/SEC_PER_YEAR,t_arr/SEC_PER_YEAR,t_arr-uc->onset_time,
 	      (int)gcnt,gred[3],mean_slip,gmx[0],mean_drop/1e6,gmx[1]/1e6,gpeak,M0,Mw);
       fflush(uc->fout_catalog);
     }

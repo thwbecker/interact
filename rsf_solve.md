@@ -18,6 +18,31 @@ through several hierarchical-matrix (H-matrix) backends, selected with
 This note focuses on the two production MPI backends, **HTOOL** and **HACApK**,
 benchmarked against the **dense** ground truth.
 
+## Checkpoint and restart
+
+`-rsf_checkpoint <N>` writes a restart checkpoint every N accepted
+steps and once more after a regular finish; `-rsf_checkpoint_file`
+sets the name (default `rsf_checkpoint.bin`), and the previous
+checkpoint is kept as `<file>.prev`. Writes are crash safe (written
+to a temporary name and renamed). `-rsf_restart <file>` resumes a
+run: the full evolving state is the TS solution vector (psi, tau,
+sigma, and slip per patch), so the checkpoint is that vector plus
+time, dt, step number, and validation metadata in one PETSc binary
+file, which makes restarts portable across MPI rank counts through
+VecLoad. On restart the patch count and state dimension are
+validated, changes of state law or slip mode produce a warning, and
+the output files (monitor, events, catalog, budget) are opened in
+append mode with a `# restarted` marker line. Two caveats: the
+in-progress event tracker is not checkpointed, so an event spanning
+the restart boundary is split between the two runs' outputs; and
+`-ts_max_steps` counts absolute step numbers, so raise it beyond the
+checkpoint's step when chaining. In a single-fault test, a run split
+at a checkpoint reproduced the uninterrupted reference catalog to
+all printed digits, including an event entirely after the restart;
+trajectories are expected to be near identical rather than bit
+identical in general, since the timestep controller's internal
+history is not preserved.
+
 ## Source layout
 
 `rsf_solve` was split (2026-06) from a single `rsf_solve.c` into four translation

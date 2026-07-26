@@ -16,6 +16,8 @@ PetscErrorCode rsf_init_catalog(struct rsf_out_ctx *,struct interact_ctx *,
 				Vec ,PetscReal );
 PetscErrorCode rsf_ODE_RHSFunction(TS, PetscReal, Vec, Vec, void*);
 PetscErrorCode rsf_TS_Monitor(TS, PetscInt, PetscReal, Vec, void*);
+PetscErrorCode rsf_write_checkpoint(TS, Vec, struct rsf_out_ctx *);
+PetscErrorCode rsf_read_checkpoint(const char *, Vec, struct rsf_out_ctx *, PetscReal *, PetscReal *, PetscInt *);
 PetscErrorCode rsf_domain_check(TS, PetscReal, Vec, PetscBool*);
 /* shared between the explicit and IMEX paths (rsf_engine.c) */
 PetscReal rsf_state_rate(PetscInt, PetscReal, PetscReal, struct interact_ctx *,

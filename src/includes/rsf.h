@@ -62,6 +62,24 @@ struct rsf_out_ctx{
     per-cell arrays are rank-local, length medium->rn (owned patches), indexed
     by local k with global patch i = medium->rs + k.
   */
+  /*
+     checkpoint/restart: the full evolving state is the TS solution
+     vector (psi,tau,sigma,slip per patch), so a checkpoint is that
+     vector plus time/step/dt and validation metadata, written as a
+     PETSc binary file (rank-count portable through VecLoad). Written
+     every ckpt_every accepted steps (0: off) and once more after a
+     regular TSSolve return; the previous checkpoint is kept as
+     <file>.prev. Restart validates nrflt/dim and warns on law or
+     slip-mode changes; output files are opened in append mode on
+     restart with a marker comment. Note the in-progress event tracker
+     is not checkpointed: an event spanning the restart is split, and
+     -ts_max_steps counts absolute step numbers, so raise it when
+     chaining runs.
+  */
+  PetscInt ckpt_every;
+  char ckpt_file[300];
+  PetscBool restarted;
+  PetscInt ckpt_dim,ckpt_slip_mode,ckpt_law; /* stashed for the metadata */
   PetscBool cat_enable;		/* -rsf_catalog: write rsf_catalog.dat */
   PetscBool rup_enable;		/* -rsf_rupture_time: write rsf_rupture_time.dat (event 1) */
   PetscBool budget_enable;	/* -slip_budget: write rsf_slip_budget.dat */

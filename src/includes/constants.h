@@ -23,3 +23,6 @@
 
 
 #define RADIUS_EARTH 6371.0 // radius of earth in km
+//
+// 365.25*24.*60.*60.
+#define SEC_PER_YEAR 31557600.0

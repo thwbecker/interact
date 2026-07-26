@@ -13,8 +13,14 @@
 
 */
 #define RSF_PAR_FILE "rsf.dat"	/* rate state parameter file */
-
-
+/* output files */
+#define RSF_EVENTS_FILE "rsf_events.dat"
+#define RSF_CATALOG_FILE "rsf_catalog.dat"
+#define RSF_VEL_TIME_FILE "rsf_vel.times"
+#define RSF_MONITOR_FILE "rsf_monitor.dat"
+#define RSF_CHECKPOINT_FILE "rsf_checkpoint.bin"
+#define RSF_RUPTURE_TIME_FILE "rsf_rupture_time.dat"
+#define RSF_SLIP_BUDGET_FILE "rsf_slip_budget.dat"
 
 #define STRESS_OUT_FILE "stress.out" // stress field output
 #define STRESS_HDR_FILE "stress.hdr" // header file

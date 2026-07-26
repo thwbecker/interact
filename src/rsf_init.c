@@ -171,10 +171,18 @@ void rsf_print_help(const char *prog)
   fprintf(stderr,"  -event_tmin_yr <yr>     suppress event output before this time (default 0)\n");
   fprintf(stderr,"\n");
 
+  fprintf(stderr,"check pointing and restart\n");
+  fprintf(stderr,"  -rsf_checkpoint <N>     write a restart checkpoint every N accepted steps and once\n");
+  fprintf(stderr,"                          after a regular finish (0: off); previous kept as .prev\n");
+  fprintf(stderr,"  -rsf_checkpoint_file <f> checkpoint file name (%s)\n",RSF_CHECKPOINT_FILE);
+  fprintf(stderr,"  -rsf_restart <f>        restart from a checkpoint; outputs append with a marker;\n");
+  fprintf(stderr,"                          note -ts_max_steps counts absolute step numbers\n");
+  fprintf(stderr,"\n");
+  
   fprintf(stderr,"optional outputs (all default off)\n");
-  fprintf(stderr,"  -rsf_catalog            write rsf_catalog.dat (per-event slip, drop, M0, Mw)\n");
-  fprintf(stderr,"  -rsf_rupture_time       write rsf_rupture_time.dat (first event front times)\n");
-  fprintf(stderr,"  -slip_budget            write rsf_slip_budget.dat (slip vs plate-rate reference)\n");
+  fprintf(stderr,"  -rsf_catalog            write %s (per-event slip, drop, M0, Mw)\n",RSF_CATALOG_FILE);
+  fprintf(stderr,"  -rsf_rupture_time       write %s (first event front times)\n", RSF_RUPTURE_TIME_FILE);
+  fprintf(stderr,"  -slip_budget            write %s (slip vs plate-rate reference)\n",RSF_SLIP_BUDGET_FILE);
   fprintf(stderr,"  -rupture_vth <m/s>      rupture-front threshold for the two above (default vel_event)\n");
   fprintf(stderr,"  -field_step_interval <n> slip-rate field frame every n accepted steps (0 = off)\n");
   fprintf(stderr,"  -field_tmin_yr <yr>     suppress field frames before this time (default 0)\n");
@@ -188,10 +196,10 @@ void rsf_print_help(const char *prog)
   fprintf(stderr,"  -hacapk_inorm <int>     HACApK tolerance norm (1 = block-local)\n");
   fprintf(stderr,"  -hmmvp_tol <val>        hmmvp compression tolerance\n");
   fprintf(stderr,"  -hmmvp_eta <val>        hmmvp admissibility eta\n");
-  fprintf(stderr,"  -hmmvp_inorm <int>      hmmvp tolerance norm (1 = block, 3 = matrix \n");
-  fprintf(stderr,"  -hmmvp_nthreads <int>   hmmvp compression threads\n");
-  fprintf(stderr,"\n");
+  fprintf(stderr,"  -hmmvp_inorm <int>      hmmvp tolerance norm (1 = block, 3 = matrix MREM)\n");
+  fprintf(stderr,"  -hmmvp_nthreads <int>   hmmvp compression threads\n\n");
 
+  
   fprintf(stderr,"relevant PETSc options (a full list is printed by -help)\n");
   fprintf(stderr,"  -ts_rk_type <3bs|5dp|...>   Runge-Kutta variant (rsf uses an explicit RK)\n");
   fprintf(stderr,"  -ts_adapt_type <basic|none> step-size adaptation\n");
@@ -203,18 +211,18 @@ void rsf_print_help(const char *prog)
   fprintf(stderr,"  -help                       PETSc's full registered-option dump\n");
   fprintf(stderr,"\n");
 
-  fprintf(stderr,"output files\n");
-  fprintf(stderr,"  rsf_monitor.dat         time series on the adaptive monitor cadence (-dt_monitor,\n");
+  fprintf(stderr,"output files (change filename in includes/filenames.h)\n");
+  fprintf(stderr,"  %s         time series on the adaptive monitor cadence (-dt_monitor,\n",RSF_MONITOR_FILE);
   fprintf(stderr,"                          -adx_monitor, -rdx_monitor): step, time[s], time[yr], dt[s],\n");
   fprintf(stderr,"                          log10(max|v|), mean_slip, mean_mu, max_sigma, min_sigma.\n");
   fprintf(stderr,"                          Flushed as it is written\n");
-  fprintf(stderr,"  rsf_vel.times           one row per field frame (-field_step_interval): frame, step,\n");
+  fprintf(stderr,"  %s           one row per field frame (-field_step_interval): frame, step,\n",RSF_VEL_TIME_FILE);
   fprintf(stderr,"                          time[yr], time[s], log10(max|v|), mean|v|, std|v|, min|v|,\n");
   fprintf(stderr,"                          mean_slip. The |v| statistics are slip SPEEDS (v is signed).\n");
   fprintf(stderr,"                          This is the index for the tmp_rsf/rsf_vel.gGGG.NNNNNN.bin\n");
   fprintf(stderr,"                          frames and replaces the former rsf_stats.dat\n");
-  fprintf(stderr,"  rsf_events.dat          one row per slip-rate threshold crossing (-vel_event)\n");
-  fprintf(stderr,"  rsf_catalog.dat         one row per completed event (with -rsf_catalog)\n");
+  fprintf(stderr,"  %s          one row per slip-rate threshold crossing (-vel_event)\n",RSF_EVENTS_FILE);
+  fprintf(stderr,"  %s         one row per completed event (with -rsf_catalog)\n",RSF_CATALOG_FILE);
   fprintf(stderr,"  rsf_geom.gGGG.dat       per-group patch geometry for the field frames\n");
   fprintf(stderr,"\n");
 
@@ -240,7 +248,6 @@ PetscErrorCode rsf_get_settings(int argc,char **argv,struct interact_ctx *par,
 				struct rsf_solve_settings *set)
 {
   struct med *medium = par->medium;
-  const PetscReal sec_per_year = 365.25*24.*60.*60.;
   /* material parameters */
   PetscReal shear_modulus_si = 32.04e9, s_wave_speed_si = 3.464e3;
   PetscBool use_full_space=PETSC_FALSE;
@@ -249,8 +256,8 @@ PetscErrorCode rsf_get_settings(int argc,char **argv,struct interact_ctx *par,
   PetscReal sigma_init,tau_init,vel_init,rtol,atol_slip,dt_init,dt_max,rand_amp,tmp;
   PetscReal dt_monitor,rdx_monitor,adx_monitor,monitor_tmin,vel_event,vel_event_hyst,event_tmin;
   PetscBool track_events;
-  char geom_file[STRLEN]=GEOMETRY_FILE,rsf_file[STRLEN]=RSF_PAR_FILE,rsf_ic_file[STRLEN]="",
-    rsf_dc_file[STRLEN]="",rsf_sigma_file[STRLEN]="";
+  char geom_file[STRLEN]=GEOMETRY_FILE,rsf_file[STRLEN]=RSF_PAR_FILE,
+    rsf_ic_file[STRLEN]="",rsf_dc_file[STRLEN]="",rsf_sigma_file[STRLEN]="";
   PetscBool have_ic=PETSC_FALSE,have_dc=PETSC_FALSE,have_sigma=PETSC_FALSE;
   PetscBool read_value;
   struct rsf_vars *rsf;
@@ -311,9 +318,9 @@ PetscErrorCode rsf_get_settings(int argc,char **argv,struct interact_ctx *par,
   rd_fac = 1.0;			/* full damping by default */
   
   medium->time = medium->slip_line_time = 0.;
-  medium->stop_time = 3000*sec_per_year;	      /* stop time */
+  medium->stop_time = 3000*SEC_PER_YEAR;	      /* stop time */
   /* output */
-  medium->print_interval = 0.1*sec_per_year;	      /* for average property output */
+  medium->print_interval = 0.1*SEC_PER_YEAR;	      /* for average property output */
   /*
      velocity-field snapshots to tmp_rsf/ (written in rsf_TS_Monitor): a
      full-field dump for slip-evolution visualization, NOT required for the
@@ -328,7 +335,7 @@ PetscErrorCode rsf_get_settings(int argc,char **argv,struct interact_ctx *par,
      fine SEAS-style interseismic cadence or a coarser value (say 10-20 yr)
      for a cycle-scale view, and clean tmp_rsf between runs either way.
   */
-  medium->slip_line_dt = 1.0e9*sec_per_year;	      /* OFF; opt in via -slip_line_dt_yr */
+  medium->slip_line_dt = 1.0e9*SEC_PER_YEAR;	      /* OFF; opt in via -slip_line_dt_yr */
   /* 
      field output settings 
   */
@@ -456,15 +463,15 @@ PetscErrorCode rsf_get_settings(int argc,char **argv,struct interact_ctx *par,
   PetscCall(PetscOptionsGetReal(NULL,NULL,"-atol_slip",&atol_slip,NULL));
   PetscCall(PetscOptionsGetReal(NULL,NULL,"-dt_init",&dt_init,NULL));
   PetscCall(PetscOptionsGetReal(NULL,NULL,"-dt_max",&dt_max,NULL));
-  tmp = medium->stop_time/sec_per_year;
+  tmp = medium->stop_time/SEC_PER_YEAR;
   PetscCall(PetscOptionsGetReal(NULL,NULL,"-stop_time_yr",&tmp,NULL));
-  medium->stop_time = tmp * sec_per_year;
-  tmp = medium->print_interval/sec_per_year;
+  medium->stop_time = tmp * SEC_PER_YEAR;
+  tmp = medium->print_interval/SEC_PER_YEAR;
   PetscCall(PetscOptionsGetReal(NULL,NULL,"-print_interval_yr",&tmp,NULL));
-  medium->print_interval = tmp * sec_per_year;
-  tmp = medium->slip_line_dt/sec_per_year;
+  medium->print_interval = tmp * SEC_PER_YEAR;
+  tmp = medium->slip_line_dt/SEC_PER_YEAR;
   PetscCall(PetscOptionsGetReal(NULL,NULL,"-slip_line_dt_yr",&tmp,NULL));
-  medium->slip_line_dt = tmp * sec_per_year;
+  medium->slip_line_dt = tmp * SEC_PER_YEAR;
   /* 
      monitor and event controls, cf. hmatrix_test/ode_solve_test.c:
      the state monitor logs when the relative or absolute state change
@@ -493,8 +500,10 @@ PetscErrorCode rsf_get_settings(int argc,char **argv,struct interact_ctx *par,
   /* triangular patch evaluation scheme, cf. -tv of interact */
   PetscCall(PetscOptionsGetInt(NULL,NULL,"-tv",&tvmode,NULL));
   medium->tri_eval_mode = (MODE_TYPE)tvmode;
-
-  dt_monitor *= sec_per_year;monitor_tmin *= sec_per_year;event_tmin *= sec_per_year;
+  /* convert all from years to secodns */
+  dt_monitor *= SEC_PER_YEAR;
+  monitor_tmin *= SEC_PER_YEAR;
+  event_tmin *= SEC_PER_YEAR;
   /*
      optional compact slip-rate field output for later GMT
      visualization; off unless -field_step_interval > 0 is given.  A
@@ -507,7 +516,7 @@ PetscErrorCode rsf_get_settings(int argc,char **argv,struct interact_ctx *par,
   PetscCall(PetscOptionsGetReal(NULL,NULL,"-field_tmin_yr",&field_tmin_yr,NULL));
   set->field_step_interval = (fset && (field_step_interval > 0))?(field_step_interval):(0);
   set->field_enable = (set->field_step_interval > 0)?(PETSC_TRUE):(PETSC_FALSE);
-  set->field_tmin = field_tmin_yr * sec_per_year;
+  set->field_tmin = field_tmin_yr * SEC_PER_YEAR;
   /* cat output */
   set->cat_enable = cat_enable;
   set->rup_enable = rup_enable;
