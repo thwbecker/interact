@@ -73,7 +73,7 @@ void rsf_print_help(const char *prog)
 
   fprintf(stderr,"geometry and input files\n");
   fprintf(stderr,"  -geom_file <file>       fault geometry, one patch per row (default %s)\n",GEOMETRY_FILE);
-  fprintf(stderr,"  -full_space <bool>      whole-space Green functions (default 0 = half space)\n");
+  fprintf(stderr,"  -full_space <bool>      whole-space 3D or horizontal 2D Green functions (default 0 = half space/plane)\n");
   fprintf(stderr,"  -tv <int>               triangular patch evaluation mode (default 0)\n");
   fprintf(stderr,"\n");
 
