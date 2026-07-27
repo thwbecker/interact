@@ -139,13 +139,15 @@
 #
 # src is the main source directory, within it includes with the header files
 # src/green 		holds green's function routines
-# src/la_and_geo 	linear algebra and geometry computation type stuff
+# src/linear_algebra 	linear algebra type of routines
+# src/geometry		geometry and mesh morphology routines
+# src/interact		routines specifically used for the interact program 
 # src/util		helper routines for post-processing and the like, some soatial statistics
 # serc/testing		testing rotuines for subsets and the like
 # src/block 		is for the routines used for geodetic block modeling in Becker et al. (2005)
-# src/interact		routines specifically used for the interact program 
+
 #
-VPATH = src src/green src/la_and_geo src/util src/block src/testing/ src/interact
+VPATH = src src/green src/linear_algebra src/util src/block src/testing/ src/interact src/geometry
 
 LOCAL_INCLUDES = -Isrc/includes/ -Isrc/util/ -Isrc/block/
 

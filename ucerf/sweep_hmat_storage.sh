@@ -35,15 +35,10 @@
 # Run from the directory holding the geometry. All parameters are plain
 # assignments below; edit them there (no environment variables).
 
-ncore=64                 # MPI ranks for the H-matrix sweep runs
-ncore_dense=64           # MPI ranks for the one dense reference run
+ncore=48                 # MPI ranks for the H-matrix sweep runs
+ncore_dense=48           # MPI ranks for the one dense reference run
 nrandom=200              # matvec timing applies (0 skips the timing line!)
-nsolve=3                 # Ax=b GMRES solves to time per point (0: off)
-#solver_pc_strin=g"-pc_type jacobi"         # KSP preconditioner for the solve timing (jacobi
-#
-# pc_type jacobu does not work HTOOLS
-solver_pc_string="-pc_type none -ksp_type gmres -ksp_gmres_restart 6000 -ksp_rtol 1e-4"
-
+nsolve=3                 # Ax=b GMRES(no PC) solves to time per point (0: off)
 bin=../bin/compress_interaction_matrix
 geom=geom.in
 out=hmat_storage.dat
@@ -57,9 +52,8 @@ hmmvp_eps="1e-3 1e-4 1e-5 1e-6"
 
 # ---------------------------------------------------------------- dense
 if [ $make_dense_reference -eq 1 ]; then
-    mpirun -bind-to core -np $ncore_dense $bin -geom_file $geom -make_matrix_externally \
-	   -use_hmatrix 0 -dense_reference_only -nrandom $nrandom -nsolve $nsolve \
-	  $solver_pc_string &> log.dense_ref
+    mpirun -np $ncore_dense $bin -geom_file $geom -make_matrix_externally \
+	   -use_hmatrix 0 -dense_reference_only -nrandom $nrandom -nsolve $nsolve &> log.dense_ref
     gawk 'BEGIN{si="NA";ss="NA"}
           /dense_solve m/ {
             for(i=1;i<=NF;i++){
@@ -151,12 +145,14 @@ run_one () {                 # label logfile extra-flags...
     label=$1; log=$2; shift 2
     if ! grep -q "hmat_matvec backend" $log 2> /dev/null ; then
 	mpirun -np $ncore $bin -geom_file $geom -make_matrix_externally \
-	       -skip_dense -nrandom $nrandom -nsolve $nsolve \
-	       $solver_pc_string "$@" &> $log
+	       -skip_dense -nrandom $nrandom -nsolve $nsolve "$@" &> $log
     fi
     gawk -v B=$label -v EPS=$eps -v DMS=$d_ms -v DAS=$d_as -v DSS=$d_ss -v DTAG=$d_tag "$extract" $log >> $out
 }
 
+for eps in $htool_eps; do
+    run_one HTOOL log.$eps.htools -use_hmatrix 1 -mat_htool_eta 3 -mat_htool_epsilon $eps
+done
 
 for eps in $hacapk_eps; do
     run_one HACApK log.$eps.hacapk -use_hmatrix 3 -hacapk_inorm 1 -hacapk_eta 2 -hacapk_ztol $eps
@@ -168,10 +164,6 @@ done
 
 for eps in $hmmvp_eps; do
     run_one HMMVP_MREM log.$eps.hmmvp_mrem -use_hmatrix 4 -hmmvp_inorm 3 -hmmvp_tol $eps
-done
-
-for eps in $htool_eps; do
-    run_one HTOOL log.$eps.htools -use_hmatrix 1 -mat_htool_eta 3 -mat_htool_epsilon $eps
 done
 
 echo "wrote $out"

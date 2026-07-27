@@ -140,8 +140,7 @@ int print_patch_geometry_and_bc(int flt_offset,struct flt *fault,
   }
   /*
 
-    output in XYZ format for plotting with pxxyz from
-    GMT
+    output in XYZ format for plotting with psxy or psxyz of GMT
 
   */
   case PSXYZ_SCALAR_MODE:
@@ -150,34 +149,6 @@ int print_patch_geometry_and_bc(int flt_offset,struct flt *fault,
     calculate_bloated_vertices(vertex,(fault+flt_offset),leeway);
 #ifdef ALLOW_NON_3DQUAD_GEOM
     switch(fault[flt_offset].type){
-    case TWO_DIM_SEGMENT_PLANE_STRAIN:
-    case TWO_DIM_SEGMENT_PLANE_STRESS:{
-      if(opmode == PSXYZ_SCALAR_MODE)
-	fprintf(out,"> -Z%e\n",scalar[flt_offset]);
-      else if(opmode == PSXYZ_STRIKE_DISP_OUT_MODE)
-	fprintf(out,"> -Z%e\n",fault[flt_offset].u[STRIKE]);
-      // draw segment with endbars
-      lfac = fault[flt_offset].l * 0.2;
-      for(l=0;l<3;l++)
-	x[l] = vertex[0*3+l] + fault[flt_offset].normal[l] * lfac;
-      fprintf(out,"%22.15e %22.15e %22.15e\n",x[INT_X]/CHAR_FAULT_DIM,x[INT_Y]/CHAR_FAULT_DIM,x[INT_Z]/CHAR_FAULT_DIM);
-      for(l=0;l<3;l++)
-	x[l] = vertex[0*3+l] - fault[flt_offset].normal[l] * lfac;
-      fprintf(out,"%22.15e %22.15e %22.15e\n",x[INT_X]/CHAR_FAULT_DIM,x[INT_Y]/CHAR_FAULT_DIM,x[INT_Z]/CHAR_FAULT_DIM);
-      for(l=0;l<3;l++)
-	x[l] = vertex[0*3+l];
-      fprintf(out,"%22.15e %22.15e %22.15e\n",x[INT_X]/CHAR_FAULT_DIM,x[INT_Y]/CHAR_FAULT_DIM,x[INT_Z]/CHAR_FAULT_DIM);
-      for(l=0;l<3;l++)
-	x[l] = vertex[1*3+l];
-      fprintf(out,"%22.15e %22.15e %22.15e\n",x[INT_X]/CHAR_FAULT_DIM,x[INT_Y]/CHAR_FAULT_DIM,x[INT_Z]/CHAR_FAULT_DIM);
-      for(l=0;l<3;l++)
-	x[l] = vertex[1*3+l] + fault[flt_offset].normal[l] * lfac;
-      fprintf(out,"%22.15e %22.15e %22.15e\n",x[INT_X]/CHAR_FAULT_DIM,x[INT_Y]/CHAR_FAULT_DIM,x[INT_Z]/CHAR_FAULT_DIM);
-      for(l=0;l<3;l++)
-	x[l] = vertex[1*3+l] - fault[flt_offset].normal[l] * lfac;
-      fprintf(out,"%22.15e %22.15e %22.15e\n",x[INT_X]/CHAR_FAULT_DIM,x[INT_Y]/CHAR_FAULT_DIM,x[INT_Z]/CHAR_FAULT_DIM);
-      break;
-    }
     case IQUAD:
       ielmul = number_of_subpatches((fault+flt_offset));
       for(i=0;i < ielmul;i++){
@@ -198,6 +169,8 @@ int print_patch_geometry_and_bc(int flt_offset,struct flt *fault,
       }
       break;
     case POINT_SOURCE:
+    case TWO_DIM_SEGMENT_PLANE_STRAIN:
+    case TWO_DIM_SEGMENT_PLANE_STRESS:
     case TRIANGULAR_M244:
     case TRIANGULAR_M236:
     case TRIANGULAR_HYBR:
