@@ -21,7 +21,7 @@ int main(int argc, char **argv)
   if((argc > 5)||((argc>1)&&(strcmp(argv[1],"-h")==0))){
     fprintf(stderr,"%s [flt.dat] [disp_component, %i] [shrink_patches, %i] [use_scalar, %i]\n\t reads in patch format from stdin and writes GMT xyz to stdout\n",
 	    argv[0],comp,(int)shrink_patches,(int)use_scalar);
-    fprintf(stderr,"if flt.dat is given, will print slip or stress if file found\n");
+    fprintf(stderr,"if flt.dat is given, will print slip or stress, if file found (use xxx or such to skip this argument)\n");
     fprintf(stderr,"\twhere 0: strike 1: dip 2: normal 3: total shear 4: total slip\n");
     fprintf(stderr,"\twhere 10: strike 11: dip 12: normal 13: vector shear stress\n");
     fprintf(stderr,"\twhere 14: is Coulomb stress for strike\n");

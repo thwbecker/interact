@@ -65,10 +65,10 @@ void phelp(void)
   PE("      in the case of a point source, the point source location.");
   PE("");
   PE("    - strike and dip are fault plane orientation angles in degree");
-  PE("      strike is defined in degrees clockwise from North");
+  PE("      strike is defined in degrees clockwise from North (y axes)");
   PE("      dip    is defined in degrees downward from the horizontal, 90 degrees means vertical fault");
-  PE("      note that right now, the geometrical rake has to be 90 or 0 degrees, i.e. no tilted rectangles");
-  PE("      slip can, however, have a rake as given by different along-strike and along-dip values, see below");
+  PE("      The geometrical rake has to be 90 or 0 degrees, for regular quaes, but see iquad and triangles.");
+  PE("      Slip can have a rake as given by different strike and dip values, see below");
   PE("")
   PE("    - hlength (L) and hwidth (W) are the patch's *half* length and *half* width in ");
   PE("      strike and dip direction, respectively. The patch area is thus 4LW.");

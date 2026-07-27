@@ -24,14 +24,12 @@ int print_patch_geometry_and_bc(int flt_offset,struct flt *fault,
   static int nrf,bc_code;
   COMP_PRECISION vertex[MAX_NR_EL_VERTICES*3],sin_dip,cos_dip,leeway;
   double alpha;
-#ifdef ALLOW_NON_3DQUAD_GEOM
-  COMP_PRECISION lfac,x[3];
-#endif
+
   //
   // shrink patches for easier viewing
   //
   if(shrink_patches)
-    leeway = 0.9;
+    leeway = 0.85;
   else
     leeway = 1.0;
 
@@ -156,7 +154,8 @@ int print_patch_geometry_and_bc(int flt_offset,struct flt *fault,
 	  fprintf(out,"> -Z%e\n",scalar[flt_offset]);
 	else if(opmode == PSXYZ_STRIKE_DISP_OUT_MODE)
 	  fprintf(out,"> -Z%e\n",fault[flt_offset].u[STRIKE]);
-	ncon = ncon_of_subpatch((fault+flt_offset),i);
+	ncon = ncon_of_subpatch
+	  ((fault+flt_offset),i);
 	for(k=0;k < ncon;k++){
 	  for(l=0;l<3;l++){
 	    if(fabs(vertex[node_number_of_subelement((fault+flt_offset),k, i)*3+l]/CHAR_FAULT_DIM) > EPS_COMP_PREC)
@@ -171,11 +170,12 @@ int print_patch_geometry_and_bc(int flt_offset,struct flt *fault,
     case POINT_SOURCE:
     case TWO_DIM_SEGMENT_PLANE_STRAIN:
     case TWO_DIM_SEGMENT_PLANE_STRESS:
+    case TWO_DIM_HALFPLANE_PLANE_STRAIN:
     case TRIANGULAR_M244:
     case TRIANGULAR_M236:
     case TRIANGULAR_HYBR:
     case TRIANGULAR:
-    case OKADA_PATCH:{
+    case OKADA_PATCH:
       if(opmode == PSXYZ_SCALAR_MODE)
 	fprintf(out,"> -Z%e\n",scalar[flt_offset]);
       else if(opmode == PSXYZ_STRIKE_DISP_OUT_MODE)
@@ -192,7 +192,11 @@ int print_patch_geometry_and_bc(int flt_offset,struct flt *fault,
 	fprintf(out,"\n");
       }
       break;
-    }}
+    default:
+      fprintf(stderr,"fault type undefined for xyz out mode\n");
+      exit(-1);
+      break;
+    }
 #else
     if(opmode == PSXYZ_SCALAR_MODE)
       fprintf(out,"> -Z%e\n",scalar[flt_offset]);

@@ -1077,12 +1077,16 @@ void calc_centroid_quad(COMP_PRECISION *xq, COMP_PRECISION *xc)
 // decide if patch is 2-D in geometry
 my_boolean patch_is_2d(MODE_TYPE type)
 {
-  if((type == TWO_DIM_SEGMENT_PLANE_STRESS)||
-     (type == TWO_DIM_SEGMENT_PLANE_STRAIN)||
-     (type == TWO_DIM_HALFPLANE_PLANE_STRAIN))
+  switch(type){
+  case TWO_DIM_SEGMENT_PLANE_STRESS:
+  case TWO_DIM_SEGMENT_PLANE_STRAIN:
+  case TWO_DIM_HALFPLANE_PLANE_STRAIN:
     return TRUE;
-  else
+    break;
+  default:
     return FALSE;
+    break;
+  }
 }
 #endif
 

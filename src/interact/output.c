@@ -647,10 +647,12 @@ void print_displacement(struct med *medium,struct flt *fault)
 	    DISP_OUT_FILE);
     fprintf(stderr,"print_displacement: format: x y z u_x u_y u_z\n");
     out=myopen(DISP_HDR_FILE,"w");
-    fprintf(out,"%g %g %i %g %g %i %g %g %i\n",
+    /* xmin xmax nx ymin ymax ny zmin zmax nz dx dy dz */
+    fprintf(out,"%g %g %i %g %g %i %g %g %i %e %e %e\n",
 	    medium->pxmin[INT_X],medium->pxmax[INT_X],medium->n[INT_X],
 	    medium->pxmin[INT_Y],medium->pxmax[INT_Y],medium->n[INT_Y],
-	    medium->pxmin[INT_Z],medium->pxmax[INT_Z],medium->n[INT_Z]);
+	    medium->pxmin[INT_Z],medium->pxmax[INT_Z],medium->n[INT_Z],
+	    dx[INT_X],dx[INT_Y],dx[INT_Z]);
     fclose(out);
     fprintf(stderr,"print_displacement: dimension information in \"%s\"\n",
 	    DISP_HDR_FILE);

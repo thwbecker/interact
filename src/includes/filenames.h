@@ -32,7 +32,7 @@
 #define STRESS_HDR_FILE "stress.hdr" // header file
 #define FAULT_STRESS_OUT_FILE "flt_stress.out" // stress on fault output
 #define DISP_OUT_FILE "disp.out" // displacement field output
-#define DISP_HDR_FILE "disp.hdr" // header 
+#define DISP_HDR_FILE "disp.hdr" // header for stress and displacement bulk output
 #define FAULT_DATA_PREFIX "flt"
 #define ONE_STEP_FAULT_DATA_FILE "flt.dat" // stress and displacement on fault data
 #define EVENT_FILE_BINARY  "events.bin"    // binary event log for loading simulation

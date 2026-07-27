@@ -1,5 +1,4 @@
-#!/bin/ksh
-l=3
+#!/bin/bash
 infile=${1-geom}
 includepoints=${2-0}
 fixedrange=${3-0}
@@ -11,43 +10,35 @@ if [ ! -s $infile.in ];then
     exit
 fi
 cat $infile.in | patch2xyz > tmp.xyz
-exit
+cat $infile.in | patch2xyz xx 0 1 > tmp.s.xyz
+
 file=$infile.2d.ps
 
 if [ $fixedrange -eq 0 ];then
-    xmin=`gawk -f min.awk col=1 $infile.in` 
-    xmax=`gawk -f max.awk col=1 $infile.in ` 
-    ymin=`gawk -f min.awk col=2 $infile.in ` 
-    ymax=`gawk -f max.awk col=2 $infile.in ` 
-    zmin=`gawk -f min.awk col=3 $infile.in ` 
-    zmax=0 
-    ann1=-Bf10a100:x:/f10a100:y:SWen
+    minmax -C tmp.xyz > tmp.dat
+    read xmin xmax ymin ymax zmin zmax < tmp.dat ; rm tmp.dat
+    ann1=-Bf.5a5:x:/f.5a5:y:SWen
 
 else
     ann1=-Bf1a2g1:x:/f1a2g1:y:SWen
     bound=2
-    xmin=-$bound
-    xmax=$bound
-    ymin=-$bound
-    ymax=$bound
-    zmin=-2.
-    zmax=0
+    xmin=-$bound;xmax=$bound
+    ymin=-$bound;ymax=$bound
+    zmin=-2.;zmax=0
 
 fi
 
 ann2=-Bf1a2:y:/f1a2:z:SEnw
 ann3=-Bf1a2:x:/f1a2:z:WNse
-scl=0.3
 reg1=-R$xmin/$xmax/$ymin/$ymax
 reg2=-R$ymin/$ymax/$zmin/$zmax
 reg3=-R$xmin/$xmax/$zmin/$zmax
 
-proj="-JX7 -P"
-
-
-
-gawk '{print($1,$2)}' tmp.xyz  | 
-    psxy $reg1 $ann1  -m $proj -K  -W1,darkgreeen > $file
+proj="-Jx.2 -P"
+#
+#psxy tmp.xyz $reg1 $ann1  -m $proj -K  -W1,darkgreen > $file
+# shrunk patches
+psxy tmp.s.xyz $reg1 $ann1  -m $proj -K  -W1,darkgreen > $file
 
 if [ $usethree -eq 1 ];then
     if [ ! $testcircle -eq 1 ]
@@ -72,4 +63,4 @@ fi
 
 modifybb $file
 
-rm tmp.xyz
+rm tmp.xyz tmp.s.xyz
