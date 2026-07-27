@@ -63,6 +63,21 @@ PetscErrorCode time_solves(Mat A, PetscInt nsolve, PetscReal *solve_s,
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+/* deterministic, rank-layout independent test vector for the accuracy
+   reference: entry i depends only on the global index */
+PetscErrorCode fill_accuracy_x0(Vec x)
+{
+  PetscInt i,rs,re;
+  PetscScalar *v;
+  PetscFunctionBegin;
+  PetscCall(VecGetOwnershipRange(x,&rs,&re));
+  PetscCall(VecGetArray(x,&v));
+  for(i=rs;i < re;i++)
+    v[i-rs] = (PetscScalar)(sin((double)(i+1)) + 0.3*cos(3.0*(double)i));
+  PetscCall(VecRestoreArray(x,&v));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 int main(int argc, char **argv)
 {
 #ifdef USE_PETSC
@@ -122,6 +137,16 @@ int main(int argc, char **argv)
      geometries may behave differently. See also the iterative solver
      comments in the top-level makefile. */
   PetscInt nsolve=0,sits_total;
+  /* -accuracy_ref_file <file>: with -dense_reference_only, compute
+     b0 = A_dense x0 for a deterministic, rank-layout independent x0
+     and save it there; in the H sweep runs, load b0 and report the
+     measured forward error ||A_H x0 - b0|| / ||b0||, which puts the
+     backends' nominal tolerances on a common measured-accuracy axis */
+  char accuracy_ref_file[STRLEN];
+  PetscBool have_accref=PETSC_FALSE;
+  Vec ax0,ab0,ay0;
+  PetscViewer aviewer;
+  PetscReal anrm,adiff;
   PetscReal solve_s,at0,at1;
   KSPConvergedReason sreason;
   /* for the unified H-operator matvec timing (runs also with -skip_dense) */
@@ -185,6 +210,7 @@ int main(int argc, char **argv)
   PetscCall(PetscOptionsGetBool(NULL, NULL, "-skip_dense", &skip_dense,NULL));
   PetscCall(PetscOptionsGetBool(NULL, NULL, "-dense_reference_only", &dense_reference_only,NULL));
   PetscCall(PetscOptionsGetInt(NULL, NULL, "-nsolve", &nsolve,NULL));
+  PetscCall(PetscOptionsGetString(NULL,NULL,"-accuracy_ref_file",accuracy_ref_file,STRLEN,&have_accref));
   if(dense_reference_only && skip_dense){
     HEADNODE
       fprintf(stderr,"%s: -dense_reference_only and -skip_dense are mutually exclusive\n",argv[0]);
@@ -673,6 +699,20 @@ int main(int argc, char **argv)
       if(dense_reference_only){
 	/* time matvecs on the dense operator and leave; one line holds
 	   everything the sweep script needs */
+	if(have_accref){
+	  PetscCall(MatCreateVecs(Adense,&ax0,&ab0));
+	  PetscCall(fill_accuracy_x0(ax0));
+	  PetscCall(MatMult(Adense,ax0,ab0));
+	  PetscCall(VecNorm(ab0,NORM_2,&anrm));
+	  PetscCall(PetscViewerBinaryOpen(PETSC_COMM_WORLD,accuracy_ref_file,FILE_MODE_WRITE,&aviewer));
+	  PetscCall(VecView(ab0,aviewer));
+	  PetscCall(PetscViewerDestroy(&aviewer));
+	  HEADNODE
+	  fprintf(stderr,"%s: accuracy_reference wrote b0 = A x0 to %s (|b0| %.6e)\n",
+		  argv[0],accuracy_ref_file,(double)anrm);
+	  PetscCall(VecDestroy(&ax0));
+	  PetscCall(VecDestroy(&ab0));
+	}
 	if(nrandom > 0){
 	  PetscCall(MatCreateVecs(Adense,&mvx,&mvy));
 	  PetscCall(PetscRandomCreate(PETSC_COMM_WORLD,&mrnd));
@@ -759,6 +799,25 @@ int main(int argc, char **argv)
       PetscCall(PetscRandomDestroy(&mrnd));
       PetscCall(VecDestroy(&mvx));
       PetscCall(VecDestroy(&mvy));
+    }
+    if(have_accref){
+      PetscCall(MatCreateVecs(AH,&ax0,&ay0));
+      PetscCall(VecDuplicate(ay0,&ab0));
+      PetscCall(PetscViewerBinaryOpen(PETSC_COMM_WORLD,accuracy_ref_file,FILE_MODE_READ,&aviewer));
+      PetscCall(VecLoad(ab0,aviewer));
+      PetscCall(PetscViewerDestroy(&aviewer));
+      PetscCall(fill_accuracy_x0(ax0));
+      PetscCall(MatMult(AH,ax0,ay0));
+      PetscCall(VecNorm(ab0,NORM_2,&anrm));
+      PetscCall(VecAXPY(ay0,-1.0,ab0));
+      PetscCall(VecNorm(ay0,NORM_2,&adiff));
+      HEADNODE
+	fprintf(stderr,"%s: hmat_accuracy backend %i m %i rel_l2_err %.6e\n",
+		argv[0],(int)medium->use_hmatrix,m,
+		(anrm > 0.0) ? (double)(adiff/anrm) : -1.0);
+      PetscCall(VecDestroy(&ax0));
+      PetscCall(VecDestroy(&ay0));
+      PetscCall(VecDestroy(&ab0));
     }
     if(nsolve > 0){
       PetscCall(time_solves(AH,nsolve,&solve_s,&sits_total,&sreason));
