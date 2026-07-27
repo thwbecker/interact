@@ -3,14 +3,15 @@
 #
 # 2D half plane test, x is horizontal direction, y is depth
 #
-dip=40				# dip of fault from origin (0,0) in degrees, CW from horizontal
+dip=30				# dip of fault from origin (0,0) in degrees, CW from horizontal
 hl=.5				# half length of the fault
-n=50				# number of segments
+n=100				# number of segments
+sconst=0			# depth variable or const sliP?
 # 
 if [ ! -s geom.in ];then
     pif=`pif`
     x=`echo $hl $dip | gawk -v pif=$pif '{printf("%.10e",cos($2/pif)*$1)}'`
-    z=`echo $hl $dip | gawk -v pif=$pif '{printf("%.10e",-sin($2/pif)*$1-1e-11)}'`
+    z=`echo $hl $dip | gawk -v pif=$pif '{printf("%.10e",-sin($2/pif)*$1)}'`
     ((strike=90+dip))
     makefault -dip 90 -strike $strike -x $x -y $z -z 0 -l $hl -m 1 -n $n -w 0 > geom.in
     ../plotting/pgeom2d geom
@@ -20,11 +21,20 @@ fi
 if [ ! -s disp.out ];then
 
     # thrust case, which translates to left lateral
+
     cat <<EOF > bc.in
 1 1
--1.5 3 451 -2 0 201 0 0 1
--1 -1 -1 0 1
+-1.5 3 501 -1.5 0 201 0 0 1
 EOF
+    if [ $sconst -eq 1 ];then
+	echo -1 -1 -1 0 1 >> bc.in
+    else			# depth dependent slip
+	gawk '{z=-$2;print(z)}' geom.in > tmp.dat
+	zmax=`gawk -f max.awk tmp.dat`
+	#gawk -v zmax=$zmax '{x=2*($1-zmax/2)/zmax;slip=sqrt(1-x**2);print(NR-1,0,slip)}' tmp.dat >> bc.in
+	gawk -v zmax=$zmax -v pi=`pi` '{x=2*($1-zmax/2)/zmax;slip=cos(x*pi/2)**2;print(NR-1,0,slip)}' tmp.dat >> bc.in
+    fi
+    
     interact
 else
     echo $0: reusing disp.out
@@ -57,13 +67,13 @@ grdimage sm.grd -Cs.cpt $reg $proj -Y4 -K -P > $ofile
 psscale -D7/-1/6/.2h -E -Cs.cpt -B5e3/:@~s@~@-m@-: -O -K >> $ofile
 psbasemap $reg $proj  -Ba.5f.05:"horizontal distance, x":/a.5f.05:"depth, y": -K -O >> $ofile
 cat geom.in | patch2xyz xxx 0 1  | psxy  $reg  -m $proj -K -O -W2,darkgreen >> $ofile
-grdvector ux.grd uy.grd -Q0.05/0.09/0.05n.2 $vinc -N -Gorange -W0.5 $reg  $proj -O -K >> $ofile
+grdvector ux.grd uy.grd -Q0.05/0.09/0.05n.5 -S.6 $vinc -N -Gorange -W0.5 $reg  $proj -O -K >> $ofile
 
 proj=-JX13.5/3
-reg=-R$xmin/$xmax/-1.2e4/1.2e4
-psbasemap  $reg $proj -Ba.5f.05:"horizontal distance, x":/a5e3f1e3:"stress @@ y = 0":WesN -Y7 -O -K >> $ofile
+reg=-R$xmin/$xmax/-4e4/1.2e4
+psbasemap  $reg $proj -Ba.5f.05:"horizontal distance, x":/g1e6a1e4f5e3:"stress @@ y = 0":Wesn -Y5 -O -K >> $ofile
 gawk '{if(sqrt($2*$2)<1e-10)print($0)}' stress.out > tmp.top
-sc=1;yl=-1500
+sc=1;yl=-5000
 for s in sxx sxy syy;do
     col=`platecolor $sc`
     if [ $s = sxx ];then
@@ -75,7 +85,26 @@ for s in sxx sxy syy;do
     fi
     gawk -v col=$c '{print($1,$col)}' tmp.top | psxy -W2,$col $reg $proj -K -O  >> $ofile
     echo 2.5 $yl 24 0 29 LM "@~s@~@-$s@-" | pstext -R -O -J -K -F+f$col >> $ofile
-    ((yl=yl-3000))
+    ((yl=yl-10000))
+    ((sc=sc+1))
+done
+rm tmp.top
+
+proj=-JX13.5/3
+reg=-R$xmin/$xmax/-.5/.5
+psbasemap  $reg $proj -Ba.5f.05:"horizontal distance, x":/g100a.25f.05:"displacement @@ y = 0":WesN -Y3.25 -O -K >> $ofile
+gawk '{if(sqrt($2*$2)<1e-10)print($0)}' disp.out > tmp.top
+sc=1;yl=0.4
+for s in x y;do
+    col=`platecolor $sc`
+    if [ $s = x ];then
+	c=4
+    elif [ $s = y ];then
+	c=5
+    fi
+    gawk -v col=$c '{print($1,$col)}' tmp.top | psxy -W2,$col $reg $proj -K -O  >> $ofile
+    echo 2.5 $yl 24 0 29 LM "u@-$s@-" | pstext -R -O -J -K -F+f$col >> $ofile
+    yl=`echo $yl | gawk '{print($1-0.25)}'`
     ((sc=sc+1))
 done
 rm tmp.top
