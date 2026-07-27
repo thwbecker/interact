@@ -47,8 +47,6 @@ extern void chacapk_solve_Ab_H(void* , double *, double *, double );
 extern void chacapk_assemble_dense_mat(void* , double *, int );
 
 extern long cget_hacapk_nnz(void *);
-extern void chacapk_mult_Ax_H(void *, double *, double *);
-PetscErrorCode MatMult_HACApK(Mat , Vec , Vec );
 
 
 /* from testing routines */

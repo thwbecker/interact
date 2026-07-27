@@ -78,6 +78,8 @@ void setup_kdtree(int ,int ,PetscReal *,struct flt *,struct med *);
    makefile.petsc
 */
 #include "HACApK_c_interface.h"
+extern void chacapk_mult_Ax_H(void *, double *, double *);
+PetscErrorCode MatMult_HACApK(Mat , Vec , Vec );
 
 #endif
 

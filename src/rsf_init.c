@@ -175,7 +175,7 @@ void rsf_print_help(const char *prog)
   fprintf(stderr,"  -rdx_monitor <val>      relative state-change monitor trigger (default 1e-4)\n");
   fprintf(stderr,"  -adx_monitor <val>      absolute state-change trigger, <=0 off (default 0)\n");
   fprintf(stderr,"  -monitor_tmin_yr <yr>   suppress monitor output before this time (default 0)\n");
-  fprintf(stderr,"  -rsf_monitor_by_group <bool> also write one monitor file per fault group (default 0)\n");
+
   fprintf(stderr,"  -track_events <bool>    locate slip-rate threshold crossings (default 1 = on)\n");
   fprintf(stderr,"  -vel_event <m/s>        event onset threshold (default 1e-3)\n");
   fprintf(stderr,"  -vel_event_hyst <val>   arrest at vel_event*hyst, debounces (default 0.5)\n");
@@ -198,6 +198,7 @@ void rsf_print_help(const char *prog)
   fprintf(stderr,"  -field_step_interval <n> slip-rate field frame every n accepted steps (0 = off)\n");
   fprintf(stderr,"  -field_tmin_yr <yr>     suppress field frames before this time (default 0)\n");
   fprintf(stderr,"  -slip_line_dt_yr <yr>   tmp_rsf slip-line snapshot cadence (default off)\n");
+  fprintf(stderr,"  -rsf_monitor_by_group <bool> also write one monitor file per fault group (default 0)\n");
   fprintf(stderr,"\n");
 
   fprintf(stderr,"interaction-matrix backend\n");
