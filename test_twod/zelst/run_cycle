@@ -7,5 +7,7 @@ mpirun -bind-to core -np 8 \
        -rsf_ic_file rsf_ic.in \
        -state_law 1 -shear_modulus 3.204e10 -s_wave_speed 3464 \
        -f0 0.6 -v0 1e-6 -vpl 1e-9 \
-       -rsf_catalog -rupture_vth 0.1 -ts_rk_type 3bs -rtol 1e-5
+       -rsf_catalog -rupture_vth 0.1 -ts_rk_type 3bs -rtol 1e-5 \
+       -stop_time_yr 5000  -ts_max_steps 50000000 \
+       -rsf_checkpoint 50000
 
