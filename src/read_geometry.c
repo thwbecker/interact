@@ -139,6 +139,7 @@ void read_geometry(char *patch_filename,struct med **medium,
 	}
 	(*fault+i)->type = TWO_DIM_HALFPLANE_PLANE_STRAIN;
       }
+      (*fault+i)->w = 1;	/* for area computation */
       nr_2d++;
     }else if(((*fault+i)->w < 0)&&((*fault+i)->l< 0)){ /* length and
 							  width

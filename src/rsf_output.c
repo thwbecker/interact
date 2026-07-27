@@ -511,8 +511,8 @@ PetscErrorCode rsf_write_checkpoint(TS ts, Vec X, struct rsf_out_ctx *uc)
     if(rename(tmpf,uc->ckpt_file) != 0)
       fprintf(stderr,"rsf_write_checkpoint: WARNING: rename to %s failed\n",uc->ckpt_file);
     else
-      fprintf(stderr,"rsf_write_checkpoint: step %ld t %.8e s dt %.3e s -> %s\n",
-	      (long)step,(double)t,(double)dt,uc->ckpt_file);
+      fprintf(stderr,"rsf_write_checkpoint: step %012ld t %12.5e yr dt %.3e s -> %s\n",
+	      (long)step,(double)t/SEC_PER_YEAR,(double)dt,uc->ckpt_file);
   }
   PetscCallMPI(MPI_Barrier(PETSC_COMM_WORLD));
   PetscFunctionReturn(PETSC_SUCCESS);
