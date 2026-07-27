@@ -1,0 +1,10 @@
+# Uphoff, May & Gabriel (2023) Table 6 / section 8.1, exact:
+# b = 0.015 constant; a piecewise linear through (0 km, amax=0.025),
+# (4, a0=0.010), (15, a0), (18, amax), constant amax below 18 km.
+# Same law on the main fault and all splays.
+# depth_km   a       b
+0.0   0.025  0.015
+4.0   0.010  0.015
+15.0  0.010  0.015
+18.0  0.025  0.015
+60.0  0.025  0.015
