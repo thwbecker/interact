@@ -35,7 +35,7 @@ int main(int argc,char **argv)
     exit(-1);
   }}
   // read in fault geometry and friction properties
-  read_geometry(argv[1],&medium,&fault,read_fric,read_rake,FALSE,FALSE,FALSE);
+  read_geometry(argv[1],&medium,&fault,read_fric,read_rake,FALSE);
   // check all interactions
   if(!check_coulomb_stress_feedback(medium->nrflt,0,
 				    fault,medium, TRUE,

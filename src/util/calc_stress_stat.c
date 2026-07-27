@@ -45,8 +45,7 @@ int main(int argc, char **argv)
     break;
   }
   // read in geometry 
-  read_geometry(GEOMETRY_FILE,&medium,&fault,FALSE,FALSE,FALSE,
-		FALSE,FALSE);
+  read_geometry(GEOMETRY_FILE,&medium,&fault,FALSE,FALSE,FALSE);
   fprintf(stderr,"%s: trying to read stress inits from %s\n",argv[0],
 	  FAULT_STRESS_INIT_FILE);
   // read in fault stress initialization file

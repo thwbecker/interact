@@ -337,10 +337,15 @@ struct med{
 #endif
   my_boolean full_space;		/* 0 = Okada half-space (default), 1 = infinite-medium
 					   (full-space) Okada real-source term only; set into
-					   dc3d via SET_DC3D_FULLSPACE before assembly. Lets the
-					   Okada-based dense / H-matrix paths produce a full-space
-					   operator for apples-to-apples comparison against a
-					   native full-space H-matrix backend such as BigWham. */
+					   dc3d via SET_DC3D_FULLSPACE before assembly. 
+					   
+					   for 2D: 0: half plane
+					   (plane strai) 1: full plane
+					   (plane stress or plane
+					   strain)
+
+					*/
+  my_boolean plane_stress;	/* for 2D */
   int nr_timesteps;
   /* triangle mode type */
   MODE_TYPE tri_eval_mode;    /* 

@@ -29,7 +29,7 @@ void check_parameters_and_init_interact(int argc, char **argv,
     use_sparse_storage,use_old_imat,use_old_amat,save_imat,save_amat,
     check_for_interaction_feedback,keep_slipping,attempt_restart,
     suppress_nan_output,full_space,
-    twod_approx_is_plane_stress,print_plane_coord,half_plane,
+    twod_approx_is_plane_stress,print_plane_coord,
     variable_time_step,debug,no_interactions,force_petsc;
   MODE_TYPE tri_eval_mode;  
   short int solver_mode;
@@ -38,9 +38,9 @@ void check_parameters_and_init_interact(int argc, char **argv,
 
   if((*medium)->comm_rank==0){
     if((*medium)->comm_size==1)
-      fprintf(stderr,"heck_parameters_and_init_interact: compiled on %s %s, running in serial\n",__DATE__,__TIME__);
+      fprintf(stderr,"check_parameters_and_init_interact: compiled on %s %s, running in serial\n",__DATE__,__TIME__);
     else
-      fprintf(stderr,"heck_parameters_and_init_interact: compiled on %s %s, running on %i cores\n",__DATE__,__TIME__,(*medium)->comm_size);
+      fprintf(stderr,"check_parameters_and_init_interact: compiled on %s %s, running on %i cores\n",__DATE__,__TIME__,(*medium)->comm_size);
   }
   
   // initialization phase, get parameters from command
@@ -57,7 +57,7 @@ void check_parameters_and_init_interact(int argc, char **argv,
 			   &keep_slipping,&attempt_restart,&solver_mode,
 			   &suppress_nan_output,&pressure,
 			   &twod_approx_is_plane_stress,&print_plane_coord,
-			   &half_plane,&variable_time_step,&debug,&wcutoff,
+			   &variable_time_step,&debug,&wcutoff,
 			   &no_interactions,&force_petsc,&tri_eval_mode,&full_space,
 			   &((*medium)->no_post_slip_fault_stress_eval),
 			   (*medium)->comm_rank);
@@ -69,7 +69,7 @@ void check_parameters_and_init_interact(int argc, char **argv,
 		      use_old_amat,save_imat,save_amat,check_for_interaction_feedback,
 		      keep_slipping,attempt_restart,solver_mode,suppress_nan_output,
 		      pressure,twod_approx_is_plane_stress,
-		      print_plane_coord,half_plane,variable_time_step,debug,TRUE,wcutoff,
+		      print_plane_coord,variable_time_step,debug,TRUE,wcutoff,
 		      no_interactions,force_petsc,tri_eval_mode,full_space);
 }
 /*
@@ -99,7 +99,7 @@ void initialize_interact(struct med **medium, struct flt **fault,
 			 my_boolean attempt_restart,short int solver_mode,
 			 my_boolean suppress_nan_output,
 			 COMP_PRECISION pressure,my_boolean twod_approx_is_plane_stress,
-			 my_boolean print_plane_coord,my_boolean half_plane,
+			 my_boolean print_plane_coord,
 			 my_boolean variable_time_step,my_boolean debug,
 			 my_boolean init_system,COMP_PRECISION wcutoff,
 			 my_boolean no_interactions,my_boolean force_petsc,
@@ -117,10 +117,10 @@ void initialize_interact(struct med **medium, struct flt **fault,
   //
   /* for triangle stresses */
   (*medium)->tri_eval_mode = tri_eval_mode;
-
+  (*medium)->plane_stress = twod_approx_is_plane_stress;
+  
   /* all nodes need to know geometry */
-  read_geometry(GEOMETRY_FILE,medium,fault,read_fault_friction,read_fault_rake,
-		twod_approx_is_plane_stress,half_plane,TRUE);
+  read_geometry(GEOMETRY_FILE,medium,fault,read_fault_friction,read_fault_rake,TRUE);
   if((*medium)->comm_rank==0)
     fprintf(stderr,"initialize_interact: all stress values are based on a shear modulus of %g\n",
 	    SHEAR_MODULUS);
@@ -271,8 +271,10 @@ void initialize_interact(struct med **medium, struct flt **fault,
   (*medium)->attempt_restart = attempt_restart;
   // output of NaNs in stress or displacement?
   (*medium)->suppress_nan_output = suppress_nan_output;
-  /* full space? */
-  (*medium)->full_space = FALSE;
+  /* full space?  */
+  (*medium)->full_space =  FULL_SPACE_DEF; /* false */
+  /* 2D approx */
+  (*medium)->plane_stress =  TWO_DIM_APPROX_IS_PLANE_STRESS_DEF; /* false */
   if(force_petsc){
 #ifdef USE_PETSC
     (*medium)->force_petsc = force_petsc;
@@ -409,7 +411,6 @@ void init_parameters_interact(char **argv, int argc,
 			      COMP_PRECISION *pressure,
 			      my_boolean *twod_approx_is_plane_stress,
 			      my_boolean *print_plane_coord,
-			      my_boolean *half_plane,
 			      my_boolean *variable_time_step,
 			      my_boolean *debug,
 			      COMP_PRECISION *wcutoff,
@@ -451,13 +452,12 @@ void init_parameters_interact(char **argv, int argc,
   *pressure = PRESSURE_DEF;
   *twod_approx_is_plane_stress = TWO_DIM_APPROX_IS_PLANE_STRESS_DEF;
   *print_plane_coord = PRINT_PLANE_COORD_DEF;
-  *half_plane = HALF_PLANE_DEF;
   *variable_time_step = !(CONSTANT_TIME_STEP_DEF);
   *debug = DEBUG_DEF;
   *wcutoff = SVD_THRESHOLD;
   *no_interactions = FALSE;
   *force_petsc = FALSE;
-  *full_space = FALSE;
+  *full_space = FULL_SPACE_DEF;
   *no_post_slip_fault_stress_eval = FALSE; /* default: do evaluate post slip fault stress */
   /* 
      check for input options 
@@ -479,8 +479,6 @@ void init_parameters_interact(char **argv, int argc,
       toggle(read_initial_fault_stress);
     }else if(strcmp(argv[i],"-ps")==0){// plane strain/stress approximation
       toggle(twod_approx_is_plane_stress);
-    }else if(strcmp(argv[i],"-hp")==0){	/* half-plane for 2-D */
-      toggle(half_plane);
     }else if(strcmp(argv[i],"-b")==0){// no individual fault group files
       *max_nr_flt_files=0;
     }else if(strcmp(argv[i],"-i")==0){// no fault interactions
@@ -509,8 +507,8 @@ void init_parameters_interact(char **argv, int argc,
       toggle(print_plane_coord);
     }else if(strcmp(argv[i],"-ct")==0){// time step
       toggle(variable_time_step);
-    }else if(strcmp(argv[i],"-full")==0){// full space
-      *full_space = TRUE;
+    }else if(strcmp(argv[i],"-full")==0){// toggle full space, full plane 
+      toggle(full_space);
     }else if(strcmp(argv[i],"-sv")==0){// use SVD solver for Ax=b
       *solver_mode = SVD_SOLVER;
     }else if(strcmp(argv[i],"-sl")==0){// use LU solver for Ax=b

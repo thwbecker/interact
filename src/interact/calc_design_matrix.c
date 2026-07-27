@@ -32,7 +32,7 @@ int main(int argc, char **argv)
     fprintf(stderr,"%s: bad parameters\n",argv[0]);
     exit(-1);
   }
-  read_geometry(argv[1],&medium,&fault,read_fric,read_rake,FALSE,FALSE,TRUE);
+  read_geometry(argv[1],&medium,&fault,read_fric,read_rake,TRUE);
   medium->i_mat_cutoff = I_MAT_CUTOFF_DEF;
   medium->olocnr=0;
   medium->xoloc = (float *)malloc(sizeof(float)*2);

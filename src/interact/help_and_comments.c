@@ -14,7 +14,7 @@
 void phelp(void)
 {
   PE("");
-  PE("Interact: calculate fault stresses and displacements in a half or full space or in 2-D");
+  PE("interact: calculate fault stresses and displacements in a half or full space or in 2-D");
   PE("          using a boundary element approach.");
   PE("");
   PE("Program reads in patches subdividing a fault geometry and either solves");
@@ -22,7 +22,7 @@ void phelp(void)
   PE("conditions (sign (i.e. direction) constrained or unconstrained), or for a simulated loading");
   PE("cycle where each patch follows a static-kinematic frictional constitutive law");
   PE("and repetitive rupture is allowed during continuous \"plate-tectonic\" loading.");
-  PE("(Note that there is also a rudimentary, rate-state-friction cycle solver, rsf_solve.).");
+  PE("(Note that there is also a rate-state-friction earthquake cycle solver, rsf_solve.).");
   PE("");
   PE("When stresses (stress tensor components) or pressure are referred to, positive values mean");
   PE("extensional and compressional regimes, respectively (physics convention).");
@@ -52,13 +52,15 @@ void phelp(void)
   fprintf(stderr,"(1) The fault geometry is input via the file \"%s\",\n    a list of fault patches.\n",
 	  GEOMETRY_FILE);
   PE("    This file has the following (\"patch\") format for regular, rectangular (Okada) faults or point sources");
-  PE("    The default is to use half-space, but the -full flag can switch point and rectangles to full space for Okada");
+  PE("    The default is to use half-space, but the -full flag can switch Okada point sources and rectangles to full");
   PE("    (free format ASCII list of parameters):\n");
   PE("    x_0 y_0 z_0 strike_0 dip_0 hlength_0 hwidth_0 group_0 ...");
   PE("    x_1 y_1 z_1 strike_1 dip_1 hlength_1 hwidth_1 group_1 ...");
   PE("    ...");
   PE("    x_N-1 y_N-1 z_N-1 strike_N-1 dip_N-1 hlength_N-1 hwidth_N-1 group_N-1 ...\n");
   PE("    Here, N is the total number of patches and\n");
+  PE("");
+  PE("    REGULAR (OKADA) QUADs");
   PE("    - x,y,z are the coordinates of the center of the rectangular fault patch or");
   PE("      in the case of a point source, the point source location.");
   PE("");
@@ -79,14 +81,14 @@ void phelp(void)
   PE("    Since the \"ALLOW_NON_3DQUAD_GEOM\" flag was used during runtime, the program can deal with");
   PE("    some additional patch geometries besides rectangular. Those are selected as follows:");
   PE("");
-  PE("    - point source in half or full space");
+  PE("    - POINT SOURCE in half or full space");
   PE("      If ONLY fault half-length is set to a negative value, a point source will be assumed instead");
   PE("      of a rectangular fault patch. In this case, width should be set to the `fault' area");
   PE("      and half-length is equivalent to -aspect_ratio, where aspect_ratio is some equivalent L/W.");
   PE("");
   PE("      WARNING: Not properly tested yet.");
   PE("");
-  PE("    - triangular in half-space:");
+  PE("    - TRIANGULAR dislocationin half-space:");
   PE("      If BOTH fault half-width and length are negative, then the patch is a triangular element.");
   PE("      In this case, x, y, z, have no meaning but will be reassigned from the centroid.");
   PE("      strike and dip will also be recomputed from element local g and h vectors, and length and width");
@@ -96,9 +98,8 @@ void phelp(void)
   PE("      999 999 999 999 999 -1 -1 group_0 x_x^1 x_y^1 x_z^1 x_x^2 x_y^2 x_z^2 x_x^3 x_y^3 x_z^3\n");
   PE("      where exponents indicate the local number of the node, and 999 are place holder values, not used.");
   PE("");
-  PE("      WARNING: not fully tested.");
   PE("");
-  PE("    - irregular quad in half-space:");
+  PE("    - IRREGULAR QUAD in half-space:");
   PE("      If ONLY fault half-width is negative, then the patch is an irregular quad node element.");
   PE("      In this case, x, y, z, have no meaning but will be reassigned from the centroid.");
   PE("      strike and dip will also be recomputed from element local g and h vectors, and length and width");
@@ -108,17 +109,16 @@ void phelp(void)
   PE("      999 999 999 999 999 1 -1 group_0 x_x^1 x_y^1 x_z^1 x_x^2 x_y^2 x_z^2 x_x^3 x_y^3 x_z^3 x_x^4 x_y^4 x_z^4\n");
   PE("      where exponents indicate the local number of the node, and 999 are place holder values, not used.");
   PE("");
-  PE("      WARNING: This is experimental and not fully tested.");
   PE("");
-  PE("    - segments in two dimensions in the x-y plane");
+  PE("    - 2D SEGMENTS in the x-y (half) plane");
   PE("      If fault half-width is zero, then dip should be 90, z=0, and program will run in 2-D mode.");
   PE("      In this case, all z coordinates should still be specified (e.g. in the grid output requests)");
   fprintf(stderr,"      but z should be set to zero. Computation is plane-%s unless changed by -ps.\n",
 	  (TWO_DIM_APPROX_IS_PLANE_STRESS_DEF)?("stress"):("strain"));
   PE("      For plane stress, all output values of u[Z] (displacements into stress free direction) are");
   PE("      given as strains e_zz.");
-  fprintf(stderr,"      Calculations are performed in a %s plane by default, can be changed with the -hp option.\n",
-	  (HALF_PLANE_DEF)?("half"):("full"));
+  fprintf(stderr,"      Calculations are performed in a %s plane by default(y<=0), can be changed with the -full option.\n",
+	  (FULL_SPACE_DEF)?("full"):("half"));
   PE("");
   PE("    If all your patches are rectangular in 3-D, you could recompile\n    without the ALLOW_NON_3DQUAD_GEOM set to save memory and enhance speed.");
 #else
@@ -504,7 +504,8 @@ void phelp(void)
   PE(" -ni suppress all interactions between faults except the interactions of patches within the fault group");
   PE("");
   PE(" -full");
-  PE("     use full space for Okada rectangular or point sources, default is half space.");
+  fprintf(stderr,"     toggles space/plane for Okada (rectangular or point) or 2D, default is %s space/plane.",
+	  (FULL_SPACE_DEF)?("full"):("half"));
   
   PE("");
   PE(" -ct use constant time steps for the loading simulation");
@@ -721,8 +722,8 @@ void phelp(void)
  PE("");
  fprintf(stderr," -hp run a 2-D plane strain calculation in a half-plane (y<=0) instead of plane\n");
  fprintf(stderr,"     %s by default, if switch is set will be %s.\n",
-	name_boolean(HALF_PLANE_DEF),
-	name_boolean(TOGV(HALF_PLANE_DEF)));
+	 name_boolean(FULL_SPACE_DEF),
+	 name_boolean(TOGV(FULL_SPACE_DEF)));
 #endif
   PE("");
   PE(" -h  prints out this help message and exits to the operating system");

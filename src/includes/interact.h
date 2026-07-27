@@ -227,9 +227,10 @@ singular value will be set to zero
 #define SUPPRESS_NAN_OUTPUT_DEF TRUE // suppress NaNs in output
 #define TWO_DIM_APPROX_IS_PLANE_STRESS_DEF FALSE
 #define PRINT_PLANE_COORD_DEF FALSE
-#define HALF_PLANE_DEF FALSE
+#define FULL_SPACE_DEF FALSE
 #define CONSTANT_TIME_STEP_DEF FALSE
 #define DEBUG_DEF FALSE
+
 
 
 /* element geometry */

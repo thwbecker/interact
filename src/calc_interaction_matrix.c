@@ -33,7 +33,7 @@ int main(int argc, char **argv)
       exit(-1);
     }
   }
-  read_geometry(argv[1],&medium,&fault,read_fric,read_rake,FALSE,FALSE,FALSE);
+  read_geometry(argv[1],&medium,&fault,read_fric,read_rake,FALSE);
   medium->i_mat_cutoff = I_MAT_CUTOFF_DEF;
   calc_interaction_matrix(medium,fault,TRUE);
   switch(mode){

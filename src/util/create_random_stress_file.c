@@ -116,8 +116,7 @@ int main(int argc, char **argv)
     fprintf(stderr,"%s: rejecting extensional patches only\n",argv[0]);
   //
   // read fault geometry
-  read_geometry(GEOMETRY_FILE,&medium,&fault,read_fric,read_rake,FALSE,FALSE,
-		FALSE);
+  read_geometry(GEOMETRY_FILE,&medium,&fault,read_fric,read_rake,FALSE);
   // allocate memerory
   st=(COMP_PRECISION *)malloc(sizeof(COMP_PRECISION)*3*medium->nrflt);
   sindex=(int *)malloc(sizeof(int)*medium->nrflt);

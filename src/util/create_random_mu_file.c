@@ -64,8 +64,7 @@ int main(int argc, char **argv)
   }
   fprintf(stderr,"%s: reading patch format from %s, writing fp.in file to stdout\n",
 	  argv[0],GEOMETRY_FILE);
-  read_geometry(GEOMETRY_FILE,&medium,&fault,read_fric,read_rake,FALSE,FALSE,
-		FALSE);
+  read_geometry(GEOMETRY_FILE,&medium,&fault,read_fric,read_rake,FALSE);
   fprintf(stderr,"%s: starting values mu_s,d: %g %g, STD for mu_s,d: %g, %g\n",
 	  argv[0],mu0[0],mu0[1],std[0],std[1]);
   mu=(COMP_PRECISION *)calloc(2*medium->nrflt,sizeof(COMP_PRECISION));

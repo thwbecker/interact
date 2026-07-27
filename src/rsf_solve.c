@@ -112,6 +112,7 @@ PetscErrorCode rsf_solve_run(int argc,char **argv,struct interact_ctx *par,
   PetscReal vpl_wsum,vpl_asum,vpl_eff;
   PetscInt vrs,vre;
   PetscScalar *varr;
+  my_boolean verbose = FALSE;
   FILE *lin;
   PetscReal restart_t,restart_dt;
   FILE *iin;
@@ -140,7 +141,7 @@ PetscErrorCode rsf_solve_run(int argc,char **argv,struct interact_ctx *par,
   strncpy(rsf_dc_file,set->rsf_dc_file,STRLEN);
   strncpy(rsf_sigma_file,set->rsf_sigma_file,STRLEN);
   /* get the geometry, and rake angle if selected */
-  read_geometry(geom_file,&medium,&par->fault,FALSE,(rsf->slip_mode==RAKE)?(TRUE):(FALSE),FALSE,FALSE,FALSE);
+  read_geometry(geom_file,&medium,&par->fault,FALSE,(rsf->slip_mode==RAKE)?(TRUE):(FALSE),verbose);
   fault = par->fault;
   n = medium->nrflt;
   HEADNODE{

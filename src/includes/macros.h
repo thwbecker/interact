@@ -1,10 +1,8 @@
 /* 
 
-   programming conventions and macros
+   macros
 
 */
-#define TRUE 1
-#define FALSE 0
 
 #define SQUARE(a) (((double)a) * ((double)a))
 #ifndef MIN

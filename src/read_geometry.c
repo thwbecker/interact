@@ -24,8 +24,6 @@ void read_geometry(char *patch_filename,struct med **medium,
 		   struct flt **fault,
 		   my_boolean read_fault_friction,
 		   my_boolean read_fault_rake,
-		   my_boolean twod_approx_is_plane_stress,
-		   my_boolean half_plane,
 		   my_boolean verbose)
 {
   int i,j,k,tmpint,ic,l,off;
@@ -93,12 +91,7 @@ void read_geometry(char *patch_filename,struct med **medium,
   //
   // kind of elastic approximation for 2D segments
   //
-  (*medium)->twod_approx_is_plane_stress = twod_approx_is_plane_stress;
-  if(((*medium)->twod_approx_is_plane_stress)&&(half_plane)){
-    if((*medium)->comm_rank == 0)
-      fprintf(stderr,"read_geometry: error: half-plane only implemented for plane strain\n");
-    exit(-1);
-  }
+  
 #endif
   if((*fault=(struct flt *)calloc(1,sizeof(struct flt)))==NULL)MEMERROR("read_geometry: 2:");
   for(i=0;i<3;i++){// intialize medium boundaries for plotting
@@ -133,13 +126,18 @@ void read_geometry(char *patch_filename,struct med **medium,
 	   fprintf(stderr,"read_geometry: width 0 selects: 2D mode: dip, z should be 90, and 0, respectively\n");
 	exit(-1);
       }
-      if((*medium)->twod_approx_is_plane_stress)
-	(*fault+i)->type = TWO_DIM_SEGMENT_PLANE_STRESS;
-      else{
-	if(!half_plane)
-	  (*fault+i)->type = TWO_DIM_SEGMENT_PLANE_STRAIN;
+      if((*medium)->full_space){ /* full plane */
+	if((*medium)->plane_stress)
+	  (*fault+i)->type = TWO_DIM_SEGMENT_PLANE_STRESS;
 	else
- 	  (*fault+i)->type = TWO_DIM_HALFPLANE_PLANE_STRAIN;
+	  (*fault+i)->type = TWO_DIM_SEGMENT_PLANE_STRAIN;
+      }else{			/* half plane */
+	if((*medium)->plane_stress){
+	  if((*medium)->comm_rank == 0)
+	    fprintf(stderr,"read_geometry: error: half-plane only implemented for plane strain\n");
+	  exit(-1);
+	}
+	(*fault+i)->type = TWO_DIM_HALFPLANE_PLANE_STRAIN;
       }
       nr_2d++;
     }else if(((*fault+i)->w < 0)&&((*fault+i)->l< 0)){ /* length and
@@ -590,7 +588,7 @@ void read_geometry(char *patch_filename,struct med **medium,
   if(read_fault_rake){
     in2 = myopen(FAULT_RAKE_FILE,"r");
     for(i=0;i<(*medium)->nrflt;i++){
-      if(fscanf(in2,ONE_CP_FORMAT,&rake)!=1){
+      if(fscanf(in2,"%lf",&rake)!=1){
 	fprintf(stderr,"read_geometry: error reading rake from %s for patch %i\n",FAULT_RAKE_FILE,i);
 	exit(-1);
       }
@@ -671,8 +669,8 @@ void read_geometry(char *patch_filename,struct med **medium,
 		TRI_EVAL_DEF);
       if(nr_2d)
 	fprintf(stderr,"read_geometry: two dimensional approximation: plane %s %s\n",
-		((*medium)->twod_approx_is_plane_stress)?("stress"):("strain"),
-		(half_plane)?("(half plane)"):("(full plane)"));
+		((*medium)->plane_stress)?("stress"):("strain"),
+		((*medium)->full_space)?("(full plane)"):("(half plane)"));
     }
   }
 #endif
