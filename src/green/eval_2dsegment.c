@@ -30,9 +30,9 @@
 // be generous with those
 //
 #ifdef USE_DOUBLE_PRECISION
-#define EPS_COMP_PREC_FOR_NAN 5.0e-14
+#define EPS_COMP_PREC_FOR_NAN 5.0e-15
 #else
-#define EPS_COMP_PREC_FOR_NAN 5.0e-6
+#define EPS_COMP_PREC_FOR_NAN 5.0e-7
 #endif
 
 void eval_2dsegment_plane_strain(COMP_PRECISION *x,

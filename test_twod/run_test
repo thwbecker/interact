@@ -1,17 +1,86 @@
 #!/bin/bash
+#rm disp.out geom.in
 #
-# 2D half plane test
+# 2D half plane test, x is horizontal direction, y is depth
 #
+dip=40				# dip of fault from origin (0,0) in degrees, CW from horizontal
+hl=.5				# half length of the fault
+n=50				# number of segments
+# 
+if [ ! -s geom.in ];then
+    pif=`pif`
+    x=`echo $hl $dip | gawk -v pif=$pif '{printf("%.10e",cos($2/pif)*$1)}'`
+    z=`echo $hl $dip | gawk -v pif=$pif '{printf("%.10e",-sin($2/pif)*$1-1e-11)}'`
+    ((strike=90+dip))
+    makefault -dip 90 -strike $strike -x $x -y $z -z 0 -l $hl -m 1 -n $n -w 0 > geom.in
+    ../plotting/pgeom2d geom
+else
+    echo $0: reusing geom.in
+fi
+if [ ! -s disp.out ];then
 
-dip=30
-hl=10
-n=50
-pif=`pif`
-x=`echo $hl $dip | gawk -v pif=$pif '{print(sin($2/pif)*$1)}'`
-z=`echo $hl $dip | gawk -v pif=$pif '{print(cos($2/pif)*$1+1e-6)}'`
+    # thrust case, which translates to left lateral
+    cat <<EOF > bc.in
+1 1
+-1.5 3 451 -2 0 201 0 0 1
+-1 -1 -1 0 1
+EOF
+    interact
+else
+    echo $0: reusing disp.out
+fi
+read xmin xmax nx ymin ymax ny zmin zmax nz dx dy dz < disp.hdr
+reg=-R$xmin/$xmax/$ymin/$ymax
+col=4
+for u in ux uy;do
+    (gawk -v col=$col '{print($1,$2,$col)}' disp.out | xyz2grd $reg  -I$dx/$dy -G$u.grd ) &
+    ((col=col+1))
+done
+for col in 4 5 7;do
+    if [ $col = 4 ];then
+	g=sxx
+    elif [ $col = 5 ];then
+	g=sxy
+    else
+	g=syy
+    fi
+    (gawk -v col=$col '{print($1,$2,$col)}' stress.out | xyz2grd $reg  -I$dx/$dy -G$g.grd ) &
+done
+wait
+grdmath syy.grd syy.grd ADD 2 DIV = sm.grd
+vinc=`echo $dx $dy | gawk '{printf("-I%g/%g",$1*10,$2*10)}'`
+makecpt -T-1e4/1e4/1e3 -Croma > s.cpt 
+ofile=thrust.ps
+proj=-Jx3
+echo $reg
+grdimage sm.grd -Cs.cpt $reg $proj -Y4 -K -P > $ofile
+psscale -D7/-1/6/.2h -E -Cs.cpt -B5e3/:@~s@~@-m@-: -O -K >> $ofile
+psbasemap $reg $proj  -Ba.5f.05:"horizontal distance, x":/a.5f.05:"depth, y": -K -O >> $ofile
+cat geom.in | patch2xyz xxx 0 1  | psxy  $reg  -m $proj -K -O -W2,darkgreen >> $ofile
+grdvector ux.grd uy.grd -Q0.05/0.09/0.05n.2 $vinc -N -Gorange -W0.5 $reg  $proj -O -K >> $ofile
 
-((strike=180-dip))
-makefault -dip 90 -strike $strike -x $x -y -$z -z 0 -l $hl -m 1 -n $n -w 0 > geom.in
+proj=-JX13.5/3
+reg=-R$xmin/$xmax/-1.2e4/1.2e4
+psbasemap  $reg $proj -Ba.5f.05:"horizontal distance, x":/a5e3f1e3:"stress @@ y = 0":WesN -Y7 -O -K >> $ofile
+gawk '{if(sqrt($2*$2)<1e-10)print($0)}' stress.out > tmp.top
+sc=1;yl=-1500
+for s in sxx sxy syy;do
+    col=`platecolor $sc`
+    if [ $s = sxx ];then
+	c=4
+    elif [ $s = syy ];then
+	c=7
+    elif [ $s = sxy ];then
+	c=5
+    fi
+    gawk -v col=$c '{print($1,$col)}' tmp.top | psxy -W2,$col $reg $proj -K -O  >> $ofile
+    echo 2.5 $yl 24 0 29 LM "@~s@~@-$s@-" | pstext -R -O -J -K -F+f$col >> $ofile
+    ((yl=yl-3000))
+    ((sc=sc+1))
+done
+rm tmp.top
 
+psxy -T -O -R -J >> $ofile
+modifybb $ofile
 
-../plotting/pgeom2d geom
+rm sm.grd u?.grd s??.grd

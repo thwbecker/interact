@@ -199,7 +199,7 @@ void calc_fields(struct med *medium,struct flt *fault,
 		 my_boolean include_background_displacement,
 		 COMP_PRECISION *a,COMP_PRECISION *b)
 {
-  int i,j,k,iflt,o1,iret,p1,p2,singular_count,not_ok;
+  int i,j,k,iflt,o1,iret,p1,p2,singular_count;
   long int nxy,nxyz;
   int nz=0;
   my_boolean use_fault_plane = FALSE,on_fault = FALSE;
@@ -286,27 +286,14 @@ void calc_fields(struct med *medium,struct flt *fault,
 	fprintf(stderr,"calc_fields: avg. fault plane: x:(%g,%g,%g), v_s: strike: %g dip: %g, v_%s: strike: %g dip: %g\n",
 		flt_mean_x[INT_X],flt_mean_x[INT_Y],flt_mean_x[INT_Z],
 		s1,d1,(medium->n[INT_Z]==-1)?("d"):("n"),s2,d2);
-      if(!(medium->ok=(my_boolean *)malloc(nxy*sizeof(my_boolean))))
-	PMEMERROR("calc_fields: 3");
-      // check if the output is OK
-      for(o1=i=not_ok=0,x[INT_X]=medium->pxmin[INT_X];
+      for(o1=i=0,x[INT_X]=medium->pxmin[INT_X];
 	  i < medium->n[INT_X];
 	  x[INT_X] += dx[INT_X], i++,o1 += medium->n[INT_Y])
 	for(j=0,x[INT_Y]=medium->pxmin[INT_Y];j < medium->n[INT_Y];
 	    x[INT_Y] += dx[INT_Y],j++){
 	  get_local_x_on_plane(xl,x,flt_mean_x,vec_1,vec_2);
-	  if(xl[INT_Z] <= 0){
-	    medium->ok[o1+j] = TRUE;
-	  }else{
-	    medium->ok[o1+j] = FALSE;
-	    not_ok++;
-	  }
 	}
-      if(not_ok)
-	HEADNODE
-	  fprintf(stderr,"calc_fields: %i out of %i points were not appropriate for plane mode\n",
-		  not_ok,medium->n[INT_Y]*medium->n[INT_X]);
-    }
+    } /* end fault part */
     if(include_background_stress || include_background_displacement){
       HEADNODE
 	fprintf(stderr,"calc_fields: WARNING: including background stress for grid\n");
@@ -314,30 +301,28 @@ void calc_fields(struct med *medium,struct flt *fault,
       for(k=0,x[INT_Z]=medium->pxmin[INT_Z];k<nz;x[INT_Z]+=dx[INT_Z],k++){
 	for(i=0,x[INT_X]=medium->pxmin[INT_X];i<medium->n[INT_X];x[INT_X]+=dx[INT_X],i++){
 	  for(j=0,x[INT_Y]=medium->pxmin[INT_Y];j<medium->n[INT_Y];x[INT_Y]+=dx[INT_Y],j++){
-	    if(!use_fault_plane || medium->ok[i*medium->n[INT_Y]+j]){
-	      if(use_fault_plane){
-		// determine position along the fault plane
-		get_local_x_on_plane(xl,x,flt_mean_x,vec_1,vec_2);
-	      }else{
-		xl[INT_X]=x[INT_X];xl[INT_Y]=x[INT_Y];xl[INT_Z]=x[INT_Z];
-	      }
-	      if(include_background_displacement){
-		background_disp(u,xl,medium,a,b);
-		p1=POSU(i,j,k,INT_X);
-		local_u[p1++] = (SUM_ARR_PREC)u[INT_X];
-		local_u[p1++] = (SUM_ARR_PREC)u[INT_Y];
-		local_u[p1]   = (SUM_ARR_PREC)u[INT_Z];
-	      }
-	      if(include_background_stress){
-		background_stress(sm,xl,medium->time,a,b,medium->pressure);
-		p2=POSS(i,j,k,0);
-		local_s[p2++] = (SUM_ARR_PREC)sm[INT_X][INT_X];
-		local_s[p2++] = (SUM_ARR_PREC)sm[INT_X][INT_Y];
-		local_s[p2++] = (SUM_ARR_PREC)sm[INT_X][INT_Z];
-		local_s[p2++] = (SUM_ARR_PREC)sm[INT_Y][INT_Y];
-		local_s[p2++] = (SUM_ARR_PREC)sm[INT_Y][INT_Z];
-		local_s[p2]   = (SUM_ARR_PREC)sm[INT_Z][INT_Z];
-	      }
+	    if(use_fault_plane){
+	      // determine position along the fault plane
+	      get_local_x_on_plane(xl,x,flt_mean_x,vec_1,vec_2);
+	    }else{
+	      xl[INT_X]=x[INT_X];xl[INT_Y]=x[INT_Y];xl[INT_Z]=x[INT_Z];
+	    }
+	    if(include_background_displacement){
+	      background_disp(u,xl,medium,a,b);
+	      p1=POSU(i,j,k,INT_X);
+	      local_u[p1++] = (SUM_ARR_PREC)u[INT_X];
+	      local_u[p1++] = (SUM_ARR_PREC)u[INT_Y];
+	      local_u[p1]   = (SUM_ARR_PREC)u[INT_Z];
+	    }
+	    if(include_background_stress){
+	      background_stress(sm,xl,medium->time,a,b,medium->pressure);
+	      p2=POSS(i,j,k,0);
+	      local_s[p2++] = (SUM_ARR_PREC)sm[INT_X][INT_X];
+	      local_s[p2++] = (SUM_ARR_PREC)sm[INT_X][INT_Y];
+	      local_s[p2++] = (SUM_ARR_PREC)sm[INT_X][INT_Z];
+	      local_s[p2++] = (SUM_ARR_PREC)sm[INT_Y][INT_Y];
+	      local_s[p2++] = (SUM_ARR_PREC)sm[INT_Y][INT_Z];
+	      local_s[p2]   = (SUM_ARR_PREC)sm[INT_Z][INT_Z];
 	    }
 	  }
 	}
@@ -394,65 +379,77 @@ void calc_fields(struct med *medium,struct flt *fault,
     for(k=0,x[INT_Z]=medium->pxmin[INT_Z];k < nz;x[INT_Z]+=dx[INT_Z],k++)
       for(i=0,x[INT_X]=medium->pxmin[INT_X];i < medium->n[INT_X];x[INT_X]+=dx[INT_X],i++)
 	for(j=0,x[INT_Y]=medium->pxmin[INT_Y];j < medium->n[INT_Y];x[INT_Y]+=dx[INT_Y],j++){
-
-	  if(!use_fault_plane || medium->ok[i*medium->n[INT_Y]+j]){
-	    if(use_fault_plane){
-	      // determine position along the fault plane
-	      get_local_x_on_plane(xl,x,flt_mean_x,vec_1,vec_2);
+	  
+	  if(use_fault_plane){
+	    // determine position along the fault plane
+	    get_local_x_on_plane(xl,x,flt_mean_x,vec_1,vec_2);
+	  }else{
+	    xl[INT_X]=x[INT_X];xl[INT_Y]=x[INT_Y];xl[INT_Z]=x[INT_Z];
+	  }
+	  HEADNODE{
+	    if(medium->print_plane_coord)
+	      fprintf(out,"%g %g %g %g %g\n",xl[INT_X],xl[INT_Y],xl[INT_Z],x[INT_X],x[INT_Y]);
+	  }
+	  if(!medium->full_space){ /* half plane or half space */
+	    if(medium->is_2d){
+	      if(xl[INT_Y] > 0.0){
+		if(xl[INT_Y] > 1e-10){
+		  fprintf(stderr,"calc_fields: 2D positive depth (y) in loop, kij: %i %i %i x: (%g, %g, %g)\n",
+			  k,i,j,xl[INT_X],xl[INT_Y],xl[INT_Z]);
+		  exit(-1);
+		}else{
+		  xl[INT_Y]=0.0;
+		}
+	      }
 	    }else{
-	      xl[INT_X]=x[INT_X];xl[INT_Y]=x[INT_Y];xl[INT_Z]=x[INT_Z];
-	    }
-	    HEADNODE{
-	      if(medium->print_plane_coord)
-		fprintf(out,"%g %g %g %g %g\n",xl[INT_X],xl[INT_Y],xl[INT_Z],x[INT_X],x[INT_Y]);
-	    }
-	    if(xl[INT_Z] > 0.0){
-	      if(xl[INT_Z] > 1e-10){
-		fprintf(stderr,"calc_fields: positive depth in loop, kij: %i %i %i x: (%g, %g, %g)\n",
-			k,i,j,xl[INT_X],xl[INT_Y],xl[INT_Z]);
-		exit(-1);
-	      }else{
-		xl[INT_Z]=0.0;
+	      if(xl[INT_Z] > 0.0){
+		if(xl[INT_Z] > 1e-10){
+		  fprintf(stderr,"calc_fields: 3D positive depth in loop, kij: %i %i %i x: (%g, %g, %g)\n",
+			  k,i,j,xl[INT_X],xl[INT_Y],xl[INT_Z]);
+		  exit(-1);
+		}else{
+		  xl[INT_Z]=0.0;
+		}
 	      }
 	    }
-	    p1 = POSU(i,j,k,INT_X);
-	    p2 = POSS(i,j,k,0);
-	    
-
-	    /* possibly executed only for each core */
-	    for(iflt = medium->myfault0;iflt < medium->myfaultn;iflt++){
-	      //fprintf(stderr,"calc_fields: %04i/%04i/%04i core %i f %i s %g\n",k,i,j,medium->comm_rank,iflt,norm_3d(fault[iflt].u));	      
-	      if(norm_3d(fault[iflt].u) > 0){
-		//
-		// actual fault contribution is accounted for HERE
-		//
-		/* we leave on_fault FALSE by default here */
-		eval_green(xl,(fault+iflt),fault[iflt].u,u,sm,&iret,
-			   GC_DISP_AND_STRESS,on_fault,medium->full_space);
-		//fprintf(stderr,"core %i k %3i i %3i j %3i flt %3i %11g\n",medium->comm_rank,k,i,j,iflt,u[INT_X]);
-		if(!iret){
-
-		  local_u[p1]   += (SUM_ARR_PREC)u[INT_X];
-		  local_u[p1+1] += (SUM_ARR_PREC)u[INT_Y];
-		  local_u[p1+2] += (SUM_ARR_PREC)u[INT_Z];
-		  local_s[p2]   += (SUM_ARR_PREC)sm[INT_X][INT_X];
-		  local_s[p2+1] += (SUM_ARR_PREC)sm[INT_X][INT_Y];
-		  local_s[p2+2] += (SUM_ARR_PREC)sm[INT_X][INT_Z];
-		  local_s[p2+3] += (SUM_ARR_PREC)sm[INT_Y][INT_Y];
-		  local_s[p2+4] += (SUM_ARR_PREC)sm[INT_Y][INT_Z];
-		  local_s[p2+5] += (SUM_ARR_PREC)sm[INT_Z][INT_Z];
-		}else{
-		  singular_count++;
-		  local_u[p1]   = NAN;
-		  local_u[p1+1] = NAN;
-		  local_u[p1+2] = NAN;
-		  local_s[p2]   = NAN;
-		  local_s[p2+1] = NAN;
-		  local_s[p2+2] = NAN;
-		  local_s[p2+3] = NAN;
-		  local_s[p2+4] = NAN;
-		  local_s[p2+5] = NAN;
-		}
+	  }
+	  p1 = POSU(i,j,k,INT_X);
+	  p2 = POSS(i,j,k,0);
+	  
+	  
+	  /* possibly executed only for each core */
+	  for(iflt = medium->myfault0;iflt < medium->myfaultn;iflt++){
+	    //fprintf(stderr,"calc_fields: %04i/%04i/%04i core %i f %i s %g\n",k,i,j,medium->comm_rank,iflt,norm_3d(fault[iflt].u));	      
+	    if(norm_3d(fault[iflt].u) > 0){
+	      //
+	      // actual fault contribution is accounted for HERE
+	      //
+	      /* we leave on_fault FALSE by default here */
+	      eval_green(xl,(fault+iflt),fault[iflt].u,u,sm,&iret,
+			 GC_DISP_AND_STRESS,on_fault,medium->full_space);
+	      //fprintf(stderr,"core %i k %3i i %3i j %3i flt %3i %11g\n",medium->comm_rank,k,i,j,iflt,u[INT_X]);
+	      if(!iret){
+		
+		local_u[p1]   += (SUM_ARR_PREC)u[INT_X];
+		local_u[p1+1] += (SUM_ARR_PREC)u[INT_Y];
+		local_u[p1+2] += (SUM_ARR_PREC)u[INT_Z];
+		local_s[p2]   += (SUM_ARR_PREC)sm[INT_X][INT_X];
+		local_s[p2+1] += (SUM_ARR_PREC)sm[INT_X][INT_Y];
+		local_s[p2+2] += (SUM_ARR_PREC)sm[INT_X][INT_Z];
+		local_s[p2+3] += (SUM_ARR_PREC)sm[INT_Y][INT_Y];
+		local_s[p2+4] += (SUM_ARR_PREC)sm[INT_Y][INT_Z];
+		local_s[p2+5] += (SUM_ARR_PREC)sm[INT_Z][INT_Z];
+	      }else{
+		singular_count++;
+		local_u[p1]   = NAN;
+		local_u[p1+1] = NAN;
+		local_u[p1+2] = NAN;
+		local_s[p2]   = NAN;
+		local_s[p2+1] = NAN;
+		local_s[p2+2] = NAN;
+		local_s[p2+3] = NAN;
+		local_s[p2+4] = NAN;
+		local_s[p2+5] = NAN;
 	      }
 	    }
 	  }

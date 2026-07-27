@@ -655,6 +655,16 @@ void read_geometry(char *patch_filename,struct med **medium,
       ((*medium)->xmax[i] ): (MIN_GEOM_RANGE);
   }
 #ifdef ALLOW_NON_3DQUAD_GEOM
+  if(nr_2d){
+    (*medium)->is_2d = TRUE;
+    if(nr_2d != (*medium)->nrflt){
+      if((*medium)->comm_rank == 0)
+	fprintf(stderr,"read_geometry: cannot mix 2D and 3D patches, 2D %i total %i\n",
+		nr_2d,(*medium)->nrflt);
+      exit(-1);
+    }
+
+  }
   if(nr_pt_src + nr_triangle + nr_2d + nr_iquad == 0){
     if(verbose){
       fprintf(stderr,"read_geometry: no non-quad patches were read in, recompiling without ALLOW_NON_3DQUAD_GEOM flag\n");

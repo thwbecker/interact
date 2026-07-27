@@ -224,7 +224,7 @@ singular value will be set to zero
 #define USE_OLD_AMAT_DEF FALSE
 #define SAVE_AMAT_DEF FALSE
 #define CHECK_FOR_INTERACTION_FEEDBACK_DEF FALSE 
-#define SUPPRESS_NAN_OUTPUT_DEF TRUE // suppress NaNs in output
+#define SUPPRESS_NAN_OUTPUT_DEF FALSE // suppress NaNs in output
 #define TWO_DIM_APPROX_IS_PLANE_STRESS_DEF FALSE
 #define PRINT_PLANE_COORD_DEF FALSE
 #define FULL_SPACE_DEF FALSE

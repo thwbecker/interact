@@ -308,10 +308,6 @@ struct med{
   COMP_PRECISION lmean,wmean;
   /* geometrical boundaries for stress output, plotting */
   COMP_PRECISION pxmin[3],pxmax[3];
-  my_boolean *ok;/* this is only used to determine proper points 
-		 if we are calculating output along a 
-		 fault plane for stress field output in single
-		 step operational mode */
   /* number of columns and rows and slices 
      in stress and displacement field output matrices */
   int n[3];
@@ -345,7 +341,7 @@ struct med{
 					   strain)
 
 					*/
-  my_boolean plane_stress;	/* for 2D */
+  my_boolean is_2d,plane_stress;	/* for 2D */
   int nr_timesteps;
   /* triangle mode type */
   MODE_TYPE tri_eval_mode;    /* 

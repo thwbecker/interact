@@ -494,24 +494,22 @@ void print_stress(struct med *medium,struct flt *fault)
 	    l=6;
 	  }
 	  if(l == 6){
-	    if(!use_fault_plane || medium->ok[i*medium->n[INT_Y]+j]){
-	      for(m=0;m<3;m++){
-		//x[m]=reformat_small(x[m]);
-		fprintf(out,"%14.7e ",x[m]);
-	      }
-	      /* if stresses are in a 6 component vector, then
-		 
-		   s[0] = sm[INT_X][INT_X];
-		   s[1] = sm[INT_X][INT_Y];
-		   s[2] = sm[INT_X][INT_Z];
-		   s[3] = sm[INT_Y][INT_Y];
-		   s[4] = sm[INT_Y][INT_Z];
-		   s[5] = sm[INT_Z][INT_Z];
-	      */
-	      for(l=0;l<6;l++)
-		fprintf(out,"%14.7e ",medium->s[POSS(i, j, k, l)]);
-	      fprintf(out,"\n");
+	    for(m=0;m<3;m++){
+	      //x[m]=reformat_small(x[m]);
+	      fprintf(out,"%14.7e ",x[m]);
 	    }
+	    /* if stresses are in a 6 component vector, then
+	       
+	       s[0] = sm[INT_X][INT_X];
+	       s[1] = sm[INT_X][INT_Y];
+	       s[2] = sm[INT_X][INT_Z];
+	       s[3] = sm[INT_Y][INT_Y];
+	       s[4] = sm[INT_Y][INT_Z];
+	       s[5] = sm[INT_Z][INT_Z];
+	    */
+	    for(l=0;l<6;l++)
+	      fprintf(out,"%14.7e ",medium->s[POSS(i, j, k, l)]);
+	    fprintf(out,"\n");
 	  }
 	}
     fclose(out);
@@ -519,10 +517,11 @@ void print_stress(struct med *medium,struct flt *fault)
     fprintf(stderr,"print_stress: format: x y z s_xx s_xy s_xz s_yy s_yz s_zz\n");
 
     out=myopen(STRESS_HDR_FILE,"w");
-    fprintf(out,"%g %g %i %g %g %i %g %g %i\n",
+    fprintf(out,"%g %g %i %g %g %i %g %g %i %e %e %e\n",
 	    medium->pxmin[INT_X],medium->pxmax[INT_X],medium->n[INT_X],
 	    medium->pxmin[INT_Y],medium->pxmax[INT_Y],medium->n[INT_Y],
-	    medium->pxmin[INT_Z],medium->pxmax[INT_Z],medium->n[INT_Z]);
+	    medium->pxmin[INT_Z],medium->pxmax[INT_Z],medium->n[INT_Z],
+	    dx[INT_X],dx[INT_Y],dx[INT_Z]);
     fclose(out);
     fprintf(stderr,"print_stress: dimension information in \"%s\"\n",
 	    STRESS_HDR_FILE);
@@ -570,27 +569,24 @@ void print_stress_on_fault(struct med *medium,struct flt *fault,int nrf)
   fiddle_with_limits_for_plot(medium,&nz,&use_fault_plane,dx,TRUE);
   nxy = medium->n[INT_X] * medium->n[INT_Y];
   out=myopen(FAULT_STRESS_OUT_FILE,"w");
-  for(i=0,x[INT_X]=medium->pxmin[INT_X];i<medium->n[INT_X];x[INT_X]+=dx[INT_X],i++)
-    for(j=0,x[INT_Y]=medium->pxmin[INT_Y];j<medium->n[INT_Y];x[INT_Y]+=dx[INT_Y],j++)
-      for(k=0,x[INT_Z]=medium->pxmin[INT_Z];k<nz;x[INT_Z]+=dx[INT_Z],k++){
-	if(!use_fault_plane || medium->ok[i*medium->n[INT_Y]+j]){
-	  fprintf(out,"%14.7e %14.7e %14.7e ",x[INT_X],x[INT_Y],x[INT_Z]);
-	  sm[INT_X][INT_X]=medium->s[POSS(i, j, k, 0)];
-	  sm[INT_X][INT_Y]=sm[INT_Y][INT_X]=medium->s[POSS(i, j, k, 1)];
-	  sm[INT_X][INT_Z]=sm[INT_Z][INT_X]=medium->s[POSS(i, j, k, 2)];
-	  sm[INT_Y][INT_Y]=medium->s[POSS(i, j, k, 3)];
-	  sm[INT_Y][INT_Z]=sm[INT_Z][INT_Y]=medium->s[POSS(i, j, k, 4)];
-	  sm[INT_Z][INT_Z]=medium->s[POSS(i, j, k, 5)];
-	  calc_three_stress_components(sm,fault[nrf].normal,fault[nrf].t_strike,
-				       fault[nrf].normal,fault[nrf].t_dip,
-				       &st,&sn,&sd);
-	  //st=reformat_small(st);;
-	  //sd=reformat_small(sd);
-	  //sn=reformat_small(sn);
-	  fprintf(out,"%14.7e %14.7e %14.7e",st,sd,sn);
-	  fprintf(out,"\n");
-	}
+  for(i=0,x[INT_X]=medium->pxmin[INT_X];i<medium->n[INT_X];i++, x[INT_X]+=dx[INT_X]){
+    for(j=0,x[INT_Y]=medium->pxmin[INT_Y];j<medium->n[INT_Y];j++, x[INT_Y]+=dx[INT_Y]){
+      for(k=0,x[INT_Z]=medium->pxmin[INT_Z];k<nz;k++,	x[INT_Z]+=dx[INT_Z]){
+	fprintf(out,"%14.7e %14.7e %14.7e ",x[INT_X],x[INT_Y],x[INT_Z]);
+	sm[INT_X][INT_X]=medium->s[POSS(i, j, k, 0)];
+	sm[INT_X][INT_Y]=sm[INT_Y][INT_X]=medium->s[POSS(i, j, k, 1)];
+	sm[INT_X][INT_Z]=sm[INT_Z][INT_X]=medium->s[POSS(i, j, k, 2)];
+	sm[INT_Y][INT_Y]=medium->s[POSS(i, j, k, 3)];
+	sm[INT_Y][INT_Z]=sm[INT_Z][INT_Y]=medium->s[POSS(i, j, k, 4)];
+	sm[INT_Z][INT_Z]=medium->s[POSS(i, j, k, 5)];
+	calc_three_stress_components(sm,fault[nrf].normal,fault[nrf].t_strike,
+				     fault[nrf].normal,fault[nrf].t_dip,
+				     &st,&sn,&sd);
+	fprintf(out,"%14.7e %14.7e %14.7e",st,sd,sn);
+	fprintf(out,"\n");
       }
+    }
+  }
   fclose(out);
   fprintf(stderr,"print_stress_on_fault: stress output in %s\n",
 	  FAULT_STRESS_OUT_FILE);
@@ -620,9 +616,9 @@ void print_displacement(struct med *medium,struct flt *fault)
       exit(-1);
     }
     out=myopen(DISP_OUT_FILE,"w");
-    for(i=0,x[INT_X]=medium->pxmin[INT_X];i<medium->n[INT_X];x[INT_X]+=dx[INT_X],i++)
-      for(j=0,x[INT_Y]=medium->pxmin[INT_Y];j<medium->n[INT_Y];x[INT_Y]+=dx[INT_Y],j++)
-	for(k=0,x[INT_Z]=medium->pxmin[INT_Z];k<nz;x[INT_Z]+=dx[INT_Z],k++){
+    for(i=0,x[INT_X]=medium->pxmin[INT_X];i<medium->n[INT_X];i++,x[INT_X]+=dx[INT_X]){
+      for(j=0,x[INT_Y]=medium->pxmin[INT_Y];j<medium->n[INT_Y];j++,x[INT_Y]+=dx[INT_Y]){
+	for(k=0,x[INT_Z]=medium->pxmin[INT_Z];k<nz;k++,x[INT_Z]+=dx[INT_Z]){
 	  if(medium->suppress_nan_output){
 	    for(l=0;l<3;l++)
 	      if(!FINITE_TEST(medium->u[POSU(i, j, k, l)]))
@@ -631,20 +627,19 @@ void print_displacement(struct med *medium,struct flt *fault)
 	    l=3;
 	  }
 	  if(l==3){
-	    if(!use_fault_plane || medium->ok[i*medium->n[INT_Y]+j]){
-	      for(m=0;m<3;m++){
-		//x[m]=reformat_small(x[m]);
-		fprintf(out,"%14.7e ",x[m]);
-	      }
-	      for(l=0;l<3;l++)
-		fprintf(out,"%14.7e ",medium->u[POSU(i, j, k, l)]);
-	      fprintf(out,"\n");
+	    for(m=0;m<3;m++){
+	      //x[m]=reformat_small(x[m]);
+	      fprintf(out,"%14.7e ",x[m]);
 	    }
+	    for(l=0;l<3;l++)
+	      fprintf(out,"%14.7e ",medium->u[POSU(i, j, k, l)]);
+	    fprintf(out,"\n");
 	  }
 	}
+      }
+    }
     fclose(out);
-    fprintf(stderr,"print_displacement: displacement output in %s\n",
-	    DISP_OUT_FILE);
+    fprintf(stderr,"print_displacement: displacement output in %s (%i x %i x %i)\n",DISP_OUT_FILE,i,j,k);
     fprintf(stderr,"print_displacement: format: x y z u_x u_y u_z\n");
     out=myopen(DISP_HDR_FILE,"w");
     /* xmin xmax nx ymin ymax ny zmin zmax nz dx dy dz */
