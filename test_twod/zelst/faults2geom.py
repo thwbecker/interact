@@ -23,7 +23,7 @@ import numpy as np
 
 infile = "faults_zelst.d"
 outgeom = "geom_zelst.in"
-dx = 0.1          # target element length [km]
+dx = 0.05          # target element length [km]
 smooth_km = 2.0   # boxcar smoothing window along each fault [km]; kills
                   # digitization wiggle from the skeleton trace (0: off)
 end_trim_km = 0.5 # trim this much off each polyline end before smoothing

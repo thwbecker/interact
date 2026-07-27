@@ -1,0 +1,16 @@
+# Example depth-dependent RSF parameters for the megathrust group,
+# loosely following the logic of the temperature-dependent a-b
+# stability arguments (gabbro-type fits mapped through a subduction
+# geotherm, cf. Becker, Tectonic Geodynamics, Fig. 3.49b): velocity
+# strengthening near the surface, a weakening seismogenic core, and a
+# return to strengthening downdip. These are ILLUSTRATIVE control
+# points for one warm-ish geotherm choice, not fits; edit freely, or
+# regenerate from an actual T(z) profile and lab a-b(T) data. Linear
+# interpolation between control points; end values extend beyond.
+# depth_km   a       b
+0.0   0.015  0.011
+5.0   0.015  0.011
+8.0   0.010  0.014
+30.0  0.010  0.014
+42.0  0.016  0.010
+60.0  0.020  0.010

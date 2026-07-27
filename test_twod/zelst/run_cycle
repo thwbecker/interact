@@ -1,0 +1,11 @@
+#!/bin/bash
+
+mpirun -bind-to core -np 8 \
+       rsf_solve -geom_file geom_zelst.in \
+       -rsf_file rsf_ab.in -rsf_dc_file rsf_dc.in \
+       -rsf_sigma_file rsf_sigma.in -rsf_vpl_file rsf_vpl.in \
+       -rsf_ic_file rsf_ic.in \
+       -state_law 1 -shear_modulus 3.204e10 -s_wave_speed 3464 \
+       -f0 0.6 -v0 1e-6 -vpl 1e-9 \
+       -rsf_catalog -rupture_vth 0.1 -ts_rk_type 3bs -rtol 1e-5
+
