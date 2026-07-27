@@ -18,14 +18,24 @@ the deep-dislocation limit matching the textbook full-space field,
 and translation invariance. The displacement branch cut is placed on
 the fault by evaluating the endpoint log difference as one ratio log.
 
-Usage: analytic_compare.py <dip_deg> <half_length> [G] [nu] [slip]
+Usage: analytic_compare.py <dip_deg> <half_length> [G] [nu] [slip] [bcfile]
 reads geom-implied endpoints (fault from the origin, dipping
 clockwise from horizontal as in run_test), disp.out and stress.out
-from the current directory (uniform slip run), and reports relative
-misfits. Sign convention: interact slip +1 in the strike slot of the
-2D setup corresponds to slip -1 along the (zB - zA) tangent here.
-G defaults to 1e4 (the compiled SHEAR_MODULUS of the standard 2D
-build); adjust if built differently.
+from the current directory, and reports relative misfits. With five
+or fewer arguments a UNIFORM slip run is assumed (slip defaults 1).
+If a bc file is given as the sixth argument, its per-element slip
+lines ("index 0 slip", one per element, in geometry order) are read
+and the reference is the exact superposition of one dislocation
+dipole per element, which matches piecewise-constant slip
+distributions such as the depth-tapered default of run_test exactly.
+Sign convention: interact slip +1 in the strike slot of the 2D setup
+corresponds to slip -1 along the (zB - zA) tangent here. G defaults
+to 1e4 (the compiled SHEAR_MODULUS of the standard 2D build).
+
+for example, 
+./analytic_compare.py 30 .5 1e4 0.25 1 bc.in
+with the current run_test
+
 """
 import sys
 import numpy as np
@@ -78,6 +88,7 @@ def main():
     G = float(sys.argv[3]) if len(sys.argv) > 3 else 1.0e4
     nu = float(sys.argv[4]) if len(sys.argv) > 4 else 0.25
     slip = float(sys.argv[5]) if len(sys.argv) > 5 else 1.0
+    bcfile = sys.argv[6] if len(sys.argv) > 6 else None
     d = np.loadtxt('disp.out'); s = np.loadtxt('stress.out')
     zz = d[:,0] + 1j*d[:,1]
     zA = 0.0 + 0.0j
@@ -89,7 +100,27 @@ def main():
     dist = np.abs(zz - (zA + proj*t))
     seg = abs(zB - zA)
     mask = (dist > 0.03*seg) & (np.abs(zz-zA) > 0.06*seg) & (np.abs(zz-zB) > 0.06*seg)
-    u, sxx, syy, sxy = segment_halfplane(zz, zA, zB, -slip, G, nu)
+    if bcfile is None:
+        u, sxx, syy, sxy = segment_halfplane(zz, zA, zB, -slip, G, nu)
+    else:
+        # per-element slips: reference is the exact superposition of one
+        # dipole per constant-slip element
+        slips = []
+        with open(bcfile) as f:
+            for ln in f:
+                t = ln.split()
+                if len(t) == 3 and t[1] == "0":
+                    slips.append(float(t[2]))
+        nel = len(slips)
+        if nel < 1:
+            sys.stderr.write(f"analytic_compare: no per-element slip lines in {bcfile}\n")
+            sys.exit(1)
+        tv = (zB - zA)/nel
+        u = np.zeros_like(zz); sxx = np.zeros(len(zz)); syy = np.zeros(len(zz)); sxy = np.zeros(len(zz))
+        for k in range(nel):
+            uk, xk, yk, sk = segment_halfplane(zz, zA + k*tv, zA + (k+1)*tv, -slips[k], G, nu)
+            u = u + uk; sxx += xk; syy += yk; sxy += sk
+        print(f"analytic_compare: superposed {nel} constant-slip element dipoles from {bcfile}")
     ok = True
     tol = 1.0e-5
     for nm, a, b in (("sxx", s[:,3], sxx), ("sxy", s[:,4], sxy), ("syy", s[:,6], syy),

@@ -45,6 +45,10 @@ fi
 # (see analytic_compare.py; independent of the Crouch and Starfield
 # transcription). needs python3 with numpy.
 #
+# main run (arbitrary per-element slip): compare via exact per-element
+# dipole superposition, reading the slips from bc.in
+python3 analytic_compare.py $dip $hl 1e4 0.25 1 bc.in || \
+    echo $0: WARNING: analytic comparison of the main run FAILED
 if [ ! -s const_check/PASSED ];then
     mkdir -p const_check
     cp geom.in const_check/
@@ -135,6 +139,6 @@ done
 rm tmp.top
 
 psxy -T -O -R -J >> $ofile
-modifybb $ofile
+modifybb $ofile 1
 
 rm sm.grd u?.grd s??.grd
