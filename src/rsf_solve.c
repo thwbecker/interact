@@ -599,7 +599,8 @@ PetscErrorCode rsf_solve_run(int argc,char **argv,struct interact_ctx *par,
 				       monitor_tmin,event_tmin,vel_event,vel_event_hyst,
 				       track_events,medium->time,x,vel_init,
 				       set->field_enable,set->field_step_interval,set->field_tmin,
-				       rsf_groups,rsf_ngroup,rsf_vbuf));
+				       rsf_groups,rsf_ngroup,rsf_vbuf,
+				       set->monitor_by_group));
   /* SEAS catalog, rupture-time, slip-budget; reads x0 for the seeded event */
   PetscCall(rsf_init_catalog(uc,par,set,shear_modulus_si,rsf->vpl,x,medium->time));
   PetscCall(TSMonitorSet(ts,rsf_TS_Monitor,(void *)uc,NULL));

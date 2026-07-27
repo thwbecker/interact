@@ -175,6 +175,7 @@ void rsf_print_help(const char *prog)
   fprintf(stderr,"  -rdx_monitor <val>      relative state-change monitor trigger (default 1e-4)\n");
   fprintf(stderr,"  -adx_monitor <val>      absolute state-change trigger, <=0 off (default 0)\n");
   fprintf(stderr,"  -monitor_tmin_yr <yr>   suppress monitor output before this time (default 0)\n");
+  fprintf(stderr,"  -rsf_monitor_by_group <bool> also write one monitor file per fault group (default 0)\n");
   fprintf(stderr,"  -track_events <bool>    locate slip-rate threshold crossings (default 1 = on)\n");
   fprintf(stderr,"  -vel_event <m/s>        event onset threshold (default 1e-3)\n");
   fprintf(stderr,"  -vel_event_hyst <val>   arrest at vel_event*hyst, debounces (default 0.5)\n");
@@ -227,6 +228,8 @@ void rsf_print_help(const char *prog)
   fprintf(stderr,"                          -adx_monitor, -rdx_monitor): step, time[s], time[yr], dt[s],\n");
   fprintf(stderr,"                          log10(max|v|), mean_slip, mean_mu, max_sigma, min_sigma.\n");
   fprintf(stderr,"                          Flushed as it is written\n");
+  fprintf(stderr,"  %s   with -rsf_monitor_by_group, the same columns reduced over\n",RSF_MONITOR_GROUP_FORMAT);
+  fprintf(stderr,"                          the patches of one fault group (last geometry column)\n");
   fprintf(stderr,"  %s           one row per field frame (-field_step_interval): frame, step,\n",RSF_VEL_TIME_FILE);
   fprintf(stderr,"                          time[yr], time[s], log10(max|v|), mean|v|, std|v|, min|v|,\n");
   fprintf(stderr,"                          mean_slip. The |v| statistics are slip SPEEDS (v is signed).\n");
@@ -500,6 +503,8 @@ PetscErrorCode rsf_get_settings(int argc,char **argv,struct interact_ctx *par,
   PetscCall(PetscOptionsGetReal(NULL,NULL,"-vel_event_hyst",&vel_event_hyst,NULL));
   PetscCall(PetscOptionsGetReal(NULL,NULL,"-event_tmin_yr",&event_tmin,NULL));
   PetscCall(PetscOptionsGetBool(NULL,NULL,"-track_events",&track_events,NULL));
+  set->monitor_by_group = PETSC_FALSE;
+  PetscCall(PetscOptionsGetBool(NULL,NULL,"-rsf_monitor_by_group",&set->monitor_by_group,NULL));
   set->use_imex = PETSC_FALSE;
   PetscCall(PetscOptionsGetBool(NULL,NULL,"-imex",&set->use_imex,NULL));
   /* other outputs */

@@ -5,6 +5,93 @@
 #include "rsf.h"
 
 
+
+/*
+   per fault group monitor output (-rsf_monitor_by_group).  Writes the
+   same columns as RSF_MONITOR_FILE on the same cadence, but reduced over
+   the patches of one group (the last column of the geometry input)
+   instead of over the whole fault.  Distinct group ids are collected in
+   first seen order, matching rsf_build_groups, so the numbering agrees
+   with the one used by the compact field output.  The per group patch
+   counts are read off the global fault array, which every rank holds, so
+   the means need no extra reduction.  Returns the number of groups, or 0
+   if the feature could not be set up, in which case the caller leaves it
+   off.  All ranks take the same branch here, so a rank 0 file open
+   failure disables only the writing, not the reductions.
+*/
+static int rsf_init_monitor_groups(struct rsf_out_ctx *uc)
+{
+  struct med *medium;
+  struct flt *fault;
+  int i,j,k,n,ng,id,found;
+  char fname[STRLEN];
+
+  medium = uc->par->medium;
+  fault  = uc->par->fault;
+  n      = medium->nrflt;
+  if(n < 1)
+    return 0;
+  uc->mgrp_id = (int *)malloc((size_t)n*sizeof(int)); /* at most n distinct */
+  if(!uc->mgrp_id)
+    return 0;
+  ng = 0;
+  for(i=0;i < n;i++){		/* distinct group ids, first seen order */
+    id = (int)fault[i].group;
+    found = 0;
+    for(j=0;j < ng;j++)
+      if(uc->mgrp_id[j] == id){
+	found = 1;
+	break;
+      }
+    if(!found)
+      uc->mgrp_id[ng++] = id;
+  }
+  uc->mgrp_np   = (int *)calloc((size_t)ng,sizeof(int));
+  uc->mgrp_map  = (int *)malloc((size_t)medium->rn*sizeof(int));
+  uc->mgrp_lsum = (PetscReal *)malloc((size_t)2*(size_t)ng*sizeof(PetscReal));
+  uc->mgrp_gsum = (PetscReal *)malloc((size_t)2*(size_t)ng*sizeof(PetscReal));
+  uc->mgrp_lmx  = (PetscReal *)malloc((size_t)3*(size_t)ng*sizeof(PetscReal));
+  uc->mgrp_gmx  = (PetscReal *)malloc((size_t)3*(size_t)ng*sizeof(PetscReal));
+  if((!uc->mgrp_np)||(!uc->mgrp_map)||(!uc->mgrp_lsum)||(!uc->mgrp_gsum)||
+     (!uc->mgrp_lmx)||(!uc->mgrp_gmx)){
+    fprintf(stderr,"rsf_init_monitor_groups: alloc failed for %i group(s), per group monitor off\n",ng);
+    return 0;
+  }
+  for(i=0;i < n;i++)		/* global patch count per group */
+    for(j=0;j < ng;j++)
+      if(uc->mgrp_id[j] == (int)fault[i].group){
+	uc->mgrp_np[j]++;
+	break;
+      }
+  for(i=medium->rs,k=0;i < medium->re;i++,k++){ /* owned patch -> group slot */
+    uc->mgrp_map[k] = 0;
+    for(j=0;j < ng;j++)
+      if(uc->mgrp_id[j] == (int)fault[i].group){
+	uc->mgrp_map[k] = j;
+	break;
+      }
+  }
+  HEADNODE{
+    uc->mgrp_fout = (FILE **)calloc((size_t)ng,sizeof(FILE *));
+    if(!uc->mgrp_fout){
+      fprintf(stderr,"rsf_init_monitor_groups: alloc failed for %i output file(s), no per group files written\n",ng);
+    }else{
+      for(j=0;j < ng;j++){
+	snprintf(fname,STRLEN,RSF_MONITOR_GROUP_FORMAT,uc->mgrp_id[j]);
+	uc->mgrp_fout[j] = myopen(fname,(uc->restarted)?("a"):("w"));
+	if(uc->restarted)
+	  fprintf(uc->mgrp_fout[j],"# restarted\n");
+	fprintf(uc->mgrp_fout[j],"# fault group %i, %i of %i patches, cadence as in %s\n",
+		uc->mgrp_id[j],uc->mgrp_np[j],n,RSF_MONITOR_FILE);
+	fprintf(uc->mgrp_fout[j],"# step time[s] time[yr] dt[s] log10(max|v|[m/s]) mean_slip[m] mean_mu max_sigma[Pa] min_sigma[Pa]\n");
+      }
+      fprintf(stderr,"rsf_init_monitor_groups: per group monitor on, %i group(s), %s\n",
+	      ng,RSF_MONITOR_GROUP_FORMAT);
+    }
+  }
+  return ng;
+}
+
 /* 
    set up the monitor and event tracking environment,
    cf. init_monitor_and_event in ode_solve_test.c
@@ -17,7 +104,8 @@ PetscErrorCode rsf_init_monitor_and_event(struct rsf_out_ctx *uc,struct interact
 					  PetscReal t_init,Vec X0,PetscReal vel_init,
 					  PetscBool field_enable,PetscInt field_step_interval,
 					  PetscReal field_tmin,struct rsf_group_grid *groups,
-					  int ngroup,double *vbuf)
+					  int ngroup,double *vbuf,
+					  PetscBool monitor_by_group)
 {
   struct med *medium;
   PetscFunctionBeginUser;
@@ -78,6 +166,13 @@ PetscErrorCode rsf_init_monitor_and_event(struct rsf_out_ctx *uc,struct interact
   /* force the first monitor call to log */
   uc->old_time = t_init - 2.0*dt_monitor;
   uc->fout_monitor = uc->fout_event = NULL;
+  /* per group monitor: all state off and unallocated unless asked for */
+  uc->mgrp_n = 0;
+  uc->mgrp_id = uc->mgrp_np = uc->mgrp_map = NULL;
+  uc->mgrp_lsum = uc->mgrp_gsum = uc->mgrp_lmx = uc->mgrp_gmx = NULL;
+  uc->mgrp_fout = NULL;
+  if(monitor_by_group)
+    uc->mgrp_n = rsf_init_monitor_groups(uc);
   HEADNODE{
     uc->fout_monitor = myopen(RSF_MONITOR_FILE,(uc->restarted)?("a"):("w"));
     if(uc->restarted) fprintf(uc->fout_monitor,"# restarted\n");
@@ -110,6 +205,7 @@ PetscErrorCode rsf_init_monitor_and_event(struct rsf_out_ctx *uc,struct interact
 PetscErrorCode rsf_finalize_monitor_and_event(struct rsf_out_ctx *uc)
 {
   struct med *medium;
+  int ig;
   PetscFunctionBeginUser;
   medium = uc->par->medium;
   HEADNODE{
@@ -127,7 +223,22 @@ PetscErrorCode rsf_finalize_monitor_and_event(struct rsf_out_ctx *uc)
     rsf_free_groups(uc->groups,uc->ngroup);
     uc->groups = NULL;uc->ngroup = 0;
     if(uc->vbuf){free(uc->vbuf);uc->vbuf = NULL;}
+    if(uc->mgrp_fout){
+      for(ig=0;ig < uc->mgrp_n;ig++)
+	if(uc->mgrp_fout[ig])fclose(uc->mgrp_fout[ig]);
+      free(uc->mgrp_fout);uc->mgrp_fout = NULL;
+      fprintf(stderr,"rsf_finalize_monitor_and_event: wrote %i per group monitor file(s)\n",uc->mgrp_n);
+    }
   }
+  /* the reduction scratch lives on every rank */
+  if(uc->mgrp_id){free(uc->mgrp_id);uc->mgrp_id = NULL;}
+  if(uc->mgrp_np){free(uc->mgrp_np);uc->mgrp_np = NULL;}
+  if(uc->mgrp_map){free(uc->mgrp_map);uc->mgrp_map = NULL;}
+  if(uc->mgrp_lsum){free(uc->mgrp_lsum);uc->mgrp_lsum = NULL;}
+  if(uc->mgrp_gsum){free(uc->mgrp_gsum);uc->mgrp_gsum = NULL;}
+  if(uc->mgrp_lmx){free(uc->mgrp_lmx);uc->mgrp_lmx = NULL;}
+  if(uc->mgrp_gmx){free(uc->mgrp_gmx);uc->mgrp_gmx = NULL;}
+  uc->mgrp_n = 0;
   PetscCall(VecDestroy(&uc->Xold));
   PetscCall(VecScatterDestroy(&uc->gather));
   PetscCall(VecDestroy(&uc->gathered));
@@ -480,6 +591,8 @@ PetscErrorCode rsf_TS_Monitor(TS ts,PetscInt step,PetscReal time,Vec X,void *ptr
   Vec DX;
   PetscInt i,j;
   PetscBool bail;
+  int ig;
+  PetscInt kk;
   PetscReal v,lsum[2],gsum[2],lminmax[3],gminmax[3],dt,d1,d2,d3,dx_norm,x_norm;
   struct rsf_vars *rsf;
   PetscFunctionBeginUser;
@@ -543,7 +656,11 @@ PetscErrorCode rsf_TS_Monitor(TS ts,PetscInt step,PetscReal time,Vec X,void *ptr
       lminmax[0] = -1e30;		/* max |v| */
       lminmax[1] = -1e30;		/* max sigma */
       lminmax[2] = -1e30;		/* -min sigma */
-      for (i = medium->rs, j=0; i < medium->re; i++, j+=rsf->dim) {
+      for(ig=0;ig < uc->mgrp_n;ig++){ /* same, per fault group */
+	uc->mgrp_lsum[2*ig] = uc->mgrp_lsum[2*ig+1] = 0.0;
+	uc->mgrp_lmx[3*ig] = uc->mgrp_lmx[3*ig+1] = uc->mgrp_lmx[3*ig+2] = -1e30;
+      }
+      for (i = medium->rs, j=0, kk=0; i < medium->re; i++, j+=rsf->dim, kk++) {
 	v = vel_from_rsf(x[j+1],x[j+2],x[j],fault[i].mu_sa,rsf->v0,&d1,&d2,&d3,medium);
 	v = fabs(v);
 	if(v > lminmax[0])lminmax[0] = v;
@@ -551,10 +668,22 @@ PetscErrorCode rsf_TS_Monitor(TS ts,PetscInt step,PetscReal time,Vec X,void *ptr
 	if(-x[j+2] > lminmax[2])lminmax[2] = -x[j+2];
 	lsum[0] += x[j+3];		/* slip */
 	lsum[1] += x[j+1]/x[j+2];	/* mu */
+	if(uc->mgrp_n > 0){		/* and into this patch's group */
+	  ig = uc->mgrp_map[kk];
+	  if(v > uc->mgrp_lmx[3*ig])uc->mgrp_lmx[3*ig] = v;
+	  if( x[j+2] > uc->mgrp_lmx[3*ig+1])uc->mgrp_lmx[3*ig+1] =  x[j+2];
+	  if(-x[j+2] > uc->mgrp_lmx[3*ig+2])uc->mgrp_lmx[3*ig+2] = -x[j+2];
+	  uc->mgrp_lsum[2*ig]   += x[j+3];
+	  uc->mgrp_lsum[2*ig+1] += x[j+1]/x[j+2];
+	}
       }
       PetscCall(VecRestoreArrayRead(X,&x));
       PetscCallMPI(MPI_Reduce(lsum,gsum,2,MPIU_REAL,MPI_SUM,0,PETSC_COMM_WORLD));
       PetscCallMPI(MPI_Reduce(lminmax,gminmax,3,MPIU_REAL,MPI_MAX,0,PETSC_COMM_WORLD));
+      if(uc->mgrp_n > 0){
+	PetscCallMPI(MPI_Reduce(uc->mgrp_lsum,uc->mgrp_gsum,2*uc->mgrp_n,MPIU_REAL,MPI_SUM,0,PETSC_COMM_WORLD));
+	PetscCallMPI(MPI_Reduce(uc->mgrp_lmx, uc->mgrp_gmx, 3*uc->mgrp_n,MPIU_REAL,MPI_MAX,0,PETSC_COMM_WORLD));
+      }
       if((medium->comm_rank == 0) && uc->fout_monitor){
 	fprintf(uc->fout_monitor,"%9i %20.8e %17.10f %15.8e %12.7f %15.8e %10.6f %15.8e %15.8e\n",
 		(int)step,time,time/SEC_PER_YEAR,dt,
@@ -563,6 +692,19 @@ PetscErrorCode rsf_TS_Monitor(TS ts,PetscInt step,PetscReal time,Vec X,void *ptr
 		gminmax[1],-gminmax[2]);
 	fflush(uc->fout_monitor); /* so a long run does not look dead: the file is
 				     otherwise buffered and appears empty while running */
+      }
+      if((medium->comm_rank == 0) && (uc->mgrp_n > 0) && uc->mgrp_fout){
+	for(ig=0;ig < uc->mgrp_n;ig++){
+	  if(!uc->mgrp_fout[ig])
+	    continue;
+	  fprintf(uc->mgrp_fout[ig],"%9i %20.8e %17.10f %15.8e %12.7f %15.8e %10.6f %15.8e %15.8e\n",
+		  (int)step,time,time/SEC_PER_YEAR,dt,
+		  log10((uc->mgrp_gmx[3*ig] > 1e-300)?(uc->mgrp_gmx[3*ig]):(1e-300)),
+		  uc->mgrp_gsum[2*ig]/(PetscReal)uc->mgrp_np[ig],
+		  uc->mgrp_gsum[2*ig+1]/(PetscReal)uc->mgrp_np[ig],
+		  uc->mgrp_gmx[3*ig+1],-uc->mgrp_gmx[3*ig+2]);
+	  fflush(uc->mgrp_fout[ig]);
+	}
       }
       /* store last logged state */
       uc->old_time = time;

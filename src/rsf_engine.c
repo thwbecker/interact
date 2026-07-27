@@ -217,13 +217,13 @@ PetscErrorCode rsf_ODE_RHSFunction(TS ts,PetscReal time,Vec X,Vec F,void *ptr)
        state evolution, in the psi variable used throughout
        (implemented in rsf_state_rate above, shared with the IMEX path):
 
-       aging law (state_law 0, default):
+       aging law (state_law 1, default):
          d psi/dt = b/dc (v0 exp((f0-psi)/b) - |v|)
 
-       slip law (state_law 1):
+       slip law (state_law 2):
          d psi/dt = -(|v|/dc) (psi - psi_ss),  psi_ss = f0 - b ln(|v|/v0)
 
-       PRZ law (state_law 2; Perrin, Rice and Zheng, 1995), in the normalization
+       PRZ law (state_law 3; Perrin, Rice and Zheng, 1995), in the normalization
        with Omega = |v| theta/dc and Omega_ss = 1:
          d theta/dt = 1/2 ( 1 - (|v| theta/dc)^2 )
        Substituting theta = (dc/v0) exp((psi-f0)/b) gives
@@ -239,8 +239,8 @@ PetscErrorCode rsf_ODE_RHSFunction(TS ts,PetscReal time,Vec X,Vec F,void *ptr)
        and making it NOT directly comparable to aging and slip at equal dc. The
        Omega_ss = 1 form above is used here so that all three laws are comparable.
 
-       Sato-type law (state_law 3) and the Kato and Tullis composite law
-       (state_law 4): both are the slip law plus the aging law's healing term
+       Sato-type law (state_law 4) and the Kato and Tullis composite law
+       (state_law 5): both are the slip law plus the aging law's healing term
        gated so that healing only operates near stationary contact,
          d theta/dt = gate - Omega ln Omega,   Omega = |v| theta/dc
        with gate = exp(-Omega/sato_beta) for the Sato-type law and

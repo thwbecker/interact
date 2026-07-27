@@ -1,5 +1,15 @@
 #ifndef __READ_RSF_HEADER__
 /* 
+   rate-and-state state evolution laws, for rsf->state_law (-state_law) 
+*/
+#define RSF_AGING_LAW 1
+#define RSF_SLIP_LAW  2
+#define RSF_PRZ_LAW   3
+#define RSF_SATO_LAW  4
+#define RSF_KT_LAW    5
+
+
+/* 
 
    default values
 
@@ -38,6 +48,22 @@ struct rsf_out_ctx{
   PetscReal old_time,dt_monitor,adx_monitor,rdx_monitor,monitor_tmin;
   Vec Xold;
   FILE *fout_monitor;
+  /*
+     optional per fault group monitor (-rsf_monitor_by_group): the same
+     columns as fout_monitor, on the same cadence, but reduced over the
+     patches of one group of the geometry input instead of over the whole
+     fault.  mgrp_n == 0 means the feature is off and none of the arrays
+     below are allocated.  mgrp_map is rank local, length medium->rn, and
+     holds the group slot of each owned patch; mgrp_np holds the GLOBAL
+     patch count per group, so the per group means need no extra reduction
+  */
+  int mgrp_n;			/* number of distinct groups, 0: off */
+  int *mgrp_id;			/* group ids, first seen order, length mgrp_n */
+  int *mgrp_np;			/* global patches per group, length mgrp_n */
+  int *mgrp_map;		/* owned patch -> group slot, length medium->rn */
+  PetscReal *mgrp_lsum,*mgrp_gsum; /* 2*mgrp_n: sum slip, sum mu */
+  PetscReal *mgrp_lmx,*mgrp_gmx;   /* 3*mgrp_n: max|v|, max sigma, -min sigma */
+  FILE **mgrp_fout;		/* rank 0: one file per group, length mgrp_n */
   /* periodic full-field output (stats line, velocity snapshots) */
   PetscReal next_print_time;
   int field_out;
@@ -131,6 +157,7 @@ struct rsf_solve_settings{
   PetscInt field_step_interval;			    /* compact field output cadence [steps] */
   PetscReal field_tmin;				    /* [s] field output time floor */
   PetscBool field_enable;
+  PetscBool monitor_by_group;	/* -rsf_monitor_by_group: per group monitor files */
   PetscBool have_ic,have_dc,have_sigma;
   PetscBool use_imex;		/* -imex: ARKIMEX with implicit local state terms (rsf_imex.c) */
   /* Task 1 outputs (all default off) */
@@ -153,7 +180,8 @@ PetscErrorCode rsf_init_monitor_and_event(struct rsf_out_ctx *,struct interact_c
 						 PetscReal,PetscReal,PetscReal,PetscBool,
 						 PetscReal,Vec,PetscReal,
 						 PetscBool,PetscInt,PetscReal,
-						 struct rsf_group_grid *,int,double *);
+						 struct rsf_group_grid *,int,double *,
+						 PetscBool);
 PetscErrorCode rsf_finalize_monitor_and_event(struct rsf_out_ctx *);
 PetscErrorCode rsf_event_function(TS,PetscReal,Vec,PetscScalar *,void *);
 PetscErrorCode rsf_post_event(TS,PetscInt,PetscInt[],PetscReal,Vec,PetscBool,void *);

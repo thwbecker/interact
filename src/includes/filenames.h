@@ -18,6 +18,9 @@
 #define RSF_CATALOG_FILE "rsf_catalog.dat"
 #define RSF_VEL_TIME_FILE "rsf_vel.times"
 #define RSF_MONITOR_FILE "rsf_monitor.dat"
+/* per fault group monitor files, -rsf_monitor_by_group; group id from the
+   last column of the geometry input, same numbering as rsf_geom.gGGG.dat */
+#define RSF_MONITOR_GROUP_FORMAT "rsf_monitor.g%03d.dat"
 #define RSF_CHECKPOINT_FILE "rsf_checkpoint.bin"
 #define RSF_RUPTURE_TIME_FILE "rsf_rupture_time.dat"
 #define RSF_SLIP_BUDGET_FILE "rsf_slip_budget.dat"
