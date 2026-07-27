@@ -1,0 +1,62 @@
+#!/bin/bash
+#
+# Uphoff, May & Gabriel (2023 GJI, ggac467) section 8.1 splay scenario,
+# normal stress HELD FIXED at the sigma0 of rsf_sigma.in (no In matrix).
+# This is the cheaper of the pair and the one to get running first: with
+# -calc_sigma_dot off the friction law is odd in (tau, v), so the two
+# possible slip-sense conventions are related by an exact symmetry and a
+# sign error in the initial condition shows up as a slow monotonic drift
+# rather than as wrong physics.
+#
+# Run this and run_cycle_sigma from the same input files so that the only
+# difference between the two catalogs is the normal stress treatment.
+#
+# All parameters are plain assignments below; no environment variables.
+
+rundir=run_nosigma
+nproc=8
+
+geom=geom_uphoff.in
+ab=rsf_ab.in
+dc=rsf_dc.in
+sigma=rsf_sigma.in
+vplf=rsf_vpl.in
+icf=rsf_ic.in
+
+shear_modulus=3.204e10      # rho0 cs^2, their Table 6
+s_wave_speed=3464           # their cs
+f0=0.6                      # their f0, must match rsf_input_gen_uphoff.py
+v0=1e-6                     # their V0, must match rsf_input_gen_uphoff.py
+vpl=-1e-9                   # their Vp; rsf_vpl.in replaces this in the
+                            # loading products, this only sets the sign and
+                            # magnitude of the slip-budget reference
+state_law=1                 # 1 = aging, their eq. 7
+rk_type=3bs
+rtol=1e-5
+vel_event=1e-3              # onset threshold, as used for their fig. 13
+rupture_vth=1e-3            # rupture-front threshold; keep at vel_event so
+                            # the slow transients on the outer splays are
+                            # not silently dropped from the catalog
+stop_time_yr=2500           # their t_end is 1500 yr; the extra time is
+                            # spin-up, since T0 is uniform and is not the
+                            # steady state of the velocity-weakening band
+max_steps=50000000
+checkpoint_every=50000
+
+mkdir -p $rundir
+cp $geom $geom.idx $ab $dc $sigma $vplf $icf $rundir/
+cd $rundir || exit 1
+
+mpirun -bind-to core -np $nproc \
+       rsf_solve -geom_file $geom \
+       -rsf_file $ab -rsf_dc_file $dc \
+       -rsf_sigma_file $sigma -rsf_vpl_file $vplf \
+       -rsf_ic_file $icf \
+       -state_law $state_law \
+       -shear_modulus $shear_modulus -s_wave_speed $s_wave_speed \
+       -f0 $f0 -v0 $v0 -vpl $vpl \
+       -rsf_catalog -vel_event $vel_event -rupture_vth $rupture_vth \
+       -rsf_monitor_by_group \
+       -ts_rk_type $rk_type -rtol $rtol \
+       -stop_time_yr $stop_time_yr -ts_max_steps $max_steps \
+       -rsf_checkpoint $checkpoint_every

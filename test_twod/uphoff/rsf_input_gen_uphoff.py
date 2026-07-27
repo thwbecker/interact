@@ -43,12 +43,22 @@ dc_default = 0.05             # their L
 dsigma_dz = 0.0               # their sigma_n is CONSTANT
 sigma_cap = 50.0e6            # cap [Pa]
 sigma_min = 50.0e6            # = cap: constant 50 MPa everywhere
-vpl_by_group = {0: -1.0e-9}   # their Vp (extension, normal sense); main fault only
+slip_sense = -1.0             # sign of slip in interact's 2D convention that
+                              # corresponds to normal (extensional) faulting on
+                              # this geometry.  vpl, v_ic and tau_ic below all
+                              # carry it, so the initial state sits on the same
+                              # branch of the (odd) friction law that the
+                              # backslip loading drives towards.  Confirm the
+                              # sense with a static forward run before trusting
+                              # a normal-stress-evolving cycle: with
+                              # -calc_sigma_dot off the two signs are related by
+                              # an exact symmetry, with it on they are not
+vpl_by_group = {0: slip_sense*1.0e-9}   # their |Vp|; main fault only
 shear_modulus = 3.204e10      # [Pa], only for the h* diagnostics
 f0 = 0.6                      # reference friction, must match -f0
 v0 = 1.0e-6                   # reference velocity, must match -v0
-v_ic = 1.0e-9                 # initial sliding velocity for the ICs
-ic_uniform_tau = 26.5461e6    # their uniform T0 [Pa]; None: per-patch steady state
+v_ic = slip_sense*1.0e-9      # initial sliding velocity for the ICs
+ic_uniform_tau = slip_sense*26.5461e6  # their uniform T0 [Pa]; None: per-patch steady state
 coord_unit_km = 1.0           # geometry length unit in km (1.0: km)
 
 rows = np.loadtxt(geom, usecols=(0, 1, 5, 7))
@@ -80,7 +90,7 @@ np.savetxt("rsf_dc.in", dc, fmt="%.6e")
 np.savetxt("rsf_sigma.in", sig, fmt="%.6e")
 np.savetxt("rsf_vpl.in", vpl, fmt="%.6e")
 if ic_uniform_tau is None:
-    tau_ic = sig*(f0 + (a - b)*np.log(v_ic/v0))
+    tau_ic = slip_sense*sig*(f0 + (a - b)*np.log(abs(v_ic)/v0))
 else:
     tau_ic = np.full(n, ic_uniform_tau)
 np.savetxt("rsf_ic.in", np.column_stack([tau_ic, np.full(n, v_ic)]),

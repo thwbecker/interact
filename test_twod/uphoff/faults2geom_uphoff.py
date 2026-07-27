@@ -23,12 +23,12 @@ import numpy as np
 
 infile = "faults_uphoff.d"
 outgeom = "geom_uphoff.in"
-dx = 0.05         # target element length [km]; their production res_f 0.25
+dx = 0.25         # target element length [km]; their production res_f 0.25
 smooth_km = 0.0   # exact spline samples, no digitization noise
                   # digitization wiggle from the skeleton trace (0: off)
 end_trim_km = 0.0
                   # (skeleton endpoints carry bulb artifacts)
-min_depth = 0.2   # clamp shallow fault tips to at least this depth [km]
+min_depth = 0.0   # clamp shallow fault tips to at least this depth [km]
                   # (digitization can put a tip a fraction of a km above
                   # the surface; the half-plane needs y < 0)
 scale = 1.0       # multiply coordinates (1.0 keeps km as model units)
