@@ -74,13 +74,13 @@ reg=-R$xmin/$xmax/-4e4/1.2e4
 psbasemap  $reg $proj -Ba.5f.05:"horizontal distance, x":/g1e6a1e4f5e3:"stress @@ y = 0":Wesn -Y5 -O -K >> $ofile
 gawk '{if(sqrt($2*$2)<1e-10)print($0)}' stress.out > tmp.top
 sc=1;yl=-5000
-for s in sxx sxy syy;do
+for s in xx xy yy;do
     col=`platecolor $sc`
-    if [ $s = sxx ];then
+    if [ $s = xx ];then
 	c=4
-    elif [ $s = syy ];then
+    elif [ $s = yy ];then
 	c=7
-    elif [ $s = sxy ];then
+    elif [ $s = xy ];then
 	c=5
     fi
     gawk -v col=$c '{print($1,$col)}' tmp.top | psxy -W2,$col $reg $proj -K -O  >> $ofile
