@@ -20,33 +20,37 @@ double ckernel_func(int , int , void *);
 
  */
 /* initialize hacapk structure with N x N matrix */
-extern void *cinit_hacapk_struct(int n, void *ckernel_par);
+extern void *cinit_hacapk_struct(int , void *);
 /* free */
-extern void cdeallocate_hacapk_struct(void* c_pointer);
+extern void cdeallocate_hacapk_struct(void* );
 
 /* set coordinates, should be x[N], y[N], z[N] */
-extern void cset_hacapk_struct_coord(void* c_pointer,
-				     double *x, double *y, double *z);
+extern void cset_hacapk_struct_coord(void* ,double *, double *, double *);
+extern void cset_hacapk_inorm(void* , int );
+extern void cset_hacapk_eta(void* , double );
+extern void cset_hacapk_verbosity(void* , int );
 
 /* get coordinates, should be x[N], y[N], z[N] */
-extern void *cget_hacapk_struct_coordp(void* c_pointer, int dim);
+extern void *cget_hacapk_struct_coordp(void* , int );
 
 /* create an H matrix */
-extern void cmake_hacapk_struct_hmat(void* c_pointer, double ztol);
+extern void cmake_hacapk_struct_hmat(void* , double );
 /* given an H matrix, multiply A x and return b = A x */
-extern void chacapk_mult_Ax_H(void* c_pointer, double *x, double *b);
+extern void chacapk_mult_Ax_H(void* , double *, double *);
 
 /* given a dense matrix, solve x = A\b */
-extern void chacapk_solve_dense(double *Ad, int n, double *b, double *x);
+extern void chacapk_solve_dense(double *, int , double *, double *);
 /* given an H matrix, solve A x = b and return x = A\b */
-extern void chacapk_solve_Ab_H(void* c_pointer, double *b, double *x, double ztol);
+extern void chacapk_solve_Ab_H(void* , double *, double *, double );
 
 /* assmeble a dense matrix */
-extern void chacapk_assemble_dense_mat(void* c_pointer, double *Ad, int n);
+extern void chacapk_assemble_dense_mat(void* , double *, int );
 
-
+extern long cget_hacapk_nnz(void *);
+extern void chacapk_mult_Ax_H(void *, double *, double *);
+PetscErrorCode MatMult_HACApK(Mat , Vec , Vec );
 
 
 /* from testing routines */
-extern void hacapk_assign_random_coord(double *x, double *y, double *z, int *n);
+extern void hacapk_assign_random_coord(double *, double *, double *, int *);
 

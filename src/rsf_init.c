@@ -204,6 +204,7 @@ void rsf_print_help(const char *prog)
   fprintf(stderr,"  -hacapk_ztol <val>      HACApK compression tolerance\n");
   fprintf(stderr,"  -hacapk_eta <val>       HACApK admissibility eta\n");
   fprintf(stderr,"  -hacapk_inorm <int>     HACApK tolerance norm (1 = block-local)\n");
+  fprintf(stderr,"  -hacapk_verb <int>      HACApK verbosity (0 = error, 1 stand., 2 debug)\n");
   fprintf(stderr,"  -hmmvp_tol <val>        hmmvp compression tolerance\n");
   fprintf(stderr,"  -hmmvp_eta <val>        hmmvp admissibility eta\n");
   fprintf(stderr,"  -hmmvp_inorm <int>      hmmvp tolerance norm (1 = block, 3 = matrix MREM)\n");

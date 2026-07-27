@@ -464,6 +464,7 @@ struct med{
 #ifdef USE_HACAPK
   PetscReal hacapk_ztol, hacapk_eta;
   PetscInt hacapk_inorm;		/* 1 or 3 */
+  PetscInt hacapk_verb;
 #endif
 #ifdef USE_BIGWHAM
   PetscReal bigwham_eta, bigwham_eps_aca; /* admissibility, ACA tolerance */

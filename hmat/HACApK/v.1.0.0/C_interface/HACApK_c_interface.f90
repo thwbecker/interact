@@ -69,6 +69,8 @@ CONTAINS
     !
     ! H matrix parameters, these are the defaults, we have routines to override them
     !
+    hacapk_int_handle%st_ctl%param(1) = 0 ! Print : 0:Only Error 1:STD 2:Dubug
+    
     ! H-matrix : dicision param of distance 2.0
     hacapk_int_handle%st_ctl%param(51) = 2.0
     ! param(61): ACA norm mode 1:MREM(absolute ACA_EPS) 3:norm(relative).
@@ -181,6 +183,19 @@ CONTAINS
     end if
     lf_struct%st_ctl%param(61) = inorm
   END SUBROUTINE cset_hacapk_inorm
+  ! Print : 0:Only Error 1:STD 2:Dubug
+  SUBROUTINE cset_hacapk_verbosity(c_pointer, iverb) &
+       BIND(C, name='cset_hacapk_verbosity')
+    TYPE(C_PTR), value, INTENT(in) :: c_pointer
+    integer(c_int), value, intent(in) :: iverb
+    TYPE(hacapk_chandle_struct), POINTER :: lf_struct
+    call c_f_pointer(c_pointer, lf_struct) ! Associate the C handle with a Fortran pointer.
+    if(.not.lf_struct%init)then
+       print *,'cset_hacapk_verbosity: structure not initialized'
+       stop
+    end if
+    lf_struct%st_ctl%param(1) = iverb ! Print : 0:Only Error 1:STD 2:Dubug
+  END SUBROUTINE cset_hacapk_verbosity
 
   !
   ! get pointer to coordinates, dim = 0,1,2

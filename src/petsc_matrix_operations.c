@@ -584,12 +584,16 @@ PetscErrorCode calc_petsc_Isn_matrices(struct med *medium, struct flt *fault,
 	      receive_mode,ictx->rec_stress_mode);
     hacapk_handle = cinit_hacapk_struct((int)m,(void *)ictx);
     cset_hacapk_struct_coord(hacapk_handle,xc,yc,zc);
+    /* 
+       default settings
+    */
     cset_hacapk_eta(hacapk_handle,(double)medium->hacapk_eta); /* override param(51) before the build, eta */
     cset_hacapk_inorm(hacapk_handle,medium->hacapk_inorm);     /* error norm mode */
-    
-    fprintf(stderr,"core %03i/%03i: assigning HACApK m %i n %i ztol %g eta %g inorm: %i\n",
+    cset_hacapk_verbosity(hacapk_handle,medium->hacapk_verb);   /* 0:Only Error 1:STD 2:Dubug */
+
+    fprintf(stderr,"core %03i/%03i: assigning HACApK m %i n %i ztol %g eta %g inorm: %i verb: %i\n",
 	    medium->comm_rank,medium->comm_size,m,n,(double)medium->hacapk_ztol,
-	    (double)medium->hacapk_eta,medium->hacapk_inorm);
+	    (double)medium->hacapk_eta,medium->hacapk_inorm,medium->hacapk_verb);
     cmake_hacapk_struct_hmat(hacapk_handle,(double)medium->hacapk_ztol);
     hctx = (hmat_helper_shell_ctx *)malloc(sizeof(hmat_helper_shell_ctx));
     hctx->handle = hacapk_handle;
@@ -912,6 +916,8 @@ PetscErrorCode set_hmat_defaults_and_options(struct med *medium, int hmat) /*  t
        See test_hmatrix/hmat_backend_evaluation.md. */
     medium->hacapk_inorm = 3;
     PetscCall(PetscOptionsGetInt(NULL,NULL,"-hacapk_inorm",&medium->hacapk_inorm,NULL));
+    medium->hacapk_verb = 0; /* 0:Only Error 1:STD 2:Dubug */
+    PetscCall(PetscOptionsGetInt(NULL,NULL,"-hacapk_verb",&medium->hacapk_verb,NULL));
 #else
     HEADNODE
       fprintf(stderr,"set_hmat_defaults_and_options: HACApk requested but not compiled in (see USE_HACAPK and makefile.petc)\n");

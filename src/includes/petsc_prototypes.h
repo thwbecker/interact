@@ -77,18 +77,8 @@ void setup_kdtree(int ,int ,PetscReal *,struct flt *,struct med *);
    objects into libhacapk.a) and set HACAPK_DEFINES/HACAPK_LIBS, see
    makefile.petsc
 */
-extern void *cinit_hacapk_struct(int, void *);
-extern void cdeallocate_hacapk_struct(void *);
-extern void cset_hacapk_struct_coord(void *, double *, double *, double *);
-extern void cset_hacapk_eta(void *, double);
-extern void cset_hacapk_inorm(void *, int);
-extern void cmake_hacapk_struct_hmat(void *, double);
-/* return this rank's number of stored scalars in the assembled HACApk
-   H-matrix (dense leaves ndl*ndt, low-rank leaves kt*(ndl+ndt)); the caller
-   sums across ranks for the global count. */
-extern long cget_hacapk_nnz(void *);
-extern void chacapk_mult_Ax_H(void *, double *, double *);
-PetscErrorCode MatMult_HACApK(Mat , Vec , Vec );
+#include "HACApK_c_interface.h"
+
 #endif
 
 #ifdef USE_HMMVP
