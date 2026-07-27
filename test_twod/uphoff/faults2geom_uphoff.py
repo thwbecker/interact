@@ -23,6 +23,8 @@ import numpy as np
 
 infile = "faults_uphoff.d"
 outgeom = "geom_uphoff.in"
+outplot = "faults_uphoff_overview.png"
+make_plot = 1     # write outplot (needs matplotlib); 0: off
 dx = 0.25         # target element length [km]; their production res_f 0.25
 smooth_km = 0.0   # exact spline samples, no digitization noise
                   # digitization wiggle from the skeleton trace (0: off)
@@ -174,3 +176,67 @@ for name, gid in idx:
 print(f"wrote {outgeom} ({len(rows)} elements, dx = {dx} km) and {outgeom}.idx")
 for name, c in counts.items():
     print(f"  {name}: {c} elements")
+
+# ---------------------------------------------------------------- plot
+# quick look at what was written: the elements as they will be handed to
+# rsf_solve, and their local dip against depth.  The dip panel is the one
+# that catches shallow-tip damage, since a clamped rather than trimmed
+# polyline shows up there as a few elements at the wrong dip near the
+# surface while the cross section still looks fine at this scale
+if make_plot:
+    try:
+        import matplotlib
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+    except ImportError:
+        print("matplotlib not available, skipping " + outplot)
+    else:
+        R = np.array([(r[0], r[1], r[2], r[3], r[4]) for r in rows])
+        names = np.array([q[0] for q in idx])
+        cols = plt.cm.tab10(np.arange(10))
+        fig = plt.figure(figsize=(12, 7.5))
+        gs = fig.add_gridspec(2, 2, height_ratios=[1.0, 1.25])
+        axc = fig.add_subplot(gs[0, :])
+        axd = fig.add_subplot(gs[1, 0])
+        axz = fig.add_subplot(gs[1, 1])
+        for k, name in enumerate(counts):
+            s = names == name
+            cx, cy, st, hl = R[s, 0], R[s, 1], R[s, 2], R[s, 3]
+            th = np.radians(st - 90.0)
+            xseg = np.vstack([cx - hl*np.cos(th), cx + hl*np.cos(th)])
+            yseg = np.vstack([cy + hl*np.sin(th), cy - hl*np.sin(th)])
+            for q in (axc, axz):
+                q.plot(xseg, yseg, "-", color=cols[k], lw=1.6)
+            axc.plot([], [], "-", color=cols[k], lw=2,
+                     label=f"{name} ({int(s.sum())})")
+            axd.plot(st - 90.0, -cy, ".", ms=2.5, color=cols[k])
+        for q in (axc, axz):
+            q.axhline(0.0, color="k", lw=0.8)
+            q.set_aspect("equal")
+            q.set_xlabel("x [km]")
+            q.set_ylabel("y [km]")
+        axc.set_title(f"{outgeom}: {len(rows)} elements, dx = {dx} km")
+        axc.legend(fontsize=7, loc="lower left", ncol=5)
+        # zoom on the shallowest splay tip and the gap it leaves to the
+        # main fault, which is the part of the geometry that is easiest
+        # to break and hardest to see at full scale
+        s1 = names == "splay1"
+        if s1.any():
+            th1 = np.radians(R[s1, 2] - 90.0)
+            ex = R[s1, 0] + R[s1, 3]*np.cos(th1)
+            ey = R[s1, 1] - R[s1, 3]*np.sin(th1)
+            m = int(np.argmax(ex))
+            axz.set_xlim(ex[m] - 6.0, ex[m] + 6.0)
+            axz.set_ylim(ey[m] - 5.0, ey[m] + 5.0)
+            # perpendicular distance from the splay tip to the planar main
+            # fault, their f2 = 7 km along the 40 deg chord
+            gap = abs(ey[m] + ex[m]*np.tan(np.radians(20.0)))*np.cos(np.radians(20.0))
+            axz.set_title(f"splay1 deep tip, perpendicular gap to main fault {gap:.3f} km")
+        axd.invert_yaxis()
+        axd.set_xlabel("local dip [deg]")
+        axd.set_ylabel("depth [km]")
+        axd.set_title("element dip against depth")
+        axd.grid(alpha=0.3)
+        fig.tight_layout()
+        fig.savefig(outplot, dpi=140)
+        print(f"wrote {outplot}")

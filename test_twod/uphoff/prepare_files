@@ -1,3 +1,56 @@
 #!/bin/bash
+#
+# regenerate every derived file in this directory, in dependency order:
+#
+#   make_faults_uphoff.py    splays.geo construction  -> faults_uphoff.d
+#   faults2geom_uphoff.py    faults_uphoff.d          -> geom_uphoff.in, .idx
+#                                                        faults_uphoff_overview.png
+#   rsf_input_gen_uphoff.py  geom_uphoff.in,          -> rsf_ab.in, rsf_dc.in,
+#                            profile_uphoff.dat          rsf_sigma.in, rsf_vpl.in,
+#                                                        rsf_ic.in
+#                                                        rsf_input_uphoff.png
+#
+# Run this after changing any parameter at the top of the three generators,
+# and commit all of the outputs together: rsf_solve reads geom_uphoff.in and
+# the rsf_*.in files and they have to agree on the patch count.
+#
+# Three couplings that no single script can check on its own:
+#   ds in make_faults_uphoff.py should be at or below dx in
+#     faults2geom_uphoff.py, otherwise curve detail is lost before the
+#     elements are cut;
+#   min_depth in faults2geom_uphoff.py has to stay 0.0, since
+#     make_faults_uphoff.py now trims the shallow tip along the true curve
+#     and the clamp in the converter would flatten it again;
+#   f0, v0 and shear_modulus in rsf_input_gen_uphoff.py have to match the
+#     -f0, -v0 and -shear_modulus of run_cycle_nosigma and run_cycle_sigma.
+#
+# All parameters are plain assignments below; no environment variables.
+
+set -e
+
+geom=geom_uphoff.in
+rsffiles="rsf_ab.in rsf_dc.in rsf_sigma.in rsf_vpl.in rsf_ic.in"
+
 ./make_faults_uphoff.py
 ./faults2geom_uphoff.py
+./rsf_input_gen_uphoff.py
+
+# every per-patch input has to have the same number of rows as the geometry
+n=$(wc -l < $geom)
+for f in $geom.idx $rsffiles; do
+    m=$(wc -l < $f)
+    if [ "$m" -ne "$n" ]; then
+        echo "prepare_files: $f has $m rows, $geom has $n" 1>&2
+        exit 1
+    fi
+done
+
+# every element centre has to sit below the free surface for the half-plane
+# kernels; column 2 of the geometry is y, negative down
+above=$(awk '$2 >= 0 {c++} END {print c+0}' $geom)
+if [ "$above" -ne 0 ]; then
+    echo "prepare_files: $above element centre(s) at or above y = 0 in $geom" 1>&2
+    exit 1
+fi
+
+echo "prepare_files: $n patches, geometry and rsf inputs consistent"

@@ -35,6 +35,8 @@ import sys
 import numpy as np
 
 geom = "geom_uphoff.in"
+outplot = "rsf_input_uphoff.png"
+make_plot = 1     # write outplot (needs matplotlib); 0: off
 idxfile = "geom_uphoff.in.idx"
 group_profiles = {}                              # every other group:
 default_profile = "profile_uphoff.dat"           # this profile (same law on all faults)
@@ -114,3 +116,50 @@ for g in sorted(set(gids)):
           f"{(ratio[vw].min() if vw.any() else float('inf')):9.1f}{flag}")
 print("h* = G D_c / ((b-a) sigma) on velocity-weakening patches; keep")
 print("h*/dx well above ~3 (raise D_c or refine dx where flagged)")
+
+# ---------------------------------------------------------------- plot
+# quick look at the per-patch fields actually written.  The signs matter
+# here: tau_ic, v_ic and vpl all have to sit on the same branch of the
+# (odd) friction law, so a sign slip shows up as tau_ic and vpl on
+# opposite sides of zero in the right-hand panel
+if make_plot:
+    try:
+        import matplotlib
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+    except ImportError:
+        print("matplotlib not available, skipping " + outplot)
+    else:
+        cols = plt.cm.tab10(np.arange(10))
+        fig, ax = plt.subplots(1, 3, figsize=(13, 4.6), sharey=True)
+        for k, g in enumerate(sorted(set(gids))):
+            s = gids == g
+            o = np.argsort(depth_km[s])
+            z = depth_km[s][o]
+            ax[0].plot(a[s][o], z, "-", color=cols[k], lw=1.4, label=f"group {g}")
+            ax[0].plot(b[s][o], z, "--", color=cols[k], lw=1.0)
+            ax[1].plot((a - b)[s][o], z, "-", color=cols[k], lw=1.4)
+            ax[2].plot(tau_ic[s][o]/1e6, z, "-", color=cols[k], lw=1.4)
+            ax[2].plot(sig[s][o]/1e6, z, ":", color=cols[k], lw=1.0)
+        vw = (a - b) < 0
+        if vw.any():
+            ax[1].axhspan(depth_km[vw].min(), depth_km[vw].max(),
+                          color="0.85", zorder=0)
+            ax[1].set_title("a - b (solid), velocity weakening shaded\n"
+                            f"{depth_km[vw].min():.2f} to {depth_km[vw].max():.2f} km")
+        ax[1].axvline(0.0, color="k", lw=0.8)
+        ax[2].axvline(0.0, color="k", lw=0.8)
+        ax[0].set_xlabel("a (solid), b (dashed)")
+        ax[0].set_ylabel("depth [km]")
+        ax[0].legend(fontsize=7)
+        ax[0].set_title(f"{n} patches, D_c = {dc.min():g} to {dc.max():g} m")
+        ax[1].set_xlabel("a - b")
+        ax[2].set_xlabel("tau_ic (solid), sigma (dotted) [MPa]")
+        ax[2].set_title(f"v_ic = {v_ic:+.1e} m/s, vpl = "
+                        f"{min(vpl):+.1e} to {max(vpl):+.1e} m/s")
+        ax[0].invert_yaxis()
+        for q in ax:
+            q.grid(alpha=0.3)
+        fig.tight_layout()
+        fig.savefig(outplot, dpi=140)
+        print(f"wrote {outplot}")
