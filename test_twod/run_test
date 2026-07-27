@@ -39,6 +39,30 @@ EOF
 else
     echo $0: reusing disp.out
 fi
+#
+# analytical check: run the uniform slip case in a subdirectory and
+# compare against the exact half-plane dislocation dipole solution
+# (see analytic_compare.py; independent of the Crouch and Starfield
+# transcription). needs python3 with numpy.
+#
+if [ ! -s const_check/PASSED ];then
+    mkdir -p const_check
+    cp geom.in const_check/
+    cat <<EOF > const_check/bc.in
+1 1
+-1.5 3 501 -1.5 0 201 0 0 1
+-1 -1 -1 0 1
+EOF
+    (cd const_check && interact > interact.log 2>&1 && \
+	 python3 ../analytic_compare.py $dip $hl && touch PASSED)
+    if [ -s const_check/PASSED ];then
+	echo $0: analytic comparison PASSED
+    else
+	echo $0: WARNING: analytic comparison FAILED, see const_check/
+    fi
+else
+    echo $0: analytic comparison previously passed
+fi
 read xmin xmax nx ymin ymax ny zmin zmax nz dx dy dz < disp.hdr
 reg=-R$xmin/$xmax/$ymin/$ymax
 col=4
@@ -64,6 +88,7 @@ ofile=thrust.ps
 proj=-Jx3
 echo $reg
 grdimage sm.grd -Cs.cpt $reg $proj -Y4 -K -P > $ofile
+grdcontour sxy.grd -C5000 $reg $proj -W1 -A  -K -O >> $ofile
 psscale -D7/-1/6/.2h -E -Cs.cpt -B5e3/:@~s@~@-m@-: -O -K >> $ofile
 psbasemap $reg $proj  -Ba.5f.05:"horizontal distance, x":/a.5f.05:"depth, y": -K -O >> $ofile
 cat geom.in | patch2xyz xxx 0 1  | psxy  $reg  -m $proj -K -O -W2,darkgreen >> $ofile
@@ -91,7 +116,7 @@ done
 rm tmp.top
 
 proj=-JX13.5/3
-reg=-R$xmin/$xmax/-.5/.5
+reg=-R$xmin/$xmax/-.3/.5
 psbasemap  $reg $proj -Ba.5f.05:"horizontal distance, x":/g100a.25f.05:"displacement @@ y = 0":WesN -Y3.25 -O -K >> $ofile
 gawk '{if(sqrt($2*$2)<1e-10)print($0)}' disp.out > tmp.top
 sc=1;yl=0.4
