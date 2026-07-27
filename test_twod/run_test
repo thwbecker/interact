@@ -1,0 +1,17 @@
+#!/bin/bash
+#
+# 2D half plane test
+#
+
+dip=30
+hl=10
+n=50
+pif=`pif`
+x=`echo $hl $dip | gawk -v pif=$pif '{print(sin($2/pif)*$1)}'`
+z=`echo $hl $dip | gawk -v pif=$pif '{print(cos($2/pif)*$1+1e-6)}'`
+
+((strike=180-dip))
+makefault -dip 90 -strike $strike -x $x -y -$z -z 0 -l $hl -m 1 -n $n -w 0 > geom.in
+
+
+../plotting/pgeom2d geom

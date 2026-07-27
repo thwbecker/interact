@@ -479,7 +479,7 @@ void read_geometry(char *patch_filename,struct med **medium,
 	  /* check if segment is sticking out into the air */
 	  if((vertex[0*3+INT_Y] > 0 )||(vertex[1*3+INT_Y] > 0)){
 	    if((*medium)->comm_rank == 0){
-	      fprintf(stderr,"read_geometry: error, half-plane segment %i endpoints: %g,%g and %g,%g\n",
+	      fprintf(stderr,"read_geometry: error, half-plane segment %i endpoints: %g,%g and %g,%g (y should be <= 0)\n",
 		      i,vertex[0*3+INT_X] ,vertex[0*3+INT_Y],vertex[1*3+INT_X] ,vertex[1*3+INT_Y]);
 	    }
 	    exit(-1);

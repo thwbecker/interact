@@ -81,7 +81,7 @@ void phelp(void)
   PE("    Since the \"ALLOW_NON_3DQUAD_GEOM\" flag was used during runtime, the program can deal with");
   PE("    some additional patch geometries besides rectangular. Those are selected as follows:");
   PE("");
-  PE("    - POINT SOURCE in half or full space");
+  PE("    - POINT SOURCE in half or full space:");
   PE("      If ONLY fault half-length is set to a negative value, a point source will be assumed instead");
   PE("      of a rectangular fault patch. In this case, width should be set to the `fault' area");
   PE("      and half-length is equivalent to -aspect_ratio, where aspect_ratio is some equivalent L/W.");
@@ -110,7 +110,7 @@ void phelp(void)
   PE("      where exponents indicate the local number of the node, and 999 are place holder values, not used.");
   PE("");
   PE("");
-  PE("    - 2D SEGMENTS in the x-y (half) plane");
+  PE("    - 2D SEGMENTS in the x-y (half) plane:");
   PE("      If fault half-width is zero, then dip should be 90, z=0, and program will run in 2-D mode.");
   PE("      In this case, all z coordinates should still be specified (e.g. in the grid output requests)");
   fprintf(stderr,"      but z should be set to zero. Computation is plane-%s unless changed by -ps.\n",

@@ -11,7 +11,7 @@ int main(int argc, char **argv)
   struct flt *fault;
   struct med *medium;
   int i,j,comp=0;
-  int opmode=PSXYZ_MODE;
+  int opmode = PSXYZ_MODE;
   COMP_PRECISION *scalar=NULL,min,max,*tmp_scalar=NULL;
   my_boolean shrink_patches=FALSE,read_slip = FALSE,
     attempt_read_slip = FALSE,verbose = TRUE;
