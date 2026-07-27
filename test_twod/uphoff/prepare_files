@@ -1,0 +1,3 @@
+#!/bin/bash
+./make_faults_uphoff.py
+./faults2geom_uphoff.py
