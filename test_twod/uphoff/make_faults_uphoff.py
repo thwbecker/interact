@@ -37,15 +37,19 @@ dip         = 20.0      # main normal fault dip [deg], their "dip"
 splay_dip1  = 50.0      # their splay_dip1
 splay_dip2  = 40.0      # their splay_dip2
 f1          = 0.3       # their Macro Splay f1
+
 f2          = 7.0       # their Macro Splay f2 [km], the intentional gap
+
 offsets     = [30.0, 50.0, 70.0, 90.0]   # splay surface offsets [km]
 H           = 60.0      # main fault depth [km], their H
+
 min_depth   = 0.2       # trim the shallow tip to this depth [km]; the
                         # half-plane kernels need y < 0 and an element
                         # centre a few hundred m below the free surface
-ds          = 0.25      # polyline sampling along the curve [km]; keep at
+ds          = 0.05      # polyline sampling along the curve [km]; keep at
                         # or below the target element length dx of
                         # faults2geom_uphoff.py so no curve detail is lost
+                        
 main_extend = 0.0       # extra down-dip length of the main fault beyond
                         # H [km along dip], to emulate their fault
                         # extension towards 1000 km depth (0.0: off).

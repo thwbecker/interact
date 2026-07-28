@@ -24,8 +24,11 @@ import numpy as np
 infile = "faults_uphoff.d"
 outgeom = "geom_uphoff.in"
 outplot = "faults_uphoff_overview.png"
+
+dx = 0.1         # target element length [km]; their production res_f 0.25
+
 make_plot = 1     # write outplot (needs matplotlib); 0: off
-dx = 0.25         # target element length [km]; their production res_f 0.25
+
 smooth_km = 0.0   # exact spline samples, no digitization noise
                   # digitization wiggle from the skeleton trace (0: off)
 end_trim_km = 0.0

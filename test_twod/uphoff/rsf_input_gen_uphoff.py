@@ -45,7 +45,10 @@ dc_default = 0.05             # their L
 dsigma_dz = 0.0               # their sigma_n is CONSTANT
 sigma_cap = 50.0e6            # cap [Pa]
 sigma_min = 50.0e6            # = cap: constant 50 MPa everywhere
-slip_sense = -1.0             # sign of slip in interact's 2D convention that
+
+slip_sense = 1.0              # thrust
+#slip_sense = -1.0              # normal
+#slip_sense = -1.0             # sign of slip in interact's 2D convention that
                               # corresponds to normal (extensional) faulting on
                               # this geometry.  vpl, v_ic and tau_ic below all
                               # carry it, so the initial state sits on the same
@@ -55,6 +58,7 @@ slip_sense = -1.0             # sign of slip in interact's 2D convention that
                               # a normal-stress-evolving cycle: with
                               # -calc_sigma_dot off the two signs are related by
                               # an exact symmetry, with it on they are not
+
 vpl_by_group = {0: slip_sense*1.0e-9}   # their |Vp|; main fault only
 shear_modulus = 3.204e10      # [Pa], only for the h* diagnostics
 f0 = 0.6                      # reference friction, must match -f0
