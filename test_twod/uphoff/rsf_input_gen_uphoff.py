@@ -62,7 +62,7 @@ v0 = 1.0e-6                   # reference velocity, must match -v0
 v_ic = slip_sense*1.0e-9      # initial sliding velocity for the ICs
 #ic_uniform_tau = slip_sense*26.5461e6  # their uniform T0 [Pa]; None: per-patch steady state
 ic_uniform_tau = None
-coord_unit_km = 1.0           # geometry length unit in km (1.0: km)
+coord_unit_km = 0.001         # geometry length unit in km (0.001: meters)
 
 rows = np.loadtxt(geom, usecols=(0, 1, 5, 7))
 gids = rows[:, 3].astype(int)

@@ -33,7 +33,11 @@ end_trim_km = 0.0
 min_depth = 0.0   # clamp shallow fault tips to at least this depth [km]
                   # (digitization can put a tip a fraction of a km above
                   # the surface; the half-plane needs y < 0)
-scale = 1.0       # multiply coordinates (1.0 keeps km as model units)
+scale = 1000.0    # km -> m.  interact's kernels scale as G/length, so the
+                  # geometry must be in the same length unit as -shear_modulus
+                  # [Pa], vpl [m/s] and D_c [m]; km geometry with SI inputs
+                  # weakens the elastic coupling by 1000x and stretches every
+                  # recurrence time by the same factor
 monotone_x = 1    # enforce monotonically increasing x along each fault
                   # (true for this geometry; removes digitization
                   # double-backs at junctions)
