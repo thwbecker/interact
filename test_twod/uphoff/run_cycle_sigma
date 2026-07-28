@@ -18,7 +18,9 @@
 # All parameters are plain assignments below; no environment variables.
 
 rundir=run_sigma
-nproc=8
+nproc=16
+#hmat_flags="-use_hmatrix 4 -hmmvp_inorm 3 -hmmvp_tol 1e-4"
+hmat_flags=""
 
 geom=geom_uphoff.in
 ab=rsf_ab.in
@@ -45,7 +47,7 @@ stop_time_yr=2500           # their t_end is 1500 yr; the extra time is
                             # spin-up, since T0 is uniform and is not the
                             # steady state of the velocity-weakening band
 max_steps=50000000
-checkpoint_every=50000
+checkpoint_every=500000
 
 min_sigma=1e6               # limiter floor [Pa].  Their eq. 11 uses a floor
                             # of 0, which is singular here because the state
@@ -73,4 +75,4 @@ mpirun -bind-to core -np $nproc \
        -calc_sigma_dot -limit_sigma -min_sigma $min_sigma -max_sigma $max_sigma \
        -ts_rk_type $rk_type -rtol $rtol \
        -stop_time_yr $stop_time_yr -ts_max_steps $max_steps \
-       -rsf_checkpoint $checkpoint_every
+       -rsf_checkpoint $checkpoint_every $hmat_flags
