@@ -223,10 +223,10 @@ PetscErrorCode rsf_solve_run(int argc,char **argv,struct interact_ctx *par,
      NOTE on conventions: interact uses the physics (extension
      positive) convention for stress.  the RSF formulation, like HBI,
      needs sigma compression positive, hence the NEGATIVE scale factor
-     for the normal stress interaction matrix.  the shear (strike)
-     convention is consistent as is: positive slip reduces the shear
-     traction on the slipping patch (negative diagonal), so backslip
-     -vpl produces positive loading
+     for the normal stress interaction matrix.  the shear convention
+     is consistent as is: positive slip reduces the shear traction on
+     the slipping patch (negative diagonal), so backslip -vpl produces
+     positive loading
   */
   
   PetscCall(PetscBarrier(NULL));
@@ -381,6 +381,14 @@ PetscErrorCode rsf_solve_run(int argc,char **argv,struct interact_ctx *par,
   for (i = medium->rs,j=i*rsf->dim; i < medium->re; i++,j+=rsf->dim){
     PetscCall(PetscRandomGetValue(prand,&rand_fac));
     fault[i].s[NORMAL] = (rsf->sigma_vec)?(rsf->sigma_vec[i]):(sigma_init);	/* compression positive */
+    /* STRIKE here is only for storage, can externally be
+       corresponding to motion in strike, dip, or intermediate rake
+       component, but we do distinguish between strike and normal
+       stress
+       
+
+    */
+
     if(have_ic){
       fault[i].s[STRIKE] = ic_tau[i];	/* per-cell initial shear stress [Pa] */
       fault[i].u[0]      = ic_vel[i];	/* per-cell initial slip velocity [m/s] */

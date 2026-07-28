@@ -334,7 +334,9 @@ PetscErrorCode rsf_init_catalog(struct rsf_out_ctx *uc,struct interact_ctx *par,
 	      "# onset/arrest |v| threshold = %.3e m/s ; rupture-front |v| threshold = %.3e m/s\n",
 	      uc->vel_event,uc->rupture_vth);
       fprintf(uc->fout_catalog,
-	      "# stress drop = tau_onset - tau_arrest (positive = drop); slip/drop means are over ruptured cells\n");
+	      "# stress drop = |tau_onset| - |tau_arrest| (positive = drop); slip enters as |dslip|; means are over ruptured cells\n");
+      fprintf(uc->fout_catalog,
+	      "# for 2D geometries, M0 and Mw are equivalent values assuming along-strike length = ruptured in-plane length\n");
       fprintf(uc->fout_catalog,
 	      "# ev onset[yr] arrest[yr] duration[s] n_ruptured area_ruptured[m^2] mean_slip[m] max_slip[m] mean_drop[MPa] max_drop[MPa] peak_sliprate[m/s] M0[Nm] Mw\n");
     }
@@ -925,22 +927,34 @@ PetscErrorCode rsf_finalize_event(struct rsf_out_ctx *uc,PetscReal t_arr,Vec X)
   const PetscScalar *xc;
   struct med *medium;struct flt *fault;struct rsf_vars *rsf;
   PetscInt ii,jj,kk;
-  PetscReal lred[5],gred[5],lmx[2],gmx[2],gpeak,gcnt;
+  PetscReal lred[7],gred[7],lmx[2],gmx[2],gpeak,gcnt;
   PetscFunctionBeginUser;
   medium = uc->par->medium;fault = uc->par->fault;rsf = medium->rsf;
   if(!uc->ev_open)
     PetscFunctionReturn(PETSC_SUCCESS);
-  /* lred: 0 sum dslip, 1 sum ddrop, 2 count, 3 area, 4 moment */
-  lred[0]=lred[1]=lred[2]=lred[3]=lred[4]=0.0;
-  lmx[0]=lmx[1]=0.0;		/* max dslip, max ddrop */
+  /* lred: 0 sum |dslip|, 1 sum drop, 2 count, 3 area, 4 moment,
+     5 2D per-unit-thickness moment [Nm/m], 6 2D ruptured in-plane
+     length [m].  Slip enters through its absolute value and the
+     stress drop through the change of |tau|, so both slip senses
+     (e.g. backslip-loaded normal faulting with negative rates)
+     yield positive moment and drop; without this, negative-sense
+     events produced M0 < 0 and the Mw guard value of -99 */
+  lred[0]=lred[1]=lred[2]=lred[3]=lred[4]=lred[5]=lred[6]=0.0;
+  lmx[0]=lmx[1]=0.0;		/* max |dslip|, max drop */
   PetscCall(VecGetArrayRead(X,&xc));
   for(ii=medium->rs,jj=0,kk=0; ii<medium->re; ii++,jj+=rsf->dim,kk++){
     if(uc->cell_ruptured && uc->cell_ruptured[kk]){
-      PetscReal dslip = xc[jj+3] - (uc->snap_slip0?uc->snap_slip0[kk]:0.0);
-      PetscReal ddrop = (uc->snap_tau0?uc->snap_tau0[kk]:0.0) - xc[jj+1];
+      PetscReal dslip = fabs(xc[jj+3] - (uc->snap_slip0?uc->snap_slip0[kk]:0.0));
+      PetscReal ddrop = fabs(uc->snap_tau0?uc->snap_tau0[kk]:0.0) - fabs(xc[jj+1]);
       PetscReal area  = 4.0*fault[ii].l*fault[ii].w;
       lred[0]+=dslip; lred[1]+=ddrop; lred[2]+=1.0; lred[3]+=area;
       lred[4]+=uc->shear_modulus*area*dslip;
+      if((fault[ii].type == TWO_DIM_SEGMENT_PLANE_STRAIN)||
+	 (fault[ii].type == TWO_DIM_SEGMENT_PLANE_STRESS)||
+	 (fault[ii].type == TWO_DIM_HALFPLANE_PLANE_STRAIN)){
+	lred[5]+=uc->shear_modulus*2.0*fault[ii].l*dslip;
+	lred[6]+=2.0*fault[ii].l;
+      }
       if(dslip > lmx[0])lmx[0]=dslip;
       if(ddrop > lmx[1])lmx[1]=ddrop;
     }
@@ -954,14 +968,23 @@ PetscErrorCode rsf_finalize_event(struct rsf_out_ctx *uc,PetscReal t_arr,Vec X)
      sub-threshold transient, not a rupture: skip it.  rupture_vth is the
      definition of rupture, so gcnt == 0 is not an event. */
   if(gcnt > 0.0){
-    PetscCallMPI(MPI_Reduce(lred,gred,5,MPIU_REAL,MPI_SUM,0,PETSC_COMM_WORLD));
+    PetscCallMPI(MPI_Reduce(lred,gred,7,MPIU_REAL,MPI_SUM,0,PETSC_COMM_WORLD));
     PetscCallMPI(MPI_Reduce(lmx,gmx,2,MPIU_REAL,MPI_MAX,0,PETSC_COMM_WORLD));
     PetscCallMPI(MPI_Reduce(&uc->peakv_local,&gpeak,1,MPIU_REAL,MPI_MAX,0,PETSC_COMM_WORLD));
     if((medium->comm_rank == 0) && uc->fout_catalog && (t_arr >= uc->event_tmin)){
       PetscReal mean_slip = gred[0]/gcnt;
       PetscReal mean_drop = gred[1]/gcnt;
       PetscReal M0        = gred[4];
-      PetscReal Mw        = mwfromm0(M0);
+      PetscReal Mw;
+      if(gred[6] > 0.0){
+	/* 2D geometry: the physical quantity is the per-unit-thickness
+	   moment gred[5] [Nm/m]; for an equivalent magnitude assume an
+	   along-strike dimension equal to the ruptured in-plane length
+	   (aspect ratio one), a common convention for 2D cycle models.
+	   The M0 column then carries this equivalent moment [Nm] */
+	M0 = gred[5]*gred[6];
+      }
+      Mw = mwfromm0(M0);
       uc->ncat++;
       fprintf(uc->fout_catalog,
 	      "%5i %17.10f %17.10f %13.6e %8i %14.6e %13.6e %13.6e %12.6e %12.6e %13.6e %13.6e %8.4f\n",

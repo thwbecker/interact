@@ -38,7 +38,21 @@ splay_dip1  = 50.0      # their splay_dip1
 splay_dip2  = 40.0      # their splay_dip2
 f1          = 0.3       # their Macro Splay f1
 
-f2          = 7.0       # their Macro Splay f2 [km], the intentional gap
+f2          = 0.5       # gap between splay end and main fault along the 40
+                        # deg chord [km].  Their production scenario uses 7.0
+                        # (fig. 15c, non-intersecting) because their volumetric
+                        # DG rate-and-state solve fails at the triple junctions
+                        # of the connected variant (fig. 15a).  The BEM cycle
+                        # solve fails at EXACT junctions too (f2 = 0.0 puts a
+                        # splay endpoint on the main fault; the near-coincident
+                        # elements interact with near-singular stiffness and
+                        # the quasi-static solve runs away within a year of
+                        # model time), so the practical connected variant is a
+                        # gap of about two elements: f2 = 0.5 with dx = 0.25
+                        # runs cleanly and couples the splays as closely as the
+                        # discretization allows.  Scale f2 with dx if the
+                        # resolution changes; 7.0 recovers their published
+                        # non-intersecting scenario
 
 offsets     = [30.0, 50.0, 70.0, 90.0]   # splay surface offsets [km]
 H           = 60.0      # main fault depth [km], their H

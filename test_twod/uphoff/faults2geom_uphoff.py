@@ -44,7 +44,9 @@ scale = 1000.0    # km -> m.  interact's kernels scale as G/length, so the
 monotone_x = 1    # enforce monotonically increasing x along each fault
                   # (true for this geometry; removes digitization
                   # double-backs at junctions)
-r_junc = 0.0      # splays intentionally do NOT touch the main fault (7 km gap along the 40 deg chord); never snap
+r_junc = 0.0      # junction repair radius; keep 0.0: the splay curves are
+                  # analytic and end exactly where make_faults_uphoff.py puts
+                  # them (on the main fault for f2 = 0, or f2 km short of it)
                   # splay root, the skeleton trace weaves; the megathrust
                   # is bridged smoothly through the zone and each splay is
                   # extended along its last clean tangent to an exact

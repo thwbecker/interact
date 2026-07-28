@@ -8,19 +8,26 @@ set xlabel 'time [yr]'
 set ylabel 'log_{10}(v [m/s])'
 set title 'with normal stress change'
 set key outside
-plot 'run_sigma/rsf_monitor.g000.dat' using 3 : 5 title 'M' w l lw 2,\
-     'run_sigma/rsf_monitor.g001.dat' using 3 : 5 title 'S1' w l,\
-     'run_sigma/rsf_monitor.g002.dat' using 3 : 5 title 'S2' w l,\
-     'run_sigma/rsf_monitor.g003.dat' using 3 : 5 title 'S3' w l,\
-     'run_sigma/rsf_monitor.g004.dat' using 3 : 5 title 'S4' w l
+#set ytics nomirror
+#set y2label 'M_w'
+#set y2tics nomirror
+#set y2range [6:8]
+set xrange [0:5000]
+plot 'run_sigma/rsf_monitor.g000.dat' using 3 : 5 title 'M' w l lt 8 lw 3,\
+     'run_sigma/rsf_monitor.g001.dat' using 3 : 5 title 'S1' w l lt 1 ,\
+     'run_sigma/rsf_monitor.g002.dat' using 3 : 5 title 'S2' w l lt 2,\
+     'run_sigma/rsf_monitor.g003.dat' using 3 : 5 title 'S3' w l lt 3 ,\
+     'run_sigma/rsf_monitor.g004.dat' using 3 : 5 title 'S4' w l lt 4 lw 2
+#     'run_sigma/rsf_catalog.dat' using 3 : 13 axes x1y2 title 'events' w imp lt 8 lw 2
+     
 
 set origin 0,0
 set title 'no normal stress change'
-plot 'run_nosigma/rsf_monitor.g000.dat' using 3 : 5 title 'M' w l lw 2,\
-     'run_nosigma/rsf_monitor.g001.dat' using 3 : 5 title 'S1' w l,\
-     'run_nosigma/rsf_monitor.g002.dat' using 3 : 5 title 'S2' w l,\
-     'run_nosigma/rsf_monitor.g003.dat' using 3 : 5 title 'S3' w l,\
-     'run_nosigma/rsf_monitor.g004.dat' using 3 : 5 title 'S4' w l
+plot 'run_nosigma/rsf_monitor.g000.dat' using 3 : 5 title 'M' w l lt 8 lw 3,\
+     'run_nosigma/rsf_monitor.g001.dat' using 3 : 5 title 'S1' w l lt 1,\
+     'run_nosigma/rsf_monitor.g002.dat' using 3 : 5 title 'S2' w l lt 2 ,\
+     'run_nosigma/rsf_monitor.g003.dat' using 3 : 5 title 'S3' w l lt 3 ,\
+     'run_nosigma/rsf_monitor.g004.dat' using 3 : 5 title 'S4' w l lt 4 lw 2
 
 
 !modifybb uphoff.ps 1
