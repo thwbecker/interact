@@ -1,0 +1,30 @@
+#!/bin/bash
+models=${1-"bp5 bp5_sl bp5_prz bp5_sato bp5_imex bp5_sl_imex bp5_prz_imex bp5_sato_imex"}
+hmode=${2-1}
+res=${3-0.1km}
+ncore=${4-56}
+
+wdir=`pwd`
+TACC=${TACC:-0}
+
+for m in $models;do
+    cat <<EOF > sbatch.$m.$hmode
+#!/bin/bash
+#SBATCH -A EAR22003
+#SBATCH -t 48:00:00
+#SBATCH -N 1
+#SBATCH -n $ncore
+#SBATCH -D $wdir
+#SBATCH -o $wdir/run_logs/run.$m.$hmode.log
+#SBATCH -p normal
+./create_run $m $res $hmode $hmode
+EOF
+    if [ $TACC -eq 1 ];then
+	sbatch sbatch.$m.$hmode
+    else
+	sh -x sbatch.$m.$hmode
+    fi
+
+
+
+done

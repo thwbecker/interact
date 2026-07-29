@@ -427,9 +427,9 @@ PetscErrorCode rsf_solve_run(int argc,char **argv,struct interact_ctx *par,
   */
   PetscCall(VecDuplicate(x,&vatol));
   for (i = medium->rs,j=i*rsf->dim; i < medium->re; i++,j+=rsf->dim){
-    PetscCall(VecSetValue(vatol,(PetscInt)(j+0),1e-12, INSERT_VALUES)); /* psi */
-    PetscCall(VecSetValue(vatol,(PetscInt)(j+1),1e-3,  INSERT_VALUES)); /* tau [Pa] */
-    PetscCall(VecSetValue(vatol,(PetscInt)(j+2),1e-3,  INSERT_VALUES)); /* sigma [Pa] */
+    PetscCall(VecSetValue(vatol,(PetscInt)(j+0),RSF_AERROR_PSI, INSERT_VALUES)); /* psi */
+    PetscCall(VecSetValue(vatol,(PetscInt)(j+1),RSF_AERROR_TAU,  INSERT_VALUES)); /* tau [Pa] */
+    PetscCall(VecSetValue(vatol,(PetscInt)(j+2),RSF_AERROR_SIGMA,  INSERT_VALUES)); /* sigma [Pa] */
     PetscCall(VecSetValue(vatol,(PetscInt)(j+3),atol_slip,INSERT_VALUES)); /* slip [m] */
   }
   PetscCall(VecAssemblyBegin(vatol));PetscCall(VecAssemblyEnd(vatol));

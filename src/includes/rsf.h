@@ -21,6 +21,16 @@
 #define RSF_DEFAULT_VPL 1e-9
 #define RSF_DEFAULT_V0 1e-6
 #define RSF_DEFAULT_NORMAL_STRESS  5.0e7
+
+/* 
+
+   defaultt absolute error tolerance for ODE integration
+
+*/
+#define RSF_AERROR_PSI 1e-12 /* psi */
+#define RSF_AERROR_TAU 1e-3 /* tau [Pa] */
+#define RSF_AERROR_SIGMA 1e-3 /* sigma [Pa] */
+
 /* 
    context for the monitor and event functions, following the layout
    in hmatrix_test/ode_solve_test.c; the RHS keeps using the plain

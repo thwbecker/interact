@@ -151,6 +151,8 @@ void rsf_print_help(const char *prog)
 
   fprintf(stderr,"time stepping\n");
   fprintf(stderr,"  -rtol <val>             ODE relative tolerance (default 1e-4)\n");
+  fprintf(stderr,"                          absolute tolerances for tau: %e sigma %e psi %e\n",
+	  RSF_AERROR_TAU,RSF_AERROR_SIGMA, RSF_AERROR_PSI);
   fprintf(stderr,"  -atol_slip <m>          absolute tolerance for slip entries (default 1e-3)\n");
   fprintf(stderr,"  -dt_init <s>            initial step size (default 1)\n");
   fprintf(stderr,"  -dt_max <s>             maximum step size (default 1e10)\n");
