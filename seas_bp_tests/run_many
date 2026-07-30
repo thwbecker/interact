@@ -1,8 +1,8 @@
 #!/bin/bash
 models=${1-"bp5 bp5_sl bp5_prz bp5_sato bp5_imex bp5_sl_imex bp5_prz_imex bp5_sato_imex"}
-hmode=${2-1}
-res=${3-0.1km}
-ncore=${4-56}
+hmodes=${2-"1 2 3"}
+res=${3-1km}
+ncore=${4-$NR_CPUS}
 
 wdir=`pwd`
 TACC=${TACC:-0}
