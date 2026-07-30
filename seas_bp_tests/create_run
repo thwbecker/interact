@@ -105,7 +105,7 @@ fi
 mkdir -p $sub_dir
 cd $sub_dir
 
-oname=lr.r.$res.$hmat
+oname=lr.r.$res.$evol_law.$hmat
 lfile=log.$oname.dat
 if [ ! -s $lfile ];then    
     echo $0: in `pwd`, writing to $lfile deleting output
@@ -114,10 +114,10 @@ if [ ! -s $lfile ];then
     $mbin  ../../../bin/rsf_solve  \
 	   -geom_file   ../../bp5/"geom_bp5_"$res".in" -rsf_file    ../../bp5/"rsf_bp5_"$res".dat"   \
 	   -rsf_ic_file ../../bp5/"ic_bp5_"$res".in"   -rsf_dc_file ../../bp5/"dc_bp5_"$res".in"   \
-	   $hmat_flags -shear_modulus 3.204e10 -s_wave_speed 3464 $imex_flag \
+	   $hmat_flags -shear_modulus 3.204e10 -s_wave_speed 3464 $imex_flag -state_law $evol_law \
 	   -f0 0.6 -dc 0.14 -vpl 1e-9 -v0 1e-6 -sigma_init 25e6  -rsf_checkpoint 500000 \
 	   -rtol $rtol -ts_rk_type 3bs -stop_time_yr $tmax -slip_line_dt_yr 5 \
-	   -ts_max_steps 200000000  -rsf_catalog -rsf_rupture_time -state_law $state_law \
+	   -ts_max_steps 200000000  -rsf_catalog -rsf_rupture_time  \
 	   -print_interval_yr 0.02  -rupture_vth 0.01 -log_view 2>> $lfile >> $lfile
     date >> $lfile
     cd ..

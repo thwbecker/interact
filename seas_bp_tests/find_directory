@@ -1,29 +1,54 @@
 #!/bin/bash
-sl=${1-aging}
-res=${2-0.5km}
-imex=${3-0}
+sls=${1-"aging sl prz sato"}
+ress=${2-"1km"}
+imexs=${3-"0 1"}
+hmodes=${4-"1 2 3"}			# if >1, will add number before 
 
-base=${4-bp5}
+base=${5-bp5}
+for hmode in $hmodes;do
+    for sl in $sls;do
+	for res in $ress;do
+	    for imex in $imexs;do
+		
+		if [ $sl = aging ];then
+		    dir=$base
+		elif [ $sl = slip ];then
+		    dir=$base"_"sl
+		else
+		    dir=$base"_"$sl
+		fi
+		if [ $imex = 1 ];then
+		    dir=$dir"_imex"
+		fi
+		if [ ! -s $dir ];then
+		    echo $0: base dir $dir not found > /dev/stderr
+		    exit
+		fi
+		if [ $hmode = 1 ];then
+		    pat=.r.$res
+		else
+		    pat=.r.$res.$hmode
+		fi
+		ls -d $dir/*$pat/  > tmp.$$.dat 2> /dev/null
+		
+		# pick first
+		#head -1 tmp.$$.dat > tmp.$$.2.dat; mv tmp.$$.2.dat tmp.$$.dat
+		
+		n=`lc tmp.$$.dat`
+		if [ $n -eq 0 ];then
+		    echo $0: error, $dir does not hold any $res at hmat $hmode pat $pat > /dev/stderr
+		    cat tmp.$$.dat > /dev/stderr
+		    echo NaN
+		elif [ $n -gt 1 ];then
+		    echo $0: error, $dir holds more than one  $res at hmat $hmode > /dev/stderr
+		    cat tmp.$$.dat > /dev/stderr
+		    echo NaN
+		else
+		    cat tmp.$$.dat
+		fi
+		rm tmp.$$.dat
+	    done
+	done
+    done
 
-if [ $sl = aging ];then
-    dir=$base
-elif [ $sl = slip ];then
-    dir=$base"_"sl
-else
-    dir=$base"_"$sl
-fi
-if [ $imex = 1 ];then
-    dir=$dir"_imex"
-fi
-if [ ! -s $dir ];then
-    echo $0: base dir $dir not found > /dev/stderr
-    exit
-fi
-ls -d $dir/*.$res/ > tmp.$$.dat
-if [ `lc tmp.$$.dat` -ne 1 ];then
-    echo $0: error, $dir does not hold $res > /dev/stderr
-    cat tmp.$$.dat > /dev/stderr
-else
-    cat tmp.$$.dat
-fi
-rm tmp.$$.dat
+done
