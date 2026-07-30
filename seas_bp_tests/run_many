@@ -7,7 +7,8 @@ ncore=${4-$NR_CPUS}
 wdir=`pwd`
 TACC=${TACC:-0}
 
-for m in $models;do
+for hmode in $hmodes;do
+    for m in $models;do
     cat <<EOF > sbatch.$m.$hmode
 #!/bin/bash
 #SBATCH -A EAR22003
@@ -25,6 +26,5 @@ EOF
 	sh -x sbatch.$m.$hmode
     fi
 
-
-
+    done
 done
