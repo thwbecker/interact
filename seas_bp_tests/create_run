@@ -8,7 +8,6 @@ hmode=${3-1}			# H matrix modes
 
 ncore=${4-$NR_CPUS}
 
-
 mkdir -p $m
 cd $m
 
@@ -73,20 +72,6 @@ else
     imex_flag=""
 fi
 #
-# h matrix modes
-#
-hmat_tol=1e-4
-
-if [ $hmode -eq 1 ];then
-    hmat=4;
-    hmat_flags="-use_hmatrix $hmat  -hmmvp_tol $hmat_tol"
-elif [ $hmode -eq 2 ];then
-    hmat_flags="-use_hmatrix 4 -hmmvp_inorm 3 -hmmvp_tol $hmat_tol"
-    sub_dir=$sub_dir.$hmode
-elif [ $hmode -eq 3 ];then
-    hmat_flags="-use_hmatrix 3  -hacapk_ztol  $hmat_tol"
-    sub_dir=$sub_dir.$hmode
-fi
 
 export OMP_NUM_THREADS=1
 TACC=${TACC:-0}
@@ -100,12 +85,27 @@ fi
 #
 # working dir for this host
 #
-sub_dir=$host.$res
+sub_dir=$host.r.$res
+# 
+# h matrix modes, and possibly modify subdirectory name
+#
+hmat_tol=1e-4
+
+if [ $hmode -eq 1 ];then	# default
+    hmat_flags="-use_hmatrix 4                -hmmvp_tol $hmat_tol"
+elif [ $hmode -eq 2 ];then
+    hmat_flags="-use_hmatrix 4 -hmmvp_inorm 3 -hmmvp_tol $hmat_tol"
+elif [ $hmode -eq 3 ];then
+    hmat_flags="-use_hmatrix 3  -hacapk_ztol  $hmat_tol"
+fi
+if [ $hmode -ne 1 ];then
+    sub_dir=$sub_dir.$hmode
+fi
 
 mkdir -p $sub_dir
 cd $sub_dir
 
-oname=lr.$res.$hmat
+oname=lr.r.$res.$hmat
 lfile=log.$oname.dat
 if [ ! -s $lfile ];then    
     echo $0: in `pwd`, writing to $lfile deleting output
