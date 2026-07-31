@@ -1,6 +1,6 @@
 #!/bin/bash
 models=${1-"bp5 bp5_sl bp5_prz bp5_sato bp5_imex bp5_sl_imex bp5_prz_imex bp5_sato_imex"}
-hmodes=${2-"1 2 3"}
+hmodes=${2-"3"}			# 2 and 3 are OK, 1 very slow 
 res=${3-1km}
 ncore=${4-$NR_CPUS}
 
