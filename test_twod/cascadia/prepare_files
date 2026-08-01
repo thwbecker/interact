@@ -8,12 +8,22 @@
 #                                                  faults_cascadia_overview.png
 #   faults2geom_cascadia.py P  faults_P.d       -> geom_P.in, geom_P.in.idx
 #                                                  geom_P_overview.png
-#   rsf_input_gen_cascadia.py P                 -> P/rsf_ab.in, rsf_dc.in,
-#                                                  rsf_sigma.in, rsf_vpl.in,
-#                                                  rsf_ic.in, rsf_input_P.png
+#   rsf_input_gen_cascadia.py P                 -> P_nosigma/ and P_sigma/,
+#                                                  each with rsf_ab.in,
+#                                                  rsf_dc.in, rsf_sigma.in,
+#                                                  rsf_vpl.in, rsf_ic.in
+#                                                  (plus rsf_input_P.png in
+#                                                  the nosigma one)
 #
-# Each section gets its own run directory P/ holding the geometry and the
-# five per-patch files, so the three do not overwrite each other.
+# Six run directories result, one per section and normal stress treatment:
+#
+#   PD06_nosigma  PD07_nosigma  PD13_nosigma    sigma held fixed
+#   PD06_sigma    PD07_sigma    PD13_sigma      sigma evolving
+#
+# Each holds the geometry and the five per-patch files, so it is
+# self-contained.  The inputs of a pair are byte identical on purpose:
+# the only difference between the two runs is the -calc_sigma_dot flag
+# set that run_cycle adds, which is what makes the catalogs comparable.
 #
 # Inputs that are NOT generated: cascadia_picks.d (the colour separation
 # of the three cross sections), zab_TzT.dat (a-b from a subduction
@@ -45,7 +55,9 @@ profiles="PD06 PD07 PD13"
 for p in $profiles; do
     ./faults2geom_cascadia.py $p
     ./rsf_input_gen_cascadia.py $p
-    cp geom_$p.in geom_$p.in.idx $p/
+    for v in nosigma sigma; do
+        cp geom_$p.in geom_$p.in.idx ${p}_$v/
+    done
 done
 
 for p in $profiles; do
@@ -55,12 +67,23 @@ for p in $profiles; do
         echo "prepare_files: $above element centre(s) at or above y = 0 in geom_$p.in" 1>&2
         exit 1
     fi
-    for f in geom_$p.in.idx $p/rsf_ab.in $p/rsf_dc.in $p/rsf_sigma.in $p/rsf_vpl.in $p/rsf_ic.in; do
-        m=$(wc -l < $f)
-        if [ "$m" -ne "$n" ]; then
-            echo "prepare_files: $f has $m rows, geom_$p.in has $n" 1>&2
+    for v in nosigma sigma; do
+        d=${p}_$v
+        for f in geom_$p.in.idx $d/rsf_ab.in $d/rsf_dc.in $d/rsf_sigma.in $d/rsf_vpl.in $d/rsf_ic.in; do
+            m=$(wc -l < $f)
+            if [ "$m" -ne "$n" ]; then
+                echo "prepare_files: $f has $m rows, geom_$p.in has $n" 1>&2
+                exit 1
+            fi
+        done
+    done
+    # the pair has to be byte identical, or the two catalogs are not
+    # a controlled comparison of the normal stress treatment
+    for f in rsf_ab.in rsf_dc.in rsf_sigma.in rsf_vpl.in rsf_ic.in; do
+        if ! cmp -s ${p}_nosigma/$f ${p}_sigma/$f; then
+            echo "prepare_files: ${p}_nosigma/$f and ${p}_sigma/$f differ" 1>&2
             exit 1
         fi
     done
-    echo "prepare_files: $p ok, $n elements, run directory $p/"
+    echo "prepare_files: $p ok, $n elements, run directories ${p}_nosigma/ ${p}_sigma/"
 done

@@ -38,9 +38,18 @@ import numpy as np
 profile = sys.argv[1] if len(sys.argv) > 1 else "PD06"
 geom = "geom_%s.in" % profile
 idxfile = geom + ".idx"
-outdir = profile + "/"    # rsf_*.in and the plot go here, one run
-                          # directory per section, so the three profiles
-                          # do not overwrite each other
+variants = ["nosigma", "sigma"]
+                          # one run directory per section AND per normal
+                          # stress treatment: <profile>_nosigma holds sigma
+                          # fixed at the values in rsf_sigma.in, <profile>_sigma
+                          # evolves it through the In interaction matrix.  The
+                          # per-patch input files are IDENTICAL in the two, so
+                          # they are written twice from the same arrays and the
+                          # only difference between the runs is the flag set in
+                          # run_cycle.  Keeping the inputs byte identical is the
+                          # point: it makes the two catalogs directly comparable
+outdirs = [profile + "_" + v + "/" for v in variants]
+outdir = outdirs[0]
 outplot = outdir + "rsf_input_%s.png" % profile
 make_plot = 1     # write outplot (needs matplotlib); 0: off
 group_profiles = {}                              # megathrust (group 0) and the
@@ -121,19 +130,24 @@ for i in range(n):
     sig[i] = min(max(dsigma_dz*depth_km[i], sigma_min), sigma_cap)
     vpl[i] = vpl_by_group.get(gids[i], 0.0)
 
-os.makedirs(outdir, exist_ok=True)
-np.savetxt(outdir + "rsf_ab.in", np.column_stack([a, b]), fmt="%.6f %.6f")
-np.savetxt(outdir + "rsf_dc.in", dc, fmt="%.6e")
-np.savetxt(outdir + "rsf_sigma.in", sig, fmt="%.6e")
-np.savetxt(outdir + "rsf_vpl.in", vpl, fmt="%.6e")
+for od in outdirs:
+    os.makedirs(od, exist_ok=True)
+    np.savetxt(od + "rsf_ab.in", np.column_stack([a, b]), fmt="%.6f %.6f")
+    np.savetxt(od + "rsf_dc.in", dc, fmt="%.6e")
+    np.savetxt(od + "rsf_sigma.in", sig, fmt="%.6e")
+    np.savetxt(od + "rsf_vpl.in", vpl, fmt="%.6e")
 if ic_uniform_tau is None:
     tau_ic = slip_sense*sig*(f0 + (a - b)*np.log(abs(v_ic)/v0))
 else:
     tau_ic = np.full(n, ic_uniform_tau)
-np.savetxt(outdir + "rsf_ic.in", np.column_stack([tau_ic, np.full(n, v_ic)]),
-           fmt="%.6e %.6e")
+for od in outdirs:
+    np.savetxt(od + "rsf_ic.in", np.column_stack([tau_ic, np.full(n, v_ic)]),
+               fmt="%.6e %.6e")
 
-print(f"wrote {outdir}rsf_ab.in rsf_dc.in rsf_sigma.in rsf_vpl.in rsf_ic.in for {n} patches")
+print("wrote rsf_ab.in rsf_dc.in rsf_sigma.in rsf_vpl.in rsf_ic.in for "
+      f"{n} patches in " + " ".join(outdirs))
+print(f"  sigma {sig.min()/1e6:.2f} to {sig.max()/1e6:.2f} MPa; in the sigma "
+      "variant the limiter bounds in run_cycle have to bracket this")
 print(f"{'group':>5s} {'npatch':>6s} {'depth km':>12s} {'a-b range':>18s} "
       f"{'VW':>4s} {'VS':>4s} {'min h*/dx':>9s}")
 for g in sorted(set(gids)):

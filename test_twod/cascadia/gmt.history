@@ -1,0 +1,8 @@
+# GMT 6 Session common arguments shelf
+BEGIN GMT 6.7.0
+B	a500f100:time [yr]:/a3f1:@[\log_{10}(v [\mathrm{m/s}]@[::.PD13:WeSn
+J	X
+JX	X7/4
+R	500/5000/-20/2
+@L	11
+END

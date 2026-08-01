@@ -52,7 +52,7 @@ make_plot = 1        # write outplot (needs matplotlib); 0: off
 
 deg_mega = 3         # polynomial degree for interface depth against x
 deg_splay = 2        # polynomial degree for splay x against depth
-ds_out = 0.25        # output sampling along each curve [km]; keep at or
+ds_out = 0.05        # output sampling along each curve [km]; keep at or
                      # below the element length dx of faults2geom_cascadia.py
 
 ext_depth_km = 70.0  # continue the interface down to this depth [km].

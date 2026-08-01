@@ -26,13 +26,20 @@ infile = "faults_%s.d" % profile
 outgeom = "geom_%s.in" % profile
 outplot = "geom_%s_overview.png" % profile
 make_plot = 1     # write outplot (needs matplotlib); 0: off
-dx = 0.25         # target element length [km].  Set by the nucleation
-                  # length rather than by the geometry: with b = 0.015,
-                  # D_c = 0.05 m and sigma capped at 50 MPa, L_b =
-                  # G D_c / (b sigma) is 2.0 km, so dx = 0.25 puts eight
-                  # elements in L_b, the same ratio the Uphoff runs had
-                  # at their dx = 0.25.  0.5 km leaves only four and is
-                  # marginal; check the census the generator prints
+dx = 0.1          # target element length [km].  Set by the SPLAYS, not by
+                  # the interface or the nucleation length: the shortest
+                  # splay is 2.07 km (PD13 splay4), so 0.1 km is what it
+                  # takes to give every splay at least twenty elements.
+                  # The generator prints the per-splay element count, so
+                  # check it after changing anything upstream that alters
+                  # splay length.  For reference L_b = G D_c / (b sigma)
+                  # is 2.0 km at D_c = 0.05 m and sigma 50 MPa, so the
+                  # interface is heavily over-resolved at this dx; 0.25
+                  # would be ample for the interface alone
+min_splay_elements = 20
+                  # warn if any splay ends up with fewer elements than
+                  # this.  A splay carrying only a handful of elements
+                  # cannot resolve slip on itself whatever its friction
 min_depth = 0.0   # clamp shallow tips [km]; make_faults_cascadia.py
                   # already trims them, so this should stay a no-op
 scale = 1000.0    # km -> m.  interact's kernels scale as G/length, so
@@ -101,6 +108,13 @@ for name, gid in idx:
 print(f"wrote {outgeom} ({len(rows)} elements, dx = {dx} km, scale = {scale}) and {outgeom}.idx")
 for name, c in counts.items():
     print(f"  {name}: {c} elements")
+sp = {k: v for k, v in counts.items() if k != "megathrust"}
+if sp:
+    worst = min(sp, key=sp.get)
+    print(f"  shortest splay is {worst} with {sp[worst]} elements", end="")
+    print("" if sp[worst] >= min_splay_elements else
+          f"  <-- below the {min_splay_elements} wanted; reduce dx to about "
+          f"{dx*sp[worst]/min_splay_elements:.3f} km")
 
 # ---------------------------------------------------------------- plot
 # the elements as rsf_solve will see them, plus dip against depth, which

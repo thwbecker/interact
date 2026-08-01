@@ -1,33 +1,44 @@
 #!/bin/bash
+s=${1-nosigma}
 
-reg=-R500/5000/-20/2
-proj=-JX7/4
+trange=500/5000
+reg=-R$trange/-20/2
+reg2=-R$trange/4/10
+
+proj=-JX7/3
+proj2=-JX7/2
 fs=""
 for p in PD06 PD07 PD13;do
+    puse=$p"_"$s
 
-    ofile=$p.ps
 
-    psbasemap -Ba500f100:"time [yr]":/a3f1:"@[\log_{10}(v [\mathrm{m/s}]@["::.$p:WeSn -P -K $reg $proj > $ofile
-    gawk '{if(NR>2)print($3,$5)}' $p/rsf_monitor.g000.dat > tmp.dat
+    ofile=$puse.ps
+
+    psbasemap -Ba500f100:"time [yr]":/a3f1:"@[\log_{10}(v [\mathrm{m/s})])@["::.$puse:Wesn -P -Y4 -K $reg $proj > $ofile
+    gawk '{if(substr($1,1,1)!="#")print($3,$5)}' $puse/rsf_monitor.g000.dat > tmp.dat
     minmax tmp.dat
-    psxy tmp.dat $reg $proj -W2,black -O -K >> $ofile
+    psxy tmp.dat $reg $proj -W4,darkgray -O -K >> $ofile
     rm tmp.dat
     i=1
     si=`echo $i | gawk '{printf("g%03i",$1)}'`
     xl=600;dxl=250;yl=1
-    while [ -s $p/rsf_monitor.$si.dat ];do
-	echo  $p/rsf_monitor.$si.dat
+    while [ -s $puse/rsf_monitor.$si.dat ];do
+	echo  $puse/rsf_monitor.$si.dat
 	col=`platecolor $i`
-	gawk '{if(NR>2)print($3,$5)}' $p/rsf_monitor.$si.dat | psxy $reg $proj -W2,$col -O -K >> $ofile
+	gawk '{if(substr($1,1,1)!="#")print($3,$5)}' $puse/rsf_monitor.$si.dat | psxy $reg $proj -W2,$col -O -K >> $ofile
 	echo $xl $yl 18 0 29 LM "S$i" | pstext $reg $proj -O -K -F+f$col >> $ofile
 	((i=i+1))
 	((xl=xl+dxl))
 	si=`echo $i | gawk '{printf("g%03i",$1)}'`
     done
+    
+    psbasemap -Ba500f100:"time [yr]":/a2f.5:"@[M_w@[":WeSn -O -K $reg2 $proj2 -Y-3.05 >> $ofile
+    gawk '{if(substr($1,1,1)!="#")print($3,$13)}' $puse/rsf_catalog.dat | psxy $reg2 $proj2 -Sc.15 -Gblack -O -K >> $ofile
+    
     psxy -T $reg $proj -O >> $ofile
     modifybb $ofile
     fs="$fs $ofile"
 done
-epsmerge -par -x 1 -y 3 $fs > cascadia.ps
-modifybb cascadia.ps 1
+epsmerge -par -x 3 -y 1 --orientation Landscape $fs > cascadia.$s.ps
+modifybb cascadia.$s.ps 1
 rm $fs
