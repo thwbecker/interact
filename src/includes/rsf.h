@@ -161,6 +161,11 @@ struct rsf_out_ctx{
      per group monitor already built
   */
   int cgrp_n;			/* number of groups, 0: off */
+  int *cgrp_id;			/* OWN copy of the group ids, length cgrp_n.  Not a
+				   pointer to mgrp_id: rsf_solve calls
+				   rsf_finalize_monitor_and_event BEFORE
+				   rsf_finalize_catalog, so mgrp_id is already
+				   freed by the time the summary below is printed */
   FILE **cgrp_fout;		/* rank 0: one file per group, length cgrp_n */
   int *cgrp_ncat;		/* rank 0: rows written per group */
   PetscReal *cgrp_peak;		/* [m/s] running max |v| this event, per group */

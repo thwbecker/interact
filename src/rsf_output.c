@@ -286,6 +286,7 @@ static int rsf_init_catalog_groups(struct rsf_out_ctx *uc)
   ng = uc->mgrp_n;
   if(ng < 1)
     return 0;
+  uc->cgrp_id   = (int *)malloc((size_t)ng*sizeof(int));
   uc->cgrp_peak = (PetscReal *)malloc((size_t)ng*sizeof(PetscReal));
   uc->cgrp_t0   = (PetscReal *)malloc((size_t)ng*sizeof(PetscReal));
   uc->cgrp_t1   = (PetscReal *)malloc((size_t)ng*sizeof(PetscReal));
@@ -295,12 +296,13 @@ static int rsf_init_catalog_groups(struct rsf_out_ctx *uc)
   uc->cg_gmx    = (PetscReal *)malloc((size_t)4*(size_t)ng*sizeof(PetscReal));
   uc->cg_lmn    = (PetscReal *)malloc((size_t)ng*sizeof(PetscReal));
   uc->cg_gmn    = (PetscReal *)malloc((size_t)ng*sizeof(PetscReal));
-  if((!uc->cgrp_peak)||(!uc->cgrp_t0)||(!uc->cgrp_t1)||(!uc->cg_lsum)||
+  if((!uc->cgrp_id)||(!uc->cgrp_peak)||(!uc->cgrp_t0)||(!uc->cgrp_t1)||(!uc->cg_lsum)||
      (!uc->cg_gsum)||(!uc->cg_lmx)||(!uc->cg_gmx)||(!uc->cg_lmn)||(!uc->cg_gmn)){
     fprintf(stderr,"rsf_init_catalog_groups: alloc failed for %i group(s), per group catalog off\n",ng);
     return 0;
   }
   for(j=0;j < ng;j++){
+    uc->cgrp_id[j] = uc->mgrp_id[j];
     uc->cgrp_peak[j] = 0.0;
     uc->cgrp_t0[j] = -1.0;
     uc->cgrp_t1[j] = -1.0;
@@ -314,12 +316,12 @@ static int rsf_init_catalog_groups(struct rsf_out_ctx *uc)
       if(uc->cgrp_fout){free(uc->cgrp_fout);uc->cgrp_fout = NULL;}
     }else{
       for(j=0;j < ng;j++){
-	snprintf(fname,STRLEN,RSF_CATALOG_GROUP_FORMAT,uc->mgrp_id[j]);
+	snprintf(fname,STRLEN,RSF_CATALOG_GROUP_FORMAT,uc->cgrp_id[j]);
 	uc->cgrp_fout[j] = myopen(fname,(uc->restarted)?("a"):("w"));
 	if(uc->restarted)
 	  fprintf(uc->cgrp_fout[j],"# restarted\n");
 	fprintf(uc->cgrp_fout[j],"# fault group %i, %i of %i patches\n",
-		uc->mgrp_id[j],uc->mgrp_np[j],medium->nrflt);
+		uc->cgrp_id[j],uc->mgrp_np[j],medium->nrflt);
 	fprintf(uc->cgrp_fout[j],
 		"# one row per event in which this group ruptured; rows are only\n");
 	fprintf(uc->cgrp_fout[j],
@@ -377,7 +379,7 @@ PetscErrorCode rsf_init_catalog(struct rsf_out_ctx *uc,struct interact_ctx *par,
   uc->cell_ruptured = NULL;
   uc->fout_catalog = uc->fout_budget = NULL;
   uc->cgrp_n = 0;
-  uc->cgrp_fout = NULL; uc->cgrp_ncat = NULL;
+  uc->cgrp_fout = NULL; uc->cgrp_ncat = NULL; uc->cgrp_id = NULL;
   uc->cgrp_peak = uc->cgrp_t0 = uc->cgrp_t1 = NULL;
   uc->cg_lsum = uc->cg_gsum = uc->cg_lmx = uc->cg_gmx = NULL;
   uc->cg_lmn = uc->cg_gmn = NULL;
@@ -550,7 +552,7 @@ PetscErrorCode rsf_finalize_catalog(struct rsf_out_ctx *uc)
       for(ig=0;ig < uc->cgrp_n;ig++){
 	if(uc->cgrp_fout[ig]){
 	  fprintf(stderr,"rsf_finalize_catalog: group %i ruptured in %i of %i events\n",
-		  uc->mgrp_id[ig],(uc->cgrp_ncat)?(uc->cgrp_ncat[ig]):(0),uc->ncat);
+		  uc->cgrp_id[ig],(uc->cgrp_ncat)?(uc->cgrp_ncat[ig]):(0),uc->ncat);
 	  fclose(uc->cgrp_fout[ig]);
 	}
       }
@@ -563,6 +565,7 @@ PetscErrorCode rsf_finalize_catalog(struct rsf_out_ctx *uc)
   if(uc->snap_slip0){free(uc->snap_slip0);uc->snap_slip0=NULL;}
   if(uc->cell_ruptured){free(uc->cell_ruptured);uc->cell_ruptured=NULL;}
   /* the per group catalog scratch lives on every rank */
+  if(uc->cgrp_id){free(uc->cgrp_id);uc->cgrp_id=NULL;}
   if(uc->cgrp_peak){free(uc->cgrp_peak);uc->cgrp_peak=NULL;}
   if(uc->cgrp_t0){free(uc->cgrp_t0);uc->cgrp_t0=NULL;}
   if(uc->cgrp_t1){free(uc->cgrp_t1);uc->cgrp_t1=NULL;}

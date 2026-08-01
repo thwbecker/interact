@@ -1,9 +1,10 @@
 #!/bin/bash
 s=${1-nosigma}
 
-trange=500/5000
+#trange=500/5000
+trange=0/5000
 reg=-R$trange/-20/2
-reg2=-R$trange/4/10
+reg2=-R$trange/1/10
 
 proj=-JX7/3
 proj2=-JX7/2
@@ -14,26 +15,52 @@ for p in PD06 PD07 PD13;do
 
     ofile=$puse.ps
 
+    
     psbasemap -Ba500f100:"time [yr]":/a3f1:"@[\log_{10}(v [\mathrm{m/s})])@["::.$puse:Wesn -P -Y4 -K $reg $proj > $ofile
-    gawk '{if(substr($1,1,1)!="#")print($3,$5)}' $puse/rsf_monitor.g000.dat > tmp.dat
-    minmax tmp.dat
-    psxy tmp.dat $reg $proj -W4,darkgray -O -K >> $ofile
-    rm tmp.dat
-    i=1
+
+    i=0
     si=`echo $i | gawk '{printf("g%03i",$1)}'`
-    xl=600;dxl=250;yl=1
-    while [ -s $puse/rsf_monitor.$si.dat ];do
-	echo  $puse/rsf_monitor.$si.dat
+    xl=50;dxl=250;yl=1
+    while [ -s $puse/rsf_monitor.$si.dat ];do # max slip
+	if [ $i = 0 ];then
+	    lw=4
+	else
+	    lw=1
+	fi
 	col=`platecolor $i`
-	gawk '{if(substr($1,1,1)!="#")print($3,$5)}' $puse/rsf_monitor.$si.dat | psxy $reg $proj -W2,$col -O -K >> $ofile
-	echo $xl $yl 18 0 29 LM "S$i" | pstext $reg $proj -O -K -F+f$col >> $ofile
+	echo $0: group $i file $puse/rsf_monitor.$si.dat color $col linewith $lw
+	gawk '{if(substr($1,1,1)!="#")print($3,$5)}' $puse/rsf_monitor.$si.dat | psxy $reg $proj -W$lw,$col -O -K >> $ofile
+	if [ $i -eq 0 ];then
+	    echo $xl $yl 18 0 31 LM "M" | pstext $reg $proj -O -K -F+f$col >> $ofile
+	else
+	    echo $xl $yl 18 0 29 LM "S$i" | pstext $reg $proj -O -K -F+f$col >> $ofile
+	fi
 	((i=i+1))
 	((xl=xl+dxl))
 	si=`echo $i | gawk '{printf("g%03i",$1)}'`
     done
     
     psbasemap -Ba500f100:"time [yr]":/a2f.5:"@[M_w@[":WeSn -O -K $reg2 $proj2 -Y-3.05 >> $ofile
-    gawk '{if(substr($1,1,1)!="#")print($3,$13)}' $puse/rsf_catalog.dat | psxy $reg2 $proj2 -Sc.15 -Gblack -O -K >> $ofile
+    i=0
+    si=`echo $i | gawk '{printf("g%03i",$1)}'`
+    while [ -s $puse/rsf_catalog.$si.dat ];do # events by group
+	col=`platecolor $i`
+	gawk '{if(substr($1,1,1)!="#")print($3,$14)}' $puse/rsf_catalog.$si.dat  > tmp.dat
+	n=`lc tmp.dat`
+	echo $0: group $i file $puse/rsf_catalog.$si.dat n $n color $col 
+	if [ $n -gt 0 ];then
+	    minmax tmp.dat
+	    if [ $i = 0 ];then
+		ss=0.2
+	    else
+		ss=0.15
+	    fi
+	    psxy tmp.dat -N $reg2 $proj2 -Sc$ss -G$col -W.5 -O -K >> $ofile
+	fi
+	rm tmp.dat
+	((i=i+1))
+	si=`echo $i | gawk '{printf("g%03i",$1)}'`
+    done
     
     psxy -T $reg $proj -O >> $ofile
     modifybb $ofile
