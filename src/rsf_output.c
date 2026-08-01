@@ -255,6 +255,101 @@ PetscErrorCode rsf_finalize_monitor_and_event(struct rsf_out_ctx *uc)
   the context.
 
 */
+
+/*
+   per fault group event catalogs (-rsf_catalog together with
+   -rsf_monitor_by_group).  These do NOT re-detect events: they reuse the
+   same global onset/arrest brackets that RSF_CATALOG_FILE is built on, and
+   split each bracket by group.  That is complete rather than restrictive,
+   because the bracket opens whenever the maximum |v| over the WHOLE fault
+   crosses vel_event, so an episode carried by one splay alone opens a
+   bracket just as a megathrust rupture does; what the split adds is which
+   groups took part, how much each slipped, and when each of them went
+   relative to the others.
+
+   The group partition is the one rsf_init_monitor_groups already built, so
+   this returns 0 unless that ran.  Ordering is guaranteed: rsf_solve calls
+   rsf_init_monitor_and_event before rsf_init_catalog.
+
+   Returns the number of groups, or 0 if the feature could not be set up,
+   in which case the caller leaves it off.  All ranks take the same branch,
+   so a rank 0 file open failure disables only the writing, not the
+   reductions.
+*/
+static int rsf_init_catalog_groups(struct rsf_out_ctx *uc)
+{
+  struct med *medium;
+  int ng,j;
+  char fname[STRLEN];
+
+  medium = uc->par->medium;
+  ng = uc->mgrp_n;
+  if(ng < 1)
+    return 0;
+  uc->cgrp_peak = (PetscReal *)malloc((size_t)ng*sizeof(PetscReal));
+  uc->cgrp_t0   = (PetscReal *)malloc((size_t)ng*sizeof(PetscReal));
+  uc->cgrp_t1   = (PetscReal *)malloc((size_t)ng*sizeof(PetscReal));
+  uc->cg_lsum   = (PetscReal *)malloc((size_t)7*(size_t)ng*sizeof(PetscReal));
+  uc->cg_gsum   = (PetscReal *)malloc((size_t)7*(size_t)ng*sizeof(PetscReal));
+  uc->cg_lmx    = (PetscReal *)malloc((size_t)4*(size_t)ng*sizeof(PetscReal));
+  uc->cg_gmx    = (PetscReal *)malloc((size_t)4*(size_t)ng*sizeof(PetscReal));
+  uc->cg_lmn    = (PetscReal *)malloc((size_t)ng*sizeof(PetscReal));
+  uc->cg_gmn    = (PetscReal *)malloc((size_t)ng*sizeof(PetscReal));
+  if((!uc->cgrp_peak)||(!uc->cgrp_t0)||(!uc->cgrp_t1)||(!uc->cg_lsum)||
+     (!uc->cg_gsum)||(!uc->cg_lmx)||(!uc->cg_gmx)||(!uc->cg_lmn)||(!uc->cg_gmn)){
+    fprintf(stderr,"rsf_init_catalog_groups: alloc failed for %i group(s), per group catalog off\n",ng);
+    return 0;
+  }
+  for(j=0;j < ng;j++){
+    uc->cgrp_peak[j] = 0.0;
+    uc->cgrp_t0[j] = -1.0;
+    uc->cgrp_t1[j] = -1.0;
+  }
+  HEADNODE{
+    uc->cgrp_ncat = (int *)calloc((size_t)ng,sizeof(int));
+    uc->cgrp_fout = (FILE **)calloc((size_t)ng,sizeof(FILE *));
+    if((!uc->cgrp_ncat)||(!uc->cgrp_fout)){
+      fprintf(stderr,"rsf_init_catalog_groups: alloc failed for %i output file(s), no per group files written\n",ng);
+      if(uc->cgrp_ncat){free(uc->cgrp_ncat);uc->cgrp_ncat = NULL;}
+      if(uc->cgrp_fout){free(uc->cgrp_fout);uc->cgrp_fout = NULL;}
+    }else{
+      for(j=0;j < ng;j++){
+	snprintf(fname,STRLEN,RSF_CATALOG_GROUP_FORMAT,uc->mgrp_id[j]);
+	uc->cgrp_fout[j] = myopen(fname,(uc->restarted)?("a"):("w"));
+	if(uc->restarted)
+	  fprintf(uc->cgrp_fout[j],"# restarted\n");
+	fprintf(uc->cgrp_fout[j],"# fault group %i, %i of %i patches\n",
+		uc->mgrp_id[j],uc->mgrp_np[j],medium->nrflt);
+	fprintf(uc->cgrp_fout[j],
+		"# one row per event in which this group ruptured; rows are only\n");
+	fprintf(uc->cgrp_fout[j],
+		"# written for groups that actually reached the rupture threshold,\n");
+	fprintf(uc->cgrp_fout[j],
+		"# so a quiet group simply has no row for that event.  The event\n");
+	fprintf(uc->cgrp_fout[j],
+		"# index and the onset/arrest times are the GLOBAL ones of %s,\n",RSF_CATALOG_FILE);
+	fprintf(uc->cgrp_fout[j],
+		"# so rows can be joined to it on column 1; t_first and t_last are\n");
+	fprintf(uc->cgrp_fout[j],
+		"# this group's own, and are resolved to the accepted time steps\n");
+	fprintf(uc->cgrp_fout[j],
+		"# rather than root found, unlike the global onset and arrest.\n");
+	fprintf(uc->cgrp_fout[j],
+		"# All quantities right of t_last are summed over THIS group only,\n");
+	fprintf(uc->cgrp_fout[j],
+		"# with the same definitions and units as %s.\n",RSF_CATALOG_FILE);
+	fprintf(uc->cgrp_fout[j],
+		"# ievent t_onset[yr] t_arrest[yr] t_first[yr] t_last[yr] ncell "
+		"area[m^2] mean_slip[m] max_slip[m] mean_drop[MPa] max_drop[MPa] "
+		"peak_v[m/s] M0[Nm] Mw\n");
+      }
+      fprintf(stderr,"rsf_init_catalog_groups: per group catalog on, %i group(s), %s\n",
+	      ng,RSF_CATALOG_GROUP_FORMAT);
+    }
+  }
+  return ng;
+}
+
 PetscErrorCode rsf_init_catalog(struct rsf_out_ctx *uc,struct interact_ctx *par,
 				struct rsf_solve_settings *set,
 				PetscReal shear_modulus_si,PetscReal vpl,
@@ -281,6 +376,11 @@ PetscErrorCode rsf_init_catalog(struct rsf_out_ctx *uc,struct interact_ctx *par,
   uc->snap_tau0 = uc->snap_slip0 = uc->rup_time = NULL;
   uc->cell_ruptured = NULL;
   uc->fout_catalog = uc->fout_budget = NULL;
+  uc->cgrp_n = 0;
+  uc->cgrp_fout = NULL; uc->cgrp_ncat = NULL;
+  uc->cgrp_peak = uc->cgrp_t0 = uc->cgrp_t1 = NULL;
+  uc->cg_lsum = uc->cg_gsum = uc->cg_lmx = uc->cg_gmx = NULL;
+  uc->cg_lmn = uc->cg_gmn = NULL;
   /*
     The catalog and the rupture-time field are built on the SAME onset/arrest
     crossings that the event tracker (rsf_events.dat) already detects, so they
@@ -357,6 +457,10 @@ PetscErrorCode rsf_init_catalog(struct rsf_out_ctx *uc,struct interact_ctx *par,
     if(uc->budget_enable)
       fprintf(stderr,"rsf_init_catalog: slip-budget diagnostic on\n");
   }
+  /* split the catalog by fault group when the per group monitor is on.
+     Not gated on HEADNODE: the reductions below are collective */
+  if(uc->cat_enable)
+    uc->cgrp_n = rsf_init_catalog_groups(uc);
   /*
     Seeded-start case: if the fault is already above the event threshold at
     t_init (e.g. the BP5 nucleation patch), there is no onset crossing for the
@@ -441,11 +545,34 @@ PetscErrorCode rsf_finalize_catalog(struct rsf_out_ctx *uc)
       fclose(uc->fout_catalog);
       fprintf(stderr,"rsf_finalize_catalog: wrote event catalog (%i completed events)\n",uc->ncat);
     }
+    if(uc->cgrp_fout){
+      int ig;
+      for(ig=0;ig < uc->cgrp_n;ig++){
+	if(uc->cgrp_fout[ig]){
+	  fprintf(stderr,"rsf_finalize_catalog: group %i ruptured in %i of %i events\n",
+		  uc->mgrp_id[ig],(uc->cgrp_ncat)?(uc->cgrp_ncat[ig]):(0),uc->ncat);
+	  fclose(uc->cgrp_fout[ig]);
+	}
+      }
+      free(uc->cgrp_fout);uc->cgrp_fout = NULL;
+    }
+    if(uc->cgrp_ncat){free(uc->cgrp_ncat);uc->cgrp_ncat = NULL;}
     if(uc->fout_budget)fclose(uc->fout_budget);
   }
   if(uc->snap_tau0){free(uc->snap_tau0);uc->snap_tau0=NULL;}
   if(uc->snap_slip0){free(uc->snap_slip0);uc->snap_slip0=NULL;}
   if(uc->cell_ruptured){free(uc->cell_ruptured);uc->cell_ruptured=NULL;}
+  /* the per group catalog scratch lives on every rank */
+  if(uc->cgrp_peak){free(uc->cgrp_peak);uc->cgrp_peak=NULL;}
+  if(uc->cgrp_t0){free(uc->cgrp_t0);uc->cgrp_t0=NULL;}
+  if(uc->cgrp_t1){free(uc->cgrp_t1);uc->cgrp_t1=NULL;}
+  if(uc->cg_lsum){free(uc->cg_lsum);uc->cg_lsum=NULL;}
+  if(uc->cg_gsum){free(uc->cg_gsum);uc->cg_gsum=NULL;}
+  if(uc->cg_lmx){free(uc->cg_lmx);uc->cg_lmx=NULL;}
+  if(uc->cg_gmx){free(uc->cg_gmx);uc->cg_gmx=NULL;}
+  if(uc->cg_lmn){free(uc->cg_lmn);uc->cg_lmn=NULL;}
+  if(uc->cg_gmn){free(uc->cg_gmn);uc->cg_gmn=NULL;}
+  uc->cgrp_n = 0;
   if(uc->rup_time){free(uc->rup_time);uc->rup_time=NULL;}
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -626,8 +753,17 @@ PetscErrorCode rsf_TS_Monitor(TS ts,PetscInt step,PetscReal time,Vec X,void *ptr
     for(i = medium->rs, j=0, k=0; i < medium->re; i++, j+=rsf->dim, k++){
       vv = fabs(vel_from_rsf(xt[j+1],xt[j+2],xt[j],fault[i].mu_sa,rsf->v0,&d1t,&d2t,&d3t,medium));
       if(vv > uc->peakv_local)uc->peakv_local = vv;
+      if(uc->cgrp_n > 0){	/* same running peak, per group */
+	int igc = uc->mgrp_map[k];
+	if(vv > uc->cgrp_peak[igc])uc->cgrp_peak[igc] = vv;
+      }
       if(vv >= uc->rupture_vth){
 	if(uc->cell_ruptured)uc->cell_ruptured[k] = 1;
+	if(uc->cgrp_n > 0){	/* when this group first and last ruptured */
+	  int igc = uc->mgrp_map[k];
+	  if(uc->cgrp_t0[igc] < 0.0)uc->cgrp_t0[igc] = time;
+	  uc->cgrp_t1[igc] = time;
+	}
 	/* first crossing time for event 1 only (absolute; referenced to the
 	   earliest crossing, i.e. the initiation time, when written) */
 	if(uc->rup_enable && uc->rup_armed && (!uc->rup_done) &&
@@ -903,6 +1039,10 @@ PetscErrorCode rsf_post_event(TS ts,PetscInt nevents,PetscInt event_list[],
 	if(uc->cell_ruptured)uc->cell_ruptured[kk] = 0;
       }
       PetscCall(VecRestoreArrayRead(X,&xc));
+      for(kk=0;kk < (PetscInt)uc->cgrp_n;kk++){
+	uc->cgrp_peak[kk] = 0.0;
+	uc->cgrp_t0[kk] = uc->cgrp_t1[kk] = -1.0;
+      }
       uc->ev_open     = PETSC_TRUE;
       uc->onset_time  = t;
       uc->peakv_local = 0.0;
@@ -927,6 +1067,7 @@ PetscErrorCode rsf_finalize_event(struct rsf_out_ctx *uc,PetscReal t_arr,Vec X)
   const PetscScalar *xc;
   struct med *medium;struct flt *fault;struct rsf_vars *rsf;
   PetscInt ii,jj,kk;
+  int igc,ngc;
   PetscReal lred[7],gred[7],lmx[2],gmx[2],gpeak,gcnt;
   PetscFunctionBeginUser;
   medium = uc->par->medium;fault = uc->par->fault;rsf = medium->rsf;
@@ -941,6 +1082,20 @@ PetscErrorCode rsf_finalize_event(struct rsf_out_ctx *uc,PetscReal t_arr,Vec X)
      events produced M0 < 0 and the Mw guard value of -99 */
   lred[0]=lred[1]=lred[2]=lred[3]=lred[4]=lred[5]=lred[6]=0.0;
   lmx[0]=lmx[1]=0.0;		/* max |dslip|, max drop */
+  /* the same accumulators, per fault group: sums 0-6 as in lred, maxima
+     0 max |dslip|, 1 max drop, 2 peak |v|, 3 last rupture time, and a
+     single minimum, the first rupture time.  Groups that never reached
+     rupture_vth stay at zero count and get no row */
+  ngc = uc->cgrp_n;
+  for(igc=0;igc < ngc;igc++){
+    uc->cg_lsum[7*igc+0]=uc->cg_lsum[7*igc+1]=uc->cg_lsum[7*igc+2]=0.0;
+    uc->cg_lsum[7*igc+3]=uc->cg_lsum[7*igc+4]=0.0;
+    uc->cg_lsum[7*igc+5]=uc->cg_lsum[7*igc+6]=0.0;
+    uc->cg_lmx[4*igc+0]=uc->cg_lmx[4*igc+1]=0.0;
+    uc->cg_lmx[4*igc+2]=uc->cgrp_peak[igc];
+    uc->cg_lmx[4*igc+3]=uc->cgrp_t1[igc];
+    uc->cg_lmn[igc]=(uc->cgrp_t0[igc] < 0.0)?(1e300):(uc->cgrp_t0[igc]);
+  }
   PetscCall(VecGetArrayRead(X,&xc));
   for(ii=medium->rs,jj=0,kk=0; ii<medium->re; ii++,jj+=rsf->dim,kk++){
     if(uc->cell_ruptured && uc->cell_ruptured[kk]){
@@ -957,6 +1112,20 @@ PetscErrorCode rsf_finalize_event(struct rsf_out_ctx *uc,PetscReal t_arr,Vec X)
       }
       if(dslip > lmx[0])lmx[0]=dslip;
       if(ddrop > lmx[1])lmx[1]=ddrop;
+      if(ngc > 0){
+	igc = uc->mgrp_map[kk];
+	uc->cg_lsum[7*igc+0]+=dslip; uc->cg_lsum[7*igc+1]+=ddrop;
+	uc->cg_lsum[7*igc+2]+=1.0;   uc->cg_lsum[7*igc+3]+=area;
+	uc->cg_lsum[7*igc+4]+=uc->shear_modulus*area*dslip;
+	if((fault[ii].type == TWO_DIM_SEGMENT_PLANE_STRAIN)||
+	   (fault[ii].type == TWO_DIM_SEGMENT_PLANE_STRESS)||
+	   (fault[ii].type == TWO_DIM_HALFPLANE_PLANE_STRAIN)){
+	  uc->cg_lsum[7*igc+5]+=uc->shear_modulus*2.0*fault[ii].l*dslip;
+	  uc->cg_lsum[7*igc+6]+=2.0*fault[ii].l;
+	}
+	if(dslip > uc->cg_lmx[4*igc+0])uc->cg_lmx[4*igc+0]=dslip;
+	if(ddrop > uc->cg_lmx[4*igc+1])uc->cg_lmx[4*igc+1]=ddrop;
+      }
     }
   }
   PetscCall(VecRestoreArrayRead(X,&xc));
@@ -991,6 +1160,39 @@ PetscErrorCode rsf_finalize_event(struct rsf_out_ctx *uc,PetscReal t_arr,Vec X)
 	      uc->ncat,uc->onset_time/SEC_PER_YEAR,t_arr/SEC_PER_YEAR,t_arr-uc->onset_time,
 	      (int)gcnt,gred[3],mean_slip,gmx[0],mean_drop/1e6,gmx[1]/1e6,gpeak,M0,Mw);
       fflush(uc->fout_catalog);
+    }
+    /* per group rows for the same event.  ncat was just incremented on
+       rank 0 for a written row; when the row was suppressed by
+       event_tmin the group rows are suppressed with it, so the two
+       files stay joinable on the event index */
+    if(ngc > 0){
+      PetscCallMPI(MPI_Reduce(uc->cg_lsum,uc->cg_gsum,7*ngc,MPIU_REAL,MPI_SUM,0,PETSC_COMM_WORLD));
+      PetscCallMPI(MPI_Reduce(uc->cg_lmx, uc->cg_gmx, 4*ngc,MPIU_REAL,MPI_MAX,0,PETSC_COMM_WORLD));
+      PetscCallMPI(MPI_Reduce(uc->cg_lmn, uc->cg_gmn, ngc,  MPIU_REAL,MPI_MIN,0,PETSC_COMM_WORLD));
+      if((medium->comm_rank == 0) && uc->cgrp_fout && uc->fout_catalog &&
+	 (t_arr >= uc->event_tmin)){
+	for(igc=0;igc < ngc;igc++){
+	  PetscReal gc = uc->cg_gsum[7*igc+2];
+	  PetscReal M0g,Mwg,t0g,t1g;
+	  if((gc <= 0.0) || (!uc->cgrp_fout[igc]))
+	    continue;		/* this group did not rupture in this event */
+	  M0g = uc->cg_gsum[7*igc+4];
+	  if(uc->cg_gsum[7*igc+6] > 0.0)
+	    M0g = uc->cg_gsum[7*igc+5]*uc->cg_gsum[7*igc+6];
+	  Mwg = mwfromm0(M0g);
+	  t0g = (uc->cg_gmn[igc] > 1e299)?(uc->onset_time):(uc->cg_gmn[igc]);
+	  t1g = (uc->cg_gmx[4*igc+3] < 0.0)?(t_arr):(uc->cg_gmx[4*igc+3]);
+	  uc->cgrp_ncat[igc]++;
+	  fprintf(uc->cgrp_fout[igc],
+		  "%5i %17.10f %17.10f %17.10f %17.10f %8i %14.6e %13.6e %13.6e %12.6e %12.6e %13.6e %13.6e %8.4f\n",
+		  uc->ncat,uc->onset_time/SEC_PER_YEAR,t_arr/SEC_PER_YEAR,
+		  t0g/SEC_PER_YEAR,t1g/SEC_PER_YEAR,(int)gc,
+		  uc->cg_gsum[7*igc+3],uc->cg_gsum[7*igc+0]/gc,uc->cg_gmx[4*igc+0],
+		  uc->cg_gsum[7*igc+1]/gc/1e6,uc->cg_gmx[4*igc+1]/1e6,
+		  uc->cg_gmx[4*igc+2],M0g,Mwg);
+	  fflush(uc->cgrp_fout[igc]);
+	}
+      }
     }
     /* the rupture-time field is for the first real rupture; freeze it here */
     if(uc->rup_enable && uc->rup_armed && (!uc->rup_done))

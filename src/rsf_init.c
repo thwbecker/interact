@@ -200,7 +200,8 @@ void rsf_print_help(const char *prog)
   fprintf(stderr,"  -field_step_interval <n> slip-rate field frame every n accepted steps (0 = off)\n");
   fprintf(stderr,"  -field_tmin_yr <yr>     suppress field frames before this time (default 0)\n");
   fprintf(stderr,"  -slip_line_dt_yr <yr>   tmp_rsf slip-line snapshot cadence (default off)\n");
-  fprintf(stderr,"  -rsf_monitor_by_group <bool> also write one monitor file per fault group (default 0)\n");
+  fprintf(stderr,"  -rsf_monitor_by_group <bool> also write one monitor file per fault group (default 0);\n");
+  fprintf(stderr,"                          with -rsf_catalog this also splits the event catalog by group\n");
   fprintf(stderr,"\n");
 
   fprintf(stderr,"interaction-matrix backend\n");
@@ -240,6 +241,8 @@ void rsf_print_help(const char *prog)
   fprintf(stderr,"                          frames and replaces the former rsf_stats.dat\n");
   fprintf(stderr,"  %s          one row per slip-rate threshold crossing (-vel_event)\n",RSF_EVENTS_FILE);
   fprintf(stderr,"  %s         one row per completed event (with -rsf_catalog)\n",RSF_CATALOG_FILE);
+  fprintf(stderr,"  %s   the same events split by fault group, when\n",RSF_CATALOG_GROUP_FORMAT);
+  fprintf(stderr,"                          -rsf_catalog and -rsf_monitor_by_group are both set\n");
   fprintf(stderr,"  rsf_geom.gGGG.dat       per-group patch geometry for the field frames\n");
   fprintf(stderr,"\n");
 

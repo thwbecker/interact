@@ -16,6 +16,10 @@
 /* output files */
 #define RSF_EVENTS_FILE "rsf_events.dat"
 #define RSF_CATALOG_FILE "rsf_catalog.dat"
+/* per fault group catalogs, written alongside RSF_CATALOG_FILE when both
+   -rsf_catalog and -rsf_monitor_by_group are set; group id from the last
+   column of the geometry input, same numbering as rsf_monitor.gGGG.dat */
+#define RSF_CATALOG_GROUP_FORMAT "rsf_catalog.g%03d.dat"
 #define RSF_VEL_TIME_FILE "rsf_vel.times"
 #define RSF_MONITOR_FILE "rsf_monitor.dat"
 /* per fault group monitor files, -rsf_monitor_by_group; group id from the

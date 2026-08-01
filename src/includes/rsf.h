@@ -147,6 +147,28 @@ struct rsf_out_ctx{
   int ncat;			/* completed catalog events (arrests written) */
   PetscBool rup_armed;		/* event-1 rupture-time capture is active */
   PetscBool rup_done;		/* event 1 finished; rup_time is frozen */
+  /*
+     optional per fault group catalog (-rsf_catalog together with
+     -rsf_monitor_by_group): for every event that RSF_CATALOG_FILE
+     records, one extra row per group that actually ruptured, carrying
+     that group's own ruptured cells, slip, drop, moment and magnitude,
+     plus the first and last time any of its cells was above
+     rupture_vth.  The event brackets are the SAME global onset/arrest
+     crossings, so RSF_CATALOG_FILE is unchanged and the two are row
+     consistent through the shared event index.  cgrp_n == 0 means the
+     feature is off and none of the arrays below are allocated.  The
+     group partition itself (mgrp_n, mgrp_id, mgrp_map) is the one the
+     per group monitor already built
+  */
+  int cgrp_n;			/* number of groups, 0: off */
+  FILE **cgrp_fout;		/* rank 0: one file per group, length cgrp_n */
+  int *cgrp_ncat;		/* rank 0: rows written per group */
+  PetscReal *cgrp_peak;		/* [m/s] running max |v| this event, per group */
+  PetscReal *cgrp_t0;		/* [s] first time a cell of the group ruptured */
+  PetscReal *cgrp_t1;		/* [s] last such time */
+  PetscReal *cg_lsum,*cg_gsum;	/* 7*cgrp_n reduction scratch (sums) */
+  PetscReal *cg_lmx,*cg_gmx;	/* 4*cgrp_n (maxima) */
+  PetscReal *cg_lmn,*cg_gmn;	/* 1*cgrp_n (minima) */
 };
 /*
    all run settings gathered up front by rsf_get_settings and consumed

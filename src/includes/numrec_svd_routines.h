@@ -12,7 +12,6 @@ extern void cginv(COMP_PRECISION *,COMP_PRECISION *,
 		  COMP_PRECISION *,COMP_PRECISION *,
 		  COMP_PRECISION *,int *,int *);
 
-#ifdef SGI_SUBROUTINE_CONVENTION
 
 #define svdcmp svdcmp_
 #define svbksb svbksb_
@@ -20,5 +19,4 @@ extern void cginv(COMP_PRECISION *,COMP_PRECISION *,
 #define pythag pythag_
 
 
-#endif
 
