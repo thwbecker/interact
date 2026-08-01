@@ -4,28 +4,29 @@
 #
 #res=0.5km
 hmode=${1-1}				#  1,2,3 other Hmat modes
-res=${1-1km}
+res=${2-1km}
 
 
 laws="aging slip prz sato"
 plaws="$laws"
 
 
-ofile=bp5_evol.ps
+ofile=bp5_evol.$res.$hmode.ps
 
 
 if  [ $res = 1km ];then
-    reg=-R1000/2000/-10/1;xann=a50f5;xl=1010
+#    reg=-R1000/2000/-10/1;xann=a50f5;xl=1010
+    reg=-R1250/1440/-10/1;xann=a25f5;xl=1260
 else
     reg=-R1000/1250/-10/1;xann=a50f5;xl=1010
 fi
 
-#reg=-R200/270/-16/1
+
 proj=-JX7/3.5
 #
 # vel vs time for 3bs and IMEX solves
 #
-psbasemap $reg $proj -Y13 -K -P -B$xann:"time [years]":/a2f.5:"@~\341@~log@-10@-(v [m/s])@~\361@~"::."BP5 cycle test @@ $res": > $ofile
+psbasemap $reg $proj -Y13 -K -P -B$xann:"time [years]":/a2f.5:"log@-10@-(max|v [m/s]|)"::."BP5 cycle test @@ $res": > $ofile
 pc=1;
 yl=0;
 for sl in $laws ;do
@@ -59,7 +60,7 @@ by_color=0			# colored lines single plot, 0: several plots
 pc=1
 if [ $by_color = 1 ];then
     proj=-JX7/4
-    psbasemap $reg $proj -Y-5.25 -K -O -Ba.025f0.0025:"mean friction @~\341m\361@~":/a2f.5:"@~\341@~log@-10@-(v [m/s])@~\361@~": >> $ofile
+    psbasemap $reg $proj -Y-5.25 -K -O -Ba.025f0.0025:"mean friction @~\341m\361@~":/a2f.5:"log@-10@-(max|v [m/s]|)": >> $ofile
 
     for sl in $laws ;do
 	dir=`./find_directory $sl $res 0 $hmode 2> /dev/null`
@@ -94,7 +95,7 @@ else
 	    ae=wESn;off="-X3.55"
 	fi
 	psbasemap $reg $proj $off -K -O \
-		  -Ba.025f0.005g0.025:"mean friction @~\341m\361@~":/g3a3f.5:"@~\341@~log@-10@-(v [m/s])@~\361@~":$ae >> $ofile
+		  -Ba.025f0.005g0.025:"mean friction @~\341m\361@~":/g3a3f.5:"log@-10@-(max|v [m/s]|)":$ae >> $ofile
 	sym=-SC
 	if [[ $dir != NaN && `lc $dir/rsf_catalog.dat` -ge 2 ]];then
 	# find the right time to adjust
