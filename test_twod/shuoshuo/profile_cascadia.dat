@@ -1,0 +1,34 @@
+# Depth-dependent rate and state parameters for the megathrust, built
+# from the SHALLOWER of the two frictional-stability estimates in the
+# k_c/k figure of Tectonic Geodynamics (see stability_bands.dat for the
+# digitized band depths and for the caveat about the colour bar sign).
+#
+# What comes from the figure: the DEPTHS.  Velocity weakening spans the
+# red band, 4.89 to 52.46 km.  The cream bands that bracket it, 3.76 to
+# 4.89 km above and 52.46 to 55.20 km below, are the transition zones,
+# so a-b is taken through zero at their midpoints (4.33 and 53.83 km)
+# and ramps linearly across them.  Below the red band a-b keeps
+# increasing through the blue band to the dark blue boundary at 66.4 km,
+# which is why the updip transition here is sharp (about 1 km) and the
+# downdip one is broad (about 14 km), as the figure shows.
+#
+# What does NOT come from the figure: the magnitudes of a and b.  The
+# figure constrains where a-b changes sign, not by how much, so the
+# values below are ordinary lab-range numbers chosen to give a-b of
+# about -0.006 in the seismogenic core.  They set the nucleation size
+# through h* = G D_c / ((b-a) sigma), so check the h*/dx census that
+# rsf_input_gen_cascadia.py prints after editing them.
+#
+# Linear interpolation between control points; end values extend beyond.
+# depth_km    a        b
+0.00      0.0190   0.0110
+3.79      0.0170   0.0110
+4.33      0.0140   0.0140
+4.89      0.0110   0.0150
+15.00     0.0100   0.0160
+40.00     0.0100   0.0160
+52.46     0.0110   0.0150
+53.83     0.0140   0.0140
+55.20     0.0160   0.0120
+66.40     0.0200   0.0100
+100.00    0.0220   0.0100

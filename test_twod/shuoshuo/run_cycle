@@ -1,0 +1,55 @@
+#!/bin/bash
+#
+# Quasi-dynamic seismic cycle on one of the PD06/PD07/PD13 sections.
+# Run it from this directory with the section name as the argument:
+#   ./run_cycle PD06
+# It works inside the run directory that prepare_files built, so the
+# geometry and the five per-patch files are the ones that belong to that
+# section.
+#
+# The flags below are deliberately the ones the Uphoff splay runs used,
+# so the two sets of results are comparable: same D_c, same f0 and v0,
+# same integrator and tolerance, same explicit event threshold.  What
+# differs is the geometry, the a-b(z) profile, and vpl.
+#
+# All parameters are plain assignments below; no environment variables.
+
+set -e
+
+profile=${1:-PD06}
+nproc=$NR_CPUS
+
+geom=geom_$profile.in
+
+shear_modulus=3.0e10        # must match the value in rsf_input_gen_cascadia.py,
+                            # which used it for the h* census
+s_wave_speed=3464
+f0=0.6                      # must match rsf_input_gen_cascadia.py
+v0=1e-6                     # must match rsf_input_gen_cascadia.py
+vpl=1.2e-9                  # thrust sense; rsf_vpl.in carries the per-patch
+                            # values and this only sets the slip-budget
+                            # reference
+state_law=1                 # aging
+rk_type=3bs
+rtol=1e-5
+vel_event=1e-3
+rupture_vth=1e-3
+stop_time_yr=5000
+max_steps=50000000
+checkpoint_every=50000
+
+cd $profile
+
+mpirun -bind-to core -np $nproc \
+       rsf_solve -geom_file $geom \
+       -rsf_file rsf_ab.in -rsf_dc_file rsf_dc.in \
+       -rsf_sigma_file rsf_sigma.in -rsf_vpl_file rsf_vpl.in \
+       -rsf_ic_file rsf_ic.in \
+       -state_law $state_law \
+       -shear_modulus $shear_modulus -s_wave_speed $s_wave_speed \
+       -f0 $f0 -v0 $v0 -vpl $vpl \
+       -rsf_catalog -vel_event $vel_event -rupture_vth $rupture_vth \
+       -rsf_monitor_by_group \
+       -ts_rk_type $rk_type -rtol $rtol \
+       -stop_time_yr $stop_time_yr -ts_max_steps $max_steps \
+       -rsf_checkpoint $checkpoint_every

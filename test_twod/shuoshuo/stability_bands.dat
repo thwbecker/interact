@@ -1,0 +1,36 @@
+# Frictional-stability bands read off the k_c/k figure of Tectonic
+# Geodynamics (colour separation of the supplied PDF page).  Axis
+# calibration from the tick marks: 4.4317 px/km horizontal, 11.085 px/km
+# vertical at 400 dpi, giving VE = 2.50 against the stated VE = 2.5.
+#
+# The figure shows two subduction interfaces, each coloured by k_c/k with
+# a three-band discrete colour scale plus over/under caps.  The bands, in
+# the order the colour bar labels them from top to bottom, are
+#
+#   dark blue   k_c/k > 1
+#   blue        0 < k_c/k < 1
+#   cream      -1 < k_c/k < 0
+#   red        -2 < k_c/k < -1
+#   dark red    k_c/k < -2      (not used on either interface)
+#
+# NOTE ON SIGN.  Taken at face value that puts the red band at the most
+# negative k_c/k, yet red is what occupies the seismogenic depth range on
+# both interfaces while dark blue sits at the trench and below 66 km.
+# The depth ordering below is measured and is not in doubt; only the
+# number attached to each band is.  Whichever way that resolves, the
+# entries below are ordered stable -> unstable -> stable with depth, and
+# the profiles are built from the band DEPTHS, not from the values.
+#
+# columns: estimate  band  depth_top_km  depth_bottom_km
+shallow  darkblue    3.11    3.14
+shallow  blue        3.11    3.83
+shallow  cream       3.76    4.89
+shallow  red         4.89   52.46
+shallow  cream      52.46   55.20
+shallow  blue       55.20   66.40
+shallow  darkblue   66.53   92.92
+deep     darkblue    6.27    7.35
+deep     blue        7.44   13.54
+deep     cream      13.59   21.08
+deep     red        21.08   79.96
+deep     darkblue   80.47   99.77

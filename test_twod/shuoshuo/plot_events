@@ -1,0 +1,29 @@
+#!/bin/bash
+
+reg=-R0/5000/-15/0
+proj=JX7/4
+
+for p in PD06 PD07 PD13;do
+
+    ofile=$p.ps
+
+    psbasemap -Ba500f100:"time [yr]":/a3f1:"@[\log_{10}(v [\mathrm{m/s}]@[":WeSn -P $reg $proj > $ofile
+    set xlabel 'time [yr]'
+
+    gawk '{print($3,$5)}' $p/rsf_monitor.g000.dat $reg $proj -W2,black >> $ofile
+    i=1
+    si=`echo $i | gawk '{printf("g%03i",$1)}'`
+    
+    while [ -s $p/rsf_monitor.$si.dat ];do
+	col=`platecolor $i`
+	gawk '{print($3,$5)}' $p/rsf_monitor.$si.dat $reg $proj -W1,$col >> $ofile
+	((i=i+1))
+	si=`echo $i | gawk '{printf("g%03i",$1)}'`
+    done
+    psxy -T $reg $proj >> $ofile
+    modifybb $ofile
+    fs="$fs $ofile"
+done
+epsmerge -x 1 -y 3 $fs > cascadia.ps
+modifybb cascadia.ps 1
+rm $fs

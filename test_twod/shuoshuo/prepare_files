@@ -1,0 +1,66 @@
+#!/bin/bash
+#
+# regenerate every derived file in this directory, in dependency order:
+#
+#   ab2profile.py              zab_TzT.dat      -> profile_cascadia_TzT.dat
+#   make_faults_cascadia.py    cascadia_picks.d -> faults_PD06.d, faults_PD07.d,
+#                                                  faults_PD13.d
+#                                                  faults_cascadia_overview.png
+#   faults2geom_cascadia.py P  faults_P.d       -> geom_P.in, geom_P.in.idx
+#                                                  geom_P_overview.png
+#   rsf_input_gen_cascadia.py P                 -> P/rsf_ab.in, rsf_dc.in,
+#                                                  rsf_sigma.in, rsf_vpl.in,
+#                                                  rsf_ic.in, rsf_input_P.png
+#
+# Each section gets its own run directory P/ holding the geometry and the
+# five per-patch files, so the three do not overwrite each other.
+#
+# Inputs that are NOT generated: cascadia_picks.d (the colour separation
+# of the three cross sections), zab_TzT.dat (a-b from a subduction
+# geotherm), stability_bands.dat and profile_cascadia*.dat (the k_c/k
+# figure, used for the splays and for the overlay on the plots).
+#
+# Couplings no single script can check:
+#   scale = 1000.0 in faults2geom_cascadia.py has to be paired with
+#     coord_unit_km = 0.001 in rsf_input_gen_cascadia.py, or the geometry
+#     is in km against SI material properties and every recurrence
+#     interval comes out 1000 times too long;
+#   ds_out in make_faults_cascadia.py should be at or below dx in
+#     faults2geom_cascadia.py;
+#   f0 and v0 in rsf_input_gen_cascadia.py have to match the -f0 and -v0
+#     of whatever run script you use, since the initial conditions are
+#     built from them;
+#   ext_depth_km in make_faults_cascadia.py has to reach past the
+#     downdip end of the velocity-weakening band, which the generator
+#     checks and reports.
+#
+# All parameters are plain assignments below; no environment variables.
+
+set -e
+
+profiles="PD06 PD07 PD13"
+
+./ab2profile.py
+./make_faults_cascadia.py
+for p in $profiles; do
+    ./faults2geom_cascadia.py $p
+    ./rsf_input_gen_cascadia.py $p
+    cp geom_$p.in geom_$p.in.idx $p/
+done
+
+for p in $profiles; do
+    n=$(wc -l < geom_$p.in)
+    above=$(awk '$2 >= 0 {c++} END {print c+0}' geom_$p.in)
+    if [ "$above" -ne 0 ]; then
+        echo "prepare_files: $above element centre(s) at or above y = 0 in geom_$p.in" 1>&2
+        exit 1
+    fi
+    for f in geom_$p.in.idx $p/rsf_ab.in $p/rsf_dc.in $p/rsf_sigma.in $p/rsf_vpl.in $p/rsf_ic.in; do
+        m=$(wc -l < $f)
+        if [ "$m" -ne "$n" ]; then
+            echo "prepare_files: $f has $m rows, geom_$p.in has $n" 1>&2
+            exit 1
+        fi
+    done
+    echo "prepare_files: $p ok, $n elements, run directory $p/"
+done

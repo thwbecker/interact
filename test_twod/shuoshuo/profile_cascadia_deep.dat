@@ -1,0 +1,26 @@
+# The DEEPER of the two frictional-stability estimates from the same
+# figure, for comparison runs.  Same construction as profile_cascadia.dat
+# (see the header there and stability_bands.dat): velocity weakening
+# spans the red band, here 21.08 to 79.96 km, with the cream band 13.59
+# to 21.08 km as the updip transition and a-b through zero at its
+# midpoint, 17.34 km.
+#
+# CAVEAT: this estimate has no resolved downdip transition.  The
+# interface is steep where it leaves the red band, so the cream and blue
+# bands there are thinner than the digitization can separate and the
+# figure goes from red at 79.96 km straight to dark blue at 80.47 km.
+# The 80 to 86 km ramp below is therefore assumed, not measured.
+#
+# Linear interpolation between control points; end values extend beyond.
+# depth_km    a        b
+0.00      0.0190   0.0110
+13.59     0.0170   0.0110
+17.34     0.0140   0.0140
+21.08     0.0110   0.0150
+30.00     0.0100   0.0160
+70.00     0.0100   0.0160
+79.96     0.0110   0.0150
+80.50     0.0140   0.0140
+83.00     0.0160   0.0120
+86.00     0.0200   0.0100
+100.00    0.0220   0.0100
