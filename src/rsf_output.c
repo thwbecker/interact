@@ -48,8 +48,8 @@ static int rsf_init_monitor_groups(struct rsf_out_ctx *uc)
   }
   uc->mgrp_np   = (int *)calloc((size_t)ng,sizeof(int));
   uc->mgrp_map  = (int *)malloc((size_t)medium->rn*sizeof(int));
-  uc->mgrp_lsum = (PetscReal *)malloc((size_t)2*(size_t)ng*sizeof(PetscReal));
-  uc->mgrp_gsum = (PetscReal *)malloc((size_t)2*(size_t)ng*sizeof(PetscReal));
+  uc->mgrp_lsum = (PetscReal *)malloc((size_t)MGRP_NSUM*(size_t)ng*sizeof(PetscReal));
+  uc->mgrp_gsum = (PetscReal *)malloc((size_t)MGRP_NSUM*(size_t)ng*sizeof(PetscReal));
   uc->mgrp_lmx  = (PetscReal *)malloc((size_t)3*(size_t)ng*sizeof(PetscReal));
   uc->mgrp_gmx  = (PetscReal *)malloc((size_t)3*(size_t)ng*sizeof(PetscReal));
   if((!uc->mgrp_np)||(!uc->mgrp_map)||(!uc->mgrp_lsum)||(!uc->mgrp_gsum)||
@@ -725,7 +725,7 @@ PetscErrorCode rsf_TS_Monitor(TS ts,PetscInt step,PetscReal time,Vec X,void *ptr
   PetscBool bail;
   int ig;
   PetscInt kk;
-  PetscReal v,lsum[2],gsum[2],lminmax[3],gminmax[3],dt,d1,d2,d3,dx_norm,x_norm;
+  PetscReal v,lsum[MGRP_NSUM],gsum[MGRP_NSUM],lminmax[3],gminmax[3],dt,d1,d2,d3,dx_norm,x_norm;
   struct rsf_vars *rsf;
   PetscFunctionBeginUser;
   {
@@ -793,12 +793,13 @@ PetscErrorCode rsf_TS_Monitor(TS ts,PetscInt step,PetscReal time,Vec X,void *ptr
     if(bail){
       PetscCall(TSGetTimeStep(ts,&dt));
       PetscCall(VecGetArrayRead(X,&x));
-      lsum[0]=lsum[1]=0.0;
+      lsum[0]=lsum[1]=lsum[2]=0.0;
       lminmax[0] = -1e30;		/* max |v| */
       lminmax[1] = -1e30;		/* max sigma */
       lminmax[2] = -1e30;		/* -min sigma */
       for(ig=0;ig < uc->mgrp_n;ig++){ /* same, per fault group */
-	uc->mgrp_lsum[2*ig] = uc->mgrp_lsum[2*ig+1] = 0.0;
+	uc->mgrp_lsum[MGRP_NSUM*ig]   = uc->mgrp_lsum[MGRP_NSUM*ig+1] =
+	  uc->mgrp_lsum[MGRP_NSUM*ig+2] = 0.0;
 	uc->mgrp_lmx[3*ig] = uc->mgrp_lmx[3*ig+1] = uc->mgrp_lmx[3*ig+2] = -1e30;
       }
       for (i = medium->rs, j=0, kk=0; i < medium->re; i++, j+=rsf->dim, kk++) {
@@ -809,28 +810,36 @@ PetscErrorCode rsf_TS_Monitor(TS ts,PetscInt step,PetscReal time,Vec X,void *ptr
 	if(-x[j+2] > lminmax[2])lminmax[2] = -x[j+2];
 	lsum[0] += x[j+3];		/* slip */
 	lsum[1] += x[j+1]/x[j+2];	/* mu */
+	lsum[2] += v;			/* |v|, the mean companion to max|v| */
 	if(uc->mgrp_n > 0){		/* and into this patch's group */
 	  ig = uc->mgrp_map[kk];
 	  if(v > uc->mgrp_lmx[3*ig])uc->mgrp_lmx[3*ig] = v;
 	  if( x[j+2] > uc->mgrp_lmx[3*ig+1])uc->mgrp_lmx[3*ig+1] =  x[j+2];
 	  if(-x[j+2] > uc->mgrp_lmx[3*ig+2])uc->mgrp_lmx[3*ig+2] = -x[j+2];
-	  uc->mgrp_lsum[2*ig]   += x[j+3];
-	  uc->mgrp_lsum[2*ig+1] += x[j+1]/x[j+2];
+	  uc->mgrp_lsum[MGRP_NSUM*ig]   += x[j+3];
+	  uc->mgrp_lsum[MGRP_NSUM*ig+1] += x[j+1]/x[j+2];
+	  uc->mgrp_lsum[MGRP_NSUM*ig+2] += v;
 	}
       }
       PetscCall(VecRestoreArrayRead(X,&x));
-      PetscCallMPI(MPI_Reduce(lsum,gsum,2,MPIU_REAL,MPI_SUM,0,PETSC_COMM_WORLD));
+      PetscCallMPI(MPI_Reduce(lsum,gsum,MGRP_NSUM,MPIU_REAL,MPI_SUM,0,PETSC_COMM_WORLD));
       PetscCallMPI(MPI_Reduce(lminmax,gminmax,3,MPIU_REAL,MPI_MAX,0,PETSC_COMM_WORLD));
       if(uc->mgrp_n > 0){
-	PetscCallMPI(MPI_Reduce(uc->mgrp_lsum,uc->mgrp_gsum,2*uc->mgrp_n,MPIU_REAL,MPI_SUM,0,PETSC_COMM_WORLD));
+	PetscCallMPI(MPI_Reduce(uc->mgrp_lsum,uc->mgrp_gsum,MGRP_NSUM*uc->mgrp_n,MPIU_REAL,MPI_SUM,0,PETSC_COMM_WORLD));
 	PetscCallMPI(MPI_Reduce(uc->mgrp_lmx, uc->mgrp_gmx, 3*uc->mgrp_n,MPIU_REAL,MPI_MAX,0,PETSC_COMM_WORLD));
       }
       if((medium->comm_rank == 0) && uc->fout_monitor){
-	fprintf(uc->fout_monitor,"%9i %20.8e %17.10f %15.8e %12.7f %15.8e %10.6f %15.8e %15.8e\n",
+	fprintf(uc->fout_monitor,"%9i %20.8e %17.10f %15.8e %12.7f %15.8e %10.6f %15.8e %15.8e %12.7f\n",
 		(int)step,time,time/SEC_PER_YEAR,dt,
 		log10(gminmax[0]),gsum[0]/(PetscReal)medium->nrflt,
 		gsum[1]/(PetscReal)medium->nrflt,
-		gminmax[1],-gminmax[2]);
+		gminmax[1],-gminmax[2],
+		/* column 10 is appended, so 1 to 9 keep their meaning and
+		   mean|v| can be read as $NF.  the mean shear stress is not
+		   written separately: it is controlled by mu, which is
+		   already column 7 */
+		log10((gsum[2]/(PetscReal)medium->nrflt > 1e-300)?
+		      (gsum[2]/(PetscReal)medium->nrflt):(1e-300)));
 	fflush(uc->fout_monitor); /* so a long run does not look dead: the file is
 				     otherwise buffered and appears empty while running */
       }
@@ -838,12 +847,14 @@ PetscErrorCode rsf_TS_Monitor(TS ts,PetscInt step,PetscReal time,Vec X,void *ptr
 	for(ig=0;ig < uc->mgrp_n;ig++){
 	  if(!uc->mgrp_fout[ig])
 	    continue;
-	  fprintf(uc->mgrp_fout[ig],"%9i %20.8e %17.10f %15.8e %12.7f %15.8e %10.6f %15.8e %15.8e\n",
+	  fprintf(uc->mgrp_fout[ig],"%9i %20.8e %17.10f %15.8e %12.7f %15.8e %10.6f %15.8e %15.8e %12.7f\n",
 		  (int)step,time,time/SEC_PER_YEAR,dt,
 		  log10((uc->mgrp_gmx[3*ig] > 1e-300)?(uc->mgrp_gmx[3*ig]):(1e-300)),
-		  uc->mgrp_gsum[2*ig]/(PetscReal)uc->mgrp_np[ig],
-		  uc->mgrp_gsum[2*ig+1]/(PetscReal)uc->mgrp_np[ig],
-		  uc->mgrp_gmx[3*ig+1],-uc->mgrp_gmx[3*ig+2]);
+		  uc->mgrp_gsum[MGRP_NSUM*ig]/(PetscReal)uc->mgrp_np[ig],
+		  uc->mgrp_gsum[MGRP_NSUM*ig+1]/(PetscReal)uc->mgrp_np[ig],
+		  uc->mgrp_gmx[3*ig+1],-uc->mgrp_gmx[3*ig+2],
+		  log10((uc->mgrp_gsum[MGRP_NSUM*ig+2]/(PetscReal)uc->mgrp_np[ig] > 1e-300)?
+			(uc->mgrp_gsum[MGRP_NSUM*ig+2]/(PetscReal)uc->mgrp_np[ig]):(1e-300)));
 	  fflush(uc->mgrp_fout[ig]);
 	}
       }

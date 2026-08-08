@@ -230,7 +230,9 @@ void rsf_print_help(const char *prog)
   fprintf(stderr,"output files (change filename in includes/filenames.h)\n");
   fprintf(stderr,"  %s         time series on the adaptive monitor cadence (-dt_monitor,\n",RSF_MONITOR_FILE);
   fprintf(stderr,"                          -adx_monitor, -rdx_monitor): step, time[s], time[yr], dt[s],\n");
-  fprintf(stderr,"                          log10(max|v|), mean_slip, mean_mu, max_sigma, min_sigma.\n");
+  fprintf(stderr,"                          log10(max|v|), mean_slip, mean_mu, max_sigma, min_sigma,\n");
+  fprintf(stderr,"                          log10(mean|v|). The last is appended, so columns 1 to 9\n");
+  fprintf(stderr,"                          are unchanged from earlier versions\n");
   fprintf(stderr,"                          Flushed as it is written\n");
   fprintf(stderr,"  %s   with -rsf_monitor_by_group, the same columns reduced over\n",RSF_MONITOR_GROUP_FORMAT);
   fprintf(stderr,"                          the patches of one fault group (last geometry column)\n");

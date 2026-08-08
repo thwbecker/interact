@@ -215,7 +215,7 @@ if [[ $restart -eq 1 ||  ! -s $lfile ]];then
 	   -f0 0.6 -dc 0.14 -vpl 1e-9 -v0 1e-6 -sigma_init 25e6  -rsf_checkpoint 200000 \
 	   -rtol $rtol $rk_type -stop_time_yr $tmax -slip_line_dt_yr 5 \
 	   -ts_max_steps 200000000  -rsf_catalog -rsf_rupture_time \
-	   -domain_check_max_reject $max_reject \
+	   -domain_check_max_reject $max_reject -rsf_monitor_by_group \
 	   -print_interval_yr 0.02  -rupture_vth 0.01 -log_view 2>> $lfile >> $lfile
     date >> $lfile
     cd ..

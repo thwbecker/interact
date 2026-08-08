@@ -27,6 +27,13 @@
    defaultt absolute error tolerance for ODE integration
 
 */
+/* number of per patch quantities summed for the monitor means: slip, mu,
+   |v|.  the last is appended to the monitor output as column 10,
+   log10(mean|v|), so columns 1 to 9 keep the meaning they had before and
+   mean |v| is the last column.  the mean shear stress is not written
+   separately: it is controlled by mu, already in column 7 */
+#define MGRP_NSUM 3
+
 #define RSF_AERROR_PSI 1e-12 /* psi */
 #define RSF_AERROR_TAU 1e-3 /* tau [Pa] */
 #define RSF_AERROR_SIGMA 1e-3 /* sigma [Pa] */
@@ -71,7 +78,8 @@ struct rsf_out_ctx{
   int *mgrp_id;			/* group ids, first seen order, length mgrp_n */
   int *mgrp_np;			/* global patches per group, length mgrp_n */
   int *mgrp_map;		/* owned patch -> group slot, length medium->rn */
-  PetscReal *mgrp_lsum,*mgrp_gsum; /* 2*mgrp_n: sum slip, sum mu */
+  PetscReal *mgrp_lsum,*mgrp_gsum; /* MGRP_NSUM*mgrp_n: sum slip, sum mu,
+				      sum |v| */
   PetscReal *mgrp_lmx,*mgrp_gmx;   /* 3*mgrp_n: max|v|, max sigma, -min sigma */
   FILE **mgrp_fout;		/* rank 0: one file per group, length mgrp_n */
   /* periodic full-field output (stats line, velocity snapshots) */
