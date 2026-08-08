@@ -5,8 +5,8 @@
 m=${1-bp5}			# name decides imex and creep law
 res=${2-0.5km}
 hmode=${3-3}			# H matrix modes 1: pretty bad/slow 2: ok 3: best?
-
 ncore=${4-$NR_CPUS}
+restart=${5-0}
 
 mkdir -p $m
 cd $m
@@ -89,14 +89,22 @@ sub_dir=$host.r.$res
 # 
 # h matrix modes, and possibly modify subdirectory name
 #
-hmat_tol=1e-4
 
+hmat_tol=1e-4
+rk_type="-ts_rk_type 3bs "
 if [ $hmode -eq 1 ];then	# default
     hmat_flags="-use_hmatrix 4  -hmmvp_inorm 3 -hmmvp_tol $hmat_tol"
 elif [ $hmode -eq 2 ];then
+    hmat_tol=1e-5
     hmat_flags="-use_hmatrix 4  -hmmvp_inorm 3 -hmmvp_tol $hmat_tol"
 elif [ $hmode -eq 3 ];then
     hmat_flags="-use_hmatrix 3  -hacapk_ztol  $hmat_tol"
+elif [ $hmode -eq 4 ];then
+    hmat_flags="-use_hmatrix 4  -hmmvp_inorm 3 -hmmvp_tol $hmat_tol"
+    rk_type="-ts_rk_type 5dp"
+elif [ $hmode -eq 5 ];then
+    	rtol=1e-6
+	hmat_flags="-use_hmatrix 3  -hacapk_ztol  $hmat_tol"
 fi
 if [ $hmode -ne 1 ];then
     sub_dir=$sub_dir.$hmode
@@ -104,10 +112,14 @@ fi
 
 mkdir -p $sub_dir
 cd $sub_dir
-
+if [ $restart -eq 1 ];then
+    rs_flags="-rsf_restart rsf_checkpoint.bin"
+else
+    rs_flags=""
+fi
 oname=lr.r.$res.e.$evol_law.h,$hmode
 lfile=log.$oname.dat
-if [ ! -s $lfile ];then    
+if [[ $restart -eq 1 ||  ! -s $lfile ]];then    
     echo $0: in `pwd`, writing to $lfile deleting output
     rm -r tmp_rsf/* 2> /dev/null
     date > $lfile
@@ -116,8 +128,8 @@ if [ ! -s $lfile ];then
 	   -rsf_ic_file ../../bp5/"ic_bp5_"$res".in"   -rsf_dc_file ../../bp5/"dc_bp5_"$res".in"   \
 	   $hmat_flags -shear_modulus 3.204e10 -s_wave_speed 3464 $imex_flag -state_law $evol_law \
 	   -f0 0.6 -dc 0.14 -vpl 1e-9 -v0 1e-6 -sigma_init 25e6  -rsf_checkpoint 200000 \
-	   -rtol $rtol -ts_rk_type 3bs -stop_time_yr $tmax -slip_line_dt_yr 5 \
-	   -ts_max_steps 200000000  -rsf_catalog -rsf_rupture_time  \
+	   -rtol $rtol $rk_type -stop_time_yr $tmax -slip_line_dt_yr 5 \
+	   -ts_max_steps 200000000  -rsf_catalog -rsf_rupture_time -domain_check_max_reject -1 \
 	   -print_interval_yr 0.02  -rupture_vth 0.01 -log_view 2>> $lfile >> $lfile
     date >> $lfile
     cd ..

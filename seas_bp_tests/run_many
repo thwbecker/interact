@@ -1,29 +1,34 @@
 #!/bin/bash
 models=${1-"bp5 bp5_sl bp5_prz bp5_sato bp5_imex bp5_sl_imex bp5_prz_imex bp5_sato_imex"}
-hmodes=${2-"3"}			# 2 and 3 are OK, 1 very slow 
+hmodes=${2-"2 4"}			# 
 res=${3-1km}
-ncore=${4-$NR_CPUS}
+ncore=${4-56}			# multiples of ppn
+restart=${5-0}
+
+ppn=56
 
 wdir=`pwd`
 TACC=${TACC:-0}
 
+((nhost=ncore/56))
+
 for hmode in $hmodes;do
     for m in $models;do
-    cat <<EOF > sbatch.$m.$hmode
+    cat <<EOF > sbatch.$m.$hmode.$res
 #!/bin/bash
 #SBATCH -A EAR22003
 #SBATCH -t 48:00:00
-#SBATCH -N 1
+#SBATCH -N $nhost
 #SBATCH -n $ncore
 #SBATCH -D $wdir
 #SBATCH -o $wdir/run_logs/run.$m.$hmode.log
 #SBATCH -p normal
-./create_run $m $res $hmode $hmode
+./create_run $m $res $hmode  $ncore $restart
 EOF
     if [ $TACC -eq 1 ];then
-	sbatch sbatch.$m.$hmode
+	sbatch sbatch.$m.$hmode.$res
     else
-	sh -x sbatch.$m.$hmode
+	sh -x sbatch.$m.$hmode.$res
     fi
 
     done
