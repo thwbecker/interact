@@ -8,6 +8,44 @@ hmode=${3-3}			# H matrix modes 1: pretty bad/slow 2: ok 3: best?
 ncore=${4-$NR_CPUS}
 restart=${5-0}
 
+#
+# initial condition convention.  make_bp5.py writes two IC files that differ
+# only inside the 12x12 km nucleation patch:
+#
+#   ic_bp5_<res>.in           BP5 spec: state at steady state for Vpl with the
+#                             patch forced to slide at Vnuc, so that the patch
+#                             starts at Omega = |v| theta/dc = Vnuc/Vpl = 3e7
+#   ic_bp5_ssvinit_<res>.in   state at steady state for the LOCAL initial
+#                             velocity, so that the patch starts at Omega = 1
+#
+# in the shared psi normalization all laws are d psi/dt = (b |v|/dc) g(Omega)
+# with g = 1/Omega - 1 (aging), -ln Omega (slip), (1/Omega - Omega)/2 (PRZ).
+# for Omega >> 1 the aging term saturates at -1 and the slip term grows only
+# like ln Omega, but the PRZ term grows like Omega.  with the spec IC the PRZ
+# patch therefore sheds b ln(Omega) = 0.52 in friction, 13 MPa at 25 MPa, in
+# roughly 1e-7 s.  that is a step change in strength rather than a nucleation,
+# and how it is resolved depends on the step history, so the PRZ first event
+# is not reproducible with the spec IC.
+#
+#   prz  : ssvinit for PRZ, spec IC for the other laws (default)
+#   all  : ssvinit for every law, i.e. like for like across laws, off spec for
+#          all four
+#   spec : spec IC for every law, the previous behaviour
+#
+# NOTE: the subdirectory name does not record this choice, so move or remove an
+# existing bp5_prz/<host>.r.<res> tree before switching conventions
+#
+ic_mode=prz
+#
+# abort after this many CONSECUTIVE out of domain trial steps.  a value <= 0
+# disables the guard, in which case a rejection storm consumes the whole wall
+# clock and leaves a log that reads as a slow run rather than as a failure.
+# a large finite number still lets healthy rejection episodes resolve but names
+# the failure in the log, which is what distinguishes "PRZ blew up" from "PRZ
+# did not reach enough events"
+#
+max_reject=50000
+
 mkdir -p $m
 cd $m
 
@@ -72,6 +110,29 @@ else
     imex_flag=""
 fi
 #
+# pick the IC file that goes with the evolution law
+#
+case $ic_mode in
+    prz)
+	if [ $evol_law -eq 3 ];then
+	    ic_tag=ssvinit_
+	else
+	    ic_tag=""
+	fi
+	;;
+    all)
+	ic_tag=ssvinit_
+	;;
+    spec)
+	ic_tag=""
+	;;
+    *)
+	echo $0: ic_mode $ic_mode not understood
+	exit
+	;;
+esac
+ic_file=../../bp5/"ic_bp5_"$ic_tag$res".in"
+#
 
 export OMP_NUM_THREADS=1
 TACC=${TACC:-0}
@@ -105,6 +166,27 @@ elif [ $hmode -eq 4 ];then
 elif [ $hmode -eq 5 ];then
     	rtol=1e-6
 	hmat_flags="-use_hmatrix 3  -hacapk_ztol  $hmat_tol"
+elif [ $hmode -eq 6 ];then	# H matrix tolerance tightened as the mesh is
+				# refined.  hmodes 1 to 5 hold hmat_tol fixed at
+				# 1e-4 or 1e-5 for every res, so the operator
+				# error sits at a floor that refinement cannot
+				# lower and a resolution convergence test cannot
+				# see anything below it
+    case $res in
+	2km|1km)      hmat_tol=1e-4 ;;
+	0.5km|0.25km) hmat_tol=1e-5 ;;
+	0.1km|0.05km) hmat_tol=1e-6 ;;
+	*)            hmat_tol=1e-5 ;;
+    esac
+    hmat_flags="-use_hmatrix 4  -hmmvp_inorm 3 -hmmvp_tol $hmat_tol"
+elif [ $hmode -eq 7 ];then	# same nominal tolerance, block local (inorm 1)
+				# instead of the global MREM norm (inorm 3) used
+				# by hmodes 1, 2, 4 and 6.  measured on the 1800
+				# plane case inorm 1 over delivers the nominal
+				# tolerance by about 3.5 decades while inorm 3
+				# lands near nominal/10, so this is an
+				# independent handle on the compression error
+    hmat_flags="-use_hmatrix 4  -hmmvp_inorm 1 -hmmvp_tol $hmat_tol"
 fi
 if [ $hmode -ne 1 ];then
     sub_dir=$sub_dir.$hmode
@@ -123,13 +205,17 @@ if [[ $restart -eq 1 ||  ! -s $lfile ]];then
     echo $0: in `pwd`, writing to $lfile deleting output
     rm -r tmp_rsf/* 2> /dev/null
     date > $lfile
+    echo "# model $m res $res evol_law $evol_law imex $imex hmode $hmode" >> $lfile
+    echo "# ic_mode $ic_mode ic_file $ic_file" >> $lfile
+    echo "# hmat_flags $hmat_flags rtol $rtol $rk_type max_reject $max_reject ncore $ncore" >> $lfile
     $mbin  ../../../bin/rsf_solve  \
 	   -geom_file   ../../bp5/"geom_bp5_"$res".in" -rsf_file    ../../bp5/"rsf_bp5_"$res".dat"   \
-	   -rsf_ic_file ../../bp5/"ic_bp5_"$res".in"   -rsf_dc_file ../../bp5/"dc_bp5_"$res".in"   \
+	   -rsf_ic_file $ic_file                       -rsf_dc_file ../../bp5/"dc_bp5_"$res".in"   \
 	   $hmat_flags -shear_modulus 3.204e10 -s_wave_speed 3464 $imex_flag -state_law $evol_law \
 	   -f0 0.6 -dc 0.14 -vpl 1e-9 -v0 1e-6 -sigma_init 25e6  -rsf_checkpoint 200000 \
 	   -rtol $rtol $rk_type -stop_time_yr $tmax -slip_line_dt_yr 5 \
-	   -ts_max_steps 200000000  -rsf_catalog -rsf_rupture_time -domain_check_max_reject -1 \
+	   -ts_max_steps 200000000  -rsf_catalog -rsf_rupture_time \
+	   -domain_check_max_reject $max_reject \
 	   -print_interval_yr 0.02  -rupture_vth 0.01 -log_view 2>> $lfile >> $lfile
     date >> $lfile
     cd ..

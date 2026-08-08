@@ -7,6 +7,15 @@ hmodes=${1-1}				#  1,2,3 other Hmat modes
 ress=${2-1km}
 
 plot_last=0			# 1: plot the last event 0: plot the second
+mw_min=7			# magnitude threshold used to bracket the cycle
+				# shown in the phase space panels
+tsreg=-R250/550/-10/1		# window of the velocity time series panel.  this
+				# is NOT the window of the phase space panels,
+				# which is set by the events selected below
+tsann=a25f5
+tsxl=260			# x of the law labels in the time series panel.
+				# this was 1260, i.e. outside the 250 to 550
+				# window, so those labels were being clipped
 
 laws="aging slip prz sato"
 plaws="$laws"
@@ -17,10 +26,8 @@ for hmode in $hmodes;do
 	ofile=bp5_evol.$res.$hmode.ps
 
 
-	#    reg=-R1000/2000/-10/1;xann=a50f5;xl=1010
-	#reg=-R1250/1440/-10/1
-	reg=-R250/550/-10/1
-	xann=a25f5;xl=1260
+	reg=$tsreg
+	xann=$tsann;xl=$tsxl
 
 
 
@@ -102,13 +109,29 @@ for hmode in $hmodes;do
 		psbasemap $reg $proj $off -K -O \
 			  -Ba.025f0.005g0.025:"mean friction @~\341m\361@~":/g3a3f.5:"log@-10@-(max|v [m/s]|)":$ae >> $ofile
 		sym=-SC
-		if [[ $dir != NaN && `lc $dir/rsf_catalog.dat` -ge 2 ]];then
+		#
+		# the cycle is bracketed by two events with Mw >= mw_min, so the
+		# panel needs nmin of them.  with fewer, read leaves t2 empty,
+		# gawk reads it as zero, and the panel comes out blank and
+		# unlabelled, which looks exactly like a crashed run.  count
+		# first and say which it is
+		#
+		if [ $plot_last -eq 1 ];then
+		    nmin=2
+		else
+		    nmin=4
+		fi
+		nev=0
+		if [ $dir != NaN ];then
+		    nev=`gawk -v mw=$mw_min '!/^#/ && $13>=mw' $dir/rsf_catalog.dat 2> /dev/null | wc -l`
+		fi
+		if [[ $dir != NaN && $nev -ge $nmin ]];then
 		    # find the right time to adjust
 		    if [ $plot_last -eq 1 ];then
 			#gawk '{if($3==-1)print($2)}' $dir/rsf_events.dat | tail -2 | gawk -f torow.awk > tmp.val
-			gawk '!/^#/ && $13>=7{print $3}' $dir/rsf_catalog.dat | tail -2 | gawk -f torow.awk > tmp.val
+			gawk -v mw=$mw_min '!/^#/ && $13>=mw{print $3}' $dir/rsf_catalog.dat | tail -2 | gawk -f torow.awk > tmp.val
 		    else
-			gawk '!/^#/ && $13>=7{print $3}' $dir/rsf_catalog.dat | head -4 | tail -2 | gawk -f torow.awk > tmp.val
+			gawk -v mw=$mw_min '!/^#/ && $13>=mw{print $3}' $dir/rsf_catalog.dat | head -4 | tail -2 | gawk -f torow.awk > tmp.val
 		    fi
 		    read t1 t2 < tmp.val; rm tmp.val
 		    echo $sl $t1 $t2 $dir
@@ -125,7 +148,17 @@ for hmode in $hmodes;do
 			psscale -D0/-0.3/4/.15h -Ctime.cpt -O -K -B0.2/:"t/T": >> $ofile
 		    fi
 		    echo $xl2 -2 22 0 29 LM "$sll" | pstext $reg $proj  -Gwhite  -O -K >> $ofile
+		    #
+		    # the phase panel and the velocity time series above cover
+		    # different intervals, so label the cycle actually shown
+		    #
+		    trec=`echo $t1 $t2 | gawk '{printf("%.0f",$2-$1)}'`
+		    echo 0.4825 -8.6 10 0 0 LM "@~\104@~t = $trec yr" | \
+			pstext $reg $proj -Gwhite -O -K >> $ofile
 		    rm tmp.dat
+		else
+		    echo "$0: no phase panel for $sl at $res hmode $hmode:" \
+			 "dir $dir, $nev events with Mw >= $mw_min, need $nmin"
 		fi
 
 		((pc=pc+1))

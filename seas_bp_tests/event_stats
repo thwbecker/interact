@@ -1,0 +1,71 @@
+#!/bin/bash
+#
+# print the Mw >= mw_min event sequence and its recurrence statistics for each
+# evolution law and resolution.
+#
+# this is the test that has to come before any resolution comparison at fixed
+# event index.  if the sequence has settled onto a limit cycle, the recurrence
+# is constant and cv falls toward zero as cycles accumulate, and the timing of
+# the n-th event is then a convergent quantity that should tighten as dx is
+# reduced.  if cv stays finite, the n-th cycle is drawn from an aperiodic
+# sequence, the within-run cycle to cycle scatter is the correct null
+# hypothesis, and it has to be compared against the across-resolution scatter
+# before the latter is called a convergence failure.
+#
+# columns: law res imex hmode nev t_first t_last <dt> sd cv dt_min dt_max
+#
+laws="aging slip prz sato"
+ress="1km 0.5km 0.25km 0.1km 0.05km"
+imexs="0 1"
+hmodes=1
+mw_min=7
+nskip=1				# leading cycles dropped as spin up
+verbose=1			# 1: also list the individual event times
+
+printf "%-6s %-7s %5s %6s %5s %10s %10s %10s %10s %8s %10s %10s\n" \
+       law res imex hmode nev t_first t_last mean sd cv dt_min dt_max
+
+for hmode in $hmodes;do
+    for res in $ress;do
+	for sl in $laws;do
+	    for imex in $imexs;do
+		dir=`./find_directory $sl $res $imex $hmode 2> /dev/null`
+		if [ "$dir" = "NaN" ] || [ -z "$dir" ];then
+		    continue
+		fi
+		if [ ! -s $dir/rsf_catalog.dat ];then
+		    printf "%-6s %-7s %5s %6s   no catalog in %s\n" $sl $res $imex $hmode $dir
+		    continue
+		fi
+		gawk -v mw=$mw_min '!/^#/ && $13>=mw{print $3}' \
+		     $dir/rsf_catalog.dat > tmp.ev.$$
+		nev=`wc -l < tmp.ev.$$`
+		if [ $nev -lt 3 ];then
+		    printf "%-6s %-7s %5s %6s %5i   only %i events, last time in monitor %s yr\n" \
+			   $sl $res $imex $hmode $nev $nev \
+			   "`tail -1 $dir/rsf_monitor.dat 2> /dev/null | gawk '{printf(\"%.1f\",$3)}'`"
+		    rm tmp.ev.$$
+		    continue
+		fi
+		gawk -v law=$sl -v res=$res -v im=$imex -v hm=$hmode -v ns=$nskip '
+		{t[NR]=$1}
+		END{
+		  n=0;
+		  for(i=2+ns;i<=NR;i++){n++;d[n]=t[i]-t[i-1]}
+		  if(n<2){printf("%-6s %-7s %5s %6s %5i  fewer than two cycles after skip\n",law,res,im,hm,NR);exit}
+		  s=0;for(i=1;i<=n;i++)s+=d[i]; m=s/n;
+		  v=0;for(i=1;i<=n;i++)v+=(d[i]-m)^2; sd=sqrt(v/(n-1));
+		  lo=d[1];hi=d[1];
+		  for(i=1;i<=n;i++){if(d[i]<lo)lo=d[i];if(d[i]>hi)hi=d[i]}
+		  printf("%-6s %-7s %5s %6s %5i %10.2f %10.2f %10.3f %10.4f %8.4f %10.2f %10.2f\n",
+		         law,res,im,hm,NR,t[1],t[NR],m,sd,sd/m,lo,hi);
+		}' tmp.ev.$$
+		if [ $verbose -eq 1 ];then
+		    gawk '{if(NR>1)printf("    cycle %2i  t = %10.2f yr  dt = %8.2f yr\n",NR-1,$1,$1-p);p=$1}' \
+			 tmp.ev.$$
+		fi
+		rm tmp.ev.$$
+	    done
+	done
+    done
+done

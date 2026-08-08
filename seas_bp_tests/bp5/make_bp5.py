@@ -69,6 +69,18 @@ Vnuc = 3e-2               # nucleation-patch initial velocity [m/s]
 
 half = ds*1e3/2.0         # interact half-length [m]  (L=W -> ds-km square cell)
 
+# last column of the geometry file.  0 -> everything in one group, as before.
+# 1 -> group 0 for the VS exterior, 1 for the VW region (a < b), 2 for the
+# nucleation patch.  the group id is diagnostic in this configuration: it
+# enters the interaction matrix only under -suppress_interactions, which these
+# runs do not use, so the solve is unchanged.  it does let
+# -rsf_monitor_by_group report mean friction over the asperity alone.  the
+# fault-wide mean written to rsf_monitor.dat column 7 averages over all cells,
+# and the VS exterior is about 80 percent of the area, so the phase-space loop
+# plotted from it is dominated by the creeping exterior rather than by the
+# asperity.  changing this requires regenerating the geometry files.
+write_groups = 1
+
 fg = open(f"geom_bp5_{ds:g}km.in", "w")
 fr = open(f"rsf_bp5_{ds:g}km.dat", "w")
 fi = open(f"ic_bp5_{ds:g}km.in",  "w")
@@ -84,8 +96,10 @@ for i in range(imax):
         a = min(a0 + r*(a_max-a0), a_max); a = max(a, a0)
         v = Vpl
         dc = dc0
+        grp = 1 if (a < b0) else 0               # velocity weakening where a < b
         if abs(x+24) < 6 and abs(dep-10) < 6:     # 12x12 km nucleation patch
-            v = Vnuc; dc = dc_nuc; nnuc += 1
+            v = Vnuc; dc = dc_nuc; nnuc += 1; grp = 2
+        if not write_groups: grp = 0
         if a < 0.01: nvw += 1
         # steady-state-at-Vpl initial stress evaluated at the local velocity v
         # (independent of D_RS; D_RS enters only the state evolution rate)
@@ -97,7 +111,7 @@ for i in range(imax):
         tau_ssv = sig*a*np.arcsinh(0.5*v/V0*np.exp((f0 + b0*np.log(V0/v))/a)) + eta*v
         # interact geometry: strike=0 => strike dir +y, dip=90 => normal +x, dip +z(up)
         #   so BP5 along-strike -> interact y, depth -> z=-dep, fault plane at x=0
-        fg.write(f"0.0 {x*1e3:.6e} {-dep*1e3:.6e} 0.0 90.0 {half:.1f} {half:.1f} 0\n")
+        fg.write(f"0.0 {x*1e3:.6e} {-dep*1e3:.6e} 0.0 90.0 {half:.1f} {half:.1f} {grp:d}\n")
         fr.write(f"{a:.6e} {b0:.6e}\n")
         fi.write(f"{tau*1e6:.8e} {v:.6e}\n")          # MPa -> Pa
         fs.write(f"{tau_ssv*1e6:.8e} {v:.6e}\n")      # MPa -> Pa
