@@ -3,127 +3,138 @@
 # compare BP5 results for different evolution laws
 #
 #res=0.5km
-hmode=${1-1}				#  1,2,3 other Hmat modes
-res=${2-1km}
+hmodes=${1-1}				#  1,2,3 other Hmat modes
+ress=${2-1km}
 
+plot_last=0			# 1: plot the last event 0: plot the second
 
 laws="aging slip prz sato"
 plaws="$laws"
 
-
-ofile=bp5_evol.$res.$hmode.ps
-
-
-if  [ $res = 1km ];then
-#    reg=-R1000/2000/-10/1;xann=a50f5;xl=1010
-    reg=-R1250/1440/-10/1;xann=a25f5;xl=1260
-else
-    reg=-R1000/1250/-10/1;xann=a50f5;xl=1010
-fi
-
-
-proj=-JX7/3.5
-#
-# vel vs time for 3bs and IMEX solves
-#
-psbasemap $reg $proj -Y13 -K -P -B$xann:"time [years]":/a2f.5:"log@-10@-(max|v [m/s]|)"::."BP5 cycle test @@ $res": > $ofile
-pc=1;
-yl=0;
-for sl in $laws ;do
-    sll=`echo $sl | gawk '{print(toupper($1))}'`
-    col=`platecolor $pc`
-    dir=`./find_directory $sl $res 0 $hmode 2>/dev/null`
-    if [[ $dir != NaN && `lc $dir/rsf_monitor.dat` -gt 1 ]];then
-	gawk '{if(NR>1)print($3,$5)}' $dir/rsf_monitor.dat | \
-	    psxy -W2,$col $reg $proj -O -K >> $ofile
-	echo $xl $yl 18 0 29 LM $sll | pstext -R -J -O -K -F+f$col >> $ofile
-    else
-	echo $0: regular dir for $sl $res hmode $hmode not found for vel
-    fi
-    dir=`./find_directory $sl $res 1 $hmode 2>/dev/null`
-    if [ $dir != NaN ];then
-	gawk '{if(NR>1)print($3,$5)}' $dir/rsf_monitor.dat | \
-	    psxy -W3,$col,. $reg $proj -O -K >> $ofile
-
-    else
-	echo $0: dir for $sl $res IMEX hmode $hmode not found for vel
-    fi
-    ((yl=yl-1))
-    ((pc=pc+1))
-done
-#psxy -T -O -R >> $ofile;modifybb $ofile
-
-
-pc=1;xl=0.52;xl2=0.5;yl=-2
-reg=-R0.49/0.6/-10/1.5		# phase space
-by_color=0			# colored lines single plot, 0: several plots
-pc=1
-if [ $by_color = 1 ];then
-    proj=-JX7/4
-    psbasemap $reg $proj -Y-5.25 -K -O -Ba.025f0.0025:"mean friction @~\341m\361@~":/a2f.5:"log@-10@-(max|v [m/s]|)": >> $ofile
-
-    for sl in $laws ;do
-	dir=`./find_directory $sl $res 0 $hmode 2> /dev/null`
-	sll=`echo $sl | gawk '{print(toupper($1))}'`
-	col=`platecolor $pc`
-	if [ $dir != NaN ];then
-	    gawk '{if(NR>1)if($3>1000)if($3>1250)print($7,$5)}' $dir/rsf_monitor.dat | \
-		psxy -W1,$col $reg $proj -O -K >> $ofile
-	    
-	    echo $xl $yl 18 0 29 LM $sll | pstext -R -J -O -K -F+f$col >> $ofile
-	else
-	    echo $0: $sl $res hmode $hmode not found for phase
-	fi
-	yl=$(bc <<< "$yl - 1.5")
-	((pc=pc+1))
-    done
-else
-    makecpt -Croma -I -T0/1/0.05 > time.cpt
-    #makecpt -Croma -I -Q -T-2/1/0.1 > time.cpt
-
-    proj=-JX3.35/3.8
-    for sl in $plaws;do
-	dir=`./find_directory $sl $res 0 $hmode`
-	sll=`echo $sl | gawk '{print(toupper($1))}'`
-	if [ $pc -eq 1 ];then
-	    ae=WesN;off="-Y-5.25"
-	elif [ $pc -eq 2 ];then
-	    ae=wEsN;off="-X3.55"
-	elif [ $pc -eq 3 ];then
-	    ae=WeSn;off="-X-3.55 -Y-4.75"
-	elif [ $pc -eq 4 ];then
-	    ae=wESn;off="-X3.55"
-	fi
-	psbasemap $reg $proj $off -K -O \
-		  -Ba.025f0.005g0.025:"mean friction @~\341m\361@~":/g3a3f.5:"log@-10@-(max|v [m/s]|)":$ae >> $ofile
-	sym=-SC
-	if [[ $dir != NaN && `lc $dir/rsf_catalog.dat` -ge 2 ]];then
-	# find the right time to adjust
-	    #gawk '{if($3==-1)print($2)}' $dir/rsf_events.dat | tail -2 | gawk -f torow.awk > tmp.val
-	    gawk '!/^#/ && $13>=7{print $3}' $dir/rsf_catalog.dat | tail -2 | gawk -f torow.awk > tmp.val
+for hmode in $hmodes;do
+    for res in $ress;do
 	
-	    read t1 t2 < tmp.val; rm tmp.val
-	    echo $sl $t1 $t2 $dir
-	    gawk -v t1=$t1 -v t2=$t2 '{if(NR>1)if($3>=t1)if($3<=t2)print($7,$5,($3-t1)/(t2-t1))}' $dir/rsf_monitor.dat > tmp.dat
-	    if [ $pc -eq 1 ];then
-		gawk '{print($1,$2)}' tmp.dat > tmp.back
+	ofile=bp5_evol.$res.$hmode.ps
+
+
+	#    reg=-R1000/2000/-10/1;xann=a50f5;xl=1010
+	#reg=-R1250/1440/-10/1
+	reg=-R250/550/-10/1
+	xann=a25f5;xl=1260
+
+
+
+	proj=-JX7/3.5
+	#
+	# vel vs time for 3bs and IMEX solves
+	#
+	psbasemap $reg $proj -Y13 -K -P -B$xann:"time [years]":/a2f.5:"log@-10@-(max|v [m/s]|)"::."BP5 cycle test @@ $res": > $ofile
+	pc=1;
+	yl=0;
+	for sl in $laws ;do
+	    sll=`echo $sl | gawk '{print(toupper($1))}'`
+	    col=`platecolor $pc`
+	    dir=`./find_directory $sl $res 0 $hmode 2>/dev/null`
+	    if [[ $dir != NaN && `lc $dir/rsf_monitor.dat` -gt 1 ]];then
+		gawk '{if(NR>1)print($3,$5)}' $dir/rsf_monitor.dat | \
+		    psxy -W2,$col $reg $proj -O -K >> $ofile
+		echo $xl $yl 18 0 29 LM $sll | pstext -R -J -O -K -F+f$col >> $ofile
+	    else
+		echo $0: regular dir for $sl $res hmode $hmode not found for vel
 	    fi
-	    if [ -s tmp.back ];then
-		psxy tmp.back -W3,gray $reg $proj -O -K >> $ofile
+	    dir=`./find_directory $sl $res 1 $hmode 2>/dev/null`
+	    if [ $dir != NaN ];then
+		gawk '{if(NR>1)print($3,$5)}' $dir/rsf_monitor.dat | \
+		    psxy -W3,$col,. $reg $proj -O -K >> $ofile
+
+	    else
+		echo $0: dir for $sl $res IMEX hmode $hmode not found for vel
 	    fi
-	    gawk -f xyval2seg.awk tmp.dat | psxy -m  $reg $proj -O -K -W2 -Ctime.cpt >> $ofile
-	    psxy tmp.dat $sym".05" $reg $proj -O -K -Ctime.cpt >> $ofile
-	    if [ $pc -eq 2 ];then
-		psscale -D0/-0.3/4/.15h -Ctime.cpt -O -K -B0.2/:"t/T": >> $ofile
-	    fi
-	    echo $xl2 -2 22 0 29 LM "$sll" | pstext $reg $proj  -Gwhite  -O -K >> $ofile
-	    rm tmp.dat
+	    ((yl=yl-1))
+	    ((pc=pc+1))
+	done
+	#psxy -T -O -R >> $ofile;modifybb $ofile
+
+
+	pc=1;xl=0.52;xl2=0.5;yl=-2
+	reg=-R0.48/0.6/-10/1.5		# phase space
+	by_color=0			# colored lines single plot, 0: several plots
+	pc=1
+	if [ $by_color = 1 ];then
+	    proj=-JX7/4
+	    psbasemap $reg $proj -Y-5.25 -K -O -Ba.025f0.0025:"mean friction @~\341m\361@~":/a2f.5:"log@-10@-(max|v [m/s]|)": >> $ofile
+
+	    for sl in $laws ;do
+		dir=`./find_directory $sl $res 0 $hmode 2> /dev/null`
+		sll=`echo $sl | gawk '{print(toupper($1))}'`
+		col=`platecolor $pc`
+		if [ $dir != NaN ];then
+		    gawk '{if(NR>1)if($3>1000)if($3>1250)print($7,$5)}' $dir/rsf_monitor.dat | \
+			psxy -W1,$col $reg $proj -O -K >> $ofile
+		    
+		    echo $xl $yl 18 0 29 LM $sll | pstext -R -J -O -K -F+f$col >> $ofile
+		else
+		    echo $0: $sl $res hmode $hmode not found for phase
+		fi
+		yl=$(bc <<< "$yl - 1.5")
+		((pc=pc+1))
+	    done
+	else
+	    makecpt -Croma -I -T0/1/0.05 > time.cpt
+	    #makecpt -Croma -I -Q -T-2/1/0.1 > time.cpt
+
+	    proj=-JX3.35/3.8
+	    for sl in $plaws;do
+		dir=`./find_directory $sl $res 0 $hmode`
+		if [ $dir = "NaN" ];then # try imex
+		    dir=`./find_directory $sl $res 1 $hmode`
+		fi
+		sll=`echo $sl | gawk '{print(toupper($1))}'`
+		if [ $pc -eq 1 ];then
+		    ae=WesN;off="-Y-5.25"
+		elif [ $pc -eq 2 ];then
+		    ae=wEsN;off="-X3.55"
+		elif [ $pc -eq 3 ];then
+		    ae=WeSn;off="-X-3.55 -Y-4.75"
+		elif [ $pc -eq 4 ];then
+		    ae=wESn;off="-X3.55"
+		fi
+		psbasemap $reg $proj $off -K -O \
+			  -Ba.025f0.005g0.025:"mean friction @~\341m\361@~":/g3a3f.5:"log@-10@-(max|v [m/s]|)":$ae >> $ofile
+		sym=-SC
+		if [[ $dir != NaN && `lc $dir/rsf_catalog.dat` -ge 2 ]];then
+		    # find the right time to adjust
+		    if [ $plot_last -eq 1 ];then
+			#gawk '{if($3==-1)print($2)}' $dir/rsf_events.dat | tail -2 | gawk -f torow.awk > tmp.val
+			gawk '!/^#/ && $13>=7{print $3}' $dir/rsf_catalog.dat | tail -2 | gawk -f torow.awk > tmp.val
+		    else
+			gawk '!/^#/ && $13>=7{print $3}' $dir/rsf_catalog.dat | head -4 | tail -2 | gawk -f torow.awk > tmp.val
+		    fi
+		    read t1 t2 < tmp.val; rm tmp.val
+		    echo $sl $t1 $t2 $dir
+		    gawk -v t1=$t1 -v t2=$t2 '{if(NR>1)if($3>=t1)if($3<=t2)print($7,$5,($3-t1)/(t2-t1))}' $dir/rsf_monitor.dat > tmp.dat
+		    if [ $pc -eq 1 ];then
+			gawk '{print($1,$2)}' tmp.dat > tmp.back
+		    fi
+		    if [ -s tmp.back ];then
+			psxy tmp.back -W3,gray $reg $proj -O -K >> $ofile
+		    fi
+		    gawk -f xyval2seg.awk tmp.dat | psxy -m  $reg $proj -O -K -W2 -Ctime.cpt >> $ofile
+		    psxy tmp.dat $sym".05" $reg $proj -O -K -Ctime.cpt >> $ofile
+		    if [ $pc -eq 2 ];then
+			psscale -D0/-0.3/4/.15h -Ctime.cpt -O -K -B0.2/:"t/T": >> $ofile
+		    fi
+		    echo $xl2 -2 22 0 29 LM "$sll" | pstext $reg $proj  -Gwhite  -O -K >> $ofile
+		    rm tmp.dat
+		fi
+
+		((pc=pc+1))
+	    done
+	    rm tmp.back 2> /dev/null
 	fi
 
-	((pc=pc+1))
+	psxy -T  $reg $proj -O >> $ofile
+	modifybb $ofile 1
+	cp bp5_evol.$res.$hmode.pdf $HOME/Dropbox/tmp/
     done
-    rm tmp.back 2> /dev/null
-fi
-
-psxy -T  $reg $proj -O >> $ofile
-modifybb $ofile 1
+done
