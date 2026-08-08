@@ -17,7 +17,7 @@
 laws="aging slip prz sato"
 ress="1km 0.5km 0.25km 0.1km 0.05km"
 imexs="0 1"
-hmodes=1
+hmodes="2 4"			# match run_many's current default
 mw_min=7
 nskip=1				# leading cycles dropped as spin up
 verbose=1			# 1: also list the individual event times

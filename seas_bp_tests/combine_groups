@@ -1,0 +1,81 @@
+#!/bin/bash
+#
+# combine the per group monitor files rsf_monitor.gGGG.dat into a single time
+# series over a chosen set of groups.  the result is exact, not an
+# approximation: the per group files are written at the same monitor steps in
+# the same reduction block, so the rows align line for line, the means
+# recombine weighted by the cell count of each group, and the extrema
+# recombine as extrema.  the output is identical to what a single reduction
+# over those cells would have produced.
+#
+# the intended use with the BP5 grouping written by make_bp5.py
+# (0 = VS exterior, 1 = VW region, 2 = nucleation patch) is groups "0 1",
+# i.e. the whole fault except the nucleation patch.  the patch is driven at
+# Vnuc by construction and its state is imposed rather than earned, so it
+# contributes an offset to any fault wide average that has nothing to do with
+# the cycle.
+#
+# columns follow rsf_monitor.dat:
+#   1 step  2 t[s]  3 t[yr]  4 dt[s]  5 log10(max|v|)  6 mean_slip  7 mean_mu
+#   8 max_sigma  9 min_sigma  10 log10(mean|v|)
+# column 10 is only written if every input file carries it
+#
+dir=${1-.}
+geom=${2-../../bp5/geom_bp5_1km.in}
+groups=${3-"0 1"}
+out=${4-rsf_monitor.sel.dat}
+
+if [ ! -s $geom ];then
+    echo $0: geometry file $geom not found, needed for the cell counts
+    exit 1
+fi
+
+files=""
+counts=""
+ncol=99
+for g in $groups;do
+    gg=`echo $g | gawk '{printf("%03i",$1)}'`
+    f=$dir/rsf_monitor.g$gg.dat
+    if [ ! -s $f ];then
+	echo $0: $f not found. was the run made with -rsf_monitor_by_group?
+	exit 1
+    fi
+    n=`gawk -v g=$g '$NF==g{n++}END{print n+0}' $geom`
+    if [ $n -eq 0 ];then
+	echo $0: no patches with group $g in $geom
+	exit 1
+    fi
+    nc=`gawk '!/^#/{print NF;exit}' $f`
+    if [ $nc -lt $ncol ];then
+	ncol=$nc
+    fi
+    files="$files $f"
+    counts="$counts $n"
+    echo "$0: group $g, $n patches, $nc columns, $f"
+done
+
+echo "# combined over groups $groups from $dir, cell counts $counts" > $out
+echo "# step t[s] t[yr] dt[s] log10(max|v|) mean_slip mean_mu max_sigma min_sigma log10(mean|v|)" >> $out
+
+paste $files | gawk -v cnt="$counts" -v nc=$ncol '
+BEGIN{ng=split(cnt,w," ");ntot=0;for(i=1;i<=ng;i++)ntot+=w[i]}
+!/^#/{
+  if(NF < ng*nc)next;
+  vmax=0;smax=-1e30;smin=1e30;msl=0;mmu=0;mv=0;
+  for(i=1;i<=ng;i++){
+    o=(i-1)*nc;
+    v=10^$(o+5); if(v>vmax)vmax=v;
+    if($(o+8)>smax)smax=$(o+8);
+    if($(o+9)<smin)smin=$(o+9);
+    msl += w[i]*$(o+6);
+    mmu += w[i]*$(o+7);
+    if(nc>=10)mv += w[i]*(10^$(o+10));
+  }
+  printf("%9i %20.8e %17.10f %15.8e %12.7f %15.8e %10.6f %15.8e %15.8e",
+         $1,$2,$3,$4,log(vmax)/log(10),msl/ntot,mmu/ntot,smax,smin);
+  if(nc>=10)
+    printf(" %12.7f",log(mv/ntot)/log(10));
+  printf("\n");
+}' >> $out
+
+echo "$0: wrote $out (`gawk '!/^#/' $out | wc -l` rows)"

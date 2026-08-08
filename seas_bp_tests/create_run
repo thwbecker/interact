@@ -201,10 +201,17 @@ else
 fi
 oname=lr.r.$res.e.$evol_law.h,$hmode
 lfile=log.$oname.dat
-if [[ $restart -eq 1 ||  ! -s $lfile ]];then    
-    echo $0: in `pwd`, writing to $lfile deleting output
-    rm -r tmp_rsf/* 2> /dev/null
-    date > $lfile
+if [[ $restart -eq 1 ||  ! -s $lfile ]];then
+    if [ $restart -eq 1 ];then
+	# restarting: keep the previous log and the tmp_rsf snapshots, both
+	# belong to the run being continued
+	echo $0: in `pwd`, restarting, appending to $lfile
+	date >> $lfile
+    else
+	echo $0: in `pwd`, writing to $lfile deleting output
+	rm -r tmp_rsf/* 2> /dev/null
+	date > $lfile
+    fi
     echo "# model $m res $res evol_law $evol_law imex $imex hmode $hmode" >> $lfile
     echo "# ic_mode $ic_mode ic_file $ic_file" >> $lfile
     echo "# hmat_flags $hmat_flags rtol $rtol $rk_type max_reject $max_reject ncore $ncore" >> $lfile
@@ -215,7 +222,7 @@ if [[ $restart -eq 1 ||  ! -s $lfile ]];then
 	   -f0 0.6 -dc 0.14 -vpl 1e-9 -v0 1e-6 -sigma_init 25e6  -rsf_checkpoint 200000 \
 	   -rtol $rtol $rk_type -stop_time_yr $tmax -slip_line_dt_yr 5 \
 	   -ts_max_steps 200000000  -rsf_catalog -rsf_rupture_time \
-	   -domain_check_max_reject $max_reject -rsf_monitor_by_group \
+	   -domain_check_max_reject $max_reject -rsf_monitor_by_group $rs_flags \
 	   -print_interval_yr 0.02  -rupture_vth 0.01 -log_view 2>> $lfile >> $lfile
     date >> $lfile
     cd ..
