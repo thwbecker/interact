@@ -127,6 +127,7 @@ PetscErrorCode rsf_solve_run(int argc,char **argv,struct interact_ctx *par,
   PetscReal shear_modulus_si = set->shear_modulus_si, s_wave_speed_si = set->s_wave_speed_si;
   PetscReal sigma_init = set->sigma_init, tau_init = set->tau_init, vel_init = set->vel_init;
   PetscReal rand_amp = set->rand_amp, rtol = set->rtol, atol_slip = set->atol_slip;
+  PetscReal atol_psi = set->atol_psi;
   PetscReal dt_init = set->dt_init, dt_max = set->dt_max;
   PetscReal dt_monitor = set->dt_monitor, rdx_monitor = set->rdx_monitor;
   PetscReal adx_monitor = set->adx_monitor, monitor_tmin = set->monitor_tmin;
@@ -427,7 +428,7 @@ PetscErrorCode rsf_solve_run(int argc,char **argv,struct interact_ctx *par,
   */
   PetscCall(VecDuplicate(x,&vatol));
   for (i = medium->rs,j=i*rsf->dim; i < medium->re; i++,j+=rsf->dim){
-    PetscCall(VecSetValue(vatol,(PetscInt)(j+0),RSF_AERROR_PSI, INSERT_VALUES)); /* psi */
+    PetscCall(VecSetValue(vatol,(PetscInt)(j+0),atol_psi, INSERT_VALUES)); /* psi */
     PetscCall(VecSetValue(vatol,(PetscInt)(j+1),RSF_AERROR_TAU,  INSERT_VALUES)); /* tau [Pa] */
     PetscCall(VecSetValue(vatol,(PetscInt)(j+2),RSF_AERROR_SIGMA,  INSERT_VALUES)); /* sigma [Pa] */
     PetscCall(VecSetValue(vatol,(PetscInt)(j+3),atol_slip,INSERT_VALUES)); /* slip [m] */

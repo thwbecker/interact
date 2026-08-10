@@ -195,7 +195,11 @@ struct rsf_out_ctx{
 struct rsf_solve_settings{
   PetscReal shear_modulus_si,s_wave_speed_si;	    /* G [Pa], c_s [m/s] */
   PetscReal sigma_init,tau_init,vel_init,rand_amp;  /* initial conditions */
-  PetscReal rtol,atol_slip,dt_init,dt_max;	    /* time stepping */
+  PetscReal rtol,atol_slip,atol_psi,dt_init,dt_max; /* time stepping.  atol_psi
+			defaults to RSF_AERROR_PSI, i.e. effectively pure
+			relative control on psi; raise to ~1e-3 to keep the
+			error norm from resolving the fast state relaxation
+			at rupture fronts (PRZ) */
   PetscReal dt_monitor,rdx_monitor,adx_monitor,monitor_tmin; /* monitor */
   PetscReal vel_event,vel_event_hyst,event_tmin;    /* event tracking */
   PetscBool track_events;

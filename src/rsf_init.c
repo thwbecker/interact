@@ -154,6 +154,10 @@ void rsf_print_help(const char *prog)
   fprintf(stderr,"                          absolute tolerances for tau: %e sigma %e psi %e\n",
 	  RSF_AERROR_TAU,RSF_AERROR_SIGMA, RSF_AERROR_PSI);
   fprintf(stderr,"  -atol_slip <m>          absolute tolerance for slip entries (default 1e-3)\n");
+  fprintf(stderr,"  -atol_psi <val>         absolute tolerance for psi entries (default %e, i.e.\n",RSF_AERROR_PSI);
+  fprintf(stderr,"                          pure relative control). raise to ~1e-3 to stop the error\n");
+  fprintf(stderr,"                          norm from resolving the fast state relaxation at rupture\n");
+  fprintf(stderr,"                          fronts (PRZ), where dt otherwise collapses to ~1e-10 s\n");
   fprintf(stderr,"  -dt_init <s>            initial step size (default 1)\n");
   fprintf(stderr,"  -dt_max <s>             maximum step size (default 1e10)\n");
   fprintf(stderr,"  -imex                   IMEX (ARKIMEX) integration: local state terms implicit,\n");
@@ -275,7 +279,7 @@ PetscErrorCode rsf_get_settings(int argc,char **argv,struct interact_ctx *par,
   PetscBool use_full_space=PETSC_FALSE;
   PetscInt tvmode = 0;		/* triangle evaluation mode */
   PetscInt use_hmatrix=IHMAT_TYPE_DENSE;
-  PetscReal sigma_init,tau_init,vel_init,rtol,atol_slip,dt_init,dt_max,rand_amp,tmp;
+  PetscReal sigma_init,tau_init,vel_init,rtol,atol_slip,atol_psi,dt_init,dt_max,rand_amp,tmp;
   PetscReal dt_monitor,rdx_monitor,adx_monitor,monitor_tmin,vel_event,vel_event_hyst,event_tmin;
   PetscBool track_events;
   char geom_file[STRLEN]=GEOMETRY_FILE,rsf_file[STRLEN]=RSF_PAR_FILE,
@@ -320,6 +324,8 @@ PetscErrorCode rsf_get_settings(int argc,char **argv,struct interact_ctx *par,
   
   /* time stepping controls, can override below */
   rtol = 1e-4;			/* HBI eps_r default */
+  atol_psi  = RSF_AERROR_PSI;	/* default: effectively zero, pure relative
+				   control on psi */
   atol_slip = 1e-3;		/* [m] absolute tolerance for the slip entries,
 				   effectively excluding slip from error control as in HBI */
   dt_init = 1.0;		/* [s], HBI dtinit default */
@@ -483,6 +489,7 @@ PetscErrorCode rsf_get_settings(int argc,char **argv,struct interact_ctx *par,
   
   PetscCall(PetscOptionsGetReal(NULL,NULL,"-rtol",&rtol,NULL));
   PetscCall(PetscOptionsGetReal(NULL,NULL,"-atol_slip",&atol_slip,NULL));
+  PetscCall(PetscOptionsGetReal(NULL,NULL,"-atol_psi",&atol_psi,NULL));
   PetscCall(PetscOptionsGetReal(NULL,NULL,"-dt_init",&dt_init,NULL));
   PetscCall(PetscOptionsGetReal(NULL,NULL,"-dt_max",&dt_max,NULL));
   tmp = medium->stop_time/SEC_PER_YEAR;
@@ -557,6 +564,7 @@ PetscErrorCode rsf_get_settings(int argc,char **argv,struct interact_ctx *par,
   set->rand_amp   = rand_amp;
   set->rtol       = rtol;
   set->atol_slip  = atol_slip;
+  set->atol_psi   = atol_psi;
   set->dt_init    = dt_init;
   set->dt_max     = dt_max;
   set->dt_monitor   = dt_monitor;
