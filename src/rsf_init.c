@@ -565,6 +565,19 @@ PetscErrorCode rsf_get_settings(int argc,char **argv,struct interact_ctx *par,
   set->rtol       = rtol;
   set->atol_slip  = atol_slip;
   set->atol_psi   = atol_psi;
+  /* a loosened psi tolerance removes the error-control constraint on dt, but
+     on the fully explicit path error control is the only thing holding dt at
+     or below the explicit STABILITY limit of the state relaxation, which for
+     PRZ at rupture fronts is 2 dc/(|v| Omega), of order 1e-9 s.  Loosening
+     atol_psi there produces out-of-domain trial stages and rejection storms
+     rather than speed.  The combination that works is -imex, where the state
+     term is integrated implicitly and the loosened tolerance lets the
+     controller stop resolving the fast transient. */
+  if((!set->use_imex) && (atol_psi > RSF_AERROR_PSI) && (medium->comm_rank == 0))
+    fprintf(stderr,"rsf_get_settings: WARNING: -atol_psi %g loosened without -imex: on the explicit\n"
+	    "rsf_get_settings: WARNING: path this invites domain-rejection storms for stiff state laws\n"
+	    "rsf_get_settings: WARNING: (PRZ in particular); combine -atol_psi with -imex instead\n",
+	    (double)atol_psi);
   set->dt_init    = dt_init;
   set->dt_max     = dt_max;
   set->dt_monitor   = dt_monitor;

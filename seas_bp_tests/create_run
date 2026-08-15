@@ -72,7 +72,14 @@ case $wdir in 			# decide on type of computation
     bp5_prz)
 	imex=0
 	evol_law=3
-	atol_string="-atol_psi 1e-3"
+	# NO -atol_psi here: on the fully explicit path the error control on
+	# psi is the only thing holding dt at or below the explicit stability
+	# limit of the PRZ front relaxation (2 dc/(|v| Omega), order 1e-9 s).
+	# Loosening it produced 50000-rejection domain storms at t ~ 20 s
+	# (first rupture) at 0.5 km and finer.  Explicit PRZ therefore runs
+	# with the default (pure relative) tolerance and is expensive; the
+	# fast configuration is bp5_prz_imex, where the state term is
+	# implicit and the loosened tolerance is safe.
 	;;
     bp5_prz_imex)
 	imex=1
