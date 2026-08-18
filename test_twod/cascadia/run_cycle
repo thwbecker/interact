@@ -75,8 +75,8 @@ elif [ "$variant" != "nosigma" ]; then
     echo "$0: $rundir does not end in _nosigma or _sigma" 1>&2
     exit 1
 fi
-#hmat_flags="-use_hmatrix 4 -hmmvp_tol 1e-4"
-hmat_flags=""
+hmat_flags="-use_hmatrix 4 -hmmvp_tol 1e-4"
+#hmat_flags=""
 
 
 cd $rundir

@@ -26,7 +26,8 @@ infile = "faults_%s.d" % profile
 outgeom = "geom_%s.in" % profile
 outplot = "geom_%s_overview.png" % profile
 make_plot = 1     # write outplot (needs matplotlib); 0: off
-dx = 0.1          # target element length [km].  Set by the SPLAYS, not by
+dx = 0.025
+#dx = 0.1          # target element length [km].  Set by the SPLAYS, not by
                   # the interface or the nucleation length: the shortest
                   # splay is 2.07 km (PD13 splay4), so 0.1 km is what it
                   # takes to give every splay at least twenty elements.
