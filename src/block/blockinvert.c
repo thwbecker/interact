@@ -1189,7 +1189,7 @@ int main(int argc, char **argv)
       was there a decrease in chi^2 for this (random) iteration?
       
       */
-      if((chi2[0] < minchi2[0])||(!finite(chi2[0]))){		
+      if((chi2[0] < minchi2[0])||(!isfinite(chi2[0]))){		
 	// save minimum chi2
 	a_equals_b_vector(minchi2,chi2,3);		
 	//

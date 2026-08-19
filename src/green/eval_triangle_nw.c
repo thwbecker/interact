@@ -53,7 +53,7 @@ void eval_triangle_nw(COMP_PRECISION *x,struct flt *fault,
 	    u[0],u[1],u[2]);
     fprintf(stderr,"eval_triangle_nw: u: %g %g %g\n",u[0],u[1],u[2]);
 #endif
-    if(!finite(u[0])||(!finite(u[1]))||(!finite(u[2]))){
+    if(!isfinite(u[0])||(!isfinite(u[1]))||(!isfinite(u[2]))){
       set_stress_and_disp_nan(sm,u,mode);
       *giret = 1;
       return;
@@ -75,8 +75,8 @@ void eval_triangle_nw(COMP_PRECISION *x,struct flt *fault,
     fprintf(stderr,"eval_triangle_nw: stress: %g %g %g %g %g %g\n",strain[0],strain[1],strain[2],strain[3],strain[4],strain[5]);
 #endif
 #endif
-    if((!finite(stress[0]))||(!finite(stress[1]))||(!finite(stress[2]))||
-       (!finite(stress[3]))||(!finite(stress[4]))||(!finite(stress[5]))){
+    if((!isfinite(stress[0]))||(!isfinite(stress[1]))||(!isfinite(stress[2]))||
+       (!isfinite(stress[3]))||(!isfinite(stress[4]))||(!isfinite(stress[5]))){
       set_stress_and_disp_nan(sm,u,mode);
       *giret = 1;
       return;
@@ -129,7 +129,7 @@ void get_tri_prop_based_on_gh(struct flt *fault)
     fault->t_dip[INT_Z]  = -1.;
   dip = (COMP_PRECISION)asin((double)fault->t_dip[INT_Z])*RAD2DEG;
 #ifdef DEBUG
-  if(!finite(dip)){
+  if(!isfinite(dip)){
     fprintf(stderr,"get_tri_prop_based_on_gh: dip not finite z: %20.16e\n", fault->t_dip[INT_Z]);
     exit(-1);
   }

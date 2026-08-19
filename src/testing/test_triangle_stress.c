@@ -18,8 +18,8 @@ int main(int argc,char **argv)
 	hbi_tdstresshs_(loc,(loc+1),(loc+2),p1,p2,p3,&Ss,&Ds,&Ts,&mu,&lambda,
 		       (stress2),(stress2+1),(stress2+2),(stress2+3),(stress2+4),(stress2+5));
 	for(i=0;i<6;i++){
-	  if((finite(stress1[i])&&(!finite(stress2[i])))||
-	     (!finite(stress1[i])&&(finite(stress2[i])))||
+	  if((isfinite(stress1[i])&&(!isfinite(stress2[i])))||
+	     (!isfinite(stress1[i])&&(isfinite(stress2[i])))||
 	     (fabs(stress1[i]-stress2[i])>1e-7)){
 	    fprintf(stdout,"min) %11g %11g %11g ",loc[0],loc[1],loc[2]);
 	    fprintf(stdout,"%20.14e %20.14e %20.14e %20.14e %20.14e %20.14e\n",stress1[0],stress1[1],stress1[2],stress1[3],stress1[4],stress1[5]);

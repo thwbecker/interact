@@ -488,7 +488,7 @@ void print_stress(struct med *medium,struct flt *fault)
 	  // check if all stresses are finite
 	  if(medium->suppress_nan_output){
 	    for(l=0;l<6;l++)
-	      if(!FINITE_TEST(medium->s[POSS(i, j, k, l)]))
+	      if(!isfinite(medium->s[POSS(i, j, k, l)]))
 		break;
 	  }else{
 	    l=6;
@@ -536,7 +536,7 @@ void print_stress(struct med *medium,struct flt *fault)
     for(k=j=i=0;i<medium->olocnr;i++,j+=6,k+=3){
       if(medium->suppress_nan_output){
 	for(l=0;l<6;l++)
-	  if(!FINITE_TEST(medium->s[j+l]))
+	  if(!isfinite(medium->s[j+l]))
 	    break;
       }else{
 	l=6;
@@ -621,7 +621,7 @@ void print_displacement(struct med *medium,struct flt *fault)
 	for(k=0,x[INT_Z]=medium->pxmin[INT_Z];k<nz;k++,x[INT_Z]+=dx[INT_Z]){
 	  if(medium->suppress_nan_output){
 	    for(l=0;l<3;l++)
-	      if(!FINITE_TEST(medium->u[POSU(i, j, k, l)]))
+	      if(!isfinite(medium->u[POSU(i, j, k, l)]))
 		break;
 	  }else{
 	    l=3;
@@ -658,7 +658,7 @@ void print_displacement(struct med *medium,struct flt *fault)
     for(i=j=0;i<medium->olocnr;i++,j+=3){
       if(medium->suppress_nan_output){
 	for(l=0;l<3;l++)
-	  if(!FINITE_TEST(medium->u[j+l]))
+	  if(!isfinite(medium->u[j+l]))
 	    break;
       }else{
 	l=3;

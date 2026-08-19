@@ -146,13 +146,6 @@ don't expect anything to work....
 //#define RAND_GEN ran1
 #define RAND_GEN ran2
 
-//
-// not-nan test function
-#ifndef USE_HPUX_FUNCTIONS
-#define FINITE_TEST(x) (finite(x))
-#else
-#define FINITE_TEST(x) (isfinite(x))
-#endif
 
 /*
   important constants for program execution 

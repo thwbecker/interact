@@ -881,7 +881,7 @@ int par_assemble_a_matrix(int naflt,my_boolean *sma,int nreq,int *nameaf,
 	      amax = avalues[eqc2];
 	    if(!assigned[eqc2])
 	      fprintf(stderr,"%06i out of %06i unassigned?!\n",(int)eqc2,(int)nreq);
-	    if(!finite(avalues[eqc2]))
+	    if(!isfinite(avalues[eqc2]))
 	      fprintf(stderr,"%06i out of %06i not finite\n",(int)eqc2,(int)nreq);
 	  }
 	  fprintf(stderr,"row eqc1 %6i eqc2 %6i nreq %6i amin %12g amax %12g\n",(int)eqc1,(int)eqc2,(int)nreq,amin,amax);
