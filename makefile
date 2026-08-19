@@ -394,14 +394,11 @@ OLD_MATRIX_LIBS =	 $(SLATEC_LIBS) $(SUPERLU_LIBS)
 #
 # libraries, also linker flags
 #
-LIBS = $(MY_LIBDIR_SPEC)$(ODIR)/    -linput -lpatchio  $(TGF_LIB) \
-	$(COMPUTATIONAL_LIBS) $(MATHLIB) 
+LIBS = $(MY_LIBDIR_SPEC)$(ODIR)/    -linput -lpatchio  $(TGF_LIB) $(MATHLIBS) 
 
-LIBS_SGL = $(MY_LIBDIR_SPEC)$(ODIR)/     -linput.sgl -lpatchio.sgl $(TGF_LIB) \
-	$(COMPUTATIONAL_LIBS) $(MATHLIB) 
+LIBS_SGL = $(MY_LIBDIR_SPEC)$(ODIR)/     -linput.sgl -lpatchio.sgl $(TGF_LIB)  $(MATHLIBS) 
 
-LIBS_DEBUG = $(MY_LIBDIR_SPEC)$(ODIR)/     -linput.dbg -lpatchio.dbg $(TGF_LIB) \
-	$(COMPUTATIONAL_LIBS) $(MATHLIB) 
+LIBS_DEBUG = $(MY_LIBDIR_SPEC)$(ODIR)/     -linput.dbg -lpatchio.dbg $(TGF_LIB)  $(MATHLIBS) 
 
 #
 # list of all programs in groups
@@ -555,7 +552,7 @@ $(BDIR)/points2patch: $(ODIR)/points2patch.o  $(ODIR)/fit_plane.o $(ODIR)/libpat
 	 $(LIBLIST) 
 	$(MPILD) $(ODIR)/points2patch.o $(ODIR)/libpatchio.a \
 		$(ODIR)/fit_plane.o \
-		-o $(BDIR)/points2patch  $(LIBS)  $(BLASLIB) $(LDFLAGS)   
+		-o $(BDIR)/points2patch  $(LIBS)  $(MATHLIBS) $(LDFLAGS)   
 
 $(BDIR)/create_random_stress_file: $(ODIR)/create_random_stress_file.o \
 	$(GEN_P_INC)  $(LIBLIST) 
@@ -755,7 +752,7 @@ $(BDIR)/blockinvert_sph: $(GEN_P_INC)  $(GEOPROJECT_OBJS) $(LIBLIST) \
 		-o  $(BDIR)/blockinvert_sph  $(LIBS)		\
 		$(PETSC_LIBS)	$(GEOPROJECT_LIBS) \
 		 $(EISPACK_LIB) $(PGLIBS) 	\
-		$(COMPUTATIONAL_LIBS)  $(OLD_MATRIX_LIBS)  $(LDFLAGS)
+		$(MATHLIBS)  $(OLD_MATRIX_LIBS)  $(LDFLAGS)
 
 $(BDIR)/fstress2hor: $(GEN_P_INC)  $(LIBLIST) $(GEOPROJECT_OBJS)\
 		$(FSTRESS2HOR_OBJS) $(ODIR)/fstress2hor.o
@@ -763,7 +760,7 @@ $(BDIR)/fstress2hor: $(GEN_P_INC)  $(LIBLIST) $(GEOPROJECT_OBJS)\
 			$(MY_LIBDIR_SPEC)$(ODIR)/ $(GEOPROJECT_OBJS)	\
 		-o  $(BDIR)/fstress2hor   -linput -lpatchio		\
 		$(GEOPROJECT_LIBS)					\
-		$(COMPUTATIONAL_LIBS) $(MATHLIB)   $(TGF_LIB) $(EISPACK_LIB) $(LDFLAGS)
+		$(MATHLIBS)   $(TGF_LIB) $(EISPACK_LIB) $(LDFLAGS)
 
 $(BDIR)/fit_mean_stress: $(GEN_P_INC)  $(LIBLIST) $(GEOPROJECT_OBJS)\
 		$(FSTRESS2HOR_OBJS) $(ODIR)/fit_mean_stress.o
@@ -771,7 +768,7 @@ $(BDIR)/fit_mean_stress: $(GEN_P_INC)  $(LIBLIST) $(GEOPROJECT_OBJS)\
 			$(MY_LIBDIR_SPEC)$(ODIR)/ $(GEOPROJECT_OBJS)	\
 		-o  $(BDIR)/fit_mean_stress   -linput -lpatchio		\
 		$(GEOPROJECT_LIBS)	$(TGF_LIB)				\
-		$(COMPUTATIONAL_LIBS) $(MATHLIB)    $(EISPACK_LIB)  $(LDFLAGS) 
+		$(MATHLIBS)     $(EISPACK_LIB)  $(LDFLAGS) 
 
 $(BDIR)/fstress2eig: $(GEN_P_INC)  $(LIBLIST) $(GEOPROJECT_OBJS)\
 		$(FSTRESS2HOR_OBJS) $(ODIR)/fstress2eig.o
@@ -779,7 +776,7 @@ $(BDIR)/fstress2eig: $(GEN_P_INC)  $(LIBLIST) $(GEOPROJECT_OBJS)\
 			$(MY_LIBDIR_SPEC)$(ODIR)/ $(GEOPROJECT_OBJS)	\
 		-o  $(BDIR)/fstress2eig   -linput -lpatchio		\
 		$(GEOPROJECT_LIBS)					\
-		$(COMPUTATIONAL_LIBS) $(MATHLIB)   $(TGF_LIB) $(EISPACK_LIB) $(LDFLAGS)
+		$(MATHLIBS)    $(TGF_LIB) $(EISPACK_LIB) $(LDFLAGS)
 
 $(BDIR)/block_evaluate_solution: $(GEN_P_INC)  $(GEOPROJECT_OBJS) $(LIBLIST)	\
 		$(BLOCK_EVALUATE_SOLUTION_OBJS) 		\
@@ -789,7 +786,7 @@ $(BDIR)/block_evaluate_solution: $(GEN_P_INC)  $(GEOPROJECT_OBJS) $(LIBLIST)	\
 			$(MY_LIBDIR_SPEC)$(ODIR)/ $(GEOPROJECT_OBJS)	\
 		-o  $(BDIR)/block_evaluate_solution   -linput -lpatchio	\
 		$(GEOPROJECT_LIBS)					\
-		$(COMPUTATIONAL_LIBS) $(MATHLIB)  $(TGF_LIB)  $(EISPACK_LIB) $(LDFLAGS)
+		$(MATHLIBS)  $(TGF_LIB)  $(EISPACK_LIB) $(LDFLAGS)
 
 $(BDIR)/block_checkflt: $(GEN_P_INC)  $(GEOPROJECT_OBJS) $(LIBLIST) \
 		$(BLOCKINVERT_SPH_OBJS) $(ODIR)/block_checkflt.o
@@ -797,13 +794,13 @@ $(BDIR)/block_checkflt: $(GEN_P_INC)  $(GEOPROJECT_OBJS) $(LIBLIST) \
 			$(MY_LIBDIR_SPEC)$(ODIR)/ $(GEOPROJECT_OBJS)			\
 		-o  $(BDIR)/block_checkflt   -linput -lpatchio		\
 		$(GEOPROJECT_LIBS) $(PETSC_LIBS)				\
-		$(COMPUTATIONAL_LIBS) $(MATHLIB)    $(TGF_LIB) $(EISPACK_LIB)  $(PGLIBS) $(LDFLAGS) 
+		$(MATHLIBS)     $(TGF_LIB) $(EISPACK_LIB)  $(PGLIBS) $(LDFLAGS) 
 
 $(BDIR)/geo_okada: $(ODIR)/geo_okada.o $(ODIR)/coulomb_stress.o $(GEN_P_INC)  \
 	$(GEOPROJECT_OBJS) $(LIBLIST) 
 	$(MPILD)  $(ODIR)/geo_okada.o $(MY_LIBDIR_SPEC)$(ODIR)/ $(GEOPROJECT_OBJS) \
 		-o  $(BDIR)/geo_okada  $(ODIR)/coulomb_stress.o -lpatchio \
-		$(GEOPROJECT_LIBS)	$(COMPUTATIONAL_LIBS)  $(MATHLIB)  $(LDFLAGS)
+		$(GEOPROJECT_LIBS)	$(MATHLIBS)    $(LDFLAGS)
 
 #
 # C function prototyper

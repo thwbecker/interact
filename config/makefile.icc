@@ -67,10 +67,7 @@ SF90ARGS = -Ofast -nofor-main  -fPIE -fpp
 #
 SFARGSSAVE = $(SFARGS)
 #
-# BLAS
-BLASLIB =  $(MATHLIBS)
 
-COMPUTATIONAL_LIBS = $(BLASLIB)
 #
 # where are the modified EISPACK routines from the myeispack.tar.gz
 EISPACK_DIR = eispack/

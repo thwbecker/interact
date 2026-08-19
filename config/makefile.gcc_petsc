@@ -57,11 +57,7 @@ SFARGS = -Wall -ffixed-line-length-132  -fmax-errors=0 -x f77-cpp-input
 SF90ARGS = -Wall   -fmax-errors=0 -cpp
 #
 SFARGSSAVE = $(SFARGS)
-#
-# BLAS
-BLASLIB =  $(MATHLIBS)
 
-COMPUTATIONAL_LIBS = $(BLASLIB)
 #
 # where are the modified EISPACK routines from the myeispack.tar.gz
 EISPACK_DIR = eispack/

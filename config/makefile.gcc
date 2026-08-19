@@ -46,7 +46,6 @@ X11LIBDIR = /usr/lib/x86_64-linux-gnu/
 MATHLIBS = -llapack -lblas -lm
 
 
-
 CFLAGS_OTHER =  -Wno-discarded-qualifiers
 SCARGS =  $(GCCWOPT) $(CFLAGS_OTHER)
 
@@ -64,10 +63,7 @@ SF90ARGS = -Wall   -fmax-errors=0 -cpp
 #
 SFARGSSAVE = $(SFARGS)
 #
-# BLAS
-BLASLIB =  $(MATHLIBS)
 
-COMPUTATIONAL_LIBS = $(BLASLIB)
 #
 # where are the modified EISPACK routines from the myeispack.tar.gz
 EISPACK_DIR = eispack/

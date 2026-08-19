@@ -41,7 +41,6 @@ LDFLAGS =  -nofor-main -L/disk/rh_usr_local/intel/oneapi/mpi/latest/lib/
 # X 11 only needed for PGPLOT
 X11LIBDIR = /usr/lib/x86_64-linux-gnu/
 #
-#MATHLIBS = -llapack -lblas -lm
 MATHLIBS = -mkl
 #
 # warning options
@@ -72,10 +71,7 @@ SF90ARGS = -Ofast -nofor-main  -fPIE -fpp
 #
 SFARGSSAVE = $(SFARGS)
 #
-# BLAS
-BLASLIB =  $(MATHLIBS)
 
-COMPUTATIONAL_LIBS = $(BLASLIB)
 #
 # where are the modified EISPACK routines from the myeispack.tar.gz
 EISPACK_DIR = eispack/
