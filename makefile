@@ -189,11 +189,15 @@ OKROUTINE_DEBUG = $(ODIR)/dc3d.dbg.o	# my modified version
 # 
 # include the machine dependent flags
 # 
-include config/makefile.gcc
+#include config/makefile.gcc
+include config/makefile.gcc_petsc
+
+
 #include config/makefile.icc
 #include config/makefile.mixed_mkl
 #include config/makefile.mixed
 #include config/makefile.icc_frontera
+#include config/makefile.petsc
 #
 # add this for pgplot support, otherwise comment it out
 # you will use runtime plotting capabilities
@@ -203,10 +207,6 @@ include config/makefile.gcc
 # you will use NNLS solving capabilities
 #include config/makefile.slatec
 
-#
-# petsc, will override some of the flags
-# comment out if not needed
-include config/makefile.petsc
 ifndef MPILD
 MPILD = $(LD)
 endif
