@@ -233,7 +233,7 @@ PetscErrorCode rsf_solve_run(int argc,char **argv,struct interact_ctx *par,
   PetscCall(PetscBarrier(NULL));
   PetscCall(PetscTime(&tb0));
   calc_petsc_Isn_matrices(medium,fault,use_hmatrix,
-			  shear_modulus_si/SHEAR_MODULUS,0,rsf->slip_mode,
+			  shear_modulus_si/medium->elastic.shear,0,rsf->slip_mode,
 			  &medium->Is,medium->Is_hctx); /* shear stress */
   PetscCall(PetscBarrier(NULL));
   PetscCall(PetscTime(&tb1));
@@ -243,7 +243,7 @@ PetscErrorCode rsf_solve_run(int argc,char **argv,struct interact_ctx *par,
     PetscCall(PetscBarrier(NULL));
     PetscCall(PetscTime(&tb0));
     calc_petsc_Isn_matrices(medium,fault,use_hmatrix,
-			    -shear_modulus_si/SHEAR_MODULUS,1,rsf->slip_mode,
+			    -shear_modulus_si/medium->elastic.shear,1,rsf->slip_mode,
 			    &medium->In,medium->In_hctx); /* normal stress, compression positive */
     PetscCall(PetscBarrier(NULL));
     PetscCall(PetscTime(&tb1));

@@ -17,7 +17,7 @@
 */
 #include "interact.h"
 #ifdef USE_BIGWHAM
-#include "properties.h"		/* YOUNG_MODULUS, POISSON_NU for the BigWham elastic constants */
+#include "properties.h"	
 #endif
 
 #ifdef USE_PETSC
@@ -277,7 +277,7 @@ PetscErrorCode setup_bigwham_matshell(struct med *medium, struct flt *fault,
   Vec xd;
   PetscInt i,k,m,n;
   double *coor; int *conn;
-  double E,nu,l,w,ts,td,c;
+  double E,l,w,ts,td,c;
   void *handle;
   int bm,bn; double comp;
   PetscFunctionBeginUser;
@@ -299,12 +299,13 @@ PetscErrorCode setup_bigwham_matshell(struct med *medium, struct flt *fault,
     conn[4*i+0] = 4*i+0; conn[4*i+1] = 4*i+1;
     conn[4*i+2] = 4*i+2; conn[4*i+3] = 4*i+3;
   }
-  E  = (double)YOUNG_MODULUS;	/* = 2 G (1+nu), same constants as Okada */
-  nu = (double)POISSON_NU;
+  /* = 2 G (1+nu), same constants as Okada */
+  E  = (double)medium->elastic->mu2*(1.0+medium->elastic->poisson);	
+
   if(!medium->full_space)	/* BigWham is an infinite-medium kernel */
     HEADNODE
       fprintf(stderr,"setup_bigwham_matshell: WARNING: BigWham is full-space only; without -full_space 1 the dense reference is the Okada half-space operator and the comparison is not apples-to-apples\n");
-  handle = cbigwham_create(coor,3*4*(int)n,conn,4*(int)n,"3DR0-H",E,nu,
+  handle = cbigwham_create(coor,3*4*(int)n,conn,4*(int)n,"3DR0-H",E,medium->elastic->poisson,
 			   (int)medium->bigwham_nthreads);
   cbigwham_build(handle,(int)medium->bigwham_max_leaf,
 		 (double)medium->bigwham_eta,(double)medium->bigwham_eps_aca);

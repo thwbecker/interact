@@ -1232,6 +1232,7 @@ void background_stress(COMP_PRECISION sm[3][3], COMP_PRECISION *x,
   sm[INT_X][INT_Z]=sm[INT_Z][INT_X] = a[2] + time * b[2];
   sm[INT_Y][INT_Z]=sm[INT_Z][INT_Y] = a[4] + time * b[4];
 }
+
 void background_disp(COMP_PRECISION *u, COMP_PRECISION *x, 
 		     struct med *medium,COMP_PRECISION *a,
 		     COMP_PRECISION *b)
@@ -1258,7 +1259,7 @@ void background_disp(COMP_PRECISION *u, COMP_PRECISION *x,
     fprintf(stderr,"background_disp: EXITING: background displacement is inaccurate since no simple shear stressing\n");
     exit(-1);
   }
-  u[INT_X]=medium->time * (b[1]/SHEAR_MODULUS)*u[INT_Y];
+  u[INT_X]=medium->time * (b[1]/medium->elastic.shear)*u[INT_Y];
   u[INT_Y]=u[INT_Z]=0.0;
 }
 /*

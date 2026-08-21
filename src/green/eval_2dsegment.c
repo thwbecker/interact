@@ -40,15 +40,16 @@ void eval_2dsegment_plane_strain(COMP_PRECISION *x,
 				 COMP_PRECISION *disp,
 				 COMP_PRECISION *u_global, 
 				 COMP_PRECISION sm_global[3][3],
-				 int *iret, MODE_TYPE mode)
+				 int *iret, MODE_TYPE mode,
+				 struct el_par elastic)
 {
   COMP_PRECISION u[3],x_local[3],dx[3],sm_local[3][3],f2,f3,f4,f5,f6,f7,
     c1,c12,c2,c22,c3,c32,c4,c42,y2;
-  static COMP_PRECISION 
-    pfac1 = 4.0 * PI * (1.0 - POISSON_NU),
-    pfac2 = (1.0 -       POISSON_NU), 
-    pfac3 = (1.0 - 2.0 * POISSON_NU),
-    pfac4 = POISSON_NU;
+  COMP_PRECISION 
+    pfac2 = (1.0 -       elastic.poisson), 
+    pfac1 = 4.0 * PI * pfac2,
+    pfac3 = (1.0 - 2.0 * elastic.poisson);
+
 #ifdef DEBUG
   COMP_PRECISION l,w,corners[MAX_NR_EL_VERTICES*3];
   if(x[INT_Z] != 0.0){
@@ -95,11 +96,11 @@ void eval_2dsegment_plane_strain(COMP_PRECISION *x,
     // plane strain solution
     //
     // stresses
-    get_2dseg_stress(sm_local,disp,x_local,f4,f5,f6,f7);
+    get_2dseg_stress(sm_local,disp,x_local,f4,f5,f6,f7,elastic);
     // no shear stresses with z for plain strain since exz and eyz = 0
     sm_local[INT_X][INT_Z] = sm_local[INT_Z][INT_X] = sm_local[INT_Z][INT_Y] = sm_local[INT_Y][INT_Z] = 0.0;
     // from plane strain: szz = \nu/ (sxx + syy)
-    sm_local[INT_Z][INT_Z] = pfac4 * (sm_local[INT_X][INT_X] + sm_local[INT_Y][INT_Y]);
+    sm_local[INT_Z][INT_Z] = elastic.poisson * (sm_local[INT_X][INT_X] + sm_local[INT_Y][INT_Y]);
     /* 
 
        rotate displacements back into global frame this subroutine
@@ -126,16 +127,17 @@ void eval_2dsegment_plane_stress(COMP_PRECISION *x,struct flt *fault,
 				 COMP_PRECISION *disp,
 				 COMP_PRECISION *u_global, 
 				 COMP_PRECISION sm_global[3][3],int *iret,
-				 MODE_TYPE mode)
+				 MODE_TYPE mode,struct el_par elastic)
 {  
   COMP_PRECISION u[3],x_local[3],dx[3],sm_local[3][3],f2,f3,f4,f5,f6,f7,
     c1,c12,c2,c22,c3,c32,c4,c42,y2;
-  static COMP_PRECISION // in pfac1 ... pfac4, \nu has been replaced by  \nu/(1+\nu)
+  COMP_PRECISION 
     // the last factror, pfac5, uses the real poisson ratio for e_zz
-    pfac1 = 4.0 * 3.141592653589793 * (1.0 - (POISSON_NU/(1.0+POISSON_NU))),
-		       pfac2 = (1.0 -       (POISSON_NU/(1.0+POISSON_NU))), 
-    pfac3 = (1.0 - 2.0 * (POISSON_NU/(1.0+POISSON_NU))),
-    pfac5 = POISSON_NU/(TWO_TIMES_SHEAR_MODULUS*(1.0+POISSON_NU));
+    pfac0 =  elastic.poisson/(1.0+elastic.poisson),
+    pfac1 = 4.0 * 3.141592653589793 * (1.0 - (elastic.poisson/(1.0+elastic.poisson))),
+    pfac2 = 1.0 -       pfac0, 
+    pfac3 = 1.0 - 2.0 * pfac0,
+    pfac5 = elastic.poisson/(2.0*elastic.shear*(1.0+elastic.poisson));
 #ifdef DEBUG
   COMP_PRECISION l,w,corners[MAX_NR_EL_VERTICES*3];
   if(x[INT_Z] != 0.0){
@@ -162,7 +164,7 @@ void eval_2dsegment_plane_stress(COMP_PRECISION *x,struct flt *fault,
     get_2dseg_ffac(&f2,&f3,&f4,&f5,&f6,&f7,c1,c2,c12,c22,
 		   c3,c4,c32,c42,pfac1,y2,x_local);
     get_2dseg_disp(u,disp,x_local,f2,f3,f4,f5,pfac2,pfac3);
-    get_2dseg_stress(sm_local,disp,x_local,f4,f5,f6,f7);
+    get_2dseg_stress(sm_local,disp,x_local,f4,f5,f6,f7,elastic);
     // no shear stresses with z 
     sm_local[INT_X][INT_Z] = sm_local[INT_Z][INT_X] =
       sm_local[INT_Z][INT_Y] = sm_local[INT_Y][INT_Z] = 0.0;
@@ -190,15 +192,14 @@ void eval_2dsegment_plane_strain_basic(COMP_PRECISION *x,
 				       COMP_PRECISION *disp,
 				       COMP_PRECISION *u_global, 
 				       COMP_PRECISION sm_global[3][3],
-				       int *iret)
+				       int *iret,struct el_par elastic)
 {
   COMP_PRECISION f2,f3,f4,f5,f6,f7,c1,c12,c2,c22,c3,c32,c4,
     c42,y2;
-  static COMP_PRECISION 
-    pfac1 = 4.0 * PI * (1.0 - POISSON_NU),
-    pfac2 = (1.0 -       POISSON_NU), 
-    pfac3 = (1.0 - 2.0 * POISSON_NU),
-    pfac4 = POISSON_NU;
+  COMP_PRECISION
+    pfac0 = 1.0 - elastic.poisson,
+    pfac1 = 4.0 * PI * pfac0,
+    pfac3 = (1.0 - 2.0 * elastic.poisson);
 #ifdef DEBUG
   COMP_PRECISION l,w,corners[MAX_NR_EL_VERTICES*3];
   if(x[INT_Z] != 0.0){
@@ -228,10 +229,11 @@ void eval_2dsegment_plane_strain_basic(COMP_PRECISION *x,
   }else{
     get_2dseg_ffac(&f2,&f3,&f4,&f5,&f6,&f7,c1,c2,c12,c22,c3,c4,
 		   c32,c42,pfac1,y2,x);
-    get_2dseg_disp(u_global,disp,x,f2,f3,f4,f5,pfac2,pfac3);
-    get_2dseg_stress(sm_global,disp,x,f4,f5,f6,f7);
-    sm_global[INT_X][INT_Z] = sm_global[INT_Z][INT_X] = sm_global[INT_Z][INT_Y] = sm_global[INT_Y][INT_Z] = 0.0;
-    sm_global[INT_Z][INT_Z] = pfac4 * (sm_global[INT_X][INT_X] + sm_global[INT_Y][INT_Y]);
+    get_2dseg_disp(u_global,disp,x,f2,f3,f4,f5,pfac0,pfac3);
+    get_2dseg_stress(sm_global,disp,x,f4,f5,f6,f7,elastic);
+    sm_global[INT_X][INT_Z] = sm_global[INT_Z][INT_X] = sm_global[INT_Z][INT_Y] =
+      sm_global[INT_Y][INT_Z] = 0.0;
+    sm_global[INT_Z][INT_Z] = elastic.poisson * (sm_global[INT_X][INT_X] + sm_global[INT_Y][INT_Y]);
     u_global[INT_Z] = 0.0;
   }
 }
@@ -240,16 +242,16 @@ void eval_2dsegment_plane_stress_basic(COMP_PRECISION *x,
 				       COMP_PRECISION *disp,
 				       COMP_PRECISION *u_global, 
 				       COMP_PRECISION sm_global[3][3],
-				       int *iret)
+				       int *iret,struct el_par elastic)
 {  
   COMP_PRECISION f2,f3,f4,f5,f6,f7,c1,c12,c2,c22,c3,c32,c4,c42,
     y2;
-  static COMP_PRECISION // in pfac1 ... pfac4, \nu has been replaced by  \nu/(1+\nu)
-    // the last factror, pfac5, uses the real poisson ratio for e_zz
-    pfac1 = 4.0 * 3.141592653589793 * (1.0 - (POISSON_NU/(1.0+POISSON_NU))),
-		       pfac2 = (1.0 -       (POISSON_NU/(1.0+POISSON_NU))), 
-    pfac3 = (1.0 - 2.0 * (POISSON_NU/(1.0+POISSON_NU))),
-    pfac5 = POISSON_NU/(TWO_TIMES_SHEAR_MODULUS*(1.0+POISSON_NU));
+  COMP_PRECISION
+    pfac0 = elastic.poisson/(1.0+elastic.poisson),
+    pfac2 = (1.0 - pfac0),
+    pfac1 = 4.0 * 3.141592653589793 * pfac2,
+    pfac3 = (1.0 - 2.0 * pfac0),
+    pfac5 = elastic.poisson/(elastic.mu2*(1.0+elastic.poisson));
 #ifdef DEBUG
   COMP_PRECISION l,w,corners[MAX_NR_EL_VERTICES*3];
   if(x[INT_Z] != 0.0){
@@ -280,8 +282,9 @@ void eval_2dsegment_plane_stress_basic(COMP_PRECISION *x,
     get_2dseg_ffac(&f2,&f3,&f4,&f5,&f6,&f7,c1,c2,c12,c22,
 		   c3,c4,c32,c42,pfac1,y2,x);
     get_2dseg_disp(u_global,disp,x,f2,f3,f4,f5,pfac2,pfac3);
-    get_2dseg_stress(sm_global,disp,x,f4,f5,f6,f7);
-    sm_global[INT_X][INT_Z] = sm_global[INT_Z][INT_X] = sm_global[INT_Z][INT_Y] = sm_global[INT_Y][INT_Z] = 0.0;
+    get_2dseg_stress(sm_global,disp,x,f4,f5,f6,f7,elastic);
+    sm_global[INT_X][INT_Z] = sm_global[INT_Z][INT_X] =
+      sm_global[INT_Z][INT_Y] = sm_global[INT_Y][INT_Z] = 0.0;
     sm_global[INT_Z][INT_Z] = 0.0;
     u_global[INT_Z] = -pfac5 * (sm_global[INT_X][INT_X] + sm_global[INT_Y][INT_Y]);
   }
@@ -385,13 +388,14 @@ approximation
 void get_2dseg_stress(COMP_PRECISION sm[3][3], 
 		      COMP_PRECISION *disp,COMP_PRECISION *x,
 		      COMP_PRECISION f4,COMP_PRECISION f5,
-		      COMP_PRECISION f6,COMP_PRECISION f7)
+		      COMP_PRECISION f6,COMP_PRECISION f7,
+		      struct el_par  elastic)
 {
   COMP_PRECISION tmp[4];
   tmp[0] = x[INT_Y]*f6;
   tmp[1] = x[INT_Y]*f7;
-  tmp[2] = TWO_TIMES_SHEAR_MODULUS*disp[STRIKE];
-  tmp[3] = TWO_TIMES_SHEAR_MODULUS*disp[NORMAL];
+  tmp[2] = elastic.mu2*disp[STRIKE];
+  tmp[3] = elastic.mu2*disp[NORMAL];
   sm[INT_X][INT_X] =tmp[2]*(2.0*f4 + tmp[0]);
   sm[INT_X][INT_X]-=tmp[3]*(   -f5 + tmp[1]);
   sm[INT_Y][INT_Y] =tmp[2]*(       - tmp[0]);
@@ -417,20 +421,19 @@ void eval_2dsegment_plane_strain_tdd(COMP_PRECISION *x,
 				     COMP_PRECISION *disp,
 				     COMP_PRECISION *u_global, 
 				     COMP_PRECISION sm_global[3][3],
-				     int ihalf,int *iret, MODE_TYPE mode)
+				     int ihalf,int *iret, MODE_TYPE mode,
+				     struct el_par elastic)
 {
-  static my_boolean init=FALSE;
-  static COMP_PRECISION pr,pr1,pr2,con,cons,chi;
+  static COMP_PRECISION pr0,pr,pr1,pr2,con,cons,chi;
   COMP_PRECISION sxx[3],sxy[3],syy[3],ux[3],uy[3];
-  if(!init){		/* initialize parameters */
-    pr = (COMP_PRECISION)POISSON_NU;
-    pr1 = (1.0 - 2.0 * pr);
-    pr2=  2.0*(1.0 - pr);
-    con= 1.0 / (4.0 * PI * (1.0 - pr));
-    cons = (COMP_PRECISION)YOUNG_MODULUS/(1.0 + pr);
-    chi = 3.0 - 4.0 * pr;
-    init = TRUE;
-  }
+  pr = (COMP_PRECISION)elastic.poisson;
+  pr0 =  1.0 - pr;
+  pr1 =  (1.0 - 2.0 * pr);
+  pr2=   2.0*pr0;
+  con=   1.0 / (4.0 * PI * pr0);
+  cons = (COMP_PRECISION)elastic.shear/(1.0 + pr);
+  chi =  3.0 - 4.0 * pr;
+
   if((ihalf)&&(x[INT_Y] > 0)){	/* half-plane in air */
     set_stress_and_disp_nan(sm_global,u_global,mode);
   }else{

@@ -15,46 +15,29 @@
 */
 /* STRESS_DROP_NORM flag: if defined, will normalize stresses by
  stress drop if not, shear modulus will be set to unity */
-#define STRESS_DROP_NORM
+
+/* #define STRESS_DROP_NORM */
 
 
 #ifdef STRESS_DROP_NORM
 /* set by stress drop */
-#define SHEAR_MODULUS 1.0e4
+#define SHEAR_MODULUS_DEF 1.0e4
 /* 
    define stress drop in consistent units
    for Earth, \Delta \sigma \sim 3e6 Pa, \mu= \sim 3e10 Pa,
    therefore, if we set the characteristic stress by the shear modulus 
    to unity, stress_drop should be 1e-4
 */
-#define STRESS_DROP 1.0
+#define STRESS_DROP_DEF 1.0
 #else
 /*   characteristic stress set by shear modulus  */
-#define SHEAR_MODULUS  1.0
-
-#define STRESS_DROP 1.0e-4
+#define SHEAR_MODULUS_DEF  1.0
+#define STRESS_DROP_DEF 1.0e-4
 #endif
-
-/* 
-   \lambda = (2\mu \nu)/(1-2*\nu) 
-   \alpha = (\lambda+\mu)/(\lambda+2 \mu) 
-   where \lambda and \mu are the Lame constants 
-   (\mu is the shear modulus)
-
-   if the possion ratio \nu=1/4, then \mu = \lambda, and \alpha = 2./3.
-   E = 2\mu(1+\nu), which is 2.5 for \nu=.25 and \mu=1
+/*
+  YOUNG_MODULUS (2.0*SHEAR_MODULUS*(1.0+POISSON_NU))
 */
-#define POISSON_NU 0.25
-
-
-/* those will be computed from myu and poisson */
-#define TWO_TIMES_SHEAR_MODULUS  (2.0*SHEAR_MODULUS)
-#define TWO_TIMES_SHEAR_MODULUS_FTN  (2.0d0*SHEAR_MODULUS)
-
-#define LAMBDA_CONST (TWO_TIMES_SHEAR_MODULUS*POISSON_NU)/(1.0-2.0*POISSON_NU)
-#define LAMBDA_CONST_FTN (TWO_TIMES_SHEAR_MODULUS_FTN*POISSON_NU)/(1.0d0-2.0d0*POISSON_NU) 
-
-#define ALPHA_CONST (LAMBDA_CONST+SHEAR_MODULUS)/(LAMBDA_CONST+TWO_TIMES_SHEAR_MODULUS) 
+#define POISSON_NU_DEF 0.25
 
 /* 
 
@@ -94,7 +77,7 @@
    stress in a loading simulation
 
 */
-#define PRESSURE_DEF (STRESS_DROP/DELTA_MU)
+#define PRESSURE_DEF (STRESS_DROP_DEF/DELTA_MU)
 /* 
    define HYDROSTATIC_PRESSURE if you want depth dependent pressure. 
    if undefined, pressure will be constant
@@ -127,7 +110,7 @@
    switch
 
 */
-#define COHESION_DEF (5.0*STRESS_DROP)
+#define COHESION_DEF (5.0*STRESS_DROP_DEF)
 /* #define COHESION_DEF 0.0 */
 
 /* we consider a compressive stress of amplitude TENSILE_RANGE 
@@ -140,17 +123,14 @@
 
    sigma_xy =  (PRE_STRESSING_TIME_OFFSET+time)*stressing_rate
 
-   if stressing rate is set to STRESS_DROP, then
+   if stressing rate is set to STRESS_DROP_DEF, then
    the characteristic time is unity, ie. one seismic 
    cycle
 
    WARNING: defaults can be overwritten by smlin.in!
 
 */
-#define STRESSING_RATE STRESS_DROP
+#define STRESSING_RATE STRESS_DROP_DEF
 
 
 
-/* Youngs modulus, E */
-
-#define YOUNG_MODULUS (2.0*SHEAR_MODULUS*(1.0+POISSON_NU))

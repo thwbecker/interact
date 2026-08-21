@@ -23,7 +23,8 @@ void eval_green_and_project_stress_to_fault(struct flt *fault, int ireceive,
 					    int islip, COMP_PRECISION *slip,
 					    COMP_PRECISION *s,
 					    my_boolean multi_point_eval,
-					    my_boolean full_space)
+					    my_boolean full_space,
+					    struct el_par elastic)
 {
   //#define SUPER_DUPER_DEBUG
   int iret;
@@ -35,7 +36,7 @@ void eval_green_and_project_stress_to_fault(struct flt *fault, int ireceive,
 	  slip[0],slip[1],slip[2],fault[ireceive].x[0],fault[ireceive].x[1],fault[ireceive].x[2]);
 #endif
   eval_green_at_receiver(fault,ireceive,islip,slip,u,sm,&iret,GC_STRESS_ONLY,
-			 multi_point_eval,full_space);
+			 multi_point_eval,full_space,elastic);
   if(!iret){
     /* project the stresses */
     resolve_force(fault[ireceive].normal,sm,trac); /* convert to local
@@ -86,13 +87,14 @@ void eval_green(COMP_PRECISION *x,struct flt *fault,
 		COMP_PRECISION *disp,COMP_PRECISION *u_global, 
 		COMP_PRECISION sm_global[3][3],int *iret,
 		MODE_TYPE mode,my_boolean eval_on_itself,
-		my_boolean full_space)
+		my_boolean full_space,struct el_par  elastic)
 /* mode type only for triangular */
 {
 #ifdef ALLOW_NON_3DQUAD_GEOM
   switch(fault->type){
   case POINT_SOURCE:{
-    eval_point(x,fault,disp,u_global,sm_global,iret,mode,full_space);
+    eval_point(x,fault,disp,u_global,sm_global,iret,mode,full_space,
+	       elastic);
     break;
   }
     /* 
@@ -114,28 +116,29 @@ void eval_green(COMP_PRECISION *x,struct flt *fault,
   case TRIANGULAR_M244:
   case TRIANGULAR_HYBR:
   case TRIANGULAR_MIXED:{
-     eval_triangle_general(x,fault,disp,u_global,sm_global,iret,mode,eval_on_itself);
+    eval_triangle_general(x,fault,disp,u_global,sm_global,iret,mode,
+			  eval_on_itself,elastic);
     break;
   }
   case IQUAD:{
-    eval_iquad(x,fault,disp,u_global,sm_global,iret,mode);
+    eval_iquad(x,fault,disp,u_global,sm_global,iret,mode,elastic);
     break;
   }
   case OKADA_PATCH:{
-    eval_okada(x,fault,disp,u_global,sm_global,iret,mode,full_space);
+    eval_okada(x,fault,disp,u_global,sm_global,iret,mode,full_space,elastic);
     break;
   }
   case TWO_DIM_SEGMENT_PLANE_STRAIN:{
-    eval_2dsegment_plane_strain(x,fault,disp,u_global,sm_global,iret,mode);
+    eval_2dsegment_plane_strain(x,fault,disp,u_global,sm_global,iret,mode,elastic);
     break;
   }
   case TWO_DIM_SEGMENT_PLANE_STRESS:{
-    eval_2dsegment_plane_stress(x,fault,disp,u_global,sm_global,iret,mode);
+    eval_2dsegment_plane_stress(x,fault,disp,u_global,sm_global,iret,mode,elastic);
     break;
   }
   case TWO_DIM_HALFPLANE_PLANE_STRAIN:{
     eval_2dsegment_plane_strain_tdd(x,fault,disp,u_global,sm_global, 1,iret,
-				    mode); 
+				    mode,elastic); 
     break;
   }
   default:{
@@ -144,7 +147,8 @@ void eval_green(COMP_PRECISION *x,struct flt *fault,
     exit(-1);
   }}
 #else
-  eval_okada(x,fault,disp,u_global,sm_global,iret,mode, full_space);
+  eval_okada(x,fault,disp,u_global,sm_global,iret,mode, full_space,
+	     elastic);
 #endif
 }
 
@@ -152,13 +156,14 @@ void eval_green(COMP_PRECISION *x,struct flt *fault,
 void eval_triangle_general(COMP_PRECISION *x,struct flt *fault,
 			   COMP_PRECISION *slip,COMP_PRECISION *u, 
 			   COMP_PRECISION sm[3][3],int *giret,
-			   MODE_TYPE mode,my_boolean is_self)
+			   MODE_TYPE mode,my_boolean is_self,
+			   struct el_par elastic)
 {
 #ifdef INT_USE_TGF_TRIANGLE
   fprintf(stderr,"eval_triangle_tgf: WARNING: not tested well\n");
-  eval_triangle_tgf(x,fault,slip,u,sm,giret,mode,is_self);
+  eval_triangle_tgf(x,fault,slip,u,sm,giret,mode,is_self,elastic);
 #else
-  eval_triangle_nw(x,fault,slip,u,sm,giret,mode);
+  eval_triangle_nw(x,fault,slip,u,sm,giret,mode,elastic);
 #endif
 }
 /* 
@@ -173,7 +178,8 @@ void eval_triangle_general(COMP_PRECISION *x,struct flt *fault,
 
 
 
-static int get_noda_points(int rtype,COMP_PRECISION eta[7][3],COMP_PRECISION w[7])
+static int get_noda_points(int rtype,COMP_PRECISION eta[7][3],
+			   COMP_PRECISION w[7])
 {
   const COMP_PRECISION alpha = -4.1;	/* HYB mixing parameter, Noda eq. 38 */
   const COMP_PRECISION two_sqrt3 = 2.0*sqrt(3.0),fac = 1.0/(3.0 - 2.0*sqrt(3.0));
@@ -239,7 +245,7 @@ void eval_green_at_receiver(struct flt *fault,int irec,int isrc,
 			    COMP_PRECISION *slip,COMP_PRECISION *u,
 			    COMP_PRECISION sm_global[3][3],int *iret,
 			    MODE_TYPE mode,my_boolean multi_point_eval,
-			    my_boolean full_space)
+			    my_boolean full_space, struct el_par elastic)
 {
   /* 
      multi_point_eval selects whether the Noda multi-point receiver
@@ -278,7 +284,7 @@ void eval_green_at_receiver(struct flt *fault,int irec,int isrc,
       for(p=0;p < np;p++){
 	calc_tri_bary_coord(fault[irec].xn,xl,eta[p][0],eta[p][1],eta[p][2]);
 	eval_green(xl,(fault+isrc),slip,u_loc,sm_loc,iret,mode,
-		   (irec==isrc)?(TRUE):(FALSE),full_space);
+		   (irec==isrc)?(TRUE):(FALSE),full_space,elastic);
 	if(*iret)
 	  return;			/* singular evaluation */
 	if(mode != GC_DISP_ONLY)
@@ -292,11 +298,11 @@ void eval_green_at_receiver(struct flt *fault,int irec,int isrc,
     break;
   default:
     eval_green(fault[irec].x,(fault+isrc),slip,u,sm_global,iret,mode,
-	       (irec==isrc)?(TRUE):(FALSE),full_space);
+	       (irec==isrc)?(TRUE):(FALSE),full_space,elastic);
   }
 #else
   eval_green(fault[irec].x,(fault+isrc),slip,u,sm_global,iret,mode,
-	     (irec==isrc)?(TRUE):(FALSE),full_space);
+	     (irec==isrc)?(TRUE):(FALSE),full_space,elastic);
 #endif
 }
 
@@ -311,7 +317,7 @@ void eval_green_basic(COMP_PRECISION *x,struct flt *fault,
 		      COMP_PRECISION *disp,
 		      COMP_PRECISION *u_global, 
 		      COMP_PRECISION sm_global[3][3],int *iret,
-		      my_boolean full_space)
+		      my_boolean full_space,struct el_par elastic)
 {
   
 #ifdef DEBUG
@@ -330,17 +336,18 @@ void eval_green_basic(COMP_PRECISION *x,struct flt *fault,
 		     (COMP_PRECISION)fault->w,
 		     (COMP_PRECISION)fault->dip,
 		     (COMP_PRECISION) -fault->x[INT_Z],
-		     disp,u_global,sm_global,iret,full_space);
+		     disp,u_global,sm_global,iret,full_space,
+		     elastic);
     break;
   }
   case TWO_DIM_SEGMENT_PLANE_STRAIN:{
     eval_2dsegment_plane_strain_basic(x,fault,disp,
-				      u_global,sm_global,iret);
+				      u_global,sm_global,iret,elastic);
     break;
   }
   case TWO_DIM_SEGMENT_PLANE_STRESS:{
-    eval_2dsegment_plane_stress_basic(x,fault,disp,u_global,
-				      sm_global,iret);
+    eval_2dsegment_plane_stress_basic(x,fault,disp,u_global,sm_global,
+				      iret,elastic);
     break;
   }
   default:{
@@ -349,7 +356,8 @@ void eval_green_basic(COMP_PRECISION *x,struct flt *fault,
     exit(-1);
   }}
 #else
-  eval_okada(x,fault,disp,u_global,sm_global,iret,GC_DISP_AND_STRESS,full_space);
+  eval_okada(x,fault,disp,u_global,sm_global,iret,GC_DISP_AND_STRESS,
+	     full_space,elastic);
 #endif
 }
 #if defined(USE_HACAPK) || defined(USE_HMMVP)
@@ -367,7 +375,8 @@ double ckernel_func(int i, int j, void *par)
   int iret;
   get_right_slip(slip,ictx->src_slip_mode,1.0,(ictx->fault+j));
   eval_green_at_receiver(ictx->fault,i,j,slip,disp,stress,&iret,
-			 GC_STRESS_ONLY,FALSE,ictx->medium->full_space); /* operator assembly: single-point */
+			 GC_STRESS_ONLY,FALSE,ictx->medium->full_space,
+			 ictx->medium->elastic); /* operator assembly: single-point */
   if(iret != 0)
     return 0.0;
   sval = resolve_stress_on_fault_using_ctx(stress,ictx, i);

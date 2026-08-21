@@ -23,6 +23,7 @@ int main(int argc, char **argv)
   double alpha;
   COMP_PRECISION x[3],xmin,xrange,ymin,yrange,dx,dy;
   COMP_PRECISION fxmin,fxrange,fxmean,lmin,lrange,lmean,tmpdbl,s[3][3],sl[3][3],ul[3];
+  struct el_par elastic;
   struct flt *fault;
   /* 
 
@@ -37,7 +38,8 @@ int main(int argc, char **argv)
   }
   fprintf(stderr,"%s: generating stress field for %i random faults\n",
 	  argv[0],n);
-
+  
+  calc_medium_elastic_parameters(&elastic,SHEAR_MODULUS_DEF, POISSON_NU_DEF);
   nx = ny = 101;		/* number of samples in x and y direction */
   
   xmin = -10;xrange=20;/* geographic bounds */
@@ -127,7 +129,7 @@ int main(int argc, char **argv)
 	   sum over faults 
 	*/
 	/* get contribution from fault k */
-	eval_2dsegment_plane_strain(x,(fault+k),fault[k].u,ul,sl,&err,GC_DISP_AND_STRESS);
+	eval_2dsegment_plane_strain(x,(fault+k),fault[k].u,ul,sl,&err,GC_DISP_AND_STRESS,elastic);
 	if(!err){
 	  /* non-infinite, add only three components */
 	  s[INT_X][INT_X] += sl[INT_X][INT_X];

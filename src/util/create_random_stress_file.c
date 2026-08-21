@@ -99,15 +99,15 @@ int main(int argc, char **argv)
   // multiply input values with STRESS_DROP 
   //
   for(i=0;i<3;i++)
-    std[i] = std0[i] * STRESS_DROP;
+    std[i] = std0[i] * STRESS_DROP_DEF;
   if(mode == 0)
     fprintf(stderr,"%s: Gauss deviates, target SDEV stress_s,d,n/stress drop(%g): %g/%g/%g\n",
-	    argv[0],STRESS_DROP,std[STRIKE]/STRESS_DROP,std[DIP]/STRESS_DROP,
-	    std[NORMAL]/STRESS_DROP);
+	    argv[0],STRESS_DROP_DEF,std[STRIKE]/STRESS_DROP_DEF,std[DIP]/STRESS_DROP_DEF,
+	    std[NORMAL]/STRESS_DROP_DEF);
   else
     fprintf(stderr,"%s: uniform deviates, target SDEV stress_s,d,n/stress drop(%g): %g/%g/%g\n",
-	    argv[0],STRESS_DROP,std[STRIKE]/STRESS_DROP,std[DIP]/STRESS_DROP,
-	    std[NORMAL]/STRESS_DROP);
+	    argv[0],STRESS_DROP_DEF,std[STRIKE]/STRESS_DROP_DEF,std[DIP]/STRESS_DROP_DEF,
+	    std[NORMAL]/STRESS_DROP_DEF);
   fprintf(stderr,"%s: reading patch format from %s, writing fsi.in to stdout\n",
 	  argv[0], GEOMETRY_FILE);
   if(reject_pos_coulomb)

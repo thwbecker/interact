@@ -695,3 +695,21 @@ void read_geometry(char *patch_filename,struct med **medium,
   init = TRUE;
 }
 
+void calc_medium_elastic_parameters(struct el_par *elastic,
+				    double shear_modulus, double poisson_ratio)
+{
+  /* here, we precompute some elastic constants that are routinely
+     used to hopefully save some time */
+
+  elastic->shear = shear_modulus;
+  elastic->poisson = poisson_ratio;
+  /* 
+     if the possion ratio \nu=1/4, then \mu = \lambda, and \alpha = 2./3.
+     E = 2\mu(1+\nu), which is 2.5 for \nu=.25 and \mu=1
+  */
+  elastic->mu2 = 2.0*shear_modulus;
+  elastic->lambda = (elastic->mu2* elastic->poisson)/
+    (1.0 - 2.0*elastic->poisson);
+  elastic->alpha  =(elastic->lambda+ elastic->shear)/
+    (elastic->lambda + elastic->mu2);
+}

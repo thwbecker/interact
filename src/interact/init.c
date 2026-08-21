@@ -123,7 +123,7 @@ void initialize_interact(struct med **medium, struct flt **fault,
   read_geometry(GEOMETRY_FILE,medium,fault,read_fault_friction,read_fault_rake,TRUE);
   if((*medium)->comm_rank==0)
     fprintf(stderr,"initialize_interact: all stress values are based on a shear modulus of %g\n",
-	    SHEAR_MODULUS);
+	    (*medium)->elastic.shear);
 
   /* assign faults to processors */
 #ifdef USE_PETSC
@@ -249,6 +249,9 @@ void initialize_interact(struct med **medium, struct flt **fault,
     fprintf(stderr,"initialize_interact: sparse storage only works for loading simulation!\n");
     exit(-1);
   }
+  calc_medium_elastic_parameters(&((*medium)->elastic),SHEAR_MODULUS_DEF,POISSON_NU_DEF);
+
+  /* cutout */
   (*medium)->i_mat_cutoff = i_mat_cutoff;
   (*medium)->use_old_imat = use_old_imat;
   (*medium)->save_imat = save_imat;

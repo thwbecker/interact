@@ -115,7 +115,7 @@ int main(int argc, char **argv)
       if((i<3) && (check_stress)){//stress
 	calc_vec_stat((s+j),medium->nrflt,(stat+i*4));
 	fprintf(stderr,"%s: stress dir %i: min: %12g max: %12g mean: %12g stddev: %12g (%5.2f times SD)\n",
-		argv[0],i,stat[i*4+2],stat[i*4+3],stat[i*4+0],stat[i*4+1],stat[i*4+1]/STRESS_DROP);
+		argv[0],i,stat[i*4+2],stat[i*4+3],stat[i*4+0],stat[i*4+1],stat[i*4+1]/STRESS_DROP_DEF);
       }else if(check_mu){// friction
 	calc_vec_stat((mu+(i-3)*medium->nrflt),medium->nrflt,(stat+i*4));
      	fprintf(stderr,"%s: fric type %i: min: %12g max: %12g mean: %12g stddev: %12g\n",

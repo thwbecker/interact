@@ -3,6 +3,11 @@
    and some other stuff, like the two fault group 
 */
 
+struct el_par{
+  /* elastic parameters, redundant but pre-computed for speed */
+  double shear,poisson;
+  double alpha,mu2,lambda;
+};
 
 /*
 
@@ -223,6 +228,13 @@ struct med{
   int nrgrp;
   // fault group structures
   struct fgrp *fault_group;
+  /* 
+     properties
+  */
+  struct el_par elastic;
+
+
+  
   /* 
      interaction matrix 
      and switches

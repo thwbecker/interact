@@ -99,21 +99,33 @@ extern void tdd_coeff(COMP_PRECISION *,COMP_PRECISION *,
 /*  Nikkhoo, M., Walter, T. R. (2015) half space triangular converted
     to F90 */
 extern void tddisphs(COMP_PRECISION *,COMP_PRECISION *,COMP_PRECISION *,COMP_PRECISION *,
-		     COMP_PRECISION *,COMP_PRECISION *,
-		     COMP_PRECISION *,COMP_PRECISION *);
+		     COMP_PRECISION *,COMP_PRECISION *,COMP_PRECISION *,COMP_PRECISION *,
+		     COMP_PRECISION *);
 extern void tdstresshs(COMP_PRECISION *,COMP_PRECISION *,COMP_PRECISION *,COMP_PRECISION *,
 		       COMP_PRECISION *,COMP_PRECISION *,COMP_PRECISION *,COMP_PRECISION *,
-		       COMP_PRECISION *);
-extern void get_tdcs_base_vectors(COMP_PRECISION *,COMP_PRECISION *,COMP_PRECISION *,
-				  COMP_PRECISION *,COMP_PRECISION *,COMP_PRECISION *, COMP_PRECISION *);
+		       COMP_PRECISION *,COMP_PRECISION *,COMP_PRECISION *,COMP_PRECISION *);
+extern void tdstressfs(COMP_PRECISION *,COMP_PRECISION *,
+		       COMP_PRECISION *,COMP_PRECISION *,COMP_PRECISION *,
+		       COMP_PRECISION *,COMP_PRECISION *,
+		       COMP_PRECISION *,COMP_PRECISION *,COMP_PRECISION *,COMP_PRECISION *,
+		       COMP_PRECISION *,COMP_PRECISION *,COMP_PRECISION *,COMP_PRECISION *);
 
-extern void hbi_tdstresshs(double *,double *,double *,double *,double *,double *,double *,double *,double *,
+extern void get_tdcs_base_vectors(COMP_PRECISION *,COMP_PRECISION *,
+				  COMP_PRECISION *,
+				  COMP_PRECISION *,COMP_PRECISION *,
+				  COMP_PRECISION *, COMP_PRECISION *);
+
+extern void hbi_tdstresshs(double *,double *,double *,double *,double *,
+			   double *,double *,double *,double *,
 			   double *,double *,double *,double *,double *,
 			   double *,double *,double *);
 /* 
    TGF package
 
 */
-extern void eltst3triadirectself(double *,double *,int *,int *,double *,double *,double *,double *,double *,int *,double *);
-extern void eltst3triadirecttarg(double *,double *,int *,double *,double *,double *,double *,double *,int *,double *);
-extern void elth3triaadap(double *,double *,int *,double *,double *,double *,double *,int *,double *,int *,double *,int *);
+extern void eltst3triadirectself(double *,double *,int *,int *,double *,double *,
+				 double *,double *,double *,int *,double *);
+extern void eltst3triadirecttarg(double *,double *,int *,double *,double *,
+				 double *,double *,double *,int *,double *);
+extern void elth3triaadap(double *,double *,int *,double *,double *,double *,
+			  double *,int *,double *,int *,double *,int *);

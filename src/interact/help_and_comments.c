@@ -426,7 +426,7 @@ void phelp(void)
 	  COHESION_DEF);
   fprintf(stderr,"                If the cohesion=0 at all times, recompile with NO_COHESION set\n");
   fprintf(stderr,"                to improve speed. (Stress drop is set to %g, which is %g times mu).\n",
-	  STRESS_DROP,STRESS_DROP/SHEAR_MODULUS);
+	  STRESS_DROP_DEF,STRESS_DROP_DEF/SHEAR_MODULUS_DEF);
 #endif
   PE("");
   PE(" -pr value      set the background pressure to value \"value\".");
@@ -441,7 +441,7 @@ void phelp(void)
   PE("");
   PE(" -ms value      set minimum stress drop to value \"value\". (Characteristic stress drops are");
   fprintf(stderr,"                set to %g.) The minimum stress drop is zero by default, ie.\n",
-	  STRESS_DROP);
+	  STRESS_DROP_DEF);
   PE("                allowing stress drops of all sizes (loading simulation).");
   PE("");
   

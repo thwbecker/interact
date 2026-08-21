@@ -25,7 +25,9 @@
 #ifdef ALLOW_NON_3DQUAD_GEOM
 void eval_triangle_gauss(COMP_PRECISION *x,struct flt *fault,
 			 COMP_PRECISION *disp,COMP_PRECISION *u_global, 
-			 COMP_PRECISION sm_global[3][3],int *giret)
+			 COMP_PRECISION sm_global[3][3],int *giret,int mode,
+			 my_boolean fullpsace,
+			 double elastic_shear, double elastic_lambda)
 {
   fprintf(stderr,"eval_triangle_gauss: unclear if this function works or should be called. Exiting\n");
   exit(-1);
@@ -69,7 +71,7 @@ void eval_triangle_gauss(COMP_PRECISION *x,struct flt *fault,
 		     fault->sin_alpha,
 		     fault->cos_alpha,
 		     (COMP_PRECISION)fault->dip,
-		     disp,u,sm,&iret);
+		     disp,u,sm,&iret,mode,fullspace,elastic_shear,elastic_lambda);
     if(!iret){// sum up contribution
       u_global[INT_X] += u[INT_X];
       u_global[INT_Y] += u[INT_Y];

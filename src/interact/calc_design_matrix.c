@@ -76,7 +76,7 @@ int main(int argc, char **argv)
 	      get_right_slip(disp,k,1.0,(fault+j));
 	    else
 	      get_right_slip(disp,DIP,1.0,(fault+j));
-	    eval_okada(x,(fault+j),disp,u,sm,&iret, GC_DISP_AND_STRESS,medium->full_space);
+	    eval_okada(x,(fault+j),disp,u,sm,&iret, GC_DISP_AND_STRESS,medium->full_space,medium->elastic);
 	    fprintf(stdout,"%g ",u[l]);
 	  }
 	}
@@ -126,7 +126,7 @@ void calc_design_matrix(struct med *medium,struct flt *fault,int disp_dim, int s
 	  get_right_slip(disp,k,1.0,(fault+j));
 	else
 	  get_right_slip(disp,DIP,1.0,(fault+j));
-	eval_okada(x,(fault+j),disp,u,sm,&iret,GC_DISP_AND_STRESS,medium->full_space);
+	eval_okada(x,(fault+j),disp,u,sm,&iret,GC_DISP_AND_STRESS,medium->full_space,medium->elastic);
 	for(l=0;l<disp_dim;l++){
 	  medium->val[((i*disp_dim)+l)*nmod + j*slip_modes +k] = u[l];
 	}

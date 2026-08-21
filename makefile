@@ -192,7 +192,6 @@ OKROUTINE_DEBUG = $(ODIR)/dc3d.dbg.o	# my modified version
 #include config/makefile.gcc
 include config/makefile.gcc_petsc
 
-
 #include config/makefile.icc
 #include config/makefile.mixed_mkl
 #include config/makefile.mixed
@@ -238,7 +237,7 @@ FLAGS = $(DEFINE_FLAGS) $(PGPLOT_INCLUDES) $(SLATEC_INCLUDES) $(LOCAL_INCLUDES) 
 
 # other flags
 CFLAGS =   $(FLAGS) $(SCARGS)   $(MACHINE_DEFINES)
-FFLAGS =   $(FLAGS) $(SFARGS)   $(MACHINE_DEFINES) -fopenmp
+FFLAGS =   $(FLAGS) $(SFARGS)   $(MACHINE_DEFINES) 
 F90FLAGS = $(FLAGS) $(SF90ARGS) $(MACHINE_DEFINES)
 
 
@@ -459,7 +458,7 @@ clean:
 	rm -rf $(ODIR)/*.o $(ODIR)/*.a  
 
 dist_clean:		
-	rm -rf $(BDIR)/* #src/includes/auto_proto.h src/includes/auto_proto.sgl.h
+	rm -rf $(BDIR)/* src/includes/auto_proto.h src/includes/auto_proto.sgl.h
 
 obj_directories:
 	if [ ! -s $(ODIR) ];then \
@@ -808,18 +807,10 @@ $(BDIR)/geo_okada: $(ODIR)/geo_okada.o $(ODIR)/coulomb_stress.o $(GEN_P_INC)  \
 
 proto: 	src/includes/auto_proto.h src/includes/auto_proto.sgl.h
 
-# sources scanned for the automatically generated prototypes: the shared
-# top-level files plus the interact, la_and_geo, block, green, and util
-# subdirectories (testing/ and old/ excluded; the rsf_* prototypes are
-# maintained by hand in petsc_prototypes.h, and cproto skips those files
-# anyway since their PETSc includes are not passed here)
-# the PETSc-based translation units (rsf_*.c, petsc_*.c) are excluded:
-# their prototypes are maintained by hand in petsc_prototypes.h, and
-# PETSc types must not leak into auto_proto.h, which is also included
-# by non-PETSc translation units
+
 PROTO_SRC = $(filter-out src/rsf_%.c src/petsc_%.c,$(wildcard src/*.c)) \
-	src/interact/*.c src/la_and_geo/*.c src/block/*.c \
-	src/green/*.c src/util/*.c
+	src/interact/*.c src/linear_algebra/*.c src/block/*.c src/testing/*.c \
+	src/green/*.c src/util/*.c src/block/*.c src/geometry/*.c 
 
 src/includes/auto_proto.h:
 	rm -f src/includes/auto_proto.h 2> /dev/null;\

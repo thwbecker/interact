@@ -18,11 +18,14 @@ int main(int argc, char **argv)
   COMP_PRECISION dx,h,z0,x0,zp0,zp1,xoff,r,cen[2],disp[3],s[3],
     smax,dt,e[4],e09[4],u[3],sm[3][3],dummy[2];
   COMP_PRECISION *sval;
+  struct el_par elastic;
   my_boolean full_space = FALSE;
   int q = 3,nx,nz,i,j,k,n,nf,n09,iret;
   char *tname[4]={"-tv 0 (CTR)","-tv 1 (M244)","-tv 2 (M236)","-tv 3 (HYB)"};
   if(argc > 1)
     sscanf(argv[1],"%i",&q);
+  calc_medium_elastic_parameters(&elastic, SHEAR_MODULUS_DEF, POISSON_NU_DEF);
+  
   dx = pow(2.0,-(COMP_PRECISION)q);
   h = dx*sqrt(3.0)/2.0;
   z0 = -200.0;			/* crack center depth, >> radius */
@@ -61,7 +64,7 @@ int main(int argc, char **argv)
     }
   }
   /* analytic slip at centroids, scaled for unit stress drop */
-  smax = 8.0/PI*(1.0-POISSON_NU)/(2.0-POISSON_NU)/SHEAR_MODULUS;
+  smax = 8.0/PI*(1.0-POISSON_NU_DEF)/(2.0-POISSON_NU_DEF)/SHEAR_MODULUS_DEF;
   sval = (COMP_PRECISION *)malloc(nf*sizeof(COMP_PRECISION));
   for(i=0;i < nf;i++){
     r = sqrt(fault[i].x[INT_X]*fault[i].x[INT_X] +
@@ -80,7 +83,7 @@ int main(int argc, char **argv)
       s[0]=s[1]=s[2]=0.0;
       for(j=0;j < nf;j++){	/* sources */
 	disp[STRIKE] = sval[j];disp[DIP] = disp[NORMAL] = 0.0;
-	eval_green_and_project_stress_to_fault(fault,i,j,disp,s,TRUE,full_space);
+	eval_green_and_project_stress_to_fault(fault,i,j,disp,s,TRUE,full_space,elastic);
       }
       dt = fabs(s[STRIKE] + 1.0); /* analytic: -1 */
       e[k] += dt;
@@ -107,7 +110,7 @@ int main(int argc, char **argv)
       s[0]=s[1]=s[2]=0.0;
       for(j=0;j < nf;j++){
 	disp[STRIKE] = sval[j];disp[DIP] = disp[NORMAL] = 0.0;
-	eval_green_and_project_stress_to_fault(fault,i,j,disp,s,(k)?(TRUE):(FALSE),full_space);
+	eval_green_and_project_stress_to_fault(fault,i,j,disp,s,(k)?(TRUE):(FALSE),full_space,elastic);
       }
       dummy[k] += fabs(s[STRIKE] + 1.0);
     }

@@ -40,7 +40,7 @@ void eval_iquad(COMP_PRECISION *x,struct flt *fault,
 		COMP_PRECISION *gslip,
 		COMP_PRECISION *ug, 
 		COMP_PRECISION smg[3][3],int *giret,
-		MODE_TYPE mode)
+		MODE_TYPE mode,struct el_par elastic)
 {
   COMP_PRECISION sm[3][3],u[3],slip[3];
   struct flt afault;
@@ -51,7 +51,7 @@ void eval_iquad(COMP_PRECISION *x,struct flt *fault,
     MEMERROR("eval_iquad: afault.xn");
   
   /* main triangle */
-  eval_triangle_nw(x,fault,gslip,u,sm,giret,mode);
+  eval_triangle_nw(x,fault,gslip,u,sm,giret,mode,elastic);
   //#define SUPER_DUPER_DEBUG
 
 #ifdef SUPER_DUPER_DEBUG
@@ -77,7 +77,7 @@ void eval_iquad(COMP_PRECISION *x,struct flt *fault,
 	slip[i] += gslip[j] * fault->xn[(2+nel*3+i)*3+j]; /* projection of global slip in j direction on local vector i*/
       }
     }
-    eval_triangle_nw(x,&afault,slip,u,sm,giret,mode);
+    eval_triangle_nw(x,&afault,slip,u,sm,giret,mode,elastic);
     ug[0] += u[0];  ug[1] += u[1];  ug[2] += u[2];
     smg[0][0] += sm[0][0];  smg[0][1] += sm[0][1];  smg[0][2] += sm[0][2];
     smg[1][0] += sm[1][0];  smg[1][1] += sm[1][1];  smg[1][2] += sm[1][2];

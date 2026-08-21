@@ -60,7 +60,8 @@ void eval_okada(COMP_PRECISION *x,struct flt *fault,
 		COMP_PRECISION *disp,
 		COMP_PRECISION *u_global, 
 		COMP_PRECISION sm_global[3][3],int *iret,
-		MODE_TYPE mode,my_boolean fullspace)
+		MODE_TYPE mode,my_boolean fullspace,
+		struct el_par elastic)
 {
 
   COMP_PRECISION iso,dx[3],sm_local[3][3];
@@ -69,7 +70,6 @@ void eval_okada(COMP_PRECISION *x,struct flt *fault,
   double x_local_d[3],u_d[12],disp_d[3];
 #endif
   COMP_PRECISION x_local[3],u[12];
-  static double medium_alpha = ALPHA_CONST;
   double al1,al2,aw1,aw2,depth,cpdip;int ifullspace;
 #ifdef DEBUG
   COMP_PRECISION corners[MAX_NR_EL_VERTICES*3],l,w;
@@ -105,7 +105,7 @@ void eval_okada(COMP_PRECISION *x,struct flt *fault,
   aw1 = (double)-fault->w;aw2 = (double)fault->w;
 #ifdef USE_DOUBLE_PRECISION
   // call to Okada routine
-  dc3d(&medium_alpha,(x_local+INT_X),(x_local+INT_Y),(x_local+INT_Z),
+  dc3d(&elastic.alpha,(x_local+INT_X),(x_local+INT_Y),(x_local+INT_Z),
        &depth,&cpdip,&al1,&al2,&aw1,&aw2,
        (disp+STRIKE),(disp+DIP),(disp+NORMAL),
        (u+OKUX),(u+OKUY),(u+OKUZ),(u+OKUXX),(u+OKUYX),(u+OKUZX),
@@ -116,7 +116,7 @@ void eval_okada(COMP_PRECISION *x,struct flt *fault,
     x_local_d[i] = (double)x_local[i];
   }
 
-  dc3d(&medium_alpha,(x_local_d+INT_X),(x_local_d+INT_Y),(x_local_d+INT_Z),
+  dc3d(&elastic.alpha,(x_local_d+INT_X),(x_local_d+INT_Y),(x_local_d+INT_Z),
        &depth,&cpdip,&al1,&al2,&aw1,&aw2,
        (disp_d+STRIKE),(disp_d+DIP),(disp_d+NORMAL),
        (u_d+OKUX),(u_d+OKUY),(u_d+OKUZ),(u_d+OKUXX),(u_d+OKUYX),(u_d+OKUZX),
@@ -153,18 +153,18 @@ void eval_okada(COMP_PRECISION *x,struct flt *fault,
 	 strains and stresses 
       */
       /* this is the isotropic component */
-      iso= LAMBDA_CONST*(u[OKUXX]+u[OKUYY]+u[OKUZZ]);
+      iso= elastic.lambda*(u[OKUXX]+u[OKUYY]+u[OKUZZ]);
       /* 
 	 assign sxx,sxy,sxz,syy,syz,szz 
 	 according to 
 	 s_ij = \lambda \sum_i e_ii \delta_ij + 2 \mu e_ij
       */
-      sm_local[INT_X][INT_X]=               iso + TWO_TIMES_SHEAR_MODULUS*u[OKUXX];
-      sm_local[INT_X][INT_Y]=sm_local[INT_Y][INT_X]=SHEAR_MODULUS*(u[OKUXY]+u[OKUYX]);
-      sm_local[INT_X][INT_Z]=sm_local[INT_Z][INT_X]=SHEAR_MODULUS*(u[OKUXZ]+u[OKUZX]);
-      sm_local[INT_Y][INT_Y]=               iso + TWO_TIMES_SHEAR_MODULUS*u[OKUYY];
-      sm_local[INT_Y][INT_Z]=sm_local[INT_Z][INT_Y]=SHEAR_MODULUS*(u[OKUYZ]+u[OKUZY]);
-      sm_local[INT_Z][INT_Z]=               iso+TWO_TIMES_SHEAR_MODULUS*u[OKUZZ];
+      sm_local[INT_X][INT_X]=               iso + elastic.mu2*u[OKUXX];
+      sm_local[INT_X][INT_Y]=sm_local[INT_Y][INT_X]=elastic.shear*(u[OKUXY]+u[OKUYX]);
+      sm_local[INT_X][INT_Z]=sm_local[INT_Z][INT_X]=elastic.shear*(u[OKUXZ]+u[OKUZX]);
+      sm_local[INT_Y][INT_Y]=               iso + elastic.mu2*u[OKUYY];
+      sm_local[INT_Y][INT_Z]=sm_local[INT_Z][INT_Y]=elastic.shear*(u[OKUYZ]+u[OKUZY]);
+      sm_local[INT_Z][INT_Z]=               iso+elastic.mu2*u[OKUZZ];
       /* 
 	 rotate stress matrix back into global field 
       */
@@ -190,13 +190,13 @@ void eval_okada_basic(COMP_PRECISION *x,
 		      COMP_PRECISION *disp,
 		      COMP_PRECISION *u_global, 
 		      COMP_PRECISION sm_global[3][3],
-		      int *iret,my_boolean fullspace)
+		      int *iret,my_boolean fullspace,
+		      struct el_par elastic)
 {
 #ifndef USE_DOUBLE_PRECISION
   double depth_d,x_d[3],disp_d[3],u_d[12],dip_d,u_global_d[3];
   int i;
 #endif
-  double medium_alpha = ALPHA_CONST;
   COMP_PRECISION u[12],iso;
   double al1,al2,aw1,aw2;
   int ifullspace;
@@ -211,7 +211,7 @@ void eval_okada_basic(COMP_PRECISION *x,
   }
   //#endif
 #ifdef USE_DOUBLE_PRECISION
-  dc3d(&medium_alpha,(x+INT_X),(x+INT_Y),(x+INT_Z),&depth,&dip,
+  dc3d(&elastic.alpha,(x+INT_X),(x+INT_Y),(x+INT_Z),&depth,&dip,
        &al1,&al2,&aw1,&aw2,(disp+STRIKE),(disp+DIP),
        (disp+NORMAL),(u_global+INT_X),(u_global+INT_Y),(u_global+INT_Z),
        (u+OKUXX),(u+OKUYX),(u+OKUZX),(u+OKUXY),(u+OKUYY),
@@ -223,7 +223,7 @@ void eval_okada_basic(COMP_PRECISION *x,
   }
   depth_d = (double)depth;
   dip_d = (double)dip;
-  dc3d(&medium_alpha,(x_d+INT_X),(x_d+INT_Y),(x_d+INT_Z),&depth_d,&dip_d,
+  dc3d(&elastic.alpha,(x_d+INT_X),(x_d+INT_Y),(x_d+INT_Z),&depth_d,&dip_d,
        &al1,&al2,&aw1,&aw2,(disp_d+STRIKE),(disp_d+DIP),
        (disp_d+NORMAL),(u_global_d+INT_X),(u_global_d+INT_Y),(u_global_d+INT_Z),
        (u_d+OKUXX),(u_d+OKUYX),(u_d+OKUZX),(u_d+OKUXY),(u_d+OKUYY),
@@ -236,13 +236,13 @@ void eval_okada_basic(COMP_PRECISION *x,
   if(*iret){
     set_stress_and_disp_nan(sm_global,u_global,GC_DISP_AND_STRESS);
   }else{
-    iso= LAMBDA_CONST*(u[OKUXX]+u[OKUYY]+u[OKUZZ]);
-    sm_global[INT_X][INT_X]=               iso + TWO_TIMES_SHEAR_MODULUS*u[OKUXX];
-    sm_global[INT_X][INT_Y]=sm_global[INT_Y][INT_X]=SHEAR_MODULUS*(u[OKUXY]+u[OKUYX]);
-    sm_global[INT_X][INT_Z]=sm_global[INT_Z][INT_X]=SHEAR_MODULUS*(u[OKUXZ]+u[OKUZX]);
-    sm_global[INT_Y][INT_Y]=               iso + TWO_TIMES_SHEAR_MODULUS*u[OKUYY];
-    sm_global[INT_Y][INT_Z]=sm_global[INT_Z][INT_Y]=SHEAR_MODULUS*(u[OKUYZ]+u[OKUZY]);
-    sm_global[INT_Z][INT_Z]=               iso + TWO_TIMES_SHEAR_MODULUS*u[OKUZZ];
+    iso= elastic.lambda*(u[OKUXX]+u[OKUYY]+u[OKUZZ]);
+    sm_global[INT_X][INT_X]=               iso + elastic.mu2*u[OKUXX];
+    sm_global[INT_X][INT_Y]=sm_global[INT_Y][INT_X]=elastic.shear*(u[OKUXY]+u[OKUYX]);
+    sm_global[INT_X][INT_Z]=sm_global[INT_Z][INT_X]=elastic.shear*(u[OKUXZ]+u[OKUZX]);
+    sm_global[INT_Y][INT_Y]=               iso + elastic.mu2*u[OKUYY];
+    sm_global[INT_Y][INT_Z]=sm_global[INT_Z][INT_Y]=elastic.shear*(u[OKUYZ]+u[OKUZY]);
+    sm_global[INT_Z][INT_Z]=               iso + elastic.mu2*u[OKUZZ];
   }
 }
 
@@ -265,11 +265,13 @@ void eval_okada_basic(COMP_PRECISION *x,
 void eval_point(COMP_PRECISION *x,struct flt *fault,
 		COMP_PRECISION *disp,COMP_PRECISION *u_global, 
 		COMP_PRECISION sm_global[3][3],int *iret,
-		MODE_TYPE mode,my_boolean fullspace)
+		MODE_TYPE mode,my_boolean fullspace,
+		struct el_par  elastic)
 {
   eval_point_short(x,fault->x,fault->area,fault->sin_alpha,
 		   fault->cos_alpha,(COMP_PRECISION)fault->dip,
-		   disp,u_global,sm_global,iret,mode,fullspace);
+		   disp,u_global,sm_global,iret,mode,fullspace,
+		   elastic);
 }
 /*
 
@@ -284,10 +286,8 @@ void eval_point_short(COMP_PRECISION *x,COMP_PRECISION *xf,COMP_PRECISION area,
 		      COMP_PRECISION *u_global, 
 		      COMP_PRECISION sm_global[3][3],
 		      int *iret,MODE_TYPE mode,
-		      my_boolean fullspace)
+		      my_boolean fullspace,struct el_par elastic)
 {
-  double medium_alpha = ALPHA_CONST;
-  COMP_PRECISION mu_alpha = SHEAR_MODULUS/LAMBDA_CONST;
   COMP_PRECISION u[12],
     iso,x_local[3],dx[3],sm_local[3][3];
   double depth,potency[4];
@@ -309,9 +309,10 @@ void eval_point_short(COMP_PRECISION *x,COMP_PRECISION *xf,COMP_PRECISION area,
   if(disp[DIP] != 0.)
     potency[1]=(double)area * disp[DIP];
   if(disp[NORMAL] != 0.)
-    potency[2]=(double)area * disp[NORMAL]* mu_alpha;
+    potency[2]=(double)area * disp[NORMAL]* (elastic.shear/elastic.lambda);
+
 #ifdef USE_DOUBLE_PRECISION
-  dc3d0(&medium_alpha,(x_local+INT_X),(x_local+INT_Y),(x_local+INT_Z),
+  dc3d0(&elastic.alpha,(x_local+INT_X),(x_local+INT_Y),(x_local+INT_Z),
 	&depth,&dip,
 	(potency+0),(potency+1),(potency+2),(potency+3),
 	(u+OKUX),(u+OKUY),(u+OKUZ),
@@ -322,7 +323,7 @@ void eval_point_short(COMP_PRECISION *x,COMP_PRECISION *xf,COMP_PRECISION area,
   dip_d = (double)dip;
   for(i=0;i<3;i++)
     x_local_d[i] = (double)x_local[i];
-  dc3d0(&medium_alpha,(x_local_d+INT_X),(x_local_d+INT_Y),(x_local_d+INT_Z),
+  dc3d0(&elastic.alpha,(x_local_d+INT_X),(x_local_d+INT_Y),(x_local_d+INT_Z),
 	&depth,&dip_d,
 	(potency+0),(potency+1),(potency+2),(potency+3),
 	(u_d+OKUX),(u_d+OKUY),(u_d+OKUZ),
@@ -338,17 +339,17 @@ void eval_point_short(COMP_PRECISION *x,COMP_PRECISION *xf,COMP_PRECISION area,
     if(mode !=  GC_STRESS_ONLY)
       rotate_vec(u,u_global,cos_alpha,-sin_alpha);
     if(mode != GC_DISP_ONLY){
-      iso= LAMBDA_CONST*(u[OKUXX]+u[OKUYY]+u[OKUZZ]);
+      iso= elastic.lambda*(u[OKUXX]+u[OKUYY]+u[OKUZZ]);
 
-      sm_local[INT_X][INT_X]=iso+TWO_TIMES_SHEAR_MODULUS*u[OKUXX];
+      sm_local[INT_X][INT_X]=iso+elastic.mu2*u[OKUXX];
       sm_local[INT_X][INT_Y]=sm_local[INT_Y][INT_X]=
-	SHEAR_MODULUS*(u[OKUXY]+u[OKUYX]);
+	elastic.shear*(u[OKUXY]+u[OKUYX]);
       sm_local[INT_X][INT_Z]=sm_local[INT_Z][INT_X]=
-	SHEAR_MODULUS*(u[OKUXZ]+u[OKUZX]);
-      sm_local[INT_Y][INT_Y]=iso+TWO_TIMES_SHEAR_MODULUS*u[OKUYY];
+	elastic.shear*(u[OKUXZ]+u[OKUZX]);
+      sm_local[INT_Y][INT_Y]=iso+elastic.mu2*u[OKUYY];
       sm_local[INT_Y][INT_Z]=sm_local[INT_Z][INT_Y]=
-	SHEAR_MODULUS*(u[OKUYZ]+u[OKUZY]);
-      sm_local[INT_Z][INT_Z]=iso+TWO_TIMES_SHEAR_MODULUS*u[OKUZZ];
+	elastic.shear*(u[OKUYZ]+u[OKUZY]);
+      sm_local[INT_Z][INT_Z]=iso+elastic.mu2*u[OKUZZ];
       rotate_mat_z(sm_local,sm_global,cos_alpha,-sin_alpha);
     }
   }

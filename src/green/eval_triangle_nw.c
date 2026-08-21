@@ -28,13 +28,11 @@
 void eval_triangle_nw(COMP_PRECISION *x,struct flt *fault,
 		      COMP_PRECISION *slip,COMP_PRECISION *u, 
 		      COMP_PRECISION sm[3][3],int *giret,
-		      MODE_TYPE mode)
+		      MODE_TYPE mode,struct el_par elastic)
 {
  
   COMP_PRECISION stress[6];
-#ifdef USE_HBI_TDDEF
-  double mu = SHEAR_MODULUS,lambda = LAMBDA_CONST;
-#else
+#ifndef USE_HBI_TDDEF
   COMP_PRECISION strain[6];
 #endif
     
@@ -42,7 +40,7 @@ void eval_triangle_nw(COMP_PRECISION *x,struct flt *fault,
     /* input is x y z, vertices, and slip as strike, dip, normal
        displacements are output as east, north, up
     */
-    tddisphs(x,  &(fault->xn[0]),&(fault->xn[3]),&(fault->xn[6]),(slip),(slip+1),(slip+2),u);
+    tddisphs(x,  &(fault->xn[0]),&(fault->xn[3]),&(fault->xn[6]),(slip),(slip+1),(slip+2),u,&(elastic.poisson));
     //tddisphs_bird((x+0),(x+1),(x+2),&(fault->xn[0]),&(fault->xn[3]),&(fault->xn[6]),(slip),(slip+1),(slip+2),&nu,(u+0),(u+1),(u+2));
 #ifdef CRAZY_DEBUG
     fprintf(stderr,"eval_triangle_nw: xt %g %g %g\t%g %g %g\t%g %g %g\tslip %g %g %g\tx %g %g %g\tu %g %g %g\n", 
@@ -66,11 +64,13 @@ void eval_triangle_nw(COMP_PRECISION *x,struct flt *fault,
        stress and strain are given as: Sxx, Syy, Szz, Sxy, Sxz and Syz
     */
 #ifdef USE_HBI_TDDEF
-    hbi_tdstresshs_(x,(x+1),(x+2),&(fault->xn[0]),&(fault->xn[3]),&(fault->xn[6]),slip,(slip+1),(slip+2),&mu,&lambda,
+    hbi_tdstresshs_(x,(x+1),(x+2),&(fault->xn[0]),&(fault->xn[3]),&(fault->xn[6]),
+		    slip,(slip+1),(slip+2),&(elastic.shear),&(elastic.lambda),
 		    (stress),(stress+1),(stress+2),(stress+3),(stress+4),(stress+5));
 #else
     tdstresshs(x,&(fault->xn[0]),&(fault->xn[3]),&(fault->xn[6]),
-	       (slip),(slip+1),(slip+2),stress,strain);
+	       (slip),(slip+1),(slip+2),stress,strain,&(elastic.poisson),&(elastic.mu2),
+	       &(elastic.lambda));
 #ifdef CRAZY_DEBUG
     fprintf(stderr,"eval_triangle_nw: stress: %g %g %g %g %g %g\n",strain[0],strain[1],strain[2],strain[3],strain[4],strain[5]);
 #endif

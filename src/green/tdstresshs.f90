@@ -6,7 +6,7 @@
 #include "properties.h"
 
 
-subroutine tdstresshs(loc,P1,P2,P3,Ss,Ds,Ts,stress,strain)
+subroutine tdstresshs(loc,P1,P2,P3,Ss,Ds,Ts,stress,strain,nu,mu2,lambda)
   ! TDstressHS 
   ! calculates stresses and strains associated with a triangular dislocation 
   ! in an elastic half-space.
@@ -110,7 +110,7 @@ subroutine tdstresshs(loc,P1,P2,P3,Ss,Ds,Ts,stress,strain)
   ! displacement conversion
   !
   implicit none 
-  C_PREC, intent(in) :: Ss,Ds,Ts
+  C_PREC, intent(in) :: Ss,Ds,Ts,nu,mu2,lambda
   C_PREC, intent(out),dimension(6) :: stress,strain
   C_PREC, dimension(3), intent(in) :: p1, p2, p3,loc
   C_PREC, dimension(3) :: p1n, p2n, p3n
@@ -128,37 +128,36 @@ subroutine tdstresshs(loc,P1,P2,P3,Ss,Ds,Ts,stress,strain)
 
   !print *,Ts,Ss,Ds
   ! Calculate main dislocation contribution to strains and stresses and save rotation matrix
-  call TDstressFS(loc(1),loc(2),loc(3),P1,P2,P3,Ss,Ds,Ts,StsMS,StrMS,Ar1)
+  call TDstressFS(loc(1),loc(2),loc(3),P1,P2,P3,Ss,Ds,Ts,StsMS,StrMS,Ar1,nu,mu2,lambda)
   !print *,stsms
   !print *,strms
   ! Calculate harmonic function contribution to strains and stresses, and reuse rotation matrix
-  call TDstress_HarFunc(loc(1),loc(2),loc(3),P1,P2,P3,Ss,Ds,Ts,StsFSC,StrFSC,.false.,Ar1)
+  call TDstress_HarFunc(loc(1),loc(2),loc(3),P1,P2,P3,Ss,Ds,Ts,StsFSC,StrFSC,.false.,Ar1,nu,mu2,lambda)
 
   ! Calculate image dislocation contribution to strains and stresses
   p1n(1:2) = p1(1:2);p2n(1:2)=p2(1:2);p3n(1:2) =  p3(1:2);
   p1n(3)  = -p1(3);  p2n(3)  = -p2(3);p3n(3)   = -p3(3);
   ! this one is a different Ar
-  call TDstressFS(loc(1),loc(2),loc(3),P1n,P2n,P3n,Ss,Ds,Ts,StsIS,StrIS,Ar2)
+  call TDstressFS(loc(1),loc(2),loc(3),P1n,P2n,P3n,Ss,Ds,Ts,StsIS,StrIS,Ar2,nu,mu2,lambda)
 
   ! Calculate the complete stress and strain tensor components in EFCS
   Stress = StsMS+StsIS+StsFSC
   Strain = StrMS+StrIS+StrFSC
 
 end subroutine TDstressHS
-
+!
 ! compute stuff and save rotation matrix
-subroutine TDstressFS(X,Y,Z,P1,P2,P3,Ss,Ds,Ts,Stress,Strain,Ar)
+!
+subroutine TDstressFS(X,Y,Z,P1,P2,P3,Ss,Ds,Ts,Stress,Strain,Ar,nu,two_mu,lambda)
   USE, INTRINSIC :: IEEE_ARITHMETIC
   ! TDstressFS 
   ! Calculates stresses and strains associated with a triangular dislocation 
   ! in an elastic full-space.
   implicit none
-  C_PREC,intent(in) :: x,y,z,Ss,Ds,Ts
+  C_PREC,intent(in) :: x,y,z,Ss,Ds,Ts,nu,two_mu,lambda
   C_PREC,dimension(3) :: p1,p2,p3
   C_PREC,intent(out),dimension(6) :: stress,strain
   C_PREC,dimension(3,3),intent(out) :: Ar
-  
-  C_PREC,parameter :: two_mu = TWO_TIMES_SHEAR_MODULUS_FTN, lambda =  LAMBDA_CONST_FTN
   
   C_PREC bx,by,bz,x_,y_,z_,aA,aB,aC,&
        Exx,Eyy,Ezz,Exy,Exz,Eyz,&
@@ -191,11 +190,11 @@ subroutine TDstressFS(X,Y,Z,P1,P2,P3,Ss,Ds,Ts,Stress,Strain,Ar)
   if (casepLog) then
      !print *,x_,y_,z_,aA,bx,by,bz,nu,p1_,-e13
      ! Calculate first angular dislocation contribution
-     call TDSetupS(x_,y_,z_,aA,bx,by,bz,p1_,-e13,Exx1,Eyy1,Ezz1,Exy1,Exz1,Eyz1);
+     call TDSetupS(x_,y_,z_,aA,bx,by,bz,p1_,-e13,Exx1,Eyy1,Ezz1,Exy1,Exz1,Eyz1,nu);
      ! Calculate second angular dislocation contribution
-     call TDSetupS(x_,y_,z_,aB,bx,by,bz,p2_, e12,Exx2,Eyy2,Ezz2,Exy2,Exz2,Eyz2);
+     call TDSetupS(x_,y_,z_,aB,bx,by,bz,p2_, e12,Exx2,Eyy2,Ezz2,Exy2,Exz2,Eyz2,nu);
      ! Calculate third angular dislocation contribution
-     call TDSetupS(x_,y_,z_,aC,bx,by,bz,p3_, e23,Exx3,Eyy3,Ezz3,Exy3,Exz3,Eyz3);
+     call TDSetupS(x_,y_,z_,aC,bx,by,bz,p3_, e23,Exx3,Eyy3,Ezz3,Exy3,Exz3,Eyz3,nu);
      !print *,'exx1'
      !print *,Exx1,Eyy1,Ezz1,Exy1,Exz1,Eyz1
      !print *,'exx2'
@@ -206,11 +205,11 @@ subroutine TDstressFS(X,Y,Z,P1,P2,P3,Ss,Ds,Ts,Stress,Strain,Ar)
   else if (casenLog) then 
      ! Configuration II
      ! Calculate first angular dislocation contribution
-     call TDSetupS(x_,y_,z_,aA,bx,by,bz,p1_, e13,Exx1,Eyy1,Ezz1,Exy1,Exz1,Eyz1);
+     call TDSetupS(x_,y_,z_,aA,bx,by,bz,p1_, e13,Exx1,Eyy1,Ezz1,Exy1,Exz1,Eyz1,nu);
      ! Calculate second angular dislocation contribution
-     call TDSetupS(x_,y_,z_,aB,bx,by,bz,p2_,-e12,Exx2,Eyy2,Ezz2,Exy2,Exz2,Eyz2);
+     call TDSetupS(x_,y_,z_,aB,bx,by,bz,p2_,-e12,Exx2,Eyy2,Ezz2,Exy2,Exz2,Eyz2,nu);
      ! Calculate third angular dislocation contribution
-     call TDSetupS(x_,y_,z_,aC,bx,by,bz,p3_,-e23,Exx3,Eyy3,Ezz3,Exy3,Exz3,Eyz3);    
+     call TDSetupS(x_,y_,z_,aC,bx,by,bz,p3_,-e23,Exx3,Eyy3,Ezz3,Exy3,Exz3,Eyz3,nu);    
   end if
 
   ! Calculate the strain tensor components in TDCS
@@ -252,9 +251,9 @@ subroutine TDstressFS(X,Y,Z,P1,P2,P3,Ss,Ds,Ts,Stress,Strain,Ar)
   Stress = (/Sxx,Syy,Szz,Sxy,Sxz,Syz/)
 end subroutine TDstressFS
 
-subroutine TDstress_HarFunc(X,Y,Z,P1,P2,P3,Ss,Ds,Ts,stress,strain,compute_ar,ar)
+subroutine TDstress_HarFunc(X,Y,Z,P1,P2,P3,Ss,Ds,Ts,stress,strain,compute_ar,ar,nu,two_mu,lambda)
   implicit none
-  C_PREC,intent(in) :: x,y,z,ss,ds,ts
+  C_PREC,intent(in) :: x,y,z,ss,ds,ts,nu,two_mu,lambda
   C_PREC,intent(in),dimension(3) :: p1,p2,p3
   logical,intent(in) :: compute_ar
   C_PREC,intent(in),dimension(3,3) :: Ar
@@ -283,9 +282,9 @@ subroutine TDstress_HarFunc(X,Y,Z,P1,P2,P3,Ss,Ds,Ts,stress,strain,compute_ar,ar)
   ! Calculate contribution of angular dislocation pair on each TD side
   !print *,X,Y,Z,bX_,bY_,bZ_,P1,P2,mu,lambda
   !print *,P2,P3
-  call AngSetupFSC_S(x,y,z,bx_,by_,bz_,p1,p2,stress1,strain1); ! P1P2
-  call AngSetupFSC_S(x,y,z,bx_,by_,bz_,p2,P3,stress2,strain2); ! P2P3
-  call AngSetupFSC_S(x,y,z,bx_,by_,bz_,p3,P1,stress3,strain3); ! P3P1
+  call AngSetupFSC_S(x,y,z,bx_,by_,bz_,p1,p2,stress1,strain1,nu,two_mu,lambda); ! P1P2
+  call AngSetupFSC_S(x,y,z,bx_,by_,bz_,p2,P3,stress2,strain2,nu,two_mu,lambda); ! P2P3
+  call AngSetupFSC_S(x,y,z,bx_,by_,bz_,p3,P1,stress3,strain3,nu,two_mu,lambda); ! P3P1
   !print *,'strainhar1',strain1/1e-2
   !print *,'strainhar1',strain2/1e-2
   !print *,'strainhar1',strain3/1e-2
@@ -328,12 +327,13 @@ end subroutine TensTrans
 
 
 
-subroutine TDSetupS(x,y,z,alpha,bx,by,bz,TriVertex,SideVec,exxt,eyyt,ezzt,exyt,exzt,eyzt)
+subroutine TDSetupS(x,y,z,alpha,bx,by,bz,TriVertex,SideVec,&
+     exxt,eyyt,ezzt,exyt,exzt,eyzt,nu)
   ! TDSetupS transforms coordinates of the calculation points as well as 
   ! slip vector components from ADCS into TDCS. It then calculates the 
   ! strains in ADCS and transforms them into TDCS.
   IMPLICIT NONE
-  C_PREC, INTENT(IN) :: alpha, bx, by, bz, x, y, z
+  C_PREC, INTENT(IN) :: alpha, bx, by, bz, x, y, z, nu
   C_PREC, DIMENSION(3), INTENT(IN) :: SideVec, TriVertex
   C_PREC, INTENT(OUT) :: exxt,eyyt,ezzt,exyt,exzt,eyzt
   C_PREC :: exx,eyy,ezz,exy,exz,eyz
@@ -347,7 +347,7 @@ subroutine TDSetupS(x,y,z,alpha,bx,by,bz,TriVertex,SideVec,exxt,eyyt,ezzt,exyt,e
 
 
   ! Calculate strains associated with an angular dislocation in ADCS
-  call AngDisStrain(x,y1,z1,-pi+alpha,bx,by1,bz1,exx,eyy,ezz,exy,exz,eyz);
+  call AngDisStrain(x,y1,z1,-pi+alpha,bx,by1,bz1,exx,eyy,ezz,exy,exz,eyz,nu);
 
   ! Transform strains from ADCS into TDCS
   B(1,1) = 1.0d0;B(1,2:3)=0.0d0;
@@ -364,13 +364,12 @@ subroutine TDSetupS(x,y,z,alpha,bx,by,bz,TriVertex,SideVec,exxt,eyyt,ezzt,exyt,e
   call TensTrans(exx,eyy,ezz,exy,exz,eyz,B,exxt,eyyt,ezzt,exyt,exzt,eyzt)
 end subroutine TDSetupS
 
-subroutine AngSetupFSC_S(X,Y,Z,bX,bY,bZ,PA,PB,Stress,Strain)
+subroutine AngSetupFSC_S(X,Y,Z,bX,bY,bZ,PA,PB,Stress,Strain,nu,two_mu,lambda)
   IMPLICIT NONE
-  C_PREC, intent(in) :: X,Y,Z,bX,bY,bZ
+  C_PREC, intent(in) :: X,Y,Z,bX,bY,bZ,nu,lambda,two_mu
   C_PREC, dimension(6), intent(out) :: stress,strain
   C_PREC, DIMENSION(3), INTENT(IN) :: PA, PB
-  C_PREC, PARAMETER :: pi = 3.14159265358979D0, nu = POISSON_NU,&
-       two_mu = TWO_TIMES_SHEAR_MODULUS, lambda =  LAMBDA_CONST
+  C_PREC, PARAMETER :: pi = 3.14159265358979D0
   C_PREC, parameter, dimension(3) :: eZ = (/ FORTRAN_ZERO, FORTRAN_ZERO, FORTRAN_UNITY /)
   C_PREC, PARAMETER :: eps = EPS_FOR_FORTRAN ! a crude approximation of the MatLab "eps" constant.
   
@@ -433,12 +432,12 @@ subroutine AngSetupFSC_S(X,Y,Z,bX,bY,bZ,PA,PB,Stress,Strain)
      v23B = FORTRAN_ZERO
      IF (I) THEN
         ! Configuration I
-        call AngDisStrainFSC(y1A,y2A,y3A,-pi+beta,b1,b2,b3,-PA(3),v11A,v22A,v33A,v12A,v13A,v23A);
-        call AngDisStrainFSC(y1B,y2B,y3B,-pi+beta,b1,b2,b3,-PB(3),v11B,v22B,v33B,v12B,v13B,v23B);
+        call AngDisStrainFSC(y1A,y2A,y3A,-pi+beta,b1,b2,b3,-PA(3),v11A,v22A,v33A,v12A,v13A,v23A,nu);
+        call AngDisStrainFSC(y1B,y2B,y3B,-pi+beta,b1,b2,b3,-PB(3),v11B,v22B,v33B,v12B,v13B,v23B,nu);
      else
         ! Configuration II
-        call AngDisStrainFSC(y1A,y2A,y3A,beta,b1,b2,b3,    -PA(3),v11A,v22A,v33A,v12A,v13A,v23A);
-        call AngDisStrainFSC(y1B,y2B,y3B,beta,b1,b2,b3,    -PB(3),v11B,v22B,v33B,v12B,v13B,v23B);
+        call AngDisStrainFSC(y1A,y2A,y3A,beta,b1,b2,b3,    -PA(3),v11A,v22A,v33A,v12A,v13A,v23A,nu);
+        call AngDisStrainFSC(y1B,y2B,y3B,beta,b1,b2,b3,    -PB(3),v11B,v22B,v33B,v12B,v13B,v23B,nu);
      endif
 
      !print *,v11A,v22A,v33A,v12A,v13A,v23A
@@ -471,18 +470,23 @@ subroutine AngSetupFSC_S(X,Y,Z,bX,bY,bZ,PA,PB,Stress,Strain)
 
 end subroutine AngSetupFSC_S
 
-subroutine AngDisStrain(x,y,z,alpha,bx,by,bz,Exx,Eyy,Ezz,Exy,Exz,Eyz) ! removed reference to nu 
+subroutine AngDisStrain(x,y,z,alpha,bx,by,bz,Exx,Eyy,Ezz,Exy,Exz,Eyz,nu)
   IMPLICIT NONE
   ! AngDisStrain calculates the strains associated with an angular 
   ! dislocation in an elastic full-space.
-  C_PREC,intent(in) :: x,y,z,alpha,bx,by,bz
+  C_PREC,intent(in) :: x,y,z,alpha,bx,by,bz,nu
   C_PREC,intent(out) :: exx,eyy,ezz,exy,exz,eyz
 
   C_PREC sinA,cosA,eta,zeta,x2,y2,z2,r2,r,r3,rz,r3z,W,W2,Wr,W2r,Wr3,W2r2, C,S,S2,y3
   C_PREC rFi_rx,rFi_ry,rFi_rz,r2z2,cfac,rmz,C2
   C_PREC, PARAMETER :: pi = 3.14159265358979D0, unity = FORTRAN_UNITY,&
        P4 = unity/(4.0d0*pi), P8 = P4/2.0d0
-  C_PREC, PARAMETER :: nu = POISSON_NU, N0 = 2.0d0*nu, N1 = N0+unity, N2 = unity-nu
+
+  C_PREC N0,N1,N2
+  
+  N0 = 2.0d0*nu
+  N1 = N0+unity
+  N2 = unity-nu
   
   !sinA = sin(alpha);
   !cosA = cos(alpha);
@@ -573,20 +577,18 @@ end subroutine AngDisStrain
 
 
 
-subroutine AngDisStrainFSC(y1,y2,y3,beta,b1,b2,b3,a,v11,v22,v33,v12,v13,v23) ! removed refrence to nu
+subroutine AngDisStrainFSC(y1,y2,y3,beta,b1,b2,b3,a,v11,v22,v33,v12,v13,v23,nu) 
   ! AngDisStrainFSC calculates the harmonic function contribution to the 
   ! strains associated with an angular dislocation in an elastic half-space.
   IMPLICIT NONE
-  C_PREC, intent(in) :: y1,y2,y3,beta,b1,b2,b3,a
+  C_PREC, intent(in) :: y1,y2,y3,beta,b1,b2,b3,a,nu
   C_PREC, intent (out) :: v11,v22,v33,v12,v13,v23
   C_PREC, PARAMETER :: pi = 3.14159265358979D0, unity = FORTRAN_UNITY,&
        two = 2.0d0,  three = 3.0d0, &
        one_quarter = unity/4.0d0, one_half = unity/two, three_halves = 3.0d0/two
-  ! poisson ratio related factors
-  C_PREC, PARAMETER :: nu = POISSON_NU, & ! compile in, does not change during runtime normally
-       N0 =  two*nu,N1 =  unity-N0,N2 = -two+N0, & !     -two+two*nu
-       N3 =  -N2,& !two-N0 = two-two*nu
-       N4 = unity-nu, oopin4 = unity/(pi*N4)
+ 
+
+  C_PREC N0,N1,N2,N3,N4,oopin4
   
   C_PREC y3b,z1b,z3b,rb2,rb,W1,W2,W3,W4,W5,W6,W7,W8,W9,y2s,rb2s,rbc, &
        W6s,W7s,rbp5,cosBs,fac1,twoa, &
@@ -595,7 +597,12 @@ subroutine AngDisStrainFSC(y1,y2,y3,beta,b1,b2,b3,a,v11,v22,v33,v12,v13,v23) ! r
        rFib_ry3,cosB,sinB,cotB,cotBs,y2tW8, cosBtsinB ,&
        one_over_rb,one_over_rb2,one_over_rbp3,one_over_W6,&
        one_over_W6_p2,w1_over_w7,w1_over_w7s,one_over_w7,cosBtcotB
- 
+  N0 =  two*nu
+  N1 =  unity-N0
+  N2 = -two+N0  !     -two+two*nu
+  N3 =  -N2 !two-N0 = two-two*nu
+  N4 = unity-nu
+  oopin4 = unity/(pi*N4)
   
   !sinB = sin(beta);
   !cosB = cos(beta);

@@ -82,8 +82,10 @@ int main(int argc, char **argv)
 	    argv[0],(sizeof(COMP_PRECISION)==sizeof(double))?("double"):("single"),
 	    (sizeof(A_MATRIX_PREC)==sizeof(double))?("double"):("single"),
 	    time_out_string,medium->comm_size);
-    fprintf(stderr,"%s: nu: %.5f mu: %.3e from properties.h, therefore lambda/mu: %.5f alpha: %.5f\n",
-	    argv[0],POISSON_NU,SHEAR_MODULUS,LAMBDA_CONST/SHEAR_MODULUS, ALPHA_CONST);
+    fprintf(stderr,"%s: nu: %.5f mu: %.3e  lambda/mu: %.5f alpha: %.5f\n",
+	    argv[0],medium->elastic.poisson,
+	    medium->elastic.shear,
+	    medium->elastic.lambda/medium->elastic.shear, medium->elastic.alpha);
   }
   check_parameters_and_init_interact(argc,argv,&medium,&fault,&read_initial_fault_stress,a,b);
   // decide which mode we are in and execute main loops

@@ -48,7 +48,7 @@ void quake(my_boolean *sma,COMP_PRECISION *slip,int r_flt,struct flt *fault,
   */
   if(mark_quake){
     // calculate moment of slipping patch
-    mom  = norm_3d(slip) * fault[r_flt].area * SHEAR_MODULUS;
+    mom  = norm_3d(slip) * fault[r_flt].area * medium->elastic.shear;
     // write single event to  event files
     if(medium->events_init){
       // single patch 

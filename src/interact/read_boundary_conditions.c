@@ -945,7 +945,8 @@ void read_one_step_bc(FILE *in,struct med *medium,struct flt *fault,
 						    all */
 	  /* enters the right hand side of the solve system: must be
 	     consistent with the single-point solution operator */
-	  eval_green_and_project_stress_to_fault(fault,j,i, fault[i].u,(fstress+j3),FALSE,medium->full_space);
+	  eval_green_and_project_stress_to_fault(fault,j,i, fault[i].u,(fstress+j3),FALSE,medium->full_space,
+						 medium->elastic);
 	}
       }
     }

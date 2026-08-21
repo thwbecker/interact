@@ -192,10 +192,10 @@ void two_dir_slip_check(my_boolean *sma,COMP_PRECISION *tstress_drop,
     else
       critical_stress = EXHAUSTIVE_CRITICAL_STRESS_EPS;
     fprintf(stderr,"fracture_criterion: tdsc: critical stress: %e * stress drop\n",
-	    critical_stress/STRESS_DROP);
-    if((critical_stress > 0) || (fabs(critical_stress) > 0.5*STRESS_DROP)){
+	    critical_stress/STRESS_DROP_DEF);
+    if((critical_stress > 0) || (fabs(critical_stress) > 0.5*STRESS_DROP_DEF)){
       fprintf(stderr,"fracture_criterion: range inappropriate (stress_drop: %g)\n",
-	      STRESS_DROP);
+	      STRESS_DROP_DEF);
       exit(-1);
     }
     init = TRUE;

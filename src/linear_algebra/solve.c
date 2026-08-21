@@ -851,10 +851,12 @@ int par_assemble_a_matrix(int naflt,my_boolean *sma,int nreq,int *nameaf,
 		  // calculate interaction coefficients right now
 		  //
 		  avalues[eqc2] = (PetscScalar)
-		    interaction_coefficient(nameaf[i],nameaf[k],l,j,fault,&iret,medium->full_space);
+		    interaction_coefficient(nameaf[i],nameaf[k],l,j,fault,&iret,
+					    medium->full_space,medium->elastic);
 		  if(cf != 0.0){	/* coulomb addition */
 		    fac_itmp=(PetscScalar)
-		      interaction_coefficient(nameaf[i],nameaf[k],l,NORMAL,fault,&iret,medium->full_space);
+		      interaction_coefficient(nameaf[i],nameaf[k],l,NORMAL,fault,&iret,
+					      medium->full_space,medium->elastic);
 		    if(iret){
 		      fprintf(stderr,"par_assemble_a_matrix: WARNING: encountered iret: i/j/k/l: %i/%i/%i/%i\n",
 			      (int)nameaf[i],(int)nameaf[k],(int)l,(int)j);
