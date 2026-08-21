@@ -708,8 +708,8 @@ void calc_medium_elastic_parameters(struct el_par *elastic,
      E = 2\mu(1+\nu), which is 2.5 for \nu=.25 and \mu=1
   */
   elastic->mu2 = 2.0*shear_modulus;
-  elastic->lambda = (elastic->mu2* elastic->poisson)/
+  elastic->lambda = (elastic->mu2 * elastic->poisson)/
     (1.0 - 2.0*elastic->poisson);
-  elastic->alpha  =(elastic->lambda+ elastic->shear)/
+  elastic->alpha  =(elastic->lambda + elastic->shear)/
     (elastic->lambda + elastic->mu2);
 }
