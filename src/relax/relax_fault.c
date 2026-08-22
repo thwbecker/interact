@@ -126,6 +126,7 @@ int main(int argc, char **argv)
   }
   imid = (int)((COMP_PRECISION)(ileft+iright)/2.0+0.5);
   irange = iright-ileft;
+  if(irange == 0)irange++;
   /* initial slip */
   nslip = 0;max_slip = 0;
   for(i=0;i < medium->nrflt;i++){
