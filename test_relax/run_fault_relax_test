@@ -10,7 +10,7 @@ n=500;lfac=0.4;rfac=0.6
 #n=20;lfac=0.5;rfac=0.5
 
 ((nh=n/2))
-makefault -n $n  > geom.in
+makefault -n $n -z -1.0001 > geom.in
 mode=1;	    # 0: strike 1: dip 2: normal
 
 
