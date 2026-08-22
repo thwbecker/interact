@@ -69,8 +69,7 @@ void eval_triangle_nw(COMP_PRECISION *x,struct flt *fault,
 		    (stress),(stress+1),(stress+2),(stress+3),(stress+4),(stress+5));
 #else
     tdstresshs(x,&(fault->xn[0]),&(fault->xn[3]),&(fault->xn[6]),
-	       (slip),(slip+1),(slip+2),stress,strain,&(elastic.poisson),&(elastic.mu2),
-	       &(elastic.lambda));
+	       (slip),(slip+1),(slip+2),stress,strain,&(elastic.poisson),&(elastic.mu2),&(elastic.lambda));
 #ifdef CRAZY_DEBUG
     fprintf(stderr,"eval_triangle_nw: stress: %g %g %g %g %g %g\n",strain[0],strain[1],strain[2],strain[3],strain[4],strain[5]);
 #endif

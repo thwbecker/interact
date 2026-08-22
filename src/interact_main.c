@@ -57,11 +57,17 @@ int main(int argc, char **argv)
   my_boolean read_initial_fault_stress,faults_have_slipped;
   COMP_PRECISION a[6],b[6];
   char time_out_string[20];
-  medium=(struct med *)calloc(1,sizeof(struct med)); /* init as zeros */
-  /* time at start */
+  /* 
+     time at start 
+  */
   clock_gettime(CLOCK_REALTIME, &(medium->init_time));
   strftime(time_out_string, 20, "%Y-%m-%d %H:%M:%S",
 	   localtime(&medium->init_time.tv_sec));
+  /* start  */
+  medium=(struct med *)calloc(1,sizeof(struct med)); /* init as zeros */
+  calc_medium_elastic_parameters(&medium->elastic,SHEAR_MODULUS_DEF, POISSON_NU_DEF);
+  
+ 
 #ifdef USE_PETSC
 #ifdef USE_DOUBLE_PRECISION
   PetscFunctionBegin;
@@ -70,7 +76,7 @@ int main(int argc, char **argv)
   PetscCallMPI(MPI_Comm_rank(PETSC_COMM_WORLD, &medium->comm_rank));
   if(medium->comm_size == 0)
     medium->comm_size = 1;	/* fix for non MPI call? */
-  calc_medium_elastic_parameters(&medium->elastic,SHEAR_MODULUS_DEF, POISSON_NU_DEF);
+
 #else  /* USE_PETSC but single precision: PETSc is set up for double only */
   fprintf(stderr,"%s: ERROR: PETSc support is configured for double precision only; this is a single-precision build and cannot run with PETSc. Use the double-precision interact binary instead.\n",argv[0]);
   return 1;

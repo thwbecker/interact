@@ -109,8 +109,9 @@ subroutine tdstresshs(loc,P1,P2,P3,Ss,Ds,Ts,stress,strain,nu,mu2,lambda)
   ! cross-referencing/inspiration by Peter Bird's half space
   ! displacement conversion
   !
-  implicit none 
-  C_PREC, intent(in) :: Ss,Ds,Ts,nu,mu2,lambda
+  implicit none
+  double precision, intent(in) :: nu,mu2,lambda
+  C_PREC, intent(in) :: Ss,Ds,Ts
   C_PREC, intent(out),dimension(6) :: stress,strain
   C_PREC, dimension(3), intent(in) :: p1, p2, p3,loc
   C_PREC, dimension(3) :: p1n, p2n, p3n
@@ -154,7 +155,8 @@ subroutine TDstressFS(X,Y,Z,P1,P2,P3,Ss,Ds,Ts,Stress,Strain,Ar,nu,two_mu,lambda)
   ! Calculates stresses and strains associated with a triangular dislocation 
   ! in an elastic full-space.
   implicit none
-  C_PREC,intent(in) :: x,y,z,Ss,Ds,Ts,nu,two_mu,lambda
+  double precision,intent(in): nu,two_mu,lambda
+  C_PREC,intent(in) :: x,y,z,Ss,Ds,Ts
   C_PREC,dimension(3) :: p1,p2,p3
   C_PREC,intent(out),dimension(6) :: stress,strain
   C_PREC,dimension(3,3),intent(out) :: Ar

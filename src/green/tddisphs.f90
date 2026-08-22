@@ -116,7 +116,8 @@
 subroutine  tddisphs(loc,P1,P2,P3,Ss,Ds,Ts,u,nu)
   implicit none
   C_PREC, PARAMETER :: pi = 3.14159265358979D0, zero = FORTRAN_ZERO
-  C_PREC,intent(in) :: ss,ds,ts,nu
+  C_PREC,intent(in) :: ss,ds,ts
+  double precision,intent(in) :: nu
   C_PREC,intent(in),dimension(3) :: p1,p2,p3,loc
   C_PREC,intent(out),dimension(3) :: u
   C_PREC :: ueMS,unMS,uvMS,ueFSC,unFSC,uvFSC,ueIS,unIS,uvIS

@@ -29,11 +29,12 @@ AR = ar
 # set the compiler flag for library directories
 MY_LIBDIR_SPEC = -L
 
+OPENMP_FLAGS = -fopenmp
 
 
 # LINKER FLAGS (without -lm, that get's added later)
 # gcc
-LDFLAGS = -lssp -fopenmp
+LDFLAGS = -lssp $(OPENMP_FLAGS)
 
 # X 11 only needed for PGPLOT
 X11LIBDIR = /usr/lib/x86_64-linux-gnu/
