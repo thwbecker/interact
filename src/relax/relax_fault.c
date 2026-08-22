@@ -32,17 +32,17 @@
   since the slip is constant and Dt IS ASSUMED FIXED, the two Green's function
   fields are each evaluated only once:
 
-     sig_el[i]  = sum_j F(G,      K, u_j)   the elastic field (t = 0 state)
-     sig_eff[i] = sum_j F(G'(Dt), K, u_j)   the effective field
+     sig_el[i]    = sum_j F(G,      K, u_j)   the elastic field (t = 0 state)
+     sigma_eff[i] = sum_j F(G'(Dt), K, u_j)   the effective field
 
   and every time step reduces to (no kernel calls)
 
-     sigma_i <-- vol(sig_eff[i]) + alpha(Dt) dev(sigma_i),
+     sigma_i <-- vol(sigma_eff[i]) + alpha(Dt) dev(sigma_i),
 
   which is the constant-slip form of the update above
   
   for slip held constant this recursion has the closed form
-  sigma_k = vol(sig_eff) + alpha^k dev(sig_el), which serves as a
+  sigma_k = vol(sigma_eff) + alpha^k dev(sig_el), which serves as a
   check
 
   Note that the volumetric part is evaluated from the current-step
@@ -65,7 +65,7 @@ int main(int argc, char **argv)
 {
   struct flt *fault;
   struct med *medium;
-  COMP_PRECISION (*sigma)[3][3],(*sig_eff)[3][3],xloc;
+  COMP_PRECISION (*sigma)[3][3],(*sigma_eff)[3][3],xloc;
   COMP_PRECISION t_M,Dt,time,t_max,max_slip,slip_amp,sval,lfrac,rfrac;
   MODE_TYPE slip_dir_mode,slip_dist_mode;
   int i,k,nslip,ileft,iright,irange;
