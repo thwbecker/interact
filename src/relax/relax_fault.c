@@ -4,7 +4,7 @@
   effective-modulus (implicit Euler) scheme by Dave May (Aug 2026),
   section 1
 
-  a Maxwell material in shear with constant (elastic) bulk modulus,
+  Maxwell material in shear with constant elastic bulk modulus,
 
      sdot/(2G) + s/(2 eta) = edot,
 
@@ -15,7 +15,7 @@
 
   where t_M = eta/G is the Maxwell time.
 
-  the stress update via Green's functions F(.) reads (eq I on the note)
+  the stress update via Green's functions F(.) is (eq I on the note)
 
      sig^{k+1} = F(G'(Dt),K,S^{k+1}) - dev(F(G'(Dt),K,S^k)) + alpha(Dt) s^k
 
@@ -26,33 +26,28 @@
      nu'(Dt) = (3K - 2G')/(6K + 2G'),  with  K = 2G(1+nu)/(3(1-2nu))
 
   multi-source version: the initial slip distribution is taken from
-  fault[].u[], set by the caller in main after read_geometry; any
-  number of patches may slip, all held constant after t = 0
+  fault[].u[]; any number of patches may slip, all held constant after
+  t = 0
 
-  since the slip is constant and Dt is fixed, the two Green's function
+  since the slip is constant and Dt IS ASSUMED FIXED, the two Green's function
   fields are each evaluated only once:
 
      sig_el[i]  = sum_j F(G,      K, u_j)   the elastic field (t = 0 state)
      sig_eff[i] = sum_j F(G'(Dt), K, u_j)   the effective field
 
-  and every time step reduces to O(nrflt) algebra with no kernel
-  calls,
+  and every time step reduces to (no kernel calls)
 
      sigma_i <-- vol(sig_eff[i]) + alpha(Dt) dev(sigma_i),
 
-  which is the constant-slip form of the update above; total kernel
-  cost for the whole run is 2 nrflt nslipping evaluations instead of
-  per step; for slip held constant this recursion has the closed form
+  which is the constant-slip form of the update above
+  
+  for slip held constant this recursion has the closed form
   sigma_k = vol(sig_eff) + alpha^k dev(sig_el), which serves as a
   check
 
-  a limitation inherited from the Green's function shortcut of the
-  note: the volumetric part is evaluated from the current-step
+  Note that the volumetric part is evaluated from the current-step
   effective solution only, so it depends on Dt but does not evolve in
-  time; the deviatoric (fault shear) relaxation is the meaningful part
-
-  output as before: one row per step, time and step number followed by
-  the stress resolved in the slip_mode component on each patch
+  time
 
 */
 #include "interact.h"
@@ -160,14 +155,14 @@ int main(int argc, char **argv)
      stress tensor state and the effective field, per patch 
   */
   sigma=  (COMP_PRECISION (*)[3][3])calloc(medium->nrflt,9*sizeof(COMP_PRECISION));
-  sig_eff=(COMP_PRECISION (*)[3][3])calloc(medium->nrflt,9*sizeof(COMP_PRECISION));
-  if((!sigma)||(!sig_eff))MEMERROR("relax_fault");
+  sigma_eff=(COMP_PRECISION (*)[3][3])calloc(medium->nrflt,9*sizeof(COMP_PRECISION));
+  if((!sigma)||(!sigma_eff))MEMERROR("relax_fault");
   /* 
-     the two kernel sweeps: elastic field into sigma (the t = 0
-     state), effective field into sig_eff (reused every step) 
+     the two kernel evaluation loops: elastic field into sigma (the t
+     = 0 state), effective field into sigma_eff (reused every step)
   */
   relax_stress_field(medium,fault,0.0,t_M,sigma);
-  relax_stress_field(medium,fault,Dt, t_M,sig_eff);
+  relax_stress_field(medium,fault,Dt, t_M,sigma_eff);
   /* 
      time loop; step 0 is the elastic state, each further step is the
      O(nrflt) recursion 
@@ -175,10 +170,10 @@ int main(int argc, char **argv)
   time = 0.0;
   k = 0;
   while(time < t_max){
-    if(k)			/* k = 0 is the elastic state */
-      relax_stress_step(medium,Dt,t_M,sig_eff,sigma);
-    if(k)
+    if(k){			/* k = 0 is the elastic state */
+      relax_stress_step(medium,Dt,t_M,sigma_eff,sigma);
       time += Dt;
+    }
     printf("%11g %5i\t",time,k);
     for(i=0;i < medium->nrflt;i++){
       /* resolve stress in the slip_mode component */
@@ -188,7 +183,7 @@ int main(int argc, char **argv)
     k++;
   }
   fprintf(stderr,"%s: computed %i steps\n",argv[0],k-1);
-  free(sigma);free(sig_eff);free(fault);free(medium);
+  free(sigma);free(sigma_eff);free(fault);free(medium);
   return 0;
 }
 /* 
@@ -199,8 +194,8 @@ int main(int argc, char **argv)
    field; sfield is overwritten
 
    sources are the outer loop so that only slipping patches are
-   visited and, per source, dip and alpha are constant along the inner
-   receiver sweep
+   computed and, per source, dip and alpha are constant along the
+   inner receiver loop
 
 */
 void relax_stress_field(struct med *medium, struct flt *fault,
@@ -250,23 +245,23 @@ void relax_stress_field(struct med *medium, struct flt *fault,
    stress update, in place on the stress state sigma[nrflt][3][3],
    for slip held constant since the last step:
 
-     sigma <-- vol(sig_eff) + alpha(Dt) dev(sigma)
+   sigma <-- vol(sigma_eff) + alpha(Dt) dev(sigma)
 
-   sig_eff is the precomputed effective field of relax_stress_field
+   sigma_eff is the precomputed effective field of relax_stress_field
    at this Dt; no Green's function evaluations are needed here; if
-   the slip distribution or Dt change, rebuild sig_eff first
+   the slip distribution or Dt change, rebuild sigma_eff first
 
 */
 void relax_stress_step(struct med *medium,
 			 COMP_PRECISION Dt, COMP_PRECISION t_M,
-			 COMP_PRECISION (*sig_eff)[3][3],
+			 COMP_PRECISION (*sigma_eff)[3][3],
 			 COMP_PRECISION (*sigma)[3][3])
 {
   COMP_PRECISION alphat,trace_eff,trace_sigma;
   int i,j,k;
   alphat = t_M/(t_M + Dt);	/* = eta/(eta + Dt G) */
   for(i=0;i < medium->nrflt;i++){
-    trace_eff =   tracemat3x3(sig_eff[i]);
+    trace_eff =   tracemat3x3(sigma_eff[i]);
     trace_sigma = tracemat3x3(sigma[i]);
     for(j=0;j < 3;j++)
       for(k=0;k < 3;k++){
