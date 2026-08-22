@@ -167,7 +167,8 @@ end subroutine  TDdispHS
 subroutine TDdispFS(X,Y,Z,P1,P2,P3,Ss,Ds,Ts,nu,ue,un,uv,Ar)
   USE, INTRINSIC :: IEEE_ARITHMETIC
   implicit none
-  C_PREC,intent(in) :: x,y,z,ss,ds,ts,nu
+  C_PREC,intent(in) :: x,y,z,ss,ds,ts
+  double precision,intent(in) :: nu
   C_PREC,intent(in),dimension(3) :: p1,p2,p3
   C_PREC,intent(out) :: ue,un,uv
   C_PREC,intent(out), dimension(3,3) :: Ar
@@ -270,7 +271,8 @@ subroutine TDdisp_HarFunc(X,Y,Z,P1,P2,P3,Ss,Ds,Ts,nu,ue,un,uv,&
   ! image dislocations.
   USE, INTRINSIC :: IEEE_ARITHMETIC
   implicit none
-  C_PREC,intent(in) :: x,y,z,ss,ds,ts,nu
+  C_PREC,intent(in) :: x,y,z,ss,ds,ts
+  double precision,intent(in) :: nu
   C_PREC,intent(in),dimension(3) :: p1,p2,p3
   C_PREC,intent(out) :: ue,un,uv
   C_PREC,intent(inout),dimension(3,3) :: Ar
@@ -366,7 +368,8 @@ subroutine TDSetupD(x,y,z,alpha,bx,by,bz,nu,TriVertex,SideVec,u,v,w)
   ! slip vector components from ADCS into TDCS. It then calculates the 
   ! displacements in ADCS and transforms them into TDCS.
   implicit none
-  C_PREC,intent(in) :: x,y,z,alpha,bx,by,bz,nu
+  C_PREC,intent(in) :: x,y,z,alpha,bx,by,bz
+  double precision,intent(in) :: nu
   C_PREC,intent(out) :: u,v,w
   C_PREC,intent(in),dimension(3) :: sidevec,trivertex
   C_PREC :: by1, bz1, v0, w0,y1,z1
@@ -393,7 +396,8 @@ subroutine AngSetupFSC(X,Y,Z,bX,bY,bZ,PA,PB,nu,ue,un,uv)
   ! AngSetupFSC calculates the Free Surface Correction to displacements 
   ! associated with angular dislocation pair on each TD side.
   IMPLICIT NONE
-  C_PREC, INTENT(IN) :: bX, bY, bZ, nu, X, Y, Z
+  C_PREC, INTENT(IN) :: bX, bY, bZ, X, Y, Z
+  double precision,intent(in) :: nu
   C_PREC, DIMENSION(3), INTENT(IN) :: PA, PB
   C_PREC, INTENT(OUT) :: ue, un, uv
   C_PREC, PARAMETER :: pi = 3.14159265358979D0
@@ -474,8 +478,8 @@ SUBROUTINE Angdisdisp(x, y, z, alpha, bx, by, bz, nu, & ! inputs
 
   IMPLICIT NONE
   C_PREC, PARAMETER :: pi = 3.14159265358979D0,one_over_eight_pi = 1.0d0/(8.0d0*pi)
-
-  C_PREC, INTENT(IN) :: x, y, z, alpha, bx, by, bz, nu
+  double precision, intent(in) :: nu
+  C_PREC, INTENT(IN) :: x, y, z, alpha, bx, by, bz
   C_PREC, INTENT(OUT) :: u, v, w
 
   C_PREC :: cosA, eta, r, sinA, ux, uy, uz, vx, vy, vz, wx, wy, wz, zz, zeta
@@ -563,7 +567,8 @@ SUBROUTINE Angdisdispfsc(y1, y2, y3, beta, b1, b2, b3, nu, a, & ! inputs
   IMPLICIT NONE
   C_PREC, PARAMETER :: pi = 3.14159265358979D0,&
        unity = FORTRAN_UNITY, one_over_four_pi = unity/(4.0d0*pi)
-  C_PREC, INTENT(IN) :: y1, y2, y3, beta, b1, b2, b3, nu, a
+  double precision,intent(in) :: nu
+  C_PREC, INTENT(IN) :: y1, y2, y3, beta, b1, b2, b3, a
   C_PREC, INTENT(OUT) :: v1, v2, v3
 
   C_PREC :: cosB, cotB, Fib, r2b, rb, sinB, &

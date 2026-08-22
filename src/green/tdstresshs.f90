@@ -155,7 +155,7 @@ subroutine TDstressFS(X,Y,Z,P1,P2,P3,Ss,Ds,Ts,Stress,Strain,Ar,nu,two_mu,lambda)
   ! Calculates stresses and strains associated with a triangular dislocation 
   ! in an elastic full-space.
   implicit none
-  double precision,intent(in): nu,two_mu,lambda
+  double precision,intent(in) :: nu,two_mu,lambda
   C_PREC,intent(in) :: x,y,z,Ss,Ds,Ts
   C_PREC,dimension(3) :: p1,p2,p3
   C_PREC,intent(out),dimension(6) :: stress,strain
@@ -255,7 +255,8 @@ end subroutine TDstressFS
 
 subroutine TDstress_HarFunc(X,Y,Z,P1,P2,P3,Ss,Ds,Ts,stress,strain,compute_ar,ar,nu,two_mu,lambda)
   implicit none
-  C_PREC,intent(in) :: x,y,z,ss,ds,ts,nu,two_mu,lambda
+  C_PREC,intent(in) :: x,y,z,ss,ds,ts
+  double precision, intent(in) :: nu,two_mu,lambda
   C_PREC,intent(in),dimension(3) :: p1,p2,p3
   logical,intent(in) :: compute_ar
   C_PREC,intent(in),dimension(3,3) :: Ar
@@ -335,7 +336,8 @@ subroutine TDSetupS(x,y,z,alpha,bx,by,bz,TriVertex,SideVec,&
   ! slip vector components from ADCS into TDCS. It then calculates the 
   ! strains in ADCS and transforms them into TDCS.
   IMPLICIT NONE
-  C_PREC, INTENT(IN) :: alpha, bx, by, bz, x, y, z, nu
+  C_PREC, INTENT(IN) :: alpha, bx, by, bz, x, y, z
+  double precision,intent(in) :: nu
   C_PREC, DIMENSION(3), INTENT(IN) :: SideVec, TriVertex
   C_PREC, INTENT(OUT) :: exxt,eyyt,ezzt,exyt,exzt,eyzt
   C_PREC :: exx,eyy,ezz,exy,exz,eyz
@@ -368,7 +370,8 @@ end subroutine TDSetupS
 
 subroutine AngSetupFSC_S(X,Y,Z,bX,bY,bZ,PA,PB,Stress,Strain,nu,two_mu,lambda)
   IMPLICIT NONE
-  C_PREC, intent(in) :: X,Y,Z,bX,bY,bZ,nu,lambda,two_mu
+  C_PREC, intent(in) :: X,Y,Z,bX,bY,bZ
+  double precision,intent(in) :: nu,lambda,two_mu
   C_PREC, dimension(6), intent(out) :: stress,strain
   C_PREC, DIMENSION(3), INTENT(IN) :: PA, PB
   C_PREC, PARAMETER :: pi = 3.14159265358979D0
@@ -476,7 +479,8 @@ subroutine AngDisStrain(x,y,z,alpha,bx,by,bz,Exx,Eyy,Ezz,Exy,Exz,Eyz,nu)
   IMPLICIT NONE
   ! AngDisStrain calculates the strains associated with an angular 
   ! dislocation in an elastic full-space.
-  C_PREC,intent(in) :: x,y,z,alpha,bx,by,bz,nu
+  C_PREC,intent(in) :: x,y,z,alpha,bx,by,bz
+  double precision,intent(in) :: nu
   C_PREC,intent(out) :: exx,eyy,ezz,exy,exz,eyz
 
   C_PREC sinA,cosA,eta,zeta,x2,y2,z2,r2,r,r3,rz,r3z,W,W2,Wr,W2r,Wr3,W2r2, C,S,S2,y3
@@ -583,7 +587,8 @@ subroutine AngDisStrainFSC(y1,y2,y3,beta,b1,b2,b3,a,v11,v22,v33,v12,v13,v23,nu)
   ! AngDisStrainFSC calculates the harmonic function contribution to the 
   ! strains associated with an angular dislocation in an elastic half-space.
   IMPLICIT NONE
-  C_PREC, intent(in) :: y1,y2,y3,beta,b1,b2,b3,a,nu
+  C_PREC, intent(in) :: y1,y2,y3,beta,b1,b2,b3,a
+  double precision,intent(in) :: nu
   C_PREC, intent (out) :: v11,v22,v33,v12,v13,v23
   C_PREC, PARAMETER :: pi = 3.14159265358979D0, unity = FORTRAN_UNITY,&
        two = 2.0d0,  three = 3.0d0, &
