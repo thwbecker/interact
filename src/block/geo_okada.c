@@ -22,10 +22,12 @@ int main(int argc, char **argv)
   COMP_PRECISION fx[2][2],pole[2]={0,90},x[3],px[3],u[3],pu[3],ps[3][3],
     s[3][3],center[3],l,w,tdepth,depth,dummy=0,dip,
     disp[3]={0,0,0},azi,smazi,cmazi;
+  struct el_par elastic;
   FILE *out1,*out2;
   int iret;
 
   my_boolean dxfout = TRUE;
+  calc_medium_elastic_parameters(&elastic,SHEAR_MODULUS_DEF, POISSON_NU_DEF);
   if(argc<6){
     fprintf(stderr,"%s lon1 lat1 lon2 lat2 total_depth_extent\n",
 	    argv[0]);
@@ -70,7 +72,7 @@ int main(int argc, char **argv)
     // evaluate the displacement and stresses in the projected 
     // frame
     //
-    eval_okada_basic(px,l,w,dip,depth,disp,pu,ps,&iret);
+    eval_okada_basic(px,l,w,dip,depth,disp,pu,ps,&iret,elastic);
     /*
 
       since the oblique mercator projection is conformal, we can just
