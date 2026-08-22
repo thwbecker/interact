@@ -1,0 +1,29 @@
+#!/bin/bash
+#
+# fault based visco-elastic relaxation
+#
+n=500
+dt=0.01
+tmax=50
+# slip range
+lfac=0.4
+rfac=0.6
+
+((nh=n/2))
+makefault -n $n > geom.in
+mode=1;	    # 0: strike 1: dip 2: normal
+# output is time nstep stress_0 stress_1 ... stress_nflt-1
+relax_fault $dt $mode $lfac $rfac | gawk '{for(i=3;i<=NF;i++)print(i-2,$1,$i)}' > tmp.dat
+minmax tmp.dat
+reg=-R1/$n/0/$tmax
+
+xyz2grd tmp.dat -Gtau.grd $reg -I1/$dt -V
+makecpt -I -T-3/2/.2 -Croma+h0 > stress.cpt
+ofile=fault_tau.ps
+#proj=-JX7/-7;preg=$reg
+proj=-JX7/-7l;preg=-R1/$n/0.01/$tmax
+grdimage $proj tau.grd -Cstress.cpt $preg -Ba100f20:"patch number":/a2f3:"time/Maxwell time":WesN -K -P > $ofile
+psscale -Dx3.5/-.2h/3/.15h -E -Cstress.cpt -B1/:"stress/shear modulus": -O >> $ofile
+modifybb $ofile 1
+
+rm tmp.dat tau.grd

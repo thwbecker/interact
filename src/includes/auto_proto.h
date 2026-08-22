@@ -23,8 +23,8 @@ void get_projected_fault_parameters(double [2][2], double, double *, double *, d
 double resolve_stress_on_fault_using_ctx(double [3][3], struct interact_ctx *, int);
 void calc_interaction_matrix(struct med *, struct flt *, unsigned char);
 double interaction_coefficient(int, int, int, int, struct flt *, int *, unsigned char, struct el_par);
-void get_right_slip(double *, int, double, struct flt *);
-void get_right_slip_no_rake_var(double *, int, double);
+void get_right_slip(double *, unsigned char, double, struct flt *);
+void get_right_slip_no_rake_var(double *, unsigned char, double);
 double ic_from_file(int, int, int, int, struct med *);
 double aij_from_file(int, int, int, FILE *);
 int select_i_coeff_calc_mode(struct med *);
@@ -545,4 +545,5 @@ void calculate_polar_base(double, double, double *);
 int coplanar_tri_tri(float [3], float [3], float [3], float [3], float [3], float [3], float [3]);
 int tri_tri_intersect(float [3], float [3], float [3], float [3], float [3], float [3]);
 /* src/relax/relax_fault.c */
-void relax_stress_update(struct med *, struct flt *, int, double *, double *, double, double, double (*)[3][3]);
+void relax_stress_field(struct med *, struct flt *, double, double, double (*)[3][3]);
+void relax_stress_step(struct med *, double, double, double (*)[3][3], double (*)[3][3]);

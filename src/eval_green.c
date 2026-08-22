@@ -332,12 +332,9 @@ void eval_green_basic(COMP_PRECISION *x,struct flt *fault,
   switch(fault->type){
   case OKADA_PATCH:{
     eval_okada_basic(x,
-		     (COMP_PRECISION)fault->l,
-		     (COMP_PRECISION)fault->w,
-		     (COMP_PRECISION)fault->dip,
+		     (COMP_PRECISION)fault->l,(COMP_PRECISION)fault->w,(COMP_PRECISION)fault->dip,
 		     (COMP_PRECISION) -fault->x[INT_Z],
-		     disp,u_global,sm_global,iret,full_space,
-		     elastic);
+		     disp,u_global,sm_global,iret,full_space,elastic);
     break;
   }
   case TWO_DIM_SEGMENT_PLANE_STRAIN:{

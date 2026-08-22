@@ -622,36 +622,36 @@ COMP_PRECISION interaction_coefficient(int i, int j, int k, int l,
    will also consider the rake distribution for rupturing fault rfault
 
 */				       
-void get_right_slip(COMP_PRECISION *disp,int dir,COMP_PRECISION unity, struct flt *rfault)
+void get_right_slip(COMP_PRECISION *disp,MODE_TYPE dir,COMP_PRECISION slip_value, struct flt *rfault)
 {
   disp[NORMAL]=disp[STRIKE]=disp[DIP]=0.0;
   switch(dir){
   case STRIKE:
   case DIP:
   case NORMAL:
-    disp[dir] = unity;
+    disp[dir] = slip_value;
     break;
   case RAKE:
-    disp[STRIKE] = unity * rfault->r[0];
-    disp[DIP]    = unity * rfault->r[1];
+    disp[STRIKE] = slip_value * rfault->r[0];
+    disp[DIP]    = slip_value * rfault->r[1];
     break;
   default:
-    fprintf(stderr,"get_right_slip: slip mode %i undefined\n",dir);
+    fprintf(stderr,"get_right_slip: slip mode %i undefined\n",(int)dir);
     exit(-1);
     break;
   }
 }
-void get_right_slip_no_rake_var(COMP_PRECISION *disp,int dir,COMP_PRECISION unity)
+void get_right_slip_no_rake_var(COMP_PRECISION *disp,MODE_TYPE dir,COMP_PRECISION slip_value)
 {
   disp[NORMAL]=disp[STRIKE]=disp[DIP]=0.0;
   switch(dir){
   case STRIKE:
   case DIP:
   case NORMAL:
-    disp[dir] = unity;
+    disp[dir] = slip_value;
     break;
   default:
-    fprintf(stderr,"get_right_slip: slip mode %i undefined\n",dir);
+    fprintf(stderr,"get_right_slip: slip mode %i undefined\n",(int)dir);
     exit(-1);
     break;
   }
