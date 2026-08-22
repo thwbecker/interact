@@ -80,6 +80,33 @@ void resolve_force(COMP_PRECISION *norm,COMP_PRECISION sm[3][3],
       trac[i] += norm[j] * sm[i][j];
   }
 }
+
+COMP_PRECISION resolve_stress_on_fault(COMP_PRECISION stress[3][3],  struct flt *fault, MODE_TYPE mode)
+{
+  COMP_PRECISION sval,trac[3];
+  resolve_force(fault->normal,stress,trac);
+  switch(mode){
+  case STRIKE:
+    sval = dotp_3d(trac,fault->t_strike);
+    break;
+  case DIP:
+    sval = dotp_3d(trac,fault->t_dip);
+    break;
+  case NORMAL:
+    sval = dotp_3d(trac,fault->normal);
+    break;
+  case RAKE:
+    sval  = fault->r[0] * dotp_3d(trac,fault->t_strike);
+    sval += fault->r[1] * dotp_3d(trac,fault->t_dip);
+    break;
+  default:
+    fprintf(stderr,"resolve_stress_on_fault: stress mode %i undefined \n",mode);
+    exit(-1);
+  }
+  return sval;
+
+}
+
 /* 
    given a quad fault patch with specified angles strike and dip
    (resp. their cosines and sines), calculate the normal, dip, and

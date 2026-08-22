@@ -38,7 +38,6 @@ void read_geometry(char *, struct med **, struct flt **, unsigned char, unsigned
 void calc_medium_elastic_parameters(struct el_par *, double, double);
 /* src/read_stress_observations.c */
 void read_stress_observations(struct bmd *, float *, float, unsigned char, float **, float, unsigned char);
-/* src/relax_2d.c */
 /* src/interact/adjust_time_step.c */
 void adjust_time_step(struct flt *, struct med *);
 /* src/interact/calc_design_matrix.c */
@@ -315,7 +314,6 @@ void fltcp(struct flt *, struct flt *);
 /* src/util/generate_random_2d.c */
 /* src/util/generate_slipdia.c */
 /* src/util/geoproject.c */
-void geoproject(float *, float *, int, float, float, float, float, float, float, float, int);
 /* src/util/makefault.c */
 /* src/util/mspectral.c */
 void find_range(int *, int *, float, float, float, float, float *, float *, float *, int);
@@ -395,6 +393,7 @@ void points2patch(struct flt *, float *, unsigned char);
 float patch_area(struct flt *);
 void calc_lhemi_proj(float, float, float *);
 void resolve_force(float *, float [3][3], float *);
+float resolve_stress_on_fault(float [3][3], struct flt *, unsigned char);
 void calc_quad_base_vecs(float *, float *, float *, float, float, float, float);
 void get_maxsdir_stress_drops2(float *, float, float *);
 void get_maxsdir_stress_drops(float *, float, float *, float, float *, float *);
@@ -500,6 +499,7 @@ float find_max_abs_vec_float(float *, int);
 int find_lde_max(float *, int, int, float);
 float square(float);
 float tracemat9(float *);
+float tracemat3x3(float [3][3]);
 int inv_compare_flt(const void *, const void *);
 int compare_flt(const void *, const void *);
 float rms(float *, int);
@@ -517,13 +517,6 @@ int countzero_vec(float *, int);
 float reformat_small(float);
 float mwfromm0(float);
 /* src/geometry/myprojectsimple.c */
-void myprojectsimple(float *, float *, float, float, float, int);
-float oblique_setup(float, float, float *, float, float, float *, GMT_LONG);
-void make_euler_matrix(double *, double *, double);
-void matrix_3v(double *, double *, double *);
-void matrix_2v(double *, double *, double *);
-void sphere_project_setup(float, float, float *, float, float, float *, float, float *, float *, GMT_LONG);
-void oblique_transform(float, float, float *, float *, float *, float *);
 /* src/geometry/project_stress.c */
 /* src/geometry/segseg.c */
 void intersect(float *, float *, float *, float *, float *, int *);
@@ -551,3 +544,5 @@ void calculate_polar_base(float, float, float *);
 /* src/geometry/tritri.c */
 int coplanar_tri_tri(float [3], float [3], float [3], float [3], float [3], float [3], float [3]);
 int tri_tri_intersect(float [3], float [3], float [3], float [3], float [3], float [3]);
+/* src/relax/relax_fault.c */
+void relax_stress_update(struct med *, struct flt *, int, float *, float *, float, float, float (*)[3][3]);

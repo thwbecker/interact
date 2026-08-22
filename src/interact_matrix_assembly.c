@@ -25,34 +25,16 @@
 */
 #include "interact.h"
 
-/* given a stress tensor and context, resolve on fault nfaults */
+/* 
+   given a stress tensor and context, resolve on fault rfault
+   
+   this uses the context fault to get the fault, and the main routine is in geometry/geometry.c
+
+*/
 COMP_PRECISION resolve_stress_on_fault_using_ctx(COMP_PRECISION stress[3][3],  struct interact_ctx *ictx, int rfault)
 {
-  COMP_PRECISION sval,trac[3];
-  resolve_force(ictx->fault[rfault].normal,stress,trac);
-  switch(ictx->rec_stress_mode){
-  case STRIKE:
-    sval = dotp_3d(trac,ictx->fault[rfault].t_strike);
-    break;
-  case DIP:
-    sval = dotp_3d(trac,ictx->fault[rfault].t_dip);
-    break;
-  case NORMAL:
-    sval = dotp_3d(trac,ictx->fault[rfault].normal);
-    break;
-  case RAKE:
-    sval  = ictx->fault[rfault].r[0] * dotp_3d(trac,ictx->fault[rfault].t_strike);
-    sval += ictx->fault[rfault].r[1] * dotp_3d(trac,ictx->fault[rfault].t_dip);
-    break;
-  default:
-    fprintf(stderr,"resolve_stress_on_fault_using_ctx: stress mode %i undefined \n",ictx->rec_stress_mode);
-    exit(-1);
-  }
-  return sval;
-
+  return resolve_stress_on_fault(stress, &(ictx->fault[rfault]), ictx->rec_stress_mode);
 }
-
-
 #ifdef USE_PETSC
 
 

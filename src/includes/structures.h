@@ -498,7 +498,7 @@ struct med{
 struct interact_ctx{
   struct flt *fault;
   struct med *medium;
-  int src_slip_mode,rec_stress_mode;
+  MODE_TYPE src_slip_mode,rec_stress_mode;
 };
 
 

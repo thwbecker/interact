@@ -147,7 +147,7 @@
 # src/block 		is for the routines used for geodetic block modeling in Becker et al. (2005)
 
 #
-VPATH = src src/green src/linear_algebra src/util src/block src/testing/ src/interact src/geometry
+VPATH = src src/green src/linear_algebra src/util src/block src/testing/ src/interact src/geometry src/relax
 
 LOCAL_INCLUDES = -Isrc/includes/ -Isrc/util/ -Isrc/block/
 
@@ -406,7 +406,7 @@ LIBS_DEBUG = $(MY_LIBDIR_SPEC)$(ODIR)/     -linput.dbg -lpatchio.dbg $(TGF_LIB) 
 all: obj_directories libraries main_prog \
 	tools converters geom_converters
 
-really_all: all debug_libraries  test $(BDIR)/$(INTERACT_BINARY_NAME).sgl  \
+really_all: all debug_libraries  relax test $(BDIR)/$(INTERACT_BINARY_NAME).sgl  \
 	inoise analysis geographic_tools $(BDIR)/$(INTERACT_BINARY_NAME).dbg
 #	pgplot_progs block_tools
 
@@ -428,6 +428,7 @@ random_geom_tools:  $(BDIR)/randomflt  $(BDIR)/generate_random_2d \
 random_prop_tools: $(BDIR)/create_random_stress_file \
 	$(BDIR)/create_random_mu_file $(BDIR)/calc_stress_stat
 
+relax: $(BDIR)/relax_fault
 
 block_tools: $(BDIR)/block_checkflt $(BDIR)/block_evaluate_solution 
 
@@ -495,6 +496,10 @@ $(BDIR)/interact_noise.$(NOISELEVEL): $(NOBJ) $(GEN_P_INC) $(LIBLIST) $(PETSC_OB
 	$(MPILD)  $(NOBJ) -o $(BDIR)/interact_noise.$(NOISELEVEL) $(INTERACT_NOISE_OBJS) \
 		$(PETSC_OBJS) $(PETSC_LIBS) $(EXT_HMAT_LIBS) $(LIBS) $(PGLIBS)   \
 		$(OLD_MATRIX_LIBS)  $(LDFLAGS)
+
+$(BDIR)/relax_fault: $(OBJ) $(GEN_P_INC) $(LIBLIST) $(PETSC_OBJS)  $(ODIR)/coulomb_stress.o $(ODIR)/relax_fault.o
+	$(MPILD) $(OBJ) -o $(BDIR)/relax_fault  $(ODIR)/relax_fault.o $(PETSC_OBJS) $(ODIR)/coulomb_stress.o \
+	$(EXT_HMAT_LIBS) $(PETSC_LIBS) $(LIBS) $(PGLIBS) $(OLD_MATRIX_LIBS)   $(LDFLAGS)
 
 
 
@@ -810,7 +815,7 @@ proto: 	src/includes/auto_proto.h src/includes/auto_proto.sgl.h
 
 PROTO_SRC = $(filter-out src/rsf_%.c src/petsc_%.c,$(wildcard src/*.c)) \
 	src/interact/*.c src/linear_algebra/*.c src/block/*.c src/testing/*.c \
-	src/green/*.c src/util/*.c src/geometry/*.c 
+	src/green/*.c src/util/*.c src/geometry/*.c src/relax/*.c
 
 src/includes/auto_proto.h:
 	rm -f src/includes/auto_proto.h 2> /dev/null;\

@@ -510,14 +510,19 @@ COMP_PRECISION square(COMP_PRECISION x)
 
 /*
 
-  trace of matrix stored in 3 x 3 format, fortran style
+  trace of matrix stored in 3 x 3 vector format, fortran style
 
 */
 COMP_PRECISION tracemat9(COMP_PRECISION *s)
 {
   return s[INT_XX] + s[INT_YY] + s[INT_ZZ];
-
 }
+COMP_PRECISION tracemat3x3(COMP_PRECISION s[3][3])
+{
+  return s[INT_X][INT_X] + s[INT_Y][INT_Y] + s[INT_Z][INT_Z];
+}
+
+
 /*
   
   compare two floating point numbers
