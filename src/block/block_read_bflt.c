@@ -657,13 +657,13 @@ void get_bflt_intcoeff(struct bflt **fault, int iflt,
       for(j=0;j < 3;j++){	/* use all slip modes */
 	// get a displacement vector with fac slip
 	// in the appropriate component (typically unity)
-	get_right_slip(disp,j,sfac);	
+	get_right_slip_no_rake_var(disp,j,sfac);	
 	//
 	eval_okada_basic(px,(*fault+iflt)->l,
-			     (*fault+iflt)->w,
-			     (*fault+iflt)->dip,
-			     -(*fault+iflt)->x[INT_Z],
-			     disp,pu,ps,&iret);
+			 (*fault+iflt)->w,
+			 (*fault+iflt)->dip,
+			 -(*fault+iflt)->x[INT_Z],
+			 disp,pu,ps,&iret,FALSE,elastic);
 	if((iret)&&(j==0)){
 	  fprintf(stderr,"block_read_bflt: error: singular at fault %i stress obs point %i: %g, %g\n",
 		  iflt+1,i+1,*(sx+i*BLOCK_DIM+INT_X),*(sx+i*BLOCK_DIM+INT_Y));

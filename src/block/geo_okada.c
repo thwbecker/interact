@@ -15,6 +15,7 @@
 
 */
 #include "interact.h"
+#include "properties.h"
 #include "blockinvert.h"
 
 int main(int argc, char **argv)
@@ -97,6 +98,5 @@ int main(int argc, char **argv)
   if(dxfout){
     fclose(out1);fclose(out2);
   }
-  GMT_end (1, argv);
   return 0;
 }

@@ -224,7 +224,7 @@ PETSC_OBJS = $(ODIR)/petsc_matrix_operations.o $(EXT_HMAT_OBJS)
 #
 GEO_TOOLS=
 # add this for geoprojection support, will override GEO_TOOLS
-#include config/makefile.geoproject
+include config/makefile.geoproject
 
 # add up all define flags
 DEFINE_FLAGS = $(MAIN_DEFINES) $(SLATEC_DEFINES) $(PETSC_DEFINES) \
@@ -796,9 +796,9 @@ $(BDIR)/block_checkflt: $(GEN_P_INC)  $(GEOPROJECT_OBJS) $(LIBLIST) \
 		$(MATHLIBS)     $(TGF_LIB) $(EISPACK_LIB)  $(PGLIBS) $(LDFLAGS) 
 
 $(BDIR)/geo_okada: $(ODIR)/geo_okada.o $(ODIR)/coulomb_stress.o $(GEN_P_INC)  \
-	$(GEOPROJECT_OBJS) $(LIBLIST) 
+	$(GEOPROJECT_OBJS) $(LIBLIST) $(GEOPROJECT_LIBS)
 	$(MPILD)  $(ODIR)/geo_okada.o $(MY_LIBDIR_SPEC)$(ODIR)/ $(GEOPROJECT_OBJS) \
-		-o  $(BDIR)/geo_okada  $(ODIR)/coulomb_stress.o -lpatchio \
+		-o  $(BDIR)/geo_okada  $(ODIR)/coulomb_stress.o $(LIBS)   \
 		$(GEOPROJECT_LIBS)	$(MATHLIBS)    $(LDFLAGS)
 
 #
