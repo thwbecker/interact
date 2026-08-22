@@ -73,7 +73,7 @@ void eval_triangle_tgf(COMP_PRECISION *x,struct flt *fault,
   }
   
   if(is_self)
-    eltst3triadirectself(&elastic., &elastic.shear,
+    eltst3triadirectself(&elastic.lambda, &elastic.shear,
 			 &unity, &unity, triangle, dslip, dnormal,
 			 dx, du, &calc_strain, fstrain);
   else

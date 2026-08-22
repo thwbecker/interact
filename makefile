@@ -237,7 +237,7 @@ FLAGS = $(DEFINE_FLAGS) $(PGPLOT_INCLUDES) $(SLATEC_INCLUDES) $(LOCAL_INCLUDES) 
 
 # other flags
 CFLAGS =   $(FLAGS) $(SCARGS)   $(MACHINE_DEFINES)
-FFLAGS =   $(FLAGS) $(SFARGS)   $(MACHINE_DEFINES) 
+FFLAGS =   $(FLAGS) $(SFARGS)   $(MACHINE_DEFINES)  $(OPENMP_FLAGS)
 F90FLAGS = $(FLAGS) $(SF90ARGS) $(MACHINE_DEFINES)
 
 
@@ -810,7 +810,7 @@ proto: 	src/includes/auto_proto.h src/includes/auto_proto.sgl.h
 
 PROTO_SRC = $(filter-out src/rsf_%.c src/petsc_%.c,$(wildcard src/*.c)) \
 	src/interact/*.c src/linear_algebra/*.c src/block/*.c src/testing/*.c \
-	src/green/*.c src/util/*.c src/block/*.c src/geometry/*.c 
+	src/green/*.c src/util/*.c src/geometry/*.c 
 
 src/includes/auto_proto.h:
 	rm -f src/includes/auto_proto.h 2> /dev/null;\

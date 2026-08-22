@@ -16,8 +16,7 @@
 /* STRESS_DROP_NORM flag: if defined, will normalize stresses by
  stress drop if not, shear modulus will be set to unity */
 
-/* #define STRESS_DROP_NORM */
-
+#define STRESS_DROP_NORM 	/* old default */
 
 #ifdef STRESS_DROP_NORM
 /* set by stress drop */

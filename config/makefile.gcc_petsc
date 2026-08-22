@@ -35,10 +35,10 @@ GCCWOPT = -Wall
 # fast execution options, default use
 OPTIM_FLAGS = -O3  -march=x86-64-v3  $(GCCWOPT)
 
-
+OPENMP_FLAGS = -fopenmp
 # LINKER FLAGS (without -lm, that get's added later)
 # gcc
-LDFLAGS = -fopenmp
+LDFLAGS = $(OPENMP_FLAGS)
 
 # X 11 only needed for PGPLOT
 X11LIBDIR = /usr/lib/x86_64-linux-gnu/

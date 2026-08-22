@@ -63,6 +63,7 @@ DEBUG_LIBS =
 #-DMEM_ALLOC_DEBUG \
 #	-DDEBUG -DSUPER_DEBUG  
 
+OPENMP_FLAGS = 
 
 # fortran flags
 #

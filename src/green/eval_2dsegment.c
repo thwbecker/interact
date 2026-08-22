@@ -431,7 +431,7 @@ void eval_2dsegment_plane_strain_tdd(COMP_PRECISION *x,
   pr1 =  (1.0 - 2.0 * pr);
   pr2=   2.0*pr0;
   con=   1.0 / (4.0 * PI * pr0);
-  cons = (COMP_PRECISION)elastic.shear/(1.0 + pr);
+  cons = (COMP_PRECISION)elastic.mu2;
   chi =  3.0 - 4.0 * pr;
 
   if((ihalf)&&(x[INT_Y] > 0)){	/* half-plane in air */
