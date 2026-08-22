@@ -73,9 +73,10 @@ int main(int argc, char **argv)
     sscanf(argv[1],ONE_CP_FORMAT,&Dt);
   if(argc>2)			/* read in slipping patch */
     sscanf(argv[2],"%i",&islip);
-  if(argc>3)			/* slip mode*/
+  if(argc>3){			/* slip mode*/
     sscanf(argv[3],"%i",&i);
-  slip_mode = (MODE_TYPE)i;
+    slip_mode = (MODE_TYPE)i;
+  }
   /* 
      read geometry; read_geometry also sets the default elastic
      parameters in medium->elastic 
@@ -134,14 +135,16 @@ int main(int argc, char **argv)
 
    one implicit Euler step of the effective-modulus visco-elastic
    stress update at all patch centroids, in place on the stress state
-   sigma[nrflt][3][3]
+   sigma[nrflt][3][3] from equation I
 
      sigma <-- F(G'(Dt),K,slip_new) - dev(F(G'(Dt),K,slip_old)) + alpha(Dt) dev(sigma)
 
-   slip slip_new/slip_old (strike, dip, normal components) is on patch
-   islip only; Dt = 0 recovers the elastic evaluation; the reference
-   elastic parameters are taken from medium->elastic, the bulk modulus
-   is kept at its reference (elastic) value throughout
+   slip slip_new/slip_old (strike, dip, rake, or normal components) is
+   on patch islip only; Dt = 0 recovers the elastic evaluation;
+
+   the reference elastic parameters are taken from medium->elastic,
+   the bulk modulus is kept at its reference (elastic) value
+   throughout
 
 */
 void relax_stress_update(struct med *medium, struct flt *fault, int islip,
