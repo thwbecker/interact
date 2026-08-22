@@ -73,7 +73,7 @@ int main(int argc, char **argv)
   COMP_PRECISION (*sigma)[3][3],(*sig_eff)[3][3],xloc;
   COMP_PRECISION t_M,Dt,time,t_max,max_slip,slip_amp,sval,lfrac,rfrac;
   MODE_TYPE slip_dir_mode,slip_dist_mode;
-  int i,k,nslip,ileft,iright,imid,irange;
+  int i,k,nslip,ileft,iright,irange;
   /* 
      defaults 
   */
@@ -124,7 +124,6 @@ int main(int argc, char **argv)
   if(ileft>iright){
     i = ileft;ileft = iright;iright = i;
   }
-  imid = (int)((COMP_PRECISION)(ileft+iright)/2.0+0.5);
   irange = iright-ileft;
   if(irange == 0)irange++;
   /* initial slip */
@@ -133,9 +132,11 @@ int main(int argc, char **argv)
     if((i >= ileft)&&(i <= iright)){
       if(slip_dist_mode == 0)
 	sval = 1.0;
-      else{
-	xloc = (COMP_PRECISION)(i-imid)/(COMP_PRECISION)irange;
-	sval = sqrt(1.-pow(xloc/0.5,2));
+      else{			/* elliptical */
+	xloc = ((COMP_PRECISION)i - (COMP_PRECISION)(ileft+iright)/2.0)/
+	  ((COMP_PRECISION)irange/2.0);
+	sval = 1.0 - xloc*xloc;
+	sval = (sval > 0.0)?(sqrt(sval)):(0.0);
       }
       //fprintf(stderr,"%i %g\n",i,sval);
     }else{
