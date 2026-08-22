@@ -59,9 +59,9 @@ int main(int argc, char **argv)
   COMP_PRECISION *amp[VE_MAX_NP+1],*damp[VE_MAX_NP+1];
   COMP_PRECISION *tau_a,*h_b[VE_MAX_NP],*h_c[VE_MAX_NP],*tmpv[4];
   COMP_PRECISION C[VE_MAX_NP+1][3][3],D[VE_MAX_NP+1][3];
-  COMP_PRECISION x[3],slip_dir[3],res,resmax_amp;
+  COMP_PRECISION x[3],res,resmax_amp;
   COMP_PRECISION Dt,t_M,t_ramp,t_max,t_max_fac,time,sval,xloc;
-  COMP_PRECISION efac,ifac,vfac,dev_b,dev_c,scl,bas,k1,k2,k3,k4,vmid;
+  COMP_PRECISION efac,ifac,vfac,dev_b,dev_c,scl,k1,k2,k3,k4,vmid;
   COMP_PRECISION lfrac,rfrac,xmin,xmax,xlen,max_slip;
   MODE_TYPE slip_mode;
   FILE *fs,*fd,*fr;
@@ -74,7 +74,7 @@ int main(int argc, char **argv)
   lfrac = 0.4;rfrac = 0.6;	/* slipping patch fraction range */
   t_M = 1.0;			/* Maxwell time */
   t_ramp = 0.0;			/* slip ramp duration; 0 = step */
-  t_max_fac = 10.0;		/* run to t_max_fac * t_M */
+  t_max_fac = 50.0;		/* run to t_max_fac * t_M */
   nobs = 41;			/* surface observation points */
   if(argc > 1)sscanf(argv[1],ONE_CP_FORMAT,&Dt);
   if(argc > 2){
@@ -184,13 +184,10 @@ int main(int argc, char **argv)
      [0, t_ramp], zero after; for t_ramp = 0 routes B and C are
      initialized with the full step at t = 0 
   */
-  fs = fopen("rf_ve_stress.dat","w");
-  fd = fopen("rf_ve_disp.dat","w");
-  fr = fopen("rf_ve_route.dat","w");
-  if((!fs)||(!fd)||(!fr)){
-    fprintf(stderr,"%s: error opening output files\n",argv[0]);
-    exit(-1);
-  }
+  fs = myopen("rf_ve_stress.dat","w");
+  fd = myopen("rf_ve_disp.dat","w");
+  fr = myopen("rf_ve_route.dat","w");
+ 
   if(t_ramp <= 0.0){		/* impulse initialization of the state */
     for(p=0;p < spec.np;p++)
       for(i=0;i < nrflt;i++)

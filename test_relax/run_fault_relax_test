@@ -1,25 +1,36 @@
 #!/bin/bash
+method=${1-2}
 #
 # fault based visco-elastic relaxation
 #
-n=500
 dt=0.01
 tmax=50
 # slip range
-lfac=0.4
-rfac=0.6
+n=500;lfac=0.4;rfac=0.6
+#n=20;lfac=0.5;rfac=0.5
 
 ((nh=n/2))
-makefault -n $n > geom.in
+makefault -n $n  > geom.in
 mode=1;	    # 0: strike 1: dip 2: normal
-# output is time nstep stress_0 stress_1 ... stress_nflt-1
-relax_fault $dt $mode $lfac $rfac | gawk '{for(i=3;i<=NF;i++)print(i-2,$1,$i)}' > tmp.dat
+
+
+if [ $method -eq 1 ];then
+
+    # output is time nstep stress_0 stress_1 ... stress_nflt-1
+    relax_fault $dt $mode $lfac $rfac | gawk '{for(i=3;i<=NF;i++)print(i-2,$1,$i)}' > tmp.dat
+elif [ $method -eq 2 ];then
+    relax_fault_ve $dt $mode $lfac $rfac
+    gawk '{for(i=3;i<=NF;i++)print(i-2,$1,$i)}' rf_ve_stress.dat > tmp.dat
+else
+    echo $0: method $method error
+    exit
+fi
 minmax tmp.dat
 reg=-R1/$n/0/$tmax
 
 xyz2grd tmp.dat -Gtau.grd $reg -I1/$dt -V
 makecpt -I -T-3/2/.2 -Croma+h0 > stress.cpt
-ofile=fault_tau.ps
+ofile=fault_tau.$method.ps
 #proj=-JX7/-7;preg=$reg
 proj=-JX7/-7l;preg=-R1/$n/0.01/$tmax
 grdimage $proj tau.grd -Cstress.cpt $preg -Ba100f20:"patch number":/a2f3:"time/Maxwell time":WesN -K -P > $ofile
