@@ -300,7 +300,7 @@ PetscErrorCode setup_bigwham_matshell(struct med *medium, struct flt *fault,
     conn[4*i+2] = 4*i+2; conn[4*i+3] = 4*i+3;
   }
   /* = 2 G (1+nu), same constants as Okada */
-  E  = (double)medium->elastic->mu2*(1.0+medium->elastic->poisson);	
+  E  = (double)medium->elastic.mu2*(1.0+medium->elastic.poisson);	
 
   if(!medium->full_space)	/* BigWham is an infinite-medium kernel */
     HEADNODE

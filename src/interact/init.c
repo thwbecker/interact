@@ -249,7 +249,6 @@ void initialize_interact(struct med **medium, struct flt **fault,
     fprintf(stderr,"initialize_interact: sparse storage only works for loading simulation!\n");
     exit(-1);
   }
-  calc_medium_elastic_parameters(&((*medium)->elastic),SHEAR_MODULUS_DEF,POISSON_NU_DEF);
 
   /* cutout */
   (*medium)->i_mat_cutoff = i_mat_cutoff;

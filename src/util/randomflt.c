@@ -54,10 +54,10 @@ int main(int argc, char **argv)
   // init medium with zeros
   medium=(struct med *)calloc(1,sizeof(struct med));
   if(!medium)MEMERROR("main: 1");
-
+  calc_medium_elastic_parameters(&medium->elastic,SHEAR_MODULUS_DEF, POISSON_NU_DEF);
+  
   /* default values */
   opmode=PATCH_OUT_MODE;
-
   random_mode=GAUSS_DISTRIBUTED;
 
   check_input_parameters(argc, argv,&n,&seed, seg,&bvalue, &gr_random,&gra_random,

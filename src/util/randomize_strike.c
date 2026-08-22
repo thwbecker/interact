@@ -52,6 +52,7 @@ int main(int argc, char **argv)
 #ifdef USE_UNIFORM_RANDOM
   COMP_PRECISION s11,s12,s2;
 #endif
+  calc_medium_elastic_parameters(&medium->elastic,SHEAR_MODULUS_DEF, POISSON_NU_DEF);
   /* initialize */
   s01=0;
   s02=0;

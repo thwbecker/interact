@@ -26,7 +26,7 @@
 void eval_triangle_gauss(COMP_PRECISION *x,struct flt *fault,
 			 COMP_PRECISION *disp,COMP_PRECISION *u_global, 
 			 COMP_PRECISION sm_global[3][3],int *giret,int mode,
-			 my_boolean fullpsace,
+			 my_boolean fullspace,
 			 double elastic_shear, double elastic_lambda)
 {
   fprintf(stderr,"eval_triangle_gauss: unclear if this function works or should be called. Exiting\n");

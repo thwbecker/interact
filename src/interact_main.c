@@ -70,6 +70,7 @@ int main(int argc, char **argv)
   PetscCallMPI(MPI_Comm_rank(PETSC_COMM_WORLD, &medium->comm_rank));
   if(medium->comm_size == 0)
     medium->comm_size = 1;	/* fix for non MPI call? */
+  calc_medium_elastic_parameters(&medium->elastic,SHEAR_MODULUS_DEF, POISSON_NU_DEF);
 #else  /* USE_PETSC but single precision: PETSc is set up for double only */
   fprintf(stderr,"%s: ERROR: PETSc support is configured for double precision only; this is a single-precision build and cannot run with PETSc. Use the double-precision interact binary instead.\n",argv[0]);
   return 1;
