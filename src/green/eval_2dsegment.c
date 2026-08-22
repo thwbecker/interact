@@ -424,7 +424,7 @@ void eval_2dsegment_plane_strain_tdd(COMP_PRECISION *x,
 				     int ihalf,int *iret, MODE_TYPE mode,
 				     struct el_par elastic)
 {
-  static COMP_PRECISION pr0,pr,pr1,pr2,con,cons,chi;
+  COMP_PRECISION pr0,pr,pr1,pr2,con,cons,chi;
   COMP_PRECISION sxx[3],sxy[3],syy[3],ux[3],uy[3];
   pr = (COMP_PRECISION)elastic.poisson;
   pr0 =  1.0 - pr;
