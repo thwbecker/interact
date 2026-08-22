@@ -224,7 +224,7 @@ PETSC_OBJS = $(ODIR)/petsc_matrix_operations.o $(EXT_HMAT_OBJS)
 #
 GEO_TOOLS=
 # add this for geoprojection support, will override GEO_TOOLS
-include config/makefile.geoproject
+#include config/makefile.geoproject
 
 # add up all define flags
 DEFINE_FLAGS = $(MAIN_DEFINES) $(SLATEC_DEFINES) $(PETSC_DEFINES) \
