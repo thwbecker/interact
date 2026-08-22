@@ -672,6 +672,7 @@ void find_spherical_rotation(struct bmd *mod,int code,
 	 to Euler pole in different units
       */
       calc_geo_euler_pole(omega,&lon,&lat,&mag);
+      
       (code >= 0)?(sprintf(cstring,"%c",bname(code))):(sprintf(cstring,"%2i",code));
       if(use_model_vel)
 	fprintf(stderr,"fsr: model w: %6.3f, %6.3f, %6.3f (deg/Myr) lon lat r: %8.3f %8.3f %6.3f (%3i pts, bn: %s) %s %s\n",

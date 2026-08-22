@@ -220,11 +220,11 @@ PETSC_OBJS = $(ODIR)/petsc_matrix_operations.o $(EXT_HMAT_OBJS)
 #
 # add this for superlu support, otherwise comment it out
 # you will loose sparse matrix SuperLU LU solver capabilities
-#include makefile.superlu
+#include config/makefile.superlu
 #
 GEO_TOOLS=
 # add this for geoprojection support, will override GEO_TOOLS
-#include makefile.geoproject
+#include config/makefile.geoproject
 
 # add up all define flags
 DEFINE_FLAGS = $(MAIN_DEFINES) $(SLATEC_DEFINES) $(PETSC_DEFINES) \

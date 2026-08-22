@@ -34,6 +34,7 @@ if we get NaN, we will also return zeroes
 
 */
 #include "interact.h"
+#include "properties.h"
 #include "blockinvert.h"
 
 
@@ -53,6 +54,8 @@ void block_eval_geookada(COMP_PRECISION *xl,
 {
   COMP_PRECISION x[3]={0,0,0},px[3],pu[3],ps[3][3],dummy=0;
   int i,j;
+  struct el_par elastic;
+  calc_medium_elastic_parameters(&elastic,SHEAR_MODULUS_DEF, POISSON_NU_DEF);
   //
   // project observational point in fault local system
   a_equals_b_vector(x,xl,2);
@@ -65,7 +68,7 @@ void block_eval_geookada(COMP_PRECISION *xl,
     px[INT_Z] = -udepth;			
     //
     // evaluate displacements in rotated frame
-    eval_okada_basic(px,fl,fw,fdip,-fz,disp,pu,ps,iret);
+    eval_okada_basic(px,fl,fw,fdip,-fz,disp,pu,ps,iret,FALSE,elastic);
     /* this will also return stresses, but possibly at 
        different depth from sdepth */
     if(*iret){
@@ -93,7 +96,7 @@ void block_eval_geookada(COMP_PRECISION *xl,
     }else{
       /* reevaluate stresses, since different depth */
       px[INT_Z] = -sdepth;
-      eval_okada_basic(px,fl,fw,fdip,-fz,disp,pu,ps,iret);
+      eval_okada_basic(px,fl,fw,fdip,-fz,disp,pu,ps,iret,FALSE,elastic);
       if(*iret){
 	fprintf(stderr,"block_eval_geookada: WARNING: singular at obs point: %g, %g, %g\n",
 		*(xl+INT_X),*(xl+INT_Y),sdepth);

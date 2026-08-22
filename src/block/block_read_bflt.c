@@ -553,6 +553,8 @@ void get_bflt_intcoeff(struct bflt **fault, int iflt,
   COMP_PRECISION disp[3],pu[3],u[3],ps[3][3],s[3][3],x[3],px[3],
     dummy=0,sfac;
   int i,j,k,iret;
+  struct el_par elastic;
+  calc_medium_elastic_parameters(&elastic,SHEAR_MODULUS_DEF, POISSON_NU_DEF);
   /* 
      reallocate and clear the displacement matrix [3][3]
   */
@@ -609,13 +611,10 @@ void get_bflt_intcoeff(struct bflt **fault, int iflt,
 		 dummy, dummy, dummy, dummy, (int)FALSE);
       for(j=0;j < 3;j++){	/* assign all slip modes */
 	/* set up unity slip vector */
-	get_right_slip(disp,j,(*fault+iflt)->lfac);
+	get_right_slip_no_rake_var(disp,j,(*fault+iflt)->lfac);
 	// evaluate displacements in rotated frame
-	eval_okada_basic(px,(*fault+iflt)->l,
-			     (*fault+iflt)->w,
-			     (*fault+iflt)->dip,
-			     -(*fault+iflt)->x[INT_Z],
-			     disp,pu,ps,&iret);
+	eval_okada_basic(px,(*fault+iflt)->l,(*fault+iflt)->w,(*fault+iflt)->dip,-(*fault+iflt)->x[INT_Z],
+			 disp,pu,ps,&iret,FALSE,elastic);
 	if((iret)&&(j==0)){
 	  fprintf(stderr,"block_read_bflt: error: singular at fault %i GPS vel obs point %i: %g, %g\n",
 		  iflt+1,i+1,*(gx+i*BLOCK_DIM+INT_X),*(gx+i*BLOCK_DIM+INT_Y));
@@ -677,12 +676,12 @@ void get_bflt_intcoeff(struct bflt **fault, int iflt,
 	   stress tensor s(k,l) for slip in the j direction at stress
 	   observation i for fault iflt 
 	*/
-	(*fault+iflt)->s[i].sc[j][0] = s[INT_X][INT_X] / SHEAR_MODULUS;
-	(*fault+iflt)->s[i].sc[j][1] = s[INT_X][INT_Y] / SHEAR_MODULUS;
-	(*fault+iflt)->s[i].sc[j][2] = s[INT_X][INT_Z] / SHEAR_MODULUS;
-	(*fault+iflt)->s[i].sc[j][3] = s[INT_Y][INT_Y] / SHEAR_MODULUS;
-	(*fault+iflt)->s[i].sc[j][4] = s[INT_Y][INT_Z] / SHEAR_MODULUS;
-	(*fault+iflt)->s[i].sc[j][5] = s[INT_Z][INT_Z] / SHEAR_MODULUS;
+	(*fault+iflt)->s[i].sc[j][0] = s[INT_X][INT_X] / SHEAR_MODULUS_DEF;
+	(*fault+iflt)->s[i].sc[j][1] = s[INT_X][INT_Y] / SHEAR_MODULUS_DEF;
+	(*fault+iflt)->s[i].sc[j][2] = s[INT_X][INT_Z] / SHEAR_MODULUS_DEF;
+	(*fault+iflt)->s[i].sc[j][3] = s[INT_Y][INT_Y] / SHEAR_MODULUS_DEF;
+	(*fault+iflt)->s[i].sc[j][4] = s[INT_Y][INT_Z] / SHEAR_MODULUS_DEF;
+	(*fault+iflt)->s[i].sc[j][5] = s[INT_Z][INT_Z] / SHEAR_MODULUS_DEF;
       }
     }
   }

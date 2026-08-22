@@ -659,6 +659,21 @@ void get_right_slip(COMP_PRECISION *disp,int dir,COMP_PRECISION unity, struct fl
     break;
   }
 }
+void get_right_slip_no_rake_var(COMP_PRECISION *disp,int dir,COMP_PRECISION unity)
+{
+  disp[NORMAL]=disp[STRIKE]=disp[DIP]=0.0;
+  switch(dir){
+  case STRIKE:
+  case DIP:
+  case NORMAL:
+    disp[dir] = unity;
+    break;
+  default:
+    fprintf(stderr,"get_right_slip: slip mode %i undefined\n",dir);
+    exit(-1);
+    break;
+  }
+}
 
 /* 
    read the interaction coefficient from a binary file 
