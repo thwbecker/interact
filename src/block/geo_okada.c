@@ -72,7 +72,7 @@ int main(int argc, char **argv)
     // evaluate the displacement and stresses in the projected 
     // frame
     //
-    eval_okada_basic(px,l,w,dip,depth,disp,pu,ps,&iret,elastic);
+    eval_okada_basic(px,l,w,dip,depth,disp,pu,ps,&iret,FALSE,elastic);
     /*
 
       since the oblique mercator projection is conformal, we can just

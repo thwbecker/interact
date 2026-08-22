@@ -57,16 +57,16 @@ int main(int argc, char **argv)
   my_boolean read_initial_fault_stress,faults_have_slipped;
   COMP_PRECISION a[6],b[6];
   char time_out_string[20];
+  /* start  */
+  medium=(struct med *)calloc(1,sizeof(struct med)); /* init as zeros */
   /* 
      time at start 
   */
   clock_gettime(CLOCK_REALTIME, &(medium->init_time));
   strftime(time_out_string, 20, "%Y-%m-%d %H:%M:%S",
 	   localtime(&medium->init_time.tv_sec));
-  /* start  */
-  medium=(struct med *)calloc(1,sizeof(struct med)); /* init as zeros */
+  /* init elastic */
   calc_medium_elastic_parameters(&medium->elastic,SHEAR_MODULUS_DEF, POISSON_NU_DEF);
-  
  
 #ifdef USE_PETSC
 #ifdef USE_DOUBLE_PRECISION
