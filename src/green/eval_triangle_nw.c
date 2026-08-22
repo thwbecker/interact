@@ -91,7 +91,13 @@ void eval_triangle_nw(COMP_PRECISION *x,struct flt *fault,
     sm[INT_Z][INT_X]=sm[INT_X][INT_Z];
     sm[INT_Z][INT_Y]=sm[INT_Y][INT_Z];
   }else{
-    set_stress_and_disp_nan(sm,u,mode);
+    /* stress not requested (GC_DISP_ONLY): mark the unused stress
+       output only; set_stress_and_disp_nan would NaN the
+       displacements we just computed, since its mode argument
+       selects the REQUESTED outputs */
+    sm[INT_X][INT_X]=sm[INT_X][INT_Y]=sm[INT_X][INT_Z]=NAN;
+    sm[INT_Y][INT_X]=sm[INT_Y][INT_Y]=sm[INT_Y][INT_Z]=NAN;
+    sm[INT_Z][INT_X]=sm[INT_Z][INT_Y]=sm[INT_Z][INT_Z]=NAN;
   }
   *giret = 0;
 }

@@ -23,6 +23,8 @@
 #ifdef USE_PETSC
 #include "petsc_prototypes.h"
 
+
+
 /*
    interact_petsc_initialize: single, shared PETSc startup for the interact
    tools (interact, compress_interaction_matrix, rsf_solve).
@@ -987,5 +989,63 @@ PetscErrorCode set_hmat_defaults_and_options(struct med *medium, int hmat) /*  t
 
 
 
+/* time nsolve GMRES(no PC) solves A x = b with fresh random b each time;
+   returns average per-solve seconds, total iterations, last reason */
+PetscErrorCode time_solves(Mat A, PetscInt nsolve, PetscReal *solve_s,
+			   PetscInt *its_total, KSPConvergedReason *reason)
+{
+  KSP ksp;
+  PC pc;
+  Vec b,x;
+  PetscRandom rnd;
+  PetscReal t0,t1;
+  PetscInt i,it;
+  PetscFunctionBegin;
+  *its_total = 0; *solve_s = 0.0; *reason = KSP_CONVERGED_ITERATING;
+  PetscCall(KSPCreate(PETSC_COMM_WORLD,&ksp));
+  PetscCall(KSPSetOperators(ksp,A,A));
+  PetscCall(KSPSetType(ksp,KSPGMRES));
+  PetscCall(KSPGetPC(ksp,&pc));
+  PetscCall(PCSetType(pc,PCNONE));
+  PetscCall(KSPSetTolerances(ksp,1e-6,PETSC_DEFAULT,PETSC_DEFAULT,10000));
+  PetscCall(KSPSetFromOptions(ksp)); /* -ksp_rtol etc. can override */
+  PetscCall(MatCreateVecs(A,&x,&b));
+  PetscCall(PetscRandomCreate(PETSC_COMM_WORLD,&rnd));
+  for(i=0;i < nsolve;i++){
+    PetscCall(VecSetRandom(b,rnd));
+    PetscCall(VecZeroEntries(x));
+    PetscCallMPI(MPI_Barrier(PETSC_COMM_WORLD));
+    PetscCall(PetscTime(&t0));
+    PetscCall(KSPSolve(ksp,b,x));
+    PetscCallMPI(MPI_Barrier(PETSC_COMM_WORLD));
+    PetscCall(PetscTime(&t1));
+    *solve_s += (t1-t0);
+    PetscCall(KSPGetIterationNumber(ksp,&it));
+    *its_total += it;
+    PetscCall(KSPGetConvergedReason(ksp,reason));
+  }
+  if(nsolve > 0)
+    *solve_s /= (PetscReal)nsolve;
+  PetscCall(PetscRandomDestroy(&rnd));
+  PetscCall(VecDestroy(&x));
+  PetscCall(VecDestroy(&b));
+  PetscCall(KSPDestroy(&ksp));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+/* deterministic, rank-layout independent test vector for the accuracy
+   reference: entry i depends only on the global index */
+PetscErrorCode fill_accuracy_x0(Vec x)
+{
+  PetscInt i,rs,re;
+  PetscScalar *v;
+  PetscFunctionBegin;
+  PetscCall(VecGetOwnershipRange(x,&rs,&re));
+  PetscCall(VecGetArray(x,&v));
+  for(i=rs;i < re;i++)
+    v[i-rs] = (PetscScalar)(sin((double)(i+1)) + 0.3*cos(3.0*(double)i));
+  PetscCall(VecRestoreArray(x,&v));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
 
 #endif	/* end use Petsc */

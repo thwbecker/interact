@@ -147,7 +147,7 @@
 # src/block 		is for the routines used for geodetic block modeling in Becker et al. (2005)
 
 #
-VPATH = src src/green src/linear_algebra src/util src/block src/testing/ src/interact src/geometry src/relax
+VPATH = src src/green src/linear_algebra src/util src/block src/testing/ src/interact src/geometry src/relax 
 
 LOCAL_INCLUDES = -Isrc/includes/ -Isrc/util/ -Isrc/block/
 
@@ -428,7 +428,7 @@ random_geom_tools:  $(BDIR)/randomflt  $(BDIR)/generate_random_2d \
 random_prop_tools: $(BDIR)/create_random_stress_file \
 	$(BDIR)/create_random_mu_file $(BDIR)/calc_stress_stat
 
-relax: $(BDIR)/relax_fault
+relax: $(BDIR)/relax_fault $(BDIR)/relax_fault_ve $(BDIR)/ve_check
 
 block_tools: $(BDIR)/block_checkflt $(BDIR)/block_evaluate_solution 
 
@@ -496,6 +496,17 @@ $(BDIR)/interact_noise.$(NOISELEVEL): $(NOBJ) $(GEN_P_INC) $(LIBLIST) $(PETSC_OB
 	$(MPILD)  $(NOBJ) -o $(BDIR)/interact_noise.$(NOISELEVEL) $(INTERACT_NOISE_OBJS) \
 		$(PETSC_OBJS) $(PETSC_LIBS) $(EXT_HMAT_LIBS) $(LIBS) $(PGLIBS)   \
 		$(OLD_MATRIX_LIBS)  $(LDFLAGS)
+
+# visco-elastic Prony machinery
+VE_OBJS = $(ODIR)/prony_kernel.o
+
+$(BDIR)/ve_check: $(ODIR)/ve_check.o $(VE_OBJS) $(GEN_P_INC)  $(LIBLIST) $(ODIR)/coulomb_stress.o  
+	$(MPILD) $(ODIR)/ve_check.o $(VE_OBJS) $(MY_LIBDIR_SPEC)$(ODIR)/ $(ODIR)/coulomb_stress.o \
+	-o $(BDIR)/ve_check $(LIBS)  $(LDFLAGS)
+
+$(BDIR)/relax_fault_ve: $(ODIR)/relax_fault_ve.o $(VE_OBJS) $(GEN_P_INC) $(ODIR)/coulomb_stress.o $(LIBLIST) 
+	$(MPILD) $(ODIR)/relax_fault_ve.o $(VE_OBJS) $(MY_LIBDIR_SPEC)$(ODIR)/ $(ODIR)/coulomb_stress.o \
+	-o $(BDIR)/relax_fault_ve $(LIBS)  $(LDFLAGS)
 
 $(BDIR)/relax_fault: $(OBJ) $(GEN_P_INC) $(LIBLIST) $(PETSC_OBJS)  $(ODIR)/coulomb_stress.o $(ODIR)/relax_fault.o
 	$(MPILD) $(OBJ) -o $(BDIR)/relax_fault  $(ODIR)/relax_fault.o $(PETSC_OBJS) $(ODIR)/coulomb_stress.o \
