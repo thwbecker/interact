@@ -22,7 +22,7 @@
 
   surface displacements are tracked at nobs points along a profile at
   the free surface via the displacement Prony amplitudes; for the
-  homogeneous medium the tau_m amplitude vanishes and the constant
+  homogeneous medium the T_m amplitude vanishes and the constant
   term is the permanent (relaxed, effectively incompressible)
   deformation, so u_obs(t) evolves from the elastic to the relaxed
   field
@@ -46,7 +46,7 @@
 */
 #include "interact.h"
 #include "properties.h"
-#include "prony_kernel.h"
+
 
 int main(int argc, char **argv)
 {

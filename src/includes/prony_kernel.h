@@ -11,14 +11,14 @@
   elastic Green's functions evaluated at the effective moduli of the
   correspondence principle,
 
-     G_bar(s) = G s/(s + 1/tau_m),
+     G_bar(s) = G s/(s + 1/t_m),
      nu_bar(s) = (3 K_b - 2 G_bar)/(6 K_b + 2 G_bar),  K_b fixed
 
   for the homogeneous half or full space the pole set is material
-  only (see rsf_ve_design.md): tau_m, tau_m 3(1-nu)/(1+nu), and
-  tau_m 3/(2(1+nu)), all simple, and C_const vanishes for stress
+  only (see rsf_ve_design.md): T_m, T_m 3(1-nu)/(1+nu), and
+  T_m 3/(2(1+nu)), all simple, and C_const vanishes for stress
   kernels; the constant term is carried anyway so that layered
-  kernels (relaxed part nonzero) and displacement kernels (no tau_m
+  kernels (relaxed part nonzero) and displacement kernels (no T_m
   pole, nonzero relaxed part) use the same machinery
 
   part of interact
@@ -35,14 +35,14 @@ struct prony_spec{
   int np;			/* number of exponential terms */
   my_boolean has_const;		/* carry a constant (relaxed) term */
   int nterm;			/* np + (has_const?1:0), amplitude count */
-  COMP_PRECISION tau[VE_MAX_NP]; /* relaxation times, same units as tau_m */
+  COMP_PRECISION tau[VE_MAX_NP]; /* relaxation times, same units as T_m */
   int ns;			/* total sample points, nterm + VE_NHELD */
   COMP_PRECISION sk[VE_MAX_NS];	/* Laplace sample points, > 0 */
   /* weights: amplitude[iterm] = sum_k W[iterm][k] * sample[k], over
      the first nterm samples */
   COMP_PRECISION W[VE_MAX_NP+1][VE_MAX_NS];
   /* reference material */
-  COMP_PRECISION g0,nu0,bulk0,tau_m;
+  COMP_PRECISION g0,nu0,bulk0,t_M;
   /* effective elastic parameters at each sample point */
   struct el_par ep[VE_MAX_NS];
 };
@@ -67,5 +67,5 @@ COMP_PRECISION ve_basis_time_step(struct prony_spec *, int,
 				  COMP_PRECISION);
 COMP_PRECISION ve_basis_time_ramp(struct prony_spec *, int,
 				  COMP_PRECISION, COMP_PRECISION);
-
+void ve_solve_weights(struct prony_spec *);
 #endif

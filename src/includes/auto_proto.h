@@ -5,10 +5,6 @@ void initialize_stress_state(struct flt *, struct med *, unsigned char, double *
 void update_stress_state(struct flt *, struct med *);
 void calc_fields(struct med *, struct flt *, unsigned char, unsigned char, double *, double *);
 /* src/compress_interaction_matrix.c */
-/* src/coulomb_stress.c */
-double coulomb_stress(double, double, double, double);
-double cstress_drop(double, double, double, double);
-unsigned char in_coulomb_compress_regime(double);
 /* src/eval_green.c */
 void eval_green_and_project_stress_to_fault(struct flt *, int, int, double *, double *, unsigned char, unsigned char, struct el_par);
 void eval_green(double *, struct flt *, double *, double *, double [3][3], int *, unsigned char, unsigned char, unsigned char, struct el_par);
@@ -516,6 +512,11 @@ double stddev(double, double, int);
 int countzero_vec(double *, int);
 double reformat_small(double);
 double mwfromm0(double);
+double bulk_mod_from_G_nu(double, double);
+double nu_from_G_bulk(double, double);
+double coulomb_stress(double, double, double, double);
+double cstress_drop(double, double, double, double);
+unsigned char in_coulomb_compress_regime(double);
 /* src/geometry/myprojectsimple.c */
 /* src/geometry/project_stress.c */
 /* src/geometry/segseg.c */
@@ -544,6 +545,17 @@ void calculate_polar_base(double, double, double *);
 /* src/geometry/tritri.c */
 int coplanar_tri_tri(float [3], float [3], float [3], float [3], float [3], float [3], float [3]);
 int tri_tri_intersect(float [3], float [3], float [3], float [3], float [3], float [3]);
+/* src/relax/prony_kernel.c */
+void ve_effective_elpar(double, double, double, double, struct el_par *);
+void ve_spec_homogeneous(struct prony_spec *, double, double, double);
+double ve_basis(struct prony_spec *, int, double);
+void ve_solve_weights(struct prony_spec *);
+double ve_prony_amplitudes_stress(struct prony_spec *, struct med *, struct flt *, int, int, double *, double [6 +1][3][3]);
+double ve_prony_amplitudes_disp(struct prony_spec *, struct med *, struct flt *, double *, int, double *, double [6 +1][3]);
+double ve_basis_time_step(struct prony_spec *, int, double);
+double ve_basis_time_ramp(struct prony_spec *, int, double, double);
 /* src/relax/relax_fault.c */
 void relax_stress_field(struct med *, struct flt *, double, double, double (*)[3][3]);
 void relax_stress_step(struct med *, double, double, double (*)[3][3], double (*)[3][3]);
+/* src/relax/relax_fault_ve.c */
+/* src/relax/ve_check.c */

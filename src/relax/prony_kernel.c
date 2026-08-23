@@ -13,7 +13,7 @@
   return per-term amplitude sets plus a held-out verification
   residual
 
-  conventions: tau_m and the tau_p share one time unit (the caller's
+  conventions: t_M and the tau_p share one time unit (the caller's
   choice); Laplace sample points are in the inverse of that unit; the
   basis function of an exponential term at sample s is s/(s + 1/tau_p)
   and that of the constant (relaxed) term is 1
@@ -23,24 +23,63 @@
 */
 #include "interact.h"
 #include "properties.h"
-#include "prony_kernel.h"
 
 /* 
 
    effective elastic parameters at Laplace variable s for a shear
    Maxwell / elastic bulk material with reference (g0, nu0) and
-   Maxwell time tau_m
+   Maxwell time t_M
 
 */
 void ve_effective_elpar(COMP_PRECISION g0, COMP_PRECISION nu0,
-			COMP_PRECISION tau_m, COMP_PRECISION s,
+			COMP_PRECISION t_M, COMP_PRECISION s,
 			struct el_par *ep)
 {
   COMP_PRECISION bulk,gb,nub;
-  bulk = 2.0*g0*(1.0 + nu0)/(3.0*(1.0 - 2.0*nu0));
-  gb  = g0 * s/(s + 1.0/tau_m);
-  nub = (3.0*bulk - 2.0*gb)/(6.0*bulk + 2.0*gb);
+  bulk = bulk_mod_from_G_nu(g0,nu0);
+  /* scaled shear moulus */
+  gb  = g0 * s/(s + 1.0/t_M);
+  /* poisson from scaled G and bulk */
+  nub =  nu_from_G_bulk(gb,bulk);
   calc_medium_elastic_parameters(ep,gb,nub);
+}
+
+/* 
+
+   fill a prony_spec for the homogeneous shear Maxwell / elastic bulk
+   material: three simple poles at the material rates (see
+   rsf_ve_design.md), plus the constant term for generality, sample
+   points spread geometrically around the rates, VE_NHELD extra
+   points held out for verification
+
+*/
+void ve_spec_homogeneous(struct prony_spec *spec,
+			 COMP_PRECISION g0, COMP_PRECISION nu0,
+			 COMP_PRECISION t_M)
+{
+  int i;
+  spec->g0 = g0;
+  spec->nu0 = nu0;
+  spec->t_M = t_M;
+  /*  */
+  spec->bulk0 = 2.0*g0*(1.0 + nu0)/(3.0*(1.0 - 2.0*nu0));
+  spec->np = 3;
+  spec->tau[0] = t_M;
+  spec->tau[1] = t_M * 3.0*(1.0 - nu0)/(1.0 + nu0);
+  spec->tau[2] = t_M * 3.0/(2.0*(1.0 + nu0));
+  spec->has_const = TRUE;
+  spec->nterm = spec->np + 1;
+  spec->ns = spec->nterm + VE_NHELD;
+  /* fit samples bracketing the rates, held-out samples interleaved */
+  spec->sk[0] = 0.05/t_M;
+  spec->sk[1] = 0.40/t_M;
+  spec->sk[2] = 1.30/t_M;
+  spec->sk[3] = 5.00/t_M;
+  spec->sk[4] = 0.15/t_M;	/* held out */
+  spec->sk[5] = 2.50/t_M;	/* held out */
+  for(i=0;i < spec->ns;i++)
+    ve_effective_elpar(g0,nu0,t_M,spec->sk[i],&spec->ep[i]);
+  ve_solve_weights(spec);
 }
 /* 
 
@@ -64,7 +103,7 @@ COMP_PRECISION ve_basis(struct prony_spec *spec, int iterm,
    partial pivoting on the transposed basis matrix
 
 */
-static void ve_solve_weights(struct prony_spec *spec)
+void ve_solve_weights(struct prony_spec *spec)
 {
   COMP_PRECISION a[VE_MAX_NP+1][2*(VE_MAX_NP+1)],fac,tmp;
   int n,i,j,k,ip;
@@ -104,40 +143,7 @@ static void ve_solve_weights(struct prony_spec *spec)
     for(k=0;k < n;k++)
       spec->W[i][k] = a[i][n+k];
 }
-/* 
 
-   fill a prony_spec for the homogeneous shear Maxwell / elastic bulk
-   material: three simple poles at the material rates (see
-   rsf_ve_design.md), plus the constant term for generality, sample
-   points spread geometrically around the rates, VE_NHELD extra
-   points held out for verification
-
-*/
-void ve_spec_homogeneous(struct prony_spec *spec,
-			 COMP_PRECISION g0, COMP_PRECISION nu0,
-			 COMP_PRECISION tau_m)
-{
-  int i;
-  spec->g0 = g0;spec->nu0 = nu0;spec->tau_m = tau_m;
-  spec->bulk0 = 2.0*g0*(1.0 + nu0)/(3.0*(1.0 - 2.0*nu0));
-  spec->np = 3;
-  spec->tau[0] = tau_m;
-  spec->tau[1] = tau_m * 3.0*(1.0 - nu0)/(1.0 + nu0);
-  spec->tau[2] = tau_m * 3.0/(2.0*(1.0 + nu0));
-  spec->has_const = TRUE;
-  spec->nterm = spec->np + 1;
-  spec->ns = spec->nterm + VE_NHELD;
-  /* fit samples bracketing the rates, held-out samples interleaved */
-  spec->sk[0] = 0.05/tau_m;
-  spec->sk[1] = 0.40/tau_m;
-  spec->sk[2] = 1.30/tau_m;
-  spec->sk[3] = 5.00/tau_m;
-  spec->sk[4] = 0.15/tau_m;	/* held out */
-  spec->sk[5] = 2.50/tau_m;	/* held out */
-  for(i=0;i < spec->ns;i++)
-    ve_effective_elpar(g0,nu0,tau_m,spec->sk[i],&spec->ep[i]);
-  ve_solve_weights(spec);
-}
 /* 
 
    amplitude sets for the stress kernel of one source-receiver patch
@@ -195,7 +201,7 @@ COMP_PRECISION ve_prony_amplitudes_stress(struct prony_spec *spec,
    amplitude sets for the displacement kernel at an arbitrary
    observation point x (not a patch): D[iterm][3] displacement
    amplitudes, return value the held-out residual as above; for the
-   homogeneous medium the tau_m amplitude is expected to vanish (G
+   homogeneous medium the t_M amplitude is expected to vanish (G
    cancels in displacements from dislocations) and the constant term
    carries the permanent (relaxed) deformation
 

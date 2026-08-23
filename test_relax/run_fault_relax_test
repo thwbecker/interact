@@ -1,11 +1,11 @@
 #!/bin/bash
-method=${1-2}
+method=${1-2}			# 1: only fault based approximation 2: volumetric Prony series
 #
 # fault based visco-elastic relaxation
 #
 dt=0.01
 tmax=50
-# slip range
+# number of patches and fractional range of those slipping
 n=500;lfac=0.4;rfac=0.6
 #n=20;lfac=0.5;rfac=0.5
 
@@ -17,9 +17,13 @@ mode=1;	    # 0: strike 1: dip 2: normal
 if [ $method -eq 1 ];then
 
     # output is time nstep stress_0 stress_1 ... stress_nflt-1
+    #
     relax_fault $dt $mode $lfac $rfac | gawk '{for(i=3;i<=NF;i++)print(i-2,$1,$i)}' > tmp.dat
+
 elif [ $method -eq 2 ];then
+    #
     relax_fault_ve $dt $mode $lfac $rfac
+
     gawk '{for(i=3;i<=NF;i++)print(i-2,$1,$i)}' rf_ve_stress.dat > tmp.dat
 else
     echo $0: method $method error

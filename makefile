@@ -3,7 +3,7 @@
 #
 #  (C) Thorsten Becker, thwbecker@post.harvard.edu, 1999-2026 with
 #	contributions from Dave May, and using a range of other source
-#	codes including from Okada and Nikoo & Walter - see the
+#	codes including from Okada and Nikhoo & Walter - see the
 #	respective source files for detailed references.
 # 	As of 05/2026, some additions by Claude Code. 
 #
@@ -19,7 +19,6 @@
 #
 # Then type "make" and "interact -h" after succesful compilation for
 # the help page for interact. Also see README.md
-#
 # 
 # for calc_eigen_from_cart_stress you need EISPACK in the modified
 # form as supplied in the myeispack.tar.gz file.  Extract this files
@@ -30,8 +29,9 @@
 #
 # WARNING:
 #
-# If you change the flags, type "make clean" and "make all". This will create a new
-# C function prototype file and recompile everything, a necessary step.
+# If you change the flags, type "make dist_clean" and "make all". This will create a new
+# C function prototype files (if you have cproto!) and recompile everything. "make clean" will leave
+# prototypes in place, see below
 #
 # A list of flags follows:
 #
@@ -82,9 +82,7 @@
 #                            out by default
 # 		             
 #
-#
-#  -DUSE_PETSC               use the Petsc libraries and run the code in parallel, where only matrix inversions are parallelized right now
-#                            comments out makefile.petsc if no petsc support required. Flag should be set in makefile.petsc
+#  -DUSE_PETSC               use the Petsc libraries and run the code in parallel
 # 			     possible LU solvers are
 # 				-pc_factor_mat_solver_type scalapack -mat_type scalapack
 #  				-pc_factor_mat_solver_type elemental -mat_type elemental
@@ -127,7 +125,7 @@
 #
 # for an iterative solve
 # mpirun -bind-to core -np 8 interact-pc_type none -ksp_type gmres -ksp_gmres_restart 6000 -ksp_rtol 1e-4
-
+#
 # to debug:
 # mpirun -np 1 valgrind --tool=memcheck -q --num-callers=20 --log-file=pmia.%p.log interact -fpetsc -malloc=off
 #
@@ -138,14 +136,15 @@
 
 #
 # src is the main source directory, within it includes with the header files
-# src/green 		holds green's function routines
-# src/linear_algebra 	linear algebra type of routines
-# src/geometry		geometry and mesh morphology routines
+#
+# src/green 		holds Green's function routines
+# src/linear_algebra 	linear algebra and type of routines
+# src/geometry		geometry, mesh morphology routines and small helper functions
 # src/interact		routines specifically used for the interact program 
 # src/util		helper routines for post-processing and the like, some soatial statistics
 # serc/testing		testing rotuines for subsets and the like
 # src/block 		is for the routines used for geodetic block modeling in Becker et al. (2005)
-
+# src/relax		is for the visco-elasticity routines
 #
 VPATH = src src/green src/linear_algebra src/util src/block src/testing/ src/interact src/geometry src/relax 
 
@@ -163,14 +162,9 @@ MY_PRECISION = -DUSE_DOUBLE_PRECISION
 #TGF_LIB = tgf/objects/libtgf.a
 #
 TGF_LIB = 
+# here, the important flag is ALLOW_NON_3DQUAD_GEOM (used as a flag to have the pure Okada version run faster (?))
+COMMON_DEFINES =  -DBINARY_PATCH_EVENT_FILE -DCHECK_CI_ONE_WAY -DALLOW_NON_3DQUAD_GEOM 
 #
-COMMON_DEFINES =  -DBINARY_PATCH_EVENT_FILE -DCHECK_CI_ONE_WAY  \
-	-DALLOW_NON_3DQUAD_GEOM 
-
-#
-# noise level for random interact version. this version 
-# doesn't get compiled automatically.
-NOISELEVEL=1e-08
 #
 MAIN_DEFINES = $(COMMON_DEFINES) 
 
@@ -189,8 +183,8 @@ OKROUTINE_DEBUG = $(ODIR)/dc3d.dbg.o	# my modified version
 # 
 # include the machine dependent flags
 # 
-#include config/makefile.gcc
-include config/makefile.gcc_petsc
+#include config/makefile.gcc   # for GNU, without Petsc
+include config/makefile.gcc_petsc # with Petsc
 
 #include config/makefile.icc
 #include config/makefile.mixed_mkl
@@ -199,7 +193,7 @@ include config/makefile.gcc_petsc
 #include config/makefile.petsc
 #
 # add this for pgplot support, otherwise comment it out
-# you will use runtime plotting capabilities
+# you will use runtime plotting capabilities for interact earthquake sequences
 #include config/makefile.pgplot
 #
 # add this for slatec NNLS routine support, otherwise comment it out
@@ -210,13 +204,12 @@ ifndef MPILD
 MPILD = $(LD)
 endif
 #
-# external type libraries for h matrices outside of petsc mainly -
+# external type libraries for h matrices outside of Petsc mainly -
 # i.e. can use petsc without these if so desired
 #
 EXT_HMAT_LIBS = $(HACAPK_LIBS) $(HMMVP_LIBS) $(BIGWHAM_LIBS)
 EXT_HMAT_OBJS =  $(HMMVP_OBJS) $(BIGWHAM_OBJS)
 PETSC_OBJS = $(ODIR)/petsc_matrix_operations.o $(EXT_HMAT_OBJS)
-
 #
 # add this for superlu support, otherwise comment it out
 # you will loose sparse matrix SuperLU LU solver capabilities
@@ -233,8 +226,6 @@ DEFINE_FLAGS = $(MAIN_DEFINES) $(SLATEC_DEFINES) $(PETSC_DEFINES) \
 FLAGS = $(DEFINE_FLAGS) $(PGPLOT_INCLUDES) $(SLATEC_INCLUDES) $(LOCAL_INCLUDES) \
 	$(SUPERLU_INCLUDES) $(GEOPROJECT_INCLUDES) $(PETSC_INCLUDES) 
 # C and FORTRAN compiler specific flags, add them to the 
-
-
 # other flags
 CFLAGS =   $(FLAGS) $(SCARGS)   $(MACHINE_DEFINES)
 FFLAGS =   $(FLAGS) $(SFARGS)   $(MACHINE_DEFINES)  $(OPENMP_FLAGS)
@@ -281,7 +272,7 @@ PATCH_IO_OBJS = $(ODIR)/divide_fault_in_patches.o $(ODIR)/sparse.o	\
 	$(ODIR)/check_interaction.o $(ODIR)/eval_2dsegment.o		\
 	$(ODIR)/eval_okada.o $(ODIR)/tdd_coeff.o $(ODIR)/rhs.o		\
 	$(ODIR)/eval_green.o $(ODIR)/eval_triangle_nw.o			\
-	$(ODIR)/eval_iquad.o $(ODIR)/eval_triangle_tgf.o			\
+	$(ODIR)/eval_iquad.o $(ODIR)/eval_triangle_tgf.o \
 	$(ODIR)/interact_matrix_assembly.o  $(ODIR)/kdtree.o   $(ODIR)/mysincos.o 	\
 	$(OKROUTINE) $(ODIR)/fracture_criterion.o			\
 	$(ODIR)/myopen.o  $(ODIR)/randgen.o \
@@ -301,8 +292,7 @@ INPUT_OBJS = $(ODIR)/read_boundary_conditions.o $(ODIR)/read_fltdat.o \
 	$(ODIR)/read_geometry.o $(ODIR)/init.o $(ODIR)/help_and_comments.o	\
 	$(ODIR)/output.o $(ODIR)/input.o $(ODIR)/matrixio.o			\
 	$(ODIR)/calc_spatial_correlation.o	$(ODIR)/stress_aux.o		\
-	$(ODIR)/quake.o  $(ODIR)/restart.o			\
-	$(ODIR)/coulomb_stress.o $(POBJS) 
+	$(ODIR)/quake.o  $(ODIR)/restart.o $(POBJS)
 INPUT_OBJS_SGL = $(INPUT_OBJS:.o=.sgl.o)
 INPUT_OBJS_DEBUG = $(INPUT_OBJS:.o=.dbg.o)
 
@@ -311,49 +301,43 @@ INPUT_OBJS_DEBUG = $(INPUT_OBJS:.o=.dbg.o)
 INTERACT_OBJS = $(ODIR)/rupture.o $(ODIR)/interact_main.o \
 	$(ODIR)/adjust_time_step.o  $(ODIR)/terminate.o \
 	$(ODIR)/calc_stress.o $(MATRIX_SOLVER_OBJS)
-# this is a random noise added version
-INTERACT_NOISE_OBJS = $(ODIR)/rupture.o	$(ODIR)/calc_stress.o $(ODIR)/interact_main.o \
-	$(ODIR)/adjust_time_step.o $(MATRIX_SOLVER_OBJS)	\
-	$(ODIR)/coulomb_noise_stress.$(NOISELEVEL).o $(ODIR)/terminate.o
 # debug version
 INTERACT_OBJS_DEBUG = $(INTERACT_OBJS:.o=.dbg.o)
 # single prec version
 INTERACT_OBJS_SGL = $(INTERACT_OBJS:.o=.sgl.o)
 
 
-
 #
 # objects for rsf_solve
-RSF_SOLVE_OBJS = $(ODIR)/rsf_solve.o $(ODIR)/rsf_engine.o $(ODIR)/rsf_imex.o $(ODIR)/rsf_init.o $(ODIR)/rsf_output.o
+RSF_SOLVE_OBJS = $(ODIR)/rsf_solve.o $(ODIR)/rsf_engine.o $(ODIR)/rsf_imex.o \
+	$(ODIR)/rsf_init.o $(ODIR)/rsf_output.o
 
 #
 # objects for randomflt
 RANDOMFLT_OBJS = $(ODIR)/randomflt.o $(ODIR)/compare_fault.o	\
-	$(ODIR)/tritri.o $(ODIR)/far_enough.o	\
-	$(ODIR)/coulomb_stress.o
+	$(ODIR)/tritri.o $(ODIR)/far_enough.o
 #
 # objects for generate_random_2d
 GENERATE_RANDOM_2D_OBJS = $(ODIR)/generate_random_2d.o $(ODIR)/compare_fault.o	\
-	$(ODIR)/tritri.o $(ODIR)/far_enough.o	\
-	$(ODIR)/coulomb_stress.o
+	$(ODIR)/tritri.o $(ODIR)/far_enough.o
 
 #
 # objects for randomize_strike
-RANDOMIZE_STRIKE_OBJS = $(ODIR)/randomize_strike.o		\
+RANDOMIZE_STRIKE_OBJS = $(ODIR)/randomize_strike.o \
 	$(ODIR)/tritri.o $(ODIR)/far_enough.o	\
-	$(ODIR)/compare_fault.o $(ODIR)/coulomb_stress.o
+	$(ODIR)/compare_fault.o
 #
 # objects for the GPS velocity/crustal block inversion program
 # blockinvert
-BLOCKINVERT_OBJS = $(ODIR)/block_read_bflt.o $(ODIR)/coulomb_stress.o	\
+BLOCKINVERT_OBJS = $(ODIR)/block_read_bflt.o \
 	$(ODIR)/block_matrix.o $(ODIR)/block_read_euler.o	\
 	$(ODIR)/read_stress_observations.o $(ODIR)/block_read_gps.o $(ODIR)/svd.o \
 	$(ODIR)/eigensystem.o $(ODIR)/block_solve.o $(ODIR)/solve.o $(ODIR)/nnls.o		\
 	$(ODIR)/levmarq_numrec.o $(ODIR)/block_output.o  $(ODIR)/numrec_svd_routines.o \
-	$(ODIR)/block_stress.o $(ODIR)/block_levmarq.o 
+	$(ODIR)/block_stress.o $(ODIR)/block_levmarq.o
 
 BLOCKINVERT_SPH_OBJS = $(ODIR)/block_read_bflt.sph.o \
-	$(ODIR)/coulomb_stress.o $(ODIR)/solve.o  $(ODIR)/nnls.o  $(ODIR)/svd.o	 \
+	$(ODIR)/solve.o  $(ODIR)/nnls.o  $(ODIR)/svd.o	 \
 	$(ODIR)/block_read_euler.sph.o  $(ODIR)/lusolve.o \
 	$(ODIR)/block_matrix.sph.o $(ODIR)/numrec_svd_routines.o	\
 	$(ODIR)/block_read_gps.sph.o $(ODIR)/nnls_lawson.o \
@@ -368,6 +352,9 @@ FSTRESS2HOR_OBJS = $(ODIR)/block_read_gps.sph.o $(ODIR)/svd.o $(ODIR)/numrec_svd
 	$(ODIR)/eigensystem.o $(ODIR)/block_read_bflt.o  \
 	$(ODIR)/block_stress.o $(ODIR)/block_solve.o	
 
+# visco-elastic Prony machinery
+#
+VE_OBJS = $(ODIR)/prony_kernel.o
 
 #
 # 
@@ -388,8 +375,6 @@ LIBLIST_SGL = 	$(ODIR)/libpatchio.sgl.a $(ODIR)/libinput.sgl.a
 
 OLD_MATRIX_LIBS =	 $(SLATEC_LIBS) $(SUPERLU_LIBS)  
 
-
-
 #
 # libraries, also linker flags
 #
@@ -407,12 +392,11 @@ all: obj_directories libraries main_prog \
 	tools converters geom_converters
 
 really_all: all debug_libraries  relax test $(BDIR)/$(INTERACT_BINARY_NAME).sgl  \
-	inoise analysis geographic_tools $(BDIR)/$(INTERACT_BINARY_NAME).dbg
+	analysis geographic_tools $(BDIR)/$(INTERACT_BINARY_NAME).dbg
 #	pgplot_progs block_tools
 
 main_prog: $(BDIR)/$(INTERACT_BINARY_NAME) $(BDIR)/rsf_solve
 
-inoise: noisefile $(BDIR)/interact_noise.$(NOISELEVEL)
 
 tools: misc_tools random_geom_tools random_prop_tools
 
@@ -470,9 +454,6 @@ obj_directories:
 	fi;\
 
 
-noisefile:
-	echo $(NOISELEVEL) > noise.dat
-
 # individual programs
 
 $(BDIR)/$(INTERACT_BINARY_NAME): $(OBJ) $(GEN_P_INC) $(LIBLIST) $(PETSC_OBJS) $(INTERACT_OBJS)
@@ -491,28 +472,18 @@ $(BDIR)/$(INTERACT_BINARY_NAME).dbg: $(OBJ_DEBUG) $(GEN_P_INC)  $(PETSC_OBJS) $(
 		$(PETSC_OBJS) $(PETSC_LIBS) $(EXT_HMAT_LIBS) $(LIBS_DEBUG) $(PGLIBS)  \
 		$(OLD_MATRIX_LIBS)   $(LDFLAGS) 
 
-$(BDIR)/interact_noise.$(NOISELEVEL): $(NOBJ) $(GEN_P_INC) $(LIBLIST) $(PETSC_OBJS) \
-	$(INTERACT_NOISE_OBJS)
-	$(MPILD)  $(NOBJ) -o $(BDIR)/interact_noise.$(NOISELEVEL) $(INTERACT_NOISE_OBJS) \
-		$(PETSC_OBJS) $(PETSC_LIBS) $(EXT_HMAT_LIBS) $(LIBS) $(PGLIBS)   \
-		$(OLD_MATRIX_LIBS)  $(LDFLAGS)
 
-# visco-elastic Prony machinery
-VE_OBJS = $(ODIR)/prony_kernel.o
-
-$(BDIR)/ve_check: $(ODIR)/ve_check.o $(VE_OBJS) $(GEN_P_INC)  $(LIBLIST) $(ODIR)/coulomb_stress.o  
-	$(MPILD) $(ODIR)/ve_check.o $(VE_OBJS) $(MY_LIBDIR_SPEC)$(ODIR)/ $(ODIR)/coulomb_stress.o \
+$(BDIR)/ve_check: $(ODIR)/ve_check.o $(VE_OBJS) $(GEN_P_INC)  $(LIBLIST)   
+	$(MPILD) $(ODIR)/ve_check.o $(VE_OBJS) $(MY_LIBDIR_SPEC)$(ODIR)/  \
 	-o $(BDIR)/ve_check $(LIBS)  $(LDFLAGS)
 
-$(BDIR)/relax_fault_ve: $(ODIR)/relax_fault_ve.o $(VE_OBJS) $(GEN_P_INC) $(ODIR)/coulomb_stress.o $(LIBLIST) 
-	$(MPILD) $(ODIR)/relax_fault_ve.o $(VE_OBJS) $(MY_LIBDIR_SPEC)$(ODIR)/ $(ODIR)/coulomb_stress.o \
+$(BDIR)/relax_fault_ve: $(ODIR)/relax_fault_ve.o $(VE_OBJS) $(GEN_P_INC)  $(LIBLIST) 
+	$(MPILD) $(ODIR)/relax_fault_ve.o $(VE_OBJS) $(MY_LIBDIR_SPEC)$(ODIR)/  \
 	-o $(BDIR)/relax_fault_ve $(LIBS)  $(LDFLAGS)
 
-$(BDIR)/relax_fault: $(OBJ) $(GEN_P_INC) $(LIBLIST) $(PETSC_OBJS)  $(ODIR)/coulomb_stress.o $(ODIR)/relax_fault.o
-	$(MPILD) $(OBJ) -o $(BDIR)/relax_fault  $(ODIR)/relax_fault.o $(PETSC_OBJS) $(ODIR)/coulomb_stress.o \
+$(BDIR)/relax_fault: $(OBJ) $(GEN_P_INC) $(LIBLIST) $(PETSC_OBJS)   $(ODIR)/relax_fault.o
+	$(MPILD) $(OBJ) -o $(BDIR)/relax_fault  $(ODIR)/relax_fault.o $(PETSC_OBJS)  \
 	$(EXT_HMAT_LIBS) $(PETSC_LIBS) $(LIBS) $(PGLIBS) $(OLD_MATRIX_LIBS)   $(LDFLAGS)
-
-
 
 $(ODIR)/test_triangle_stress: $(T2OBJ) $(GEN_P_INC)  $(LIBLIST)  $(TRI_GREEN_OBJS)
 	$(MPILD) $(LDFLAGS) $(T2OBJ) $(TRI_GREEN_OBJS) -o $(BDIR)/test_triangle_stress \
@@ -525,7 +496,6 @@ $(BDIR)/randomflt: $(RANDOMFLT_OBJS)  $(GEN_P_INC)  $(LIBLIST)
 $(BDIR)/generate_random_2d: $(GENERATE_RANDOM_2D_OBJS)  $(GEN_P_INC)  $(LIBLIST) 
 	$(MPILD)  $(GENERATE_RANDOM_2D_OBJS) \
 	-o $(BDIR)/generate_random_2d $(LIBS) $(LDFLAGS)
-
 
 $(BDIR)/patchquad2patchtri: $(ODIR)/patchquad2patchtri.o $(GEN_P_INC) $(ODIR)/read_geometry.o \
 	 $(LIBLIST) 
@@ -631,20 +601,16 @@ $(BDIR)/sort_events: $(ODIR)/sort_events.o $(ODIR)/myopen.o $(GEN_P_INC)  $(LIBL
 	$(LD) $(LDFLAGS)  $(ODIR)/sort_events.o  $(ODIR)/myopen.o \
 	-o $(BDIR)/sort_events $(LIBS)
 
-$(BDIR)/check_feedback: $(ODIR)/coulomb_stress.o $(ODIR)/check_feedback.o  $(GEN_P_INC)  $(LIBLIST) 
+$(BDIR)/check_feedback:  $(ODIR)/check_feedback.o  $(GEN_P_INC)  $(LIBLIST) 
 	$(MPILD)  $(ODIR)/check_feedback.o \
-	$(ODIR)/coulomb_stress.o \
 		-o $(BDIR)/check_feedback  $(LIBS)  $(OLD_MATRIX_LIBS) $(PGLIBS) $(LDFLAGS) 
 
 $(BDIR)/mspectral: $(ODIR)/mspectral.o  src/includes/interact.h $(ODIR)/myopen.o $(ODIR)/period.o
 	$(LD) $(LDFLAGS)  $(ODIR)/mspectral.o $(ODIR)/myopen.o $(ODIR)/period.o \
 		-o $(BDIR)/mspectral  $(LIBS)
 
-$(BDIR)/calc_interaction_matrix: $(ODIR)/coulomb_stress.o \
-	$(ODIR)/calc_interaction_matrix.o $(GEN_P_INC) \
-	 $(LIBLIST) 
-	$(MPILD)  $(ODIR)/coulomb_stress.o \
-	$(ODIR)/calc_interaction_matrix.o  \
+$(BDIR)/calc_interaction_matrix:  $(ODIR)/calc_interaction_matrix.o $(GEN_P_INC) $(LIBLIST)
+	 $(MPILD)  $(ODIR)/calc_interaction_matrix.o  \
 	-o $(BDIR)/calc_interaction_matrix $(LIBS)  \
 		$(PGLIBS) $(OLD_MATRIX_LIBS)  $(LDFLAGS)
 
@@ -659,38 +625,38 @@ $(ODIR)/bigwham_shim.o: bigwham_shim.cc
 	-fPIC $(BIGWHAM_INC) $(DEFINE_FLAGS) -c $< -o $(ODIR)/bigwham_shim.o
 
 $(BDIR)/compress_interaction_matrix: $(ODIR)/compress_interaction_matrix.o \
-	$(ODIR)/coulomb_stress.o $(ODIR)/interact_matrix_assembly.o $(PETSC_OBJS) \
+	 $(ODIR)/interact_matrix_assembly.o $(PETSC_OBJS) \
 	$(GEN_P_INC)  $(LIBLIST) 
 	$(MPILD)   $(ODIR)/compress_interaction_matrix.o \
-	$(PETSC_OBJS) 	$(ODIR)/coulomb_stress.o $(ODIR)/interact_matrix_assembly.o  \
+	$(PETSC_OBJS) 	 $(ODIR)/interact_matrix_assembly.o  \
 	-o $(BDIR)/compress_interaction_matrix $(LIBS) $(PETSC_LIBS) \
 	$(EXT_HMAT_LIBS) $(PGLIBS)   $(LDFLAGS)
 
-$(BDIR)/petsc_simple_solve: $(ODIR)/petsc_simple_solve.o $(ODIR)/coulomb_stress.o \
+$(BDIR)/petsc_simple_solve: $(ODIR)/petsc_simple_solve.o  \
 	$(ODIR)/interact_matrix_assembly.o  $(GEN_P_INC) $(LIBLIST) $(PETSC_OBJS)
 	$(MPILD)   $(ODIR)/petsc_simple_solve.o $(PETSC_OBJS)    \
-	$(ODIR)/coulomb_stress.o $(ODIR)/interact_matrix_assembly.o  \
+	 $(ODIR)/interact_matrix_assembly.o  \
 	-o $(BDIR)/petsc_simple_solve $(LIBS) $(PETSC_LIBS) \
 	$(EXT_HMAT_LIBS) $(PGLIBS)   $(LDFLAGS)
 
-$(BDIR)/rsf_solve: $(RSF_SOLVE_OBJS) $(ODIR)/coulomb_stress.o \
+$(BDIR)/rsf_solve: $(RSF_SOLVE_OBJS)  \
 	$(ODIR)/interact_matrix_assembly.o  $(PETSC_OBJS) $(GEN_P_INC) $(LIBLIST)   
 	$(MPILD)   $(RSF_SOLVE_OBJS) $(PETSC_OBJS)  \
-	$(ODIR)/coulomb_stress.o $(ODIR)/interact_matrix_assembly.o  \
+	 $(ODIR)/interact_matrix_assembly.o  \
 	-o $(BDIR)/rsf_solve $(LIBS) $(PETSC_LIBS)  $(EXT_HMAT_LIBS) $(LDFLAGS)
 
 
 $(BDIR)/calc_design_matrix: $(ODIR)/calc_design_matrix.o  \
-	$(ODIR)/coulomb_stress.o $(GEN_P_INC) \
+	 $(GEN_P_INC) \
 	 $(LIBLIST) 
 	$(MPILD)  $(ODIR)/calc_design_matrix.o   \
-	$(ODIR)/coulomb_stress.o \
+	 \
 	-o $(BDIR)/calc_design_matrix $(LIBS)  \
 		$(PGLIBS) $(OLD_MATRIX_LIBS) $(LDFLAGS)
 
 
-$(BDIR)/test_sparse: $(ODIR)/test_sparse.o $(ODIR)/coulomb_stress.o $(GEN_P_INC)  $(LIBLIST) 
-	$(LD) $(LDFLAGS)  $(ODIR)/test_sparse.o $(ODIR)/coulomb_stress.o \
+$(BDIR)/test_sparse: $(ODIR)/test_sparse.o  $(GEN_P_INC)  $(LIBLIST) 
+	$(LD) $(LDFLAGS)  $(ODIR)/test_sparse.o  \
 	-o $(BDIR)/test_sparse  $(OLD_MATRIX_LIBS) $(PGLIBS) $(LIBS)
 
 $(BDIR)/test_optimize: $(ODIR)/test_optimize.o $(ODIR)/optimize.o  \
@@ -811,10 +777,10 @@ $(BDIR)/block_checkflt: $(GEN_P_INC)  $(GEOPROJECT_OBJS) $(LIBLIST) \
 		$(GEOPROJECT_LIBS) $(PETSC_LIBS)				\
 		$(MATHLIBS)     $(TGF_LIB) $(EISPACK_LIB)  $(PGLIBS) $(LDFLAGS) 
 
-$(BDIR)/geo_okada: $(ODIR)/geo_okada.o $(ODIR)/coulomb_stress.o $(GEN_P_INC)  \
+$(BDIR)/geo_okada: $(ODIR)/geo_okada.o  $(GEN_P_INC)  \
 	$(GEOPROJECT_OBJS) $(LIBLIST) $(GEOPROJECT_LIBS)
 	$(MPILD)  $(ODIR)/geo_okada.o $(MY_LIBDIR_SPEC)$(ODIR)/ $(GEOPROJECT_OBJS) \
-		-o  $(BDIR)/geo_okada  $(ODIR)/coulomb_stress.o $(LIBS)   \
+		-o  $(BDIR)/geo_okada   $(LIBS)   \
 		$(GEOPROJECT_LIBS)	$(MATHLIBS)    $(LDFLAGS)
 
 #
@@ -887,7 +853,7 @@ $(ODIR)/libinput.dbg.a: $(INPUT_OBJS_DEBUG)
 #
 # Noda multi-point receiver evaluation test (Eshelby crack)
 #
-T3OBJ = $(ODIR)/noda_crack_test.o $(ODIR)/coulomb_stress.o
+T3OBJ = $(ODIR)/noda_crack_test.o 
 $(ODIR)/noda_crack_test: $(T3OBJ) $(GEN_P_INC)  $(LIBLIST)  $(TRI_GREEN_OBJS)
 	$(MPILD) $(LDFLAGS) $(T3OBJ) $(TRI_GREEN_OBJS) -o $(BDIR)/noda_crack_test \
 	$(PETSC_LIBS) $(LIBS) $(PGLIBS)    $(OLD_MATRIX_LIBS)  $(LDFLAGS)
@@ -1003,29 +969,12 @@ $(ODIR)/block_stress.sph.sgl.o:	block_stress.c $(GEN_P_INC)
 	$(CC) $(CFLAGS) $(OPTIM_FLAGS)  -DBLOCK_SPHERICAL  -c $< -o  $(ODIR)/block_stress.sph.sgl.o
 $(ODIR)/block_read_euler.sph.sgl.o:	block_read_euler.c $(GEN_P_INC)
 	$(CC) $(CFLAGS) $(OPTIM_FLAGS)  -DBLOCK_SPHERICAL  -c $< -o  $(ODIR)/block_read_euler.sph.sgl.o
-
-#
-# the random noise version of coulomb stress
-$(ODIR)/coulomb_noise_stress.$(NOISELEVEL).o: coulomb_stress.c $(GEN_P_INC) noise.dat
-	$(CC) $(CFLAGS) $(OPTIM_FLAGS)  -c $< \
-	-DADD_COULOMB_STRESS_NOISE=$(NOISELEVEL) \
-	$(MY_PRECISION) -o  $(ODIR)/coulomb_noise_stress.$(NOISELEVEL).o
-
-$(ODIR)/coulomb_noise_stress.$(NOISELEVEL).sgl.o: coulomb_stress.c $(GEN_P_INC) noise.dat
-	$(CC) $(CFLAGS) $(OPTIM_FLAGS)  -c $< \
-	-DADD_COULOMB_STRESS_NOISE=$(NOISELEVEL) \
-	-o  $(ODIR)/coulomb_noise_stress.$(NOISELEVEL).sgl.o
-# 
-
 $(ODIR)/terminate.o:	terminate.c $(GEN_P_INC)
 	$(MPICC) $(OPTIM_FLAGS)  $(CFLAGS)  $(MY_PRECISION) -c $< -o $(ODIR)/terminate.o
-
 $(ODIR)/test_solvers.o:	test_solvers.c $(GEN_P_INC)
 	$(MPICC)  $(OPTIM_FLAGS) $(CFLAGS)  $(MY_PRECISION) -c $< -o $(ODIR)/test_solvers.o
-
 $(ODIR)/ex_dense.o:	ex_dense.c $(GEN_P_INC)
 	$(MPICC)  $(OPTIM_FLAGS) $(CFLAGS)  $(MY_PRECISION) -c $< -o $(ODIR)/ex_dense.o
-
 $(ODIR)/ex_dense_v2.o:	ex_dense_v2.c $(GEN_P_INC)
 	$(MPICC)  $(OPTIM_FLAGS) $(CFLAGS)  $(MY_PRECISION) -c $< -o $(ODIR)/ex_dense_v2.o
 

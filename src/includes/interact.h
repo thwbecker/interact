@@ -417,7 +417,8 @@ singular value will be set to zero
 #include "kdtree.h"
 // the fault and medium structures
 #include "structures.h"
-
+/* visco-elastic stuff */
+#include "prony_kernel.h"
 
 
 

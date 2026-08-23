@@ -211,11 +211,11 @@ void relax_stress_field(struct med *medium, struct flt *fault,
   */
   g0  = medium->elastic.shear;
   nu0 = medium->elastic.poisson;
-  bulk0 = 2.0*g0*(1.0 + nu0)/(3.0*(1.0 - 2.0*nu0));
+  bulk0 = bulk_mod_from_G_nu(g0,nu0);
   /* effective moduli */
   alphat = t_M/(t_M + Dt);	/* = eta/(eta + Dt G) */
   gp = g0 * alphat;		/* G'(Dt) */
-  nueff = (3.0*bulk0 - 2.0*gp)/(6.0*bulk0 + 2.0*gp); /* nu'(Dt) at fixed K */
+  nueff = nu_from_G_bulk(gp,bulk0); /* nu'(Dt) at fixed K */
   /* set the elastic parameters in the format needed for the Green's functions */
   calc_medium_elastic_parameters(&elastic_par,gp,nueff);
   /* 
