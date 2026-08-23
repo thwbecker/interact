@@ -391,7 +391,7 @@ LIBS_DEBUG = $(MY_LIBDIR_SPEC)$(ODIR)/     -linput.dbg -lpatchio.dbg $(TGF_LIB) 
 all: obj_directories libraries main_prog \
 	tools converters geom_converters
 
-really_all: all debug_libraries  relax test $(BDIR)/$(INTERACT_BINARY_NAME).sgl  \
+really_all: all debug_libraries  relax testing $(BDIR)/$(INTERACT_BINARY_NAME).sgl  \
 	analysis geographic_tools $(BDIR)/$(INTERACT_BINARY_NAME).dbg
 #	pgplot_progs block_tools
 
@@ -427,8 +427,9 @@ converters: $(BDIR)/patch2xyz   $(BDIR)/patch2vtk $(BDIR)/patch2bc \
 
 geom_converters: $(BDIR)/points2patch $(BDIR)/tri2patch  $(BDIR)/patchquad2patchtri 
 
-#test:  $(ODIR)/test_triangle_stress $(ODIR)/test_triangle_stress $(ODIR)/noda_crack_test
-test:	$(ODIR)/noda_crack_test
+#testing:  $(ODIR)/test_triangle_stress $(ODIR)/test_triangle_stress $(ODIR)/noda_crack_test
+
+testing:	$(ODIR)/noda_crack_test
 
 matrix_test_progs: $(BDIR)/test_sparse $(BDIR)/test_optimize $(BDIR)/test_solvers \
 	$(BDIR)/ex_dense

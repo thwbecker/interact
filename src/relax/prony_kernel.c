@@ -184,14 +184,18 @@ COMP_PRECISION ve_prony_amplitudes_stress(struct prony_spec *spec,
     for(j=0;j < 3;j++){
       scl = 0.0;
       for(k=0;k < spec->ns;k++)
-	if(fabs(smp[k][i][j]) > scl)scl = fabs(smp[k][i][j]);
-      if(scl < EPS_COMP_PREC)continue;
+	if(fabs(smp[k][i][j]) > scl)
+	  scl = fabs(smp[k][i][j]);
+      if(scl < EPS_COMP_PREC)
+	continue;
       for(k=spec->nterm;k < spec->ns;k++){
 	model = 0.0;
-	for(it=0;it < spec->nterm;it++)
+	for(it=0;it < spec->nterm;it++){
 	  model += C[it][i][j] * ve_basis(spec,it,spec->sk[k]);
+	}
 	res = fabs(model - smp[k][i][j])/scl;
-	if(res > resmax)resmax = res;
+	if(res > resmax)
+	  resmax = res;
       }
     }
   return resmax;
@@ -235,14 +239,18 @@ COMP_PRECISION ve_prony_amplitudes_disp(struct prony_spec *spec,
   for(i=0;i < 3;i++){
     scl = 0.0;
     for(k=0;k < spec->ns;k++)
-      if(fabs(up[k][i]) > scl)scl = fabs(up[k][i]);
-    if(scl < EPS_COMP_PREC)continue;
+      if(fabs(up[k][i]) > scl)
+	scl = fabs(up[k][i]);
+    if(scl < EPS_COMP_PREC)
+      continue;
     for(k=spec->nterm;k < spec->ns;k++){
       model = 0.0;
-      for(it=0;it < spec->nterm;it++)
+      for(it=0;it < spec->nterm;it++){
 	model += D[it][i] * ve_basis(spec,it,spec->sk[k]);
+      }
       res = fabs(model - up[k][i])/scl;
-      if(res > resmax)resmax = res;
+      if(res > resmax)
+	resmax = res;
     }
   }
   return resmax;

@@ -18,21 +18,24 @@ if [ $method -eq 1 ];then
 
     # output is time nstep stress_0 stress_1 ... stress_nflt-1
     #
-    relax_fault $dt $mode $lfac $rfac | gawk '{for(i=3;i<=NF;i++)print(i-2,$1,$i)}' > tmp.dat
+    relax_fault $dt $mode $lfac $rfac | gawk '{for(i=3;i<=NF;i++)print(i-2,$1,$i)}' > tmp.stress.dat
 
 elif [ $method -eq 2 ];then
     #
     relax_fault_ve $dt $mode $lfac $rfac
-
-    gawk '{for(i=3;i<=NF;i++)print(i-2,$1,$i)}' rf_ve_stress.dat > tmp.dat
+    gawk '{for(i=3;i<=NF;i++)print(i-2,$1,$i)}' rf_ve_stress.dat > tmp.stress.dat
+    
+    gawk '{for(i=2;i<=NF;i+=4)print($1,$i,$(i+1))}' rf_ve_disp.dat > tmp.ux.dat
+    gawk '{for(i=2;i<=NF;i+=4)print($1,$i,$(i+2))}' rf_ve_disp.dat > tmp.uy.dat
+    gawk '{for(i=2;i<=NF;i+=4)print($1,$i,$(i+3))}' rf_ve_disp.dat > tmp.uz.dat
 else
     echo $0: method $method error
     exit
 fi
-minmax tmp.dat
+minmax tmp.stress.dat
 reg=-R1/$n/0/$tmax
 
-xyz2grd tmp.dat -Gtau.grd $reg -I1/$dt -V
+xyz2grd tmp.stress.dat -Gtau.grd $reg -I1/$dt -V
 makecpt -I -T-3/2/.2 -Croma+h0 > stress.cpt
 ofile=fault_tau.$method.ps
 #proj=-JX7/-7;preg=$reg
@@ -41,4 +44,19 @@ grdimage $proj tau.grd -Cstress.cpt $preg -Ba100f20:"patch number":/a2f3:"time/M
 psscale -Dx3.5/-.2h/3/.15h -E -Cstress.cpt -B1/:"stress/shear modulus": -O >> $ofile
 modifybb $ofile 1
 
-rm tmp.dat tau.grd
+if [ -s tmp.ux.dat ];then
+    comp=uy
+    cat <<EOF | gnuplot
+set term post enh color 'Palatino-18'
+set out 'disp.ps'
+set xlabel 'x'
+set ylabel '$comp'
+plot 'tmp.$comp.dat' using ((\$1==0)?(\$2):(1/0)) : (\$3) title 't = 0' w l,\
+     'tmp.$comp.dat' using ((\$1==1)?(\$2):(1/0)) : (\$3) title 't = t_M' w l,\
+     'tmp.$comp.dat' using ((\$1==5)?(\$2):(1/0)) : (\$3) title 't = 5 t_M' w l
+!modifybb disp.ps 1
+EOF
+
+fi
+
+#rm tmp.stress.dat tmp.u?.dat tau.grd 2> /dev/null

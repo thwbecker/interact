@@ -57,7 +57,7 @@ int main(int argc, char **argv)
      direction: amp[iterm][ipatch]; per-obs displacement amplitudes
      damp[iterm][iobs][3] */
   COMP_PRECISION *amp[VE_MAX_NP+1],*damp[VE_MAX_NP+1];
-  COMP_PRECISION *tau_a,*h_b[VE_MAX_NP],*h_c[VE_MAX_NP],*tmpv[4];
+  COMP_PRECISION *tau_a,*h_b[VE_MAX_NP],*h_c[VE_MAX_NP],*tmpv[4],*xobs;
   COMP_PRECISION C[VE_MAX_NP+1][3][3],D[VE_MAX_NP+1][3];
   COMP_PRECISION x[3],res,resmax_amp;
   COMP_PRECISION Dt,t_M,t_ramp,t_max,t_max_fac,time,sval,xloc;
@@ -75,7 +75,8 @@ int main(int argc, char **argv)
   t_M = 1.0;			/* Maxwell time */
   t_ramp = 0.0;			/* slip ramp duration; 0 = step */
   t_max_fac = 50.0;		/* run to t_max_fac * t_M */
-  nobs = 41;			/* surface observation points */
+  nobs = 101;			/* surface observation points, a profile*/
+  
   if(argc > 1)sscanf(argv[1],ONE_CP_FORMAT,&Dt);
   if(argc > 2){
     sscanf(argv[2],"%i",&i);
@@ -107,17 +108,21 @@ int main(int argc, char **argv)
   if(irange == 0)irange++;
   nslip = 0;max_slip = 0.0;
   for(i=0;i < nrflt;i++){
-    fault[i].u[STRIKE] = fault[i].u[DIP] = fault[i].u[NORMAL] = 0.0;
     if((i >= ileft)&&(i <= iright)){
       xloc = ((COMP_PRECISION)i - (COMP_PRECISION)(ileft+iright)/2.0)/
 	((COMP_PRECISION)irange/2.0);
       sval = 1.0 - xloc*xloc;
       sval = (sval > 0.0)?(sqrt(sval)):(0.0);
-      fault[i].u[slip_mode] = sval;
-      if(sval > 0.0)nslip++;
-      if(sval > max_slip)max_slip = sval;
+      /* assign slip */
+      get_right_slip(fault[i].u,slip_mode,sval,(fault+i));
+      sval = norm_3d(fault[i].u);
+      if(sval > 0.0)
+	nslip++;
+      if(sval > max_slip)
+	max_slip = sval;
     }
   }
+  
   /* 
      Prony spec and amplitude assembly; stress amplitudes resolved in
      the slip_mode direction on each receiver, displacement amplitudes
@@ -142,11 +147,22 @@ int main(int argc, char **argv)
   }
   xmin = xmax = fault[0].x[INT_X];
   for(i=1;i < nrflt;i++){
-    if(fault[i].x[INT_X] < xmin)xmin = fault[i].x[INT_X];
-    if(fault[i].x[INT_X] > xmax)xmax = fault[i].x[INT_X];
+    if(fault[i].x[INT_X] < xmin)
+      xmin = fault[i].x[INT_X];
+    if(fault[i].x[INT_X] > xmax)
+      xmax = fault[i].x[INT_X];
   }
   xlen = xmax - xmin;
-  if(xlen <= 0.0)xlen = 1.0;
+  if(xlen <= 0.0)
+    xlen = 1.0;
+
+  /* profile location */
+  xobs = (COMP_PRECISION *)malloc(nobs*sizeof(COMP_PRECISION));
+  if(!xobs)MEMERROR("relax_fault_ve");
+  for(iobs=0;iobs < nobs;iobs++){
+    xobs[iobs] = -5 + 10*(COMP_PRECISION)iobs/((COMP_PRECISION)nobs - 1.0);
+  }
+  
   resmax_amp = 0.0;
   for(isrc=0;isrc < nrflt;isrc++){
     if(norm_3d(fault[isrc].u) < EPS_COMP_PREC)
@@ -155,18 +171,16 @@ int main(int argc, char **argv)
     for(i=0;i < nrflt;i++){
       res = ve_prony_amplitudes_stress(&spec,medium,fault,i,isrc,
 				       fault[isrc].u,C);
-      if(res > resmax_amp)resmax_amp = res;
-      for(it=0;it < spec.nterm;it++)
+      if(res > resmax_amp)
+	resmax_amp = res;
+      for(it=0;it < spec.nterm;it++) /* this is the incremental stress effect */
 	amp[it][i] += resolve_stress_on_fault(C[it],(fault+i),slip_mode);
     }
     /* displacement amplitudes at the surface profile */
     for(iobs=0;iobs < nobs;iobs++){
-      x[INT_X] = xmin - xlen + 3.0*xlen*(COMP_PRECISION)iobs/
-	((COMP_PRECISION)nobs - 1.0);
-      x[INT_Y] = 0.0;
-      x[INT_Z] = 0.0;
-      res = ve_prony_amplitudes_disp(&spec,medium,fault,x,isrc,
-				     fault[isrc].u,D);
+      x[INT_X] = xobs[iobs];x[INT_Y] = 0.0;x[INT_Z] = 0.0;
+      /* compute the displacements */
+      res = ve_prony_amplitudes_disp(&spec,medium,fault,x,isrc,fault[isrc].u,D);
       if(res > resmax_amp)resmax_amp = res;
       for(it=0;it < spec.nterm;it++)
 	for(j=0;j < 3;j++)
@@ -193,6 +207,10 @@ int main(int argc, char **argv)
       for(i=0;i < nrflt;i++)
 	h_b[p][i] = h_c[p][i] = amp[p][i];
   }
+  /* 
+
+     time loop
+  */
   time = 0.0;
   k = 0;
   while(time <= t_max + 1e-10){
@@ -202,7 +220,8 @@ int main(int argc, char **argv)
       tau_a[i] = 0.0;
       for(it=0;it < spec.nterm;it++)
 	tau_a[i] += ve_basis_time_ramp(&spec,it,time,t_ramp) * amp[it][i];
-      if(fabs(tau_a[i]) > scl)scl = fabs(tau_a[i]);
+      if(fabs(tau_a[i]) > scl)
+	scl = fabs(tau_a[i]);
     }
     /* route deviations */
     dev_b = dev_c = 0.0;
@@ -216,26 +235,33 @@ int main(int argc, char **argv)
 	  k1 += h_b[p][i];
 	  k2 += h_c[p][i];
 	}
-	if(fabs(k1 - tau_a[i])/scl > dev_b)dev_b = fabs(k1 - tau_a[i])/scl;
-	if(fabs(k2 - tau_a[i])/scl > dev_c)dev_c = fabs(k2 - tau_a[i])/scl;
+	if(fabs(k1 - tau_a[i])/scl > dev_b)
+	  dev_b = fabs(k1 - tau_a[i])/scl;
+	if(fabs(k2 - tau_a[i])/scl > dev_c)
+	  dev_c = fabs(k2 - tau_a[i])/scl;
       }
     }
-    /* output */
+    /* 
+       output 
+    */
+    /* stress */
     fprintf(fs,"%11g %5i\t",time,k);
     for(i=0;i < nrflt;i++)
       fprintf(fs,"%12.5e ",tau_a[i]);
     fprintf(fs,"\n");
-    fprintf(fd,"%11g %5i\t",time,k);
+    /* displacement */
+    fprintf(fd,"%11g\t",time);
     for(iobs=0;iobs < nobs;iobs++){
-      for(j=0;j < 3;j++){
+      fprintf(fd,"%11g ",xobs[iobs]); /* location */
+      for(j=0;j < 3;j++){	       /* compute three displacements */
 	res = 0.0;
-	for(it=0;it < spec.nterm;it++)
-	  res += ve_basis_time_ramp(&spec,it,time,t_ramp) *
-	    damp[it][iobs*3+j];
+	for(it=0;it < spec.nterm;it++) /* sum up */
+	  res += ve_basis_time_ramp(&spec,it,time,t_ramp) * damp[it][iobs*3+j];
 	fprintf(fd,"%12.5e ",res);
       }
     }
     fprintf(fd,"\n");
+    /* relax */
     fprintf(fr,"%11g %12.5e %12.5e\n",time,dev_b,dev_c);
     if(time >= t_max)
       break;
@@ -251,6 +277,7 @@ int main(int argc, char **argv)
       if(res > 0.0)
 	vfac = res/(Dt * t_ramp);
     }
+    /* Runge Kutta time advance for testing purposes */
     for(p=0;p < spec.np;p++){
       efac = exp(-Dt/spec.tau[p]);
       ifac = spec.tau[p]*(1.0 - efac)/Dt;
