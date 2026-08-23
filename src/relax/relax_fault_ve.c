@@ -61,7 +61,8 @@ int main(int argc, char **argv)
   COMP_PRECISION C[VE_MAX_NP+1][3][3],D[VE_MAX_NP+1][3];
   COMP_PRECISION x[3],res,resmax_amp;
   COMP_PRECISION Dt,t_M,t_ramp,t_max,t_max_fac,time,sval,xloc;
-  COMP_PRECISION efac,ifac,vfac,dev_b,dev_c,scl,k1,k2,k3,k4,vmid;
+  COMP_PRECISION efac[VE_MAX_NP],ifac[VE_MAX_NP],bas[VE_MAX_NP+1];
+  COMP_PRECISION vfac,dev_b,dev_c,scl,k1,k2,k3,k4,vmid;
   COMP_PRECISION lfrac,rfrac,xmin,xmax,xlen,max_slip;
   MODE_TYPE slip_mode;
   FILE *fs,*fd,*fr;
@@ -211,15 +212,25 @@ int main(int argc, char **argv)
 
      time loop
   */
+  /* per-pole step factors depend only on Dt, hoisted out of the
+     time loop */
+  for(p=0;p < spec.np;p++){
+    efac[p] = exp(-Dt/spec.tau[p]);
+    ifac[p] = spec.tau[p]*(1.0 - efac[p])/Dt;
+  }
   time = 0.0;
   k = 0;
   while(time <= t_max + 1e-10){
+    /* time basis of each term, computed once per step and reused
+       in the patch and observation sums below */
+    for(it=0;it < spec.nterm;it++)
+      bas[it] = ve_basis_time_ramp(&spec,it,time,t_ramp);
     /* route A, closed form, also used for output */
     scl = 0.0;
     for(i=0;i < nrflt;i++){
       tau_a[i] = 0.0;
       for(it=0;it < spec.nterm;it++)
-	tau_a[i] += ve_basis_time_ramp(&spec,it,time,t_ramp) * amp[it][i];
+	tau_a[i] += bas[it] * amp[it][i];
       if(fabs(tau_a[i]) > scl)
 	scl = fabs(tau_a[i]);
     }
@@ -227,9 +238,7 @@ int main(int argc, char **argv)
     dev_b = dev_c = 0.0;
     if(scl > EPS_COMP_PREC){
       for(i=0;i < nrflt;i++){
-	res = (t_ramp > 0.0)?
-	  (((time <= t_ramp)?(time/t_ramp):(1.0)) * amp[spec.np][i]):
-	  (amp[spec.np][i]);	/* constant-term part */
+	res = bas[spec.np] * amp[spec.np][i]; /* constant-term part */
 	k1 = res;k2 = res;	/* reuse as accumulators */
 	for(p=0;p < spec.np;p++){
 	  k1 += h_b[p][i];
@@ -256,7 +265,7 @@ int main(int argc, char **argv)
       for(j=0;j < 3;j++){	       /* compute three displacements */
 	res = 0.0;
 	for(it=0;it < spec.nterm;it++) /* sum up */
-	  res += ve_basis_time_ramp(&spec,it,time,t_ramp) * damp[it][iobs*3+j];
+	  res += bas[it] * damp[it][iobs*3+j];
 	fprintf(fd,"%12.5e ",res);
       }
     }
@@ -279,11 +288,9 @@ int main(int argc, char **argv)
     }
     /* Runge Kutta time advance for testing purposes */
     for(p=0;p < spec.np;p++){
-      efac = exp(-Dt/spec.tau[p]);
-      ifac = spec.tau[p]*(1.0 - efac)/Dt;
       /* route C, exact for piecewise-constant velocity */
       for(i=0;i < nrflt;i++)
-	h_c[p][i] = efac * h_c[p][i] + ifac * amp[p][i] * vfac * Dt;
+	h_c[p][i] = efac[p] * h_c[p][i] + ifac[p] * amp[p][i] * vfac * Dt;
       /* route B, classical RK4 on dh/dt = -h/tau + amp*vfac */
       for(i=0;i < nrflt;i++){
 	vmid = amp[p][i] * vfac;

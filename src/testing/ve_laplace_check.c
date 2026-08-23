@@ -128,6 +128,11 @@ int main(int argc, char **argv)
 	for(isrc=0;isrc < medium->nrflt;isrc++){
 	  if(norm_3d(fault[isrc].u) < EPS_COMP_PREC)
 	    continue;
+	  /* Prony route; the call fills the amplitude set D for this
+	     source and must precede the basis sum even though the
+	     returned residual is not used here */
+	  ve_prony_amplitudes_disp(&spec,medium,fault,xobs,
+				   isrc,fault[isrc].u,D);
 	  for(it=0;it < spec.nterm;it++)
 	    up += ve_basis_time_step(&spec,it,t) * D[it][j];
 	  /* Stehfest route: real-s samples of u_elastic(nu_bar(s))/s,
