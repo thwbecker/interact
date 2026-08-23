@@ -184,7 +184,7 @@ OKROUTINE_DEBUG = $(ODIR)/dc3d.dbg.o	# my modified version
 # include the machine dependent flags
 # 
 #include config/makefile.gcc   # for GNU, without Petsc
-include config/makefile.gcc_petsc # with Petsc
+include config/makefile.gcc # with Petsc
 
 #include config/makefile.icc
 #include config/makefile.mixed_mkl
@@ -354,7 +354,7 @@ FSTRESS2HOR_OBJS = $(ODIR)/block_read_gps.sph.o $(ODIR)/svd.o $(ODIR)/numrec_svd
 
 # visco-elastic Prony machinery
 #
-VE_OBJS = $(ODIR)/prony_kernel.o
+VE_OBJS = $(ODIR)/prony_kernel.o 
 
 #
 # 
@@ -486,6 +486,10 @@ $(BDIR)/ve_laplace_check: $(ODIR)/ve_laplace_check.o $(VE_OBJS) $(GEN_P_INC) $(L
 $(BDIR)/relax_fault_ve: $(ODIR)/relax_fault_ve.o $(VE_OBJS) $(GEN_P_INC)  $(LIBLIST) 
 	$(MPILD) $(ODIR)/relax_fault_ve.o $(VE_OBJS) $(MY_LIBDIR_SPEC)$(ODIR)/  \
 	-o $(BDIR)/relax_fault_ve $(LIBS)  $(LDFLAGS)
+
+$(BDIR)/ve_layered_check: $(ODIR)/ve_layered_check.o $(VE_OBJS) $(GEN_P_INC)  $(LIBLIST) 
+	$(MPILD) $(ODIR)/ve_layered_check.o $(VE_OBJS) $(MY_LIBDIR_SPEC)$(ODIR)/ \
+	-o $(BDIR)/ve_layered_check $(LIBS)  $(LDFLAGS)
 
 $(BDIR)/relax_fault: $(OBJ) $(GEN_P_INC) $(LIBLIST) $(PETSC_OBJS)   $(ODIR)/relax_fault.o
 	$(MPILD) $(OBJ) -o $(BDIR)/relax_fault  $(ODIR)/relax_fault.o $(PETSC_OBJS)  \

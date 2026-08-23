@@ -68,4 +68,13 @@ COMP_PRECISION ve_basis_time_step(struct prony_spec *, int,
 COMP_PRECISION ve_basis_time_ramp(struct prony_spec *, int,
 				  COMP_PRECISION, COMP_PRECISION);
 void ve_solve_weights(struct prony_spec *);
+/* prony_layered.c */
+void ve_layered_antiplane_sample(struct med *, struct flt *, int,
+				 COMP_PRECISION *, COMP_PRECISION *,
+				 COMP_PRECISION, int, COMP_PRECISION,
+				 MODE_TYPE, COMP_PRECISION *,
+				 COMP_PRECISION [3][3]);
+void ve_spec_layered_antiplane(struct prony_spec *, COMP_PRECISION,
+			       COMP_PRECISION, COMP_PRECISION, int);
+
 #endif

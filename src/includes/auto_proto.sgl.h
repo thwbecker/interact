@@ -11,7 +11,6 @@ void eval_green(float *, struct flt *, float *, float *, float [3][3], int *, un
 void eval_triangle_general(float *, struct flt *, float *, float *, float [3][3], int *, unsigned char, unsigned char, struct el_par);
 void eval_green_at_receiver(struct flt *, int, int, float *, float *, float [3][3], int *, unsigned char, unsigned char, unsigned char, struct el_par);
 void eval_green_basic(float *, struct flt *, float *, float *, float [3][3], int *, unsigned char, struct el_par);
-double ckernel_func(int, int, void *);
 /* src/get_projected_fault_parameters.c */
 void get_projected_fault_parameters(float [2][2], float, float *, float *, float *, float *, float *, float *);
 /* src/interact_main.c */
@@ -155,7 +154,6 @@ void nnls_driver_i(float *, float *, float *, int, int);
 int solve(struct med *, struct flt *);
 void add_solution(int, unsigned char *, float *, int *, struct med *, struct flt *, unsigned char, unsigned char, float);
 void assemble_a_matrix(float *, int, unsigned char *, int, int *, struct flt *, struct med *);
-int par_assemble_a_matrix(int, unsigned char *, int, int *, struct flt *, struct med *);
 /* src/linear_algebra/sparse.c */
 size_t create_crs_sparse_from_memory(int, float *, float, unsigned int **, unsigned int **, float **);
 size_t create_crs_sparse_from_file(int, float, unsigned int **, unsigned int **, float **, FILE *);
@@ -261,6 +259,7 @@ float mat_value(int, int, int);
 /* src/testing/test_triangle_stress.c */
 /* src/testing/ve_check.c */
 /* src/testing/ve_laplace_check.c */
+/* src/testing/ve_layered_check.c */
 /* src/green/eval_2dsegment.c */
 void eval_2dsegment_plane_strain(float *, struct flt *, float *, float *, float [3][3], int *, unsigned char, struct el_par);
 void eval_2dsegment_plane_stress(float *, struct flt *, float *, float *, float [3][3], int *, unsigned char, struct el_par);
@@ -556,6 +555,8 @@ float ve_prony_amplitudes_stress(struct prony_spec *, struct med *, struct flt *
 float ve_prony_amplitudes_disp(struct prony_spec *, struct med *, struct flt *, float *, int, float *, float [6 +1][3]);
 float ve_basis_time_step(struct prony_spec *, int, float);
 float ve_basis_time_ramp(struct prony_spec *, int, float, float);
+void ve_layered_antiplane_sample(struct med *, struct flt *, int, float *, float *, float, int, float, unsigned char, float *, float [3][3]);
+void ve_spec_layered_antiplane(struct prony_spec *, float, float, float, int);
 /* src/relax/relax_fault.c */
 void relax_stress_field(struct med *, struct flt *, float, float, float (*)[3][3]);
 void relax_stress_step(struct med *, float, float, float (*)[3][3], float (*)[3][3]);
