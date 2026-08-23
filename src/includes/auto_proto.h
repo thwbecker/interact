@@ -259,6 +259,8 @@ void rescale_observed_stresses(double *, double *, double *, double, double *, u
 double mat_value(int, int, int);
 /* src/testing/test_sparse.c */
 /* src/testing/test_triangle_stress.c */
+/* src/testing/ve_check.c */
+/* src/testing/ve_laplace_check.c */
 /* src/green/eval_2dsegment.c */
 void eval_2dsegment_plane_strain(double *, struct flt *, double *, double *, double [3][3], int *, unsigned char, struct el_par);
 void eval_2dsegment_plane_stress(double *, struct flt *, double *, double *, double [3][3], int *, unsigned char, struct el_par);
@@ -558,4 +560,3 @@ double ve_basis_time_ramp(struct prony_spec *, int, double, double);
 void relax_stress_field(struct med *, struct flt *, double, double, double (*)[3][3]);
 void relax_stress_step(struct med *, double, double, double (*)[3][3], double (*)[3][3]);
 /* src/relax/relax_fault_ve.c */
-/* src/relax/ve_check.c */

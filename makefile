@@ -412,7 +412,7 @@ random_geom_tools:  $(BDIR)/randomflt  $(BDIR)/generate_random_2d \
 random_prop_tools: $(BDIR)/create_random_stress_file \
 	$(BDIR)/create_random_mu_file $(BDIR)/calc_stress_stat
 
-relax: $(BDIR)/relax_fault $(BDIR)/relax_fault_ve $(BDIR)/ve_check
+relax: $(BDIR)/relax_fault $(BDIR)/relax_fault_ve 
 
 block_tools: $(BDIR)/block_checkflt $(BDIR)/block_evaluate_solution 
 
@@ -429,7 +429,8 @@ geom_converters: $(BDIR)/points2patch $(BDIR)/tri2patch  $(BDIR)/patchquad2patch
 
 #testing:  $(ODIR)/test_triangle_stress $(ODIR)/test_triangle_stress $(ODIR)/noda_crack_test
 
-testing:	$(ODIR)/noda_crack_test
+testing:	$(ODIR)/noda_crack_test $(BDIR)/ve_check $(BDIR)/ve_laplace_check
+
 
 matrix_test_progs: $(BDIR)/test_sparse $(BDIR)/test_optimize $(BDIR)/test_solvers \
 	$(BDIR)/ex_dense
@@ -477,6 +478,10 @@ $(BDIR)/$(INTERACT_BINARY_NAME).dbg: $(OBJ_DEBUG) $(GEN_P_INC)  $(PETSC_OBJS) $(
 $(BDIR)/ve_check: $(ODIR)/ve_check.o $(VE_OBJS) $(GEN_P_INC)  $(LIBLIST)   
 	$(MPILD) $(ODIR)/ve_check.o $(VE_OBJS) $(MY_LIBDIR_SPEC)$(ODIR)/  \
 	-o $(BDIR)/ve_check $(LIBS)  $(LDFLAGS)
+
+$(BDIR)/ve_laplace_check: $(ODIR)/ve_laplace_check.o $(VE_OBJS) $(GEN_P_INC) $(LIBLIST) 
+	$(MPILD) $(ODIR)/ve_laplace_check.o $(VE_OBJS) $(MY_LIBDIR_SPEC)$(ODIR)/  \
+	-o $(BDIR)/ve_laplace_check $(LIBS)  $(LDFLAGS)
 
 $(BDIR)/relax_fault_ve: $(ODIR)/relax_fault_ve.o $(VE_OBJS) $(GEN_P_INC)  $(LIBLIST) 
 	$(MPILD) $(ODIR)/relax_fault_ve.o $(VE_OBJS) $(MY_LIBDIR_SPEC)$(ODIR)/  \
