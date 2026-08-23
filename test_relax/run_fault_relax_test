@@ -6,12 +6,12 @@ method=${1-2}			# 1: only fault based approximation 2: volumetric Prony series
 dt=0.01
 tmax=50
 # number of patches and fractional range of those slipping
-n=500;lfac=0.4;rfac=0.6
+n=500;lfac=0.3;rfac=0.7
 #n=20;lfac=0.5;rfac=0.5
 
 ((nh=n/2))
 makefault -n $n -z -1.0001 > geom.in
-mode=1;	    # 0: strike 1: dip 2: normal
+mode=0;	    # 0: strike 1: dip 2: normal
 
 
 if [ $method -eq 1 ];then
@@ -47,13 +47,14 @@ modifybb $ofile 1
 if [ -s tmp.ux.dat ];then
     comp=uy
     cat <<EOF | gnuplot
-set term post enh color 'Palatino-18'
+set term post port enh color 'Palatino-22'
 set out 'disp.ps'
 set xlabel 'x'
 set ylabel '$comp'
 plot 'tmp.$comp.dat' using ((\$1==0)?(\$2):(1/0)) : (\$3) title 't = 0' w l,\
      'tmp.$comp.dat' using ((\$1==1)?(\$2):(1/0)) : (\$3) title 't = t_M' w l,\
-     'tmp.$comp.dat' using ((\$1==5)?(\$2):(1/0)) : (\$3) title 't = 5 t_M' w l
+     'tmp.$comp.dat' using ((\$1==5)?(\$2):(1/0)) : (\$3) title 't = 5 t_M' w l,\
+     'tmp.$comp.dat' using ((\$1==20)?(\$2):(1/0)) : (\$3) title 't = 20 t_M' w l
 !modifybb disp.ps 1
 EOF
 
