@@ -62,7 +62,7 @@ void ve_spec_homogeneous(struct prony_spec *spec,
   spec->nu0 = nu0;
   spec->t_M = t_M;
   /*  */
-  spec->bulk0 = 2.0*g0*(1.0 + nu0)/(3.0*(1.0 - 2.0*nu0));
+  spec->bulk0 =  bulk_mod_from_G_nu(g0,nu0);
   spec->np = 3;
   spec->tau[0] = t_M;
   spec->tau[1] = t_M * 3.0*(1.0 - nu0)/(1.0 + nu0);
