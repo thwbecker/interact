@@ -220,6 +220,7 @@ int main(int argc, char **argv)
     
   for(i=0;i<nrpatches;i++){
     j = list[i];
+    //fprintf(stderr,"%e\n",fault[j].x[0]);
     print_patch_geometry_and_bc(j,patch,opmode,
 				stop_time,FALSE,stdout,FALSE,dummy);
   }

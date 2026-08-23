@@ -6,8 +6,9 @@
 /* those emit the definitions SUM_ARR_PREC_IN_DOUBLE and
    A_MATRIX_PREC_IN_DOUBLE and hence make both single precision */
 
-#define EPS_COMP_PREC 7.0e-7
-#define EPS_AMAT_PREC 7.0e-7
+#define EPS_COMP_PREC 1.0e-7
+#define EPS_AMAT_PREC 1.0e-7
+#define EPS_COMP_PREC_FOR_NAN 5.0e-7
 
 #define EPS_FOR_FORTRAN 1.0e-7
 #define FORTRAN_ZERO 0.0

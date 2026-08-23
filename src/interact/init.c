@@ -479,7 +479,7 @@ void init_parameters_interact(char **argv, int argc,
       *no_interactions = TRUE;
     }else if(strcmp(argv[i],"-s")==0){// fault stress init file
       toggle(read_initial_fault_stress);
-    }else if(strcmp(argv[i],"-ps")==0){// plane strain/stress approximation
+    }else if(strcmp(argv[i],"-pstress")==0){// plane strain/stress approximation
       toggle(twod_approx_is_plane_stress);
     }else if(strcmp(argv[i],"-b")==0){// no individual fault group files
       *max_nr_flt_files=0;

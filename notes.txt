@@ -1,0 +1,12 @@
+check which routine for RK make sure it's adaptive
+
+check bind to core for parallel tests
+
+-ts_adapt_wnormtype: <now 2 : formerly 2> Type of norm computed for error estimation (choose one of) 1 2 FROBENIUS INFINITY 1_AND_2 ()
+
+set to infinity
+
+-ts_rk_type 5dp
+
+TSMonitor set
+

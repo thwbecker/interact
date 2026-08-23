@@ -1,0 +1,23 @@
+#!/bin/bash
+#
+# test of anti plane dislocation
+#
+n=10
+# convert to anti-planes 2D
+makefault -z 0 -n $n -y -0.5  | gawk '{print($1,$2,$3,$4,-$5,$7,0,$8)}' > geom.in
+cat <<EOF > bc.in 
+1 1
+-10 10 101 0 0 1 0 0 1
+-1 -1 -1 0 1
+EOF
+interact
+
+# profile with x, u_z
+cat <<EOF | gnuplot
+set term post enh color solid
+set out 'screw.ps'
+set xlabel 'x'
+set ylabel 'u_z'
+plot (sgn(x)*pi/2.-atan(x))*pi, 'disp.out' using 1 : 6 w p
+EOF
+modifybb screw.ps 1

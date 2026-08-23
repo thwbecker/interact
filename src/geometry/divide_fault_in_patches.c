@@ -225,6 +225,12 @@ void randomize_strike_dip(COMP_PRECISION srand,
 {
   COMP_PRECISION dip;
   double strike;
+#ifdef ALLOW_NON_3DQUAD_GEOM
+  if(patch_is_2d(fault->type)){
+    fprintf(stderr,"randomize_strike_dip: only set up for 3D patches\n");
+    exit(-1);
+  }
+#endif
   /* compute Gaussian deviation with srand drand std */
   strike = fault->strike + mygauss_randnr(srand,seed); 
   dip    = fault->dip    + mygauss_randnr(drand,seed); 

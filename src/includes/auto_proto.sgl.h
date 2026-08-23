@@ -11,6 +11,7 @@ void eval_green(float *, struct flt *, float *, float *, float [3][3], int *, un
 void eval_triangle_general(float *, struct flt *, float *, float *, float [3][3], int *, unsigned char, unsigned char, struct el_par);
 void eval_green_at_receiver(struct flt *, int, int, float *, float *, float [3][3], int *, unsigned char, unsigned char, unsigned char, struct el_par);
 void eval_green_basic(float *, struct flt *, float *, float *, float [3][3], int *, unsigned char, struct el_par);
+double ckernel_func(int, int, void *);
 /* src/get_projected_fault_parameters.c */
 void get_projected_fault_parameters(float [2][2], float, float *, float *, float *, float *, float *, float *);
 /* src/interact_main.c */
@@ -154,6 +155,7 @@ void nnls_driver_i(float *, float *, float *, int, int);
 int solve(struct med *, struct flt *);
 void add_solution(int, unsigned char *, float *, int *, struct med *, struct flt *, unsigned char, unsigned char, float);
 void assemble_a_matrix(float *, int, unsigned char *, int, int *, struct flt *, struct med *);
+int par_assemble_a_matrix(int, unsigned char *, int, int *, struct flt *, struct med *);
 /* src/linear_algebra/sparse.c */
 size_t create_crs_sparse_from_memory(int, float *, float, unsigned int **, unsigned int **, float **);
 size_t create_crs_sparse_from_file(int, float, unsigned int **, unsigned int **, float **, FILE *);
@@ -270,6 +272,10 @@ void get_2dseg_ffac(float *, float *, float *, float *, float *, float *, float,
 void get_2dseg_disp(float *, float *, float *, float, float, float, float, float, float);
 void get_2dseg_stress(float [3][3], float *, float *, float, float, float, float, struct el_par);
 void eval_2dsegment_plane_strain_tdd(float *, struct flt *, float *, float *, float [3][3], int, int *, unsigned char, struct el_par);
+void eval_2dsegment_antiplane(float *, struct flt *, float *, float *, float [3][3], int, int *, unsigned char, struct el_par);
+void eval_2dsegment_antiplane_basic(float *, struct flt *, float *, float *, float [3][3], int, int *, struct el_par);
+void get_2dseg_antiplane_terms(float *, struct flt *, float *, float *, int *);
+void get_2dseg_antiplane_ffac(float *, float *, float *, float, float, float, float, float, float *);
 /* src/green/eval_iquad.c */
 void eval_iquad(float *, struct flt *, float *, float *, float [3][3], int *, unsigned char, struct el_par);
 /* src/green/eval_okada.c */

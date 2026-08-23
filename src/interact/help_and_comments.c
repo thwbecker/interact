@@ -111,13 +111,16 @@ void phelp(void)
   PE("");
   PE("");
   PE("    - 2D SEGMENTS in the x-y (half) plane:");
-  PE("      If fault half-width is zero, then dip should be 90, z=0, and program will run in 2-D mode.");
+  PE("      If fault half-width is zero, then |dip| should be 90, all z = 0, and program will run in 2-D mode.");
   PE("      In this case, all z coordinates should still be specified (e.g. in the grid output requests)");
-  fprintf(stderr,"      but z should be set to zero. Computation is plane-%s unless changed by -ps.\n",
+  PE("      but z should be set to zero. ");
+  PE("      If dip =  90, dislocations are   in plane and allow for mode II (strike) and mode I (normal) motion.");
+  PE("      If dip = -90, dislocations are anti-plane and strike means mode III, out of plane motion (deformation in z direction).")
+  fprintf(stderr,"      Computation is plane-%s unless changed by -pstress for mode I and II, plane strain for mode III.\n",
 	  (TWO_DIM_APPROX_IS_PLANE_STRESS_DEF)?("stress"):("strain"));
   PE("      For plane stress, all output values of u[Z] (displacements into stress free direction) are");
   PE("      given as strains e_zz.");
-  fprintf(stderr,"      Calculations are performed in a %s plane by default(y<=0), can be changed with the -full option.\n",
+  fprintf(stderr,"      Calculations are performed in a %s plane by default (y <= 0), can be changed with the -full option.\n",
 	  (FULL_SPACE_DEF)?("full"):("half"));
   PE("");
   PE("    If all your patches are rectangular in 3-D, you could recompile\n    without the ALLOW_NON_3DQUAD_GEOM set to save memory and enhance speed.");
@@ -223,7 +226,9 @@ void phelp(void)
 	  STRIKE,DIP,NORMAL,RAKE);
   fprintf(stderr,"    %i means strike, %i dip, %i normal, and %i rake direction\n",
 	  STRIKE,DIP,NORMAL,RAKE);
-  PE("    using rake requires reading an additional fault rake file, see -rk");
+  PE("    using rake requires reading an additional rake file (see -rk) which will determine the slip partitioning");
+  PE("    into strike and dip direction (for single slip computation, could also simply add strike and dip slip,)");
+  PE("    but the rake option will also resolve shear stress into that intermediate orientation.");
   PE("");
   PE("    For strike: positive values of slip mean left-lateral fault, negative right-lateral;");
   PE("    \tthis corresponds to a resulting drop resp. increase in the strike component of stress.");
@@ -402,9 +407,14 @@ void phelp(void)
   PE("");
   PE("PARAMETERS:");
   PE("");
-  PE(" Elastic and frictional law properties are hard-coded and should be set in the \"properties.h\" file.");
-  PE(" Whenever you want to change those, you will have to recompile the program. This was done to improve");
-  PE(" the execution speed, assuming that material properties will not change between different model runs.");
+  PE(" Elastic and frictional properties have defaults which are set in the \"properties.h\" file.");
+#ifdef STRESS_DROP_NORM
+  fprintf(stderr," Stress drop (%g) normalization was chosen with shear modulus %e and Poisson %g\n",
+	  STRESS_DROP_DEF,SHEAR_MODULUS_DEF,POISSON_NU_DEF);
+#else
+  fprintf(stderr," Shear modulus (%g) normalization was chosen with stress drop %e and Poisson %g\n",
+	  SHEAR_MODULUS_DEF,STRESS_DROP_DEF,POISSON_NU_DEF);
+#endif
   PE("");
   PE(" In the following, we will refer to two different matrices, A and I. The interaction, or I, matrix is");
   PE(" assembled once for the loading simulations and holds all possible stress influence coefficients for all");
@@ -418,6 +428,8 @@ void phelp(void)
   PE(" constrained slip) are always solved with a direct implementation of Lawson and Hanson's solver.");
   PE("");
   PE(" The following parameters can be set to non-default values on the command line:");
+  PE("");
+  PE(" -nu value      set Poisson ratio");
   PE("");
 #ifdef NO_COHESION 
   PE(" -c option for cohesion was switched off, always assuming that cohesion C=0");
@@ -504,7 +516,7 @@ void phelp(void)
   PE(" -ni suppress all interactions between faults except the interactions of patches within the fault group");
   PE("");
   PE(" -full");
-  fprintf(stderr,"     toggles space/plane for Okada (rectangular or point) or 2D, default is %s space/plane.",
+  fprintf(stderr,"     toggles space/plane for Okada (rectangular or point) or 2D, default is %s space/plane.\n",
 	  (FULL_SPACE_DEF)?("full"):("half"));
   
   PE("");
@@ -556,7 +568,7 @@ void phelp(void)
 	  name_boolean(TOGV(WHOLE_FAULT_DEACTIVATIONS_DEF)));
   PE("");
 
-  fprintf(stderr," -l  reads a/b factors for the linear background loading stress relationship.\n");
+  fprintf(stderr," -l  reads a/b factors (not RSF parameters!) for background stressing.\n");
   fprintf(stderr,"     If set, the file \"%s\" is read, it should hold 6 pairs of a_i b_i factors\n",
 	  STRESS_RELATION_FILE);
   fprintf(stderr,"     where the *non-hydrostatic* background stress at time t is given by s_i=a_i+b_i*t\n");
@@ -713,17 +725,13 @@ void phelp(void)
   PE("     all patches (default off, i.e. the stress evaluation is performed)");
   PE("")
 #ifdef ALLOW_NON_3DQUAD_GEOM
-  fprintf(stderr," -ps Change the default 2-D elastic approximation for segments from plane-%s to plane-%s.\n",
+  fprintf(stderr," -pstress Change the default 2-D elastic approximation for segments from plane-%s to plane-%s.\n",
 	  (TWO_DIM_APPROX_IS_PLANE_STRESS_DEF)?("stress"):("strain"),
 	  (!TWO_DIM_APPROX_IS_PLANE_STRESS_DEF)?("stress"):("strain"));
   fprintf(stderr,"     %s by default, if switch is set will be %s.\n",
 	  name_boolean(TWO_DIM_APPROX_IS_PLANE_STRESS_DEF),
 	  name_boolean(TOGV(TWO_DIM_APPROX_IS_PLANE_STRESS_DEF)));
  PE("");
- fprintf(stderr," -hp run a 2-D plane strain calculation in a half-plane (y<=0) instead of plane\n");
- fprintf(stderr,"     %s by default, if switch is set will be %s.\n",
-	 name_boolean(FULL_SPACE_DEF),
-	 name_boolean(TOGV(FULL_SPACE_DEF)));
 #endif
   PE("");
   PE(" -h  prints out this help message and exits to the operating system");
@@ -731,6 +739,7 @@ void phelp(void)
   PE("(C) Thorsten Becker, thwbecker@post.harvard.edu, 1999 - 2026)");
   PE("    interact - boundary element code for elastic half-spaces");
   PE("    3-D quad dislocationS based on Okada (BSSA, 1992).");
+  PE("    Dave May contributions include Petsc implementation and VE approaches.");
 #ifdef ALLOW_NON_3DQUAD_GEOM
   PE("    3-D triangular dislocations based on Nikkhoo and Walter (GJI, 2015).");
   PE("    Triangular dislocations integration modifications based on Noda (EPS, 2025).");
@@ -753,32 +762,32 @@ void phelp(void)
 */
 char *comment_on_code(short int code)
 {
-switch(code){
-case INACTIVE:{return("inactive");}
-
-case STRIKE_SLIP:{return("pure strike slip, unconstrained");}
-case STRIKE_SLIP_LEFTLATERAL:{return("pure strike slip, leftlateral");}
-case STRIKE_SLIP_RIGHTLATERAL:{return("pure strike slip, rightlateral");}
-
-case DIP_SLIP:{return("pure dip slip, unconstrained");}
-case DIP_SLIP_UPWARD:{return("pure dip slip, upward");}
-case DIP_SLIP_DOWNWARD:{return("pure dip slip, downard");}
-
-case NORMAL_SLIP:{return("pure normal slip, unconstrained");}
-case NORMAL_SLIP_OUTWARD:{return("pure normal slip, explosion");}
-case NORMAL_SLIP_INWARD:{return("pure normal slip, implosion");}
-
-case MAXSDIR_SLIP:{return("mix of strike and dip slip");}
-
-case COULOMB_STRIKE_SLIP:{return("pure strike slip, Coulomb corr.");}
-case COULOMB_STRIKE_SLIP_LEFTLATERAL:{return("pure strike slip, leftlateral, Coulomb corr.");}
-case COULOMB_STRIKE_SLIP_RIGHTLATERAL:{return("pure strike slip, rightlateral, Coulomb corr.");}
-
-case COULOMB_DIP_SLIP:{return("pure dip slip, Coulomb corr.");}
-case COULOMB_DIP_SLIP_UPWARD:{return("pure dip slip, upward, Coulomb corr.");}
-case COULOMB_DIP_SLIP_DOWNWARD:{return("pure dip slip, downard, Coulomb corr.");}
-case COULOMB_MAXSDIR_SLIP:{return("mix of strike and dip slip, Coulomb corr.");}
-
+  switch(code){
+  case INACTIVE:{return("inactive");}
+    
+  case STRIKE_SLIP:{return("pure strike slip, unconstrained");}
+  case STRIKE_SLIP_LEFTLATERAL:{return("pure strike slip, leftlateral");}
+  case STRIKE_SLIP_RIGHTLATERAL:{return("pure strike slip, rightlateral");}
+    
+  case DIP_SLIP:{return("pure dip slip, unconstrained");}
+  case DIP_SLIP_UPWARD:{return("pure dip slip, upward");}
+  case DIP_SLIP_DOWNWARD:{return("pure dip slip, downard");}
+    
+  case NORMAL_SLIP:{return("pure normal slip, unconstrained");}
+  case NORMAL_SLIP_OUTWARD:{return("pure normal slip, explosion");}
+  case NORMAL_SLIP_INWARD:{return("pure normal slip, implosion");}
+    
+  case MAXSDIR_SLIP:{return("mix of strike and dip slip");}
+    
+  case COULOMB_STRIKE_SLIP:{return("pure strike slip, Coulomb corr.");}
+  case COULOMB_STRIKE_SLIP_LEFTLATERAL:{return("pure strike slip, leftlateral, Coulomb corr.");}
+  case COULOMB_STRIKE_SLIP_RIGHTLATERAL:{return("pure strike slip, rightlateral, Coulomb corr.");}
+    
+  case COULOMB_DIP_SLIP:{return("pure dip slip, Coulomb corr.");}
+  case COULOMB_DIP_SLIP_UPWARD:{return("pure dip slip, upward, Coulomb corr.");}
+  case COULOMB_DIP_SLIP_DOWNWARD:{return("pure dip slip, downard, Coulomb corr.");}
+  case COULOMB_MAXSDIR_SLIP:{return("mix of strike and dip slip, Coulomb corr.");}
+    
   default:{return("undefined");}
   }
 }

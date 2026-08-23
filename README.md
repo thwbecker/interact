@@ -392,11 +392,11 @@ ________________________________________________________________________________
 Output from interact -h follows (run code for updated versions!)
 ________________________________________________________________________________
 interact: internal double prec, A matrix double prec
-main: initializing on 2026-07-25 09:23:03 ncore: 1
-interact: nu: 0.25000 mu: 1.000e+04 from properties.h, therefore lambda/mu: 1.00000 alpha: 0.66667
-heck_parameters_and_init_interact: compiled on Jul 20 2026 15:11:23, running in serial
+main: initializing on 2026-08-23 14:20:31 ncore: 1
+interact: nu: 0.25000 mu: 1.000e+04  lambda/mu: 1.00000 alpha: 0.66667
+check_parameters_and_init_interact: compiled on Aug 23 2026 14:14:18, running in serial
 
-Interact: calculate fault stresses and displacements in a half or full space or in 2-D
+interact: calculate fault stresses and displacements in a half or full space or in 2-D
           using a boundary element approach.
 
 Program reads in patches subdividing a fault geometry and either solves
@@ -404,7 +404,7 @@ for stresses and/or displacements in a one-step problem for various boundary
 conditions (sign (i.e. direction) constrained or unconstrained), or for a simulated loading
 cycle where each patch follows a static-kinematic frictional constitutive law
 and repetitive rupture is allowed during continuous "plate-tectonic" loading.
-(Note that there is also a rudimentary, rate-state-friction cycle solver, rsf_solve.).
+(Note that there is also a rate-state-friction earthquake cycle solver, rsf_solve.).
 
 When stresses (stress tensor components) or pressure are referred to, positive values mean
 extensional and compressional regimes, respectively (physics convention).
@@ -426,7 +426,7 @@ PetSc support was compiled in, providing limited access to parallel solves for o
 (1) The fault geometry is input via the file "geom.in",
     a list of fault patches.
     This file has the following ("patch") format for regular, rectangular (Okada) faults or point sources
-    The default is to use half-space, but the -full flag can switch point and rectangles to full space for Okada
+    The default is to use half-space, but the -full flag can switch Okada point sources and rectangles to full
     (free format ASCII list of parameters):
 
     x_0 y_0 z_0 strike_0 dip_0 hlength_0 hwidth_0 group_0 ...
@@ -436,14 +436,16 @@ PetSc support was compiled in, providing limited access to parallel solves for o
 
     Here, N is the total number of patches and
 
+
+    REGULAR (OKADA) QUADs
     - x,y,z are the coordinates of the center of the rectangular fault patch or
       in the case of a point source, the point source location.
 
     - strike and dip are fault plane orientation angles in degree
-      strike is defined in degrees clockwise from North
+      strike is defined in degrees clockwise from North (y axes)
       dip    is defined in degrees downward from the horizontal, 90 degrees means vertical fault
-      note that right now, the geometrical rake has to be 90 or 0 degrees, i.e. no tilted rectangles
-      slip can, however, have a rake as given by different along-strike and along-dip values, see below
+      The geometrical rake has to be 90 or 0 degrees, for regular quaes, but see iquad and triangles.
+      Slip can have a rake as given by different strike and dip values, see below
 
     - hlength (L) and hwidth (W) are the patch's *half* length and *half* width in 
       strike and dip direction, respectively. The patch area is thus 4LW.
@@ -455,14 +457,14 @@ PetSc support was compiled in, providing limited access to parallel solves for o
     Since the "ALLOW_NON_3DQUAD_GEOM" flag was used during runtime, the program can deal with
     some additional patch geometries besides rectangular. Those are selected as follows:
 
-    - point source in half or full space
+    - POINT SOURCE in half or full space:
       If ONLY fault half-length is set to a negative value, a point source will be assumed instead
       of a rectangular fault patch. In this case, width should be set to the `fault' area
       and half-length is equivalent to -aspect_ratio, where aspect_ratio is some equivalent L/W.
 
       WARNING: Not properly tested yet.
 
-    - triangular in half-space:
+    - TRIANGULAR dislocationin half-space:
       If BOTH fault half-width and length are negative, then the patch is a triangular element.
       In this case, x, y, z, have no meaning but will be reassigned from the centroid.
       strike and dip will also be recomputed from element local g and h vectors, and length and width
@@ -474,9 +476,8 @@ PetSc support was compiled in, providing limited access to parallel solves for o
 
       where exponents indicate the local number of the node, and 999 are place holder values, not used.
 
-      WARNING: not fully tested.
 
-    - irregular quad in half-space:
+    - IRREGULAR QUAD in half-space:
       If ONLY fault half-width is negative, then the patch is an irregular quad node element.
       In this case, x, y, z, have no meaning but will be reassigned from the centroid.
       strike and dip will also be recomputed from element local g and h vectors, and length and width
@@ -488,15 +489,17 @@ PetSc support was compiled in, providing limited access to parallel solves for o
 
       where exponents indicate the local number of the node, and 999 are place holder values, not used.
 
-      WARNING: This is experimental and not fully tested.
 
-    - segments in two dimensions in the x-y plane
-      If fault half-width is zero, then dip should be 90, z=0, and program will run in 2-D mode.
+    - 2D SEGMENTS in the x-y (half) plane:
+      If fault half-width is zero, then |dip| should be 90, all z = 0, and program will run in 2-D mode.
       In this case, all z coordinates should still be specified (e.g. in the grid output requests)
-      but z should be set to zero. Computation is plane-strain unless changed by -ps.
+      but z should be set to zero. 
+      If dip =  90, dislocations are   in plane and allow for mode II (strike) and mode I (normal) motion.
+      If dip = -90, dislocations are anti-plane and strike means mode III, out of plane motion.
+      Computation is plane-strain unless changed by -pstress for mode I and II, plane strain for mode III.
       For plane stress, all output values of u[Z] (displacements into stress free direction) are
       given as strains e_zz.
-      Calculations are performed in a full plane by default, can be changed with the -hp option.
+      Calculations are performed in a half plane by default (y <= 0), can be changed with the -full option.
 
     If all your patches are rectangular in 3-D, you could recompile
     without the ALLOW_NON_3DQUAD_GEOM set to save memory and enhance speed.
@@ -586,7 +589,9 @@ PetSc support was compiled in, providing limited access to parallel solves for o
 
    (A) 0, 1, 2, 3: slip on fault specified (if called several times, will add up)
     0 means strike, 1 dip, 2 normal, and 3 rake direction
-    using rake requires reading an additional fault rake file, see -rk
+    using rake requires reading an additional rake file (see -rk) which will determine the slip partitioning
+    into strike and dip direction (for single slip computation, could also simply add strike and dip slip,)
+    but the rake option will also resolve shear stress into that intermediate orientation.
 
     For strike: positive values of slip mean left-lateral fault, negative right-lateral;
     	this corresponds to a resulting drop resp. increase in the strike component of stress.
@@ -716,9 +721,8 @@ PetSc support was compiled in, providing limited access to parallel solves for o
 
 PARAMETERS:
 
- Elastic and frictional law properties are hard-coded and should be set in the "properties.h" file.
- Whenever you want to change those, you will have to recompile the program. This was done to improve
- the execution speed, assuming that material properties will not change between different model runs.
+ Elastic and frictional properties have defaults which are set in the "properties.h" file.
+ Stress drop (1) normalization was chosen with shear modulus 1.000000e+04 and Poisson 0.25
 
  In the following, we will refer to two different matrices, A and I. The interaction, or I, matrix is
  assembled once for the loading simulations and holds all possible stress influence coefficients for all
@@ -732,6 +736,8 @@ PARAMETERS:
  constrained slip) are always solved with a direct implementation of Lawson and Hanson's solver.
 
  The following parameters can be set to non-default values on the command line:
+
+ -nu value      set Poisson ratio
 
  -c  value      sets the cohesion term of the friction law to value, by default: 5
                 If the cohesion=0 at all times, recompile with NO_COHESION set
@@ -799,7 +805,7 @@ OPTIONS:
  -ni suppress all interactions between faults except the interactions of patches within the fault group
 
  -full
-     use full space for Okada rectangular or point sources, default is half space.
+     toggles space/plane for Okada (rectangular or point) or 2D, default is half space/plane.
 
  -ct use constant time steps for the loading simulation
      OFF by default, if switch is set will be ON.
@@ -836,7 +842,7 @@ OPTIONS:
      case, the whole fault de-activations will be suppressed.
      OFF by default, if switch is set will be ON.
 
- -l  reads a/b factors for the linear background loading stress relationship.
+ -l  reads a/b factors (not RSF parameters!) for background stressing.
      If set, the file "smlin.in" is read, it should hold 6 pairs of a_i b_i factors
      where the *non-hydrostatic* background stress at time t is given by s_i=a_i+b_i*t
      s_i = {s_xx, s_xy, s_xz, s_yy, s_yz, s_zz}, so that the format is
@@ -912,7 +918,7 @@ OPTIONS:
  -sn will print NaN values in displacement and stress outputs of the one-step calculation.
      Normally, those locations (end patch/segments) yielding one or more inf values in the
      stress matrix or the displacement vector will be omitted during output.
-     OFF by default, if switch is set will be ON.
+     ON by default, if switch is set will be OFF.
 
  -pc will print the global coordinates if fault-local planes are chosen for bulk stress
      and displacement output (-1 or -2 for o in zmin zmax o), writes xyz to "plane.xyz"
@@ -941,17 +947,16 @@ OPTIONS:
      the slip solution without the serial resolved-stress evaluation on
      all patches (default off, i.e. the stress evaluation is performed)
 
- -ps Change the default 2-D elastic approximation for segments from plane-strain to plane-stress.
+ -pstress Change the default 2-D elastic approximation for segments from plane-strain to plane-stress.
      OFF by default, if switch is set will be ON.
 
- -hp run a 2-D plane strain calculation in a half-plane (y<=0) instead of plane
-     OFF by default, if switch is set will be ON.
 
  -h  prints out this help message and exits to the operating system
 
 (C) Thorsten Becker, thwbecker@post.harvard.edu, 1999 - 2026)
     interact - boundary element code for elastic half-spaces
     3-D quad dislocationS based on Okada (BSSA, 1992).
+    Dave May contributions include Petsc implementation and VE approaches.
     3-D triangular dislocations based on Nikkhoo and Walter (GJI, 2015).
     Triangular dislocations integration modifications based on Noda (EPS, 2025).
     2-D segment slip solution from Crouch and Starfield (1973).

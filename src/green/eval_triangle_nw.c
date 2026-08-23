@@ -139,6 +139,7 @@ void get_tri_prop_based_on_gh(struct flt *fault)
     exit(-1);
   }
 #endif
+  /* adjust to Okada type angles */
   check_angles(&dip,&strike);
   /*  */
   fault->strike = (COMP_PRECISION)strike;

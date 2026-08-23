@@ -184,7 +184,7 @@ OKROUTINE_DEBUG = $(ODIR)/dc3d.dbg.o	# my modified version
 # include the machine dependent flags
 # 
 #include config/makefile.gcc   # for GNU, without Petsc
-include config/makefile.gcc # with Petsc
+include config/makefile.gcc_petsc # with Petsc
 
 #include config/makefile.icc
 #include config/makefile.mixed_mkl
@@ -429,7 +429,7 @@ geom_converters: $(BDIR)/points2patch $(BDIR)/tri2patch  $(BDIR)/patchquad2patch
 
 #testing:  $(ODIR)/test_triangle_stress $(ODIR)/test_triangle_stress $(ODIR)/noda_crack_test
 
-testing:	$(ODIR)/noda_crack_test $(BDIR)/ve_check $(BDIR)/ve_laplace_check
+testing:	$(ODIR)/noda_crack_test $(BDIR)/ve_check $(BDIR)/ve_laplace_check $(BDIR)/ve_layered_check
 
 
 matrix_test_progs: $(BDIR)/test_sparse $(BDIR)/test_optimize $(BDIR)/test_solvers \

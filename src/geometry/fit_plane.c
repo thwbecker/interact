@@ -166,6 +166,7 @@ void fit_plane(int n,
   // get patch type angles
   //
   strike=90.0-alpha;
+  /* assumes Okada patch and convention */
   check_angles(&dip,&strike);
   *fdip=(float)dip;
   *fstrike=(float)strike;

@@ -137,8 +137,12 @@ void eval_green(COMP_PRECISION *x,struct flt *fault,
     break;
   }
   case TWO_DIM_HALFPLANE_PLANE_STRAIN:{
-    eval_2dsegment_plane_strain_tdd(x,fault,disp,u_global,sm_global, 1,iret,
+    eval_2dsegment_plane_strain_tdd(x,fault,disp,u_global,sm_global,1,iret,
 				    mode,elastic); 
+    break;
+  }
+  case TWO_DIM_ANTIPLANE:{
+    eval_2dsegment_antiplane(x,fault,disp,u_global,sm_global,((full_space)?(0):(1)),iret,mode,elastic);
     break;
   }
   default:{
@@ -322,9 +326,10 @@ void eval_green_basic(COMP_PRECISION *x,struct flt *fault,
   
 #ifdef DEBUG
   if((fault->strike != 90)||(norm(fault->x,2) > EPS_COMP_PREC)){
-    fprintf(stderr,"eval_green_basic: fault should have strike=90 and be at origin\n");
+    fprintf(stderr,"eval_green_basic: fault should have strike = 90 and be at origin\n");
     fprintf(stderr,"eval_green_basic: strike: %g x,y: %g,%g\n",
 	    fault->strike,fault->x[INT_X],fault->x[INT_Y]);
+    fprintf(stderr,"eval_green_basic: use eval_green for general computations\n");
     exit(-1);
   }
 #endif
@@ -345,6 +350,10 @@ void eval_green_basic(COMP_PRECISION *x,struct flt *fault,
   case TWO_DIM_SEGMENT_PLANE_STRESS:{
     eval_2dsegment_plane_stress_basic(x,fault,disp,u_global,sm_global,
 				      iret,elastic);
+    break;
+  }
+  case TWO_DIM_ANTIPLANE:{
+    eval_2dsegment_antiplane_basic(x,fault,disp,u_global,sm_global,((full_space)?(0):(1)),iret,elastic);
     break;
   }
   default:{

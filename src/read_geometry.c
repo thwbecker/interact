@@ -38,7 +38,7 @@ void read_geometry(char *patch_filename,struct med **medium,
   double alpha;
   static my_boolean init=FALSE;
 #ifdef ALLOW_NON_3DQUAD_GEOM
-  int nr_pt_src=0,nr_triangle=0,nr_2d=0,nr_iquad=0;
+  int nr_pt_src=0,nr_triangle=0,nr_2d=0,nr_2d_anti=0,nr_iquad=0;
 #endif
   if(init){
     if((*medium)->comm_rank == 0)
@@ -125,26 +125,34 @@ void read_geometry(char *patch_filename,struct med **medium,
 	2-D element
 	
       */
-      if(((*fault+i)->dip != 90.0)||((*fault+i)->x[INT_Z] != 0.0)){
+      if((fabs(fabs((*fault+i)->dip)-90)>EPS_COMP_PREC) || (fabs((*fault+i)->x[INT_Z]) > EPS_COMP_PREC)){
 	 if((*medium)->comm_rank == 0)
-	   fprintf(stderr,"read_geometry: width 0 selects: 2D mode: dip, z should be 90, and 0, respectively\n");
+	   fprintf(stderr,"read_geometry: width 0 selects: 2D mode: |dip| should be 90, and z = 0, respectively\n");
 	exit(-1);
       }
-      if((*medium)->full_space){ /* full plane */
-	if((*medium)->plane_stress)
-	  (*fault+i)->type = TWO_DIM_SEGMENT_PLANE_STRESS;
-	else
-	  (*fault+i)->type = TWO_DIM_SEGMENT_PLANE_STRAIN;
-      }else{			/* half plane */
-	if((*medium)->plane_stress){
-	  if((*medium)->comm_rank == 0)
-	    fprintf(stderr,"read_geometry: error: half-plane only implemented for plane strain\n");
-	  exit(-1);
+      if((*fault+i)->dip > 0){
+	/* dip = 90, use in plane slip (mode I or mode II) */
+	if((*medium)->full_space){ /* full plane */
+	  if((*medium)->plane_stress)
+	    (*fault+i)->type = TWO_DIM_SEGMENT_PLANE_STRESS;
+	  else
+	    (*fault+i)->type = TWO_DIM_SEGMENT_PLANE_STRAIN;
+	}else{			/* half plane, Y has to be <= 0*/
+	  if((*medium)->plane_stress){
+	    if((*medium)->comm_rank == 0)
+	      fprintf(stderr,"read_geometry: error: half-plane only implemented for plane strain\n");
+	    exit(-1);
+	  }
+	  (*fault+i)->type = TWO_DIM_HALFPLANE_PLANE_STRAIN;
 	}
-	(*fault+i)->type = TWO_DIM_HALFPLANE_PLANE_STRAIN;
+	nr_2d++;
+      }else{
+	/* out of plane slip, can be full or half space */
+	(*fault+i)->type = TWO_DIM_ANTIPLANE;
+	nr_2d_anti++;
       }
       (*fault+i)->w = 1;	/* for area computation */
-      nr_2d++;
+      (*fault+i)->area = (*fault+i)->w * (*fault+i)->l;
     }else if(((*fault+i)->w < 0)&&((*fault+i)->l< 0)){ /* length and
 							  width
 							  negative
@@ -380,9 +388,9 @@ void read_geometry(char *patch_filename,struct med **medium,
        surface sits at z = 0. In full-space mode the kernel is the
        translation-invariant infinite medium, so patches above z = 0 are
        legitimate (e.g. the whole-space SEAS BP4 fault, symmetric about x3 = 0). */
-    if((!(*medium)->full_space) && ((*fault+i)->x[INT_Z] > 0)){
+    if((!(*medium)->full_space) && ((*fault+i)->x[INT_Z] > EPS_COMP_PREC)){
       if((*medium)->comm_rank == 0)
-	fprintf(stderr,"read_geometry: patch %03i: z has to be < 0 (half-space), mid point z: %g\n",
+	fprintf(stderr,"read_geometry: patch %03i: z has to be <= 0 (half-space), mid point z: %g\n",
 		i,(*fault+i)->x[INT_Z]);
       exit(-1);
     }
@@ -404,113 +412,101 @@ void read_geometry(char *patch_filename,struct med **medium,
 	(*medium)->xmax[j] = (*fault+i)->x[j];
     }
 #ifdef ALLOW_NON_3DQUAD_GEOM
-    if( ( (*fault+i)->type != TRIANGULAR) && ( (*fault+i)->type != IQUAD) ){
-#endif
+    if( ( (*fault+i)->type != TRIANGULAR) && ( (*fault+i)->type != IQUAD) && (!patch_is_2d((*fault+i)->type))){
       // check for illegal angles
       check_fault_angles((*fault+i));
-
-      if((*fault+i)->type==OKADA_PATCH)
-	(*fault+i)->area = 4.*(*fault+i)->l*(*fault+i)->w;
-      
-      if((*fault+i)->l > lmax)lmax=(*fault+i)->l;
-      if((*fault+i)->l < lmin)lmin=(*fault+i)->l;
-      if((*fault+i)->w > wmax)wmax=(*fault+i)->w;
-      if((*fault+i)->w < wmin)wmin=(*fault+i)->w;
-      (*medium)->wmean += (*fault+i)->w;
-      (*medium)->lmean += (*fault+i)->l;
-      /*
-	strike is defined as degrees clockwise from north (azimuth)
-	we need the angle alpha, which is 
-	counterclockwise from east and used for all rotations 
-      */
-      // if we have different kinds of faults, don't do this
-      // calculation if it's a triangular patch since we 
-      // have already calculates sin and cos (alpha) above
-      alpha= 90.0 - (*fault+i)->strike;
-      my_sincos_degd(&(*fault+i)->sin_alpha,&(*fault+i)->cos_alpha,
-		     alpha);
-      /* if(fabs((*fault+i)->sin_alpha)< EPS_COMP_PREC) */
-      /* 	(*fault+i)->sin_alpha=0.0; */
-      /* if(fabs((*fault+i)->cos_alpha)< EPS_COMP_PREC) */
-      /* 	(*fault+i)->cos_alpha=0.0; */
-      my_sincos_deg(&sin_dip,&cos_dip,(COMP_PRECISION)(*fault+i)->dip);
-      //
-      // calculate the unity vectors in strike, dip, and normal
-      // direction
-      //
-      /* 
-	 executed for quads here 
-      */
-      calc_quad_base_vecs((*fault+i)->t_strike,
-			  (*fault+i)->normal,(*fault+i)->t_dip,
-			  (*fault+i)->sin_alpha,
-			  (*fault+i)->cos_alpha,sin_dip,cos_dip);
-      //fprintf(stderr,"tdq %g %g %g\n",(*fault+i)->t_dip[0],(*fault+i)->t_dip[1],(*fault+i)->t_dip[2]);
-#ifdef SUPER_DUPER_DEBUG
-      check_fault_normal_vectors((*fault+i));
-      if((*medium)->comm_rank == 0){
-	fprintf(stderr,"fault %8i: strike: %g dip: %g sc_alpha:  %10.2e/%10.2e sc_dip: %10.2e/%10.2e\n",
-		i,90.0-alpha,(*fault+i)->dip,(*fault+i)->sin_alpha,
-		(*fault+i)->cos_alpha,sin_dip,cos_dip);
-	fprintf(stderr," vec: s: (%10.2e,%10.2e,%10.2e) d: (%10.2e,%10.2e,%10.2e) n: (%10.2e,%10.2e,%10.2e)\n",
-		(*fault+i)->t_strike[INT_X],(*fault+i)->t_strike[INT_Y],(*fault+i)->t_strike[INT_Z],
-		(*fault+i)->t_dip[INT_X],(*fault+i)->t_dip[INT_Y],(*fault+i)->t_dip[INT_Z],
-		(*fault+i)->normal[INT_X],(*fault+i)->normal[INT_Y],(*fault+i)->normal[INT_Z]);
-      }
+    }
+#else
+    check_fault_angles((*fault+i));
 #endif
-      //
-      // determine geometrical boundaries for plotting
-      //
-      calculate_vertices(vertex,(*fault+i),&lloc,&wloc); /* lloc and
-							   wloc will
-							   be full l
-							   and w, not
-							   half */
-      for(j=0; j < nvert_of_patch((*fault+i));j++){ /* loop through all vertices */
-	//
-	// check depth alignment (half-space only; full space has no surface)
-	//
-	if((!(*medium)->full_space) && (vertex[j*3+INT_Z] > eps_for_z)){
-	  if((*medium)->comm_rank == 0){
-	    fprintf(stderr,"read_geometry: patch %i, vertex %i above surface, z: %20.10e (eps: %g)\n",
-		    i,j,vertex[j*3+INT_Z],eps_for_z);
-	    fprintf(stderr,"z: %g w: %g dip: %g\n",(*fault+i)->x[INT_Z],(*fault+i)->w,(*fault+i)->dip);
-	    fprintf(stderr,"read_geometry: exiting\n");
-	  }
-	  exit(-1);
-	}
-#ifdef ALLOW_NON_3DQUAD_GEOM
-	if((*fault+i)->type == TWO_DIM_HALFPLANE_PLANE_STRAIN){
-	  /* check if segment is sticking out into the air */
-	  if((vertex[0*3+INT_Y] > 0 )||(vertex[1*3+INT_Y] > 0)){
-	    if((*medium)->comm_rank == 0){
-	      fprintf(stderr,"read_geometry: error, half-plane segment %i endpoints: %g,%g and %g,%g (y should be <= 0)\n",
-		      i,vertex[0*3+INT_X] ,vertex[0*3+INT_Y],vertex[1*3+INT_X] ,vertex[1*3+INT_Y]);
-	    }
-	    exit(-1);
-	  }
-	}
-#endif
-	for(k=0;k<3;k++){
-	  if(((*medium)->xmax[k]) < vertex[j*3+k])
-	    (*medium)->xmax[k] = vertex[j*3+k];
-	  if(((*medium)->xmin[k]) > vertex[j*3+k])
-	    (*medium)->xmin[k] = vertex[j*3+k];
-	}
-      }
-#ifdef ALLOW_NON_3DQUAD_GEOM
-    }else{			/* triangular */
+    if((*fault+i)->type==OKADA_PATCH){
+      (*fault+i)->area = 4.*(*fault+i)->l*(*fault+i)->w;
+      lloc = (*fault+i)->l;
+    }else if(patch_is_2d((*fault+i)->type)){
+      lloc = (*fault+i)->l;
+    }else if(is_triangular((*fault+i)->type))
       lloc = sqrt((*fault+i)->area)/2;
-      (*medium)->wmean += lloc;
-      (*medium)->lmean += lloc;
-         
-      if(lloc > lmax)lmax=lloc;
-      if(lloc < lmin)lmin=lloc;
-      if(lloc > wmax)wmax=lloc;
-      if(lloc < wmin)wmin=lloc;
-  
+    else{
+      fprintf(stderr,"lloc logic error\n");
+      exit(-1);
+    }
+    
+    if(lloc > lmax)lmax=lloc;
+    if(lloc < lmin)lmin=lloc;
+    
+    if((*fault+i)->w > wmax)wmax=(*fault+i)->w;
+    if((*fault+i)->w < wmin)wmin=(*fault+i)->w;
+    (*medium)->wmean += (*fault+i)->w;
+    (*medium)->lmean += lloc;
+    /*
+      strike is defined as degrees clockwise from north (azimuth)
+      we need the angle alpha, which is 
+      counterclockwise from east and used for all rotations 
+    */
+    // if we have different kinds of faults, don't do this
+    // calculation if it's a triangular patch since we 
+    // have already calculates sin and cos (alpha) above
+    alpha= 90.0 - (*fault+i)->strike;
+    my_sincos_degd(&(*fault+i)->sin_alpha,&(*fault+i)->cos_alpha,
+		   alpha);
+    /* if(fabs((*fault+i)->sin_alpha)< EPS_COMP_PREC) */
+    /* 	(*fault+i)->sin_alpha=0.0; */
+    /* if(fabs((*fault+i)->cos_alpha)< EPS_COMP_PREC) */
+    /* 	(*fault+i)->cos_alpha=0.0; */
+    my_sincos_deg(&sin_dip,&cos_dip,(COMP_PRECISION)(*fault+i)->dip);
+    //
+    // calculate the unity vectors in strike, dip, and normal
+    // direction
+    //
+    /* 
+       executed for quads here 
+    */
+    calc_quad_base_vecs((*fault+i)->t_strike,
+			(*fault+i)->normal,(*fault+i)->t_dip,
+			(*fault+i)->sin_alpha,
+			(*fault+i)->cos_alpha,sin_dip,cos_dip);
+    //fprintf(stderr,"tdq %g %g %g\n",(*fault+i)->t_dip[0],(*fault+i)->t_dip[1],(*fault+i)->t_dip[2]);
+#ifdef SUPER_DUPER_DEBUG
+    check_fault_normal_vectors((*fault+i));
+    if((*medium)->comm_rank == 0){
+      fprintf(stderr,"fault %8i: strike: %g dip: %g sc_alpha:  %10.2e/%10.2e sc_dip: %10.2e/%10.2e\n",
+	      i,90.0-alpha,(*fault+i)->dip,(*fault+i)->sin_alpha,
+	      (*fault+i)->cos_alpha,sin_dip,cos_dip);
+      fprintf(stderr," vec: s: (%10.2e,%10.2e,%10.2e) d: (%10.2e,%10.2e,%10.2e) n: (%10.2e,%10.2e,%10.2e)\n",
+	      (*fault+i)->t_strike[INT_X],(*fault+i)->t_strike[INT_Y],(*fault+i)->t_strike[INT_Z],
+	      (*fault+i)->t_dip[INT_X],(*fault+i)->t_dip[INT_Y],(*fault+i)->t_dip[INT_Z],
+	      (*fault+i)->normal[INT_X],(*fault+i)->normal[INT_Y],(*fault+i)->normal[INT_Z]);
     }
 #endif
+    //
+    // determine geometrical boundaries for plotting
+    //
+    calculate_vertices(vertex,(*fault+i),&lloc,&wloc); /* lloc and
+							  wloc will
+							  be full l
+							  and w, not
+							  half */
+    for(j=0; j < nvert_of_patch((*fault+i));j++){ /* loop through all vertices */
+      //
+      // check depth alignment (half-space only; full space has no surface)
+      //
+      if((!(*medium)->full_space) && (vertex[j*3+INT_Z] > eps_for_z)){
+	if((*medium)->comm_rank == 0){
+	  fprintf(stderr,"read_geometry: patch %i, vertex %i above surface, z: %20.10e (eps: %g)\n",
+		  i,j,vertex[j*3+INT_Z],eps_for_z);
+	  fprintf(stderr,"z: %g w: %g dip: %g\n",(*fault+i)->x[INT_Z],(*fault+i)->w,(*fault+i)->dip);
+	  fprintf(stderr,"read_geometry: exiting\n");
+	}
+	exit(-1);
+      }
+      for(k=0;k<3;k++){
+	if(((*medium)->xmax[k]) < vertex[j*3+k])
+	  (*medium)->xmax[k] = vertex[j*3+k];
+	if(((*medium)->xmin[k]) > vertex[j*3+k])
+	  (*medium)->xmin[k] = vertex[j*3+k];
+      }
+    }
+    
     if(read_fault_friction){
       /* read static and dynamic friction coefficient for interact run */
       if(!in2){
@@ -588,7 +584,7 @@ void read_geometry(char *patch_filename,struct med **medium,
   *fault=(struct flt *)realloc(*fault,sizeof(struct flt)*(*medium)->nrflt);
   /* 
 
-     check if we need the rake (0 = strike 90 = dip, up from strike, in degrees)
+     check if we need the rake (0 = strike ... 90 = dip, up from strike, in degrees)
   */
   if(read_fault_rake){
     in2 = myopen(FAULT_RAKE_FILE,"r");
@@ -660,31 +656,35 @@ void read_geometry(char *patch_filename,struct med **medium,
       ((*medium)->xmax[i] ): (MIN_GEOM_RANGE);
   }
 #ifdef ALLOW_NON_3DQUAD_GEOM
-  if(nr_2d){
+  if(nr_2d || nr_2d_anti){
     (*medium)->is_2d = TRUE;
-    if(nr_2d != (*medium)->nrflt){
+    if(nr_2d+nr_2d_anti != (*medium)->nrflt){
       if((*medium)->comm_rank == 0)
-	fprintf(stderr,"read_geometry: cannot mix 2D and 3D patches, 2D %i total %i\n",
-		nr_2d,(*medium)->nrflt);
+	fprintf(stderr,"read_geometry: cannot mix 2D and 3D patches, 2D mode I/II: %i 2D-mode III: %i total %i\n",
+		nr_2d,nr_2d_anti,(*medium)->nrflt);
       exit(-1);
     }
 
   }
-  if(nr_pt_src + nr_triangle + nr_2d + nr_iquad == 0){
+  if(nr_pt_src + nr_triangle + nr_2d + nr_2d_anti + nr_iquad == 0){
     if(verbose){
       fprintf(stderr,"read_geometry: no non-quad patches were read in, recompiling without ALLOW_NON_3DQUAD_GEOM flag\n");
       fprintf(stderr,"read_geometry: might possibly improve speed and size requirements of interact\n");
     }
   }else{
     if((*medium)->comm_rank == 0){
-      fprintf(stderr,"read_geometry: %i 2D elements, %i points, %i triangles, %i iquads, and %i regular quads\n",
-	      nr_2d,nr_pt_src,nr_triangle,nr_iquad,(*medium)->nrflt - nr_triangle - nr_pt_src - nr_2d - nr_iquad);
+      fprintf(stderr,"read_geometry: 2D %i (I/II) %i (III), %i points, %i triangles, %i iquads, and %i regular quads\n",
+	      nr_2d,nr_2d_anti,nr_pt_src,nr_triangle,nr_iquad,
+	      (*medium)->nrflt - nr_triangle - nr_pt_src - nr_2d - nr_2d_anti- nr_iquad);
       if(nr_triangle)
 	fprintf(stderr,"read_geometry:  triangle integration mode %i (default: %i)\n",(*medium)->tri_eval_mode,
 		TRI_EVAL_DEF);
       if(nr_2d)
-	fprintf(stderr,"read_geometry: two dimensional approximation: plane %s %s\n",
+	fprintf(stderr,"read_geometry: 2D mode I/II approximation: plane %s %s\n",
 		((*medium)->plane_stress)?("stress"):("strain"),
+		((*medium)->full_space)?("(full plane)"):("(half plane)"));
+      if(nr_2d_anti)
+	fprintf(stderr,"read_geometry: 2D mode III %s\n",
 		((*medium)->full_space)?("(full plane)"):("(half plane)"));
     }
   }

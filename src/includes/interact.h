@@ -232,6 +232,8 @@ singular value will be set to zero
 /* 
    indices used in programs, do not change 
    the ordering here!!!
+
+   slip modes, rake is a fixed angle between strike and dip
 */
 #define STRIKE 0
 #define DIP 1
@@ -303,9 +305,13 @@ singular value will be set to zero
 #define TRIANGULAR_MIXED 24	/* this cannot go higher than 29! */
 
 #define TWO_DIM_SEGMENT_PLANE_STRAIN 30
-#define TWO_DIM_SEGMENT_PLANE_STRESS 40
-#define TWO_DIM_HALFPLANE_PLANE_STRAIN 50
+#define TWO_DIM_SEGMENT_PLANE_STRESS 31
+#define TWO_DIM_HALFPLANE_PLANE_STRAIN 32
+#define TWO_DIM_ANTIPLANE 33
+
+
 #define IQUAD 60		/* can't go above 256 */
+
 /* 
    output modes for print_patch_geometry
 */

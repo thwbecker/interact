@@ -1,20 +1,16 @@
 
 rsf_solve: quasi-dynamic rate-and-state earthquake-cycle solver (PETSc TS)
-usage: rsf_solve [options]   (options may also be placed in petsc_settings.yaml)
+usage: rsf_solve [options]   (Petsc options can  also be placed in petsc_settings.yaml)
 
 geometry and input files
   -geom_file <file>       fault geometry, one patch per row (default geom.in)
-  -rsf_file <file>        per-cell a b friction parameters (default rsf.dat)
-  -rsf_ic_file <file>     per-cell initial tau[Pa] vel[m/s]; overrides uniform IC
-  -rsf_dc_file <file>     per-cell D_c[m]; overrides uniform -dc
-  -rsf_sigma_file <file>  per-cell initial sigma0[Pa]; overrides uniform -sigma_init
-  -full_space <bool>      whole-space Green functions (default 0 = half space)
+  -full_space <bool>      whole-space 3D or horizontal 2D Green functions (default 0 = half space/plane)
   -tv <int>               triangular patch evaluation mode (default 0)
 
 elastic and rate-and-state parameters
-  -shear_modulus <Pa>     shear modulus G (default 32.04e9)
+  -shear_modulus <Pa>     shear modulus G (default 3.2040e+10)
   -s_wave_speed <m/s>     shear wave speed c_s, sets radiation damping eta = G/(2 c_s)
-                          (default 3464; note smaller c_s means MORE damping)
+                          (default 3.4640e+03; note smaller c_s means MORE damping)
   -rd_fac <fac>           scale the radiation damping coefficient (default 1;
                           0 switches damping off, i.e. the c_s -> infinity limit;
                           caution: without damping the quasi-dynamic coseismic
@@ -22,15 +18,25 @@ elastic and rate-and-state parameters
                           instabilities; > 1 gives enhanced damping)
   -f0 <val>               reference friction f0 (default 0.6)
   -dc <m>                 characteristic slip distance D_c (default 0.008)
-  -v0 <m/s>               reference velocity (default 1e-6)
-  -vpl <m/s>              plate loading rate (default 1e-9)
-  -rsf_slip_mode <0|1>    slip direction: 0 strike (default), 1 dip (thrust/normal)
+  -v0 <m/s>               reference velocity (default 1.00e-06)
+  -vpl <m/s>              plate loading rate (default 1.00e-09)
+  -rsf_slip_mode <0|1|3>  slip direction: 0 strike (default), 1 dip (thrust), 3 (rake)
+                          if mode is rake, will read rake angles from rake.in
 
-initial conditions
-  -sigma_init <Pa>        uniform initial normal stress (default 50e6)
+initial conditions and loading
+  -sigma_init <Pa>        uniform initial normal stress (default 5.00e+07)
   -tau_init <Pa>          uniform initial shear stress (default f0*sigma_init + eta*vel_init)
   -vel_init <m/s>         uniform initial slip rate (default vpl)
   -rand_amp <val>         random initial-state multiplier amplitude (default 0)
+  -rsf_file <file>        per-cell a b friction parameters (default rsf.dat)
+  -rsf_ic_file <file>     per-cell initial tau[Pa] vel[m/s]; overrides uniform IC
+  -rsf_dc_file <file>     per-cell D_c[m]; overrides uniform -dc
+  -rsf_sigma_file <file>  per-cell initial sigma0[Pa]; overrides uniform -sigma_init
+  -rsf_vpl_file <f>       per-patch plate rate [m/s], one value per patch, replacing
+                          the uniform -vpl in the backslip loading products
+  -rsf_stress_rate_file <f> per-patch additive loading rates, two columns
+                          tau_dot sigma_dot [Pa/s] (sigma_dot ignored unless
+                          -calc_sigma_dot), e.g. from an external flow model
 
 normal-stress evolution and limiter (for dip slip / nonplanar faults)
   -calc_sigma_dot <bool>  evolve normal stress via the In matrix (default 0 = off)
@@ -64,7 +70,12 @@ state evolution
 
 time stepping
   -rtol <val>             ODE relative tolerance (default 1e-4)
+                          absolute tolerances for tau: 1.000000e-03 sigma 1.000000e-03 psi 1.000000e-12
   -atol_slip <m>          absolute tolerance for slip entries (default 1e-3)
+  -atol_psi <val>         absolute tolerance for psi entries (default 1.000000e-12, i.e.
+                          pure relative control). raise to ~1e-3 to stop the error
+                          norm from resolving the fast state relaxation at rupture
+                          fronts (PRZ), where dt otherwise collapses to ~1e-10 s
   -dt_init <s>            initial step size (default 1)
   -dt_max <s>             maximum step size (default 1e10)
   -imex                   IMEX (ARKIMEX) integration: local state terms implicit,
@@ -91,6 +102,13 @@ monitor and event detection
   -vel_event_hyst <val>   arrest at vel_event*hyst, debounces (default 0.5)
   -event_tmin_yr <yr>     suppress event output before this time (default 0)
 
+check pointing and restart
+  -rsf_checkpoint <N>     write a restart checkpoint every N accepted steps and once
+                          after a regular finish (0: off); previous kept as .prev
+  -rsf_checkpoint_file <f> checkpoint file name (rsf_checkpoint.bin)
+  -rsf_restart <f>        restart from a checkpoint; outputs append with a marker;
+                          note -ts_max_steps counts absolute step numbers
+
 optional outputs (all default off)
   -rsf_catalog            write rsf_catalog.dat (per-event slip, drop, M0, Mw)
   -rsf_rupture_time       write rsf_rupture_time.dat (first event front times)
@@ -99,15 +117,18 @@ optional outputs (all default off)
   -field_step_interval <n> slip-rate field frame every n accepted steps (0 = off)
   -field_tmin_yr <yr>     suppress field frames before this time (default 0)
   -slip_line_dt_yr <yr>   tmp_rsf slip-line snapshot cadence (default off)
+  -rsf_monitor_by_group <bool> also write one monitor file per fault group (default 0);
+                          with -rsf_catalog this also splits the event catalog by group
 
 interaction-matrix backend
   -use_hmatrix <0..5>     0 dense (default) 1 HTOOL 2 H2OPUS 3 HACApK 4 hmmvp 5 BigWham
   -hacapk_ztol <val>      HACApK compression tolerance
   -hacapk_eta <val>       HACApK admissibility eta
   -hacapk_inorm <int>     HACApK tolerance norm (1 = block-local)
+  -hacapk_verb <int>      HACApK verbosity (0 = error, 1 stand., 2 debug)
   -hmmvp_tol <val>        hmmvp compression tolerance
   -hmmvp_eta <val>        hmmvp admissibility eta
-  -hmmvp_inorm <int>      hmmvp tolerance norm
+  -hmmvp_inorm <int>      hmmvp tolerance norm (1 = block, 3 = matrix MREM)
   -hmmvp_nthreads <int>   hmmvp compression threads
 
 relevant PETSc options (a full list is printed by -help)
@@ -120,11 +141,15 @@ relevant PETSc options (a full list is printed by -help)
   -options_file <file>        read options from a file (petsc_settings.yaml auto-read)
   -help                       PETSc's full registered-option dump
 
-output files
+output files (change filename in includes/filenames.h)
   rsf_monitor.dat         time series on the adaptive monitor cadence (-dt_monitor,
                           -adx_monitor, -rdx_monitor): step, time[s], time[yr], dt[s],
-                          log10(max|v|), mean_slip, mean_mu, max_sigma, min_sigma.
+                          log10(max|v|), mean_slip, mean_mu, max_sigma, min_sigma,
+                          log10(mean|v|). The last is appended, so columns 1 to 9
+                          are unchanged from earlier versions
                           Flushed as it is written
+  rsf_monitor.g%03d.dat   with -rsf_monitor_by_group, the same columns reduced over
+                          the patches of one fault group (last geometry column)
   rsf_vel.times           one row per field frame (-field_step_interval): frame, step,
                           time[yr], time[s], log10(max|v|), mean|v|, std|v|, min|v|,
                           mean_slip. The |v| statistics are slip SPEEDS (v is signed).
@@ -132,6 +157,8 @@ output files
                           frames and replaces the former rsf_stats.dat
   rsf_events.dat          one row per slip-rate threshold crossing (-vel_event)
   rsf_catalog.dat         one row per completed event (with -rsf_catalog)
+  rsf_catalog.g%03d.dat   the same events split by fault group, when
+                          -rsf_catalog and -rsf_monitor_by_group are both set
   rsf_geom.gGGG.dat       per-group patch geometry for the field frames
 
 examples

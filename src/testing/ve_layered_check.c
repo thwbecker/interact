@@ -26,7 +26,7 @@ int main(int argc, char **argv)
   struct flt *fault;struct med *medium;struct prony_spec spec;
   COMP_PRECISION slip[3],u[3],ue[3],sm[3][3],x[3],plate_h,t_M;
   COMP_PRECISION s,beta,a,smp[VE_MAX_NS],amp[VE_MAX_NP+1],dev,res,scl,model;
-  int n_img,np,i,k,it,iret,isrc;
+  int n_img,np,k,it,iret,isrc;
   plate_h = 2.0;t_M = 1.0;n_img = 60;
   if(argc > 1)sscanf(argv[1],ONE_CP_FORMAT,&plate_h);
   if(argc > 2)sscanf(argv[2],ONE_CP_FORMAT,&t_M);

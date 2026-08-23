@@ -986,9 +986,17 @@ void check_fault_angles(struct flt *fault)
 {
   COMP_PRECISION dip;
   double strike;
-  dip=(COMP_PRECISION)fault->dip;strike=(COMP_PRECISION)fault->strike;
+#ifdef ALLOW_NON_3DQUAD_GEOM
+  if(patch_is_2d(fault->type)){
+    fprintf(stderr,"check_fault_angles: only set up for 3D patches\n");
+    exit(-1);
+  }
+#endif
+  dip=(COMP_PRECISION)fault->dip;
+  strike=(COMP_PRECISION)fault->strike;
   check_angles(&dip,&strike);
-  fault->dip = (float)dip; fault->strike = (COMP_PRECISION)strike;
+  fault->dip = (float)dip;
+  fault->strike = (COMP_PRECISION)strike;
 }
 /*
   make sure angles are in the right range
@@ -1108,6 +1116,7 @@ my_boolean patch_is_2d(MODE_TYPE type)
   case TWO_DIM_SEGMENT_PLANE_STRESS:
   case TWO_DIM_SEGMENT_PLANE_STRAIN:
   case TWO_DIM_HALFPLANE_PLANE_STRAIN:
+  case TWO_DIM_ANTIPLANE:
     return TRUE;
     break;
   default:
@@ -1490,7 +1499,6 @@ my_boolean is_triangular(MODE_TYPE mode)
     break;
   }
 }
-
 
 
 /* 

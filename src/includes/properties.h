@@ -33,9 +33,6 @@
 #define SHEAR_MODULUS_DEF  1.0
 #define STRESS_DROP_DEF 1.0e-4
 #endif
-/*
-  YOUNG_MODULUS (2.0*SHEAR_MODULUS*(1.0+POISSON_NU))
-*/
 #define POISSON_NU_DEF 0.25
 
 /* 
