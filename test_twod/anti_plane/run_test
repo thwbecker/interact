@@ -2,22 +2,33 @@
 #
 # test of anti plane dislocation
 #
+# vertical screw fault from the surface to depth 2, unit left-lateral
+# slip; the surface profile has the closed form
+#
+#   u_z(x) = (sgn(x) pi/2 - atan(x/2))/pi
+#
+# (jump of unity across the trace, decay to zero); the x = 0 profile
+# point sits on the surface tip of the fault and is returned as nan
+#
 n=10
-# convert to anti-planes 2D
-makefault -z 0 -n $n -y -0.5  | gawk '{print($1,$2,$3,$4,-$5,$7,0,$8)}' > geom.in
+# convert to anti-plane 2D: half length is column 6 of the 3D output
+# (column 7 is the half WIDTH); -y -1 places the fault span at [-2,0]
+# so it just reaches the free surface
+makefault -z 0 -n $n -y -1.0  | gawk '{print($1,$2,$3,$4,-$5,$6,0,$8)}' > geom.in
 cat <<EOF > bc.in 
 1 1
--10 10 101 0 0 1 0 0 1
+-15 15 201 0 0 1 0 0 1
 -1 -1 -1 0 1
 EOF
 interact
 
 # profile with x, u_z
 cat <<EOF | gnuplot
-set term post enh color solid
+set term post enh color solid 'Palatino-22'
 set out 'screw.ps'
 set xlabel 'x'
 set ylabel 'u_z'
-plot (sgn(x)*pi/2.-atan(x))*pi, 'disp.out' using 1 : 6 w p
+plot (sgn(x)*pi/2.-atan(x/2.))/pi t 'analytical', \
+     'disp.out' using 1 : 6 w p t 'interact'
 EOF
 modifybb screw.ps 1
