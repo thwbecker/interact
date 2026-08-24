@@ -262,6 +262,7 @@ double mat_value(int, int, int);
 /* src/testing/ve_check.c */
 /* src/testing/ve_laplace_check.c */
 /* src/testing/ve_layered_check.c */
+/* src/testing/ve_pom_compare.c */
 /* src/green/eval_2dsegment.c */
 void eval_2dsegment_plane_strain(double *, struct flt *, double *, double *, double [3][3], int *, unsigned char, struct el_par);
 void eval_2dsegment_plane_stress(double *, struct flt *, double *, double *, double [3][3], int *, unsigned char, struct el_par);

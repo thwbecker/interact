@@ -5,11 +5,8 @@
 # subroutines within the .sgl.F files have a s_ before the normal name. e.g.
 # rs(...) turns into s_rs
 #
-# set architecture flag
-#ARCH=$(shell uname -m | awk '{print(tolower($$1))}')
+include ../config/makefile.gcc
 
-
-#ODIR = $(ARCH)/
 ODIR = .
 
 all: directories libraries

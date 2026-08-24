@@ -5,6 +5,7 @@
 #	contributions from Dave May, and using a range of other source
 #	codes including from Okada and Nikhoo & Walter - see the
 #	respective source files for detailed references.
+#
 # 	As of 05/2026, some additions by Claude Code. 
 #
 #  makefile for interact, rsf_solve, and related programs
@@ -867,9 +868,8 @@ $(ODIR)/libinput.dbg.a: $(INPUT_OBJS_DEBUG)
 #
 # Noda multi-point receiver evaluation test (Eshelby crack)
 #
-T3OBJ = $(ODIR)/noda_crack_test.o 
-$(ODIR)/noda_crack_test: $(T3OBJ) $(GEN_P_INC)  $(LIBLIST)  $(TRI_GREEN_OBJS)
-	$(MPILD) $(LDFLAGS) $(T3OBJ) $(TRI_GREEN_OBJS) -o $(BDIR)/noda_crack_test \
+$(BDIR)/noda_crack_test: $(T3OBJ) $(GEN_P_INC)  $(LIBLIST) $(ODIR)/noda_crack_test.o  $(TRI_GREEN_OBJS)
+	$(MPILD) $(LDFLAGS) $(ODIR)/noda_crack_test.o  $(TRI_GREEN_OBJS) -o $(BDIR)/noda_crack_test \
 	$(PETSC_LIBS) $(LIBS) $(PGLIBS)    $(OLD_MATRIX_LIBS)  $(LDFLAGS)
 
 
