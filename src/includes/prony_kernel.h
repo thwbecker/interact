@@ -75,6 +75,22 @@ void ve_layered_antiplane_sample(struct med *, struct flt *, int,
 				 MODE_TYPE, COMP_PRECISION *,
 				 COMP_PRECISION [3][3]);
 void ve_spec_layered_antiplane(struct prony_spec *, COMP_PRECISION,
+			       COMP_PRECISION, COMP_PRECISION,
+			       COMP_PRECISION, int);
+
+/* layered antiplane analytics (Rybicki 1971, Nur and Mavko 1974) */
+void ve_layered_gamma_pars(COMP_PRECISION, COMP_PRECISION, COMP_PRECISION,
+			   COMP_PRECISION *, COMP_PRECISION *);
+COMP_PRECISION ve_layered_gamma_of_s(COMP_PRECISION, COMP_PRECISION,
+				     COMP_PRECISION);
+COMP_PRECISION ve_rybicki_antiplane_uz(COMP_PRECISION, COMP_PRECISION,
+				       COMP_PRECISION, COMP_PRECISION,
+				       COMP_PRECISION, COMP_PRECISION, int);
+COMP_PRECISION ve_nur_mavko_weight(int, COMP_PRECISION, COMP_PRECISION,
+				   COMP_PRECISION);
+COMP_PRECISION ve_nur_mavko_uz(COMP_PRECISION, COMP_PRECISION,
+			       COMP_PRECISION, COMP_PRECISION,
+			       COMP_PRECISION, COMP_PRECISION,
 			       COMP_PRECISION, COMP_PRECISION, int);
 
 #endif

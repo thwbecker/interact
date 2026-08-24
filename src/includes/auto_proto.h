@@ -562,7 +562,12 @@ double ve_prony_amplitudes_disp(struct prony_spec *, struct med *, struct flt *,
 double ve_basis_time_step(struct prony_spec *, int, double);
 double ve_basis_time_ramp(struct prony_spec *, int, double, double);
 void ve_layered_antiplane_sample(struct med *, struct flt *, int, double *, double *, double, int, double, unsigned char, double *, double [3][3]);
-void ve_spec_layered_antiplane(struct prony_spec *, double, double, double, int);
+void ve_spec_layered_antiplane(struct prony_spec *, double, double, double, double, int);
+void ve_layered_gamma_pars(double, double, double, double *, double *);
+double ve_layered_gamma_of_s(double, double, double);
+double ve_rybicki_antiplane_uz(double, double, double, double, double, double, int);
+double ve_nur_mavko_weight(int, double, double, double);
+double ve_nur_mavko_uz(double, double, double, double, double, double, double, double, int);
 /* src/relax/relax_fault.c */
 void relax_stress_field(struct med *, struct flt *, double, double, double (*)[3][3]);
 void relax_stress_step(struct med *, double, double, double (*)[3][3], double (*)[3][3]);
