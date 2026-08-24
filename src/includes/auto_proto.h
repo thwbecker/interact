@@ -566,6 +566,8 @@ void ve_spec_layered_antiplane(struct prony_spec *, double, double, double, doub
 void ve_layered_gamma_pars(double, double, double, double *, double *);
 double ve_layered_gamma_of_s(double, double, double);
 double ve_rybicki_antiplane_uz(double, double, double, double, double, double, int);
+double ve_nur_mavko_weight_dot(int, double, double, double);
+double ve_nur_mavko_vz(double, double, double, double, double, double, double, double, int);
 double ve_nur_mavko_weight(int, double, double, double);
 double ve_nur_mavko_uz(double, double, double, double, double, double, double, double, int);
 /* src/relax/relax_fault.c */

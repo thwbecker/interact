@@ -579,3 +579,59 @@ COMP_PRECISION ve_nur_mavko_uz(COMP_PRECISION x, COMP_PRECISION xs,
   }
   return uz/PI;
 }
+/*
+
+  time derivative of the Nur-Mavko image weight: with W_n as in
+  ve_nur_mavko_weight, 
+
+    Wdot_n(t) = sum_{m=1}^{n} C(n,m) Gamma_0^{n-m} (1 - Gamma_0)^m
+                b exp(-b t) (b t)^{m-1} / (m-1)!
+
+  (the Erlang density of order m); the same conditioning caveat for
+  negative Gamma_0 applies
+
+*/
+COMP_PRECISION ve_nur_mavko_weight_dot(int n, COMP_PRECISION gamma0,
+				       COMP_PRECISION b, COMP_PRECISION t)
+{
+  COMP_PRECISION w,binom,pfac,x,dens;
+  int m,k;
+  x = b * t;
+  w = 0.0;
+  binom = (COMP_PRECISION)n;	/* C(n,1) */
+  dens = b * exp(-x);		/* order-1 Erlang density */
+  for(m=1;m <= n;m++){
+    pfac = 1.0;
+    for(k=0;k < n-m;k++)pfac *= gamma0;
+    for(k=0;k < m;k++)pfac *= (1.0 - gamma0);
+    w += binom * pfac * dens;
+    binom *= ((COMP_PRECISION)(n - m))/((COMP_PRECISION)(m + 1));
+    dens *= x/((COMP_PRECISION)m);
+  }
+  return w;
+}
+/*
+
+  time-domain Nur-Mavko surface velocity for the segment of
+  ve_rybicki_antiplane_uz (the coseismic term is a step, so only the
+  images contribute)
+
+*/
+COMP_PRECISION ve_nur_mavko_vz(COMP_PRECISION x, COMP_PRECISION xs,
+			       COMP_PRECISION c1, COMP_PRECISION c2,
+			       COMP_PRECISION plate_h,
+			       COMP_PRECISION gamma0, COMP_PRECISION b,
+			       COMP_PRECISION t, int n_img)
+{
+  COMP_PRECISION vz,dx,d1,d2;
+  int n;
+  dx = x - xs;
+  vz = 0.0;
+  for(n=1;n <= n_img;n++){
+    d1 = c1 + 2.0*(COMP_PRECISION)n*plate_h;
+    d2 = c2 + 2.0*(COMP_PRECISION)n*plate_h;
+    vz += ve_nur_mavko_weight_dot(n,gamma0,b,t) *
+      (atan2(dx,d1) - atan2(dx,d2));
+  }
+  return vz/PI;
+}
