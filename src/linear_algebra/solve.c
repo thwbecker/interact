@@ -43,6 +43,8 @@ int solve(struct med *medium,struct flt *fault)
   PetscReal   norm;
   PetscInt lm, ln, dn, on;
   VecScatter ctx;
+  KSPConvergedReason reason;
+  PetscBool has_sca = PETSC_FALSE, has_elem = PETSC_FALSE;
 #else
   unsigned int i;
 #endif
@@ -330,9 +332,33 @@ int solve(struct med *medium,struct flt *fault)
       PetscCall(PCSetType(ppc, PCLU));
       /* override at run time via -pc_factor_mat_solver_type xxx */
       PetscCall(PCFactorSetMatSolverType(ppc, MATSOLVERPETSC));
+      /* PETSc's native LU cannot factor a distributed (mpidense) matrix; that
+	 needs an external package (scalapack or elemental). if we are parallel
+	 and have neither, default to unpreconditioned GMRES instead of dying,
+	 all of this can still be overridden by KSPSetFromOptions below */
+      if(medium->comm_size > 1){
+	PetscCall(PetscHasExternalPackage("scalapack", &has_sca));
+	PetscCall(PetscHasExternalPackage("elemental", &has_elem));
+	if((!has_sca) && (!has_elem) && (!pset)){
+	  HEADNODE
+	    fprintf(stderr,"solve: WARNING: parallel run, but PETSc has neither scalapack nor elemental for parallel dense LU\nsolve: WARNING: falling back to GMRES with no preconditioner (override with -ksp_type/-pc_type/-ksp_rtol)\n");
+	  PetscCall(KSPSetType(pksp, KSPGMRES));
+	  PetscCall(PCSetType(ppc, PCNONE));
+	  PetscCall(KSPSetTolerances(pksp, 1.0e-8, PETSC_DEFAULT, PETSC_DEFAULT, PETSC_DEFAULT));
+	}
+      }
       PetscCall(KSPSetFromOptions(pksp));
       /* solve step */
       PetscCall(KSPSolve(pksp, pbs, x));
+      /* a diverged/failed solve does not necessarily raise a PETSc error -
+	 catch it here instead of writing garbage results */
+      PetscCall(KSPGetConvergedReason(pksp, &reason));
+      if(reason < 0){
+	HEADNODE
+	  fprintf(stderr,"solve: parallel solve FAILED (%s)\nsolve: for a parallel direct solve, build PETSc with scalapack or elemental and run with\nsolve: -pc_factor_mat_solver_type scalapack -mat_type scalapack\nsolve: or pick an iterative solver, e.g. -ksp_type gmres -pc_type none -ksp_rtol 1e-6\n",
+		  KSPConvergedReasons[reason]);
+	MPI_Abort(MPI_COMM_WORLD, -1);
+      }
       if(medium->debug)
 	PetscCall(KSPView(pksp, PETSC_VIEWER_STDERR_WORLD));
     

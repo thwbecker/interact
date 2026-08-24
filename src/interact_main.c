@@ -179,7 +179,14 @@ int main(int argc, char **argv)
 	print_interaction_matrix(medium,fault,FALSE);
     }
     if((medium->naflt)||(medium->naflt_con)){
-      solve(medium,fault);
+      if(solve(medium,fault) != 0){
+	fprintf(stderr,"main: solve() returned an error, exiting\n");
+#ifdef USE_PETSC
+	MPI_Abort(MPI_COMM_WORLD,-1);
+#else
+	exit(-1);
+#endif
+      }
 #ifdef DEBUG
       HEADNODE
 	fprintf(stderr,"main: now adding %i unconst. and %i const. solutions\n",

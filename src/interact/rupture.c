@@ -138,7 +138,14 @@ my_boolean activate_faults(struct flt *fault,struct med *medium)
 	   number of constraints is given by nreq and nreq_con
 	   solve the equation system at least once
 	*/
-	solve(medium,fault);
+	if(solve(medium,fault) != 0){
+	  fprintf(stderr,"rupture: solve() returned an error, exiting\n");
+#ifdef USE_PETSC
+	  MPI_Abort(MPI_COMM_WORLD,-1);
+#else
+	  exit(-1);
+#endif
+	}
 	// if not in keep_slipping mode, add the solution and mark quakes, else
 	// add only for testing purposes but do not print to file yet
 	mark_quakes = (medium->keep_slipping ? FALSE : TRUE);
