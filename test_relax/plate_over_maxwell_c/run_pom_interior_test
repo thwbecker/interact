@@ -1,0 +1,22 @@
+#!/bin/bash
+#
+# validation of the pom maxwell interior-stress extension (-zr),
+# along the lines of the test_relax checks: finite differences of the
+# code's own interior displacement field arbitrate the stress
+# components against the physical z-up tensor
+#
+#   szz = lam (eh + euu) + 2 mu euu,  euu = -d(uz)/d(zr)
+#   sxz = mu (-d(ue)/d(zr) + d(uz)/dx)
+#   syz = mu (-d(un)/d(zr) + d(uz)/dy)
+#
+# with lam = mu = 1 (the internal normalized moduli at mulam 1).
+# PASS threshold 1e-4 relative (finite-difference truncation floor is
+# about 1e-6 at the h used). KNOWN OPEN ISSUE: mechanisms with
+# azimuthal order |M| = 1 content (dip slip on any plane, strike slip
+# on dipping planes) currently FAIL at the tens-of-percent level; the
+# strike-slip-on-vertical and tensile cases (orders 0 and 2) pass at
+# the truncation floor, as do the free-surface and t -> 0 limits, so
+# the propagation machinery is sound and the remaining defect is
+# localized to the |M| = 1 branch of the traction synthesis
+#
+python3 pom_interior_fdcheck.py
