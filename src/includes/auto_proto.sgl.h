@@ -568,6 +568,8 @@ float ve_layered_gamma_of_s(float, float, float);
 float ve_rybicki_antiplane_uz(float, float, float, float, float, float, int);
 float ve_nur_mavko_weight(int, float, float, float);
 float ve_nur_mavko_uz(float, float, float, float, float, float, float, float, int);
+float ve_nur_mavko_weight_dot(int, float, float, float);
+float ve_nur_mavko_vz(float, float, float, float, float, float, float, float, int);
 /* src/relax/relax_fault.c */
 void relax_stress_field(struct med *, struct flt *, float, float, float (*)[3][3]);
 void relax_stress_step(struct med *, float, float, float (*)[3][3], float (*)[3][3]);

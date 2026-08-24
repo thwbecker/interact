@@ -429,7 +429,7 @@ geom_converters: $(BDIR)/points2patch $(BDIR)/tri2patch  $(BDIR)/patchquad2patch
 
 #testing:  $(ODIR)/test_triangle_stress $(ODIR)/test_triangle_stress $(ODIR)/noda_crack_test
 
-testing:	$(ODIR)/noda_crack_test $(BDIR)/ve_check $(BDIR)/ve_laplace_check $(BDIR)/ve_layered_check
+testing:	$(BDIR)/noda_crack_test $(BDIR)/ve_check $(BDIR)/ve_laplace_check $(BDIR)/ve_layered_check $(BDIR)/ve_pom_compare
 
 
 matrix_test_progs: $(BDIR)/test_sparse $(BDIR)/test_optimize $(BDIR)/test_solvers \
@@ -490,6 +490,10 @@ $(BDIR)/relax_fault_ve: $(ODIR)/relax_fault_ve.o $(VE_OBJS) $(GEN_P_INC)  $(LIBL
 $(BDIR)/ve_layered_check: $(ODIR)/ve_layered_check.o $(VE_OBJS) $(GEN_P_INC)  $(LIBLIST) 
 	$(MPILD) $(ODIR)/ve_layered_check.o $(VE_OBJS) $(MY_LIBDIR_SPEC)$(ODIR)/ \
 	-o $(BDIR)/ve_layered_check $(LIBS)  $(LDFLAGS)
+
+$(BDIR)/ve_pom_compare: $(ODIR)/ve_pom_compare.o $(VE_OBJS) $(GEN_P_INC)  $(LIBLIST) 
+	$(MPILD) $(ODIR)/ve_pom_compare.o $(VE_OBJS) $(MY_LIBDIR_SPEC)$(ODIR)/ \
+	-o $(BDIR)/ve_pom_compare $(LIBS)  $(LDFLAGS)
 
 $(BDIR)/relax_fault: $(OBJ) $(GEN_P_INC) $(LIBLIST) $(PETSC_OBJS)   $(ODIR)/relax_fault.o
 	$(MPILD) $(OBJ) -o $(BDIR)/relax_fault  $(ODIR)/relax_fault.o $(PETSC_OBJS)  \
