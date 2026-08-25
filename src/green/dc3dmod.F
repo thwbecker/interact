@@ -11,7 +11,7 @@ c     on disk in summer 2000
 c
 c     
 c     small modifications, mostly to improve speed by Thorsten Becker, 
-c     becker@eps.harvard.edu
+c     thwbecker@post.harvard.edu
 c
 c     - floating point precision is set in include files, C-style
 c       all references to real*4 are replaced with real*8
@@ -31,19 +31,15 @@ c       argument list compiles and links fine but reads garbage for
 c       IRET/IFULLSPACE (typically without crashing), silently
 c       producing wrong results. Always pass IRET and IFULLSPACE.
 c
-c     see also rcs logs!
 c
 c part of interact, (C) Thorsten Becker; see README.md and COPYRIGHT
-c
-c
-c
 c
 c
 c     NOTE: IRET and IFULLSPACE (0: half space, 1: full space) are
 c     additions relative to Okada's published interface; external
 c     callers must pass both (see header comments)
 c
-      SUBROUTINE  DC3D0(ALPHA,X,Y,Z,DEPTH,DIP,POT1,POT2,POT3,POT4,      
+      SUBROUTINE  DC3D0M(ALPHA,X,Y,Z,DEPTH,DIP,POT1,POT2,POT3,POT4,      
      *     UX,UY,UZ,UXX,UYX,UZX,UXY,UYY,UZY,UXZ,UYZ,UZZ,IRET,
      *     IFULLSPACE) 
       IMPLICIT real*8 (A-H,O-Z)
@@ -592,7 +588,7 @@ c     NOTE: IRET and IFULLSPACE (0: half space, 1: full space) are
 c     additions relative to Okada's published interface; external
 c     callers must pass both (see header comments)
 c
-      SUBROUTINE  DC3D(ALPHA,X,Y,Z,DEPTH,DIP,                           
+      SUBROUTINE  DC3DM(ALPHA,X,Y,Z,DEPTH,DIP,                           
      *     AL1,AL2,AW1,AW2,DISL1,DISL2,DISL3,                  
      *     UX,UY,UZ,UXX,UYX,UZX,UXY,UYY,UZY,UXZ,UYZ,UZZ,IRET,
      *     IFULLSPACE)  

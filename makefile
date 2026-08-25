@@ -177,8 +177,8 @@ ODIR = objects
 BDIR = bin
 #
 # choice of Okada routine
-OKROUTINE = $(ODIR)/dc3d.o	# my modified version
-OKROUTINE_DEBUG = $(ODIR)/dc3d.dbg.o	# my modified version
+OKROUTINE = $(ODIR)/dc3dmod.o	# my modified version
+OKROUTINE_DEBUG = $(ODIR)/dc3dmod.dbg.o	# my modified version
 #OKROUTINE = $(ODIR)/dc3d_original_double.o	# original, changed to double
 
 # 
