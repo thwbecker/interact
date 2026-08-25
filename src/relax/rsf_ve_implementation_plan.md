@@ -171,9 +171,11 @@ the answer is exact.
 Step 7a, the antiplane elastic plate over a Maxwell half space. This
 configuration has a closed-form time-dependent solution as an image
 series (the Nur-Mavko / Savage-Prescott construction): the image at
-depth 2 n H turns on with a degree-(n-1) polynomial in t/tau_m times
-exp(-t/tau_m), so the step-response kernel is K_relaxed plus a
-geometrically convergent series of t^k exp(-t/tau_m) terms,
+depth 2 n H turns on with a degree-(n-1) polynomial in t/(2 tau_m)
+times exp(-t/(2 tau_m)) (the image-series clock is 1/a with
+a = 1/(2 tau_m) for equal rigidities, see ve-note v6 and
+prony_kernel.c), so the step-response kernel is K_relaxed plus a
+geometrically convergent series of t^k exp(-t/(2 tau_m)) terms,
 truncatable at known accuracy for a given source-receiver distance
 over the plate thickness H. Implement this as the first per-entry
 generator behind the -ve_prony_file interface, validate it internally

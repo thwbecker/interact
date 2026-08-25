@@ -138,10 +138,16 @@ configuration), which quantifies what the exact representation adds.
 One shared-code repair came out of the work (the GC_DISP_ONLY branch
 of the triangle evaluator destroyed its own displacements; nothing
 else exercised that path), and one physical null result is worth
-remembering when designing tests: a vertical fault in a uniform
-Maxwell medium produces no postseismic surface deformation, because
-its surface displacement field appears to be nu-independent, so
-dipping faults or layering are needed for a surface transient.
+remembering when designing tests: DIP slip on a vertical (dip 90)
+fault produces no postseismic surface deformation in a uniform
+Maxwell medium, because its surface displacement field appears to be
+nu-independent (verified against dc3d to all printed digits at
+off-plane stations); strike slip on a vertical fault is only
+nu-independent in the infinite-length (antiplane) limit, and a FINITE
+strike-slip fault does produce a transient through its end effects
+(about 12 percent of coseismic on the run_fault_relax_test
+geometry). Dipping faults, finite-length strike slip, or layering are
+therefore needed for a surface transient.
 
 The next stage is the rsf_solve integration, beginning with the
 step 3 plumbing (operator assembly and verification behind

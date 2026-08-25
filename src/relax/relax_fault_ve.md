@@ -51,14 +51,18 @@ zero but to the elastic field of the effectively incompressible
 (nu = 1/2) limit, the permanent deformation, and their transient
 carries no t_M pole because displacements from dislocations depend on
 the moduli only through nu. A consequence that surprised us in
-testing: for a vertical (dip 90) fault the surface displacement field
-appears to be independent of nu entirely (verified numerically to all
-printed digits for both slip senses on the geometry below), so such a
-configuration shows no postseismic surface deformation at all in a
-uniform Maxwell medium; a dipping fault, or in the future a layered
-medium, is needed for a nontrivial surface transient. Strike slip on
-a vertical but finite fault does produce a transient through the
-finite-length end effects.
+testing: for DIP slip on a vertical (dip 90) fault the surface
+displacement field appears to be independent of nu entirely (verified
+numerically to all printed digits, both through this machinery on the
+geometry below and directly against dc3d at off-plane stations), so
+that configuration shows no postseismic surface deformation at all in
+a uniform Maxwell medium. The same is NOT true of strike slip: only
+the infinite-length (antiplane) limit is nu-independent, and strike
+slip on a vertical but finite fault does produce a transient through
+the finite-length end effects (about 12 percent of the coseismic
+amplitude on the 500-patch geometry of run_fault_relax_test). A
+dipping fault, finite-length strike slip, or in the future a layered
+medium is needed for a nontrivial surface transient.
 
 ## Program structure
 
