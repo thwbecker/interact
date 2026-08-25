@@ -28,13 +28,13 @@
 #define OKUXZ 9
 #define OKUYZ 10
 #define OKUZZ 11
-extern void dc3d(double*,double*,double*,double*,double*,double*,double*,double*,
-		 double*,double*,double*,double*,double*,double*,double*,double*,
-		 double*,double*,double*,double*,double*,double*,double*,double*,
-		 double*,int*,int*);
-extern void dc3d0(double*,double*,double*,double*,double*,double*,double*,double*,
+extern void dc3dm(double*,double*,double*,double*,double*,double*,double*,double*,
 		  double*,double*,double*,double*,double*,double*,double*,double*,
-		  double*,double*,double*,double*,double*,double*,int*,int*);
+		  double*,double*,double*,double*,double*,double*,double*,double*,
+		  double*,int*,int*);
+extern void dc3d0m(double*,double*,double*,double*,double*,double*,double*,double*,
+		   double*,double*,double*,double*,double*,double*,double*,double*,
+		   double*,double*,double*,double*,double*,double*,int*,int*);
 
 /*
   
@@ -104,8 +104,8 @@ void eval_okada(COMP_PRECISION *x,struct flt *fault,
   // half width
   aw1 = (double)-fault->w;aw2 = (double)fault->w;
 #ifdef USE_DOUBLE_PRECISION
-  // call to Okada routine
-  dc3d(&elastic.alpha,(x_local+INT_X),(x_local+INT_Y),(x_local+INT_Z),
+  // call to modified Okada routine
+  dc3dm(&elastic.alpha,(x_local+INT_X),(x_local+INT_Y),(x_local+INT_Z),
        &depth,&cpdip,&al1,&al2,&aw1,&aw2,
        (disp+STRIKE),(disp+DIP),(disp+NORMAL),
        (u+OKUX),(u+OKUY),(u+OKUZ),(u+OKUXX),(u+OKUYX),(u+OKUZX),
@@ -116,7 +116,7 @@ void eval_okada(COMP_PRECISION *x,struct flt *fault,
     x_local_d[i] = (double)x_local[i];
   }
 
-  dc3d(&elastic.alpha,(x_local_d+INT_X),(x_local_d+INT_Y),(x_local_d+INT_Z),
+  dc3dm(&elastic.alpha,(x_local_d+INT_X),(x_local_d+INT_Y),(x_local_d+INT_Z),
        &depth,&cpdip,&al1,&al2,&aw1,&aw2,
        (disp_d+STRIKE),(disp_d+DIP),(disp_d+NORMAL),
        (u_d+OKUX),(u_d+OKUY),(u_d+OKUZ),(u_d+OKUXX),(u_d+OKUYX),(u_d+OKUZX),
@@ -211,11 +211,11 @@ void eval_okada_basic(COMP_PRECISION *x,
   }
   //#endif
 #ifdef USE_DOUBLE_PRECISION
-  dc3d(&elastic.alpha,(x+INT_X),(x+INT_Y),(x+INT_Z),&depth,&dip,
-       &al1,&al2,&aw1,&aw2,(disp+STRIKE),(disp+DIP),
-       (disp+NORMAL),(u_global+INT_X),(u_global+INT_Y),(u_global+INT_Z),
-       (u+OKUXX),(u+OKUYX),(u+OKUZX),(u+OKUXY),(u+OKUYY),
-       (u+OKUZY),(u+OKUXZ),(u+OKUYZ),(u+OKUZZ),iret,&ifullspace);
+  dc3dm(&elastic.alpha,(x+INT_X),(x+INT_Y),(x+INT_Z),&depth,&dip,
+	&al1,&al2,&aw1,&aw2,(disp+STRIKE),(disp+DIP),
+	(disp+NORMAL),(u_global+INT_X),(u_global+INT_Y),(u_global+INT_Z),
+	(u+OKUXX),(u+OKUYX),(u+OKUZX),(u+OKUXY),(u+OKUYY),
+	(u+OKUZY),(u+OKUXZ),(u+OKUYZ),(u+OKUZZ),iret,&ifullspace);
 #else
   for(i=0;i<3;i++){
     x_d[i] = (double)x[i];
@@ -223,11 +223,11 @@ void eval_okada_basic(COMP_PRECISION *x,
   }
   depth_d = (double)depth;
   dip_d = (double)dip;
-  dc3d(&elastic.alpha,(x_d+INT_X),(x_d+INT_Y),(x_d+INT_Z),&depth_d,&dip_d,
-       &al1,&al2,&aw1,&aw2,(disp_d+STRIKE),(disp_d+DIP),
-       (disp_d+NORMAL),(u_global_d+INT_X),(u_global_d+INT_Y),(u_global_d+INT_Z),
-       (u_d+OKUXX),(u_d+OKUYX),(u_d+OKUZX),(u_d+OKUXY),(u_d+OKUYY),
-       (u_d+OKUZY),(u_d+OKUXZ),(u_d+OKUYZ),(u_d+OKUZZ),iret,&ifullspace);
+  dc3dm(&elastic.alpha,(x_d+INT_X),(x_d+INT_Y),(x_d+INT_Z),&depth_d,&dip_d,
+	&al1,&al2,&aw1,&aw2,(disp_d+STRIKE),(disp_d+DIP),
+	(disp_d+NORMAL),(u_global_d+INT_X),(u_global_d+INT_Y),(u_global_d+INT_Z),
+	(u_d+OKUXX),(u_d+OKUYX),(u_d+OKUZX),(u_d+OKUXY),(u_d+OKUYY),
+	(u_d+OKUZY),(u_d+OKUXZ),(u_d+OKUYZ),(u_d+OKUZZ),iret,&ifullspace);
   for(i=0;i<3;i++)
     u_global[i] = (COMP_PRECISION)u_global_d[i];
   for(i=0;i<12;i++)
@@ -312,24 +312,24 @@ void eval_point_short(COMP_PRECISION *x,COMP_PRECISION *xf,COMP_PRECISION area,
     potency[2]=(double)area * disp[NORMAL]* (elastic.shear/elastic.lambda);
 
 #ifdef USE_DOUBLE_PRECISION
-  dc3d0(&elastic.alpha,(x_local+INT_X),(x_local+INT_Y),(x_local+INT_Z),
-	&depth,&dip,
-	(potency+0),(potency+1),(potency+2),(potency+3),
-	(u+OKUX),(u+OKUY),(u+OKUZ),
-	(u+OKUXX),(u+OKUYX),(u+OKUZX),
-	(u+OKUXY),(u+OKUYY),(u+OKUZY),
-	(u+OKUXZ),(u+OKUYZ),(u+OKUZZ),iret,&ifullspace);
+  dc3d0m(&elastic.alpha,
+	 (x_local+INT_X),(x_local+INT_Y),(x_local+INT_Z),
+	 &depth,&dip,(potency+0),(potency+1),(potency+2),(potency+3),
+	 (u+OKUX),(u+OKUY),(u+OKUZ),
+	 (u+OKUXX),(u+OKUYX),(u+OKUZX),
+	 (u+OKUXY),(u+OKUYY),(u+OKUZY),
+	 (u+OKUXZ),(u+OKUYZ),(u+OKUZZ),iret,&ifullspace);
 #else
   dip_d = (double)dip;
   for(i=0;i<3;i++)
     x_local_d[i] = (double)x_local[i];
-  dc3d0(&elastic.alpha,(x_local_d+INT_X),(x_local_d+INT_Y),(x_local_d+INT_Z),
-	&depth,&dip_d,
-	(potency+0),(potency+1),(potency+2),(potency+3),
-	(u_d+OKUX),(u_d+OKUY),(u_d+OKUZ),
-	(u_d+OKUXX),(u_d+OKUYX),(u_d+OKUZX),
-	(u_d+OKUXY),(u_d+OKUYY),(u_d+OKUZY),
-	(u_d+OKUXZ),(u_d+OKUYZ),(u_d+OKUZZ),iret,&ifullspace);
+  dc3d0m(&elastic.alpha,
+	 (x_local_d+INT_X),(x_local_d+INT_Y),(x_local_d+INT_Z),
+	 &depth,&dip_d,(potency+0),(potency+1),(potency+2),(potency+3),
+	 (u_d+OKUX),(u_d+OKUY),(u_d+OKUZ),
+	 (u_d+OKUXX),(u_d+OKUYX),(u_d+OKUZX),
+	 (u_d+OKUXY),(u_d+OKUYY),(u_d+OKUZY),
+	 (u_d+OKUXZ),(u_d+OKUYZ),(u_d+OKUZZ),iret,&ifullspace);
   for(i=0;i<12;i++)
     u[i] = (COMP_PRECISION)u_d[i];
 #endif

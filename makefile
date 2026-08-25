@@ -446,7 +446,7 @@ clean:
 	rm -rf $(ODIR)/*.o $(ODIR)/*.a  
 
 dist_clean:		
-	rm -rf $(BDIR)/* src/includes/auto_proto.h src/includes/auto_proto.sgl.h
+	rm -rf  $(ODIR)/*.o $(ODIR)/*.a $(BDIR)/* src/includes/auto_proto.h src/includes/auto_proto.sgl.h
 
 obj_directories:
 	if [ ! -s $(ODIR) ];then \
