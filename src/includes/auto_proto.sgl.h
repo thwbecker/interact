@@ -575,3 +575,4 @@ float ve_nur_mavko_vz(float, float, float, float, float, float, float, float, in
 void relax_stress_field(struct med *, struct flt *, float, float, float (*)[3][3]);
 void relax_stress_step(struct med *, float, float, float (*)[3][3], float (*)[3][3]);
 /* src/relax/relax_fault_ve.c */
+/* src/relax/ve_sp_cycle.c */

@@ -413,7 +413,7 @@ random_geom_tools:  $(BDIR)/randomflt  $(BDIR)/generate_random_2d \
 random_prop_tools: $(BDIR)/create_random_stress_file \
 	$(BDIR)/create_random_mu_file $(BDIR)/calc_stress_stat
 
-relax: $(BDIR)/relax_fault $(BDIR)/relax_fault_ve 
+relax: $(BDIR)/relax_fault $(BDIR)/relax_fault_ve $(BDIR)/ve_sp_cycle 
 
 block_tools: $(BDIR)/block_checkflt $(BDIR)/block_evaluate_solution 
 
@@ -487,6 +487,10 @@ $(BDIR)/ve_laplace_check: $(ODIR)/ve_laplace_check.o $(VE_OBJS) $(GEN_P_INC) $(L
 $(BDIR)/relax_fault_ve: $(ODIR)/relax_fault_ve.o $(VE_OBJS) $(GEN_P_INC)  $(LIBLIST) 
 	$(MPILD) $(ODIR)/relax_fault_ve.o $(VE_OBJS) $(MY_LIBDIR_SPEC)$(ODIR)/  \
 	-o $(BDIR)/relax_fault_ve $(LIBS)  $(LDFLAGS)
+
+$(BDIR)/ve_sp_cycle: $(ODIR)/ve_sp_cycle.o $(VE_OBJS) $(GEN_P_INC)  $(LIBLIST) 
+	$(MPILD) $(ODIR)/ve_sp_cycle.o $(VE_OBJS) $(MY_LIBDIR_SPEC)$(ODIR)/  \
+	-o $(BDIR)/ve_sp_cycle $(LIBS)  $(LDFLAGS)
 
 $(BDIR)/ve_layered_check: $(ODIR)/ve_layered_check.o $(VE_OBJS) $(GEN_P_INC)  $(LIBLIST) 
 	$(MPILD) $(ODIR)/ve_layered_check.o $(VE_OBJS) $(MY_LIBDIR_SPEC)$(ODIR)/ \
