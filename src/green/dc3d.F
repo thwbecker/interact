@@ -22,12 +22,26 @@ c     - changed value of EPS to reflect double precision (was 1.0d-6)
 c
 c     - added call to sincos functions
 c
+c     - INTERFACE CHANGE relative to Okada's original: both DC3D0 and
+c       DC3D take an additional, final integer argument IFULLSPACE
+c       (0: half space, i.e. the original behavior; 1: full space),
+c       following the (also non-original) IRET return code argument.
+c       EXTERNAL CALLERS BEWARE: linking dc3d.o with Okada's textbook
+c       argument list compiles and links fine but reads garbage for
+c       IRET/IFULLSPACE (typically without crashing), silently
+c       producing wrong results. Always pass IRET and IFULLSPACE.
+c
 c     see also rcs logs!
 c
 c part of interact, (C) Thorsten Becker; see README.md and COPYRIGHT
 c
 c
 c
+c
+c
+c     NOTE: IRET and IFULLSPACE (0: half space, 1: full space) are
+c     additions relative to Okada's published interface; external
+c     callers must pass both (see header comments)
 c
       SUBROUTINE  DC3D0(ALPHA,X,Y,Z,DEPTH,DIP,POT1,POT2,POT3,POT4,      
      *     UX,UY,UZ,UXX,UYX,UZX,UXY,UYY,UZY,UXZ,UYZ,UZZ,IRET,
@@ -573,6 +587,11 @@ C=========================================
       END                    
 
       
+c
+c     NOTE: IRET and IFULLSPACE (0: half space, 1: full space) are
+c     additions relative to Okada's published interface; external
+c     callers must pass both (see header comments)
+c
       SUBROUTINE  DC3D(ALPHA,X,Y,Z,DEPTH,DIP,                           
      *     AL1,AL2,AW1,AW2,DISL1,DISL2,DISL3,                  
      *     UX,UY,UZ,UXX,UYX,UZX,UXY,UYY,UZY,UXZ,UYZ,UZZ,IRET,
