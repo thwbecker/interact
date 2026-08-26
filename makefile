@@ -311,7 +311,7 @@ INTERACT_OBJS_SGL = $(INTERACT_OBJS:.o=.sgl.o)
 #
 # objects for rsf_solve
 RSF_SOLVE_OBJS = $(ODIR)/rsf_solve.o $(ODIR)/rsf_engine.o $(ODIR)/rsf_imex.o \
-	$(ODIR)/rsf_init.o $(ODIR)/rsf_output.o
+	$(ODIR)/rsf_init.o $(ODIR)/rsf_output.o $(ODIR)/rsf_ve.o $(VE_OBJS)
 
 #
 # objects for randomflt

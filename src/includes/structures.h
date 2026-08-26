@@ -203,6 +203,34 @@ struct rsf_vars{
 					domain-check rejections (storm guard,
 					-domain_check_max_reject, <= 0 off) */
   PetscInt domain_check_nreject;     /* running count, reset on accept */
+  /*
+     visco-elastic hereditary stressing (Prony representation of the
+     step-response interaction kernel, see src/rsf_ve.c and
+     rsf_ve_implementation_plan.md steps 3 and 5): OFF unless
+     ve_np > 0, in which case the shear stressing rate gains the sink
+     - sum_p h_p/tau_p with per-patch memory states h_p forced by
+     C_p (v - vpl), updated by an exact-exponential recurrence
+     between accepted steps (the memory-light "step" h mode)
+  */
+#define RSF_VE_MAX_NP 8
+  PetscInt  ve_np;		/* number of exponential terms, 0 = off */
+  PetscInt  ve_mode;		/* 1: uniform Maxwell, 2: layered antiplane */
+  PetscInt  ve_hstage;		/* 1 (default): stage-consistent sink forcing
+				   (within-step h forcing from the stage state's
+				   own slip increment, under TS error control);
+				   0: frozen decay-only sink (forcing lagged to
+				   the last accepted step; cheaper, np fewer
+				   matvecs per RHS, but first-order in the
+				   interseismic velocity variation, which can
+				   bias recurrence in relaxation-sensitive
+				   near-critical problems) */
+  PetscReal ve_tau[RSF_VE_MAX_NP]; /* relaxation times [s] */
+  Mat       ve_C[RSF_VE_MAX_NP];   /* amplitude operators [Pa/m], Is layout */
+  Vec       ve_h[RSF_VE_MAX_NP];   /* memory states [Pa], Is row layout */
+  Vec       ve_slip_prev;	/* slip at the last h update [m] */
+  Vec       ve_negvpl;		/* -vpl per patch [m/s] (loading reference) */
+  Vec       ve_vrel,ve_work;	/* scratch, Is row layout */
+  PetscReal ve_t0;		/* time of the last h update [s] */
   /*  */
   short int dim;
 };

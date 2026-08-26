@@ -624,6 +624,11 @@ PetscErrorCode rsf_write_checkpoint(TS ts, Vec X, struct rsf_out_ctx *uc)
   PetscCall(VecSetValue(meta,6,(PetscScalar)step,INSERT_VALUES));
   PetscCall(VecSetValue(meta,7,(PetscScalar)t,INSERT_VALUES));
   PetscCall(VecSetValue(meta,8,(PetscScalar)dt,INSERT_VALUES));
+  /* visco-elastic memory states (rsf_ve.c): slots 9/10 flag the VE
+     block appended after X; 0 for elastic runs, so pre-VE
+     checkpoints stay compatible */
+  PetscCall(VecSetValue(meta,9,(PetscScalar)uc->par->medium->rsf->ve_np,INSERT_VALUES));
+  PetscCall(VecSetValue(meta,10,(PetscScalar)uc->par->medium->rsf->ve_t0,INSERT_VALUES));
   PetscCall(VecAssemblyBegin(meta));
   PetscCall(VecAssemblyEnd(meta));
   snprintf(tmpf,sizeof(tmpf),"%s.tmp",uc->ckpt_file);
@@ -631,6 +636,12 @@ PetscErrorCode rsf_write_checkpoint(TS ts, Vec X, struct rsf_out_ctx *uc)
   PetscCall(PetscViewerBinaryOpen(PETSC_COMM_WORLD,tmpf,FILE_MODE_WRITE,&viewer));
   PetscCall(VecView(meta,viewer));
   PetscCall(VecView(X,viewer));
+  if(uc->par->medium->rsf->ve_np > 0){
+    PetscInt p;
+    for(p=0;p < uc->par->medium->rsf->ve_np;p++)
+      PetscCall(VecView(uc->par->medium->rsf->ve_h[p],viewer));
+    PetscCall(VecView(uc->par->medium->rsf->ve_slip_prev,viewer));
+  }
   PetscCall(PetscViewerDestroy(&viewer));
   PetscCall(VecDestroy(&meta));
   PetscCallMPI(MPI_Comm_rank(PETSC_COMM_WORLD,&rank));
@@ -684,6 +695,16 @@ PetscErrorCode rsf_read_checkpoint(const char *file, Vec X, struct rsf_out_ctx *
   *step = (PetscInt)mv[6];
   *t = (PetscReal)mv[7];
   *dt = (PetscReal)mv[8];
+  {				/* VE block flags, 0 in elastic checkpoints */
+    PetscInt cnp = (PetscInt)mv[9];
+    struct rsf_vars *rsf = medium->rsf;
+    if(cnp != rsf->ve_np)
+      SETERRQ(PETSC_COMM_WORLD,PETSC_ERR_ARG_INCOMP,
+	      "rsf_read_checkpoint: checkpoint has %ld VE memory terms, run has %ld (elastic and VE runs cannot restart from each other)",
+	      (long)cnp,(long)rsf->ve_np);
+    if(rsf->ve_np > 0)
+      rsf->ve_t0 = (PetscReal)mv[10];
+  }
   PetscCall(VecRestoreArrayRead(mseq,&mv));
   PetscCall(VecScatterDestroy(&scat));
   PetscCall(VecDestroy(&mseq));
@@ -708,10 +729,17 @@ PetscErrorCode rsf_read_checkpoint(const char *file, Vec X, struct rsf_out_ctx *
 	      (long)law,(long)uc->ckpt_law);
   }
   PetscCall(VecLoad(X,viewer));
+  if(medium->rsf->ve_np > 0){	/* the VE memory block after X */
+    PetscInt p;
+    for(p=0;p < medium->rsf->ve_np;p++)
+      PetscCall(VecLoad(medium->rsf->ve_h[p],viewer));
+    PetscCall(VecLoad(medium->rsf->ve_slip_prev,viewer));
+  }
   PetscCall(PetscViewerDestroy(&viewer));
   HEADNODE
-    fprintf(stderr,"rsf_read_checkpoint: restarting from %s: step %ld t %.8e s (%.4f yr) dt %.3e s\n",
-	    file,(long)*step,(double)*t,(double)(*t)/SEC_PER_YEAR,(double)*dt);
+    fprintf(stderr,"rsf_read_checkpoint: restarting from %s: step %ld t %.8e s (%.4f yr) dt %.3e s%s\n",
+	    file,(long)*step,(double)*t,(double)(*t)/SEC_PER_YEAR,(double)*dt,
+	    (medium->rsf->ve_np > 0)?(" (with VE memory states)"):(""));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
@@ -730,7 +758,8 @@ PetscErrorCode rsf_TS_Monitor(TS ts,PetscInt step,PetscReal time,Vec X,void *ptr
   PetscFunctionBeginUser;
   {
     struct rsf_out_ctx *uc_ck = (struct rsf_out_ctx *)ptr;
-    if((uc_ck->ckpt_every > 0) && (step > 0) && (step % uc_ck->ckpt_every == 0))
+    if((uc_ck->ckpt_every > 0) && (step > uc_ck->ckpt_step0) &&
+       (step % uc_ck->ckpt_every == 0))
       PetscCall(rsf_write_checkpoint(ts,X,uc_ck));
   }
   uc = (struct rsf_out_ctx *)ptr;

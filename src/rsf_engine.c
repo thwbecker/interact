@@ -136,7 +136,7 @@ PetscReal rsf_state_rate(PetscInt i, PetscReal psi, PetscReal vin,
    between the monolithic RHS and the IMEX explicit RHS.  Includes the
    layout consistency check formerly at the top of rsf_ODE_RHSFunction.
 */
-PetscErrorCode rsf_compute_vel_and_stressing(Vec X, struct interact_ctx *par)
+PetscErrorCode rsf_compute_vel_and_stressing(Vec X, PetscReal time, struct interact_ctx *par)
 {
   PetscScalar *vel,mu,scaled_tau,exp_fac;
   const PetscScalar *x;
@@ -168,6 +168,9 @@ PetscErrorCode rsf_compute_vel_and_stressing(Vec X, struct interact_ctx *par)
   PetscCall(MatMult(medium->Is, rsf->vel, rsf->tau_dot));
   if(rsf->calc_sigma_dot)
     PetscCall(MatMult(medium->In, rsf->vel, rsf->sigma_dot));
+  /* visco-elastic hereditary sink (no-op unless -ve_mode is active,
+     see rsf_ve.c): tau_dot -= sum_p h_p(t0) e^(-(t-t0)/tau_p)/tau_p */
+  PetscCall(rsf_ve_apply_sink(par,X,time));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
@@ -200,7 +203,7 @@ PetscErrorCode rsf_ODE_RHSFunction(TS ts,PetscReal time,Vec X,Vec F,void *ptr)
   rsf = medium->rsf;
   
   /* layout consistency is checked inside rsf_compute_vel_and_stressing */
-  PetscCall(rsf_compute_vel_and_stressing(X,par));
+  PetscCall(rsf_compute_vel_and_stressing(X,time,par));
   PetscCall(VecGetArrayRead(X,&x));
   /* 
      compute derivatives 

@@ -85,6 +85,24 @@ COMP_PRECISION resolve_stress_on_fault(COMP_PRECISION stress[3][3],  struct flt 
 {
   COMP_PRECISION sval,trac[3];
   resolve_force(fault->normal,stress,trac);
+#ifdef ALLOW_NON_3DQUAD_GEOM
+  /* 2-D antiplane (mode III) elements: the slip assigned via
+     slip[STRIKE] is the OUT-OF-PLANE (z) displacement jump, so the
+     work-conjugate shear traction is the out-of-plane component,
+     which in the base-vector convention of these patches (read in
+     with the dip = -90 antiplane flag, reset to the geometric dip of
+     90 by read_geometry: normal = +x, t_strike = +y, t_dip = +z for
+     strike 0) is the t_dip projection:
+     dotp(trac, t_dip) = sigma_xz on the positive-x face, negative
+     for the self-interaction as required.  The t_strike projection,
+     which the generic branch below would use, is identically zero
+     for antiplane fields; mapping STRIKE to the conjugate component
+     here makes single-slip-mode operator assembly (rsf_solve,
+     compress_interaction_matrix, hmat kernels) work on antiplane
+     geometries */
+  if((fault->type == TWO_DIM_ANTIPLANE) && (mode == STRIKE))
+    return dotp_3d(trac,fault->t_dip);
+#endif
   switch(mode){
   case STRIKE:
     sval = dotp_3d(trac,fault->t_strike);

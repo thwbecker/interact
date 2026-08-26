@@ -130,3 +130,27 @@
 
 
 
+
+/* 
+   visco-elastic hereditary kernel machinery (rsf_ve.c) compile-time
+   settings.  These are fixed here rather than run-time options
+   because good values are geometry independent and unlikely to need
+   changing:
+
+   VE_NIMG_DEF: image-family depth of the Laplace-domain sampling of
+   the layered antiplane kernel.  Each sample at s_k truncates the
+   reflection series at Gamma(s_k)^n; the smallest sample s_min =
+   b/100 has Gamma ~ 0.99, so n = 600 leaves a relative truncation
+   of exp(-6) ~ 2.5e-3 in the SLOWEST kernel content (the relaxed /
+   late-interseismic part); the fast and coseismic parts converge
+   after a few images.  Halving it doubles that bias; assembly cost
+   is linear in it.
+
+   VE_FIT_TOL_DEF: abort threshold on the worst per-pair held-out
+   residual of the Prony fit.  A pure safety gate: it changes no
+   numbers, it only refuses to run when the rate ladder cannot
+   represent the sampled kernel (typical healthy values are 3e-5,
+   two orders below the gate).
+*/
+#define VE_NIMG_DEF 600
+#define VE_FIT_TOL_DEF 1e-3

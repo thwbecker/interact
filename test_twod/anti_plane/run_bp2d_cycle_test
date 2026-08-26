@@ -1,0 +1,143 @@
+#!/bin/bash
+#
+# run_bp2d_cycle_test: 2-D antiplane rate-and-state earthquake cycles
+# in rsf_solve, elastic and with the visco-elastic hereditary kernels
+# (-ve_mode), BP5-style depth-dependent a-b on vertical shear zones.
+#
+# stages (each gates on PASS/FAIL):
+#  (1) elastic baseline: BP5-style single fault in the elastic half
+#      plane must produce arresting stick-slip events
+#  (2) VE elastic limit: -ve_mode 2 with a huge Maxwell time must
+#      reproduce the elastic event times to integrator accuracy
+#  (3) locked-fault hereditary loading: a velocity-pinned through-plate
+#      fault under backslip loading must follow the closed-form
+#      Savage-Prescott-type loading curve (independent python analytic)
+#  (4) a short plate-over-Maxwell cycle run (tM comparable to the
+#      recurrence) demonstrating sustained, modified cycles, plus a
+#      uniform-Maxwell (-ve_mode 1) run demonstrating loading
+#      saturation (no events), the C_inf = 0 end member
+#
+# run from test_twod/anti_plane with the binaries built
+#
+bindir=`cd ../../bin && pwd`
+sdir=`pwd`
+tmpd=tmp_bp2d_cycle
+fail=0
+mkdir -p $tmpd
+cd $tmpd
+
+common="-dc 0.14 -sigma_init 25e6 -rtol 1e-4 -ts_rk_type 3bs -dt_monitor_yr 2 -track_events"
+
+# ---- (1) elastic baseline ---------------------------------------------------
+# fault depth 20 km INSIDE the 40-km plate: a fault cutting the whole
+# plate has a stress-free uniform-slip-deficit mode in the relaxed
+# limit and hence no steady cycle attractor (secular drift); keeping
+# the fault bottom above the interface restores a nonzero relaxed
+# kernel and a well-defined steady state
+python3 $sdir/gen_bp2d.py 0.5 1 20 20 6 > /dev/null
+$bindir/rsf_solve -geom_file geom_bp2d.in -rsf_file rsf_bp2d.dat -rsf_ic_file ic_bp2d.in \
+  -stop_time_yr 600 $common > run_el.log 2>&1
+nev=`grep -v '^#' rsf_events.dat | awk '$3==1' | wc -l`
+narr=`grep -v '^#' rsf_events.dat | awk '$3==-1' | wc -l`
+cp rsf_events.dat ev_elastic.dat; cp rsf_monitor.dat mon_elastic.dat
+if [ $nev -ge 2 ] && [ $narr -ge 2 ];then
+    echo "$0: (1) elastic baseline: $nev events, all arrested: PASS"
+else
+    echo "$0: (1) elastic baseline: $nev onsets / $narr arrests: FAIL"; fail=1
+fi
+
+# ---- (2) VE elastic limit ---------------------------------------------------
+$bindir/rsf_solve -geom_file geom_bp2d.in -rsf_file rsf_bp2d.dat -rsf_ic_file ic_bp2d.in \
+  -stop_time_yr 600 $common -ve_mode 2 -ve_tmaxwell_yr 1e7 -ve_plate_h 40e3 -ve_h_init 0 > run_lim.log 2>&1
+python3 - <<EOF || fail=1
+import numpy as np,sys
+def onsets(f):
+    o=[]
+    for l in open(f):
+        if l.startswith("#"): continue
+        c=l.split()
+        if int(c[2])==1: o.append(float(c[1]))
+    return np.array(o)
+a,b=onsets("ev_elastic.dat"),onsets("rsf_events.dat")
+ok=(len(a)==len(b)) and np.max(np.abs(a-b))<0.01
+print(f"$0: (2) VE elastic limit: worst event-time deviation "
+      f"{np.max(np.abs(a-b)) if len(a)==len(b) else float('nan'):.5f} yr: "+("PASS" if ok else "FAIL"))
+sys.exit(0 if ok else 1)
+EOF
+
+# ---- (3) locked-fault hereditary loading vs closed form ---------------------
+python3 - <<'EOF'
+half=250.0
+with open("geoml.in","w") as fg, open("rsfl.dat","w") as fr, open("icl.in","w") as fi:
+    for j in range(80):
+        zmid=(j+0.5)*500.0
+        fg.write(f"0 {-zmid:.6e} 0 0 -90 {half:.6e} 0 0\n")
+        fr.write("0.2 0.1\n")
+        fi.write("1.0e7 1.0e-15\n")
+EOF
+rm -f rsf_checkpoint.bin*
+$bindir/rsf_solve -geom_file geoml.in -rsf_file rsfl.dat -rsf_ic_file icl.in \
+  -stop_time_yr 80 -dc 0.14 -sigma_init 25e6 -rtol 1e-6 -ts_rk_type 3bs \
+  -ve_mode 2 -ve_tmaxwell_yr 20 -ve_plate_h 40e3 -ve_h_init 0 \
+  -rsf_checkpoint 1000000000 -dt_monitor_yr 1000 > run_lock.log 2>&1
+python3 - <<'EOF' || fail=1
+import numpy as np, struct, sys
+def read_petsc_vecs(fname):
+    vecs=[]
+    with open(fname,"rb") as f:
+        while True:
+            h=f.read(8)
+            if len(h)<8: break
+            cid,n=struct.unpack(">ii",h)
+            if cid!=1211214: break
+            vecs.append(np.frombuffer(f.read(8*n),dtype=">f8").copy())
+    return vecs
+H=40e3; tM=20*3.15576e7; b=1.0/(2.0*tM); vpl=1e-9; tau0=1.0e7; G=32.04e9
+T=80*3.15576e7
+z=(np.arange(80)+0.5)*500.0
+nmax=80
+def S_n(z,n,H):
+    if n==0: return (1.0/(z+H)-1.0/(z-H))/(2*np.pi)
+    return (1.0/(z-(2*n-1)*H)-1.0/(z-(2*n+1)*H)+1.0/(z+(2*n+1)*H)-1.0/(z+(2*n-1)*H))/(2*np.pi)
+Sn=np.array([S_n(z,n,H)*G for n in range(nmax+1)])
+ts=np.linspace(0,T,4001)
+bt=b*ts
+w=np.zeros((nmax+1,ts.size)); w[0]=1.0
+eterm=np.exp(-bt); psum=np.zeros_like(bt)
+for n in range(1,nmax+1):
+    psum=psum+eterm; w[n]=np.maximum(1.0-psum,0.0); eterm=eterm*bt/n
+In=np.trapezoid(w,ts,axis=1)
+meta,X,*_=read_petsc_vecs("rsf_checkpoint.bin")
+tau=X.reshape(80,4)[:,1]
+dta=vpl*(Sn.T@In); dtn=tau-tau0
+dev=np.max(np.abs(dtn-dta))/np.max(np.abs(dta))
+ok=dev<2e-2
+print(f"run_bp2d_cycle_test: (3) locked-fault hereditary loading vs closed form: "
+      f"worst rel dev {dev:.2e} (max {np.max(np.abs(dta))/1e6:.2f} MPa): "+("PASS" if ok else "FAIL"))
+sys.exit(0 if ok else 1)
+EOF
+
+# ---- (4) cycle physics: layered sustains and modifies, uniform stalls -------
+$bindir/rsf_solve -geom_file geom_bp2d.in -rsf_file rsf_bp2d.dat -rsf_ic_file ic_bp2d.in \
+  -stop_time_yr 1500 $common -ve_mode 2 -ve_tmaxwell_yr 20 -ve_plate_h 40e3 > run_ve20.log 2>&1
+cp rsf_events.dat ev_ve20.dat; cp rsf_monitor.dat mon_ve20.dat
+nev2=`grep -v '^#' ev_ve20.dat | awk '$3==1' | wc -l`
+# uniform Maxwell in the SPUN (steady) state has zero net backslip
+# loading (C_inf = 0): no sustained cycles for any t_M; the virgin
+# state shows the (~t_M long) transient instead
+$bindir/rsf_solve -geom_file geom_bp2d.in -rsf_file rsf_bp2d.dat -rsf_ic_file ic_bp2d.in \
+  -stop_time_yr 1500 $common -ve_mode 1 -ve_tmaxwell_yr 50 > run_uni50.log 2>&1
+cp rsf_events.dat ev_uni50.dat; cp rsf_monitor.dat mon_uni50.dat
+nev3=`grep -v '^#' ev_uni50.dat | awk '$3==1' | wc -l`
+if [ $nev2 -ge 8 ] && [ $nev3 -le 2 ];then
+    echo "$0: (4) plate-over-Maxwell (tM 20 yr): $nev2 events sustained; uniform Maxwell (tM 50 yr, spun): $nev3 events (steady loading saturates): PASS"
+else
+    echo "$0: (4) layered $nev2 events, uniform $nev3 events: FAIL (expected >=8 and <=2)"; fail=1
+fi
+
+cd ..
+if [ $fail -eq 0 ];then
+    echo "$0: all 2-D antiplane cycle checks passed"
+else
+    echo "$0: FAILURES, see above"; exit 1
+fi

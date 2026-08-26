@@ -73,7 +73,7 @@ PetscErrorCode rsf_IMEX_RHSFunction(TS ts,PetscReal time,Vec X,Vec G,void *ptr)
   PetscFunctionBeginUser;
   par = (struct interact_ctx *)ptr;
   medium = par->medium;fault = par->fault;rsf = medium->rsf;
-  PetscCall(rsf_compute_vel_and_stressing(X,par));
+  PetscCall(rsf_compute_vel_and_stressing(X,time,par));
   PetscCall(VecGetArrayRead(X,&x));
   PetscCall(VecGetArrayRead(rsf->vel,&velr));
   PetscCall(VecGetArrayRead(rsf->tau_dot,&tau_dot));

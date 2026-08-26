@@ -150,6 +150,12 @@ void read_geometry(char *patch_filename,struct med **medium,
 	/* out of plane slip, can be full or half space */
 	(*fault+i)->type = TWO_DIM_ANTIPLANE;
 	nr_2d_anti++;
+	/* dip = -90 is only the INPUT flag selecting antiplane; the
+	   patch itself is a vertical plane, so reset to the geometric
+	   dip of 90 for all downstream base-vector and geometry use
+	   (the type carries the antiplane nature; patch-format output
+	   re-emits -90, see print_patch_geometry) */
+	(*fault+i)->dip = 90.0;
       }
       (*fault+i)->w = 1;	/* for area computation */
       (*fault+i)->area = (*fault+i)->w * (*fault+i)->l;

@@ -82,10 +82,13 @@ int print_patch_geometry_and_bc(int flt_offset,struct flt *fault,
     case TWO_DIM_ANTIPLANE:
     case TWO_DIM_SEGMENT_PLANE_STRAIN:
     case TWO_DIM_SEGMENT_PLANE_STRESS:{// normal rectangular fault, this is the default
+      /* the patch FILE format flags antiplane by dip = -90 (the
+	 in-memory dip is reset to the geometric 90 at read time) */
       fprintf(out,"%19.12e %19.12e %19.12e %10.6f %10.6f %19.12e %19.12e %10i\n",
 	      fault[flt_offset].x[INT_X], fault[flt_offset].x[INT_Y], 
 	      fault[flt_offset].x[INT_Z],fault[flt_offset].strike,
-	      fault[flt_offset].dip,
+	      (fault[flt_offset].type == TWO_DIM_ANTIPLANE)?
+	      (-fabs(fault[flt_offset].dip)):(fault[flt_offset].dip),
 	      fault[flt_offset].l,fault[flt_offset].w,fault[flt_offset].group);
       break;
     }

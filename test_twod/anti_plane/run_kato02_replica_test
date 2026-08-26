@@ -1,0 +1,88 @@
+#!/bin/bash
+#
+# Kato (EPS 2002) replica and machinery cross-validation for the 2-D
+# antiplane VE cycles in rsf_solve (see kato_mn_replication_notes.md).
+#
+# Gates (about 3 minutes total):
+#  (1) elastic replica: Tcy within 1 yr of the calibrated 137.9 yr
+#      (Kato Table 1: 138), on the full n=200 discretization
+#  (2) independent-integrator cross-check: on a reduced n=80 problem,
+#      rsf_solve -ve_mode 2 (tr = 1 yr, virgin start) against
+#      kato02_exact_chain.py, which integrates Kato's hereditary kernel
+#      (his Eqs 1-5) EXACTLY via Erlang memory chains, with no Prony fit
+#      and no shared code.  First recurrence intervals must agree to 8
+#      percent, and BOTH must be shorter than 0.85 x elastic, which is
+#      the (non-)replication result: Kato's published Table 1 reports NO
+#      change there.
+#
+# Full sweeps (tr = 1..300, h = 20/15/12, the M&N 2019 patch runs, the
+# loading-condition experiments) are documented in the notes and take
+# minutes each; this script only gates the machinery.
+
+bindir=`cd ../../bin && pwd`
+sdir=`pwd`
+tdir=tmp_kato02_replica
+mkdir -p $tdir; cd $tdir
+fail=0
+
+common="-state_law 5 -v0 1e-6 -f0 0.6 -vpl 1.109083e-9 -shear_modulus 30e9 \
+ -s_wave_speed 3270 -rtol 1e-4 -ts_rk_type 3bs -dt_monitor_yr 20 -track_events \
+ -rsf_catalog -rsf_monitor_by_group 1 -vel_event 1e-2"
+
+# ---- (1) elastic replica, full resolution --------------------------------
+python3 $sdir/gen_kato02.py 0.1 20 kato02 > gen.log
+$bindir/rsf_solve -geom_file kato02_geom.in -rsf_file kato02_rsf.dat \
+  -rsf_ic_file kato02_ic.in -rsf_sigma_file kato02_sigma.in -dc 0.05 \
+  -stop_time_yr 560 $common > run_el.log 2>&1
+tcy=`grep -v '^#' rsf_catalog.g000.dat | awk '$6>50{if(t)d=$2-t; t=$2} END{print d}'`
+ok=`echo $tcy | awk '{print ($1>136.9 && $1<138.9)?1:0}'`
+if [ "$ok" = "1" ];then
+    echo "$0: (1) elastic Kato replica: Tcy $tcy yr (target 137.9, Kato 138): PASS"
+else
+    echo "$0: (1) elastic Kato replica: Tcy '$tcy' yr outside [136.9,138.9]: FAIL"; fail=1
+fi
+
+# ---- (2) VE cross-validation against the exact-chain integrator ----------
+rm -f rsf_catalog* rsf_events.dat rsf_monitor*
+python3 $sdir/gen_kato02.py 0.25 20 kato02 > gen.log
+$bindir/rsf_solve -geom_file kato02_geom.in -rsf_file kato02_rsf.dat \
+  -rsf_ic_file kato02_ic.in -rsf_sigma_file kato02_sigma.in -dc 0.1 \
+  -stop_time_yr 350 $common \
+  -ve_mode 2 -ve_plate_h 20e3 -ve_tmaxwell_yr 0.5 -ve_h_init 0 > run_ve.log 2>&1
+python3 $sdir/kato02_exact_chain.py 200 1 350 80 0.1 > chain.log 2>&1
+python3 - <<EOF || fail=1
+import numpy as np,sys
+tv=[]
+for l in open("rsf_catalog.g000.dat"):
+    if l.startswith("#"): continue
+    c=l.split()
+    if int(c[5])>30: tv.append(float(c[1]))
+iv_rsf=np.diff(tv)
+on=[]
+for l in open("chain.log"):
+    if l.startswith(" onsets"):
+        on=sorted(set(float(x) for x in l.split(":")[1].split()))
+iv_ch=np.diff(on)
+if len(iv_rsf)<2 or len(iv_ch)<2:
+    print("cross-check: too few events (rsf %d, chain %d): FAIL"%(len(iv_rsf),len(iv_ch)));sys.exit(1)
+# gate the FIRST TWO intervals: beyond those the two representations
+# drift apart slowly (the fitted ladder spans [tM/1.5, 45 tM] while the
+# exact Erlang chain carries content out to M tr; the secular neutral
+# mode of the through-plate geometry amplifies that tail difference,
+# about 9 percent by interval 3, same asymptotics; see the notes)
+nn=min(len(iv_rsf),len(iv_ch),2)
+dev=np.max(np.abs(iv_rsf[:nn]-iv_ch[:nn])/(0.5*(iv_rsf[:nn]+iv_ch[:nn])))
+el=151.3   # elastic Tcy of this reduced problem (rsf_solve = chain M=0 to 0.01%)
+short=max(iv_rsf[:nn].max(),iv_ch[:nn].max())/el
+ok = dev < 0.08 and short < 0.85
+print("cross-check: rsf %s vs exact chain %s yr; max dev %.1f%%; Tcy/Tel <= %.2f: %s"%(
+  np.round(iv_rsf[:nn],2),np.round(iv_ch[:nn],2),100*dev,short,"PASS" if ok else "FAIL"))
+sys.exit(0 if ok else 1)
+EOF
+
+cd ..
+if [ $fail -eq 0 ];then
+    echo "$0: all gates PASS"
+else
+    echo "$0: FAILURES, see above"; exit 1
+fi

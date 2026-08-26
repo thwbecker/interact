@@ -22,7 +22,11 @@ PetscErrorCode rsf_domain_check(TS, PetscReal, Vec, PetscBool*);
 /* shared between the explicit and IMEX paths (rsf_engine.c) */
 PetscReal rsf_state_rate(PetscInt, PetscReal, PetscReal, struct interact_ctx *,
 			 PetscReal *, PetscReal *);
-PetscErrorCode rsf_compute_vel_and_stressing(Vec, struct interact_ctx *);
+PetscErrorCode rsf_compute_vel_and_stressing(Vec, PetscReal, struct interact_ctx *);
+/* rsf_ve.c: visco-elastic hereditary stressing (Prony/h-state machinery) */
+PetscErrorCode rsf_ve_setup(struct interact_ctx *, Vec, PetscReal);
+PetscErrorCode rsf_ve_apply_sink(struct interact_ctx *, Vec, PetscReal);
+PetscErrorCode rsf_ve_monitor(TS, PetscInt, PetscReal, Vec, void *);
 /* IMEX (ARKIMEX) variant, -imex (rsf_imex.c) */
 PetscErrorCode rsf_IMEX_RHSFunction(TS, PetscReal, Vec, Vec, void*);
 PetscErrorCode rsf_IMEX_IFunction(TS, PetscReal, Vec, Vec, Vec, void*);

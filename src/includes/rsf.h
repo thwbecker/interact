@@ -133,6 +133,11 @@ struct rsf_out_ctx{
      chaining runs.
   */
   PetscInt ckpt_every;
+  PetscInt ckpt_step0;		/* step at (re)start; suppresses the spurious
+				   re-write the monitor would otherwise emit at
+				   the restart step itself (step %% ckpt_every
+				   can be 0 there, and the TS time step is not
+				   yet valid at that first monitor call) */
   char ckpt_file[300];
   PetscBool restarted;
   PetscInt ckpt_dim,ckpt_slip_mode,ckpt_law; /* stashed for the metadata */

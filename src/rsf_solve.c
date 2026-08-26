@@ -327,6 +327,12 @@ PetscErrorCode rsf_solve_run(int argc,char **argv,struct interact_ctx *par,
     PetscCall(VecScatterDestroy(&ctx));
     PetscCall(VecDestroy(&xout));
   }
+  /* optional visco-elastic hereditary stressing (rsf_ve.c): parses
+     -ve_mode etc., assembles the Prony amplitude operators and the
+     memory-state vectors; a no-op that leaves everything untouched
+     when the option is absent.  Needs the -vpl slip-rate vector as
+     the loading reference of the h forcing. */
+  PetscCall(rsf_ve_setup(par,islip_rate_vec,shear_modulus_si/medium->elastic.shear));
   PetscCall(VecDestroy(&stress_rate));
   PetscCall(VecDestroy(&islip_rate_vec));
   if(have_sratef){
@@ -598,6 +604,7 @@ PetscErrorCode rsf_solve_run(int argc,char **argv,struct interact_ctx *par,
   PetscCall(PetscOptionsGetString(NULL,NULL,"-rsf_checkpoint_file",ckpt_file,300,NULL));
   PetscCall(PetscOptionsGetString(NULL,NULL,"-rsf_restart",restart_file,300,&have_restart));
   uc->ckpt_every = ckpt_every;
+  uc->ckpt_step0 = 0;		/* raised to the restored step on restart */
   strcpy(uc->ckpt_file,ckpt_file);
   uc->restarted = have_restart;
   uc->ckpt_dim = rsf->dim;
@@ -612,6 +619,8 @@ PetscErrorCode rsf_solve_run(int argc,char **argv,struct interact_ctx *par,
 				       set->monitor_by_group));
   /* SEAS catalog, rupture-time, slip-budget; reads x0 for the seeded event */
   PetscCall(rsf_init_catalog(uc,par,set,shear_modulus_si,rsf->vpl,x,medium->time));
+  if(rsf->ve_np > 0)		/* accepted-step h update, before output */
+    PetscCall(TSMonitorSet(ts,rsf_ve_monitor,(void *)par,NULL));
   PetscCall(TSMonitorSet(ts,rsf_TS_Monitor,(void *)uc,NULL));
   if(track_events){
     PetscCall(TSSetEventHandler(ts,1,event_direction,event_terminate,
@@ -636,9 +645,27 @@ PetscErrorCode rsf_solve_run(int argc,char **argv,struct interact_ctx *par,
     PetscCall(TSSetTime(ts,restart_t));
     PetscCall(TSSetStepNumber(ts,restart_step));
     PetscCall(TSSetTimeStep(ts,restart_dt));
+    uc->ckpt_step0 = restart_step;
     HEADNODE
       fprintf(stderr,"%s: restart: -ts_max_steps counts absolute steps; raise it beyond %ld when chaining\n",
 	      argv[0],(long)restart_step);
+  }
+  if(rsf->ve_np > 0){
+    /* h clock and slip reference at the (possibly restarted) start
+       state; on restart the h states themselves were loaded by
+       rsf_read_checkpoint */
+    PetscReal tstart;
+    const PetscScalar *xr;
+    PetscScalar *sp;
+    PetscCall(TSGetTime(ts,&tstart));
+    if(!have_restart)
+      rsf->ve_t0 = tstart;
+    PetscCall(VecGetArrayRead(x,&xr));
+    PetscCall(VecGetArray(rsf->ve_slip_prev,&sp));
+    for(i=medium->rs,j=i*rsf->dim;i < medium->re;i++,j+=rsf->dim)
+      sp[i-medium->rs] = xr[j-medium->rs*rsf->dim+3];
+    PetscCall(VecRestoreArray(rsf->ve_slip_prev,&sp));
+    PetscCall(VecRestoreArrayRead(x,&xr));
   }
   PetscCall(TSSolve(ts, x));
   if(ckpt_every > 0)
