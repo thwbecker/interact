@@ -1,0 +1,66 @@
+#!/bin/bash
+#
+# run_pom_transplant_test: quantitative measurement of the
+# scalar-image ("transplant") approximation for 3-D plate-over-Maxwell
+# surface deformation against the Kaj Johnson propagator, with and
+# without the second image family (ve_pom_compare2; the single-family
+# mode reproduces the construction of the historical negative result)
+#
+# panel: mechanisms x times; metrics: least-squares amplitude recovery
+# and shape correlation of the transient over a 2-D station grid
+#
+# geometry pairing (decoded from pom_maxwell.c): pom's point source
+# sits at depth m[2] - (W/2) sin(dip), with a horizontal centroid
+# offset (W/2) cos(dip) in the dip direction; vertical faults pair
+# exactly with an interact patch centered at that depth, and the
+# dipping cases use a small W so the horizontal offset is negligible
+#
+bindir=`cd ../bin && pwd`
+pomdir=`cd plate_over_maxwell_c && pwd`
+tmpd=tmp_pom_transplant
+fail=0
+mkdir -p $tmpd
+cd $tmpd
+( cd $pomdir && make pom > /dev/null 2>&1 )
+python3 -c "
+for x in (4,6,8,12,16,24,32,48,64,80):
+    for y in (0,6,16,30): print(x,y)" > sta2.txt
+
+run_case () {
+  name=$1; mf=$2; pomm=$3; mode=$4
+  $bindir/makefault $mf -n 1 -m 1 > geom.in 2>/dev/null
+  for t in 25 100 500;do
+    $pomdir/pom maxwell -m $pomm -t $t -tR 25 -H 20 -mulam 1 \
+        -sta sta2.txt -o pom_${name}_t$t.txt 2>/dev/null
+    $bindir/ve_pom_compare2 20 25 $t 300 $mode 1 sta2.txt > new_${name}_t$t.txt 2>/dev/null || fail=1
+    $bindir/ve_pom_compare2 20 25 $t 300 $mode 0 sta2.txt > old_${name}_t$t.txt 2>/dev/null || fail=1
+  done
+}
+run_case ss90  "-l 1 -w 1 -x 0 -y 0 -z -11 -strike 0 -dip 90"    "2 2 12 90 0 0 0 1 0 0" 0
+run_case ds90  "-l 1 -w 1 -x 0 -y 0 -z -11 -strike 0 -dip 90"    "2 2 12 90 0 0 0 0 1 0" 1
+run_case ten90 "-l 1 -w 1 -x 0 -y 0 -z -11 -strike 0 -dip 90"    "2 2 12 90 0 0 0 0 0 1" 2
+run_case ds30  "-l 1 -w 0.25 -x 0 -y 0 -z -11 -strike 0 -dip 30" "2 0.5 11.125 30 0 0 0 0 1 0" 1
+run_case ss60  "-l 1 -w 0.25 -x 0 -y 0 -z -11 -strike 0 -dip 60" "2 0.5 11.2165 60 0 0 0 1 0 0" 0
+
+python3 - <<'EOF'
+import numpy as np
+def metrics(tfile,pfile):
+    d=np.loadtxt(tfile); p=np.loadtxt(pfile)
+    tt=(d[:,2:5]-d[:,5:8]).ravel(); tp=p[:,2:5].ravel()
+    m=np.abs(tp)>0.05*np.abs(tp).max()
+    amp=np.sum(tt[m]*tp[m])/np.sum(tp[m]**2)
+    cor=np.sum(tt[m]*tp[m])/np.sqrt(np.sum(tt[m]**2)*np.sum(tp[m]**2))
+    return abs(amp),abs(cor)
+print("transient recovery vs propagator: amplitude / shape correlation")
+print("mech    t/t_M   single family (old)   both families (corrected)")
+for mech in ("ss90","ds90","ten90","ds30","ss60"):
+    for t in (25,100,500):
+        ao,co=metrics(f"old_{mech}_t{t}.txt",f"pom_{mech}_t{t}.txt")
+        an,cn=metrics(f"new_{mech}_t{t}.txt",f"pom_{mech}_t{t}.txt")
+        print(f"{mech:5s} {t/25.0:5.0f}      {ao:4.2f} / {co:4.2f}          {an:4.2f} / {cn:4.2f}")
+print()
+print("NOTE: even corrected, the scalar (SH) reflection ladder is not a")
+print("quantitative 3-D kernel generator; see the reassessment notes.")
+EOF
+cd ..
+[ $fail -eq 0 ] && echo "$0: panel complete (see table above)" || { echo "$0: FAILURES"; exit 1; }
