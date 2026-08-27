@@ -87,6 +87,7 @@
    per patch (the slip-rate vector used for the sinc products).
    scale converts interact-internal stress to SI, as for Is.
 */
+static int cmp_comp_precision(const void *, const void *);
 PetscErrorCode rsf_ve_setup(struct interact_ctx *par, Vec negvpl_in,
 			    PetscReal scale)
 {
@@ -140,6 +141,18 @@ PetscErrorCode rsf_ve_setup(struct interact_ctx *par, Vec negvpl_in,
     COMP_PRECISION *srow,smp[VE_MAX_NS],amp[VE_MAX_NP+1],res,scl,elastic_dev,val;
     PetscScalar *crow;
     PetscInt *colidx;
+    /* translational-invariance sample cache: the sampled kernel of a
+       pair depends only on (x_i - x_j, z_i, z_j) (all elements are
+       parallel vertical antiplane patches of equal half-length), so
+       multi-fault geometries repeat the expensive image walk across
+       receiver rows.  Key: unique dx values x unique z (receiver) x
+       unique z (source); disabled if the elements have mixed
+       half-lengths or the table would be too large */
+    int cache_on;
+    long ndx=0,nuz=0,ncache=0;
+    COMP_PRECISION *udx=NULL,*uzz=NULL,*csamp=NULL;
+    int *dxof=NULL,*izof=NULL;
+    char *cset=NULL;
     if((np < 2)||(np > VE_MAX_NP))
       SETERRQ(PETSC_COMM_WORLD,PETSC_ERR_USER,"rsf_ve_setup: -ve_np %ld out of [2, %d]",(long)np,VE_MAX_NP);
     if(plate_h <= 0.0)
@@ -191,6 +204,67 @@ PetscErrorCode rsf_ve_setup(struct interact_ctx *par, Vec negvpl_in,
       colidx[j] = j;
     slip[STRIKE] = 1.0;slip[DIP] = slip[NORMAL] = 0.0;
     worst_res = elastic_dev = 0.0;
+    /* build the sample cache index tables */
+    cache_on = 1;
+    for(i=1;i < medium->nrflt;i++)
+      if(fabs(fault[i].l - fault[0].l) > 1e-6){cache_on = 0;break;}
+    if(cache_on){
+      COMP_PRECISION *tmpv;
+      long ii,jj,nn;
+      tmpv = (COMP_PRECISION *)malloc((size_t)medium->nrflt*sizeof(COMP_PRECISION));
+      izof = (int *)malloc((size_t)medium->nrflt*sizeof(int));
+      dxof = NULL;
+      if((!tmpv)||(!izof))MEMERROR("rsf_ve_setup: cache");
+      /* unique z (INT_Y) values, 1e-4 m quantization */
+      for(ii=0;ii < medium->nrflt;ii++)tmpv[ii] = fault[ii].x[INT_Y];
+      qsort(tmpv,(size_t)medium->nrflt,sizeof(COMP_PRECISION),cmp_comp_precision);
+      uzz = (COMP_PRECISION *)malloc((size_t)medium->nrflt*sizeof(COMP_PRECISION));
+      if(!uzz)MEMERROR("rsf_ve_setup: cache");
+      for(nn=0,ii=0;ii < medium->nrflt;ii++)
+	if((nn == 0)||(fabs(tmpv[ii]-uzz[nn-1]) > 1e-4))uzz[nn++] = tmpv[ii];
+      nuz = nn;
+      for(ii=0;ii < medium->nrflt;ii++){
+	for(jj=0;jj < nuz;jj++)
+	  if(fabs(fault[ii].x[INT_Y]-uzz[jj]) <= 1e-4)break;
+	izof[ii] = (int)jj;
+      }
+      /* unique signed dx = x_i - x_j values over all pairs of unique x */
+      {
+	COMP_PRECISION *ux;
+	long nux;
+	for(ii=0;ii < medium->nrflt;ii++)tmpv[ii] = fault[ii].x[INT_X];
+	qsort(tmpv,(size_t)medium->nrflt,sizeof(COMP_PRECISION),cmp_comp_precision);
+	ux = (COMP_PRECISION *)malloc((size_t)medium->nrflt*sizeof(COMP_PRECISION));
+	if(!ux)MEMERROR("rsf_ve_setup: cache");
+	for(nn=0,ii=0;ii < medium->nrflt;ii++)
+	  if((nn == 0)||(fabs(tmpv[ii]-ux[nn-1]) > 1e-4))ux[nn++] = tmpv[ii];
+	nux = nn;
+	udx = (COMP_PRECISION *)malloc((size_t)nux*nux*sizeof(COMP_PRECISION));
+	if(!udx)MEMERROR("rsf_ve_setup: cache");
+	for(nn=0,ii=0;ii < nux;ii++)
+	  for(jj=0;jj < nux;jj++)
+	    udx[nn++] = ux[ii]-ux[jj];
+	qsort(udx,(size_t)(nux*nux),sizeof(COMP_PRECISION),cmp_comp_precision);
+	for(ndx=0,ii=0;ii < nux*nux;ii++)
+	  if((ndx == 0)||(fabs(udx[ii]-udx[ndx-1]) > 1e-4))udx[ndx++] = udx[ii];
+	free(ux);
+      }
+      /* per-fault dx index against fault 0 is NOT enough; store each
+	 fault's x for on-the-fly bsearch of dx below instead */
+      ncache = ndx*nuz*nuz;
+      if((ncache > 0) && (ncache*(long)spec.ns*8L < 512L*1024L*1024L)){
+	csamp = (COMP_PRECISION *)calloc((size_t)(ncache*spec.ns),sizeof(COMP_PRECISION));
+	cset  = (char *)calloc((size_t)ncache,sizeof(char));
+	if((!csamp)||(!cset))cache_on = 0;
+      }else{
+	cache_on = 0;
+      }
+      free(tmpv);
+      HEADNODE
+	if(cache_on)
+	  fprintf(stderr,"rsf_ve_setup: sample cache on: %ld dx x %ld^2 z = %ld entries (vs %ld pairs)\n",
+		  ndx,nuz,ncache,(long)medium->nrflt*(long)medium->nrflt);
+    }
     HEADNODE
       fprintf(stderr,"rsf_ve_setup: mode 2 (plate over Maxwell, antiplane): H %g m g2/g1 %g t_M %g yr, np %ld, n_img %ld, sampling...\n",
 	      (double)plate_h,(double)g2fac,(double)tm_yr,(long)np,(long)n_img);
@@ -198,6 +272,24 @@ PetscErrorCode rsf_ve_setup(struct interact_ctx *par, Vec negvpl_in,
       int iret;
       memset(srow,0,(size_t)spec.ns*medium->nrflt*sizeof(COMP_PRECISION));
       for(j=0;j < medium->nrflt;j++){
+	long ci = -1;
+	if(cache_on){
+	  COMP_PRECISION dx = fault[i].x[INT_X]-fault[j].x[INT_X];
+	  long lo=0,hi=ndx-1,mid,kdx=-1;
+	  while(lo <= hi){
+	    mid = (lo+hi)/2;
+	    if(fabs(udx[mid]-dx) <= 1e-4){kdx = mid;break;}
+	    if(udx[mid] < dx)lo = mid+1;else hi = mid-1;
+	  }
+	  if(kdx >= 0){
+	    ci = (kdx*nuz + (long)izof[i])*nuz + (long)izof[j];
+	    if(cset[ci]){
+	      for(k=0;k < spec.ns;k++)
+		srow[k*medium->nrflt+j] = csamp[ci*spec.ns+k];
+	      continue;
+	    }
+	  }
+	}
 	for(n=0;n <= n_img;n++){
 	  /* image family n: plain shift and (n >= 1) the surface
 	     mirror, each with its own auto free-surface image via
@@ -230,6 +322,11 @@ PetscErrorCode rsf_ve_setup(struct interact_ctx *par, Vec negvpl_in,
 		 (COMP_PRECISION)(n+1)) < 1e-16)
 	    break;
 	}
+	if(cache_on && (ci >= 0)){
+	  for(k=0;k < spec.ns;k++)
+	    csamp[ci*spec.ns+k] = srow[k*medium->nrflt+j];
+	  cset[ci] = 1;
+	}
       }
       /* per-pair fit and fill of the np amplitude rows */
       for(p=0;p < np;p++){
@@ -261,6 +358,11 @@ PetscErrorCode rsf_ve_setup(struct interact_ctx *par, Vec negvpl_in,
       }
     }
     free(srow);free(colidx);free(crow);
+    if(udx)free(udx);
+    if(uzz)free(uzz);
+    if(izof)free(izof);
+    if(csamp)free(csamp);
+    if(cset)free(cset);
     for(p=0;p < np;p++){
       PetscCall(MatAssemblyBegin(rsf->ve_C[p],MAT_FINAL_ASSEMBLY));
       PetscCall(MatAssemblyEnd(rsf->ve_C[p],MAT_FINAL_ASSEMBLY));
@@ -343,6 +445,11 @@ PetscErrorCode rsf_ve_setup(struct interact_ctx *par, Vec negvpl_in,
 	    (rsf->ve_hstage)?("stage-consistent"):("frozen (lagged)"));
   }
   PetscFunctionReturn(PETSC_SUCCESS);
+}
+static int cmp_comp_precision(const void *a, const void *b)
+{
+  COMP_PRECISION d = *(const COMP_PRECISION *)a - *(const COMP_PRECISION *)b;
+  return (d > 0.0)?(1):((d < 0.0)?(-1):(0));
 }
 /*
    apply the memory sink to tau_dot at stage time `time` (no-op when VE

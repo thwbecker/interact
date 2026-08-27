@@ -149,6 +149,9 @@ PetscErrorCode rsf_init_monitor_and_event(struct rsf_out_ctx *uc,struct interact
   uc->field_enable = field_enable;
   uc->field_step_interval = field_step_interval;
   uc->field_tmin = field_tmin;
+  uc->field_stress = PETSC_FALSE;	/* stress frames alongside the velocity
+					   frames; same cadence, same frame ids */
+  PetscCall(PetscOptionsGetBool(NULL,NULL,"-field_stress",&uc->field_stress,NULL));
   uc->field_frame = 0;
   uc->fout_field_times = NULL;
   uc->groups = groups;
@@ -1005,6 +1008,22 @@ PetscErrorCode rsf_TS_Monitor(TS ts,PetscInt step,PetscReal time,Vec X,void *ptr
 	if(fb){
 	  fwrite(g->buf,sizeof(float),(size_t)3*(size_t)g->np,fb);
 	  fclose(fb);
+	}
+	if(uc->field_stress){
+	  /* shear-stress frame, (x, y, tau[MPa]) triples, same layout;
+	     tau is the |tau| stress component the solve carries (state
+	     slot 1), i.e. the resolved shear stress in the slip mode */
+	  for(k=0;k < g->np;k++){
+	    g->buf[3*k+0] = (float)g->xs[k];
+	    g->buf[3*k+1] = (float)g->ys[k];
+	    g->buf[3*k+2] = (float)(fvals[g->idx[k]*rsf->dim+1]/1e6);
+	  }
+	  snprintf(ffile,STRLEN,"tmp_rsf/rsf_tau.g%03d.%06i.bin",g->id,uc->field_frame);
+	  fb = myopen(ffile,"wb");
+	  if(fb){
+	    fwrite(g->buf,sizeof(float),(size_t)3*(size_t)g->np,fb);
+	    fclose(fb);
+	  }
 	}
       }
       if(uc->fout_field_times){

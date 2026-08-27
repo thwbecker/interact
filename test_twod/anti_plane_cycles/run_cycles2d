@@ -1,0 +1,88 @@
+#!/bin/bash
+#
+# run_cycles2d: user-facing driver for single- and multi-fault 2-D
+# antiplane earthquake-cycle experiments, elastic or with a Maxwell
+# half-space below an elastic plate.  See README_cycles2d.md.
+#
+# usage:
+#   run_cycles2d profile ds_km D_km nfault spacing_km tM_yr H_km stop_yr outdir [extra rsf_solve options]
+#
+#   profile     bp1 (SEAS BP1-QD friction) or bp5 (BP5-flavored, seeded)
+#   ds_km       cell size [km] (bp1: <= 0.1 recommended; bp5: <= 0.5)
+#   D_km        fault depth extent [km]
+#   nfault      number of parallel faults
+#   spacing_km  fault spacing [km]
+#   tM_yr       Maxwell time of the substrate [yr]; 0 = elastic
+#   H_km        elastic plate thickness [km] (used when tM_yr > 0;
+#               keep D_km < H_km, see README)
+#   stop_yr     simulation time [yr]
+#   outdir      output directory (created; figures land there too)
+#
+# environment overrides:
+#   FIELD_INT   accepted steps between field frames (default 20 bp5, 400 bp1)
+#   VE_HINIT    -ve_h_init value (default 1, backslip-spun memory: right for
+#               steady-cycle studies of contained faults; 0 = virgin medium,
+#               spin-up ~90 tM, used by the replication tests)
+#   RTOL        integrator tolerance (default 1e-4)
+#   NOPLOT=1    skip figure rendering
+#
+# examples (see README_cycles2d.md for the full experiment recipes):
+#   ./run_cycles2d bp5 0.5 20 1 10 0   40 800  el_single
+#   ./run_cycles2d bp5 0.5 20 1 10 12  40 800  ve_single_tm12
+#   ./run_cycles2d bp5 0.5 20 8 10 12  40 1200 ve_8faults
+#   ./run_cycles2d bp1 0.1 40 1 10 0   60 400  bp1qd_coarse
+
+if [ $# -lt 9 ];then
+    sed -n '2,30p' $0; exit 1
+fi
+profile=$1; ds=$2; D=$3; nf=$4; sp=$5; tm=$6; H=$7; stop=$8; out=$9
+shift 9
+bindir=`cd ../../bin && pwd`
+sdir=`pwd`
+# frame cadence: the bp5 profile runs ~6 accepted steps/yr interseismically,
+# bp1 (dc = 8 mm) runs orders of magnitude more; scale the default so both
+# give a few-year interseismic sampling that densifies through events
+if [ "$profile" = "bp1" ];then deffint=400; else deffint=20; fi
+fint=${FIELD_INT-$deffint}
+rtol=${RTOL-1e-4}
+
+mkdir -p $out && cd $out
+restart=""
+if [ -f rsf_checkpoint.bin ];then
+    # continue a previous run of the same setup to the (new) stop time
+    restart="-rsf_restart rsf_checkpoint.bin"
+    echo "$0: restarting from existing checkpoint in $out"
+fi
+python3 $sdir/gen_cycles2d.py $profile $ds $D $nf $sp cyc > gen.log || exit 1
+cat gen.log
+popts=`awk '/pass:/{sub(".*pass: ",""); print}' gen.log`
+
+veopts=""
+if [ `echo "$tm > 0" | bc` -eq 1 ];then
+    veopts="-ve_mode 2 -ve_plate_h ${H}e3 -ve_tmaxwell_yr $tm -ve_h_init ${VE_HINIT-1}"
+fi
+
+$bindir/rsf_solve -geom_file cyc_geom.in -rsf_file cyc_rsf.dat \
+  -rsf_ic_file cyc_ic.in $popts \
+  -rtol $rtol -ts_rk_type 3bs -ts_max_steps 2000000000 \
+  -dt_monitor_yr 5 -track_events -rsf_catalog -rsf_monitor_by_group 1 \
+  -vel_event 1e-3 -field_step_interval $fint -field_stress \
+  -rsf_checkpoint 500000 -stop_time_yr $stop $restart $veopts "$@" >> run.log 2>&1
+status=$?
+tail -2 run.log | head -1
+if [ $status -ne 0 ];then
+    echo "$0: rsf_solve failed, see $out/run.log"; exit $status
+fi
+
+# quick recurrence summary per fault
+for f in rsf_catalog.g*.dat;do
+    [ -f "$f" ] || continue
+    g=${f#rsf_catalog.g}; g=$((10#${g%.dat}))
+    grep -v '^#' $f | awk -v g=$g '$6>3{n++; if(t)s+=$2-t; t=$2; us=$8}
+      END{if(n>1)printf "fault %s: %d events, mean recurrence %.2f yr, last slip %.2f m\n",g,n,s/(n-1),us;
+          else printf "fault %s: %d event(s)\n",g,n}'
+done
+
+if [ -z "$NOPLOT" ];then
+    python3 $sdir/plot_cycles2d.py . && echo "$0: figures in $out/"
+fi

@@ -106,6 +106,10 @@ struct rsf_out_ctx{
   PetscBool field_enable;
   PetscInt field_step_interval;	/* write a frame every this many accepted steps */
   PetscReal field_tmin;		/* [s] suppress field output before this model time */
+  PetscBool field_stress;	/* with field frames: also write shear-stress
+				   frames rsf_tau.gGGG.NNNNNN.bin, (x,y,tau[MPa])
+				   float triples on the same cadence and frame
+				   numbering (-field_stress) */
   int field_frame;
   FILE *fout_field_times;
   struct rsf_group_grid *groups;	/* rank 0: one per fault group */
