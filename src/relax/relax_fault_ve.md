@@ -41,7 +41,8 @@ points are held out and used to verify per entry that the pole set is
 complete, so an incomplete representation would be detected rather
 than silently fitted. The constant term is carried throughout even
 where it vanishes (homogeneous stress kernels) because displacement
-kernels and the planned layered extension both need it.
+kernels and the layered extension (since implemented; see
+test_twod/anti_plane/README_ve_antiplane.md) both need it.
 
 Two properties of the homogeneous configuration are worth knowing
 when interpreting output. Stress on the fault relaxes completely,

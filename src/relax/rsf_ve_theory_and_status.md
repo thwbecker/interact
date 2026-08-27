@@ -153,3 +153,19 @@ The next stage is the rsf_solve integration, beginning with the
 step 3 plumbing (operator assembly and verification behind
 -maxwell_time, option-absent path bit-identical), followed by the
 step 4 dynamics.
+
+
+## STATUS POINTER, 2026-08-26 (appended)
+
+The rsf_solve integration foreseen above is complete for the 2-D
+antiplane path (uniform Maxwell and plate-over-Maxwell), validated
+against independent exact-kernel integrators and community benchmarks.
+Current entry points: test_twod/anti_plane/README_ve_antiplane.md
+(validation ledger), ve_loading_conditions.md (loading regimes),
+noda_mn_tests.md (Kato 2002 / Miyake & Noda 2019 replications),
+test_twod/anti_plane_cycles/README_cycles2d.md (experiments), and the
+STATUS appendix of rsf_ve_implementation_plan.md.  Two findings since
+this note: the layered antiplane image construction was missing its
+second family (fixed; order-unity far-field effect), and the step-5 h
+mode required stage-consistent sink forcing (-ve_h_stage) to avoid
+first-order recurrence biases in relaxation-critical problems.

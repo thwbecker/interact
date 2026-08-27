@@ -230,3 +230,47 @@ The natural first deliverable is steps 1 and 2 together, since step 2
 is the requested prescribed-slip demonstration with surface
 deformation and settles trust in the machinery before rsf_solve is
 touched at all.
+
+
+## STATUS, 2026-08-26 (appended; supersedes the outlook implied above)
+
+Steps 0-3, 5, 6, and 7a are COMPLETE and in master; step 4 in its
+"in-state h" form and step 7b remain open.  Concretely:
+
+- Steps 0-2 (harness, Prony core, prescribed-slip testbed): done and
+  gated (run_ve_tests, relax_fault_ve.md, rsf_ve_test_ledger.md).
+  The layered antiplane kernels acquired the missing second image
+  family during 7a validation (order-unity far-field effect; see the
+  ledger update).
+- Step 3 (plumbing): done, generalized beyond -maxwell_time into
+  -ve_mode 1/2 with per-pair sampled Prony operators (src/rsf_ve.c),
+  option-absent runs bit-identical.
+- Step 5 (approximate h mode): done and is the production mode, with
+  one important amendment: the sink forcing is STAGE-CONSISTENT by
+  default (-ve_h_stage 1), i.e. the within-step memory forcing comes
+  from the stage state's own slip increment and is seen by the TS
+  error controller.  The original frozen/lagged variant (retained as
+  -ve_h_stage 0) biases recurrence by tens of percent in
+  relaxation-critical problems (found by cross-checking against
+  exact-Erlang-chain integrators; see
+  test_twod/anti_plane/noda_mn_tests.md).
+- Step 4 proper (in-state h): OPEN.  The stage-consistent step mode
+  removes the known first-order bias, but in-state h would put the
+  memory fully under integrator error control and is the remaining
+  robustness upgrade.
+- Step 6 (H-matrix coverage): dense and compressed matvec verification
+  in place; np > 1 H-matrix cycle regression on a production host
+  still pending.
+- Step 7a (antiplane layered): done, validated end to end
+  (Savage-Prescott cycle testbed, locked-fault closed forms, BP5-style
+  cycles, the Kato 2002 and Miyake & Noda 2019 replications, and the
+  SEAS BP1-QD elastic anchor); entry point
+  test_twod/anti_plane/README_ve_antiplane.md, experiments in
+  test_twod/anti_plane_cycles.  Multi-fault assembly uses a
+  translational-invariance sample cache (exact, 8x at 16 faults).
+- Step 7b (3-D layered kernels, -ve_prony_file): OPEN; the propagator
+  interior-stress work front is summarized in rsf_ve_test_ledger.md.
+  A further extension class identified since (Lambert & Barbot 2016
+  style strain-volume elements for nonlinear rheology and
+  mantle-driven loading) is documented in
+  test_twod/anti_plane/ve_loading_conditions.md.
