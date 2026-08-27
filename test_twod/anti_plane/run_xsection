@@ -1,0 +1,119 @@
+#!/bin/bash
+#
+# run_xsection: single-fault 2-D antiplane cycle models with the fault
+# reaching a FRACTION of the elastic plate thickness, elastic plus a
+# series of Maxwell times expressed as ratios of the measured elastic
+# recurrence time, all fully spun up; then reconstruct and plot the
+# OFF-FAULT stress field sigma_xy(x, z, t) in x-depth cross section
+# (elastic plate AND relaxing substrate) at snapshot times through the
+# last full cycle (plot_xsection.py; see its header for the method and
+# built-in consistency checks).
+#
+# usage: run_xsection [frac] [H_km] [ncycle] [ratio1 ratio2 ...]
+#        defaults      0.5    40     6        0.1 0.5 1 2 10
+#
+#   frac    fault depth extent D = frac * H (keep < 1: contained fault)
+#   H_km    elastic plate thickness [km]
+#   ncycle  cycles to run (snapshots use the LAST full cycle)
+#   ratios  Maxwell times tM = ratio * T_rec(elastic); 0 = skip
+#
+# Geometry/friction: gen_bp2d.py BP5-flavored profile (VS cap 4 km,
+# 2-km transitions, VW core 6-12 km for the default D = 20 km), dc =
+# 0.08 m, ds = 0.5 km; elastic recurrence about 127 yr.  VE runs use
+# -ve_mode 2, spun memory (-ve_h_init 1).  Output directories
+# xsect_el, xsect_r<ratio>; figures land inside each.
+#
+bindir=`cd ../../bin && pwd`
+sdir=`pwd`
+frac=${1-0.5}
+H=${2-40}
+ncyc=${3-6}
+shift 3 2>/dev/null
+ratios=${@:-"0.1 0.5 1 2 10"}
+
+D=`echo "$frac * $H" | bc -l`
+Hvw=6
+common="-dc 0.08 -rtol 1e-4 -ts_rk_type 3bs -ts_max_steps 2000000000 \
+ -dt_monitor_yr 5 -track_events -rsf_catalog -rsf_monitor_by_group 1 \
+ -vel_event 1e-3 -field_step_interval 20 -field_slip -field_stress \
+ -rsf_checkpoint 10000 -rsf_checkpoint_wall 120"
+
+run_one () {
+    # run_one dir stop_yr [ve options]
+    local dir=$1; local stop=$2; shift 2
+    mkdir -p $dir && cd $dir
+    python3 $sdir/gen_bp2d.py 0.5 1 20 $D $Hvw > gen.log
+    local restart=""
+    [ -f rsf_checkpoint.bin ] && restart="-rsf_restart rsf_checkpoint.bin"
+    $bindir/rsf_solve -geom_file geom_bp2d.in -rsf_file rsf_bp2d.dat \
+      -rsf_ic_file ic_bp2d.in $common -stop_time_yr $stop $restart "$@" \
+      >> run.log 2>&1
+    local st=$?
+    cd ..
+    return $st
+}
+
+# ---- elastic reference and recurrence measurement ---------------------------
+echo "$0: elastic reference (D = $D km fault in effectively infinite medium)"
+run_one xsect_el 1500 || { echo "$0: elastic run failed"; exit 1; }
+# clustered onsets (gap > 5 yr) from the catalog; last interval.
+# T_rec is measured ONCE and cached, so that chained re-invocations
+# (resuming interrupted runs) keep every run's tM exactly fixed
+if [ -f xsect_Trec.txt ];then
+    Trec=`cat xsect_Trec.txt`
+else
+Trec=$(python3 -c "
+import sys
+r=[float(l.split()[1]) for l in open('xsect_el/rsf_catalog.g000.dat')
+   if not l.startswith('#') and int(l.split()[5])>3]
+c=[r[0]]+[x for i,x in enumerate(r[1:]) if x-r[i]>5.0]
+# mean clustered interval, excluding the seed-to-first leg; NOTE this
+# configuration produces period-2 cycles (alternating small/large
+# events), so the mean is the natural recurrence unit
+iv=[c[i+1]-c[i] for i in range(1,len(c)-1)]
+print(f'{sum(iv)/len(iv):.4f}' if iv else '')")
+    echo $Trec > xsect_Trec.txt
+fi
+if [ -z "$Trec" ];then echo "$0: could not measure T_rec"; exit 1; fi
+echo "$0: elastic T_rec = $Trec yr"
+stop=`echo "($ncyc + 0.5) * $Trec" | bc -l`
+# extend the elastic run to the common duration
+run_one xsect_el $stop
+cat > xsect_el/xsect_params.txt <<EOF
+H_km $H
+D_km $D
+ds_km 0.5
+G_Pa 32.04e9
+vpl_ms 1e-9
+tM_yr 0
+label elastic
+EOF
+python3 $sdir/plot_xsection.py xsect_el && echo "$0: xsect_el figures done"
+
+# ---- viscoelastic series ------------------------------------------------------
+for r in $ratios;do
+    [ "$r" = "0" ] && continue
+    dir=xsect_r$r
+    if [ -f $dir/xsect_params.txt ];then
+        tm=`awk '/tM_yr/{print $2}' $dir/xsect_params.txt`
+    else
+        tm=`echo "$r * $Trec" | bc -l`
+    fi
+    echo "$0: tM/Trec = $r  (tM = $tm yr)"
+    mkdir -p $dir
+    cat > $dir/xsect_params.txt <<XPEOF
+H_km $H
+D_km $D
+ds_km 0.5
+G_Pa 32.04e9
+vpl_ms 1e-9
+tM_yr $tm
+label tM/Trec=$r
+XPEOF
+    run_one $dir $stop -ve_mode 2 -ve_plate_h ${H}e3 -ve_tmaxwell_yr $tm \
+        -ve_h_init 1 || { echo "$0: $dir failed, see $dir/run.log"; continue; }
+    reached=`grep -v '^#' $dir/rsf_monitor.dat | tail -1 | awk '{print $3}'`
+    echo "$0: $dir reached t = $reached yr of $stop (re-run to resume if short)"
+    python3 $sdir/plot_xsection.py $dir && echo "$0: $dir figures done"
+done
+echo "$0: all done; figures: xsect_*/xsect_sxy.png (and _syz, _coseis)"
