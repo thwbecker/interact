@@ -106,6 +106,12 @@ the periodic write is suppressed at the restart step itself (it could
 previously rewrite the file with an uninitialized dt when chaining
 runs); when chaining interrupted runs, prefer frequent checkpoints
 (e.g. `-rsf_checkpoint 30000`) and avoid killing a run mid-write.
+Restarting from a checkpoint already at or past `-stop_time_yr` (a
+completed run re-invoked, e.g. by an idempotent driver script) is a
+clean no-op: the solver prints "run already complete, nothing to do"
+and exits without entering the time stepper (handing PETSc a max time
+behind the restored clock stalled indefinitely on some versions) and
+without touching the checkpoint or output files.
 
 ## Source layout
 

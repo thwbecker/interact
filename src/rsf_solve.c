@@ -103,6 +103,7 @@ PetscErrorCode rsf_solve_run(int argc,char **argv,struct interact_ctx *par,
   struct rsf_out_ctx uc[1];
   /* checkpoint/restart */
   PetscInt ckpt_every=0,restart_step=0;
+  PetscBool restart_done=PETSC_FALSE;
   char ckpt_file[300],restart_file[300];
   PetscBool have_restart=PETSC_FALSE;
   /* per-patch loading */
@@ -655,6 +656,17 @@ PetscErrorCode rsf_solve_run(int argc,char **argv,struct interact_ctx *par,
     HEADNODE
       fprintf(stderr,"%s: restart: -ts_max_steps counts absolute steps; raise it beyond %ld when chaining\n",
 	      argv[0],(long)restart_step);
+    if(restart_t >= medium->stop_time - 1.0){
+      /* the checkpoint is already at (or past) the requested stop
+	 time: the run is complete, and there is nothing to integrate.
+	 skip TSSolve entirely rather than handing it a max time behind
+	 its clock (harmless on some PETSc versions, an infinite stall
+	 on others), and leave the checkpoint and output files untouched */
+      restart_done = PETSC_TRUE;
+      HEADNODE
+	fprintf(stderr,"%s: restart: checkpoint t %.6f yr >= stop time %g yr, run already complete, nothing to do\n",
+		argv[0],restart_t/SEC_PER_YEAR,medium->stop_time/SEC_PER_YEAR);
+    }
   }
   if(rsf->ve_np > 0){
     /* h clock and slip reference at the (possibly restarted) start
@@ -673,9 +685,11 @@ PetscErrorCode rsf_solve_run(int argc,char **argv,struct interact_ctx *par,
     PetscCall(VecRestoreArray(rsf->ve_slip_prev,&sp));
     PetscCall(VecRestoreArrayRead(x,&xr));
   }
-  PetscCall(TSSolve(ts, x));
-  if(ckpt_every > 0)
-    PetscCall(rsf_write_checkpoint(ts,x,uc));
+  if(!restart_done){
+    PetscCall(TSSolve(ts, x));
+    if(ckpt_every > 0)
+      PetscCall(rsf_write_checkpoint(ts,x,uc));
+  }
   PetscCall(TSGetSolveTime(ts,&(medium->time)));
   PetscCall(rsf_finalize_monitor_and_event(uc));
   PetscCall(rsf_finalize_catalog(uc));
