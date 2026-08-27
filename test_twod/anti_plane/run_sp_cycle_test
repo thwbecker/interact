@@ -1,0 +1,51 @@
+#!/bin/bash
+#
+# run_sp_cycle_test: end-to-end validation of the 2-D antiplane
+# layered (elastic plate over Maxwell half space) machinery
+#
+# (1) single-event relaxation against the Rybicki / Nur-Mavko series
+#     (ve_layered_check anchors and term-count table, profile plots)
+# (2) Savage-Prescott earthquake cycle: ve_sp_cycle compares the
+#     h-state Prony machinery (route A) against an exact-in-time
+#     element-based reference (route B); sp_analytic.py adds the
+#     fully independent closed-form reference (route C) and renders
+#     the comparison figures
+#
+# plain assignments, no environment variables; run from
+# test_twod/anti_plane with the interact binaries built
+#
+bindir=`cd ../../bin && pwd`
+sdir=`pwd`
+plate_h=2.0
+t_M=1.0
+n=25
+np=6
+n_img=600
+tmpd=tmp_sp_cycle
+fail=0
+
+mkdir -p $tmpd
+cd $tmpd
+
+# through-plate antiplane fault, n patches over depth [0, H]
+$bindir/makefault -z 0 -n $n -y -1.0 2> /dev/null | \
+    gawk '{print($1,$2,$3,$4,-$5,$6,0,$8)}' > geom.in
+
+# (1) single-event relaxation checks and plots
+$bindir/ve_layered_check $plate_h $t_M 1.0 60 prof || fail=1
+python3 $sdir/plot_layered_relaxation.py prof . || fail=1
+
+# (2) the cycle, at three recurrence-to-relaxation ratios
+for Ttr in 0.2 1.0 5.0;do
+    echo "$0: cycle T/taur = $Ttr"
+    $bindir/ve_sp_cycle $plate_h $t_M 1.0 $Ttr $np $n_img sp_T$Ttr || fail=1
+    python3 $sdir/sp_analytic.py sp_T$Ttr $plate_h $t_M $Ttr . || fail=1
+done
+
+cd ..
+if [ $fail -eq 0 ];then
+    echo "$0: all layered antiplane cycle checks passed; figures in $tmpd/"
+else
+    echo "$0: FAILURES, see above"
+    exit 1
+fi

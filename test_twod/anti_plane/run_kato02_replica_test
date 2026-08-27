@@ -1,7 +1,7 @@
 #!/bin/bash
 #
 # Kato (EPS 2002) replica and machinery cross-validation for the 2-D
-# antiplane VE cycles in rsf_solve (see kato_mn_replication_notes.md).
+# antiplane VE cycles in rsf_solve (see noda_mn_tests.md).
 #
 # Gates (about 3 minutes total):
 #  (1) elastic replica: Tcy within 1 yr of the calibrated 137.9 yr

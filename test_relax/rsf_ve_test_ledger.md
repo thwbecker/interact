@@ -114,3 +114,48 @@ from the generator matrix and finite-difference calibration.
 5. First layered cycle applications in 2-D antiplane (exact
    machinery, already validated end to end) while 3-D interior
    kernels mature; Savage-Prescott as the cycle benchmark.
+
+
+## UPDATE, 2026-08-26 (appended; supersedes specific rows above)
+
+1. 2-D antiplane layered numbers above are PRE-FIX: the layered
+   construction (ve_layered_antiplane_sample, ve_rybicki_antiplane_uz,
+   ve_nur_mavko_uz/vz) carried only one image family per reflection
+   order; the second family (depths 2nH - [c2, c1]) was added after
+   validation against a finite-difference solve and a k-space closed
+   form (order-unity far-field effect: through-plate relaxed offset
+   du/4 instead of du/2).  Corrected np table (held-out / time-domain
+   of coseismic, [b/45, 1.5b] ladder, n_img 600): np = 2..6 gives
+   2.1e-2/9.5e-2, 8.8e-4/1.7e-2, 1.1e-4/4.2e-3, 2.4e-5/1.0e-3,
+   1.2e-6/1.1e-4.  np = 7/8 overfit (held-out improves, time-domain
+   degrades); defaults stay np = 6, VE_NIMG_DEF 600.
+
+2. The 3-D scalar-transplant row under "what does not work" was
+   measured WITH the missing family and overstated the failure.
+   Re-measured with both families (ve_pom_compare2,
+   test_relax/run_pom_transplant_test): the construction is SH-exact
+   and P-SV-deficient; vertical strike-slip recovers 0.46-0.82
+   amplitude at 0.78-0.88 shape correlation, dip-slip/tensile/dipping
+   mechanisms remain at 15-50 percent.  Verdict unchanged in
+   substance (not a 3-D kernel route; useful SH prior), severity
+   corrected.
+
+3. "What to do next" items 2, 4 (step-5 form), and 5 are DONE: the
+   plumbing became -ve_mode 1/2 in src/rsf_ve.c; the exact-exponential
+   h mode runs with STAGE-CONSISTENT sink forcing (-ve_h_stage 1
+   default; the lagged variant biases relaxation-critical recurrence
+   by tens of percent, found via exact-Erlang-chain cross-checks); the
+   2-D antiplane cycle applications include the Savage-Prescott
+   benchmark, BP5-style cycles, the Kato (2002) and Miyake & Noda
+   (2019) replications, and the SEAS BP1-QD elastic anchor (78.2 yr
+   community value reproduced).  Entry point:
+   test_twod/anti_plane/README_ve_antiplane.md.  Items 1 (|M| = 1
+   interior stresses plus sxx/syy/sxy) and 3 (-ve_prony_file) remain
+   the open 3-D front; in-state h (step 4 proper) remains the
+   robustness upgrade.
+
+4. New machinery findings on the record: (a) restart chaining wrote a
+   checkpoint at the restart step with an invalid dt (fixed); (b) the
+   -ve_mode 2 assembly caches samples by (x_i - x_j, z_i, z_j)
+   (exact; 8x at 16 faults); (c) -field_stress adds shear-stress
+   field frames alongside the slip-rate frames.

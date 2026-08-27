@@ -38,6 +38,41 @@ shifted recurrence intervals in quantitative agreement with the
 expected T proportional to 1/(k vpl + tau_dot) scaling, and a
 doubled per-patch plate rate approximately halved the recurrence.
 
+## Visco-elastic hereditary stressing (2026-08)
+
+`rsf_solve` can replace the purely elastic interaction with a
+hereditary visco-elastic kernel for 2-D antiplane geometries:
+`-ve_mode 1` (uniform Maxwell medium, one exact relaxation pole) or
+`-ve_mode 2` (elastic plate of thickness `-ve_plate_h` [m] over a
+Maxwell half-space, per-pair 6-pole Prony fits of the two-family image
+kernel, held-out-gated at assembly), with `-ve_tmaxwell_yr` the Maxwell
+time (note: some papers define t_r = 2 eta/G = 2x this), `-ve_g2fac`
+the substrate/plate rigidity ratio, `-ve_np` the fit size,
+`-ve_h_init` the memory initialization (1 = backslip-spun, the right
+default for steady-cycle studies; 0 = virgin medium, ~90 t_M spin-up),
+and `-ve_h_stage` the sink accuracy (1 default: stage-consistent
+forcing under the TS error controller; 0: cheaper lagged forcing, only
+safe far from relaxation-critical regimes). The coseismic operator
+stays exactly the assembled elastic matrix; option-absent runs are
+bit-identical to the elastic code path.
+
+Performance: the memory sink adds `ve_np` matvecs per RHS stage in the
+default stage-consistent mode (one for mode 1, six for mode 2), so VE
+runs cost roughly 2-4x elastic; `-ve_h_stage 0` reduces this to
+`ve_np` matvecs per accepted step. Mode-2 assembly samples the image
+kernel per pair with a translational-invariance cache (pairs sharing
+x_i - x_j, z_i, z_j are sampled once), which matters for multi-fault
+geometries. Field output gains `-field_stress` (shear-stress frames
+alongside the slip-rate frames, same step cadence).
+
+Keep the fault bottom above `-ve_plate_h`: a fault cutting the entire
+plate has no steady cycle attractor (stress-free relaxed slip mode).
+Validation, replication studies (Kato 2002; Miyake & Noda 2019), the
+SEAS BP1-QD anchor, loading-condition guidance, and the experiment
+suite are documented in test_twod/anti_plane/README_ve_antiplane.md,
+ve_loading_conditions.md, noda_mn_tests.md, and
+test_twod/anti_plane_cycles/README_cycles2d.md.
+
 ## Checkpoint and restart
 
 `-rsf_checkpoint <N>` writes a restart checkpoint every N accepted
@@ -62,6 +97,15 @@ all printed digits, including an event entirely after the restart;
 trajectories are expected to be near identical rather than bit
 identical in general, since the timestep controller's internal
 history is not preserved.
+
+Visco-elastic runs append the memory states (h vectors, slip
+reference, and the h clock in meta slots 9/10) after the solution
+vector; elastic checkpoints remain readable, and elastic/VE runs
+refuse each other's checkpoints with a clear message. Since 2026-08
+the periodic write is suppressed at the restart step itself (it could
+previously rewrite the file with an uninitialized dt when chaining
+runs); when chaining interrupted runs, prefer frequent checkpoints
+(e.g. `-rsf_checkpoint 30000`) and avoid killing a run mid-write.
 
 ## Source layout
 

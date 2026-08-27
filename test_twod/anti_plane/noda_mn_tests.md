@@ -13,7 +13,8 @@ Kato (2002): vertical strike-slip fault cutting an elastic layer
 Vpl = 35 mm/yr, composite Kato-Tullis friction (state_law 5, Vc =
 0.01 um/s), sigma_eff = (rho - rho_w) g z, G = 30 GPa, c_s = 3.27 km/s,
 L = 5 cm, a(z) and a-b(z) DIGITIZED from his Fig. 2 (see gen_kato02.py
-header; the overlay QC is in the delivered kato_fig2_digitized.png).
+header; the digitization was pixel-measured and tick-calibrated from
+the article PDF, with an overlay QC figure delivered outside the repo).
 His kernel (his Eq. 2) is exactly the Bonafede et al. (1984) two-family
 image construction with Erlang time weights that this repo's layered
 machinery implements; his tr = 2 eta/G = 2x our -ve_tmaxwell_yr.
@@ -73,7 +74,11 @@ Maxwell kernel exactly via one memory state per cell
    unchanged, and postseismic fault slip rates that reproduce his
    Fig. 4 exactly in character (tr = 3 and tr = 30 curves nearly
    coincident, the shorter tr peak "slightly larger"; the exact kernel
-   instead separates them clearly, see kato_fig4_compare.png).  This
+   instead separates them clearly).  Regenerate that comparison with
+   the chain's probe output, e.g.
+   `kato02_exact_chain.py 10 3 165 144 0.07 exact probe.dat` for
+   elastic/exact/single at tr = 3 and 30, plotting v(15 km) and
+   v(18 km) for 20 yr after the second event.  This
    is the SAME single-family construction this project found and fixed
    in the repo's own layered antiplane kernels: family A alone is
    dynamically inert on the fault while still producing order-unity

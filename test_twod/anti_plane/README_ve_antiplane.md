@@ -48,11 +48,17 @@ forcing).  VE-aware checkpoint/restart.  A future -ve_prony_file slots
    locked-fault hereditary loading gate against the closed-form
    two-family Erlang analytic (1.5-3e-3 of a 22 MPa swing); sustained
    layered cycles vs uniform-Maxwell loading saturation; -imex vs RK
-   and restart reproducibility.  Physics: recurrence shortens
-   monotonically with stronger relaxation and shallower substrate
-   (-0.5 to -1.2 percent for a substrate 20 km below the fault, to
-   -6.4 percent at 2 km below), with virgin and spun starts converging
-   to the same attractor for contained (non-through-plate) faults.
+   and restart reproducibility.  Physics, CORRECTED after the
+   -ve_h_stage fix (the earlier sweep reported steady-state SHORTENING
+   for contained faults; that sign was a bias of the lagged memory
+   sink): contained faults over a relaxing substrate LENGTHEN mildly
+   and monotonically with relaxation strength and substrate proximity,
+   +1.3 / +1.0 / +0.6 / +0.1 percent at (tM = 2.5 yr, H = 22 km),
+   (5, 22), (5, 25), (5, 40) for a 20-km fault with elastic recurrence
+   250.9 yr; robust to rtol, np = 5/6, and virgin-vs-spun starts
+   (identical attractor).  The loading-pathway relaxation (Miyake-Noda
+   mechanism) wins for contained faults; the strong afterslip-reloading
+   SHORTENING is a through-plate phenomenon (Kato replication).
 
 4. Kato (2002) replication (run_noda_test gates 1-3, gen_kato02.py,
    kato02_exact_chain.py, noda_mn_tests.md): elastic Tcy/us match his
@@ -74,7 +80,26 @@ forcing).  VE-aware checkpoint/restart.  A future -ve_prony_file slots
    periodic); mode 1 agrees with the exact single-state integrator to
    better than 1 percent after the -ve_h_stage fix.
 
-6. Loading conditions (documented in kato_mn_replication_notes.md):
+6. SEAS BP1-QD community anchor (test_twod/anti_plane_cycles,
+   run_cycles2d_test): the elastic antiplane benchmark of Erickson et
+   al. (SRL 2020) reproduces with zero tuning; recurrence 77.88 /
+   78.21 / 78.24 / 78.19 yr at 200 / 100 / 50 / 25 m cells against the
+   community-converged 78.2 yr, demonstrating RSF resolution
+   convergence explicitly (the suggested criterion ds < Lb/3 holds
+   with margin).
+
+7. Experiment suite (test_twod/anti_plane_cycles, README_cycles2d.md):
+   single- and multi-fault (tested to 32 faults) drivers with slip-rate
+   AND shear-stress field frames (-field_stress; step-cadence, dense
+   through events), spacetime and stress-cross-section rendering, and
+   per-fault catalogs; VE assembly accelerated by a translational-
+   invariance sample cache (exact; 8x at 16 faults).  Multi-fault runs
+   desynchronize into migrating sequences with partial ruptures;
+   substrate relaxation adds long-range interaction (cf. Shi, Wei &
+   Barbot, JGR 2022).
+
+8. Loading conditions (documented in ve_loading_conditions.md, this
+   directory):
    backslip is well posed for faults contained in the elastic plate;
    through-plate and uniform-medium geometries have a stress-free
    relaxed slip mode (protocol-matched early cycles meaningful,
@@ -83,6 +108,24 @@ forcing).  VE-aware checkpoint/restart.  A future -ve_prony_file slots
    elastic backslip cycle exactly (137.86 vs 137.87 yr) but is ill
    posed on a relaxing kernel (unbounded acceleration) and should only
    perturb a well-posed backslip configuration.
+
+## Document map
+
+- README_ve_antiplane.md (this file): validation ledger, entry point.
+- ve_loading_conditions.md: the four loading regimes, elastic vs VE,
+  the literature placed on that map, and what is implemented.
+- noda_mn_tests.md: the Kato (2002) and Miyake & Noda (2019)
+  replications and their diagnosis; driver run_noda_test.
+- ../anti_plane_cycles/README_cycles2d.md: the experiment suite
+  (single/multi-fault, snapshots, figures); driver run_cycles2d,
+  gates run_cycles2d_test.
+- src/relax/rsf_ve_theory_and_status.md and
+  rsf_ve_implementation_plan.md: theory lineage and build order, with
+  dated status appendices.
+- test_relax/rsf_ve_test_ledger.md: the original step-1/2 and 3-D
+  ledger, with a dated update superseding its pre-two-family-fix rows.
+- rsf_solve.md (repo root): solver usage, H-matrix backends, and the
+  VE options/cost section.
 
 ## Known limitations
 
