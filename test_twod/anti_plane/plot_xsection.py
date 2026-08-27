@@ -47,20 +47,35 @@ pre(next event).  A separate figure shows the coseismic change of the
 cycle-closing event.  Fields are symmetric (sigma_xy) / antisymmetric
 (sigma_yz) in x; only x >= 0 is shown.
 
-usage: plot_xsection.py rundir [nx nz xfac zfac]
-       grid defaults 90 x 90 over (0, xfac*H] x (0, zfac*H], fac 1.5
+usage: plot_xsection.py rundir [nx nz xfac zfac sat]
+       grid defaults 90 x 90 over (0, xfac*H] x (0, zfac*H],
+       xfac = 1.5, zfac = 1.75 (extra substrate depth in view); sat is
+       the saturation quantile of the color scale (default 0.99: the
+       top 1 percent of |values|, i.e. the near-fault extremes, are
+       clipped so that the far-field differences read better;
+       colorbars show arrows where saturated)
 """
 import sys, glob, os
 import numpy as np
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+from matplotlib.colors import BoundaryNorm
+from matplotlib import cm
+
+NLEV = 21          # target discrete color subdivisions (nice-number levels)
+from matplotlib.ticker import MaxNLocator
+def discrete(vmax):
+    """symmetric discrete levels with round values, about NLEV bins"""
+    lev = MaxNLocator(nbins=NLEV, symmetric=True).tick_values(-vmax, vmax)
+    return lev, BoundaryNorm(lev, len(lev)-1), plt.get_cmap("RdBu_r", len(lev)-1)
 
 rundir = sys.argv[1]
 nx  = int(sys.argv[2]) if len(sys.argv) > 2 else 90
 nz  = int(sys.argv[3]) if len(sys.argv) > 3 else 90
 xfac = float(sys.argv[4]) if len(sys.argv) > 4 else 1.5
-zfac = float(sys.argv[5]) if len(sys.argv) > 5 else 1.5
+zfac = float(sys.argv[5]) if len(sys.argv) > 5 else 1.75
+sat  = float(sys.argv[6]) if len(sys.argv) > 6 else 0.99
 os.chdir(rundir)
 
 par = dict((l.split()[0], l.split()[1]) for l in open("xsect_params.txt") if l.split())
@@ -208,8 +223,11 @@ for i, t0 in enumerate(on):
     sel = off[(off > t0) & (off < t1)]
     offc.append(sel[-1] if sel.size else t0)
 off = np.array(offc)
-if on.size < 3:
-    sys.exit("plot_xsection: fewer than 3 clustered events; run longer")
+if on.size < 2:
+    sys.exit("plot_xsection: fewer than 2 clustered events; run longer")
+if on.size == 2:
+    print("plot_xsection: WARNING: only 2 clustered events; the single "
+          "available cycle is used (consider running longer)")
 t_a = off[-2]          # arrest of the penultimate event
 t_b = on[-1]           # onset of the final event
 t_c = off[-1]          # arrest of the final event
@@ -221,6 +239,16 @@ i_end = min(np.searchsorted(t_fr, t_c) + 1, nfr-1)
 
 fields = [field_at(i) for i in idx]
 f_end  = field_at(i_end)
+
+# save the snapshot fields for plot_xsection_overview.py
+np.savez_compressed(
+    "xsect_fields.npz",
+    xg=xg, zg=zg, H=H, D=Df, tM=tM, label=label,
+    t_snap=np.array([t_fr[i] for i in idx]),
+    phases=np.array([p for p, _ in phases]),
+    sxy=np.array([f[0] for f in fields]),
+    syz=np.array([f[1] for f in fields]),
+    sxy_end=f_end[0], syz_end=f_end[1], t_end=t_fr[i_end])
 
 # self-test 3: interface traction continuity at every snapshot
 iH1 = np.argmin(np.abs(zg - 0.985*H)); iH2 = np.argmin(np.abs(zg - 1.015*H))
@@ -234,44 +262,58 @@ for (sxy, syz), (ph, _) in zip(fields, phases):
 # ---------------------------------------------------------------------------
 ref_xy, ref_yz = fields[0]
 def panelplot(comp, cbl, outname, title):
-    fig, axs = plt.subplots(1, 4, figsize=(14.5, 3.9), sharey=True)
+    """panel 1: the ACTUAL post-event field (the reconstructed stress
+    anomaly of the deficit history, own color scale); panels 2-5: the
+    change since that state through the cycle (shared scale)"""
+    fig, axs = plt.subplots(1, 5, figsize=(17.5, 3.9), sharey=True)
     diffs = [fields[k][comp] - fields[0][comp] for k in range(1, 5)]
-    vmax = max(np.max(np.abs(d)) for d in diffs)/1e6
-    vmax = max(vmax, 1e-12)
+    vmax = max(np.quantile(np.abs(np.array(diffs)), sat)/1e6, 1e-12)
+    va = max(np.quantile(np.abs(fields[0][comp]), sat)/1e6, 1e-12)
+    lev0, nrm0, cmp0 = discrete(va)
+    im0 = axs[0].pcolormesh(xg/1e3, zg/1e3, fields[0][comp]/1e6,
+                            cmap=cmp0, norm=nrm0, shading="auto")
+    axs[0].set_title(f"post-event state, t = {t_fr[idx[0]]/yr:.1f} yr",
+                     fontsize=9)
+    lev, nrm, cmpd = discrete(vmax)
     im = None
-    for k, ax in enumerate(axs):
-        im = ax.pcolormesh(xg/1e3, zg/1e3, diffs[k]/1e6, cmap="RdBu_r",
-                           vmin=-vmax, vmax=vmax, shading="auto")
+    for k in range(1, 5):
+        ax = axs[k]
+        im = ax.pcolormesh(xg/1e3, zg/1e3, diffs[k-1]/1e6, cmap=cmpd,
+                           norm=nrm, shading="auto")
+        ax.set_title(f"change, phase {phases[k][0]}, "
+                     f"t = {t_fr[idx[k]]/yr:.1f} yr", fontsize=9)
+    for ax in axs:
         ax.axhline(H/1e3, color="k", lw=0.8, ls="--")
         ax.plot([0, 0], [0, Df], color="k", lw=2.5)
-        ax.set_title(f"phase {phases[k+1][0]}, t = {t_fr[idx[k+1]]/yr:.1f} yr",
-                     fontsize=9)
         ax.set_xlabel("x [km]")
     axs[0].set_ylabel("depth [km]")
     axs[0].set_ylim(zfac*H/1e3, 0)
-    fig.colorbar(im, ax=axs, label=cbl, shrink=0.85, pad=0.01)
-    fig.suptitle(f"{title}  [{label}]   change since post-event state at "
-                 f"t = {t_fr[idx[0]]/yr:.1f} yr; dashed: plate base "
-                 f"H = {H/1e3:.0f} km; thick: fault (D = {Df:.0f} km)",
+    fig.colorbar(im0, ax=axs[0], label=cbl + " (state)", shrink=0.8,
+                 pad=0.03, extend="both")
+    fig.colorbar(im, ax=axs[1:], label="d " + cbl, shrink=0.8, pad=0.01,
+                 extend="both")
+    fig.suptitle(f"{title}  [{label}]   dashed: plate base H = "
+                 f"{H/1e3:.0f} km; thick: fault (D = {Df:.0f} km)",
                  fontsize=10)
     fig.savefig(outname, dpi=150, bbox_inches="tight")
     plt.close(fig)
 
-panelplot(0, "d sigma_xy [MPa]", "xsect_sxy.png",
-          "interseismic stress evolution, sigma_xy")
-panelplot(1, "d sigma_yz [MPa]", "xsect_syz.png",
-          "interseismic stress evolution, sigma_yz")
+panelplot(0, "sigma_xy [MPa]", "xsect_sxy.png",
+          "stress evolution, sigma_xy")
+panelplot(1, "sigma_yz [MPa]", "xsect_syz.png",
+          "stress evolution, sigma_yz")
 
 co = f_end[0] - fields[-1][0]
-vmax = max(np.max(np.abs(co))/1e6, 1e-12)
+vmax = max(np.quantile(np.abs(co), sat)/1e6, 1e-12)
+lev, nrm, cmpd = discrete(vmax)
 fig, ax = plt.subplots(figsize=(5.8, 4.8))
-im = ax.pcolormesh(xg/1e3, zg/1e3, co/1e6, cmap="RdBu_r",
-                   vmin=-vmax, vmax=vmax, shading="auto")
+im = ax.pcolormesh(xg/1e3, zg/1e3, co/1e6, cmap=cmpd, norm=nrm,
+                   shading="auto")
 ax.axhline(H/1e3, color="k", lw=0.8, ls="--")
 ax.plot([0, 0], [0, Df], color="k", lw=2.5)
 ax.set_ylim(zfac*H/1e3, 0)
 ax.set_xlabel("x [km]"); ax.set_ylabel("depth [km]")
-fig.colorbar(im, ax=ax, label="coseismic d sigma_xy [MPa]")
+fig.colorbar(im, ax=ax, label="coseismic d sigma_xy [MPa]", extend="both")
 ax.set_title(f"coseismic stress change  [{label}]", fontsize=10)
 fig.savefig("xsect_coseis.png", dpi=150, bbox_inches="tight")
 plt.close(fig)

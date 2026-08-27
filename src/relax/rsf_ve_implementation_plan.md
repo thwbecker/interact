@@ -268,6 +268,18 @@ Steps 0-3, 5, 6, and 7a are COMPLETE and in master; step 4 in its
   test_twod/anti_plane/README_ve_antiplane.md, experiments in
   test_twod/anti_plane_cycles.  Multi-fault assembly uses a
   translational-invariance sample cache (exact, 8x at 16 faults).
+- Specified but deliberately not built (2026-08-27): in-code
+  OBSERVATION ROWS, i.e. -ve_obs_file with off-fault points, per-point
+  operators C_p^obs assembled by the same generator/sampler machinery
+  (substrate receivers need a transmitted-kernel sampler in
+  prony_kernel.c: (1 + Gamma(s)) Gamma(s)^n mu_2(s) weighting), lazy
+  exact-exponential h_obs updates at frame cadence (read-only, no
+  feedback on dynamics, negligible cost), giving off-fault stress and,
+  later, surface-displacement time series consistent with whatever
+  kernels the solver carries (including future 3-D via -ve_prony_file).
+  The python reference implementation with EXACT image weights is
+  test_twod/anti_plane/plot_xsection.py; keep it as the
+  independent-representation check if obs rows are ever added.
 - Step 7b (3-D layered kernels, -ve_prony_file): OPEN; the propagator
   interior-stress work front is summarized in rsf_ve_test_ledger.md.
   A further extension class identified since (Lambert & Barbot 2016

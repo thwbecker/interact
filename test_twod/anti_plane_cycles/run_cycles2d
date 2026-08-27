@@ -20,6 +20,10 @@
 #
 # environment overrides:
 #   FIELD_INT   accepted steps between field frames (default 20 bp5, 400 bp1)
+#   CKPT_INT    accepted steps between restart checkpoints (default 10000)
+#   CKPT_WALL   seconds of wallclock between checkpoints (default 120;
+#               whichever cadence fires first); re-running the same
+#               outdir resumes from the last checkpoint
 #   VE_HINIT    -ve_h_init value (default 1, backslip-spun memory: right for
 #               steady-cycle studies of contained faults; 0 = virgin medium,
 #               spin-up ~90 tM, used by the replication tests)
@@ -67,11 +71,19 @@ $bindir/rsf_solve -geom_file cyc_geom.in -rsf_file cyc_rsf.dat \
   -rtol $rtol -ts_rk_type 3bs -ts_max_steps 2000000000 \
   -dt_monitor_yr 5 -track_events -rsf_catalog -rsf_monitor_by_group 1 \
   -vel_event 1e-3 -field_step_interval $fint -field_stress \
-  -rsf_checkpoint 500000 -stop_time_yr $stop $restart $veopts "$@" >> run.log 2>&1
+  -rsf_checkpoint ${CKPT_INT-10000} -rsf_checkpoint_wall ${CKPT_WALL-120} \
+  -stop_time_yr $stop $restart $veopts "$@" >> run.log 2>&1
 status=$?
-tail -2 run.log | head -1
 if [ $status -ne 0 ];then
-    echo "$0: rsf_solve failed, see $out/run.log"; exit $status
+    echo "$0: rsf_solve exited with an error, see $out/run.log (tail follows)"
+    tail -5 run.log; exit $status
+fi
+reached=`grep -v '^#' rsf_monitor.dat | tail -1 | awk '{print $3}'`
+echo "$0: reached t = $reached yr of $stop requested"
+inc=`echo "$reached < $stop - 1" | bc 2>/dev/null`
+if [ "$inc" = "1" ];then
+    echo "$0: INCOMPLETE (killed externally?); re-run the same command to resume"
+    echo "$0: from the last checkpoint (every ${CKPT_INT-10000} steps or ${CKPT_WALL-120} s)"
 fi
 
 # quick recurrence summary per fault

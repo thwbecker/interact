@@ -98,7 +98,22 @@ forcing).  VE-aware checkpoint/restart.  A future -ve_prony_file slots
    substrate relaxation adds long-range interaction (cf. Shi, Wei &
    Barbot, JGR 2022).
 
-8. Loading conditions (documented in ve_loading_conditions.md, this
+8. Off-fault stress cross sections (run_xsection, plot_xsection.py,
+   this directory): sigma_xy(x, z, t) and sigma_yz through plate AND
+   relaxing substrate, reconstructed from -field_slip frames via the
+   validated image series (plate: Erlang-weighted two-family images;
+   substrate: the transmitted series, whose stress weights reduce to
+   Poisson masses p_n(bt) obtained from the same memory chains).
+   Driver: fault reaching a fraction of H (default 0.5), elastic plus
+   tM/T_rec = 0.1, 0.5, 1, 2, 10, all spun; snapshots through the last
+   full cycle plus the coseismic change.  Built-in checks: on-fault
+   kernel match, free-surface traction, and interface-traction
+   continuity at every snapshot time (jointly tests image positions
+   and both media's time weights).  Note this configuration produces
+   period-2 cycles (alternating small/large events); T_rec is the mean
+   clustered interval.
+
+9. Loading conditions (documented in ve_loading_conditions.md, this
    directory):
    backslip is well posed for faults contained in the elastic plate;
    through-plate and uniform-medium geometries have a stress-free
@@ -116,6 +131,8 @@ forcing).  VE-aware checkpoint/restart.  A future -ve_prony_file slots
   the literature placed on that map, and what is implemented.
 - noda_mn_tests.md: the Kato (2002) and Miyake & Noda (2019)
   replications and their diagnosis; driver run_noda_test.
+- run_xsection + plot_xsection.py: off-fault stress cross-section
+  evolution (plate and substrate), elastic vs Maxwell-time series.
 - ../anti_plane_cycles/README_cycles2d.md: the experiment suite
   (single/multi-fault, snapshots, figures); driver run_cycles2d,
   gates run_cycles2d_test.

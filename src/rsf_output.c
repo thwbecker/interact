@@ -152,6 +152,8 @@ PetscErrorCode rsf_init_monitor_and_event(struct rsf_out_ctx *uc,struct interact
   uc->field_stress = PETSC_FALSE;	/* stress frames alongside the velocity
 					   frames; same cadence, same frame ids */
   PetscCall(PetscOptionsGetBool(NULL,NULL,"-field_stress",&uc->field_stress,NULL));
+  uc->field_slip = PETSC_FALSE;		/* signed slip frames likewise */
+  PetscCall(PetscOptionsGetBool(NULL,NULL,"-field_slip",&uc->field_slip,NULL));
   uc->field_frame = 0;
   uc->fout_field_times = NULL;
   uc->groups = groups;
@@ -190,6 +192,27 @@ PetscErrorCode rsf_init_monitor_and_event(struct rsf_out_ctx *uc,struct interact
       int ierr_dir = system("mkdir -p tmp_rsf");
       if(ierr_dir)
 	fprintf(stderr,"rsf_init_monitor_and_event: WARNING: could not make tmp_rsf directory\n");
+      /* on restart, CONTINUE the frame numbering where the previous
+	 run left off (last frame id in the times file + 1); without
+	 this, a chained run restarts at frame 0, overwriting old
+	 frames while the times file appends, leaving the frame files
+	 and their time stamps inconsistent */
+      if(uc->restarted){
+	FILE *fprev = fopen(RSF_VEL_TIME_FILE,"r");
+	if(fprev){
+	  char lbuf[1024];
+	  int lastf = -1, ftmp;
+	  while(fgets(lbuf,sizeof(lbuf),fprev))
+	    if((lbuf[0] != '#') && (sscanf(lbuf,"%d",&ftmp) == 1))
+	      lastf = ftmp;
+	  fclose(fprev);
+	  if(lastf >= 0){
+	    uc->field_frame = lastf + 1;
+	    fprintf(stderr,"rsf_init_monitor_and_event: restart: continuing field frames at %06i\n",
+		    uc->field_frame);
+	  }
+	}
+      }
       uc->fout_field_times = myopen(RSF_VEL_TIME_FILE,(uc->restarted)?("a"):("w"));
       if(uc->fout_field_times){
 	fprintf(uc->fout_field_times,"# frame step time[yr] time[s] log10(max|v|[m/s]) mean|v|[m/s] std|v|[m/s] min|v|[m/s] mean_slip[m]\n");
@@ -1030,6 +1053,22 @@ PetscErrorCode rsf_TS_Monitor(TS ts,PetscInt step,PetscReal time,Vec X,void *ptr
 	    g->buf[3*k+2] = (float)(fvals[g->idx[k]*rsf->dim+1]/1e6);
 	  }
 	  snprintf(ffile,STRLEN,"tmp_rsf/rsf_tau.g%03d.%06i.bin",g->id,uc->field_frame);
+	  fb = myopen(ffile,"wb");
+	  if(fb){
+	    fwrite(g->buf,sizeof(float),(size_t)3*(size_t)g->np,fb);
+	    fclose(fb);
+	  }
+	}
+	if(uc->field_slip){
+	  /* signed slip frame, (x, y, slip[m]) triples (state slot 3);
+	     float32 keeps ~7 digits, ample for slip histories, and the
+	     off-fault reconstruction uses slip DIFFERENCES over frames */
+	  for(k=0;k < g->np;k++){
+	    g->buf[3*k+0] = (float)g->xs[k];
+	    g->buf[3*k+1] = (float)g->ys[k];
+	    g->buf[3*k+2] = (float)(fvals[g->idx[k]*rsf->dim+3]);
+	  }
+	  snprintf(ffile,STRLEN,"tmp_rsf/rsf_slip.g%03d.%06i.bin",g->id,uc->field_frame);
 	  fb = myopen(ffile,"wb");
 	  if(fb){
 	    fwrite(g->buf,sizeof(float),(size_t)3*(size_t)g->np,fb);

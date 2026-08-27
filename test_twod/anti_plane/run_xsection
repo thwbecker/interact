@@ -10,12 +10,13 @@
 # built-in consistency checks).
 #
 # usage: run_xsection [frac] [H_km] [ncycle] [ratio1 ratio2 ...]
-#        defaults      0.5    40     6        0.1 0.5 1 2 10
+#        defaults      0.75   40     6        0.1 0.5 1 2 10
 #
 #   frac    fault depth extent D = frac * H (keep < 1: contained fault)
 #   H_km    elastic plate thickness [km]
 #   ncycle  cycles to run (snapshots use the LAST full cycle)
 #   ratios  Maxwell times tM = ratio * T_rec(elastic); 0 = skip
+# env: NOPLOT=1 skips figure rendering (useful when chaining resumed runs)
 #
 # Geometry/friction: gen_bp2d.py BP5-flavored profile (VS cap 4 km,
 # 2-km transitions, VW core 6-12 km for the default D = 20 km), dc =
@@ -25,7 +26,7 @@
 #
 bindir=`cd ../../bin && pwd`
 sdir=`pwd`
-frac=${1-0.5}
+frac=${1-0.75}
 H=${2-40}
 ncyc=${3-6}
 shift 3 2>/dev/null
@@ -77,6 +78,10 @@ fi
 if [ -z "$Trec" ];then echo "$0: could not measure T_rec"; exit 1; fi
 echo "$0: elastic T_rec = $Trec yr"
 stop=`echo "($ncyc + 0.5) * $Trec" | bc -l`
+# spun VE runs can nucleate their first spontaneous event only after a
+# long quiescence (the seeded event decays under the spun memory), so
+# give them extra cycles to guarantee >= 3 clustered events
+vestop=`echo "($ncyc + 4.5) * $Trec" | bc -l`
 # extend the elastic run to the common duration
 run_one xsect_el $stop
 cat > xsect_el/xsect_params.txt <<EOF
@@ -88,7 +93,7 @@ vpl_ms 1e-9
 tM_yr 0
 label elastic
 EOF
-python3 $sdir/plot_xsection.py xsect_el && echo "$0: xsect_el figures done"
+[ -z "$NOPLOT" ] && python3 $sdir/plot_xsection.py xsect_el && echo "$0: xsect_el figures done"
 
 # ---- viscoelastic series ------------------------------------------------------
 for r in $ratios;do
@@ -110,10 +115,12 @@ vpl_ms 1e-9
 tM_yr $tm
 label tM/Trec=$r
 XPEOF
-    run_one $dir $stop -ve_mode 2 -ve_plate_h ${H}e3 -ve_tmaxwell_yr $tm \
+    run_one $dir $vestop -ve_mode 2 -ve_plate_h ${H}e3 -ve_tmaxwell_yr $tm \
         -ve_h_init 1 || { echo "$0: $dir failed, see $dir/run.log"; continue; }
     reached=`grep -v '^#' $dir/rsf_monitor.dat | tail -1 | awk '{print $3}'`
-    echo "$0: $dir reached t = $reached yr of $stop (re-run to resume if short)"
-    python3 $sdir/plot_xsection.py $dir && echo "$0: $dir figures done"
+    echo "$0: $dir reached t = $reached yr of $vestop (re-run to resume if short)"
+    [ -z "$NOPLOT" ] && python3 $sdir/plot_xsection.py $dir && echo "$0: $dir figures done"
 done
+python3 $sdir/plot_xsection_overview.py xsect_el `for r in $ratios;do echo xsect_r$r;done` && \
+    echo "$0: overview figures: xsect_overview_sxy.png, xsect_overview_syz.png"
 echo "$0: all done; figures: xsect_*/xsect_sxy.png (and _syz, _coseis)"

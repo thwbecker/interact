@@ -207,6 +207,8 @@ void rsf_print_help(const char *prog)
   fprintf(stderr,"  -field_tmin_yr <yr>     suppress field frames before this time (default 0)\n");
   fprintf(stderr,"  -field_stress           also write shear-stress frames rsf_tau.gGGG.NNNNNN.bin\n");
   fprintf(stderr,"                          ((x,y,tau[MPa]) triples, same cadence/frame ids)\n");
+  fprintf(stderr,"  -field_slip             also write signed slip frames rsf_slip.gGGG.NNNNNN.bin\n");
+  fprintf(stderr,"                          ((x,y,slip[m]); input for off-fault stress reconstruction)\n");
   fprintf(stderr,"  -slip_line_dt_yr <yr>   tmp_rsf slip-line snapshot cadence (default off)\n");
   fprintf(stderr,"  -rsf_monitor_by_group <bool> also write one monitor file per fault group (default 0);\n");
   fprintf(stderr,"                          with -rsf_catalog this also splits the event catalog by group\n");

@@ -78,8 +78,15 @@ the substrate (cf. Shi, Wei & Barbot, JGR 2022, for the 3-D analog).
   problems); use it only for exploration and re-run keepers with the
   default.  Multi-fault VE runs spend most time in event cascades.
 - Long runs: chain calls with the same outdir; the driver auto-restarts
-  from rsf_checkpoint.bin (add -rsf_checkpoint 30000 for frequent
-  checkpoints on runs you may interrupt).
+  from rsf_checkpoint.bin, and checkpoints every 10000 accepted steps
+  or 120 s of wallclock, whichever comes first (CKPT_INT / CKPT_WALL
+  override; -rsf_checkpoint_wall is the underlying rsf_solve option),
+  so interrupted runs resume with at most ~2 minutes lost.  The driver reports "reached t = ... of ...
+  requested" at the end; an INCOMPLETE run was killed externally
+  (queue/time limit), not by any internal step limit (max steps is
+  effectively unbounded).  Note the VE runs are 3-5x slower than
+  elastic at the same fault count; at 32-64 faults budget accordingly
+  or chain restarts.
 
 ## CAVEATS
 

@@ -110,6 +110,10 @@ struct rsf_out_ctx{
 				   frames rsf_tau.gGGG.NNNNNN.bin, (x,y,tau[MPa])
 				   float triples on the same cadence and frame
 				   numbering (-field_stress) */
+  PetscBool field_slip;		/* likewise signed slip frames
+				   rsf_slip.gGGG.NNNNNN.bin (x,y,slip[m]),
+				   the input for off-fault stress
+				   reconstruction (-field_slip) */
   int field_frame;
   FILE *fout_field_times;
   struct rsf_group_grid *groups;	/* rank 0: one per fault group */
