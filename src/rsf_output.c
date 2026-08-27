@@ -761,9 +761,20 @@ PetscErrorCode rsf_TS_Monitor(TS ts,PetscInt step,PetscReal time,Vec X,void *ptr
   PetscFunctionBeginUser;
   {
     struct rsf_out_ctx *uc_ck = (struct rsf_out_ctx *)ptr;
+    PetscBool do_ck = PETSC_FALSE;
     if((uc_ck->ckpt_every > 0) && (step > uc_ck->ckpt_step0) &&
        (step % uc_ck->ckpt_every == 0))
+      do_ck = PETSC_TRUE;
+    if((!do_ck) && (uc_ck->ckpt_wall > 0.0) && (step > uc_ck->ckpt_step0)){
+      PetscLogDouble now;
+      PetscCall(PetscTime(&now));
+      if(now - uc_ck->ckpt_last_wtime > (PetscLogDouble)uc_ck->ckpt_wall)
+	do_ck = PETSC_TRUE;
+    }
+    if(do_ck){
       PetscCall(rsf_write_checkpoint(ts,X,uc_ck));
+      PetscCall(PetscTime(&uc_ck->ckpt_last_wtime));
+    }
   }
   uc = (struct rsf_out_ctx *)ptr;
   medium = uc->par->medium;

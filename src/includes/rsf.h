@@ -137,6 +137,11 @@ struct rsf_out_ctx{
      chaining runs.
   */
   PetscInt ckpt_every;
+  PetscReal ckpt_wall;		/* [s] wallclock checkpoint cadence
+				   (-rsf_checkpoint_wall, 0 = off); a
+				   robust companion to the step cadence,
+				   whose meaning varies with problem size */
+  PetscLogDouble ckpt_last_wtime;
   PetscInt ckpt_step0;		/* step at (re)start; suppresses the spurious
 				   re-write the monitor would otherwise emit at
 				   the restart step itself (step %% ckpt_every

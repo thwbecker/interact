@@ -601,6 +601,12 @@ PetscErrorCode rsf_solve_run(int argc,char **argv,struct interact_ctx *par,
      vector, see rsf_write_checkpoint in rsf_output.c */
   strcpy(ckpt_file,"rsf_checkpoint.bin");
   PetscCall(PetscOptionsGetInt(NULL,NULL,"-rsf_checkpoint",&ckpt_every,NULL));
+  {
+    PetscReal ckpt_wall = 0.0;
+    PetscCall(PetscOptionsGetReal(NULL,NULL,"-rsf_checkpoint_wall",&ckpt_wall,NULL));
+    uc->ckpt_wall = ckpt_wall;
+    PetscCall(PetscTime(&uc->ckpt_last_wtime));
+  }
   PetscCall(PetscOptionsGetString(NULL,NULL,"-rsf_checkpoint_file",ckpt_file,300,NULL));
   PetscCall(PetscOptionsGetString(NULL,NULL,"-rsf_restart",restart_file,300,&have_restart));
   uc->ckpt_every = ckpt_every;

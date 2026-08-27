@@ -191,6 +191,8 @@ void rsf_print_help(const char *prog)
   fprintf(stderr,"check pointing and restart\n");
   fprintf(stderr,"  -rsf_checkpoint <N>     write a restart checkpoint every N accepted steps and once\n");
   fprintf(stderr,"                          after a regular finish (0: off); previous kept as .prev\n");
+  fprintf(stderr,"  -rsf_checkpoint_wall <s> also checkpoint every s seconds of wallclock (0 = off);\n");
+  fprintf(stderr,"                          robust cadence for heavy runs where step counts vary\n");
   fprintf(stderr,"  -rsf_checkpoint_file <f> checkpoint file name (%s)\n",RSF_CHECKPOINT_FILE);
   fprintf(stderr,"  -rsf_restart <f>        restart from a checkpoint; outputs append with a marker;\n");
   fprintf(stderr,"                          note -ts_max_steps counts absolute step numbers\n");
