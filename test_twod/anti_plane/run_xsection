@@ -4,7 +4,7 @@
 # reaching a FRACTION of the elastic plate thickness, elastic plus a
 # series of Maxwell times expressed as ratios of the measured elastic
 # recurrence time, all fully spun up; then reconstruct and plot the
-# OFF-FAULT stress field sigma_xy(x, z, t) in x-depth cross section
+# OFF-FAULT stress field sigma_xz(x, z, t) in x-depth cross section
 # (elastic plate AND relaxing substrate) at snapshot times through the
 # last full cycle (plot_xsection.py; see its header for the method and
 # built-in consistency checks).
@@ -30,7 +30,7 @@ frac=${1-0.75}
 H=${2-40}
 ncyc=${3-6}
 shift 3 2>/dev/null
-ratios=${@:-"0.1 0.5 1 2 10"}
+ratios=${@:-"0.02 0.1 0.5 1 2 10 50"}
 
 D=`echo "$frac * $H" | bc -l`
 Hvw=6
@@ -121,6 +121,6 @@ XPEOF
     echo "$0: $dir reached t = $reached yr of $vestop (re-run to resume if short)"
     [ -z "$NOPLOT" ] && python3 $sdir/plot_xsection.py $dir && echo "$0: $dir figures done"
 done
-python3 $sdir/plot_xsection_overview.py xsect_el `for r in $ratios;do echo xsect_r$r;done` && \
-    echo "$0: overview figures: xsect_overview_sxy.png, xsect_overview_syz.png"
-echo "$0: all done; figures: xsect_*/xsect_sxy.png (and _syz, _coseis)"
+python3 $sdir/plot_xsection_overview.py `for r in $ratios;do echo xsect_r$r;done` xsect_el && \
+    echo "$0: overview figures: xsect_overview_sxz.png, xsect_overview_syz.png"
+echo "$0: all done; figures: xsect_*/xsect_sxz.png (and _syz, _coseis)"

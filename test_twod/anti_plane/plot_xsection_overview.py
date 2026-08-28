@@ -1,19 +1,41 @@
 #!/usr/bin/env python3
 """
 plot_xsection_overview.py: assemble the run_xsection series into one
-overview figure, model rows (elastic on top, then increasing
-tM/T_rec), snapshot columns (the ACTUAL post-event field, then the
-change through the cycle at phases 0.25, 0.50, 0.75, pre), so the
-effect of viscous relaxation reads directly down the columns.  Uses
-the per-run xsect_fields.npz files written by plot_xsection.py (run
-that first), a shared DISCRETE color scale (21 subdivisions) for all
-change panels and a second shared discrete scale for the post-event
-column.
+overview figure, model rows ordered by INCREASING Maxwell time top to
+bottom, with the elastic model as the BOTTOM row: elastic is the
+tM -> infinity limit, so the r = tM/T_rec = 10 row should visibly
+converge to it, and the effect of viscous relaxation grows reading
+UP the figure.  All panels show the ACTUAL reconstructed stress field
+(the loading-relevant sigma_xz, and sigma_yz) at the snapshot times
+through the last cycle (right after the event, cycle phases
+0.25/0.50/0.75, and right before the next event), on ONE shared
+discrete color scale (~21 nice-number subdivisions, quantile
+saturated) so values read off the plot and rows compare directly.
 
-usage: plot_xsection_overview.py [dir1 dir2 ...] (SAT env overrides the
-       0.99 color-scale saturation quantile)
-       default: xsect_el xsect_r0.1 xsect_r0.5 xsect_r1 xsect_r2 xsect_r10
-writes xsect_overview_sxy.png (and _syz)
+Uses the per-run xsect_fields.npz files written by plot_xsection.py
+(run that first).
+
+usage: plot_xsection_overview.py [mode] [sat] [dir1 dir2 ...]
+       mode: cyc (default) subtracts each run's own cycle-mean field;
+             abs plots the actual reconstructed fields (see caveat)
+       sat:  saturation quantile of the shared color scale (0.99)
+       dirs: xsect_r0.1 xsect_r0.5 xsect_r1 xsect_r2 xsect_r10 xsect_el
+       (all optional; a leading cyc/abs is the mode, a leading number
+       the quantile, everything else directories)
+writes xsect_overview_sxz.png (and _syz); mode abs appends _abs, and
+its row labels carry each run's standing deficit (lag) at the plotted
+snapshots
+
+CAVEAT on mode abs: the absolute field includes each run's STANDING
+slip-deficit level, which is genuine solver output but only partly
+comparable across models: the elastic run's level is pinned by the
+seed/initial stress forever, and the viscoelastic level equilibrates
+on the slow tail of the relaxation ladder (tens of Maxwell times),
+far beyond these run durations for tM >~ T_rec.  So in MODE=abs the
+large-tM rows need not visually converge to the elastic row even
+though the physics does in the tM -> inf limit.  MODE=cyc removes
+that run-specific DC and shows the actual stress pattern of the cycle
+itself; there the large-tM rows do converge to elastic.
 """
 import sys, os
 import numpy as np
@@ -21,18 +43,35 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from matplotlib.colors import BoundaryNorm
+from matplotlib.ticker import MaxNLocator
 
 NLEV = 21          # target discrete color subdivisions (nice-number levels)
-from matplotlib.ticker import MaxNLocator
+args = sys.argv[1:]
+MODE = "cyc"
+if args and args[0] in ("cyc", "abs"):
+    MODE = args.pop(0)
+SAT = 0.99
+if args:
+    try:
+        SAT = float(args[0]); args.pop(0)
+    except ValueError:
+        pass
 def discrete(vmax):
     """symmetric discrete levels with round values, about NLEV bins"""
     lev = MaxNLocator(nbins=NLEV, symmetric=True).tick_values(-vmax, vmax)
-    return lev, BoundaryNorm(lev, len(lev)-1), plt.get_cmap("RdBu_r", len(lev)-1)
+    return BoundaryNorm(lev, len(lev)-1), plt.get_cmap("RdBu_r", len(lev)-1)
 
-sat = float(os.environ.get("SAT", 0.99))
-dirs = sys.argv[1:] if len(sys.argv) > 1 else \
-    ["xsect_el", "xsect_r0.1", "xsect_r0.5", "xsect_r1", "xsect_r2",
-     "xsect_r10"]
+def getcomp(z, comp):
+    """npz key with fallback to the pre-rename key (sxz was sxy)"""
+    if comp in z.files:
+        return z[comp]
+    return z[{"sxz": "sxy"}.get(comp, comp)]
+
+dirs = args if args else \
+    ["xsect_r0.1", "xsect_r0.5", "xsect_r1", "xsect_r2", "xsect_r10",
+     "xsect_el"]
+# elastic (tM -> inf) belongs at the bottom regardless of argument order
+dirs = sorted(dirs, key=lambda d: d == "xsect_el")
 yr = 3.15576e7
 runs = []
 for d in dirs:
@@ -47,49 +86,51 @@ if not runs:
 
 def overview(comp, cbl, outname):
     nr = len(runs); ncol = 5
-    fig, axs = plt.subplots(nr, ncol, figsize=(3.1*ncol + 1.6, 2.6*nr + 1.6),
-                            sharex=True, sharey=True, squeeze=False,
-                            constrained_layout=True)
-    # shared scales over ALL runs
-    va = vd = 1e-12
+    fig, axs = plt.subplots(nr, ncol, figsize=(3.1*ncol + 1.4, 2.6*nr + 1.0),
+                            sharex=True, sharey=True, squeeze=False)
+    # one shared, saturated scale over ALL runs and ALL snapshots
+    def prep(z):
+        F = np.array(getcomp(z, comp), dtype=float)
+        if MODE == "cyc":
+            F = F - np.mean(F, axis=0)
+        return F
+    va = 1e-12
     for _, z in runs:
-        F = z[comp]                       # (5, nz, nx): post, 0.25, ..., pre
-        va = max(va, np.quantile(np.abs(F[0]), sat)/1e6)
-        vd = max(vd, np.quantile(np.abs(F[1:] - F[0]), sat)/1e6)
-    _, nrm0, cmp0 = discrete(va)
-    _, nrmd, cmpd = discrete(vd)
-    im0 = imd = None
+        va = max(va, np.quantile(np.abs(prep(z)), SAT)/1e6)
+    nrm, cmp_ = discrete(va)
+    im = None
     for r, (d, z) in enumerate(runs):
         xg, zg = z["xg"]/1e3, z["zg"]/1e3
         H, D = float(z["H"])/1e3, float(z["D"])
-        F = z[comp]; ts = z["t_snap"]/yr; ph = z["phases"]
+        F = prep(z); ts = z["t_snap"]/yr; ph = z["phases"]
         lab = str(z["label"])
-        im0 = axs[r, 0].pcolormesh(xg, zg, F[0]/1e6, cmap=cmp0, norm=nrm0,
-                                   shading="auto")
-        for c in range(1, ncol):
-            imd = axs[r, c].pcolormesh(xg, zg, (F[c] - F[0])/1e6, cmap=cmpd,
-                                       norm=nrmd, shading="auto")
         for c in range(ncol):
             ax = axs[r, c]
+            im = ax.pcolormesh(xg, zg, F[c]/1e6, cmap=cmp_, norm=nrm,
+                               shading="auto")
             ax.axhline(H, color="k", lw=0.7, ls="--")
             ax.plot([0, 0], [0, D], color="k", lw=2.0)
             if r == 0:
-                ax.set_title("post-event state" if c == 0 else
-                             f"change, phase {ph[c]}", fontsize=9)
+                ax.set_title("post-event" if c == 0 else
+                             ("pre-event" if c == ncol - 1 else
+                              f"phase {ph[c]}"), fontsize=9)
             if r == nr - 1:
                 ax.set_xlabel("x [km]")
+        if MODE == "abs" and "dmean" in z.files:
+            lab += f"\nlag {-float(z['dmean']):.0f} m"
         axs[r, 0].set_ylabel(f"{lab}\ndepth [km]", fontsize=9)
     axs[0, 0].set_ylim(zg[-1], 0)
-    fig.colorbar(im0, ax=axs[-1, 0], location="bottom", fraction=0.15,
-                 label=cbl + " (state) [MPa]", extend="both")
-    fig.colorbar(imd, ax=axs[-1, 1:], location="bottom", fraction=0.15,
-                 shrink=0.5, label="d " + cbl + " [MPa]", extend="both")
-    fig.suptitle(f"{cbl} through the last cycle: post-event state and the "
-                 "interseismic change at cycle phases 0.25/0.50/0.75/pre; "
-                 "dashed: plate base; thick: fault", fontsize=11)
+    fig.colorbar(im, ax=axs, label=cbl + " [MPa]", shrink=0.55, pad=0.015,
+                 aspect=40, extend="both")
+    what = ("actual reconstructed field" if MODE == "abs" else
+            "actual field around each run's own cycle mean")
+    fig.suptitle(f"{cbl} through the cycle ({what}; rows: increasing "
+                 "tM/T_rec, elastic = tM -> inf limit at bottom; dashed: "
+                 "plate base; thick: fault)", fontsize=11)
     fig.savefig(outname, dpi=150, bbox_inches="tight")
     plt.close(fig)
     print(f"plot_xsection_overview: wrote {outname} ({nr} models)")
 
-overview("sxy", "sigma_xy", "xsect_overview_sxy.png")
-overview("syz", "sigma_yz", "xsect_overview_syz.png")
+tag = "" if MODE == "cyc" else "_abs"
+overview("sxz", "sigma_xz", f"xsect_overview_sxz{tag}.png")
+overview("syz", "sigma_yz", f"xsect_overview_syz{tag}.png")

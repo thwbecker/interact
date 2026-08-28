@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 plot_xsection.py: reconstruct and plot the OFF-FAULT stress field
-sigma_xy(x, z, t) (and sigma_yz) in x-depth cross section for a
+sigma_xz(x, z, t) (and sigma_yz) in x-depth cross section for a
 run_xsection output directory: an antiplane rate-and-state fault
 (0 <= z <= D, x = 0) in an elastic plate (0 <= z <= H, modulus G) over
 a Maxwell half-space of the same elastic modulus (equal rigidities;
@@ -32,11 +32,11 @@ dS_m/dt = b (S_{m-1} - S_m); b = 1/(2 tM) for equal rigidities):
   half-space, and as t -> infinity substrate stresses relax to zero).
 
 BUILT-IN CONSISTENCY CHECKS (run every time; abort on failure):
-(1) the on-fault sigma_xy of the elastic kernel matches the
+(1) the on-fault sigma_xz of the elastic kernel matches the
 independent closed-form fault kernel; (2) the free surface is traction
 free; (3) the interface traction sigma_yz is continuous across z = H
 at EVERY snapshot time, which jointly tests the image positions and
-the time weights of both media (sigma_xy may jump once the substrate
+the time weights of both media (sigma_xz may jump once the substrate
 relaxes; sigma_yz must not).
 
 WHAT IS PLOTTED.  Snapshots through the LAST full recurrence of the
@@ -44,7 +44,7 @@ run: the change of stress relative to the immediately post-event state
 (this is "how stress evolves over the cycle" and is independent of the
 reconstruction's virgin start), at phases post, 0.25, 0.50, 0.75, and
 pre(next event).  A separate figure shows the coseismic change of the
-cycle-closing event.  Fields are symmetric (sigma_xy) / antisymmetric
+cycle-closing event.  Fields are symmetric (sigma_xz) / antisymmetric
 (sigma_yz) in x; only x >= 0 is shown.
 
 usage: plot_xsection.py rundir [nx nz xfac zfac sat]
@@ -190,7 +190,7 @@ def field_at(ifr):
     return sxy, syz
 
 # ---------------------------------------------------------------------------
-# self-test 1: on-fault sigma_xy vs the closed-form fault kernel
+# self-test 1: on-fault sigma_xz vs the closed-form fault kernel
 jt = ncell//3
 zt = np.array([[zc_f[2*ncell//3]]]); xt = np.array([[1.0]])
 sxy_t, _ = cell_stress(xt, zt, ze1[jt], ze2[jt])
@@ -208,7 +208,7 @@ if np.max(np.abs(a[1])) > 1e-6*np.max(np.abs(a[0])):
     sys.exit("plot_xsection: SELF-TEST 2 FAILED (free surface traction)")
 
 # ---------------------------------------------------------------------------
-# snapshots: last full cycle
+# snapshots: one full, late, spun-up cycle
 ev = [l.split() for l in open("rsf_events.dat") if not l.startswith("#")]
 on  = np.array([float(r[0]) for r in ev if int(r[2]) == 1])
 off = np.array([float(r[0]) for r in ev if int(r[2]) == -1])
@@ -228,9 +228,25 @@ if on.size < 2:
 if on.size == 2:
     print("plot_xsection: WARNING: only 2 clustered events; the single "
           "available cycle is used (consider running longer)")
-t_a = off[-2]          # arrest of the penultimate event
-t_b = on[-1]           # onset of the final event
-t_c = off[-1]          # arrest of the final event
+# the cycle to plot: configurations can be period-2 (alternating
+# small and large events), and an absolute-stress comparison across
+# models is only meaningful if every run shows the same leg.  Among
+# the last few complete cycles, pick the one FOLLOWING the largest
+# event (mean slip jump across the event, from the slip frames).
+ncand = min(4, on.size - 1)
+cand = range(on.size - 1 - ncand, on.size - 1)
+def slip_jump(j):
+    i0 = max(np.searchsorted(t_fr, on[j]) - 1, 0)
+    i1 = min(np.searchsorted(t_fr, off[j]) + 1, nfr - 1)
+    return np.mean(slip[i1] - slip[i0])
+jumps = {j: slip_jump(j) for j in cand}
+jsel = max(jumps, key=lambda j: (round(jumps[j], 3), j))
+print(f"plot_xsection: period check, mean slip of the last {ncand} "
+      "events: " + ", ".join(f"{jumps[j]:.2f}" for j in sorted(jumps))
+      + f" m; using the cycle after the {jumps[jsel]:.2f} m event")
+t_a = off[jsel]        # arrest of the selected (large) event
+t_b = on[jsel+1]       # onset of the next event
+t_c = off[jsel+1]      # arrest of the next event
 phases = [("post", t_a + 1e-4*yr), ("0.25", t_a + 0.25*(t_b - t_a)),
           ("0.50", t_a + 0.50*(t_b - t_a)), ("0.75", t_a + 0.75*(t_b - t_a)),
           ("pre", t_b - 1e-4*yr)]
@@ -246,9 +262,10 @@ np.savez_compressed(
     xg=xg, zg=zg, H=H, D=Df, tM=tM, label=label,
     t_snap=np.array([t_fr[i] for i in idx]),
     phases=np.array([p for p, _ in phases]),
-    sxy=np.array([f[0] for f in fields]),
+    sxz=np.array([f[0] for f in fields]),
     syz=np.array([f[1] for f in fields]),
-    sxy_end=f_end[0], syz_end=f_end[1], t_end=t_fr[i_end])
+    sxy=np.array([f[0] for f in fields]),      # legacy alias of sxz
+    sxz_end=f_end[0], syz_end=f_end[1], t_end=t_fr[i_end])
 
 # self-test 3: interface traction continuity at every snapshot
 iH1 = np.argmin(np.abs(zg - 0.985*H)); iH2 = np.argmin(np.abs(zg - 1.015*H))
@@ -298,8 +315,8 @@ def panelplot(comp, cbl, outname, title):
     fig.savefig(outname, dpi=150, bbox_inches="tight")
     plt.close(fig)
 
-panelplot(0, "sigma_xy [MPa]", "xsect_sxy.png",
-          "stress evolution, sigma_xy")
+panelplot(0, "sigma_xz [MPa]", "xsect_sxz.png",
+          "stress evolution, sigma_xz (the fault-loading component)")
 panelplot(1, "sigma_yz [MPa]", "xsect_syz.png",
           "stress evolution, sigma_yz")
 
@@ -313,11 +330,11 @@ ax.axhline(H/1e3, color="k", lw=0.8, ls="--")
 ax.plot([0, 0], [0, Df], color="k", lw=2.5)
 ax.set_ylim(zfac*H/1e3, 0)
 ax.set_xlabel("x [km]"); ax.set_ylabel("depth [km]")
-fig.colorbar(im, ax=ax, label="coseismic d sigma_xy [MPa]", extend="both")
+fig.colorbar(im, ax=ax, label="coseismic d sigma_xz [MPa]", extend="both")
 ax.set_title(f"coseismic stress change  [{label}]", fontsize=10)
 fig.savefig("xsect_coseis.png", dpi=150, bbox_inches="tight")
 plt.close(fig)
 
 print(f"plot_xsection: {label}: N = {N} orders, cycle "
-      f"[{t_a/yr:.1f}, {t_b/yr:.1f}] yr; wrote xsect_sxy/syz/coseis.png; "
+      f"[{t_a/yr:.1f}, {t_b/yr:.1f}] yr; wrote xsect_sxz/syz/coseis.png; "
       "self-tests passed")
