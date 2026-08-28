@@ -256,6 +256,36 @@ i_end = min(np.searchsorted(t_fr, t_c) + 1, nfr-1)
 fields = [field_at(i) for i in idx]
 f_end  = field_at(i_end)
 
+# probe-point stress time series over the selected cycle (for
+# plot_xsection_phase.py): x = 0.25/0.75 H at mid-fault depth and
+# below the plate base
+def eval_points(xp, zp, ifr):
+    xp = np.asarray(xp, float); zp = np.asarray(zp, float)
+    sxz = np.zeros(xp.shape); syz = np.zeros(xp.shape)
+    mp = zp < H; ms = ~mp
+    if np.any(mp):
+        wpl = [(0, S[0, ifr])] + [(n, S[n, ifr]) for n in range(1, N+1)]
+        a, c = accum(xp[mp], zp[mp], wpl, sub=False)
+        sxz[mp] = a; syz[mp] = c
+    if np.any(ms):
+        if elastic:
+            wsb = [(0, S[0, ifr])]
+        else:
+            wsb = [(n, S[n, ifr] - S[n+1, ifr]) for n in range(0, N+1)]
+        a, c = accum(xp[ms], zp[ms], wsb, sub=True)
+        sxz[ms] = a; syz[ms] = c
+    return sxz, syz
+
+probe_xz = np.array([[0.25*H, 0.5*Df*1e3], [0.75*H, 0.5*Df*1e3],
+                     [0.25*H, 1.25*H], [0.75*H, 1.25*H]])
+ia = max(np.searchsorted(t_fr, t_a) - 1, 0)
+ib = min(np.searchsorted(t_fr, t_c) + 1, nfr - 1)
+probe_i = range(ia, ib + 1)
+probe_t = t_fr[ia:ib+1]
+pr = [eval_points(probe_xz[:, 0], probe_xz[:, 1], i) for i in probe_i]
+probe_sxz = np.array([a for a, _ in pr])
+probe_syz = np.array([c for _, c in pr])
+
 # save the snapshot fields for plot_xsection_overview.py
 np.savez_compressed(
     "xsect_fields.npz",
@@ -265,7 +295,11 @@ np.savez_compressed(
     sxz=np.array([f[0] for f in fields]),
     syz=np.array([f[1] for f in fields]),
     sxy=np.array([f[0] for f in fields]),      # legacy alias of sxz
-    sxz_end=f_end[0], syz_end=f_end[1], t_end=t_fr[i_end])
+    sxz_end=f_end[0], syz_end=f_end[1], t_end=t_fr[i_end],
+    dmean=np.mean([np.mean(D_fr[i]) for i in idx]),
+    t_cyc=np.array([t_a, t_b, t_c]),
+    probe_xz=probe_xz, probe_t=probe_t,
+    probe_sxz=probe_sxz, probe_syz=probe_syz)
 
 # self-test 3: interface traction continuity at every snapshot
 iH1 = np.argmin(np.abs(zg - 0.985*H)); iH2 = np.argmin(np.abs(zg - 1.015*H))

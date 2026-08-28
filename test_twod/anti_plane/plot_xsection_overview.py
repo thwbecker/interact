@@ -17,7 +17,11 @@ Uses the per-run xsect_fields.npz files written by plot_xsection.py
 
 usage: plot_xsection_overview.py [mode] [sat] [dir1 dir2 ...]
        mode: cyc (default) subtracts each run's own cycle-mean field;
-             abs plots the actual reconstructed fields (see caveat)
+             abs plots the actual reconstructed fields (see caveat);
+             dif plots each VE model MINUS THE ELASTIC model, both
+             cycle-mean-referenced (the pure viscous perturbation of
+             the cycle pattern; elastic must be among the dirs and
+             gets no row of its own)
        sat:  saturation quantile of the shared color scale (0.99)
        dirs: xsect_r0.1 xsect_r0.5 xsect_r1 xsect_r2 xsect_r10 xsect_el
        (all optional; a leading cyc/abs is the mode, a leading number
@@ -48,7 +52,7 @@ from matplotlib.ticker import MaxNLocator
 NLEV = 21          # target discrete color subdivisions (nice-number levels)
 args = sys.argv[1:]
 MODE = "cyc"
-if args and args[0] in ("cyc", "abs"):
+if args and args[0] in ("cyc", "abs", "dif"):
     MODE = args.pop(0)
 SAT = 0.99
 if args:
@@ -85,21 +89,33 @@ if not runs:
     sys.exit("plot_xsection_overview: nothing to plot")
 
 def overview(comp, cbl, outname):
-    nr = len(runs); ncol = 5
+    Fel = None
+    if MODE == "dif":
+        el = [z for d, z in runs if str(z["label"]) == "elastic"]
+        if not el:
+            sys.exit("plot_xsection_overview: mode dif needs the elastic "
+                     "run among the directories")
+        Fel = np.array(getcomp(el[0], comp), dtype=float)
+        Fel = Fel - np.mean(Fel, axis=0)
+    def prep(z):
+        F = np.array(getcomp(z, comp), dtype=float)
+        if MODE in ("cyc", "dif"):
+            F = F - np.mean(F, axis=0)
+        if MODE == "dif":
+            F = F - Fel
+        return F
+    rows = runs if MODE != "dif" else \
+        [(d, z) for d, z in runs if str(z["label"]) != "elastic"]
+    nr = len(rows); ncol = 5
     fig, axs = plt.subplots(nr, ncol, figsize=(3.1*ncol + 1.4, 2.6*nr + 1.0),
                             sharex=True, sharey=True, squeeze=False)
     # one shared, saturated scale over ALL runs and ALL snapshots
-    def prep(z):
-        F = np.array(getcomp(z, comp), dtype=float)
-        if MODE == "cyc":
-            F = F - np.mean(F, axis=0)
-        return F
     va = 1e-12
-    for _, z in runs:
+    for _, z in rows:
         va = max(va, np.quantile(np.abs(prep(z)), SAT)/1e6)
     nrm, cmp_ = discrete(va)
     im = None
-    for r, (d, z) in enumerate(runs):
+    for r, (d, z) in enumerate(rows):
         xg, zg = z["xg"]/1e3, z["zg"]/1e3
         H, D = float(z["H"])/1e3, float(z["D"])
         F = prep(z); ts = z["t_snap"]/yr; ph = z["phases"]
@@ -122,15 +138,18 @@ def overview(comp, cbl, outname):
     axs[0, 0].set_ylim(zg[-1], 0)
     fig.colorbar(im, ax=axs, label=cbl + " [MPa]", shrink=0.55, pad=0.015,
                  aspect=40, extend="both")
-    what = ("actual reconstructed field" if MODE == "abs" else
-            "actual field around each run's own cycle mean")
-    fig.suptitle(f"{cbl} through the cycle ({what}; rows: increasing "
-                 "tM/T_rec, elastic = tM -> inf limit at bottom; dashed: "
+    what = {"abs": "actual reconstructed field",
+            "cyc": "actual field around each run's own cycle mean",
+            "dif": "cycle pattern minus the elastic cycle pattern"}[MODE]
+    rowtxt = ("rows: increasing tM/T_rec (elastic reference subtracted)"
+              if MODE == "dif" else
+              "rows: increasing tM/T_rec, elastic = tM -> inf limit at bottom")
+    fig.suptitle(f"{cbl} through the cycle ({what}; {rowtxt}; dashed: "
                  "plate base; thick: fault)", fontsize=11)
     fig.savefig(outname, dpi=150, bbox_inches="tight")
     plt.close(fig)
     print(f"plot_xsection_overview: wrote {outname} ({nr} models)")
 
-tag = "" if MODE == "cyc" else "_abs"
+tag = {"cyc": "", "abs": "_abs", "dif": "_dif"}[MODE]
 overview("sxz", "sigma_xz", f"xsect_overview_sxz{tag}.png")
 overview("syz", "sigma_yz", f"xsect_overview_syz{tag}.png")

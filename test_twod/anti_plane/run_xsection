@@ -121,6 +121,13 @@ XPEOF
     echo "$0: $dir reached t = $reached yr of $vestop (re-run to resume if short)"
     [ -z "$NOPLOT" ] && python3 $sdir/plot_xsection.py $dir && echo "$0: $dir figures done"
 done
-python3 $sdir/plot_xsection_overview.py `for r in $ratios;do echo xsect_r$r;done` xsect_el && \
-    echo "$0: overview figures: xsect_overview_sxz.png, xsect_overview_syz.png"
+dirs="`for r in $ratios;do echo xsect_r$r;done` xsect_el"
+python3 $sdir/plot_xsection_overview.py cyc 0.99 $dirs && \
+    echo "$0: overview (cycle-mean view): xsect_overview_sxz.png, _syz"
+python3 $sdir/plot_xsection_overview.py abs 0.99 $dirs && \
+    echo "$0: overview (absolute view, standing lag in row labels): xsect_overview_sxz_abs.png"
+python3 $sdir/plot_xsection_overview.py dif 0.99 $dirs && \
+    echo "$0: overview (viscous perturbation vs elastic): xsect_overview_sxz_dif.png"
+python3 $sdir/plot_xsection_phase.py $dirs && \
+    echo "$0: probe phase curves: xsect_phase_sxz.png, xsect_phase_syz.png"
 echo "$0: all done; figures: xsect_*/xsect_sxz.png (and _syz, _coseis)"
