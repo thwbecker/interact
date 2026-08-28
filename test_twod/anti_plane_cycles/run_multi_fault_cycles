@@ -1,0 +1,5 @@
+#!/bin/bash
+for nf in 2 4 8 16 32 64; do
+    ./run_cycles2d bp5 0.5 20 $nf 10 0 22 5000 el_${nf}f -dc 0.08
+    ./run_cycles2d bp5 0.5 20 $nf 10 5 22 5000 ve_${nf}f -dc 0.08
+done
