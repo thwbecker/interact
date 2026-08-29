@@ -1,0 +1,139 @@
+# slider: single-patch benchmark for state evolution laws and ODE solvers
+
+A single 10 x 10 km Okada patch (`geom_slider10.in`, half-lengths in meters)
+with BP5 velocity-weakening friction (`rsf_slider.in`: a = 0.004, b = 0.03)
+loaded by backslip is a spring slider with the code's own self-stiffness
+(K11 about -3e6 Pa/m here, k/k_c about 0.65) and radiation damping.  It
+cycles with about 140 yr recurrence, every run takes seconds to minutes, and
+solver behavior can be charted without any of the cost or ambiguity of the
+full BP5 problem.  `run_slider` executes the matrix of law variants x solvers
+x tolerances (resumable: completed runs are skipped; an optional argument
+gives a wall-clock budget in seconds); `analyze_slider.py` produces a physics
+table from the tight-tolerance 5dp reference runs and work-precision data
+(cost versus the RMS event-time error against the reference).  A 20 km patch
+(`geom_slider.in`) is also provided (k/k_c about 0.3, larger drops, about
+290 yr recurrence).
+
+All numbers below are from one configuration (dense, serial, PETSc 3.19.6,
+tmax 450 yr, three events, phase error over matched events); they should be
+regenerated rather than quoted for other setups.
+
+## Physics of the laws (reference runs)
+
+| variant | recurrence [yr] | drop [MPa] | peak v [m/s] | duration [s] |
+|---------|-----------------|------------|--------------|--------------|
+| aging   | 142.3           | 12.7       | 0.95         | 65           |
+| slip    | 135.9           | 12.4       | 2.6          | 16           |
+| prz     | 136.5           | 14.2       | 3.3          | 6.5          |
+| sato    | 142.1           | 14.7       | 3.1          | 9.6          |
+| kt      | 143.3           | 14.7       | 3.1          | 15           |
+
+Observations, specific to this configuration: on a single degree of freedom
+the laws differ strongly in coseismic character (PRZ events are ten times
+shorter and three times faster than aging, the gated laws sit in between with
+aging-like healing) but only weakly in recurrence (spread under about 5
+percent).  The much larger recurrence differences seen on BP5 (about 235
+versus 172 yr at 2 km) are therefore not a zero-dimensional property of the
+laws; they emerge from the spatially extended dynamics (partial ruptures,
+arrest levels, front behavior).  An alternative PRZ normalization
+(d theta/dt = 1 - Omega^2, healing matched to aging at the cost of a doubled
+relaxation rate) was also tested here and lengthened the slider recurrence by
+2.3 yr, under 2 percent, consistent with the estimate that the healing
+normalization is a minor contributor to recurrence differences; the runtime
+option for it was subsequently removed as not useful.
+
+## Solvers (work-precision, phase error of matched events)
+
+Explicit 3bs converges cleanly for every law: for aging, RMS event-time error
+falls from 1.0e-1 yr at rtol 1e-3 to 2.0e-4 yr at 1e-6 for 364 to 2103 steps;
+PRZ costs only about 40 percent more steps than aging at equal tolerance on
+this problem, so the single-cell PRZ stiffness is unremarkable; the BP5-scale
+PRZ cost explosion is a rupture-front (many-cell) effect.  rtol 1e-3 is
+outside the stable envelope for the slip, PRZ, Sato, and KT laws (PETSc
+aborts with DIVERGED_STEP_REJECTED at the first event).
+
+The current plain IMEX (`-imex`, Newton line-search stage solves) is
+dominated by explicit 3bs on this problem everywhere it was tested: it costs
+more per step (implicit function evaluations two to three times the RHS
+count), its error stagnates near 1e-2 yr for aging instead of improving from
+rtol 1e-5 to 1e-6, it loses events or wedges at loose tolerances (the aging
+runs at rtol 1e-3 and 1e-4 stall at the first nucleation in a domain-check
+rejection storm, about 2e5 rejected attempts per 1e2 accepted steps, which
+appears not to count toward any PETSc rejection limit; the step ceiling in
+run_slider now terminates such runs within seconds and the analysis flags
+them), and the PRZ IMEX runs timed out mid-series at all tolerances tried.
+
+Two later findings from runs at the lab-inspired parameter set (a = 0.010,
+b = 0.015, dc = 0.008 m, sigma = 50 MPa), where all laws cycle with about
+56 to 67 yr recurrence and the IMEX nucleation storms of the BP5 parameters
+do not occur.  First, the ARKIMEX tableau controls IMEX correctness on this
+problem: at rtol 1e-6 the RMS event-time error was about 8e-2 yr with
+ARKIMEX3 (uniformly across laws; the embedded estimator is deceived by stiff
+stage-order reduction and the controller accepts inaccurate steps), worse
+with ARKIMEX4, about 2e-3 yr with `l2` (on par with explicit 3bs at the same
+tolerance, at second-order step counts), and ars443 numerically quenched the
+stick-slip cycle entirely.  The rsf_solve `-imex` default is therefore `l2`.
+Second, on this slider the explicit 5dp method dominated 3bs in
+work-precision (about 3x fewer steps and 3 to 25x smaller phase error at
+rtol 1e-6, law-dependent); note however that on the BP5 problem 3bs has been
+found preferable in practice, so this ranking is configuration-specific and
+should be rechecked per problem rather than generalized.
+
+A full tolerance sweep (rtol 1e-4 to 1e-9, all laws, one configuration)
+sharpened this picture in four ways.  (1) The cost scalings match the nominal
+orders exactly (steps per tolerance decade: about 1.9x for 3bs, 1.4x for 5dp,
+3.16x = 10^(1/2) for the l2 IMEX), and the l2 IMEX shows the cleanest
+tolerance proportionality of the three, delivered error tracking rtol over
+five decades with near-zero rejections throughout; at equal delivered error
+it costs roughly 10 to 30 times the RHS evaluations of 5dp here, which
+prices the IMEX option for non-stiff physics.  A tableau sweep (laws 1 to
+3, rtol 1e-4 to 1e-7) additionally found a cheap stage-order-2 sub-family
+(2c/2d/2e, about 3.4x fewer steps than l2 at equal tolerance, 2d the most
+accurate of the three, all robust here), and bpr3 joining ars443 in
+quenching the cycle.  IMPORTANT NEGATIVE RESULT AND BENCHMARK LIMITATION:
+2d passed every slider criterion but, on the BP5 0.5 km PRZ problem at
+rtol 1e-4, produced numerous spurious small events absent from the explicit
+and l2 solutions.  The marginally stable partial-rupture modes responsible
+are a property of the spatially extended fault and cannot exist on a single
+patch, so this benchmark validates phase accuracy and robustness but NOT
+event statistics; integrator changes that pass here still need one
+fault-scale statistics check before adoption.  l2 remains the -imex
+default for that reason.  (2) 5dp has a FAILURE BAND at
+loose to moderate tolerances: at rtol 1e-4 to 1e-5 several laws died at the
+first nucleation in the same uncounted domain-check rejection storm
+described above, and 5dp sustains a roughly 30 percent rejection rate at
+EVERY tolerance (even 1e-9) while 3bs drops below 1 percent beyond 1e-7:
+fifth order means long steps that overshoot violently at stiff transitions,
+so the method permanently rides the rejection edge.  3bs completed every run
+in the sweep.  Practical guidance from this configuration: 5dp only at rtol
+1e-6 or tighter, 3bs as the robust default; storms now abort quickly and
+loudly via -domain_check_max_reject (see the rsf_solve help) instead of
+grinding.  (3) A physics result: the reference recurrence orders exactly by
+rest-healing content, aging 66.7 and KT 66.7 (full healing at rest), Sato
+63.0 (gate-reduced), PRZ 60.6 (half), slip 56.2 (none), and the aging-PRZ
+gap of 9 percent matches the sigma b ln2 / drop estimate of 8 percent, an
+independent quantitative check of the healing analysis in rsf_solve.md.
+(4) Metrology: err values at or below about 2e-6 yr are at the floor set by
+the reference's own accuracy (independent 1e-9 runs of different methods
+differ by about 1.4e-6 yr); analyze_slider.py now flags the
+reference-vs-itself row (=ref) and prints the per-variant floor, and numbers
+at that level should not be quoted as method differences.
+This reproduces, on the simplest possible system and for the AGING law, the
+stage-problem pathology diagnosed on BP5: without the cell's elastic
+self-stiffness in the implicit part, the per-cell stage problem loses its
+root at large dt (a saddle-node) and the nonlinear solve fails, capping the
+step.  The slider therefore makes a suitable development target for the
+stage-solver work: a correct treatment should first make this matrix clean
+(IMEX at least matching explicit accuracy law by law) before returning to
+BP5.
+
+## Files
+
+    geom_slider10.in   the 10 km patch (default)
+    geom_slider.in     a 20 km variant (lower k/k_c, longer cycles)
+    rsf_slider.in      a, b
+    run_slider         the matrix driver (parameters as plain assignments
+                       at the top; resumable; optional wall-clock budget
+                       argument)
+    analyze_slider.py  physics table and work-precision extraction; writes
+                       slider_physics.dat and slider_wp.dat
