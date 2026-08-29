@@ -608,6 +608,59 @@ PetscErrorCode rsf_solve_run(int argc,char **argv,struct interact_ctx *par,
     uc->ckpt_wall = ckpt_wall;
     PetscCall(PetscTime(&uc->ckpt_last_wtime));
   }
+  {
+    /* SEAS-style per-station time series */
+    char stat_file[300];
+    PetscBool have_stat = PETSC_FALSE;
+    PetscReal stat_dt_yr = 0.1, stat_vd = 1e-6;
+    uc->nstat = 0;
+    PetscCall(PetscOptionsGetString(NULL,NULL,"-rsf_stations",stat_file,
+				    sizeof(stat_file),&have_stat));
+    PetscCall(PetscOptionsGetReal(NULL,NULL,"-rsf_station_dt_yr",&stat_dt_yr,NULL));
+    PetscCall(PetscOptionsGetReal(NULL,NULL,"-rsf_station_vdense",&stat_vd,NULL));
+    if(have_stat){
+      FILE *fs = fopen(stat_file,"r");
+      char lbuf[256],nm[64];
+      int ic;
+      PetscBool is_rst = PETSC_FALSE;
+      PetscCall(PetscOptionsHasName(NULL,NULL,"-rsf_restart",&is_rst));
+      if(!fs)
+	SETERRQ(PETSC_COMM_WORLD,PETSC_ERR_FILE_OPEN,
+		"rsf_solve: cannot open station file %s",stat_file);
+      uc->stat_cell = NULL; uc->stat_name = NULL;
+      while(fgets(lbuf,sizeof(lbuf),fs)){
+	if(lbuf[0] == '#')continue;
+	if(sscanf(lbuf,"%63s %d",nm,&ic) == 2){
+	  uc->stat_cell = (int *)realloc(uc->stat_cell,(uc->nstat+1)*sizeof(int));
+	  uc->stat_name = (char **)realloc(uc->stat_name,(uc->nstat+1)*sizeof(char *));
+	  uc->stat_cell[uc->nstat] = ic;
+	  uc->stat_name[uc->nstat] = strdup(nm);
+	  uc->nstat++;
+	}
+      }
+      fclose(fs);
+      uc->stat_dt = stat_dt_yr * SEC_PER_YEAR;
+      uc->stat_vdense = stat_vd;
+      uc->stat_f = (FILE **)calloc(uc->nstat,sizeof(FILE *));
+      uc->stat_last = (PetscReal *)malloc(uc->nstat*sizeof(PetscReal));
+      for(i=0;i < uc->nstat;i++){
+	uc->stat_last[i] = -1e300;
+	if((uc->stat_cell[i] >= medium->rs) && (uc->stat_cell[i] < medium->re)){
+	  char fn[128];
+	  snprintf(fn,sizeof(fn),"fltst_%s.dat",uc->stat_name[i]);
+	  uc->stat_f[i] = fopen(fn,(is_rst)?("a"):("w"));
+	  if(!is_rst)
+	    fprintf(uc->stat_f[i],"# station %s cell %d: t[s] slip[m] log10(|v|[m/s]) tau[MPa] sigma[MPa] log10(theta[s])\n",
+		    uc->stat_name[i],uc->stat_cell[i]);
+	  else
+	    fprintf(uc->stat_f[i],"# restarted\n");
+	}
+      }
+      HEADNODE
+	fprintf(stderr,"%s: station time series for %d stations (dt %g yr, vdense %g m/s)\n",
+		argv[0],uc->nstat,(double)stat_dt_yr,(double)stat_vd);
+    }
+  }
   PetscCall(PetscOptionsGetString(NULL,NULL,"-rsf_checkpoint_file",ckpt_file,300,NULL));
   PetscCall(PetscOptionsGetString(NULL,NULL,"-rsf_restart",restart_file,300,&have_restart));
   uc->ckpt_every = ckpt_every;

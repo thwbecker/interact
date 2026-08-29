@@ -117,6 +117,10 @@ void rsf_print_help(const char *prog)
   
   fprintf(stderr,"normal-stress evolution and limiter (for dip slip / nonplanar faults)\n");
   fprintf(stderr,"  -calc_sigma_dot <bool>  evolve normal stress via the In matrix (default 0 = off)\n");
+  fprintf(stderr,"  -rsf_stations <file>    SEAS-style per-cell time series: file lines are NAME CELL_INDEX;\n");
+  fprintf(stderr,"                          writes fltst_NAME.dat (t slip log10|v| tau sigma log10theta)\n");
+  fprintf(stderr,"  -rsf_station_dt_yr <dt> station output interval when quiescent (default 0.1 yr)\n");
+  fprintf(stderr,"  -rsf_station_vdense <v> station |v| above which every accepted step is written (default 1e-6)\n");
   fprintf(stderr,"  -limit_sigma <bool>     clamp sigma to [min,max], as HBI limitsigma (default 0)\n");
   fprintf(stderr,"  -min_sigma <Pa>         limiter floor (default 1e6)\n");
   fprintf(stderr,"  -max_sigma <Pa>         limiter ceiling (default 300e6)\n");

@@ -110,6 +110,17 @@ struct rsf_out_ctx{
 				   frames rsf_tau.gGGG.NNNNNN.bin, (x,y,tau[MPa])
 				   float triples on the same cadence and frame
 				   numbering (-field_stress) */
+  /* SEAS-style per-station time series (-rsf_stations FILE): one
+     ASCII file fltst_<name>.dat per station cell, columns
+     t[s] slip[m] log10|v| tau[MPa] sigma[MPa] log10(theta[s]);
+     dense output while |v| > stat_vdense, else every stat_dt */
+  int nstat;			/* number of stations, 0: off */
+  int *stat_cell;		/* global cell index per station */
+  char **stat_name;		/* station names */
+  FILE **stat_f;		/* owning-rank file handles (NULL if not owned) */
+  PetscReal stat_dt;		/* max output interval [s] */
+  PetscReal stat_vdense;	/* |v| above which every step is written */
+  PetscReal *stat_last;		/* last output time per station */
   PetscBool field_slip;		/* likewise signed slip frames
 				   rsf_slip.gGGG.NNNNNN.bin (x,y,slip[m]),
 				   the input for off-fault stress

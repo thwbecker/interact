@@ -842,6 +842,39 @@ PetscErrorCode rsf_TS_Monitor(TS ts,PetscInt step,PetscReal time,Vec X,void *ptr
     }
     PetscCall(VecRestoreArrayRead(X,&xt));
   }
+  if(uc->nstat > 0){
+    /* SEAS-style per-station time series: dense while |v| exceeds
+       stat_vdense, else every stat_dt of model time */
+    const PetscScalar *xs_;
+    PetscInt is_,ks_,js_;
+    PetscReal vv_,d1_,d2_,d3_,l10th_,bloc_;
+    PetscCall(VecGetArrayRead(X,&xs_));
+    for(is_=0;is_ < uc->nstat;is_++){
+      if(!uc->stat_f[is_])continue;	/* not owned by this rank */
+      ks_ = uc->stat_cell[is_] - medium->rs;
+      js_ = ks_*rsf->dim;
+      vv_ = vel_from_rsf(xs_[js_+1],xs_[js_+2],xs_[js_],
+			 fault[uc->stat_cell[is_]].mu_sa,rsf->v0,
+			 &d1_,&d2_,&d3_,medium);
+      if(((time - uc->stat_last[is_]) >= uc->stat_dt) ||
+	 (fabs(vv_) > uc->stat_vdense)){
+	bloc_ = fault[uc->stat_cell[is_]].mu_db;
+	if(bloc_ != 0.0)
+	  l10th_ = log10(rsf->dc/rsf->v0) +
+	    (xs_[js_] - rsf->f0)/(bloc_*2.302585092994046);
+	else
+	  l10th_ = 0.0;
+	fprintf(uc->stat_f[is_],"%22.14e %15.8e %12.6f %15.8e %15.8e %12.6f\n",
+		(double)time,(double)xs_[js_+3],
+		(double)log10(fabs(vv_) + 1e-300),
+		(double)(xs_[js_+1]/1e6),(double)(xs_[js_+2]/1e6),
+		(double)l10th_);
+	fflush(uc->stat_f[is_]);
+	uc->stat_last[is_] = time;
+      }
+    }
+    PetscCall(VecRestoreArrayRead(X,&xs_));
+  }
   if(time >= uc->monitor_tmin){
     /* change since the last logged state */
     PetscCall(VecNorm(X,NORM_2,&x_norm));
