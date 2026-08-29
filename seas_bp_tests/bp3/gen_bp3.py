@@ -63,6 +63,12 @@ for i in range(n):
         a = amax
     fr.write(f"{a:.6f} {b0:.6f}\n")
     fi.write(f"{tau0:.8e} {Vp:.6e}\n")
+# SEAS station file: 12 stations by down-dip distance (spec sec. 6)
+with open(pref + "_stations.dat", "w") as fs:
+    for xd_km in (0, 2.5, 5, 7.5, 10, 12.5, 15, 17.5, 20, 25, 30, 35):
+        idx = min(max(int(round(xd_km*1e3/ds - 0.5)), 0), n - 1)
+        fs.write(f"dp{int(round(xd_km*10)):03d} {idx}\n")
+
 print(f"gen_bp3: {n} segments, ds {ds:.0f} m, dip {np.rad2deg(dip):.0f}, "
       f"tau0 {tau0/1e6:.4f} MPa")
 print(f"opts: -dc {dc} -sigma_init {sig0:.3e} -f0 {f0} -v0 {V0} "

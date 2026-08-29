@@ -19,6 +19,7 @@ $bindir/rsf_solve -geom_file bp3_geom.in -rsf_file bp3_rsf.dat \
   -vpl $vpl -shear_modulus 3.204e10 -s_wave_speed 3464 -rtol $RTOL \
   -ts_rk_type 3bs -ts_max_steps 2000000000 -dt_monitor_yr 10 \
   -track_events -rsf_catalog -vel_event 1e-3 -rsf_checkpoint 5000 \
-  -rsf_checkpoint_wall 25 -stop_time_yr $stop $sig $restart >> run.log 2>&1
+  -rsf_checkpoint_wall 25 -rsf_stations bp3_stations.dat \
+  -rsf_station_dt_yr 0.1 -stop_time_yr $stop $sig $restart >> run.log 2>&1
 reached=`grep -v '^#' rsf_monitor.dat | tail -1 | awk '{print $3}'`
 echo "run_bp3: $dir reached t = $reached of $stop yr"
