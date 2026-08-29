@@ -1,0 +1,24 @@
+#!/bin/bash
+# run_bp3 ds_km dip vpl outdir [stop_yr] : BP3-QD case; re-run to resume
+bindir=`cd ../../bin && pwd`
+sdir=`pwd`
+RTOL=${RTOL-1e-4}
+ds=${1-0.1}
+dip=${2-60}
+vpl=${3-1e-9}
+dir=${4-bp3_d60r_100m}
+stop=${5-1500}
+sense=${6-1}
+sig=${7-}
+mkdir -p $dir && cd $dir
+python3 $sdir/gen_bp3.py $ds $dip bp3 $sense > gen.log
+restart=""
+[ -f rsf_checkpoint.bin ] && restart="-rsf_restart rsf_checkpoint.bin"
+$bindir/rsf_solve -geom_file bp3_geom.in -rsf_file bp3_rsf.dat \
+  -rsf_ic_file bp3_ic.in -dc 0.008 -sigma_init 5e7 -f0 0.6 -v0 1e-6 \
+  -vpl $vpl -shear_modulus 3.204e10 -s_wave_speed 3464 -rtol $RTOL \
+  -ts_rk_type 3bs -ts_max_steps 2000000000 -dt_monitor_yr 10 \
+  -track_events -rsf_catalog -vel_event 1e-3 -rsf_checkpoint 5000 \
+  -rsf_checkpoint_wall 25 -stop_time_yr $stop $sig $restart >> run.log 2>&1
+reached=`grep -v '^#' rsf_monitor.dat | tail -1 | awk '{print $3}'`
+echo "run_bp3: $dir reached t = $reached of $stop yr"
