@@ -83,7 +83,7 @@ static int rsf_init_monitor_groups(struct rsf_out_ctx *uc)
 	  fprintf(uc->mgrp_fout[j],"# restarted\n");
 	fprintf(uc->mgrp_fout[j],"# fault group %i, %i of %i patches, cadence as in %s\n",
 		uc->mgrp_id[j],uc->mgrp_np[j],n,RSF_MONITOR_FILE);
-	fprintf(uc->mgrp_fout[j],"# step time[s] time[yr] dt[s] log10(max|v|[m/s]) mean_slip[m] mean_mu max_sigma[Pa] min_sigma[Pa]\n");
+	fprintf(uc->mgrp_fout[j],"# step time[s] time[yr] dt[s] log10(max|v|[m/s]) mean_slip[m] mean_mu max_sigma[Pa] min_sigma[Pa] log10(mean|v|[m/s])\n");
       }
       fprintf(stderr,"rsf_init_monitor_groups: per group monitor on, %i group(s), %s\n",
 	      ng,RSF_MONITOR_GROUP_FORMAT);
@@ -181,7 +181,7 @@ PetscErrorCode rsf_init_monitor_and_event(struct rsf_out_ctx *uc,struct interact
   HEADNODE{
     uc->fout_monitor = myopen(RSF_MONITOR_FILE,(uc->restarted)?("a"):("w"));
     if(uc->restarted) fprintf(uc->fout_monitor,"# restarted\n");
-    fprintf(uc->fout_monitor,"# step time[s] time[yr] dt[s] log10(max|v|[m/s]) mean_slip[m] mean_mu max_sigma[Pa] min_sigma[Pa]\n");
+    fprintf(uc->fout_monitor,"# step time[s] time[yr] dt[s] log10(max|v|[m/s]) mean_slip[m] mean_mu max_sigma[Pa] min_sigma[Pa] log10(mean|v|[m/s])\n");
     if(uc->track_events){
       uc->fout_event = myopen(RSF_EVENTS_FILE,(uc->restarted)?("a"):("w"));
       if(uc->restarted) fprintf(uc->fout_event,"# restarted\n");
