@@ -217,25 +217,29 @@ demonstration case (dip-60 BP3 thrust, ds = 1 km, H = 40 km,
 gravity, tM = 45 yr): held-out fit residual 1.1e-3 for the normal
 family (4.6e-4 shear), N0 vs In 1.2 percent, K0 vs Is 0.7 percent.
 
-WHY IT MATTERS: with sigma_n held fixed the viscoelastic effect on
-recurrence and with it evolving are not just different in size, they
-are different in SIGN at this resolution:
+HOW MUCH IT MATTERS IS NOT SETTLED BY THIS DEMO.  Normal-stress
+coupling changes measured recurrence by tens of percent, so it is
+clearly a first-order ingredient for dipping faults, but at
+demonstration resolution the result is not stable enough to quote a
+number, let alone a sign.  Mean recurrence over the same four runs
+as a function of the slip threshold that defines a "large event"
+(ds = 1 km, stop 1200 yr):
 
-                   sigma_n frozen    sigma_n evolving
-    elastic            56.3 yr           73.4 yr
-    viscoelastic       60.7 yr           68.1 yr
+    slip >   elastic            viscoelastic
+             frozen  evolving   frozen  evolving
+    0.3 m     15.7    11.7       10.8    15.8
+    0.5 m     56.3    73.4       60.7    68.1
+    1.0 m     80.3   128.3       97.1   136.2
+    2.0 m    120.5   171.0      161.9   181.6
 
-i.e. elastic normal-stress coupling lengthens recurrence strongly
-(+30 percent), shear relaxation alone lengthens it mildly
-(+8 percent), but once the normal traction is allowed to relax too,
-viscoelasticity SHORTENS recurrence relative to the elastic case
-(-7 percent), because the relaxation partly undoes the clamping the
-elastic coupling provides.  These numbers are demonstration
-resolution (ds = 1 km, well above the BP3 cohesive-zone requirement
-of 25 m) and are not converged; the sign flip is the point, not the
-percentages.  It also means shear-only viscoelastic kernels on a
-dipping fault are qualitatively, not just quantitatively,
-incomplete.
+The elastic-vs-viscoelastic difference changes SIGN between the
+0.5 m and 1.0 m thresholds, so no sign can be claimed from these
+runs.  The reason is resolution: ds = 1 km is about 3 x Lb here
+(BP3 asks for 25 m), so the catalog is dominated by partial-rupture
+chatter and "recurrence" depends on where the event-size cut is
+drawn.  Any physical statement about how normal-stress relaxation
+shifts recurrence needs the converged mesh; this demo exercises the
+machinery, it does not measure the effect.
 
 ## Caveats and next steps
 

@@ -280,8 +280,27 @@ Steps 0-3, 5, 6, and 7a are COMPLETE and in master; step 4 in its
   The python reference implementation with EXACT image weights is
   test_twod/anti_plane/plot_xsection.py; keep it as the
   independent-representation check if obs rows are ever added.
-- Step 7b (3-D layered kernels, -ve_prony_file): OPEN; the propagator
-  interior-stress work front is summarized in rsf_ve_test_ledger.md.
+- Step 7b (plane strain and 3-D layered kernels, -ve_prony_file):
+  the INTERFACE and the PLANE-STRAIN half are DONE.  -ve_mode 3
+  reads shared relaxation times plus per-pair amplitude matrices
+  with consistency gates against the assembled operators, and the
+  plane-strain plate-over-Maxwell-with-gravity generator plus its
+  validation suite live in test_relax/inplane_ve_proto/ (analytic
+  gates, interact-Okada elastic anchor, correspondence-principle
+  exactness, Rundle 1982 relaxation with and without gravity,
+  PSGRN/PSCMP cross-check at 1-3 percent).  Hereditary
+  NORMAL-STRESS relaxation (In(t)) is done as well: kernel files may
+  declare two traction families on the same tau ladder, the normal
+  blocks are gated against the assembled In, and the second memory
+  family drives a sink on the sigma equation; it switches on with
+  -calc_sigma_dot, while a shear-only file plus that flag is refused
+  (relaxing shear with frozen normal traction is not a consistent
+  medium).  Modes 1 and 2 keep refusing -calc_sigma_dot: 2-D
+  antiplane slip induces no normal-stress change.  Gates:
+  test_relax/inplane_ve_proto/run_ve_normal_test.  STILL OPEN: 3-D
+  kernels (PSGRN/PSCMP route sketched in
+  tools/psgrn/README_psgrn.md).  The propagator interior-stress work
+  front is summarized in rsf_ve_test_ledger.md.
   A further extension class identified since (Lambert & Barbot 2016
   style strain-volume elements for nonlinear rheology and
   mantle-driven loading) is documented in

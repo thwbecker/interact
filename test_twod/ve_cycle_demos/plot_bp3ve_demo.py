@@ -31,6 +31,10 @@ def trec(f):
     return (np.mean(np.diff(t[1:])), len(t)) if len(t) > 3 else (None, len(t))
 
 te, ne = trec("cat_el.dat")
+if te is None:
+    raise SystemExit(f"plot_bp3ve_demo: only {ne} large events in "
+                     "cat_el.dat: run longer (-stop_time_yr) or lower "
+                     "the slip threshold (2nd argument)")
 print(f"elastic: t_rec {te:.1f} yr ({ne} large events)")
 tms, trs = [], []
 for f in sorted(glob.glob("cat_tm*.dat")):
@@ -39,7 +43,12 @@ for f in sorted(glob.glob("cat_tm*.dat")):
     if r:
         tms.append(tm); trs.append(r)
         print(f"tM = {tm:6.1f} yr: t_rec {r:.1f} yr ({n} events)")
+    else:
+        print(f"tM = {tm:6.1f} yr: only {n} large events, skipped")
 tms, trs = np.array(tms), np.array(trs)
+if tms.size == 0:
+    raise SystemExit("plot_bp3ve_demo: no viscoelastic run had enough "
+                     "large events to measure a recurrence")
 
 fig, ax = plt.subplots(figsize=(7, 5))
 ax.axhline(1.0, color="0.6", lw=0.8, ls=":", label="elastic")
@@ -48,9 +57,14 @@ ax.plot(te/tms[o], trs[o]/te, "ks-", ms=7, mfc="none",
         label="rsf_solve -ve_mode 3 (plate over Maxwell, gravity)")
 ax.set_xlabel("T_rec(elastic) / t_M   (relaxation strength)")
 ax.set_ylabel("T_rec / T_rec(elastic)")
-ax.set_title("Contained dipping thrust: recurrence lengthening by\n"
-             "substrate relaxation (loading-pathway mechanism)",
-             fontsize=11)
+import glob as _g
+_lg = sorted(_g.glob("run_tm*.log"))
+_sig = "shear + normal tractions"
+if _lg and not any("SHEAR + NORMAL" in open(l, errors="ignore").read()
+                   for l in _lg):
+    _sig = "shear only, sigma_n frozen"
+ax.set_title("Contained dipping thrust: recurrence change by\n"
+             f"substrate relaxation ({_sig})", fontsize=11)
 ax.legend(fontsize=9)
 fig.tight_layout()
 fig.savefig("bp3ve_demo.png", dpi=150, bbox_inches="tight")
