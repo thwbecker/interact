@@ -1,6 +1,0 @@
-# SEAS-style event catalog from rsf_solve; complements rsf_events.dat
-# same onset/arrest events as rsf_events.dat (needs -track_events); rows are per completed event
-# onset/arrest |v| threshold = 1.000e-03 m/s ; rupture-front |v| threshold = 1.000e-03 m/s
-# stress drop = |tau_onset| - |tau_arrest| (positive = drop); slip enters as |dslip|; means are over ruptured cells
-# for 2D geometries, M0 and Mw are equivalent values assuming along-strike length = ruptured in-plane length
-# ev onset[yr] arrest[yr] duration[s] n_ruptured area_ruptured[m^2] mean_slip[m] max_slip[m] mean_drop[MPa] max_drop[MPa] peak_sliprate[m/s] M0[Nm] Mw
