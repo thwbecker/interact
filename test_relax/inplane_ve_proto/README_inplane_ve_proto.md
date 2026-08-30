@@ -186,9 +186,56 @@ in-plane analog of the contained-fault loading-pathway relaxation.
 The same file contract is the intended landing pad for
 PSGRN/PSCMP-derived 3-D layered viscoelastic-gravitational kernels
 (sample step responses with PSGRN per source patch, fit the same
-ladders, write the same file).  SHEAR ONLY so far: hereditary
-normal-stress relaxation (In(t)) remains open, so -calc_sigma_dot
-VE runs are refused.
+ladders, write the same file).  Both traction families are
+implemented (see above); what remains open is 3-D kernels via the
+PSGRN route.
+
+## Hereditary NORMAL-stress relaxation (two-family kernels)
+
+On a dipping fault, slip changes the fault-normal traction as well as
+the shear traction, and when the substrate relaxes BOTH evolve.
+bp3_ve_kernels.py therefore fits a second family of amplitude
+matrices, from the same field solves (one extra projection,
+n.sigma.n instead of t.sigma.n), on the SAME tau ladder: the
+relaxation spectrum is a property of the medium, not of the traction
+component.  The file declares the number of families in its header
+and carries an N0 gate block plus the normal amplitudes.  rsf_solve
+(-ve_mode 3) activates the family exactly when the elastic normal
+path is on (-calc_sigma_dot), and refuses that flag with a
+shear-only file, since relaxing shear with frozen normal traction is
+not a consistent medium.  NOTE the sign conventions differ between
+the two families: interact assembles In compression positive (it is
+scaled by -1 internally) while the projection here is tension
+positive, so the normal blocks carry the opposite global sign; the
+N0 gate is what pins this (a pure flip reads exactly 2.0, which is
+how it was found).
+
+Gates: run_ve_normal_test (format and guards, N0 vs In agreement,
+and a regression that a two-family file with the normal family
+inactive is bit-identical to the shear-only file).  Measured on the
+demonstration case (dip-60 BP3 thrust, ds = 1 km, H = 40 km,
+gravity, tM = 45 yr): held-out fit residual 1.1e-3 for the normal
+family (4.6e-4 shear), N0 vs In 1.2 percent, K0 vs Is 0.7 percent.
+
+WHY IT MATTERS: with sigma_n held fixed the viscoelastic effect on
+recurrence and with it evolving are not just different in size, they
+are different in SIGN at this resolution:
+
+                   sigma_n frozen    sigma_n evolving
+    elastic            56.3 yr           73.4 yr
+    viscoelastic       60.7 yr           68.1 yr
+
+i.e. elastic normal-stress coupling lengthens recurrence strongly
+(+30 percent), shear relaxation alone lengthens it mildly
+(+8 percent), but once the normal traction is allowed to relax too,
+viscoelasticity SHORTENS recurrence relative to the elastic case
+(-7 percent), because the relaxation partly undoes the clamping the
+elastic coupling provides.  These numbers are demonstration
+resolution (ds = 1 km, well above the BP3 cohesive-zone requirement
+of 25 m) and are not converged; the sign flip is the point, not the
+percentages.  It also means shear-only viscoelastic kernels on a
+dipping fault are qualitatively, not just quantitatively,
+incomplete.
 
 ## Caveats and next steps
 
@@ -204,7 +251,7 @@ VE runs are refused.
 - Next: sample K_ij(t) = stress-at-patch-i from unit-slip-at-patch-j
   step responses on a fault discretization using ve_fields_xz, fit
   the per-pair Prony ladders with the same held-out gate as the
-  antiplane mode 2, and exercise the planned -ve_prony_file
+  antiplane mode 2, and exercise the -ve_prony_file
   interface end to end.
 - FEM upgrade (quadratic or incompatible-mode elements) if an
   independent time-domain VE check is wanted beyond the T2/T3

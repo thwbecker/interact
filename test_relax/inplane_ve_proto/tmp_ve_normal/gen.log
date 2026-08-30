@@ -1,0 +1,2 @@
+gen_bp3: 40 segments, ds 1000 m, dip 60, tau0 26.5461 MPa
+opts: -dc 0.008 -sigma_init 5.000e+07 -f0 0.6 -v0 1e-06 -shear_modulus 3.2040e+10 -s_wave_speed 3464.0
