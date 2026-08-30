@@ -1,0 +1,757 @@
+read_geometry: 2D 0 (I/II) 2560 (III), 0 points, 0 triangles, 0 iquads, and 0 regular quads
+read_geometry: 2D mode III (half plane)
+/home/twb/progs/src/interact/bin/rsf_solve: read geometry from cyc_geom.in, 2560 patches, on 1 cores
+/home/twb/progs/src/interact/bin/rsf_solve: G 3.204000e+10 Pa cs 3464 m/s eta 4.624711e+06 f0 0.6 dc 0.08 m v0 1.000e-06 vpl 1.000e-09 m/s
+/home/twb/progs/src/interact/bin/rsf_solve: sigma0 2.500000e+07 tau0 1.500000e+07 Pa vinit 1.000e-09 m/s rand_amp 0
+/home/twb/progs/src/interact/bin/rsf_solve: rtol 1.0e-04 dt_init 1 s dt_max 1e+10 s stop 5000 yr evol law: 1
+read_rsf: read a and b values, on averag 0.0184 and 0.03
+/home/twb/progs/src/interact/bin/rsf_solve: read per-cell initial tau,vel from cyc_ic.in
+calc_petsc_Isn_matrices: creating dense matrix for stress mode 0 stress type 0
+calc_petsc_Isn_matrices: core 000/001: assigning dense row     0 to  2560
+calc_petsc_Isn_matrices: hmat_storage backend dense m 2560 n 2560 stored_scalars 6553600 dense_ratio 1 mbytes 50
+rsf_solve: Is (shear) interaction matrix build wall =       1.8433 s
+rsf_ve_setup: sample cache on: 127 dx x 40^2 z = 203200 entries (vs 6553600 pairs)
+rsf_ve_setup: mode 2 (plate over Maxwell, antiplane): H 22000 m g2/g1 1 t_M 5 yr, np 6, n_img 600, sampling...
+rsf_ve_setup: worst held-out residual 7.89e-04 (tol 1.0e-03); ||C_inf 1||/||K^el 1|| = 6.640e-01 (relaxed operator, uniform probe)
+rsf_ve_setup: memory states initialized at the backslip steady state (-ve_h_init 1)
+rsf_ve_setup: VE ON, np 6, rates ladder [yr]: 450 194 83.5 35.9 15.5 6.67; h: exact-exponential, stage-consistent sink forcing
+/home/twb/progs/src/interact/bin/rsf_solve: field output on, 64 fault group(s), one frame every 20 accepted steps
+rsf_init_monitor_groups: per group monitor on, 64 group(s), rsf_monitor.g%03d.dat
+rsf_init_catalog: event catalog on (rupture-front |v| = 1.000e-03 m/s)
+rsf_init_catalog_groups: per group catalog on, 64 group(s), rsf_catalog.g%03d.dat
+rsf_write_checkpoint: step 000000001340 t  7.74161e+01 yr dt 2.163e-01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000002688 t  9.69967e+01 yr dt 2.530e+01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000004019 t  1.13297e+02 yr dt 6.968e-02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000005390 t  1.28366e+02 yr dt 3.869e-01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000006769 t  1.48332e+02 yr dt 5.119e+00 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000008055 t  1.60473e+02 yr dt 3.887e-01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000009452 t  1.73543e+02 yr dt 2.992e+06 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000010000 t  1.81369e+02 yr dt 2.795e+06 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000011390 t  1.91201e+02 yr dt 3.767e-02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000012814 t  1.99145e+02 yr dt 1.076e+03 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000014185 t  2.16466e+02 yr dt 5.723e+02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000015578 t  2.20866e+02 yr dt 7.056e-02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000017014 t  2.33381e+02 yr dt 4.989e+04 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000018411 t  2.44791e+02 yr dt 2.449e-02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000019796 t  2.49403e+02 yr dt 4.834e-01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000020000 t  2.57906e+02 yr dt 3.827e+04 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000021338 t  2.63055e+02 yr dt 3.826e-02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000022789 t  2.76064e+02 yr dt 7.211e-01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000024210 t  2.90275e+02 yr dt 1.647e+02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000025504 t  2.93506e+02 yr dt 2.747e-02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000026900 t  3.05344e+02 yr dt 3.587e+03 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000028297 t  3.13432e+02 yr dt 4.268e+04 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000029594 t  3.21129e+02 yr dt 1.289e+00 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000030000 t  3.21130e+02 yr dt 3.494e+03 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000031387 t  3.33529e+02 yr dt 1.122e+01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000032716 t  3.47854e+02 yr dt 3.046e-02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000034061 t  3.49471e+02 yr dt 6.652e+04 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000035427 t  3.74971e+02 yr dt 4.806e+04 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000036788 t  3.88661e+02 yr dt 3.848e-01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000038143 t  4.08278e+02 yr dt 8.754e-02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000039510 t  4.30208e+02 yr dt 9.062e-02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000040000 t  4.41251e+02 yr dt 2.502e-01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000041371 t  4.55790e+02 yr dt 1.276e-01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000042715 t  4.61687e+02 yr dt 1.833e+02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000044000 t  4.75043e+02 yr dt 1.785e+01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000045340 t  4.78950e+02 yr dt 1.708e+05 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000046629 t  4.92459e+02 yr dt 7.624e+00 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000048041 t  5.05334e+02 yr dt 1.657e-01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000049384 t  5.12328e+02 yr dt 6.114e-01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000050000 t  5.17825e+02 yr dt 2.861e+03 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000051418 t  5.28191e+02 yr dt 6.236e+02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000052728 t  5.33114e+02 yr dt 3.892e-02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000054085 t  5.43515e+02 yr dt 5.969e-02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000055411 t  5.52291e+02 yr dt 6.194e-02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000056703 t  5.56563e+02 yr dt 9.583e+01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000058015 t  5.65613e+02 yr dt 4.075e-01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000059413 t  5.75097e+02 yr dt 7.684e+04 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000060000 t  5.80814e+02 yr dt 1.091e+05 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000061314 t  5.84663e+02 yr dt 1.669e+02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000062655 t  5.92659e+02 yr dt 1.387e-01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000063978 t  6.00837e+02 yr dt 2.720e-01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000065302 t  6.07364e+02 yr dt 3.519e-01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000066638 t  6.16417e+02 yr dt 6.061e+02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000067936 t  6.23994e+02 yr dt 2.123e+04 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000069217 t  6.36520e+02 yr dt 6.932e+02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000070000 t  6.38110e+02 yr dt 2.322e+02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000071293 t  6.46944e+02 yr dt 3.184e-02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000072647 t  6.53775e+02 yr dt 3.359e-01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000074066 t  6.66120e+02 yr dt 1.103e+01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000075444 t  6.80393e+02 yr dt 2.981e-02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000076815 t  6.90620e+02 yr dt 4.345e+01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000078136 t  7.11140e+02 yr dt 3.177e-01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000079516 t  7.28806e+02 yr dt 1.704e-01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000080000 t  7.34058e+02 yr dt 2.906e+02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000081317 t  7.44078e+02 yr dt 2.740e-02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000082655 t  7.57921e+02 yr dt 4.385e-02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000084043 t  7.64236e+02 yr dt 3.368e+03 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000085348 t  7.72304e+02 yr dt 1.095e+01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000086676 t  7.82042e+02 yr dt 6.649e+02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000087976 t  7.83398e+02 yr dt 1.247e-01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000089335 t  7.88419e+02 yr dt 2.700e+06 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000090000 t  7.97238e+02 yr dt 1.292e+06 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000091306 t  8.03180e+02 yr dt 3.447e+00 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000092620 t  8.10288e+02 yr dt 2.900e-02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000093989 t  8.15666e+02 yr dt 1.495e+03 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000095362 t  8.27142e+02 yr dt 4.873e+04 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000096710 t  8.34208e+02 yr dt 2.355e+01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000098044 t  8.40526e+02 yr dt 4.256e-02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000099403 t  8.47033e+02 yr dt 1.419e+01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000100000 t  8.49135e+02 yr dt 7.649e+00 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000101400 t  8.57633e+02 yr dt 1.376e-01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000102759 t  8.66713e+02 yr dt 2.327e+04 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000104040 t  8.77931e+02 yr dt 1.320e+02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000105437 t  8.90473e+02 yr dt 1.567e+04 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000106741 t  8.94157e+02 yr dt 2.087e+00 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000108046 t  9.04085e+02 yr dt 4.413e-02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000109473 t  9.13989e+02 yr dt 5.649e+01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000110000 t  9.18149e+02 yr dt 4.701e-02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000111352 t  9.29215e+02 yr dt 3.497e-01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000112704 t  9.36375e+02 yr dt 1.048e+03 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000113983 t  9.44953e+02 yr dt 5.170e-02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000115463 t  9.56476e+02 yr dt 8.556e-02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000116817 t  9.63568e+02 yr dt 1.929e-01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000118164 t  9.75942e+02 yr dt 2.668e-01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000119605 t  9.91430e+02 yr dt 1.102e-01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000120000 t  9.91430e+02 yr dt 1.931e+02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000121384 t  1.00261e+03 yr dt 4.343e+01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000122782 t  1.01115e+03 yr dt 4.654e+00 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000124184 t  1.02797e+03 yr dt 2.693e+05 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000125514 t  1.03120e+03 yr dt 3.515e-02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000126834 t  1.04418e+03 yr dt 8.737e+03 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000128151 t  1.05208e+03 yr dt 3.454e+04 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000129565 t  1.06002e+03 yr dt 2.718e+04 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000130000 t  1.06004e+03 yr dt 3.168e-01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000131376 t  1.06940e+03 yr dt 2.342e-01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000132725 t  1.07682e+03 yr dt 3.210e+02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000134077 t  1.08496e+03 yr dt 2.616e+00 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000135379 t  1.08913e+03 yr dt 4.642e-02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000136665 t  1.09691e+03 yr dt 3.472e+01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000138075 t  1.10678e+03 yr dt 3.429e+05 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000139376 t  1.11237e+03 yr dt 3.432e+01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000140000 t  1.11683e+03 yr dt 4.077e+03 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000141345 t  1.12165e+03 yr dt 1.377e-01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000142710 t  1.12866e+03 yr dt 3.486e+00 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000144059 t  1.13792e+03 yr dt 7.488e+06 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000145345 t  1.14960e+03 yr dt 3.040e+05 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000146630 t  1.15563e+03 yr dt 2.691e+04 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000147889 t  1.16564e+03 yr dt 2.686e-01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000149202 t  1.17495e+03 yr dt 5.947e-01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000150000 t  1.17815e+03 yr dt 9.389e-01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000151338 t  1.18606e+03 yr dt 5.802e+03 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000152655 t  1.19782e+03 yr dt 6.403e+02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000153968 t  1.21326e+03 yr dt 9.997e-02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000155344 t  1.21816e+03 yr dt 4.090e+05 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000156661 t  1.22907e+03 yr dt 8.066e+05 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000158110 t  1.24134e+03 yr dt 5.016e+03 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000159452 t  1.24962e+03 yr dt 2.578e-02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000160000 t  1.25526e+03 yr dt 4.670e-02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000161362 t  1.26503e+03 yr dt 1.399e+02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000162695 t  1.27233e+03 yr dt 1.657e+00 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000163992 t  1.28050e+03 yr dt 4.332e+02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000165397 t  1.28796e+03 yr dt 9.912e+01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000166739 t  1.29468e+03 yr dt 6.255e+02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000168100 t  1.30118e+03 yr dt 1.945e+03 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000169445 t  1.31235e+03 yr dt 4.608e+00 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000170000 t  1.32082e+03 yr dt 3.530e+05 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000171337 t  1.32806e+03 yr dt 2.736e-02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000172724 t  1.33222e+03 yr dt 1.861e+05 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000174031 t  1.34142e+03 yr dt 6.615e+05 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000175390 t  1.34998e+03 yr dt 8.425e-02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000176711 t  1.36010e+03 yr dt 3.078e-02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000178061 t  1.36251e+03 yr dt 1.275e-01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000179379 t  1.37458e+03 yr dt 9.757e+04 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000180000 t  1.37569e+03 yr dt 1.551e+06 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000181285 t  1.38041e+03 yr dt 5.529e+05 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000182658 t  1.39208e+03 yr dt 2.567e+01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000183982 t  1.39630e+03 yr dt 6.405e-02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000185254 t  1.40323e+03 yr dt 4.174e-02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000186680 t  1.41353e+03 yr dt 4.478e-01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000188076 t  1.42510e+03 yr dt 1.231e+03 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000189359 t  1.43680e+03 yr dt 6.457e-02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000190000 t  1.44270e+03 yr dt 3.841e-02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000191356 t  1.44804e+03 yr dt 2.882e+00 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000192710 t  1.45685e+03 yr dt 3.569e+05 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000193988 t  1.46856e+03 yr dt 6.114e+02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000195317 t  1.47930e+03 yr dt 5.960e+03 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000196621 t  1.48342e+03 yr dt 5.156e-01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000197954 t  1.49786e+03 yr dt 1.863e+03 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000199276 t  1.51063e+03 yr dt 7.877e-02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000200000 t  1.51411e+03 yr dt 4.459e+00 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000201314 t  1.51865e+03 yr dt 6.039e+06 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000202605 t  1.52824e+03 yr dt 2.807e-02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000203960 t  1.53399e+03 yr dt 2.096e-01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000205294 t  1.54189e+03 yr dt 1.678e+03 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000206626 t  1.55428e+03 yr dt 5.023e+05 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000208000 t  1.55991e+03 yr dt 4.027e+05 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000209345 t  1.56316e+03 yr dt 5.683e+04 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000210000 t  1.56445e+03 yr dt 1.167e+01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000211396 t  1.57787e+03 yr dt 5.181e+00 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000212749 t  1.58868e+03 yr dt 6.891e+04 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000214133 t  1.59403e+03 yr dt 5.102e+06 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000215435 t  1.60315e+03 yr dt 7.750e+04 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000216726 t  1.60781e+03 yr dt 1.044e+03 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000218040 t  1.61357e+03 yr dt 4.989e-01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000219386 t  1.62230e+03 yr dt 2.721e+05 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000220000 t  1.62509e+03 yr dt 9.631e+05 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000221286 t  1.63386e+03 yr dt 1.600e+06 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000222593 t  1.63922e+03 yr dt 3.365e+03 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000223901 t  1.64447e+03 yr dt 4.965e-02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000225224 t  1.64973e+03 yr dt 6.706e-02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000226536 t  1.65840e+03 yr dt 1.042e-01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000227832 t  1.67317e+03 yr dt 1.283e-01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000229179 t  1.68178e+03 yr dt 1.266e+04 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000230000 t  1.69368e+03 yr dt 2.084e+01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000231341 t  1.69552e+03 yr dt 1.695e+00 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000232619 t  1.70195e+03 yr dt 2.010e+04 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000233912 t  1.71563e+03 yr dt 3.015e+03 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000235228 t  1.72743e+03 yr dt 4.072e+04 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000236550 t  1.73756e+03 yr dt 4.351e+04 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000237816 t  1.74276e+03 yr dt 1.010e+01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000239124 t  1.75308e+03 yr dt 1.299e-01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000240000 t  1.75638e+03 yr dt 3.033e+05 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000241394 t  1.76746e+03 yr dt 5.856e-02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000242801 t  1.77052e+03 yr dt 4.100e+01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000244147 t  1.78381e+03 yr dt 5.874e+04 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000245473 t  1.78691e+03 yr dt 1.754e+02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000246759 t  1.79065e+03 yr dt 2.167e-02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000248064 t  1.80178e+03 yr dt 4.082e-02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000249357 t  1.80514e+03 yr dt 1.730e+01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000250000 t  1.81061e+03 yr dt 2.382e-01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000251338 t  1.81877e+03 yr dt 6.256e+05 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000252588 t  1.82452e+03 yr dt 1.143e+04 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000253925 t  1.83421e+03 yr dt 2.489e+02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000255246 t  1.84313e+03 yr dt 5.123e+01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000256512 t  1.84882e+03 yr dt 2.107e+00 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000257784 t  1.85231e+03 yr dt 1.925e+00 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000259102 t  1.85822e+03 yr dt 2.256e-01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000260000 t  1.86265e+03 yr dt 9.394e-01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000261347 t  1.86852e+03 yr dt 7.663e+01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000262653 t  1.87347e+03 yr dt 3.920e+02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000263958 t  1.88709e+03 yr dt 5.161e+01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000265325 t  1.89526e+03 yr dt 4.315e-01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000266652 t  1.90173e+03 yr dt 2.042e+01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000268018 t  1.91994e+03 yr dt 4.481e+04 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000269297 t  1.92918e+03 yr dt 1.310e+00 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000270000 t  1.93750e+03 yr dt 4.417e+01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000271371 t  1.94114e+03 yr dt 4.183e-01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000272689 t  1.95363e+03 yr dt 6.981e-02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000274021 t  1.96147e+03 yr dt 3.062e-02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000275347 t  1.97306e+03 yr dt 3.258e-02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000276725 t  1.97964e+03 yr dt 1.190e+00 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000278034 t  1.98787e+03 yr dt 2.342e+04 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000279384 t  1.99669e+03 yr dt 9.856e+04 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000280000 t  1.99867e+03 yr dt 4.733e+05 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000281366 t  2.00529e+03 yr dt 1.294e+06 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000282631 t  2.01166e+03 yr dt 2.224e+04 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000283938 t  2.01942e+03 yr dt 2.153e-01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000285277 t  2.02213e+03 yr dt 2.163e-01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000286684 t  2.03560e+03 yr dt 8.497e+04 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000287995 t  2.03672e+03 yr dt 1.416e-01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000289325 t  2.04390e+03 yr dt 1.934e+00 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000290000 t  2.05014e+03 yr dt 2.552e+00 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000291334 t  2.05501e+03 yr dt 4.456e-02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000292695 t  2.06123e+03 yr dt 4.443e-02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000293970 t  2.07141e+03 yr dt 6.525e-02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000295359 t  2.07513e+03 yr dt 4.654e+01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000296690 t  2.09057e+03 yr dt 9.951e+03 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000298053 t  2.09227e+03 yr dt 4.068e-02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000299351 t  2.09835e+03 yr dt 8.296e-02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000300000 t  2.10362e+03 yr dt 6.122e-01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000301368 t  2.11638e+03 yr dt 7.187e+02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000302661 t  2.12110e+03 yr dt 2.861e-02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000304022 t  2.12871e+03 yr dt 1.193e-01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000305342 t  2.13936e+03 yr dt 2.852e+04 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000306661 t  2.14732e+03 yr dt 4.032e-01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000307989 t  2.15623e+03 yr dt 2.050e+02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000309311 t  2.17030e+03 yr dt 2.116e-01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000310000 t  2.17351e+03 yr dt 6.166e-02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000311328 t  2.18679e+03 yr dt 7.044e+02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000312629 t  2.19184e+03 yr dt 2.486e-02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000313964 t  2.19764e+03 yr dt 2.117e-01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000315388 t  2.20320e+03 yr dt 2.731e+01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000316800 t  2.21223e+03 yr dt 1.419e+02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000318119 t  2.22076e+03 yr dt 1.112e-01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000319423 t  2.22580e+03 yr dt 1.308e+05 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000320000 t  2.22878e+03 yr dt 3.739e+05 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000321319 t  2.23931e+03 yr dt 6.269e-02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000322622 t  2.24651e+03 yr dt 3.156e-01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000323892 t  2.25108e+03 yr dt 3.932e-01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000325218 t  2.25621e+03 yr dt 2.720e+06 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000326613 t  2.26731e+03 yr dt 2.133e+05 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000327848 t  2.27139e+03 yr dt 3.139e-02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000329200 t  2.28104e+03 yr dt 9.398e-02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000330000 t  2.28598e+03 yr dt 1.111e-01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000331297 t  2.28990e+03 yr dt 7.362e+04 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000332564 t  2.30095e+03 yr dt 2.207e+04 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000333815 t  2.30314e+03 yr dt 2.705e-01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000335103 t  2.30594e+03 yr dt 4.399e-02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000336471 t  2.31412e+03 yr dt 1.024e+02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000337776 t  2.32106e+03 yr dt 1.672e+02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000339140 t  2.33011e+03 yr dt 6.370e+04 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000340000 t  2.33572e+03 yr dt 3.632e-01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000341323 t  2.34804e+03 yr dt 3.264e-02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000342641 t  2.35514e+03 yr dt 6.041e-01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000343998 t  2.36113e+03 yr dt 6.292e+06 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000345296 t  2.37422e+03 yr dt 3.397e+03 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000346566 t  2.37898e+03 yr dt 1.259e+00 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000347939 t  2.38972e+03 yr dt 2.343e-01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000349214 t  2.39593e+03 yr dt 2.968e-02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000350000 t  2.39959e+03 yr dt 1.135e-01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000351396 t  2.40628e+03 yr dt 1.972e+02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000352728 t  2.41886e+03 yr dt 1.904e+03 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000354106 t  2.42185e+03 yr dt 9.523e-02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000355459 t  2.43067e+03 yr dt 1.493e+03 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000356797 t  2.44277e+03 yr dt 5.728e+05 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000358095 t  2.44545e+03 yr dt 1.503e+04 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000359353 t  2.44986e+03 yr dt 8.000e+00 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000360000 t  2.45308e+03 yr dt 6.465e-02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000361335 t  2.45828e+03 yr dt 9.967e-02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000362666 t  2.46523e+03 yr dt 7.834e+00 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000364034 t  2.47001e+03 yr dt 5.827e+05 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000365361 t  2.48025e+03 yr dt 1.897e+05 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000366686 t  2.48637e+03 yr dt 3.627e+05 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000368063 t  2.49419e+03 yr dt 4.875e+03 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000369364 t  2.50199e+03 yr dt 6.957e+00 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000370000 t  2.50510e+03 yr dt 1.023e+01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000371430 t  2.51266e+03 yr dt 7.285e+00 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000372843 t  2.51687e+03 yr dt 3.819e-02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000374206 t  2.52354e+03 yr dt 1.422e+00 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000375649 t  2.53092e+03 yr dt 7.215e-01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000377033 t  2.54321e+03 yr dt 2.331e+05 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000378313 t  2.54667e+03 yr dt 6.098e-02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000379646 t  2.55881e+03 yr dt 9.715e+00 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000380000 t  2.55881e+03 yr dt 1.244e-01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000381391 t  2.56967e+03 yr dt 4.504e+04 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000382720 t  2.57747e+03 yr dt 2.487e-02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000384107 t  2.58643e+03 yr dt 1.976e+06 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000385462 t  2.59773e+03 yr dt 5.759e+02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000386821 t  2.59916e+03 yr dt 5.866e-02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000388203 t  2.61502e+03 yr dt 2.898e-02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000389564 t  2.61607e+03 yr dt 3.971e-01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000390000 t  2.62321e+03 yr dt 6.325e-02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000391367 t  2.62884e+03 yr dt 5.329e-02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000392773 t  2.63546e+03 yr dt 7.500e-01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000394140 t  2.64563e+03 yr dt 1.663e-01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000395510 t  2.65173e+03 yr dt 3.518e+05 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000396882 t  2.66473e+03 yr dt 3.911e+05 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000398191 t  2.66901e+03 yr dt 7.516e+03 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000399528 t  2.67625e+03 yr dt 2.135e+00 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000400000 t  2.67860e+03 yr dt 7.487e-02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000401317 t  2.68650e+03 yr dt 8.130e-02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000402645 t  2.69748e+03 yr dt 1.284e+03 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000403965 t  2.70425e+03 yr dt 4.024e-02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000405288 t  2.70940e+03 yr dt 3.715e-02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000406698 t  2.71780e+03 yr dt 6.113e-02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000408089 t  2.72327e+03 yr dt 1.137e-01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000409410 t  2.72685e+03 yr dt 2.461e+01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000410000 t  2.73076e+03 yr dt 1.520e+04 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000411374 t  2.74137e+03 yr dt 1.542e+03 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000412675 t  2.74669e+03 yr dt 2.436e-01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000413981 t  2.75052e+03 yr dt 8.746e-02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000415329 t  2.76113e+03 yr dt 3.171e-01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000416640 t  2.76900e+03 yr dt 1.230e+02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000417961 t  2.77002e+03 yr dt 5.699e+05 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000419341 t  2.78700e+03 yr dt 6.847e+02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000420000 t  2.79079e+03 yr dt 1.668e+03 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000421297 t  2.80169e+03 yr dt 3.852e+00 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000422593 t  2.80615e+03 yr dt 3.605e-02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000423950 t  2.81693e+03 yr dt 2.262e-01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000425291 t  2.82030e+03 yr dt 1.433e+06 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000426636 t  2.83371e+03 yr dt 1.047e+00 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000427947 t  2.83850e+03 yr dt 4.329e-02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000429287 t  2.84777e+03 yr dt 6.243e-02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000430000 t  2.84984e+03 yr dt 8.262e+05 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000431304 t  2.85678e+03 yr dt 2.699e+03 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000432605 t  2.86475e+03 yr dt 3.242e+04 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000433932 t  2.87377e+03 yr dt 5.659e+00 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000435285 t  2.88023e+03 yr dt 8.872e-02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000436633 t  2.89026e+03 yr dt 4.256e-01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000437976 t  2.89375e+03 yr dt 9.364e+00 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000439291 t  2.90619e+03 yr dt 4.397e+03 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000440000 t  2.91195e+03 yr dt 2.679e-01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000441337 t  2.91397e+03 yr dt 4.015e-02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000442722 t  2.92523e+03 yr dt 7.963e+05 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000444065 t  2.92805e+03 yr dt 2.440e-01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000445365 t  2.93135e+03 yr dt 6.403e-02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000446769 t  2.94109e+03 yr dt 4.047e-02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000448070 t  2.94554e+03 yr dt 8.834e-01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000449426 t  2.95170e+03 yr dt 3.584e+06 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000450000 t  2.95567e+03 yr dt 5.094e+03 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000451340 t  2.96417e+03 yr dt 7.386e+05 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000452647 t  2.97310e+03 yr dt 1.493e+04 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000453959 t  2.97439e+03 yr dt 1.344e-01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000455306 t  2.98349e+03 yr dt 3.564e+01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000456668 t  2.99010e+03 yr dt 1.118e+06 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000458009 t  2.99822e+03 yr dt 1.643e+05 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000459410 t  3.00566e+03 yr dt 1.727e+05 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000460000 t  3.01241e+03 yr dt 1.269e+05 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000461320 t  3.03019e+03 yr dt 2.662e+01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000462649 t  3.03409e+03 yr dt 2.726e-01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000463990 t  3.03708e+03 yr dt 5.846e-02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000465364 t  3.05515e+03 yr dt 8.026e+02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000466683 t  3.06272e+03 yr dt 1.482e-01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000468010 t  3.07127e+03 yr dt 4.587e+06 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000469327 t  3.07865e+03 yr dt 6.192e+01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000470000 t  3.07970e+03 yr dt 2.364e-02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000471331 t  3.08686e+03 yr dt 2.318e+00 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000472681 t  3.09635e+03 yr dt 1.937e+03 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000474007 t  3.10502e+03 yr dt 8.361e-02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000475425 t  3.11500e+03 yr dt 1.965e+04 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000476778 t  3.12147e+03 yr dt 2.679e-02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000478104 t  3.12366e+03 yr dt 1.743e-01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000479556 t  3.13312e+03 yr dt 3.152e+01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000480000 t  3.13661e+03 yr dt 1.492e+01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000481379 t  3.14132e+03 yr dt 2.113e+01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000482688 t  3.15266e+03 yr dt 2.657e+04 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000484032 t  3.15436e+03 yr dt 1.914e+01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000485390 t  3.16263e+03 yr dt 3.598e-02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000486713 t  3.16427e+03 yr dt 5.199e+00 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000488033 t  3.17479e+03 yr dt 1.440e+05 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000489342 t  3.17533e+03 yr dt 3.329e-01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000490000 t  3.18298e+03 yr dt 4.999e-02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000491416 t  3.18893e+03 yr dt 1.005e-01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000492787 t  3.20461e+03 yr dt 4.916e+03 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000494107 t  3.21006e+03 yr dt 1.013e-01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000495417 t  3.21598e+03 yr dt 1.506e+03 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000496808 t  3.22569e+03 yr dt 5.131e-01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000498178 t  3.22938e+03 yr dt 1.399e-01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000499581 t  3.23960e+03 yr dt 3.968e-02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000500000 t  3.24766e+03 yr dt 1.771e+04 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000501382 t  3.25415e+03 yr dt 4.794e+05 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000502686 t  3.25956e+03 yr dt 1.179e-01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000504039 t  3.26724e+03 yr dt 2.560e+00 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000505415 t  3.27271e+03 yr dt 5.863e-02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000506788 t  3.28060e+03 yr dt 2.655e+03 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000508201 t  3.29498e+03 yr dt 3.401e+05 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000509584 t  3.31023e+03 yr dt 3.056e-02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000510000 t  3.31068e+03 yr dt 1.406e-01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000511367 t  3.32125e+03 yr dt 2.375e+02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000512668 t  3.32777e+03 yr dt 1.273e-01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000513961 t  3.33083e+03 yr dt 6.997e-02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000515243 t  3.33694e+03 yr dt 9.339e-01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000516563 t  3.34638e+03 yr dt 1.740e-01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000517963 t  3.35270e+03 yr dt 3.136e+05 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000519242 t  3.35966e+03 yr dt 2.316e+04 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000520000 t  3.36235e+03 yr dt 8.182e-02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000521326 t  3.36980e+03 yr dt 1.703e-01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000522734 t  3.37450e+03 yr dt 2.130e+00 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000524106 t  3.38139e+03 yr dt 1.288e+04 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000525463 t  3.39145e+03 yr dt 2.179e+05 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000526875 t  3.40070e+03 yr dt 2.869e+02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000528161 t  3.40762e+03 yr dt 1.065e+00 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000529534 t  3.41630e+03 yr dt 8.046e-02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000530000 t  3.41682e+03 yr dt 2.886e-01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000531370 t  3.42365e+03 yr dt 1.269e+05 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000532729 t  3.43471e+03 yr dt 5.283e+05 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000534020 t  3.44717e+03 yr dt 6.651e-01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000535343 t  3.45212e+03 yr dt 5.217e-01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000536710 t  3.45526e+03 yr dt 1.001e+00 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000538065 t  3.46730e+03 yr dt 3.997e+02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000539422 t  3.47839e+03 yr dt 3.464e+05 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000540000 t  3.48187e+03 yr dt 4.557e+05 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000541290 t  3.48856e+03 yr dt 1.364e+06 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000542585 t  3.49579e+03 yr dt 3.561e+06 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000543875 t  3.50504e+03 yr dt 1.018e+00 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000545238 t  3.51048e+03 yr dt 2.213e-01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000546604 t  3.51966e+03 yr dt 4.410e+05 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000547961 t  3.53053e+03 yr dt 9.464e+05 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000549313 t  3.53823e+03 yr dt 1.610e+00 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000550000 t  3.54066e+03 yr dt 7.907e-02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000551307 t  3.54619e+03 yr dt 1.087e-01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000552704 t  3.54971e+03 yr dt 5.180e+04 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000554063 t  3.56179e+03 yr dt 4.384e+01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000555431 t  3.56950e+03 yr dt 6.872e+04 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000556714 t  3.57176e+03 yr dt 1.235e+03 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000558092 t  3.57943e+03 yr dt 1.421e-01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000559414 t  3.58733e+03 yr dt 3.263e-02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000560000 t  3.58945e+03 yr dt 4.672e-02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000561360 t  3.59999e+03 yr dt 1.017e-01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000562706 t  3.60237e+03 yr dt 1.109e+02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000564034 t  3.61288e+03 yr dt 5.769e+04 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000565351 t  3.61805e+03 yr dt 5.094e+01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000566648 t  3.62759e+03 yr dt 5.723e-01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000568006 t  3.63276e+03 yr dt 5.230e-01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000569392 t  3.63918e+03 yr dt 2.289e+01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000570000 t  3.64170e+03 yr dt 3.080e-01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000571320 t  3.64607e+03 yr dt 3.989e-01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000572647 t  3.65448e+03 yr dt 2.402e+00 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000574037 t  3.66621e+03 yr dt 3.229e+04 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000575387 t  3.67473e+03 yr dt 1.515e+02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000576771 t  3.68850e+03 yr dt 2.309e+04 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000578067 t  3.69498e+03 yr dt 7.394e-02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000579411 t  3.70552e+03 yr dt 1.074e-01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000580000 t  3.70856e+03 yr dt 4.393e-01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000581353 t  3.71799e+03 yr dt 7.335e-02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000582745 t  3.72791e+03 yr dt 2.501e+06 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000584075 t  3.73570e+03 yr dt 5.690e+02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000585392 t  3.74360e+03 yr dt 4.499e-02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000586767 t  3.74779e+03 yr dt 2.396e+04 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000588075 t  3.75809e+03 yr dt 6.364e-02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000589399 t  3.76721e+03 yr dt 3.425e+03 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000590000 t  3.77182e+03 yr dt 1.449e+01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000591343 t  3.77492e+03 yr dt 6.829e-01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000592653 t  3.78309e+03 yr dt 1.041e+00 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000594033 t  3.78803e+03 yr dt 1.097e+04 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000595334 t  3.79264e+03 yr dt 5.668e-02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000596649 t  3.80359e+03 yr dt 5.758e-02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000598017 t  3.81235e+03 yr dt 2.302e+01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000599371 t  3.81811e+03 yr dt 3.923e+03 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000600000 t  3.82173e+03 yr dt 3.043e+05 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000601351 t  3.82964e+03 yr dt 2.320e+03 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000602657 t  3.83197e+03 yr dt 2.240e-02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000604071 t  3.83566e+03 yr dt 1.258e+03 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000605402 t  3.84964e+03 yr dt 1.953e+06 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000606688 t  3.85206e+03 yr dt 6.054e+02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000608017 t  3.86114e+03 yr dt 1.708e+05 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000609355 t  3.87028e+03 yr dt 2.737e-01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000610000 t  3.87107e+03 yr dt 1.134e+00 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000611348 t  3.88335e+03 yr dt 1.149e+02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000612826 t  3.89714e+03 yr dt 8.345e+05 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000614128 t  3.90626e+03 yr dt 1.981e-02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000615502 t  3.91524e+03 yr dt 7.830e+04 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000616849 t  3.92358e+03 yr dt 8.306e+04 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000618186 t  3.92923e+03 yr dt 5.883e+03 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000619530 t  3.93953e+03 yr dt 4.036e+00 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000620000 t  3.94184e+03 yr dt 2.164e+05 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000621318 t  3.94381e+03 yr dt 3.886e+00 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000622706 t  3.95374e+03 yr dt 4.040e-02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000624056 t  3.95913e+03 yr dt 1.139e+01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000625375 t  3.96604e+03 yr dt 5.956e-02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000626689 t  3.97560e+03 yr dt 8.770e+05 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000628037 t  3.98287e+03 yr dt 1.142e+02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000629422 t  3.99006e+03 yr dt 2.787e-02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000630000 t  3.99211e+03 yr dt 9.809e-02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000631424 t  3.99797e+03 yr dt 3.174e-01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000632745 t  4.00494e+03 yr dt 7.642e-02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000634098 t  4.01070e+03 yr dt 1.112e-01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000635484 t  4.02110e+03 yr dt 5.456e-01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000636825 t  4.02368e+03 yr dt 5.751e-01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000638171 t  4.03256e+03 yr dt 5.463e+04 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000639510 t  4.04333e+03 yr dt 6.960e+02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000640000 t  4.04468e+03 yr dt 1.353e-01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000641352 t  4.05386e+03 yr dt 4.861e+05 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000642721 t  4.06251e+03 yr dt 6.718e-02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000644102 t  4.07379e+03 yr dt 2.353e+06 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000645430 t  4.08316e+03 yr dt 2.533e+02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000646810 t  4.08494e+03 yr dt 9.627e-02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000648161 t  4.09487e+03 yr dt 7.202e+02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000649451 t  4.10388e+03 yr dt 2.379e-01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000650000 t  4.10847e+03 yr dt 1.211e+01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000651402 t  4.11773e+03 yr dt 4.206e+00 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000652696 t  4.12370e+03 yr dt 4.157e+03 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000654056 t  4.12681e+03 yr dt 2.570e+00 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000655381 t  4.13678e+03 yr dt 1.094e+00 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000656787 t  4.14582e+03 yr dt 3.854e+03 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000658191 t  4.15566e+03 yr dt 2.094e+06 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000659562 t  4.16276e+03 yr dt 9.828e-01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000660000 t  4.16358e+03 yr dt 2.191e+04 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000661381 t  4.17521e+03 yr dt 1.493e+00 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000662777 t  4.18279e+03 yr dt 2.817e+05 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000664135 t  4.18605e+03 yr dt 1.847e+02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000665417 t  4.19467e+03 yr dt 3.824e-02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000666698 t  4.20089e+03 yr dt 5.198e-02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000668050 t  4.20774e+03 yr dt 5.748e-02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000669387 t  4.21595e+03 yr dt 1.919e-01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000670000 t  4.21910e+03 yr dt 9.832e+00 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000671338 t  4.22354e+03 yr dt 7.473e+05 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000672657 t  4.23117e+03 yr dt 4.272e+04 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000674038 t  4.23684e+03 yr dt 1.467e+06 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000675345 t  4.24402e+03 yr dt 2.177e+03 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000676676 t  4.25097e+03 yr dt 2.175e+04 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000678022 t  4.26066e+03 yr dt 8.791e+05 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000679336 t  4.26862e+03 yr dt 4.102e+05 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000680000 t  4.27075e+03 yr dt 3.051e+04 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000681278 t  4.27592e+03 yr dt 2.493e-01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000682683 t  4.29380e+03 yr dt 4.319e+03 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000684058 t  4.29937e+03 yr dt 4.636e+05 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000685343 t  4.31054e+03 yr dt 8.638e+00 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000686635 t  4.31878e+03 yr dt 3.839e-01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000688012 t  4.32850e+03 yr dt 4.956e+04 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000689284 t  4.33568e+03 yr dt 1.748e+01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000690000 t  4.34325e+03 yr dt 2.022e-01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000691349 t  4.35025e+03 yr dt 1.631e+06 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000692652 t  4.35233e+03 yr dt 7.008e-02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000693982 t  4.36012e+03 yr dt 1.012e-01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000695352 t  4.36539e+03 yr dt 3.909e+01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000696680 t  4.37264e+03 yr dt 2.495e-01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000698132 t  4.37556e+03 yr dt 4.867e+04 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000699430 t  4.38797e+03 yr dt 1.911e+01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000700000 t  4.38888e+03 yr dt 1.591e-01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000701410 t  4.39245e+03 yr dt 2.958e+06 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000702723 t  4.40297e+03 yr dt 3.020e+05 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000704181 t  4.40447e+03 yr dt 1.893e-01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000705527 t  4.41526e+03 yr dt 1.747e+00 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000706881 t  4.42269e+03 yr dt 6.851e+06 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000708212 t  4.42842e+03 yr dt 1.539e-01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000709555 t  4.43610e+03 yr dt 1.234e-01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000710000 t  4.43791e+03 yr dt 4.088e-02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000711361 t  4.44408e+03 yr dt 3.132e-01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000712685 t  4.45592e+03 yr dt 1.232e-01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000714057 t  4.46153e+03 yr dt 7.139e+04 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000715345 t  4.47077e+03 yr dt 1.076e+04 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000716721 t  4.47802e+03 yr dt 2.280e+01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000718106 t  4.48494e+03 yr dt 1.220e+01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000719402 t  4.49317e+03 yr dt 3.089e-01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000720000 t  4.50025e+03 yr dt 4.847e+04 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000721339 t  4.50798e+03 yr dt 4.331e-02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000722726 t  4.51981e+03 yr dt 7.206e-02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000724172 t  4.52800e+03 yr dt 1.061e+00 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000725499 t  4.53751e+03 yr dt 3.183e+04 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000726822 t  4.54050e+03 yr dt 5.009e-02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000728231 t  4.55109e+03 yr dt 2.493e+00 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000729569 t  4.55755e+03 yr dt 1.785e+06 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000730000 t  4.56108e+03 yr dt 2.379e-01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000731374 t  4.57040e+03 yr dt 7.127e+02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000732763 t  4.57577e+03 yr dt 3.068e-02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000734185 t  4.58607e+03 yr dt 2.070e+06 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000735530 t  4.59639e+03 yr dt 2.151e+00 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000736848 t  4.59700e+03 yr dt 8.424e-02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000738200 t  4.60584e+03 yr dt 9.348e-01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000739553 t  4.61288e+03 yr dt 8.932e+05 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000740000 t  4.61631e+03 yr dt 2.004e-01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000741381 t  4.62093e+03 yr dt 2.029e+01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000742709 t  4.62975e+03 yr dt 5.265e+04 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000744071 t  4.63258e+03 yr dt 4.214e-02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000745411 t  4.63606e+03 yr dt 3.755e+03 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000746741 t  4.64673e+03 yr dt 1.450e+03 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000748102 t  4.65733e+03 yr dt 1.827e+02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000749415 t  4.66624e+03 yr dt 3.387e-02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000750000 t  4.67245e+03 yr dt 2.514e-01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000751348 t  4.67540e+03 yr dt 1.821e-01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000752674 t  4.68009e+03 yr dt 2.087e-01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000753983 t  4.69127e+03 yr dt 3.014e+03 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000755365 t  4.69990e+03 yr dt 8.923e+00 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000756675 t  4.71446e+03 yr dt 5.234e+03 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000757965 t  4.72130e+03 yr dt 1.587e-01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000759301 t  4.72762e+03 yr dt 3.201e-01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000760000 t  4.73014e+03 yr dt 3.800e+06 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000761345 t  4.74321e+03 yr dt 7.338e+05 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000762712 t  4.75260e+03 yr dt 2.712e+05 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000764020 t  4.76023e+03 yr dt 6.509e+02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000765368 t  4.76877e+03 yr dt 6.150e-02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000766750 t  4.77520e+03 yr dt 7.698e+01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000768076 t  4.77940e+03 yr dt 3.981e+06 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000769370 t  4.78224e+03 yr dt 1.483e+05 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000770000 t  4.78616e+03 yr dt 4.174e+05 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000771338 t  4.79721e+03 yr dt 3.968e-01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000772724 t  4.80165e+03 yr dt 1.135e-01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000774090 t  4.80417e+03 yr dt 4.610e-01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000775442 t  4.80775e+03 yr dt 2.196e+03 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000776841 t  4.81685e+03 yr dt 5.006e-01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000778147 t  4.82309e+03 yr dt 6.511e-02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000779495 t  4.83203e+03 yr dt 2.674e+05 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000780000 t  4.83264e+03 yr dt 5.571e+06 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000781278 t  4.84173e+03 yr dt 6.893e+00 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000782632 t  4.84814e+03 yr dt 3.671e+04 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000783913 t  4.85347e+03 yr dt 7.348e-02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000785310 t  4.85784e+03 yr dt 6.551e+02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000786682 t  4.87089e+03 yr dt 1.267e+06 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000788029 t  4.88083e+03 yr dt 7.532e+00 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000789423 t  4.88847e+03 yr dt 2.193e+03 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000790000 t  4.89545e+03 yr dt 2.244e-01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000791365 t  4.90881e+03 yr dt 2.453e+04 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000792629 t  4.91398e+03 yr dt 2.826e-01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000794026 t  4.92277e+03 yr dt 1.843e+04 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000795402 t  4.92942e+03 yr dt 1.635e+05 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000796777 t  4.93940e+03 yr dt 1.516e+06 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000798075 t  4.94844e+03 yr dt 1.250e+00 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000799417 t  4.95372e+03 yr dt 5.854e-02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000800000 t  4.95685e+03 yr dt 3.123e-01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000801376 t  4.96770e+03 yr dt 6.690e-02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000802753 t  4.96963e+03 yr dt 8.375e-02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000804133 t  4.98319e+03 yr dt 3.651e+04 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000805422 t  4.98675e+03 yr dt 2.615e+00 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000806748 t  4.99101e+03 yr dt 3.673e-02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000808074 t  4.99775e+03 yr dt 4.782e-01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000808293 t  5.00005e+03 yr dt 2.929e+06 s -> rsf_checkpoint.bin
+rsf_finalize_monitor_and_event: tracked 3443 events (|v| through 1.000e-03 m/s)
+rsf_finalize_monitor_and_event: wrote 40544 slip-rate field frame(s) across 64 group(s) to tmp_rsf/
+rsf_finalize_monitor_and_event: wrote 64 per group monitor file(s)
+rsf_finalize_catalog: wrote event catalog (1722 completed events)
+rsf_finalize_catalog: group 0 ruptured in 28 of 1722 events
+rsf_finalize_catalog: group 1 ruptured in 24 of 1722 events
+rsf_finalize_catalog: group 2 ruptured in 26 of 1722 events
+rsf_finalize_catalog: group 3 ruptured in 29 of 1722 events
+rsf_finalize_catalog: group 4 ruptured in 31 of 1722 events
+rsf_finalize_catalog: group 5 ruptured in 26 of 1722 events
+rsf_finalize_catalog: group 6 ruptured in 28 of 1722 events
+rsf_finalize_catalog: group 7 ruptured in 25 of 1722 events
+rsf_finalize_catalog: group 8 ruptured in 27 of 1722 events
+rsf_finalize_catalog: group 9 ruptured in 26 of 1722 events
+rsf_finalize_catalog: group 10 ruptured in 27 of 1722 events
+rsf_finalize_catalog: group 11 ruptured in 24 of 1722 events
+rsf_finalize_catalog: group 12 ruptured in 25 of 1722 events
+rsf_finalize_catalog: group 13 ruptured in 25 of 1722 events
+rsf_finalize_catalog: group 14 ruptured in 27 of 1722 events
+rsf_finalize_catalog: group 15 ruptured in 25 of 1722 events
+rsf_finalize_catalog: group 16 ruptured in 27 of 1722 events
+rsf_finalize_catalog: group 17 ruptured in 24 of 1722 events
+rsf_finalize_catalog: group 18 ruptured in 26 of 1722 events
+rsf_finalize_catalog: group 19 ruptured in 25 of 1722 events
+rsf_finalize_catalog: group 20 ruptured in 27 of 1722 events
+rsf_finalize_catalog: group 21 ruptured in 23 of 1722 events
+rsf_finalize_catalog: group 22 ruptured in 22 of 1722 events
+rsf_finalize_catalog: group 23 ruptured in 31 of 1722 events
+rsf_finalize_catalog: group 24 ruptured in 31 of 1722 events
+rsf_finalize_catalog: group 25 ruptured in 25 of 1722 events
+rsf_finalize_catalog: group 26 ruptured in 32 of 1722 events
+rsf_finalize_catalog: group 27 ruptured in 25 of 1722 events
+rsf_finalize_catalog: group 28 ruptured in 24 of 1722 events
+rsf_finalize_catalog: group 29 ruptured in 28 of 1722 events
+rsf_finalize_catalog: group 30 ruptured in 23 of 1722 events
+rsf_finalize_catalog: group 31 ruptured in 26 of 1722 events
+rsf_finalize_catalog: group 32 ruptured in 24 of 1722 events
+rsf_finalize_catalog: group 33 ruptured in 24 of 1722 events
+rsf_finalize_catalog: group 34 ruptured in 28 of 1722 events
+rsf_finalize_catalog: group 35 ruptured in 28 of 1722 events
+rsf_finalize_catalog: group 36 ruptured in 29 of 1722 events
+rsf_finalize_catalog: group 37 ruptured in 25 of 1722 events
+rsf_finalize_catalog: group 38 ruptured in 30 of 1722 events
+rsf_finalize_catalog: group 39 ruptured in 26 of 1722 events
+rsf_finalize_catalog: group 40 ruptured in 26 of 1722 events
+rsf_finalize_catalog: group 41 ruptured in 27 of 1722 events
+rsf_finalize_catalog: group 42 ruptured in 26 of 1722 events
+rsf_finalize_catalog: group 43 ruptured in 24 of 1722 events
+rsf_finalize_catalog: group 44 ruptured in 28 of 1722 events
+rsf_finalize_catalog: group 45 ruptured in 26 of 1722 events
+rsf_finalize_catalog: group 46 ruptured in 28 of 1722 events
+rsf_finalize_catalog: group 47 ruptured in 28 of 1722 events
+rsf_finalize_catalog: group 48 ruptured in 28 of 1722 events
+rsf_finalize_catalog: group 49 ruptured in 30 of 1722 events
+rsf_finalize_catalog: group 50 ruptured in 30 of 1722 events
+rsf_finalize_catalog: group 51 ruptured in 29 of 1722 events
+rsf_finalize_catalog: group 52 ruptured in 33 of 1722 events
+rsf_finalize_catalog: group 53 ruptured in 31 of 1722 events
+rsf_finalize_catalog: group 54 ruptured in 30 of 1722 events
+rsf_finalize_catalog: group 55 ruptured in 28 of 1722 events
+rsf_finalize_catalog: group 56 ruptured in 27 of 1722 events
+rsf_finalize_catalog: group 57 ruptured in 26 of 1722 events
+rsf_finalize_catalog: group 58 ruptured in 26 of 1722 events
+rsf_finalize_catalog: group 59 ruptured in 25 of 1722 events
+rsf_finalize_catalog: group 60 ruptured in 27 of 1722 events
+rsf_finalize_catalog: group 61 ruptured in 26 of 1722 events
+rsf_finalize_catalog: group 62 ruptured in 31 of 1722 events
+rsf_finalize_catalog: group 63 ruptured in 26 of 1722 events
+TS Object: 1 MPI process
+  type: rk
+    RK type 3bs
+    Order: 3
+    FSAL property: yes
+    Abscissa c =  0.000000  0.500000  0.750000  1.000000 
+  initial time step=1.
+  maximum steps=2000000000
+  maximum time=1.57788e+11
+  total number of RHS function evaluations=3449201
+  total number of rejected steps=338377
+  using relative error tolerance of 0.0001, using vector of absolute error tolerances
+  TSAdapt Object: 1 MPI process
+    type: basic
+    safety factor 0.9
+    extra safety factor after step rejection 0.5
+    clip fastest increase 2.
+    clip fastest decrease 0.5
+    maximum allowed timestep 1.57788e+08
+    minimum allowed timestep 0.
+    maximum solution absolute value to be ignored -1.

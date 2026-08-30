@@ -1,0 +1,120 @@
+read_geometry: 2D 0 (I/II) 1280 (III), 0 points, 0 triangles, 0 iquads, and 0 regular quads
+read_geometry: 2D mode III (half plane)
+/home/twb/progs/src/interact/bin/rsf_solve: read geometry from cyc_geom.in, 1280 patches, on 1 cores
+/home/twb/progs/src/interact/bin/rsf_solve: G 3.204000e+10 Pa cs 3464 m/s eta 4.624711e+06 f0 0.6 dc 0.08 m v0 1.000e-06 vpl 1.000e-09 m/s
+/home/twb/progs/src/interact/bin/rsf_solve: sigma0 2.500000e+07 tau0 1.500000e+07 Pa vinit 1.000e-09 m/s rand_amp 0
+/home/twb/progs/src/interact/bin/rsf_solve: rtol 1.0e-04 dt_init 1 s dt_max 1e+10 s stop 5000 yr evol law: 1
+read_rsf: read a and b values, on averag 0.0184 and 0.03
+/home/twb/progs/src/interact/bin/rsf_solve: read per-cell initial tau,vel from cyc_ic.in
+calc_petsc_Isn_matrices: creating dense matrix for stress mode 0 stress type 0
+calc_petsc_Isn_matrices: core 000/001: assigning dense row     0 to  1280
+calc_petsc_Isn_matrices: hmat_storage backend dense m 1280 n 1280 stored_scalars 1638400 dense_ratio 1 mbytes 12.5
+rsf_solve: Is (shear) interaction matrix build wall =       0.4638 s
+/home/twb/progs/src/interact/bin/rsf_solve: field output on, 32 fault group(s), one frame every 20 accepted steps
+rsf_init_monitor_groups: per group monitor on, 32 group(s), rsf_monitor.g%03d.dat
+rsf_init_catalog: event catalog on (rupture-front |v| = 1.000e-03 m/s)
+rsf_init_catalog_groups: per group catalog on, 32 group(s), rsf_catalog.g%03d.dat
+rsf_write_checkpoint: step 000000010000 t  8.88652e+01 yr dt 4.404e-02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000020000 t  2.22822e+02 yr dt 7.089e-01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000030000 t  2.94935e+02 yr dt 5.139e-02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000040000 t  4.24709e+02 yr dt 1.162e-01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000050000 t  5.04382e+02 yr dt 6.702e-02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000060000 t  6.36424e+02 yr dt 9.878e-02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000070000 t  7.16126e+02 yr dt 9.933e-02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000080000 t  8.52408e+02 yr dt 3.421e+05 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000090000 t  9.35160e+02 yr dt 3.831e+06 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000100000 t  1.05319e+03 yr dt 2.413e-02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000110000 t  1.14635e+03 yr dt 9.094e+04 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000120000 t  1.27335e+03 yr dt 5.635e-02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000130000 t  1.35341e+03 yr dt 3.446e+05 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000140000 t  1.48145e+03 yr dt 2.636e-02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000150000 t  1.56527e+03 yr dt 2.520e+06 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000160000 t  1.68958e+03 yr dt 8.429e-01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000170000 t  1.78292e+03 yr dt 1.106e-01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000180000 t  1.91460e+03 yr dt 6.222e+00 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000190000 t  2.00342e+03 yr dt 1.642e+05 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000200000 t  2.12825e+03 yr dt 5.901e+06 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000210000 t  2.21477e+03 yr dt 4.093e-02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000220000 t  2.34012e+03 yr dt 1.535e-01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000230000 t  2.42813e+03 yr dt 1.215e-01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000240000 t  2.55989e+03 yr dt 2.397e+02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000250000 t  2.64611e+03 yr dt 8.588e+01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000260000 t  2.76755e+03 yr dt 4.620e+00 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000270000 t  2.87147e+03 yr dt 5.019e+06 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000280000 t  2.98351e+03 yr dt 1.017e+05 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000290000 t  3.09450e+03 yr dt 8.708e+04 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000300000 t  3.19917e+03 yr dt 2.150e+00 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000310000 t  3.30304e+03 yr dt 7.551e+06 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000320000 t  3.40576e+03 yr dt 9.070e+04 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000330000 t  3.51714e+03 yr dt 7.698e-02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000340000 t  3.62530e+03 yr dt 1.620e+00 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000350000 t  3.73460e+03 yr dt 1.497e+05 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000360000 t  3.84028e+03 yr dt 7.696e-01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000370000 t  3.94409e+03 yr dt 1.352e+04 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000380000 t  4.06066e+03 yr dt 1.382e+01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000390000 t  4.16682e+03 yr dt 1.381e+06 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000400000 t  4.27514e+03 yr dt 1.560e+02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000410000 t  4.38883e+03 yr dt 1.061e+00 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000420000 t  4.47533e+03 yr dt 1.125e+01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000430000 t  4.60129e+03 yr dt 2.173e-02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000440000 t  4.69097e+03 yr dt 3.017e-02 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000450000 t  4.82356e+03 yr dt 9.304e-01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000460000 t  4.90950e+03 yr dt 1.240e-01 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000467509 t  5.00022e+03 yr dt 1.255e+07 s -> rsf_checkpoint.bin
+rsf_finalize_monitor_and_event: tracked 1899 events (|v| through 1.000e-03 m/s)
+rsf_finalize_monitor_and_event: wrote 23445 slip-rate field frame(s) across 32 group(s) to tmp_rsf/
+rsf_finalize_monitor_and_event: wrote 32 per group monitor file(s)
+rsf_finalize_catalog: wrote event catalog (950 completed events)
+rsf_finalize_catalog: group 0 ruptured in 28 of 950 events
+rsf_finalize_catalog: group 1 ruptured in 30 of 950 events
+rsf_finalize_catalog: group 2 ruptured in 30 of 950 events
+rsf_finalize_catalog: group 3 ruptured in 32 of 950 events
+rsf_finalize_catalog: group 4 ruptured in 32 of 950 events
+rsf_finalize_catalog: group 5 ruptured in 29 of 950 events
+rsf_finalize_catalog: group 6 ruptured in 30 of 950 events
+rsf_finalize_catalog: group 7 ruptured in 32 of 950 events
+rsf_finalize_catalog: group 8 ruptured in 27 of 950 events
+rsf_finalize_catalog: group 9 ruptured in 30 of 950 events
+rsf_finalize_catalog: group 10 ruptured in 31 of 950 events
+rsf_finalize_catalog: group 11 ruptured in 26 of 950 events
+rsf_finalize_catalog: group 12 ruptured in 31 of 950 events
+rsf_finalize_catalog: group 13 ruptured in 27 of 950 events
+rsf_finalize_catalog: group 14 ruptured in 30 of 950 events
+rsf_finalize_catalog: group 15 ruptured in 29 of 950 events
+rsf_finalize_catalog: group 16 ruptured in 33 of 950 events
+rsf_finalize_catalog: group 17 ruptured in 27 of 950 events
+rsf_finalize_catalog: group 18 ruptured in 32 of 950 events
+rsf_finalize_catalog: group 19 ruptured in 31 of 950 events
+rsf_finalize_catalog: group 20 ruptured in 27 of 950 events
+rsf_finalize_catalog: group 21 ruptured in 30 of 950 events
+rsf_finalize_catalog: group 22 ruptured in 34 of 950 events
+rsf_finalize_catalog: group 23 ruptured in 30 of 950 events
+rsf_finalize_catalog: group 24 ruptured in 32 of 950 events
+rsf_finalize_catalog: group 25 ruptured in 31 of 950 events
+rsf_finalize_catalog: group 26 ruptured in 26 of 950 events
+rsf_finalize_catalog: group 27 ruptured in 26 of 950 events
+rsf_finalize_catalog: group 28 ruptured in 30 of 950 events
+rsf_finalize_catalog: group 29 ruptured in 31 of 950 events
+rsf_finalize_catalog: group 30 ruptured in 31 of 950 events
+rsf_finalize_catalog: group 31 ruptured in 25 of 950 events
+TS Object: 1 MPI process
+  type: rk
+    RK type 3bs
+    Order: 3
+    FSAL property: yes
+    Abscissa c =  0.000000  0.500000  0.750000  1.000000 
+  initial time step=1.
+  maximum steps=2000000000
+  maximum time=1.57788e+11
+  total number of RHS function evaluations=1968884
+  total number of rejected steps=187022
+  using relative error tolerance of 0.0001, using vector of absolute error tolerances
+  TSAdapt Object: 1 MPI process
+    type: basic
+    safety factor 0.9
+    extra safety factor after step rejection 0.5
+    clip fastest increase 2.
+    clip fastest decrease 0.5
+    maximum allowed timestep 1.57788e+08
+    minimum allowed timestep 0.
+    maximum solution absolute value to be ignored -1.

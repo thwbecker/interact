@@ -71,8 +71,24 @@ landing pad for PSGRN/PSCMP-derived 3-D layered
 viscoelastic-gravitational kernels (`tools/psgrn/`). Note that
 `Is` is assembled in the stress-DROP convention, so kernels from
 stress-from-slip generators need a global sign flip; the K0 gate
-catches this. Shear only: hereditary normal-stress relaxation is not
-implemented, so VE plus `-calc_sigma_dot` is refused.
+catches this.
+
+The kernel file may carry TWO traction families (its header's third
+field: 1 = shear only, 2 = shear plus fault-normal). On a dipping
+fault slip changes the fault-normal traction as well, and when the
+substrate relaxes both evolve, so the second family carries the
+hereditary normal-traction kernel on the same relaxation ladder,
+gated against the assembled `In` exactly as the shear block is gated
+against `Is`. It switches on with the elastic normal path: with
+`-calc_sigma_dot` a two-family file gives an elastic-plus-hereditary
+normal stress, without it the normal blocks are ignored (sigma does
+not evolve at all), and a shear-only file combined with
+`-calc_sigma_dot` is REFUSED, because relaxing shear with a frozen
+normal traction is not a consistent medium. `-ve_mode 1` and `2` are
+2-D antiplane, where slip induces no normal-stress change at all, so
+they still refuse `-calc_sigma_dot`. Generator:
+`test_relax/inplane_ve_proto/bp3_ve_kernels.py ... [normal]`
+(default on); gates: `run_ve_normal_test` in the same directory.
 
 Per-station time series (SEAS style): `-rsf_stations <file>` with
 lines `NAME CELL_INDEX` writes `fltst_NAME.dat` per station with

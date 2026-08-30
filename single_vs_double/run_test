@@ -1,0 +1,29 @@
+#!/bin/ksh
+#
+# test the implementation of single vs. double precision
+#
+n=50
+
+solver="-sl"
+flags="-pr 0 -gv"
+
+
+makefault -n $n -m $n -dip 80 -strike 20 > geom.in
+
+tree=$HOME/progs/src/interact
+
+i=1
+for tb in bin/single/$ARCH/ bin/$ARCH/ ;do
+    if [ $i -eq 1 ];then # double
+	name=sgl
+	# generate A matrix 
+	$tree/$tb/interact $solver $flags -sa 
+    else #single
+	name=dbl
+	# solve A matrix only, read old
+	$tree/$tb/interact $solver $flags -oa
+    fi
+    cp flt.dat flt.$name.dat
+    cp flt.0.abs.off flt.0.abs.$name.off
+    ((i=i+1))
+done

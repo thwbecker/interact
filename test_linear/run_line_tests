@@ -1,0 +1,97 @@
+#!/bin/bash
+ntests=${1-"1 2"}	
+angles=${2-"vert dip"}			# vert or dip
+compare_to=${3-1}			# 1: iquad 2: triangle
+geoms="0 $compare_to"			# 0: quad 1: iquad 2: triangle
+binary=interact
+
+fs="";fs2=""
+for ntest in $ntests;do
+    for angle in $angles;do
+	strike0=20;
+	w0=1;l0=1
+	
+	no=16;mo=16
+	#no=32;mo=32
+	#no=8;mo=8
+	#no=1;mo=2
+	z=-1
+	
+	if [ $angle = "vert" ];then	# vertical
+	    strike=$strike0;dip=90
+	elif [ $angle = "dip" ];then	# dip
+	    strike=$strike0;dip=30
+	else
+	    echo $0: error $angle
+	    exit
+	fi
+	for geom in $geoms;do
+	   
+	    if [ $geom = 0 ];then
+		makefault -strike $strike -dip $dip -n $no -m $mo -l $l0 -z $z -w $w0  > geom.in
+		glabel=quad
+	    elif [ $geom = 1 ];then
+		# convert quads to iquads (even though they are even geometry)
+		makefault -strike $strike -dip $dip -n $no -m $mo -l $l0 -z $z -w $w0 | \
+		    patch2vertices | points2patch 0 0 0 1 > geom.in
+		glabel=iquad
+	    elif [ $geom = 2 ];then
+		((nu=no));((mu=mo/2))
+		glabel=tri
+		makefault -strike $strike -dip $dip -n $nu -m $mu -l $l0 -z $z -w $w0  > geom.in
+		#cat geom.in | patchquad2patchtri 2 > tmp
+		#cat geom.in | patchquad2patchtri 1 > tmp
+		cat geom.in | patchquad2patchtri 0 > tmp
+		mv tmp geom.in
+		#cat geom.in
+		#exit
+	    else
+		echo $0: geom error
+		exit
+	    fi
+	    rm smlin.in 2> /dev/null
+	    if [[ $ntest -eq 1 ]];then # prescribed slip
+		bc_type=0;bc_val=1
+	    elif [[ $ntest -eq 2 ]];then # prescribed stress
+		bc_type=10;bc_val=-5e3
+	    else
+		echo $0: test $ntest error
+		exit
+	    fi
+	    
+	    echo 1 1 > bc.in
+	    cat <<EOF >> bc.in
+-5 5 301 0 0 1 -1 -1 1
+EOF
+
+	    echo
+	    echo test number $ntest
+	    echo bc_type $bc_type bc_val $bc_val
+	    echo 
+	    cat <<EOF	>> bc.in		
+-1 -1 -1 $bc_type $bc_val
+EOF
+
+
+	    oname=lt.$angle.$geom.$ntest
+	    rm flt.dat stress.out disp.out 2> /dev/null
+	    #mpirun -np 4 $binary -ksp_type fgmres -pc_type none -ksp_max_it 50000 -ksp_rtol 1.0e-8
+	    #mpirun -np 8 $binary 	-pc_factor_mat_solver_type scalapack -mat_type scalapack
+	    $binary 2> logs/log.$oname
+	    cp geom.in geoms/geom.$oname.in
+	    mv flt.dat flt.$oname.dat
+	    mv bc.in bcs/bc.$oname.in
+	    mv disp.out disp.$oname.out
+	    mv stress.out stress.$oname.out
+	    mv stress.hdr stress.$oname.hdr
+	    ../plot_fault_solution flt.lt.$angle.$geom.$ntest geoms/geom.lt.$angle.$geom.$ntest.in "test $ntest $angle" -R-2/2/-2/2/-2/0 2
+	    fs2="$fs2 flt.lt.$angle.$geom.$ntest.ps"
+	done
+	compare_us $angle $ntest $compare_to
+	fs="$fs disp_comp.$angle.$ntest.$compare_to.ps"
+    done
+done
+
+epsmerge -par -x 1 -y 1 --orientation Landscape $fs > compl.ps
+epsmerge -par -x 1 -y 1 --orientation Landscape $fs2 > compf.ps
+rm $fs $fs2

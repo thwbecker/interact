@@ -1,0 +1,5 @@
+#!/bin/ksh
+bin=${1-interact}
+$bin 2> /tmp/$bin.$HOST.$USER.log.dat
+
+

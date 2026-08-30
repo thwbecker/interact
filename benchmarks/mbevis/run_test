@@ -1,0 +1,37 @@
+#!/bin/ksh
+#
+#
+#
+#
+gawk 'BEGIN{for(x=-10;x<=10;x+=2)for(y=-10;y<=10;y+=2)print(x,y,0)}' > oloc.dat
+#
+dips="90 45 0 -45"
+strikes="90"
+modes="0 1 2"
+depths="-1 -2"
+for depth in $depths;do
+    for dip in $dips;do
+	for strike in $strikes;do
+	    makefault -strike $strike -dip $dip -z $depth -w 0.5 > geom.in
+	    ../pgeom geom.in 1 1 
+	    cat geom.in | patch2xyz > geom.$depth.$strike.$dip.xyz
+	    mv geom.ps geom.$depth.$strike.$dip.ps
+	    for mode in $modes;do
+		echo 1 > bc.in
+		echo 2 >> bc.in
+		echo 0 $mode 1 >> bc.in
+		interact 
+		rm *.off flt.dat
+		for f in stress disp;do
+		    sed 's/inf/NaN/g' $f.out > $f.$depth.$strike.$dip.$mode.out
+		    rm $f.out
+		done
+		awk '{print($1,$2,90-atan2($4,$5)*57.29578,sqrt($4*$4+$5*$5)*20)}' disp.$depth.$strike.$dip.$mode.out | \
+		    psxy -Sv0.01/0.1/0.05 -R-10/10/-10/10 -N -JX5 -P -Ba2f1:"x":/a2f1:"y":WeSn -G1 > disp.$depth.$strike.$dip.$mode.ps
+	    done
+	done
+    done
+done
+
+
+tar cvf mike.tar *.xyz disp*out geom*ps

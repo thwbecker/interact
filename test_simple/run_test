@@ -1,0 +1,87 @@
+#!/bin/bash
+geoms=${1-"1 2 3"}			# 1: strike slip 2: thrust 3: thrust, submerged
+modes=${2-"1 2"}
+make_new=${2-0}
+
+sd=5929.43380824804
+
+for geom in $geoms;do
+    
+    if [ $geom = 1 ];then
+	slip_mode=0
+	stress_mode=10
+	is_thrust=0
+    else
+	slip_mode=1
+	stress_mode=20
+	is_thrust=1
+    fi
+    w=-5;e=5;s=-5;n=5
+    nx=501
+    for i in $modes;do
+	
+	if [ $i = 1 ];then
+	    dw=0.1
+	    # single fault
+	    
+	    
+	    #	../pgeom geom.in
+	    cat <<EOF > bc.in
+1 1
+$w $e $nx $s $n $nx -1 0 3
+-1 -1 -1 $slip_mode 1
+EOF
+	    label="u"		# prescribed slip
+	    lname=disp
+	elif [ $i = 2 ];then	# stress drop
+	    dw=0.025
+	    cat <<EOF > bc.in
+1 1
+$w $e $nx $s $n $nx -1 0 3
+-1 -1 -1 $stress_mode -$sd 
+EOF
+
+
+	    label="@~Ds@~";lname=stress
+	fi
+	if [ $geom = 1 ];then
+	    makefault -l 2.01 -w 0.5 -z -0.5 -tl $dw -tw $dw > geom.in
+	elif [ $geom = 2 ];then			# thrust
+	    dip=30
+	    z=0.5
+	    makefault -l 2.01 -w `echo $dip $z | gawk '{print($2/sin($1/180*3.141592653589))}'`  -z -$z -tl $dw -tw $dw -dip $dip > geom.in
+	elif [ $geom = 3 ];then			# thrust
+	    dip=30
+	    z=0.5
+	    makefault -l 2.01 -w `echo $dip $z | gawk '{print($2/sin($1/180*3.141592653589))}'`  -z -0.75 -tl $dw -tw $dw -dip $dip > geom.in
+	fi
+
+	
+	if [[ ! -s output.$geom.$i/disp.out || $make_new -eq 1 ]];then
+	    mpirun -np 16 interact -ksp_type fgmres -pc_type none -ksp_max_it 10000 -ksp_rtol 1.0e-8 
+	    mkdir -p output.$geom.$i
+	    cp  geom.in disp.out flt.dat disp.hdr stress.hdr stress.out  output.$geom.$i/
+	    use_old_grids=0
+	else
+	    use_old_grids=1
+	    cp output.$geom.$i/* .
+	fi
+	../pdisp disp 1 0 $use_old_grids 1 1 1 $is_thrust
+	psconvert -Tf disp.1.ps
+	mv disp.1.pdf flttest_simple_$lname.pdf
+	echo $0: displacement done
+	../pstress_field stress 1 1 # reverse sign
+	psconvert -Tf stress.ps
+	mv stress.pdf flttest_simple_stress_$lname.pdf
+
+
+	cp flttest_simple_stress_$lname.pdf flttest_simple_$lname.pdf output.$geom.$i/
+	#if [ $geom = 1 ];then
+	#cp  flttest_simple_stress_$lname.pdf flttest_simple_stress_$lname.neg.pdf flttest_simple_$lname.pdf $HOME/Dropbox/The_Book/book_latex/figures/transform_modeling/
+	#fi
+	if [ $use_old_grids -eq 0 ];then
+	    cp u*grd output.$geom.$i/
+	fi
+    done
+done
+

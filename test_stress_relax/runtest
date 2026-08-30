@@ -1,0 +1,48 @@
+#!/bin/ksh
+run=${1-0}
+
+if [ $run -eq 1 ];then
+    makefault -n 20 -m 5 -w 0.25 -z  -0.25 -strike 90 > geom.in
+    echo 1 1 > bc.in
+    echo -1.5 1.5 20 -1.5 1.5 20 -0.25 -0.25 1 >> bc.in
+    echo -1 -1 -1 10 1 >> bc.in
+
+    interact -pr 0 -sl
+fi
+
+
+# simple shear
+for maxs in 1.0 ;do
+
+    echo 0 0 0 $maxs -$maxs 60 | calc_cart_from_eigen_stress -ah | gawk '{print($4,$5,$7)}' > tmp.dat
+    read sxx sxy syy < tmp.dat
+    rm tmp.dat
+
+#
+# extract horizontal eigensystem
+# and convert to psvelo format
+#
+    gawk '{print($4,$5,$7,$1,$2)}' stress.out | \
+	gawk '{print($1+sxx,$2+sxy,$3+syy,$4,$5)}' \
+	sxx=$sxx sxy=$sxy syy=$syy |\
+	gawk -f calcms.awk | \
+	gawk '{print($4,$5,$1,$2,$3+90)}' > tmp.psvelo
+    
+    reg=-R-1.5/1.5/-1.5/1.5
+    proj=-JX7
+    
+    gawk '{print($1,$2,$3,0,$5)}' tmp.psvelo | psvelo -Sx.25 -W1/255/0/0 $reg $proj -P -Ba1f.1 -K > stress.$maxs.ps
+    gawk '{print($1,$2,0,$4,$5)}' tmp.psvelo | psvelo -Sx.25 -W1/0/0/250 $reg $proj  -O -K >> stress.$maxs.ps
+    echo -1 0 > tmp.in
+    echo 1 0 >> tmp.in
+    psxy tmp.in -M  $reg $proj -W4 -O >> stress.$maxs.ps
+    
+    
+
+done
+
+    gawk '{print($1,$2,atan2($5,$4)*57.29577951308,sqrt($4*$4+$5*$5))}' disp.out | \
+	psxy $reg $proj -Sv0.05/0.1/0.05 -P -Ba2f.2 > vel.ps
+
+rm tmp.in tmp.psvelo
+

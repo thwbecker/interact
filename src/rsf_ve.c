@@ -56,7 +56,15 @@
     -ve_mode <1|2|3>       generator (required to switch VE on);
                            3 = external kernel from -ve_prony_file
     -ve_prony_file <f>     mode 3: shared taus + per-pair amplitude
-                           matrices + a K0 block for the gate below
+                           matrices + a K0 block for the gate below;
+                           the header's third field is the number of
+                           TRACTION FAMILIES: 1 = shear only,
+                           2 = shear plus fault-NORMAL traction (the
+                           normal family uses the same tau ladder and
+                           is activated exactly when -calc_sigma_dot
+                           is on; a shear-only file with
+                           -calc_sigma_dot is refused, since relaxing
+                           shear with frozen normal is not a medium)
     -ve_prony_k0tol <t>    mode 3: relative tolerance of the K0 vs Is
                            consistency gate (default 0.05 warn, 5x abort)
     -ve_tmaxwell_yr <t>    Maxwell time of the relaxing medium [yr]
@@ -93,6 +101,59 @@
    scale converts interact-internal stress to SI, as for Is.
 */
 static int cmp_comp_precision(const void *, const void *);
+/*
+   -ve_mode 3 consistency gate: read one n x n block from the kernel
+   file and compare it against an assembled interaction operator
+   (Is for shear, In for normal) in the Frobenius sense, skipping
+   near-diagonal entries where an external generator cannot
+   reproduce the singular elastic self terms (those live in the
+   assembled operator, i.e. in the implicit C_inf).  Catches unit,
+   orientation and SIGN mismatches before any physics runs: a pure
+   global sign flip shows up as a relative deviation of 2.
+*/
+static PetscErrorCode rsf_ve_prony_gate(FILE *pf, Mat A, struct med *medium,
+					PetscReal *row, const char *what,
+					const char *pfile, PetscReal tol)
+{
+  PetscInt i,j;
+  PetscReal dev = 0.0,nrm = 0.0,dv,gred[2],lred[2];
+  PetscFunctionBeginUser;
+  for(i=0;i < medium->nrflt;i++){
+    for(j=0;j < medium->nrflt;j++)
+      if(fscanf(pf,"%lf",row+j) != 1)
+	SETERRQ(PETSC_COMM_WORLD,PETSC_ERR_FILE_READ,
+		"rsf_ve_setup: bad %s-gate row %ld",what,(long)i);
+    if((i >= medium->rs) && (i < medium->re)){
+      PetscInt ncols;
+      const PetscInt *cols;
+      const PetscScalar *vals;
+      PetscCall(MatGetRow(A,i,&ncols,&cols,&vals));
+      for(j=0;j < ncols;j++){
+	if(labs((long)i - (long)cols[j]) <= 2)
+	  continue;
+	dv = PetscRealPart(vals[j]) - row[cols[j]];
+	dev += dv*dv;
+	nrm += PetscRealPart(vals[j])*PetscRealPart(vals[j]);
+      }
+      PetscCall(MatRestoreRow(A,i,&ncols,&cols,&vals));
+    }
+  }
+  lred[0] = dev; lred[1] = nrm;
+  PetscCallMPI(MPI_Allreduce(lred,gred,2,MPIU_REAL,MPI_SUM,PETSC_COMM_WORLD));
+  dev = sqrt(gred[0]/(gred[1] + 1e-300));
+  HEADNODE
+    fprintf(stderr,"rsf_ve_setup: mode 3 (%s): %s block, rel dev from assembled operator %.3e\n",
+	    pfile,what,(double)dev);
+  if(dev > 5.0*tol)
+    SETERRQ(PETSC_COMM_WORLD,PETSC_ERR_USER,
+	    "rsf_ve_setup: prony %s block deviates %.3e from the assembled operator (tol %g): convention mismatch?  (a global sign flip gives exactly 2)",
+	    what,(double)dev,(double)tol);
+  if(dev > tol)
+    HEADNODE
+      fprintf(stderr,"rsf_ve_setup: WARNING: prony %s deviation %.3e exceeds %g\n",
+	      what,(double)dev,(double)tol);
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
 PetscErrorCode rsf_ve_setup(struct interact_ctx *par, Vec negvpl_in,
 			    PetscReal scale)
 {
@@ -108,7 +169,7 @@ PetscErrorCode rsf_ve_setup(struct interact_ctx *par, Vec negvpl_in,
   PetscInt i,j,k,n,it,p,jn;
   PetscBool flg;
   PetscFunctionBeginUser;
-  rsf->ve_np = 0;rsf->ve_t0 = 0.0;
+  rsf->ve_np = 0;rsf->ve_t0 = 0.0;rsf->ve_normal = PETSC_FALSE;
   PetscCall(PetscOptionsGetInt(NULL,NULL,"-ve_mode",&mode,&flg));
   if((!flg) || (mode == 0))
     PetscFunctionReturn(PETSC_SUCCESS); /* VE off: nothing changes */
@@ -127,9 +188,10 @@ PetscErrorCode rsf_ve_setup(struct interact_ctx *par, Vec negvpl_in,
 	SETERRQ(PETSC_COMM_WORLD,PETSC_ERR_SUP,
 		"rsf_ve_setup: -ve_mode %ld: patch %ld type %i, only 2-D antiplane elements are wired up (external kernels: -ve_mode 3 -ve_prony_file)",
 		(long)mode,(long)i,(int)fault[i].type);
-  if(rsf->calc_sigma_dot)
+  if(rsf->calc_sigma_dot && (mode != 3))
     SETERRQ(PETSC_COMM_WORLD,PETSC_ERR_SUP,
-	    "rsf_ve_setup: VE normal-stress coupling not implemented (antiplane has none); drop -calc_sigma_dot");
+	    "rsf_ve_setup: -ve_mode %ld has no hereditary normal-stress coupling (the internal generators are 2-D ANTIPLANE, where slip induces no normal-stress change); use -ve_mode 3 with a kernel file carrying normal blocks, or drop -calc_sigma_dot",
+	    (long)mode);
   rsf->ve_mode = mode;
   rsf->ve_hstage = 1;
   PetscCall(PetscOptionsGetInt(NULL,NULL,"-ve_h_stage",&rsf->ve_hstage,NULL));
@@ -170,8 +232,8 @@ PetscErrorCode rsf_ve_setup(struct interact_ctx *par, Vec negvpl_in,
     char pfile[300];
     FILE *pf;
     PetscReal k0tol = 0.05;
-    PetscInt nf,npf;
-    PetscReal *row,k0dev,k0nrm,dv;
+    PetscInt nf,npf,nfam;
+    PetscReal *row;
     PetscScalar *crow3;
     PetscInt *cidx3;
     PetscCall(PetscOptionsGetString(NULL,NULL,"-ve_prony_file",pfile,
@@ -191,8 +253,13 @@ PetscErrorCode rsf_ve_setup(struct interact_ctx *par, Vec negvpl_in,
 	if(!fgets(lb,sizeof(lb),pf))
 	  SETERRQ(PETSC_COMM_WORLD,PETSC_ERR_FILE_READ,"rsf_ve_setup: truncated prony file");
       }while(lb[0] == '#');
-      if(sscanf(lb,"%ld %ld",(long *)&nf,(long *)&npf) != 2)
+      nfam = 1;			/* default: shear only (format v1) */
+      if(sscanf(lb,"%ld %ld %ld",(long *)&nf,(long *)&npf,(long *)&nfam) < 2)
 	SETERRQ(PETSC_COMM_WORLD,PETSC_ERR_FILE_READ,"rsf_ve_setup: bad prony header");
+      if((nfam < 1) || (nfam > 2))
+	SETERRQ(PETSC_COMM_WORLD,PETSC_ERR_USER,
+		"rsf_ve_setup: prony file declares %ld traction families, expect 1 (shear) or 2 (shear + normal)",
+		(long)nfam);
       if(nf != medium->nrflt)
 	SETERRQ(PETSC_COMM_WORLD,PETSC_ERR_USER,
 		"rsf_ve_setup: prony file n %ld != %ld patches",(long)nf,(long)medium->nrflt);
@@ -217,51 +284,11 @@ PetscErrorCode rsf_ve_setup(struct interact_ctx *par, Vec negvpl_in,
     if((!row)||(!crow3)||(!cidx3))MEMERROR("rsf_ve_setup");
     for(j=0;j < medium->nrflt;j++)
       cidx3[j] = j;
-    /* K0 gate: file's elastic kernel vs the assembled Is, Frobenius */
-    k0dev = k0nrm = 0.0;
-    for(i=0;i < medium->nrflt;i++){
-      for(j=0;j < medium->nrflt;j++)
-	if(fscanf(pf,"%lf",row+j) != 1)
-	  SETERRQ(PETSC_COMM_WORLD,PETSC_ERR_FILE_READ,"rsf_ve_setup: bad K0 row %ld",(long)i);
-      if((i >= medium->rs) && (i < medium->re)){
-	PetscInt ncols;
-	const PetscInt *cols;
-	const PetscScalar *vals;
-	PetscCall(MatGetRow(medium->Is,i,&ncols,&cols,&vals));
-	for(j=0;j < ncols;j++){
-	  /* skip near-diagonal entries: external generators represent
-	     sources as regularized distributions and cannot produce
-	     the singular elastic self/neighbor terms; those live in
-	     the assembled Is (implicit C_inf) anyway.  The RELAXATION
-	     amplitudes C_p are regular everywhere and are used in
-	     full. */
-	  if(labs((long)i - (long)cols[j]) <= 2)
-	    continue;
-	  dv = PetscRealPart(vals[j]) - row[cols[j]];
-	  k0dev += dv*dv;
-	  k0nrm += PetscRealPart(vals[j])*PetscRealPart(vals[j]);
-	}
-	PetscCall(MatRestoreRow(medium->Is,i,&ncols,&cols,&vals));
-      }
-    }
-    {
-      PetscReal gred[2],lred[2];
-      lred[0] = k0dev; lred[1] = k0nrm;
-      PetscCallMPI(MPI_Allreduce(lred,gred,2,MPIU_REAL,MPI_SUM,PETSC_COMM_WORLD));
-      k0dev = sqrt(gred[0]/(gred[1] + 1e-300));
-      HEADNODE
-	fprintf(stderr,"rsf_ve_setup: mode 3 (%s): np %ld, tau %g ... %g yr, K0 rel dev from Is %.3e\n",
-		pfile,(long)rsf->ve_np,rsf->ve_tau[0]/SEC_PER_YEAR,
-		rsf->ve_tau[rsf->ve_np-1]/SEC_PER_YEAR,(double)k0dev);
-      if(k0dev > 5.0*k0tol)
-	SETERRQ(PETSC_COMM_WORLD,PETSC_ERR_USER,
-		"rsf_ve_setup: prony K0 deviates %.3e from the assembled elastic kernel (tol %g): convention mismatch?",
-		(double)k0dev,(double)k0tol);
-      if(k0dev > k0tol)
-	HEADNODE
-	  fprintf(stderr,"rsf_ve_setup: WARNING: prony K0 deviation %.3e exceeds %g\n",
-		  (double)k0dev,(double)k0tol);
-    }
+    PetscCall(rsf_ve_prony_gate(pf,medium->Is,medium,row,"K0",pfile,k0tol));
+    HEADNODE
+      fprintf(stderr,"rsf_ve_setup: mode 3 (%s): np %ld, tau %g ... %g yr\n",
+	      pfile,(long)rsf->ve_np,rsf->ve_tau[0]/SEC_PER_YEAR,
+	      rsf->ve_tau[rsf->ve_np-1]/SEC_PER_YEAR);
     for(p=0;p < rsf->ve_np;p++){
       for(i=0;i < medium->nrflt;i++){
 	for(j=0;j < medium->nrflt;j++)
@@ -276,6 +303,52 @@ PetscErrorCode rsf_ve_setup(struct interact_ctx *par, Vec negvpl_in,
       }
       PetscCall(MatAssemblyBegin(rsf->ve_C[p],MAT_FINAL_ASSEMBLY));
       PetscCall(MatAssemblyEnd(rsf->ve_C[p],MAT_FINAL_ASSEMBLY));
+    }
+    /*
+       SECOND FAMILY (nfam == 2): the same file continues with an In
+       gate block and the normal amplitude matrices.  It is READ only
+       when the elastic normal path is active, since otherwise sigma
+       does not evolve at all and hereditary normal terms would have
+       nothing to act on; conversely a run WITH -calc_sigma_dot and a
+       shear-only file would be an inconsistent medium (relaxing
+       shear, frozen normal) and is refused.
+    */
+    if(rsf->calc_sigma_dot && (nfam < 2))
+      SETERRQ(PETSC_COMM_WORLD,PETSC_ERR_USER,
+	      "rsf_ve_setup: -calc_sigma_dot needs a kernel file with normal blocks (header 'n np 2'); %s is shear only.  Regenerate it (bp3_ve_kernels.py ... -normal) or drop -calc_sigma_dot",
+	      pfile);
+    if((nfam == 2) && (!rsf->calc_sigma_dot)){
+      HEADNODE
+	fprintf(stderr,"rsf_ve_setup: NOTE: %s carries normal-traction kernels, ignored without -calc_sigma_dot\n",
+		pfile);
+    }else if(nfam == 2){
+      if(!medium->In)
+	SETERRQ(PETSC_COMM_WORLD,PETSC_ERR_ARG_WRONGSTATE,
+		"rsf_ve_setup: normal kernel family requested but the In matrix was not assembled");
+      for(p=0;p < rsf->ve_np;p++){
+	PetscCall(MatCreate(PETSC_COMM_WORLD,&rsf->ve_Cn[p]));
+	PetscCall(MatSetSizes(rsf->ve_Cn[p],medium->rn,PETSC_DECIDE,
+			      medium->nrflt,medium->nrflt));
+	PetscCall(MatSetType(rsf->ve_Cn[p],MATDENSE));
+	PetscCall(MatSetUp(rsf->ve_Cn[p]));
+      }
+      PetscCall(rsf_ve_prony_gate(pf,medium->In,medium,row,"N0",pfile,k0tol));
+      for(p=0;p < rsf->ve_np;p++){
+	for(i=0;i < medium->nrflt;i++){
+	  for(j=0;j < medium->nrflt;j++)
+	    if(fscanf(pf,"%lf",row+j) != 1)
+	      SETERRQ(PETSC_COMM_WORLD,PETSC_ERR_FILE_READ,
+		      "rsf_ve_setup: bad Cn_%ld row %ld",(long)p,(long)i);
+	  if((i >= medium->rs) && (i < medium->re)){
+	    for(j=0;j < medium->nrflt;j++)
+	      crow3[j] = row[j];
+	    PetscCall(MatSetValues(rsf->ve_Cn[p],1,&i,medium->nrflt,cidx3,crow3,INSERT_VALUES));
+	  }
+	}
+	PetscCall(MatAssemblyBegin(rsf->ve_Cn[p],MAT_FINAL_ASSEMBLY));
+	PetscCall(MatAssemblyEnd(rsf->ve_Cn[p],MAT_FINAL_ASSEMBLY));
+      }
+      rsf->ve_normal = PETSC_TRUE;
     }
     free(row);free(crow3);free(cidx3);
     fclose(pf);
@@ -540,12 +613,16 @@ PetscErrorCode rsf_ve_setup(struct interact_ctx *par, Vec negvpl_in,
 	      "rsf_ve_setup: held-out residual %.2e above -ve_fit_tol %.2e",
 	      (double)worst_res,(double)fit_tol);
   }else{
-    SETERRQ(PETSC_COMM_WORLD,PETSC_ERR_USER,"rsf_ve_setup: -ve_mode %ld undefined (1 or 2)",(long)mode);
+    SETERRQ(PETSC_COMM_WORLD,PETSC_ERR_USER,"rsf_ve_setup: -ve_mode %ld undefined (1, 2 or 3)",(long)mode);
   }
   /* state vectors, Is row layout */
   for(p=0;p < rsf->ve_np;p++){
     PetscCall(MatCreateVecs(medium->Is,NULL,&rsf->ve_h[p]));
     PetscCall(VecSet(rsf->ve_h[p],0.0));
+    if(rsf->ve_normal){
+      PetscCall(MatCreateVecs(medium->Is,NULL,&rsf->ve_hn[p]));
+      PetscCall(VecSet(rsf->ve_hn[p],0.0));
+    }
   }
   PetscCall(MatCreateVecs(medium->Is,&rsf->ve_vrel,&rsf->ve_work));
   PetscCall(VecDuplicate(rsf->ve_vrel,&rsf->ve_slip_prev));
@@ -574,6 +651,10 @@ PetscErrorCode rsf_ve_setup(struct interact_ctx *par, Vec negvpl_in,
       for(p=0;p < rsf->ve_np;p++){
 	PetscCall(MatMult(rsf->ve_C[p],rsf->ve_negvpl,rsf->ve_h[p]));
 	PetscCall(VecScale(rsf->ve_h[p],rsf->ve_tau[p]));
+	if(rsf->ve_normal){	/* same steady state, normal family */
+	  PetscCall(MatMult(rsf->ve_Cn[p],rsf->ve_negvpl,rsf->ve_hn[p]));
+	  PetscCall(VecScale(rsf->ve_hn[p],rsf->ve_tau[p]));
+	}
       }
       HEADNODE
 	fprintf(stderr,"rsf_ve_setup: memory states initialized at the backslip steady state (-ve_h_init 1)\n");
@@ -586,8 +667,9 @@ PetscErrorCode rsf_ve_setup(struct interact_ctx *par, Vec negvpl_in,
     fprintf(stderr,"rsf_ve_setup: VE ON, np %ld, rates ladder [yr]:",(long)rsf->ve_np);
     for(p=0;p < rsf->ve_np;p++)
       fprintf(stderr," %.3g",(double)(rsf->ve_tau[p]/SEC_PER_YEAR));
-    fprintf(stderr,"; h: exact-exponential, %s sink forcing\n",
-	    (rsf->ve_hstage)?("stage-consistent"):("frozen (lagged)"));
+    fprintf(stderr,"; h: exact-exponential, %s sink forcing, %s\n",
+	    (rsf->ve_hstage)?("stage-consistent"):("frozen (lagged)"),
+	    (rsf->ve_normal)?("SHEAR + NORMAL tractions"):("shear traction only"));
   }
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -652,11 +734,18 @@ PetscErrorCode rsf_ve_apply_sink(struct interact_ctx *par, Vec X, PetscReal time
       PetscCall(VecAXPY(rsf->tau_dot,-efac/rsf->ve_tau[p],rsf->ve_h[p]));
       PetscCall(MatMult(rsf->ve_C[p],rsf->ve_vrel,rsf->ve_work));
       PetscCall(VecAXPY(rsf->tau_dot,-(1.0-efac),rsf->ve_work));
+      if(rsf->ve_normal){	/* identical sink on the normal traction */
+	PetscCall(VecAXPY(rsf->sigma_dot,-efac/rsf->ve_tau[p],rsf->ve_hn[p]));
+	PetscCall(MatMult(rsf->ve_Cn[p],rsf->ve_vrel,rsf->ve_work));
+	PetscCall(VecAXPY(rsf->sigma_dot,-(1.0-efac),rsf->ve_work));
+      }
     }
   }else{
     for(p=0;p < rsf->ve_np;p++){
       efac = PetscExpReal(-dt/rsf->ve_tau[p]);
       PetscCall(VecAXPY(rsf->tau_dot,-efac/rsf->ve_tau[p],rsf->ve_h[p]));
+      if(rsf->ve_normal)
+	PetscCall(VecAXPY(rsf->sigma_dot,-efac/rsf->ve_tau[p],rsf->ve_hn[p]));
     }
   }
   PetscFunctionReturn(PETSC_SUCCESS);
@@ -697,6 +786,11 @@ PetscErrorCode rsf_ve_monitor(TS ts, PetscInt step, PetscReal time, Vec X, void 
     PetscCall(MatMult(rsf->ve_C[p],rsf->ve_vrel,rsf->ve_work));
     PetscCall(VecScale(rsf->ve_h[p],efac));
     PetscCall(VecAXPY(rsf->ve_h[p],rsf->ve_tau[p]*(1.0-efac),rsf->ve_work));
+    if(rsf->ve_normal){
+      PetscCall(MatMult(rsf->ve_Cn[p],rsf->ve_vrel,rsf->ve_work));
+      PetscCall(VecScale(rsf->ve_hn[p],efac));
+      PetscCall(VecAXPY(rsf->ve_hn[p],rsf->ve_tau[p]*(1.0-efac),rsf->ve_work));
+    }
   }
   rsf->ve_t0 = time;
   PetscFunctionReturn(PETSC_SUCCESS);

@@ -1,0 +1,32 @@
+#!/bin/ksh
+ns="5 10 50 100 500"
+
+cd /tmp
+
+echo "# n bc_code single_user_time mp_user_time"
+for n in $ns;do
+
+    makefault -n $n -m $n > geom.in 2> /dev/null
+    for bc in 0 10;do		# loop through types of BCs
+	echo 1 1 > bc.in
+	echo -5 5 51 -5 5 51 0 0 1 >> bc.in
+	echo -1 -1 -1 $bc 1 >> bc.in
+  
+	echo "interact -sl -pr 0 2> log.reg.dat" > tmp.$USER.$$..batch
+	chmod +x tmp.$USER.$$..batch
+	/bin/time -f %U tmp.$USER.$$..batch 2> tmp.$USER.$$..dat
+	read stime < tmp.$USER.$$..dat
+
+
+	echo "interact_mp -sl -pr 0 2> log.mp.dat" > tmp.$USER.$$..batch
+	/bin/time -f %U tmp.$USER.$$..batch 2> tmp.$USER.$$..dat
+	read mptime < tmp.$USER.$$..dat
+
+	echo $n $bc $stime $mptime
+
+    done
+
+    rm geom.in bc.in log.reg.dat log.mp.dat tmp.$USER.$$..batch tmp.$USER.$$..dat
+
+done
+cd -

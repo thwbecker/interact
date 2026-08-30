@@ -1,0 +1,87 @@
+#!/bin/ksh
+#
+# run a benchmark test suite for program interact
+# for now, just check simple rectangular and point 
+# sources
+#
+# after this script, run compare_results to compare the output
+# with the saved originals
+#
+modes=${1-"rect point twod"}
+
+# directory in which to put the output
+dir=test.$HOST.`date +"%m%d%y"`
+#dir=original
+ibinary=interact
+
+# how many patches?
+n=5
+m=3
+# what is the value for the boundary condition?
+bcval=1
+
+if [ ! -s $dir ];then
+    mkdir $dir
+fi
+echo $0: writing to $dir
+
+strikes="0 45 90 135";
+#modes="rect ";strikes="0";dips="90"
+
+
+cd $dir
+
+for mode in $modes
+do
+    for strike in $strikes
+    do
+	modecode=`echo $mode | gawk '{if($1=="point")print(1);else if($1=="twod")print(2);else  print(0)}'`
+	if [ $modecode -eq 2 ];then # 2-D
+	    dips="90"
+	else
+	    dips="90 45 0"
+	fi
+	for dip in $dips 
+	do
+		if [ $modecode -eq 0 ];then # half-space rectangle
+		    makefault -x 0 -y 0 -z -1 -w 1 -l 2 -dip $dip -strike $strike \
+			-n $n -m $m 2> /dev/null > geom.in
+		    bccodes="0 1 2 10 20 30 "
+		elif [ $modecode -eq 1 ];then # point source
+		    makefault -x 0 -y 0 -z -1 -w 1 -l 2 -dip $dip -strike $strike \
+			-n $n -m $m -point 2> /dev/null > geom.in
+		    bccodes="0 1 2 10 20 30"
+		elif [ $modecode -eq 2 ];then # twod
+		    makefault -x 0 -y 0 -z -1 -l 2 -dip $dip -strike $strike \
+			-n $n -twod > geom.in 2> /dev/null > geom.in
+		    bccodes="0 1 2 10 20 30 "
+		else
+		    echo $0: modecode error
+		    exit
+		fi
+		cp geom.in geom.$mode.$strike.$dip.in
+		gzip -f geom.$mode.$strike.$dip.in &
+		for bccode in $bccodes
+		do
+			suffix=$mode.$strike.$dip.$bccode
+			echo $0: working on $suffix
+			echo 1 1 > bc.in
+			echo -5 5 11 -5 5 11 -5 0 11 >> bc.in
+			echo -1 -1 -1 $bccode $bcval >> bc.in
+
+			$ibinary -sn 2> /dev/null
+
+			cp disp.out $suffix.disp
+			gzip -f $suffix.disp &
+			cp stress.out   $suffix.stress
+			gzip -f $suffix.stress &
+			cp flt.dat  $suffix.flt.dat
+			gzip -f $suffix.flt.dat &
+		done
+	done
+    done
+done
+cd -
+
+
+echo $0: wait for the gzip processes!

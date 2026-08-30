@@ -227,6 +227,20 @@ struct rsf_vars{
   PetscReal ve_tau[RSF_VE_MAX_NP]; /* relaxation times [s] */
   Mat       ve_C[RSF_VE_MAX_NP];   /* amplitude operators [Pa/m], Is layout */
   Vec       ve_h[RSF_VE_MAX_NP];   /* memory states [Pa], Is row layout */
+  /*
+     OPTIONAL SECOND FAMILY: hereditary relaxation of the FAULT
+     NORMAL traction, on the SAME tau ladder (the relaxation
+     spectrum is a property of the medium, not of the traction
+     component).  Only for external kernels (-ve_mode 3) whose file
+     carries the normal blocks, and only when the elastic normal
+     path is active (-calc_sigma_dot): the two switch on together,
+     so sigma is either fully elastic-plus-hereditary or not
+     evolving at all, never a mix.  ve_normal == PETSC_FALSE leaves
+     every VE code path bit-identical to the shear-only version
+  */
+  PetscBool ve_normal;		 /* normal family active */
+  Mat       ve_Cn[RSF_VE_MAX_NP];  /* normal amplitudes [Pa/m], In layout */
+  Vec       ve_hn[RSF_VE_MAX_NP];  /* normal memory states [Pa] */
   Vec       ve_slip_prev;	/* slip at the last h update [m] */
   Vec       ve_negvpl;		/* -vpl per patch [m/s] (loading reference) */
   Vec       ve_vrel,ve_work;	/* scratch, Is row layout */

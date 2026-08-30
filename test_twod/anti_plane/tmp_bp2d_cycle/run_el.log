@@ -1,0 +1,34 @@
+read_geometry: 2D 0 (I/II) 40 (III), 0 points, 0 triangles, 0 iquads, and 0 regular quads
+read_geometry: 2D mode III (half plane)
+/home/twb/progs/src/interact/bin/rsf_solve: read geometry from geom_bp2d.in, 40 patches, on 1 cores
+/home/twb/progs/src/interact/bin/rsf_solve: G 3.204000e+10 Pa cs 3464 m/s eta 4.624711e+06 f0 0.6 dc 0.14 m v0 1.000e-06 vpl 1.000e-09 m/s
+/home/twb/progs/src/interact/bin/rsf_solve: sigma0 2.500000e+07 tau0 1.500000e+07 Pa vinit 1.000e-09 m/s rand_amp 0
+/home/twb/progs/src/interact/bin/rsf_solve: rtol 1.0e-04 dt_init 1 s dt_max 1e+10 s stop 600 yr evol law: 1
+read_rsf: read a and b values, on averag 0.0256 and 0.03
+/home/twb/progs/src/interact/bin/rsf_solve: read per-cell initial tau,vel from ic_bp2d.in
+calc_petsc_Isn_matrices: creating dense matrix for stress mode 0 stress type 0
+calc_petsc_Isn_matrices: core 000/001: assigning dense row     0 to    40
+calc_petsc_Isn_matrices: hmat_storage backend dense m 40 n 40 stored_scalars 1600 dense_ratio 1 mbytes 0.012207
+rsf_solve: Is (shear) interaction matrix build wall =       0.0008 s
+rsf_finalize_monitor_and_event: tracked 9 events (|v| through 1.000e-03 m/s)
+TS Object: 1 MPI process
+  type: rk
+    RK type 3bs
+    Order: 3
+    FSAL property: yes
+    Abscissa c =  0.000000  0.500000  0.750000  1.000000 
+  initial time step=1.
+  maximum steps=1000000000
+  maximum time=1.89346e+10
+  total number of RHS function evaluations=15510
+  total number of rejected steps=336
+  using relative error tolerance of 0.0001, using vector of absolute error tolerances
+  TSAdapt Object: 1 MPI process
+    type: basic
+    safety factor 0.9
+    extra safety factor after step rejection 0.5
+    clip fastest increase 2.
+    clip fastest decrease 0.5
+    maximum allowed timestep 6.31152e+07
+    minimum allowed timestep 0.
+    maximum solution absolute value to be ignored -1.

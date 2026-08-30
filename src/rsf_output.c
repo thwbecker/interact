@@ -655,6 +655,10 @@ PetscErrorCode rsf_write_checkpoint(TS ts, Vec X, struct rsf_out_ctx *uc)
      checkpoints stay compatible */
   PetscCall(VecSetValue(meta,9,(PetscScalar)uc->par->medium->rsf->ve_np,INSERT_VALUES));
   PetscCall(VecSetValue(meta,10,(PetscScalar)uc->par->medium->rsf->ve_t0,INSERT_VALUES));
+  /* slot 11: second (normal-traction) VE memory family present?  0 in
+     every checkpoint written before that family existed, so old
+     checkpoints keep loading unchanged */
+  PetscCall(VecSetValue(meta,11,(PetscScalar)((uc->par->medium->rsf->ve_normal)?(1):(0)),INSERT_VALUES));
   PetscCall(VecAssemblyBegin(meta));
   PetscCall(VecAssemblyEnd(meta));
   snprintf(tmpf,sizeof(tmpf),"%s.tmp",uc->ckpt_file);
@@ -666,6 +670,9 @@ PetscErrorCode rsf_write_checkpoint(TS ts, Vec X, struct rsf_out_ctx *uc)
     PetscInt p;
     for(p=0;p < uc->par->medium->rsf->ve_np;p++)
       PetscCall(VecView(uc->par->medium->rsf->ve_h[p],viewer));
+    if(uc->par->medium->rsf->ve_normal)
+      for(p=0;p < uc->par->medium->rsf->ve_np;p++)
+	PetscCall(VecView(uc->par->medium->rsf->ve_hn[p],viewer));
     PetscCall(VecView(uc->par->medium->rsf->ve_slip_prev,viewer));
   }
   PetscCall(PetscViewerDestroy(&viewer));
@@ -730,6 +737,14 @@ PetscErrorCode rsf_read_checkpoint(const char *file, Vec X, struct rsf_out_ctx *
 	      (long)cnp,(long)rsf->ve_np);
     if(rsf->ve_np > 0)
       rsf->ve_t0 = (PetscReal)mv[10];
+    {				/* normal-family flag (slot 11) */
+      PetscInt cnrm = (PetscInt)mv[11];
+      PetscInt rnrm = (rsf->ve_normal)?(1):(0);
+      if(cnrm != rnrm)
+	SETERRQ(PETSC_COMM_WORLD,PETSC_ERR_ARG_INCOMP,
+		"rsf_read_checkpoint: checkpoint %s a normal-traction VE memory family, run %s one",
+		(cnrm)?("has"):("has no"),(rnrm)?("has"):("has no"));
+    }
   }
   PetscCall(VecRestoreArrayRead(mseq,&mv));
   PetscCall(VecScatterDestroy(&scat));
@@ -759,6 +774,9 @@ PetscErrorCode rsf_read_checkpoint(const char *file, Vec X, struct rsf_out_ctx *
     PetscInt p;
     for(p=0;p < medium->rsf->ve_np;p++)
       PetscCall(VecLoad(medium->rsf->ve_h[p],viewer));
+    if(medium->rsf->ve_normal)
+      for(p=0;p < medium->rsf->ve_np;p++)
+	PetscCall(VecLoad(medium->rsf->ve_hn[p],viewer));
     PetscCall(VecLoad(medium->rsf->ve_slip_prev,viewer));
   }
   PetscCall(PetscViewerDestroy(&viewer));

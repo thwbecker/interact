@@ -1,4 +1,5 @@
 #!/bin/bash
+hmat_flags="-use_hmatrix 4 -hmmvp_inorm 3 -hmmvp_tol 1e-4"
 
 mpirun -bind-to core -np 8 \
        rsf_solve -geom_file geom_zelst.in \
@@ -9,5 +10,5 @@ mpirun -bind-to core -np 8 \
        -f0 0.6 -v0 1e-6 -vpl 1e-9 \
        -rsf_catalog -rupture_vth 0.1 -ts_rk_type 3bs -rtol 1e-5 \
        -stop_time_yr 5000  -ts_max_steps 50000000 \
-       -rsf_checkpoint 50000
+       -rsf_checkpoint 50000 -rsf_monitor_by_group $hmat_flags
 

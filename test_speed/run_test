@@ -1,0 +1,26 @@
+#!/bin/bash
+
+for quad in 0 1;do
+
+    #n=30
+    #n=60
+    n=100
+    if [ $quad -eq 1 ];then
+	m=$n				# total number is n*m
+	makefault -n $n -m $m > geom.in 2> /dev/null
+    else
+	((m=n/2))			# triangles will be twice the total
+	makefault -n $n -m $m  2> /dev/null | patchquad2patchtri > geom.in 2> /dev/null
+    fi
+    cat <<EOF > bc.in
+1 0 
+-1 -1 -1 0 1
+EOF
+    
+    for c in gcc mixed;do
+	echo quad $quad c $c
+	echo "interact.$c 2> /dev/null" > tmp.script;chmod +x tmp.script
+	/usr/bin/time --format "%U"  ./tmp.script
+	rm tmp.script
+    done
+done

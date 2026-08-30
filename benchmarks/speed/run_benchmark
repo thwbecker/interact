@@ -1,0 +1,82 @@
+#!/bin/ksh
+#
+#
+#
+# results for 
+# 
+# cases                                             :      1      2       3      4      5     6
+# 
+# arthur: O200, cc/f77                              :   6.08    148   16886   3.17 146.51
+# geowuff: Athlon, 1400Mhz, gcc/g77 mix, ATLAS blas :   0.68     31    8639   1.06   70.7 41524
+# IBM t30: P4, 1600MHz, icc/ifc mix, ATLAS blas     :   4.92     99           0.77   32.1
+# IBM T30: P4, 1600Mhz, gcc/g77 mix, ATLAS blas     :   4.86     97           1.17   38.1
+# sioviz: SGI, ip35, single processor               :   3.59     76    6771   1.46   60.4 31747
+# marlin: SUN                                       :   3.62    147 24263.7   4.17  209.6
+# marlin: SUN, two processors                       :   9.12    299 24302.7   6.29  229.0
+
+program=${1-interact}
+
+types=${2-"1 2 3 4 5 6"}
+n=3
+
+
+owd=`pwd`
+wdir=/tmp/interact.benchmark.$USER.$HOST/
+
+
+mkdir $wdir 2> /dev/null
+
+cd $wdir
+
+
+for type in $types
+do
+    rm mean.dat 2> /dev/null
+    if [[ ! -s $owd/bc.$type || ! -s $owd/geom.$type ]];then
+	echo $0: input files not found, type: $type
+	exit
+    fi
+    cp $owd/bc.$type bc.in 
+    cp $owd/geom.$type geom.in
+    if [ $type -gt 3 ];then
+	cp $owd/smlin.in .
+    else
+	rm smlin.in 2> /dev/null
+    fi
+    rm timeds.dat 2> /dev/null
+    lfile=$owd/log.$program.$HOST.$type.dat
+    i=1
+    while [ $i -le $n ];do
+
+	rm tmp.log /tmp/$program.$HOST.$USER.log.dat 2> /dev/null
+	if [ `echo $ARCH | awk '{if($1=="i686")print(1);else print(0)}'` \
+	    -eq 1 ];then
+	      # LINUX
+	    /usr/bin/time -p $owd/run_batch $program   2> tmp.log
+	else
+	    timex $owd/run_batch $program   2> tmp.log
+	fi
+	if [ ! -s /tmp/$program.$HOST.$USER.log.dat ];then
+	    echo $0: error, no log file produced
+	    exit
+	fi
+	gawk '{if($1=="user")print($2)}' tmp.log | \
+	    gawk -f timefmt2sec.awk >> timeds.dat
+	
+	echo $0: type $type run $i time: `tail -1 timeds.dat`
+	((i=i+1))
+    done
+    cp /tmp/$program.$HOST.$USER.log.dat $lfile
+    meanp=`gawk -f mean.awk timeds.dat`
+    echo $0: type: $type average time: $meanp
+    echo $meanp >> mean.dat
+done
+echo host: $HOST binary: $program arch: $ARCH types: $types \
+    times: `gawk '{for(i=1;i<=NF;i++)printf("%g ",$i);\
+	printf("\n");}' mean.dat` >> $owd/results.dat
+tail -1 $owd/results.dat
+cd $owd
+rm -r $wdir
+
+
+

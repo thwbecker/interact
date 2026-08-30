@@ -1,0 +1,41 @@
+read_geometry: 2D 60 (I/II) 0 (III), 0 points, 0 triangles, 0 iquads, and 0 regular quads
+read_geometry: 2D mode I/II approximation: plane strain (half plane)
+/home/twb/progs/src/interact/bin/rsf_solve: read geometry from bp3_geom.in, 60 patches, on 1 cores
+/home/twb/progs/src/interact/bin/rsf_solve: G 3.204000e+10 Pa cs 3464 m/s eta 4.624711e+06 f0 0.6 dc 0.008 m v0 1.000e-06 vpl 1.000e-09 m/s
+/home/twb/progs/src/interact/bin/rsf_solve: sigma0 5.000000e+07 tau0 3.000000e+07 Pa vinit 1.000e-09 m/s rand_amp 0
+/home/twb/progs/src/interact/bin/rsf_solve: rtol 1.0e-04 dt_init 1 s dt_max 1e+10 s stop 1500 yr evol law: 1
+read_rsf: read a and b values, on averag 0.0188059 and 0.015
+/home/twb/progs/src/interact/bin/rsf_solve: read per-cell initial tau,vel from bp3_ic.in
+calc_petsc_Isn_matrices: creating dense matrix for stress mode 0 stress type 0
+calc_petsc_Isn_matrices: core 000/001: assigning dense row     0 to    60
+calc_petsc_Isn_matrices: hmat_storage backend dense m 60 n 60 stored_scalars 3600 dense_ratio 1 mbytes 0.0274658
+rsf_solve: Is (shear) interaction matrix build wall =       0.0008 s
+rsf_ve_setup: mode 3 (bp3_tm400.prony): np 5, tau 200 ... 8000 yr, K0 rel dev from Is 6.522e-03
+rsf_ve_setup: memory states initialized at the backslip steady state (-ve_h_init 1)
+rsf_ve_setup: VE ON, np 5, rates ladder [yr]: 200 503 1.26e+03 3.18e+03 8e+03; h: exact-exponential, stage-consistent sink forcing
+rsf_init_catalog: event catalog on (rupture-front |v| = 1.000e-03 m/s)
+rsf_write_checkpoint: step 000000020000 t  9.94347e+02 yr dt 1.181e+05 s -> rsf_checkpoint.bin
+rsf_write_checkpoint: step 000000035641 t  1.50193e+03 yr dt 6.681e+07 s -> rsf_checkpoint.bin
+rsf_finalize_monitor_and_event: tracked 496 events (|v| through 1.000e-03 m/s)
+rsf_finalize_catalog: wrote event catalog (248 completed events)
+TS Object: 1 MPI process
+  type: rk
+    RK type 3bs
+    Order: 3
+    FSAL property: yes
+    Abscissa c =  0.000000  0.500000  0.750000  1.000000 
+  initial time step=1.
+  maximum steps=2000000000
+  maximum time=4.73364e+10
+  total number of RHS function evaluations=157206
+  total number of rejected steps=16162
+  using relative error tolerance of 0.0001, using vector of absolute error tolerances
+  TSAdapt Object: 1 MPI process
+    type: basic
+    safety factor 0.9
+    extra safety factor after step rejection 0.5
+    clip fastest increase 2.
+    clip fastest decrease 0.5
+    maximum allowed timestep 3.15576e+08
+    minimum allowed timestep 0.
+    maximum solution absolute value to be ignored -1.

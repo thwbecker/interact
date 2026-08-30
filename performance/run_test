@@ -1,0 +1,27 @@
+#!/bin/ksh
+#
+# runs a performance test with standard problems
+#
+prob=${1-1}
+
+if [ $prob -eq 1 ];then
+	makefault -dip 70 -strike 43 -n 100 -m 100 > geom.in
+	echo 1 1 > bc.in
+	echo -5 5 11 -5 5 11 -5 0 11 >> bc.in
+	echo -1 -1 -1 0 1 >> bc.in
+	echo -1 -1 -1 1 1 >> bc.in
+	echo -1 -1 -1 2 1 >> bc.in
+	time interact
+fi
+#
+# arthur, with new dc3d
+#
+#real    14m44.12s
+#user    14m38.64s
+#sys     0m0.88s
+#878.953u 0.950s 14:27.14 101.4% 0+0k 25+95io 15pf+0w
+# with old...
+#real    14m46.20s
+#user    14m40.73s
+#sys     0m0.90s
+#881.049u 0.970s 14:29.24 101.4% 0+0k 21+95io 9pf+0w

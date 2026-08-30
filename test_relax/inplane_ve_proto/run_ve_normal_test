@@ -1,0 +1,103 @@
+#!/bin/bash
+#
+# run_ve_normal_test: gate suite for HEREDITARY NORMAL-STRESS
+# relaxation (rsf_solve -ve_mode 3 with a two-family kernel file).
+#
+# Physics: on a DIPPING fault, slip changes the fault-normal traction
+# as well as the shear traction, and when the substrate relaxes BOTH
+# evolve.  The kernel file therefore carries a second family of
+# amplitude matrices on the same tau ladder, and rsf_solve activates
+# it exactly when the elastic normal path is on (-calc_sigma_dot).
+# (2-D ANTIPLANE geometries have no normal-stress change at all,
+# which is why -ve_mode 1 and 2 still refuse -calc_sigma_dot.)
+#
+# Gates:
+#   N1 file/format: a two-family file is read; a shear-only file with
+#      -calc_sigma_dot is REFUSED (relaxing shear + frozen normal
+#      would be an inconsistent medium); a two-family file without
+#      -calc_sigma_dot is accepted with the normal blocks ignored
+#   N2 conventions: the N0 block agrees with the assembled In matrix
+#      (independent implementations; a sign flip reads exactly 2.0)
+#   N3 regression: with the normal family OFF, results are unchanged
+#
+# usage: run_ve_normal_test [workdir] [ds_km] [tM_yr]
+#        defaults          tmp_ve_normal 1.0   45
+#
+bindir=`cd ../../bin && pwd`
+sdir=`pwd`
+gendir=`cd ../../seas_bp_tests/bp3 && pwd`
+dir=${1-tmp_ve_normal}
+ds=${2-1.0}
+tm=${3-45}
+mkdir -p $dir && cd $dir
+fail=0
+if [ ! -f bp3_geom.in ];then
+    python3 $gendir/gen_bp3.py $ds 60 bp3 > gen.log
+fi
+if [ ! -f bp3_vn.prony ];then
+    echo "$0: generating two-family kernels (minutes; cached and resumable)"
+    python3 $sdir/bp3_ve_kernels.py bp3_geom.in 40e3 $tm bp3_vn.prony 5 -1 1 1 \
+	> kern.log 2>&1 || { echo "$0: kernel generation FAILED"; exit 1; }
+fi
+grep -E "held-out" kern.log 2>/dev/null | sed 's/^/  /'
+# a shear-only file with the same geometry, for the guard and regression tests
+python3 - <<'PY'
+lines = open("bp3_vn.prony").readlines()
+hdr = [l for l in lines if l.startswith("#")]
+body = [l for l in lines if not l.startswith("#")]
+n, npr, nfam = (int(x) for x in body[0].split())
+open("bp3_shear.prony", "w").writelines(
+    hdr + [f"{n} {npr} 1\n", body[1]] + body[2:2 + (npr + 1)*n])
+PY
+common="-geom_file bp3_geom.in -rsf_file bp3_rsf.dat -rsf_ic_file bp3_ic.in \
+ -dc 0.008 -sigma_init 5e7 -f0 0.6 -v0 1e-6 -vpl 1e-9 -shear_modulus 3.204e10 \
+ -s_wave_speed 3464 -rtol 1e-4 -ts_rk_type 3bs -ts_max_steps 2000000000 \
+ -dt_monitor_yr 10 -track_events -rsf_catalog -vel_event 1e-3 -ve_h_init 1"
+
+echo "=== N1 format and guards"
+$bindir/rsf_solve $common -stop_time_yr 2 -ve_mode 3 \
+    -ve_prony_file bp3_shear.prony -calc_sigma_dot > g1.log 2>&1
+if grep -q "needs a kernel file with normal blocks" g1.log;then
+    echo "  shear-only file + -calc_sigma_dot REFUSED  PASS"
+else
+    echo "  shear-only file + -calc_sigma_dot not refused  FAIL"; fail=1
+fi
+$bindir/rsf_solve $common -stop_time_yr 2 -ve_mode 3 \
+    -ve_prony_file bp3_vn.prony > g2.log 2>&1
+if grep -q "ignored without -calc_sigma_dot" g2.log;then
+    echo "  two-family file without -calc_sigma_dot: normal ignored  PASS"
+else
+    echo "  two-family file without -calc_sigma_dot mishandled  FAIL"; fail=1
+fi
+$bindir/rsf_solve $common -stop_time_yr 2 -ve_mode 3 \
+    -ve_prony_file bp3_vn.prony -calc_sigma_dot > g3.log 2>&1
+if grep -q "SHEAR + NORMAL tractions" g3.log;then
+    echo "  two-family file with -calc_sigma_dot: normal family ON  PASS"
+else
+    echo "  two-family file with -calc_sigma_dot failed  FAIL"; fail=1
+fi
+
+echo "=== N2 conventions (gates vs the assembled operators)"
+for b in K0 N0;do
+    d=`awk -v b=$b '$0 ~ b" block"{print $NF}' g3.log`
+    ok=`awk -v d="$d" 'BEGIN{print (d+0 < 0.05) ? 1 : 0}'`
+    if [ "$ok" = "1" ];then echo "  $b $d within 5 percent of the assembled operator  PASS"
+    else echo "  $b deviation $d too large  FAIL"; fail=1; fi
+done
+
+echo "=== N3 regression: normal family OFF is unchanged"
+rm -rf r1 r2 && mkdir -p r1 r2
+( cd r1 && $bindir/rsf_solve $common -geom_file ../bp3_geom.in \
+    -rsf_file ../bp3_rsf.dat -rsf_ic_file ../bp3_ic.in -stop_time_yr 300 \
+    -ve_mode 3 -ve_prony_file ../bp3_shear.prony > run.log 2>&1 )
+( cd r2 && $bindir/rsf_solve $common -geom_file ../bp3_geom.in \
+    -rsf_file ../bp3_rsf.dat -rsf_ic_file ../bp3_ic.in -stop_time_yr 300 \
+    -ve_mode 3 -ve_prony_file ../bp3_vn.prony > run.log 2>&1 )
+if cmp -s r1/rsf_catalog.dat r2/rsf_catalog.dat;then
+    echo "  shear-only vs two-family (normal inactive): BIT-IDENTICAL  PASS"
+else
+    echo "  normal-inactive runs differ  FAIL"; fail=1
+fi
+[ $fail -eq 0 ] && echo "run_ve_normal_test: ALL GATES PASS" || \
+    echo "run_ve_normal_test: FAILURES (see above)"
+exit $fail
