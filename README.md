@@ -76,6 +76,30 @@ boundary-element cluster to within ~0.01 yr; 2 km matches HBI exactly
 (236.8 yr). Per-cell initial conditions and D_RS are supplied via
 -rsf_ic_file / -rsf_dc_file; inputs and a generator are in seas_bp_tests/bp5/.
 
+Benchmark and viscoelastic test directories:
+
+- `seas_bp_tests/` SCEC SEAS benchmarks: bp3 (2-D in-plane dipping
+  fault, quasi-dynamic; also the station time-series output), bp4,
+  bp5, bp_thrust.  The 2-D ANTIPLANE benchmark BP1-QD is part of the
+  antiplane cycle suite, `test_twod/anti_plane_cycles/` (recurrence
+  77.9-78.2 yr at 200-25 m cells against the community 78.2 yr).
+- `test_twod/anti_plane/` antiplane viscoelastic cycles: the
+  validation ledger (README_ve_antiplane.md), the loading-condition
+  map (ve_loading_conditions.md), the Kato (2002) and Miyake & Noda
+  (2019) replications (noda_mn_tests.md), and the off-fault
+  stress cross-section tools.
+- `test_relax/inplane_ve_proto/` 2-D PLANE-STRAIN viscoelastic
+  kernels (elastic plate over a Maxwell half-space, with gravity):
+  analytic and literature gates (run_inplane_proto_test, including
+  Rundle 1982 relaxation with and without gravity), the PSGRN
+  cross-check, and the generator that writes -ve_prony_file kernels
+  for rsf_solve -ve_mode 3.
+- `test_twod/ve_cycle_demos/` runnable demos reproducing published
+  viscoelastic cycle systematics (antiplane -ve_mode 1 and in-plane
+  -ve_mode 3).
+- `tools/psgrn/` installer and notes for Wang's PSGRN/PSCMP, used as
+  a reference solution and as the intended 3-D kernel generator.
+
 ### Source layout
 
 Two main programs are built from `src/`: `interact` (static fault

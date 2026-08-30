@@ -17,7 +17,7 @@
   the assembled Is matrix).  This is the generator-agnostic
   rsf_ve_implementation_plan.md machinery: the dynamics below consume
   only rates and amplitude operators, so 3-D kernels (e.g. from the
-  plate-over-Maxwell propagator, via a future -ve_prony_file) plug in
+  plate-over-Maxwell propagator, via -ve_prony_file, mode 3) plug in
   without touching the time stepping.
 
   h treatment: the memory-light "step" mode (plan step 5): h lives
@@ -53,7 +53,12 @@
        the operator-level version of the ve_sp_cycle testbed.
 
   options (all parsed here):
-    -ve_mode <1|2>         generator (required to switch VE on)
+    -ve_mode <1|2|3>       generator (required to switch VE on);
+                           3 = external kernel from -ve_prony_file
+    -ve_prony_file <f>     mode 3: shared taus + per-pair amplitude
+                           matrices + a K0 block for the gate below
+    -ve_prony_k0tol <t>    mode 3: relative tolerance of the K0 vs Is
+                           consistency gate (default 0.05 warn, 5x abort)
     -ve_tmaxwell_yr <t>    Maxwell time of the relaxing medium [yr]
     -ve_plate_h <H>        elastic plate thickness [m] (mode 2)
     -ve_g2fac <f>          substrate/plate rigidity ratio (mode 2, default 1)
