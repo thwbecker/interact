@@ -1,0 +1,22 @@
+#!/bin/bash
+#
+# run_inplane_proto_test: gate suite for the standalone PLANE-STRAIN
+# (in-plane / dip-slip / thrust cross section) viscoelastic kernel
+# prototype.  See README_inplane_ve_proto.md.  All gates must PASS.
+#
+#   T0: analytic basis / ODE / source-jump / matcher exactness
+#   T1: elastic anchors (interact Okada, tight; FEM, soft)
+#   T2: uniform-Maxwell correspondence, sympy-exact time factor
+#   T3: elastic plate over Maxwell substrate: unrelaxed and relaxed
+#       limits, interface traction continuity in time, monotonicity
+#
+sdir=`dirname $0`
+cd $sdir
+fail=0
+for t in t0_basis.py t1_elastic.py t2_maxwell_corr.py t3_plate_maxwell.py t4_gravity.py;do
+    echo "=== $t"
+    python3 $t || fail=1
+done
+[ $fail -eq 0 ] && echo "run_inplane_proto_test: ALL GATES PASS" || \
+    echo "run_inplane_proto_test: FAILURES (see above)"
+exit $fail

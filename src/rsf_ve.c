@@ -108,18 +108,20 @@ PetscErrorCode rsf_ve_setup(struct interact_ctx *par, Vec negvpl_in,
   if((!flg) || (mode == 0))
     PetscFunctionReturn(PETSC_SUCCESS); /* VE off: nothing changes */
   PetscCall(PetscOptionsGetReal(NULL,NULL,"-ve_tmaxwell_yr",&tm_yr,&flg));
-  if((!flg)||(tm_yr <= 0.0))
+  if(((!flg)||(tm_yr <= 0.0)) && (mode != 3))
     SETERRQ(PETSC_COMM_WORLD,PETSC_ERR_USER,
 	    "rsf_ve_setup: -ve_mode %ld requires -ve_tmaxwell_yr > 0",(long)mode);
   PetscCall(PetscOptionsGetInt(NULL,NULL,"-ve_np",&np,NULL));
   PetscCall(PetscOptionsGetReal(NULL,NULL,"-ve_plate_h",&plate_h,NULL));
   PetscCall(PetscOptionsGetReal(NULL,NULL,"-ve_g2fac",&g2fac,NULL));
-  /* both implemented generators require pure 2-D antiplane geometry */
-  for(i=0;i < medium->nrflt;i++)
-    if(fault[i].type != TWO_DIM_ANTIPLANE)
-      SETERRQ(PETSC_COMM_WORLD,PETSC_ERR_SUP,
-	      "rsf_ve_setup: -ve_mode %ld: patch %ld type %i, only 2-D antiplane elements are wired up (3-D kernels: future -ve_prony_file)",
-	      (long)mode,(long)i,(int)fault[i].type);
+  /* the two internal generators require pure 2-D antiplane geometry;
+     mode 3 takes its kernel from a file and is element-agnostic */
+  if(mode != 3)
+    for(i=0;i < medium->nrflt;i++)
+      if(fault[i].type != TWO_DIM_ANTIPLANE)
+	SETERRQ(PETSC_COMM_WORLD,PETSC_ERR_SUP,
+		"rsf_ve_setup: -ve_mode %ld: patch %ld type %i, only 2-D antiplane elements are wired up (external kernels: -ve_mode 3 -ve_prony_file)",
+		(long)mode,(long)i,(int)fault[i].type);
   if(rsf->calc_sigma_dot)
     SETERRQ(PETSC_COMM_WORLD,PETSC_ERR_SUP,
 	    "rsf_ve_setup: VE normal-stress coupling not implemented (antiplane has none); drop -calc_sigma_dot");
@@ -134,6 +136,144 @@ PetscErrorCode rsf_ve_setup(struct interact_ctx *par, Vec negvpl_in,
     HEADNODE
       fprintf(stderr,"rsf_ve_setup: mode 1 (uniform Maxwell, antiplane): single EXACT pole, tau = %g yr, C_1 = Is\n",
 	      tm_yr);
+  }else if(mode == 3){
+    /*
+       GENERATOR-AGNOSTIC EXTERNAL KERNEL (-ve_prony_file): shared
+       relaxation times and per-pair amplitude matrices fitted
+       OUTSIDE this code from step responses of any layered/graded
+       medium (current generator: the plane-strain plate-over-Maxwell
+       + gravity prototype in test_relax/inplane_ve_proto; the same
+       file contract is intended for PSGRN/PSCMP-derived 3-D layered
+       viscoelastic-gravitational kernels).  ASCII format:
+
+	 # comment lines
+	 n np
+	 tau_1 ... tau_np           [s]
+	 K0 matrix, n rows x n cols [Pa/m]  (generator's ELASTIC kernel)
+	 C_1 matrix ... C_np matrix [Pa/m]
+
+       K(t) = C_inf + sum_p C_p exp(-t/tau_p) with C_inf implicit
+       (= assembled elastic Is - sum_p C_p), exactly as modes 1/2.
+       K0 is used only for a consistency gate against the assembled
+       elastic operator: the generator and this code must agree on
+       the elastic kernel (norm tolerance -ve_prony_k0tol, default
+       0.05 warn / 5x abort), which pins discretization, units,
+       orientation and sign conventions in one check.
+       SHEAR ONLY: normal-stress hereditary relaxation is not
+       implemented (-calc_sigma_dot is refused above).
+    */
+    char pfile[300];
+    FILE *pf;
+    PetscReal k0tol = 0.05;
+    PetscInt nf,npf;
+    PetscReal *row,k0dev,k0nrm,dv;
+    PetscScalar *crow3;
+    PetscInt *cidx3;
+    PetscCall(PetscOptionsGetString(NULL,NULL,"-ve_prony_file",pfile,
+				    sizeof(pfile),&flg));
+    if(!flg)
+      SETERRQ(PETSC_COMM_WORLD,PETSC_ERR_USER,
+	      "rsf_ve_setup: -ve_mode 3 requires -ve_prony_file <file>");
+    PetscCall(PetscOptionsGetReal(NULL,NULL,"-ve_prony_k0tol",&k0tol,NULL));
+    pf = fopen(pfile,"r");
+    if(!pf)
+      SETERRQ(PETSC_COMM_WORLD,PETSC_ERR_FILE_OPEN,
+	      "rsf_ve_setup: cannot open %s",pfile);
+    {
+      char lb[65536];
+      /* skip comments */
+      do{
+	if(!fgets(lb,sizeof(lb),pf))
+	  SETERRQ(PETSC_COMM_WORLD,PETSC_ERR_FILE_READ,"rsf_ve_setup: truncated prony file");
+      }while(lb[0] == '#');
+      if(sscanf(lb,"%ld %ld",(long *)&nf,(long *)&npf) != 2)
+	SETERRQ(PETSC_COMM_WORLD,PETSC_ERR_FILE_READ,"rsf_ve_setup: bad prony header");
+      if(nf != medium->nrflt)
+	SETERRQ(PETSC_COMM_WORLD,PETSC_ERR_USER,
+		"rsf_ve_setup: prony file n %ld != %ld patches",(long)nf,(long)medium->nrflt);
+      if((npf < 1)||(npf > VE_MAX_NP))
+	SETERRQ(PETSC_COMM_WORLD,PETSC_ERR_USER,
+		"rsf_ve_setup: prony file np %ld out of [1,%d]",(long)npf,VE_MAX_NP);
+      rsf->ve_np = npf;
+      for(p=0;p < npf;p++)
+	if(fscanf(pf,"%lf",&rsf->ve_tau[p]) != 1)
+	  SETERRQ(PETSC_COMM_WORLD,PETSC_ERR_FILE_READ,"rsf_ve_setup: bad tau list");
+    }
+    for(p=0;p < rsf->ve_np;p++){
+      PetscCall(MatCreate(PETSC_COMM_WORLD,&rsf->ve_C[p]));
+      PetscCall(MatSetSizes(rsf->ve_C[p],medium->rn,PETSC_DECIDE,
+			    medium->nrflt,medium->nrflt));
+      PetscCall(MatSetType(rsf->ve_C[p],MATDENSE));
+      PetscCall(MatSetUp(rsf->ve_C[p]));
+    }
+    row = (PetscReal *)malloc((size_t)medium->nrflt*sizeof(PetscReal));
+    crow3 = (PetscScalar *)malloc((size_t)medium->nrflt*sizeof(PetscScalar));
+    cidx3 = (PetscInt *)malloc((size_t)medium->nrflt*sizeof(PetscInt));
+    if((!row)||(!crow3)||(!cidx3))MEMERROR("rsf_ve_setup");
+    for(j=0;j < medium->nrflt;j++)
+      cidx3[j] = j;
+    /* K0 gate: file's elastic kernel vs the assembled Is, Frobenius */
+    k0dev = k0nrm = 0.0;
+    for(i=0;i < medium->nrflt;i++){
+      for(j=0;j < medium->nrflt;j++)
+	if(fscanf(pf,"%lf",row+j) != 1)
+	  SETERRQ(PETSC_COMM_WORLD,PETSC_ERR_FILE_READ,"rsf_ve_setup: bad K0 row %ld",(long)i);
+      if((i >= medium->rs) && (i < medium->re)){
+	PetscInt ncols;
+	const PetscInt *cols;
+	const PetscScalar *vals;
+	PetscCall(MatGetRow(medium->Is,i,&ncols,&cols,&vals));
+	for(j=0;j < ncols;j++){
+	  /* skip near-diagonal entries: external generators represent
+	     sources as regularized distributions and cannot produce
+	     the singular elastic self/neighbor terms; those live in
+	     the assembled Is (implicit C_inf) anyway.  The RELAXATION
+	     amplitudes C_p are regular everywhere and are used in
+	     full. */
+	  if(labs((long)i - (long)cols[j]) <= 2)
+	    continue;
+	  dv = PetscRealPart(vals[j]) - row[cols[j]];
+	  k0dev += dv*dv;
+	  k0nrm += PetscRealPart(vals[j])*PetscRealPart(vals[j]);
+	}
+	PetscCall(MatRestoreRow(medium->Is,i,&ncols,&cols,&vals));
+      }
+    }
+    {
+      PetscReal gred[2],lred[2];
+      lred[0] = k0dev; lred[1] = k0nrm;
+      PetscCallMPI(MPI_Allreduce(lred,gred,2,MPIU_REAL,MPI_SUM,PETSC_COMM_WORLD));
+      k0dev = sqrt(gred[0]/(gred[1] + 1e-300));
+      HEADNODE
+	fprintf(stderr,"rsf_ve_setup: mode 3 (%s): np %ld, tau %g ... %g yr, K0 rel dev from Is %.3e\n",
+		pfile,(long)rsf->ve_np,rsf->ve_tau[0]/SEC_PER_YEAR,
+		rsf->ve_tau[rsf->ve_np-1]/SEC_PER_YEAR,(double)k0dev);
+      if(k0dev > 5.0*k0tol)
+	SETERRQ(PETSC_COMM_WORLD,PETSC_ERR_USER,
+		"rsf_ve_setup: prony K0 deviates %.3e from the assembled elastic kernel (tol %g): convention mismatch?",
+		(double)k0dev,(double)k0tol);
+      if(k0dev > k0tol)
+	HEADNODE
+	  fprintf(stderr,"rsf_ve_setup: WARNING: prony K0 deviation %.3e exceeds %g\n",
+		  (double)k0dev,(double)k0tol);
+    }
+    for(p=0;p < rsf->ve_np;p++){
+      for(i=0;i < medium->nrflt;i++){
+	for(j=0;j < medium->nrflt;j++)
+	  if(fscanf(pf,"%lf",row+j) != 1)
+	    SETERRQ(PETSC_COMM_WORLD,PETSC_ERR_FILE_READ,
+		    "rsf_ve_setup: bad C_%ld row %ld",(long)p,(long)i);
+	if((i >= medium->rs) && (i < medium->re)){
+	  for(j=0;j < medium->nrflt;j++)
+	    crow3[j] = row[j];
+	  PetscCall(MatSetValues(rsf->ve_C[p],1,&i,medium->nrflt,cidx3,crow3,INSERT_VALUES));
+	}
+      }
+      PetscCall(MatAssemblyBegin(rsf->ve_C[p],MAT_FINAL_ASSEMBLY));
+      PetscCall(MatAssemblyEnd(rsf->ve_C[p],MAT_FINAL_ASSEMBLY));
+    }
+    free(row);free(crow3);free(cidx3);
+    fclose(pf);
   }else if(mode == 2){
     /* layered antiplane: sampled image kernel, per-pair Prony fit */
     struct flt img[1];
