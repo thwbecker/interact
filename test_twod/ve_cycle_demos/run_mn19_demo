@@ -20,7 +20,7 @@
 bindir=`cd ../../bin && pwd`
 sdir=`pwd`
 dir=${1-mn19_demo}
-xlist=${2-"0 3.0 2.0 1.5 1.2 1.0 0.92"}
+xlist=${2-"0 4.0 3.0 2.4 2.0 1.7 1.5 1.35 1.2 1.1 1.0 0.95 0.92 0.88"}
 tload=2.112690
 mkdir -p $dir && cd $dir
 python3 $sdir/../anti_plane/gen_mn19.py 6 0.35 16 mn19 > gen.log

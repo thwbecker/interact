@@ -21,7 +21,7 @@ bindir=`cd ../../bin && pwd`
 sdir=`pwd`
 proto=`cd ../../test_relax/inplane_ve_proto && pwd`
 dir=${1-bp3ve_demo}
-tmlist=${2-"45 150"}
+tmlist=${2-"15 30 45 75 120 200 400"}
 stop=${3-1500}
 mkdir -p $dir && cd $dir
 python3 $sdir/../../seas_bp_tests/bp3/gen_bp3.py 0.6667 60 bp3 > gen.log
