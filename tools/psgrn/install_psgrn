@@ -1,0 +1,62 @@
+#!/bin/bash
+#
+# install_psgrn: download and compile Wang's PSGRN/PSCMP (2020
+# version), the community-standard code for co- and postseismic
+# deformation of a multi-layered viscoelastic-gravitational
+# half-space, and smoke-test the binaries.  We use it (a) as a
+# cross-validation reference for the in-plane viscoelastic machinery
+# (see test_relax/inplane_ve_proto, psgrn_compare.py) and (b) as the
+# intended 3-D kernel generator for rsf_solve's -ve_mode 3
+# -ve_prony_file path: sample per-patch step responses with
+# PSGRN/PSCMP, fit shared-ladder Prony amplitudes, write the kernel
+# file (2-D reference implementation: bp3_ve_kernels.py).
+#
+# usage: install_psgrn [install_dir] [fortran_compiler]
+#        defaults:      ./psgrn_pscmp  gfortran
+#
+idir=${1-./psgrn_pscmp}
+fc=${2-gfortran}
+url=https://github.com/RongjiangWang/PSGRN-PSCMP_2020
+
+if [ ! -d $idir/src ];then
+    git clone --depth 1 $url $idir/src || exit 1
+fi
+mkdir -p $idir/bin
+echo "$0: compiling psgrn2020 ..."
+(cd $idir/src/PSGRN2020/SourceCode && $fc -O2 -o ../../../bin/psgrn2020 *.f) || exit 1
+echo "$0: compiling pscmp2020 ..."
+(cd $idir/src/PSCMP2020/SourceCode && $fc -O2 -o ../../../bin/pscmp2020 *.f) || exit 1
+#
+# smoke test: a tiny Green's function run (elastic layer over a
+# Maxwell half-space, few distances/depths/times) must complete and
+# produce the 13 GF files
+#
+tdir=$idir/smoke
+mkdir -p $tdir/grn && cd $tdir
+cat > smoke.inp <<INP
+        0.0       1
+   21   0.0    100.0   1.0
+    3   2.0    10.0
+ 8   3650.0
+ 0.05
+ 1.00
+ './grn/'
+ 'uz'  'ur'  'ut'
+ 'szz' 'srr' 'stt' 'szr' 'srt' 'stz'
+ 'tr'  'tt'  'rot' 'gd'  'gr'
+  3
+1       0.0       5.2223    3.0151    3300.0     0.0E+00    0.0E+00    1.000
+2      30.0       5.2223    3.0151    3300.0     0.0E+00    0.0E+00    1.000
+3      30.0       4.8676    2.8103    3800.0     0.0E+00    9.468E+17  1.000
+INP
+echo smoke.inp | ../bin/psgrn2020 > smoke.log 2>&1
+nf=`ls grn | wc -l`
+if [ $nf -ge 40 ];then
+    echo "$0: smoke test OK ($nf Green's function files)"
+    echo "$0: binaries in $idir/bin; input templates:"
+    echo "$0:   $tdir/smoke.inp (psgrn)"
+    echo "$0:   test_relax/inplane_ve_proto/psgrn_inputs/ (full cases)"
+else
+    echo "$0: SMOKE TEST FAILED, see $tdir/smoke.log"
+    exit 1
+fi

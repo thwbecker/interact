@@ -9,11 +9,22 @@
 #   T2: uniform-Maxwell correspondence, sympy-exact time factor
 #   T3: elastic plate over Maxwell substrate: unrelaxed and relaxed
 #       limits, interface traction continuity in time, monotonicity
+#   T4: gravity (advected-boundary buoyancy): elastic insensitivity,
+#       relaxed buoyant-flexure limit, through-plate mode suppression
+#   T5: LITERATURE, viscoelastic thrust-fault relaxation with and
+#       without gravity vs Rundle (JGR 1982) Figs. 2/3, incl. the
+#       buoyancy suppression of the relaxed basin
+#       (rundle_relax_test.py; also writes rundle_relax_test.png)
+#
+# Optional, run separately (needs PSGRN/PSCMP built, see
+# tools/psgrn/install_psgrn):
+#   psgrn_compare.py <psgrn_run_dir> plot   cross-validation against
+#       Wang's PSGRN/PSCMP (1-3 percent of peak, gravity on and off)
 #
 sdir=`dirname $0`
 cd $sdir
 fail=0
-for t in t0_basis.py t1_elastic.py t2_maxwell_corr.py t3_plate_maxwell.py t4_gravity.py;do
+for t in t0_basis.py t1_elastic.py t2_maxwell_corr.py t3_plate_maxwell.py t4_gravity.py rundle_relax_test.py;do
     echo "=== $t"
     python3 $t || fail=1
 done
