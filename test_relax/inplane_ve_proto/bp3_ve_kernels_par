@@ -1,0 +1,48 @@
+#!/bin/bash
+#
+# bp3_ve_kernels_par: generate a -ve_prony_file with bp3_ve_kernels.py
+# on several cores.  Kernel generation is trivially parallel over
+# SOURCE COLUMNS, so this launches n workers on strided column
+# subsets and then merges, fits and writes the file.  Each worker
+# checkpoints its own part, so an interrupted job resumes by simply
+# re-running the same command.
+#
+# usage: bp3_ve_kernels_par geom_file H_m tM_yr out_file ncore \
+#                           [np] [sign] [g] [normal]
+#        defaults                                  5   -1   1   1
+#
+# e.g.  ./bp3_ve_kernels_par bp3_geom.in 40e3 45 bp3_tm45.prony 8
+#
+# The 25 m BP3 case (1600 columns) is about 5-6 h on one core, so
+# roughly 45 min on 8.
+#
+sdir=`cd \`dirname $0\` && pwd`
+geom=${1?need geometry file}
+H=${2?need plate thickness [m]}
+tm=${3?need Maxwell time [yr]}
+out=${4?need output file}
+nc=${5-4}
+np=${6-5}
+sgn=${7--1}
+grav=${8-1}
+nrm=${9-1}
+if [ $nc -le 1 ];then
+    exec python3 $sdir/bp3_ve_kernels.py $geom $H $tm $out $np $sgn $grav $nrm
+fi
+echo "$0: $nc workers over source columns"
+pids=""
+for i in `seq 0 $((nc-1))`;do
+    python3 $sdir/bp3_ve_kernels.py $geom $H $tm $out $np $sgn $grav $nrm \
+	$i $nc > $out.w$i.log 2>&1 &
+    pids="$pids $!"
+done
+fail=0
+for p in $pids;do wait $p || fail=1;done
+if [ $fail -ne 0 ];then
+    echo "$0: a worker FAILED, see $out.w*.log"; exit 1
+fi
+grep -h "part .* done" $out.w*.log | sed 's/^/  /'
+python3 $sdir/bp3_ve_kernels.py $geom $H $tm $out $np $sgn $grav $nrm \
+    -1 $nc || exit 1
+rm -f $out.w*.log
+echo "$0: wrote $out (parts kept as $out.part*.npz; delete to redo)"
