@@ -32,7 +32,10 @@
 # generation takes ~10 min per Maxwell time and caches/resumes.
 #
 # usage: run_bp3ve_demo [outdir] [tmlist_yr] [stop_yr] [sigma] [ds_km]
-#                       [gravity] [extra rsf_solve options]
+#                       [gravity] [extra rsf_solve options] [ncore]
+#        ncore: cores for KERNEL GENERATION, which dominates the cost
+#              (trivially parallel over source columns; the cycle runs
+#              themselves are seconds to minutes and single core)
 #        defaults  bp3ve_demo "15 30 45 75 120 200 400" 1500 1 0.6667 1 ""
 #        extra: passed through to rsf_solve, e.g. "-imex" (needed at
 #              fine resolution with sigma coupling: explicit RK can
@@ -54,6 +57,7 @@ sigma=${4-1}
 ds=${5-0.6667}
 grav=${6-1}
 extra=${7-}			# extra rsf_solve options, e.g. "-imex"
+ncore=${8-1}			# cores for KERNEL GENERATION (the slow part)
 if [ "$sigma" = "1" ];then
     sigopt="-calc_sigma_dot"; nrm=1
     echo "$0: shear + normal tractions (two-family kernels)"
@@ -85,10 +89,10 @@ fi
 for tm in $tmlist;do
     [ -f cat_tm$tm.dat ] && continue
     if [ ! -f bp3_tm${tm}_$ktag.prony ];then
-	echo "$0: generating kernels for tM = $tm yr (~10 min, resumable)"
+	echo "$0: generating kernels for tM = $tm yr on $ncore core(s), resumable"
 	dd=`pwd`
-	(cd $proto && python3 bp3_ve_kernels.py $dd/bp3_geom.in 40e3 $tm \
-	    $dd/bp3_tm${tm}_$ktag.prony 5 -1 $grav $nrm) || exit 1
+	(cd $proto && ./bp3_ve_kernels_par $dd/bp3_geom.in 40e3 $tm \
+	    $dd/bp3_tm${tm}_$ktag.prony $ncore 5 -1 $grav $nrm) || exit 1
     fi
     echo "$0: VE run tM = $tm yr"
     rm -f rsf_catalog* rsf_events.dat rsf_monitor* rsf_checkpoint.bin

@@ -47,6 +47,10 @@ usage: bp3_ve_kernels.py geom_file H_m tM_yr out_file [np] [sign] [g] [normal]
                   K0 gate)
        g          gravity flag 0/1 (default 1: rho 2800/3300, 9.81)
        normal     0/1 (default 1): also fit the normal-traction family
+       ipart npart parallel column split (see below); default -1 1
+                  worker:  ... [normal] <i> <n>   for i = 0..n-1
+                  merge:   ... [normal] -1 <n>    once all parts exist
+                  wrapper: bp3_ve_kernels_par does both
 """
 import sys
 import numpy as np
@@ -61,6 +65,16 @@ npr = int(sys.argv[5]) if len(sys.argv) > 5 else 5
 sgn = float(sys.argv[6]) if len(sys.argv) > 6 else -1.0
 gflag = int(sys.argv[7]) if len(sys.argv) > 7 else 1
 donorm = int(sys.argv[8]) if len(sys.argv) > 8 else 1
+# PARALLEL over source columns (trivially parallel: columns are
+# independent).  ipart >= 0 with npart > 1 computes only the columns
+# j with j % npart == ipart and stores them in <out>.part<i>.npz
+# WITHOUT fitting or writing the kernel file; a final call with
+# ipart < 0 merges all parts, fits, and writes.  npart == 1 is the
+# ordinary serial path (unchanged, single <out>.cache.npz).
+ipart = int(sys.argv[9]) if len(sys.argv) > 9 else -1
+npart = int(sys.argv[10]) if len(sys.argv) > 10 else 1
+if (npart > 1) and (ipart >= npart):
+    sys.exit("bp3_ve_kernels: ipart must be < npart")
 # interact assembles the NORMAL interaction matrix In compression
 # positive (In is scaled by -1 internally), while the projection
 # n.sigma.n below is tension positive, so the normal family carries
@@ -113,7 +127,10 @@ xs = xc.copy()
 txr, tzr, nxr, nzr = tx, tz, nx, nz
 
 import os
-cachef = outf + ".cache.npz"
+if npart > 1 and ipart >= 0:
+    cachef = f"{outf}.part{ipart}.npz"
+else:
+    cachef = outf + ".cache.npz"
 if os.path.exists(cachef):
     cz = np.load(cachef)
     K0, DK, DKinf, done = (cz["K0"], cz["DK"], cz["DKinf"],
@@ -130,7 +147,9 @@ else:
     done = np.zeros(n, dtype=bool)
 import time as _time
 t0_ = _time.time()
-for j in range(n):
+cols = range(n) if (npart <= 1 or ipart < 0) else \
+    range(ipart, n, npart)
+for j in cols:
     if done[j]:
         continue
     x1, z1 = xc[j] - hl[j]*tx[j], zc[j] - hl[j]*tz[j]
@@ -175,6 +194,32 @@ for j in range(n):
              DNinf=DNinf, done=done)
     print(f"  source {j+1}/{n} done  ({_time.time()-t0_:.0f} s)",
           flush=True)
+
+if npart > 1 and ipart >= 0:
+    nd = int(done[ipart::npart].sum())
+    print(f"bp3_ve_kernels: part {ipart}/{npart} done "
+          f"({nd} of {len(range(ipart, n, npart))} columns) -> {cachef}")
+    raise SystemExit(0)
+if npart > 1:
+    # MERGE: columns are disjoint between parts, so summing the
+    # arrays and OR-ing the done masks reconstructs the whole kernel
+    K0 = np.zeros((n, n)); N0 = np.zeros((n, n))
+    DK = np.zeros((len(ts), n, n)); DN = np.zeros((len(ts), n, n))
+    DKinf = np.zeros((n, n)); DNinf = np.zeros((n, n))
+    done = np.zeros(n, dtype=bool)
+    for ip in range(npart):
+        f = f"{outf}.part{ip}.npz"
+        if not os.path.exists(f):
+            sys.exit(f"bp3_ve_kernels: missing {f}; run that worker first")
+        z = np.load(f)
+        K0 += z["K0"]; N0 += z["N0"]
+        DK += z["DK"]; DN += z["DN"]
+        DKinf += z["DKinf"]; DNinf += z["DNinf"]
+        done |= z["done"].astype(bool)
+    if not done.all():
+        sys.exit(f"bp3_ve_kernels: {int((~done).sum())} columns still "
+                 "missing across the parts")
+    print(f"bp3_ve_kernels: merged {npart} parts, all {n} columns present")
 
 # per-pair LSQ on the fixed ladder, relaxed limit as constraint row
 E = np.exp(-np.outer(ts, 1.0/taus)) - 1.0        # (nt, np)

@@ -8,7 +8,11 @@
 #   ve_shear  shear only (sigma_n frozen), gravity ON, for contrast
 #
 # usage: run_many_bp3ve_demo [ds_km] [tmlist_yr] [stop_yr] [parallel]
-#        defaults           0.025    "15 45 200"  1500      0
+#                            [ncore]
+#        defaults           0.025    "15 45 200"  1500      0     4
+#        ncore: cores per kernel generation (bp3_ve_kernels_par);
+#              parallel=1 additionally runs 2 of the 3 cases at once,
+#              so peak load is about 2 x ncore
 #
 # COST at 25 m (1600 patches): kernels are ~5-6 h per file on one
 # core and the cycle runs are hours each, so the full sweep is a
@@ -18,7 +22,10 @@
 #     file instead of generating a third one;
 #   * ve_g0 reuses ve_g1's ELASTIC reference (the elastic run knows
 #     nothing about gravity, it is the same computation).
-# parallel=1 runs the three cases concurrently (3 cores).
+# parallel=1 runs the remaining two cases concurrently.  Kernel
+# generation itself is spread over `ncore` cores per file
+# (bp3_ve_kernels_par), which is where nearly all the time goes:
+# 25 m is ~5-6 h on one core, ~45 min on eight.
 #
 # SMOKE TEST FIRST: ./run_many_bp3ve_demo 0.1 "45" 1500
 # exercises every path in about an hour before you commit to 25 m.
@@ -27,6 +34,7 @@ ds=${1-0.025}
 tms=${2-"15 45 200"}
 stop=${3-1500}
 par=${4-0}
+ncore=${5-4}		# cores for kernel generation (the slow part)
 extra="-imex"		# fine meshes with sigma coupling need it
 np=5
 
@@ -54,7 +62,7 @@ for tm in $tms;do
     echo "=== tM = $tm yr, ds = $ds km"
     # 1. gravity ON, shear + normal: this generates the kernels the
     #    other two cases reuse, so it goes first even in parallel mode
-    ./run_bp3ve_demo ve_g1 "$tm" $stop 1 $ds 1 "$extra"
+    ./run_bp3ve_demo ve_g1 "$tm" $stop 1 $ds 1 "$extra" $ncore
     # 2. reuse: shear-only kernels by truncation, elastic reference by copy
     mkdir -p ve_shear ve_g0
     trunc_shear ve_g1/bp3_tm${tm}_g1n1.prony ve_shear/bp3_tm${tm}_g1n0.prony
@@ -64,12 +72,12 @@ for tm in $tms;do
     [ -d ve_g1/st_el ] && [ ! -d ve_g0/st_el ] && cp -r ve_g1/st_el ve_g0/
     # 3. the other two cases
     if [ "$par" = "1" ];then
-	./run_bp3ve_demo ve_g0    "$tm" $stop 1 $ds 0 "$extra" &
-	./run_bp3ve_demo ve_shear "$tm" $stop 0 $ds 1 "$extra" &
+	./run_bp3ve_demo ve_g0    "$tm" $stop 1 $ds 0 "$extra" $ncore &
+	./run_bp3ve_demo ve_shear "$tm" $stop 0 $ds 1 "$extra" $ncore &
 	wait
     else
-	./run_bp3ve_demo ve_g0    "$tm" $stop 1 $ds 0 "$extra"
-	./run_bp3ve_demo ve_shear "$tm" $stop 0 $ds 1 "$extra"
+	./run_bp3ve_demo ve_g0    "$tm" $stop 1 $ds 0 "$extra" $ncore
+	./run_bp3ve_demo ve_shear "$tm" $stop 0 $ds 1 "$extra" $ncore
     fi
 done
 echo "=== summary"
