@@ -1,7 +1,80 @@
 #!/bin/bash
+#
+# run_many_bp3ve_demo: the three-way BP3 viscoelastic comparison at a
+# chosen resolution:
+#
+#   ve_g1     shear + normal tractions, gravity ON
+#   ve_g0     shear + normal tractions, gravity OFF
+#   ve_shear  shear only (sigma_n frozen), gravity ON, for contrast
+#
+# usage: run_many_bp3ve_demo [ds_km] [tmlist_yr] [stop_yr] [parallel]
+#        defaults           0.025    "15 45 200"  1500      0
+#
+# COST at 25 m (1600 patches): kernels are ~5-6 h per file on one
+# core and the cycle runs are hours each, so the full sweep is a
+# couple of days serially.  Two savings are built in:
+#   * ve_shear reuses ve_g1's SHEAR blocks (the same kernels; only
+#     the normal family is dropped), by truncating the two-family
+#     file instead of generating a third one;
+#   * ve_g0 reuses ve_g1's ELASTIC reference (the elastic run knows
+#     nothing about gravity, it is the same computation).
+# parallel=1 runs the three cases concurrently (3 cores).
+#
+# SMOKE TEST FIRST: ./run_many_bp3ve_demo 0.1 "45" 1500
+# exercises every path in about an hour before you commit to 25 m.
+#
+ds=${1-0.025}
+tms=${2-"15 45 200"}
+stop=${3-1500}
+par=${4-0}
+extra="-imex"		# fine meshes with sigma coupling need it
+np=5
 
-for tm in 15 45 200;do
-    ./run_bp3ve_demo ve_g1    $tm 1500 1 0.025 1     # shear+normal, gravity ON,  25 m
-    ./run_bp3ve_demo ve_g0    $tm 1500 1 0.025 0     # shear+normal, gravity OFF, 25 m
-    ./run_bp3ve_demo ve_shear $tm 1500 0 0.025 1     # shear only (σ frozen), for contrast
+trunc_shear ()		# derive shear-only kernels from a two-family file
+{
+    src=$1; dst=$2
+    [ -f "$src" ] || return 1
+    [ -f "$dst" ] && return 0
+    python3 - "$src" "$dst" <<'PY'
+import sys
+src, dst = sys.argv[1], sys.argv[2]
+L = open(src).readlines()
+h = [l for l in L if l.startswith("#")]
+b = [l for l in L if not l.startswith("#")]
+n, npr, nfam = (int(x) for x in b[0].split())
+if nfam < 2:
+    sys.exit(f"{src} is already shear only")
+open(dst, "w").writelines(h + [f"{n} {npr} 1\n", b[1]]
+                          + b[2:2 + (npr + 1)*n])
+print(f"run_many_bp3ve_demo: derived {dst} from {src}")
+PY
+}
+
+for tm in $tms;do
+    echo "=== tM = $tm yr, ds = $ds km"
+    # 1. gravity ON, shear + normal: this generates the kernels the
+    #    other two cases reuse, so it goes first even in parallel mode
+    ./run_bp3ve_demo ve_g1 "$tm" $stop 1 $ds 1 "$extra"
+    # 2. reuse: shear-only kernels by truncation, elastic reference by copy
+    mkdir -p ve_shear ve_g0
+    trunc_shear ve_g1/bp3_tm${tm}_g1n1.prony ve_shear/bp3_tm${tm}_g1n0.prony
+    for f in cat_el.dat;do
+	[ -f ve_g1/$f ] && [ ! -f ve_g0/$f ] && cp ve_g1/$f ve_g0/$f
+    done
+    [ -d ve_g1/st_el ] && [ ! -d ve_g0/st_el ] && cp -r ve_g1/st_el ve_g0/
+    # 3. the other two cases
+    if [ "$par" = "1" ];then
+	./run_bp3ve_demo ve_g0    "$tm" $stop 1 $ds 0 "$extra" &
+	./run_bp3ve_demo ve_shear "$tm" $stop 0 $ds 1 "$extra" &
+	wait
+    else
+	./run_bp3ve_demo ve_g0    "$tm" $stop 1 $ds 0 "$extra"
+	./run_bp3ve_demo ve_shear "$tm" $stop 0 $ds 1 "$extra"
+    fi
 done
+echo "=== summary"
+for d in ve_g1 ve_g0 ve_shear;do
+    [ -d $d ] && { echo "--- $d"; python3 plot_bp3ve_demo.py $d 2>&1 | \
+	sed 's/^/    /'; }
+done
+echo "figures: ve_*/bp3ve_demo.png; station series in ve_*/st_*/"

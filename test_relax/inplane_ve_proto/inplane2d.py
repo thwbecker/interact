@@ -250,6 +250,83 @@ def kgrid(kmin, kmax, npanel=60, nquad=8):
         ws.append(0.5*(b - a)*wg)
     return np.concatenate(ks), np.concatenate(ws)
 
+def fields_pairs(xpts, zpts, sources, lam1, mu1, lam2, mu2, H,
+                 kmin=None, kmax=None, npanel=80, nquad=8,
+                 rho1=0.0, rho2=0.0, g=0.0):
+    """fields at MATCHED points (xpts[i], zpts[i]), i.e. the diagonal
+    of fields_xz, at O(n) per wavenumber instead of O(n^2): the
+    k-domain state vector is evaluated once per receiver DEPTH and
+    multiplied by that receiver's own phase e^{i k x_i}.  Same
+    conventions and return keys as fields_xz; this is what kernel
+    generation wants, since only matched source-receiver pairs enter
+    an interaction matrix."""
+    xpts = np.atleast_1d(np.asarray(xpts, float))
+    zpts = np.atleast_1d(np.asarray(zpts, float))
+    if xpts.size != zpts.size:
+        raise ValueError("fields_pairs: xpts and zpts must match")
+    cplx = any(np.iscomplexobj(np.asarray(m))
+               for m in (lam1, mu1, lam2, mu2))
+    dmin = min(s[4] for s in sources)
+    if kmin is None: kmin = 1e-3/H
+    if kmax is None: kmax = 60.0/max(np.min(np.abs(zpts - dmin)), 1e-2*H)
+    ks, ws = kgrid(kmin, kmax, npanel, nquad)
+    dt_ = complex if cplx else float
+    out = {f: np.zeros(xpts.size, dtype=dt_) for f in
+           ("ux", "uz", "sxx", "sxz", "szz")}
+    Sp = np.array([1.0, -1.0, 1.0, -1.0])
+    lamv = np.where(zpts <= H, lam1, lam2)
+    muv = np.where(zpts <= H, mu1, mu2)
+    lp2v = lamv + 2.0*muv
+    for k, w in zip(ks, ws):
+        Yk = np.zeros((zpts.size, 4), dtype=complex)
+        sxxk = np.zeros(zpts.size, dtype=complex)
+        Ym = np.zeros((zpts.size, 4), dtype=complex)
+        sxxm = np.zeros(zpts.size, dtype=complex)
+        for (b, sh, nh, x0, d) in sources:
+            J = jumps(k, lam1, mu1, b, sh, nh, x0)
+            c = solve_k(k, lam1, mu1, lam2, mu2, H, d, J, rho1, rho2, g)
+            Yv = eval_k_vec(zpts, k, lam1, mu1, lam2, mu2, H, d, c)
+            Yk += Yv
+            sxxk += (lp2v*1j*k*Yv[:, 0] +
+                     lamv*(Yv[:, 3] - 1j*k*lamv*Yv[:, 0])/lp2v)
+            if cplx:
+                Jm = jumps(-k, lam1, mu1, b, sh, nh, x0)
+                cm = solve_k(k, lam1, mu1, lam2, mu2, H, d, Sp*Jm,
+                             rho1, rho2, g)
+                Y2 = eval_k_vec(zpts, k, lam1, mu1, lam2, mu2, H, d, cm)
+                Ym += Sp[None, :]*Y2
+                sxxm += -(lp2v*1j*k*Y2[:, 0] +
+                          lamv*(Y2[:, 3] - 1j*k*lamv*Y2[:, 0])/lp2v)
+        ph = np.exp(1j*k*xpts)
+        if cplx:
+            for i, f in enumerate(("ux", "uz", "sxz", "szz")):
+                out[f] += w*(Yk[:, i]*ph + Ym[:, i]/ph)
+            out["sxx"] += w*(sxxk*ph + sxxm/ph)
+        else:
+            for i, f in enumerate(("ux", "uz", "sxz", "szz")):
+                out[f] += 2.0*w*np.real(Yk[:, i]*ph)
+            out["sxx"] += 2.0*w*np.real(sxxk*ph)
+    return out
+
+def ve_fields_pairs(xpts, zpts, sources, lam1, mu1, lam2, mu2, H, tau2,
+                    t, tau1=None, M=16, rho1=0.0, rho2=0.0, g=0.0,
+                    lam_mode="bulk", **kw):
+    """viscoelastic fields at matched points (Talbot inversion of
+    fields_pairs); same signature idea as ve_fields_xz"""
+    def F(s):
+        l2, m2 = maxwell_moduli(s, mu2, lam2, tau2, lam_mode)
+        if tau1 is not None:
+            l1, m1 = maxwell_moduli(s, mu1, lam1, tau1, lam_mode)
+        else:
+            l1, m1 = lam1, mu1
+        out = fields_pairs(xpts, zpts, sources, l1, m1, l2, m2, H,
+                           rho1=rho1, rho2=rho2, g=g, **kw)
+        return np.stack([out[c] for c in
+                         ("ux", "uz", "sxx", "sxz", "szz")])/s
+    R = talbot(F, t, M)
+    return {c: R[i] for i, c in
+            enumerate(("ux", "uz", "sxx", "sxz", "szz"))}
+
 def fields_xz(xobs, zobs, sources, lam1, mu1, lam2, mu2, H,
               kmin=None, kmax=None, npanel=80, nquad=8,
               rho1=0.0, rho2=0.0, g=0.0):

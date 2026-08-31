@@ -31,8 +31,12 @@
 # the point is the elastic-vs-VE contrast at fixed mesh).  Kernel
 # generation takes ~10 min per Maxwell time and caches/resumes.
 #
-# usage: run_bp3ve_demo [outdir] [tmlist_yr] [stop_yr] [sigma] [ds_km] [gravity]
-#        defaults  bp3ve_demo "15 30 45 75 120 200 400" 1500 1 0.6667 1
+# usage: run_bp3ve_demo [outdir] [tmlist_yr] [stop_yr] [sigma] [ds_km]
+#                       [gravity] [extra rsf_solve options]
+#        defaults  bp3ve_demo "15 30 45 75 120 200 400" 1500 1 0.6667 1 ""
+#        extra: passed through to rsf_solve, e.g. "-imex" (needed at
+#              fine resolution with sigma coupling: explicit RK can
+#              hit domain-check rejection storms during large events)
 #        sigma 1 (default): shear + normal tractions (-calc_sigma_dot
 #              plus two-family kernels); 0: shear only, sigma frozen
 #        gravity 1 (default) / 0: buoyancy in the kernels; use
@@ -49,6 +53,7 @@ stop=${3-1500}
 sigma=${4-1}
 ds=${5-0.6667}
 grav=${6-1}
+extra=${7-}			# extra rsf_solve options, e.g. "-imex"
 if [ "$sigma" = "1" ];then
     sigopt="-calc_sigma_dot"; nrm=1
     echo "$0: shear + normal tractions (two-family kernels)"
@@ -60,7 +65,7 @@ fi
     echo "$0: gravity OFF"
 # kernels depend on tM AND on the gravity setting, so the file name
 # carries both: a run never picks up a stale file from the other case
-ktag=g$grav
+ktag=g${grav}n$nrm	# kernels depend on gravity AND family count
 mkdir -p $dir && cd $dir
 python3 $sdir/../../seas_bp_tests/bp3/gen_bp3.py $ds 60 bp3 > gen.log
 common="-geom_file bp3_geom.in -rsf_file bp3_rsf.dat -rsf_ic_file bp3_ic.in \
@@ -69,7 +74,7 @@ common="-geom_file bp3_geom.in -rsf_file bp3_rsf.dat -rsf_ic_file bp3_ic.in \
  -ts_max_steps 2000000000 -dt_monitor_yr 10 -track_events -rsf_catalog \
  -vel_event 1e-3 -rsf_checkpoint 20000 -rsf_checkpoint_wall 60 \
  -rsf_stations bp3_stations.dat -rsf_station_dt_yr 0.5 \
- -stop_time_yr $stop $sigopt"
+ -stop_time_yr $stop $sigopt $extra"
 if [ ! -f cat_el.dat ];then
     echo "$0: elastic reference"
     rm -f rsf_catalog* rsf_events.dat rsf_monitor* rsf_checkpoint.bin
