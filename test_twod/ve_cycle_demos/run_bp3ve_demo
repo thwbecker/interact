@@ -29,7 +29,11 @@
 #
 # Demonstration resolution (default ds = 667 m; NOT converged BP3,
 # the point is the elastic-vs-VE contrast at fixed mesh).  Kernel
-# generation takes ~10 min per Maxwell time and caches/resumes.
+# generation takes ~10 min and caches/resumes; only the FIRST Maxwell
+# time in the list pays it, because the sampled kernels depend on
+# t/tau rather than on tau (bp3_ve_kernels.py, "MAXWELL-TIME
+# SCALING"), so the rest are a fit and a file write.  The cache is
+# shared by every Maxwell time in the run directory.
 #
 # usage: run_bp3ve_demo [outdir] [tmlist_yr] [stop_yr] [sigma] [ds_km]
 #                       [gravity] [extra rsf_solve options] [ncore]
@@ -44,8 +48,8 @@
 #              plus two-family kernels); 0: shear only, sigma frozen
 #        gravity 1 (default) / 0: buoyancy in the kernels; use
 #              SEPARATE output directories for the two cases
-#        (kernels dominate the cost, ~10 min per tM, cached in the
-#         run dir; pass fewer Maxwell times for a quick look)
+#        (kernels dominate the cost, ~10 min for the first tM and
+#         seconds for each further one, cached in the run dir)
 #
 bindir=`cd ../../bin && pwd`
 sdir=`pwd`

@@ -15,6 +15,10 @@
 #       without gravity vs Rundle (JGR 1982) Figs. 2/3, incl. the
 #       buoyancy suppression of the relaxed basin
 #       (rundle_relax_test.py; also writes rundle_relax_test.png)
+#   T6: Maxwell-time scaling, dK(t; tau) = dKtilde(t/tau), the
+#       symmetry bp3_ve_kernels.py uses to emit one kernel file per
+#       Maxwell time from a single sampling pass (file-level check:
+#       run_tau_scaling_test)
 #
 # Optional, run separately (needs PSGRN/PSCMP built, see
 # tools/psgrn/install_psgrn):
@@ -24,7 +28,7 @@
 sdir=`dirname $0`
 cd $sdir
 fail=0
-for t in t0_basis.py t1_elastic.py t2_maxwell_corr.py t3_plate_maxwell.py t4_gravity.py rundle_relax_test.py;do
+for t in t0_basis.py t1_elastic.py t2_maxwell_corr.py t3_plate_maxwell.py t4_gravity.py rundle_relax_test.py t6_tau_scaling.py;do
     echo "=== $t"
     python3 $t || fail=1
 done

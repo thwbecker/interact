@@ -92,6 +92,12 @@ T3  plate over Maxwell substrate: t->0+ reproduces the unrelaxed
     sxz, szz continuous through time at machine precision while sxx
     develops the legitimate modulus-contrast jump; plate-point
     stress evolves monotonically between the limits.
+T6  Maxwell-time scaling: the relaxation part of both traction
+    families, sampled at matched t/tau for Maxwell times in integer
+    and non-integer ratios, agrees to 1e-13 of the relaxation scale
+    with gravity on and off, and the relaxed limit does not move at
+    all.  See the section below; the file-level counterpart is
+    run_tau_scaling_test.
 
 ## Literature anchors
 
@@ -190,6 +196,54 @@ ladders, write the same file).  Both traction families are
 implemented (see above); what remains open is 3-D kernels via the
 PSGRN route.
 
+## Maxwell-time scaling: one sampling pass per sweep
+
+The substrate enters the wavenumber-domain system only through
+mu2(s) = mu2 s/(s + 1/tau) and lam2(s) = K2 - 2 mu2(s)/3, and the two
+buoyancy rows carry no s, so substituting s = sigma/tau leaves the
+system dependent on s only through s*tau.  The step response is then
+a function of t/tau alone,
+
+    dK(t; tau) = dKtilde(t/tau),     dK(t) = K(t) - K(0+),
+
+with K(0+) elastic and Maxwell-time independent in any case.  The
+fitted amplitude blocks C_p are therefore the same for every Maxwell
+time and only the ladder tau_p scales, so a sweep over Maxwell times
+costs ONE sampling pass plus a fit per Maxwell time.  This is exact
+for a single Maxwell time with an elastic plate; a second relaxation
+time (Maxwell plate, Burgers or bi-viscous substrate,
+depth-dependent viscosity) leaves only the ratios free and would
+need one pass per case.  Gravity does not spoil it, which is worth
+stating explicitly because buoyancy is the one place where an
+s-independent term enters the matcher.
+
+What bp3_ve_kernels.py does with it:
+
+- the sampling times and the ladder are fixed multiples of tM, so in
+  units of tM they are the same set for every Maxwell time;
+- the sampled cache is named after a signature of what it actually
+  depends on (geometry, H, gravity, sign, sampling parameters) rather
+  than after the output file, so every Maxwell time written into one
+  directory shares it, across separate invocations and across the
+  serial and parallel paths;
+- tM_yr may be a comma-separated list, with %TM% in the output name,
+  to emit a whole sweep from one call;
+- a cache written before this path existed is adopted rather than
+  resampled, and the cache is written through a temporary file so
+  that an interrupted write cannot cost the sampling.
+
+Measured (run_tau_scaling_test, dip-60 BP3 geometry, gravity on and
+off): the amplitude blocks of a scaled file and of a directly
+generated one agree to 1e-11 to 1e-10 of the relaxation scale,
+against a held-out fit residual of 1e-3 to 1e-2 in the same units,
+i.e. the difference is roundoff and not a modelling choice.  A file
+written for the Maxwell time the sampling was done at is
+bit-identical to what a single-Maxwell-time run produced before this
+path existed; a file for another Maxwell time differs from a direct
+generation of it only through the rounding of the scaled ladder.
+The array-level statement is gate T6 (1e-13), which is the cleaner
+number because it is not limited by the 8-digit kernel file format.
+
 ## Hereditary NORMAL-stress relaxation (two-family kernels)
 
 On a dipping fault, slip changes the fault-normal traction as well as
@@ -267,4 +321,9 @@ inplane2d.py  the solver module (basis, matcher, sources, k
     integration, Maxwell moduli, Talbot, ve_fields_xz)
 fem2d.py      independent FEM reference (bilinear quads, split nodes)
 t0_basis.py t1_elastic.py t2_maxwell_corr.py t3_plate_maxwell.py
+t4_gravity.py t6_tau_scaling.py
 run_inplane_proto_test   gate driver
+run_tau_scaling_test     file-level Maxwell-time scaling gate
+    (bp3_ve_kernels.py scaled emission vs direct generation)
+tau_scale_compare.py     the comparison it uses (also usable on any
+    two kernel files that should differ only in the Maxwell time)

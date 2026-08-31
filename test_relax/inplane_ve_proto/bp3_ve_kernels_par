@@ -16,6 +16,16 @@
 # The 25 m BP3 case (1600 columns) is about 5-6 h on one core, so
 # roughly 45 min on 8.
 #
+# tM_yr may be a comma-separated LIST, and out_file then needs a
+# %TM% placeholder: the sampling pass does not depend on the Maxwell
+# time (see bp3_ve_kernels.py, "MAXWELL-TIME SCALING"), so a sweep
+# costs one generation plus a fit per Maxwell time.  The same holds
+# across separate invocations, since the cache is shared by every
+# Maxwell time written into one directory.
+#
+# e.g.  ./bp3_ve_kernels_par bp3_geom.in 40e3 15,45,200 \
+#           bp3_tm%TM%.prony 8
+#
 sdir=`cd \`dirname $0\` && pwd`
 geom=${1?need geometry file}
 H=${2?need plate thickness [m]}
@@ -29,20 +39,25 @@ nrm=${9-1}
 if [ $nc -le 1 ];then
     exec python3 $sdir/bp3_ve_kernels.py $geom $H $tm $out $np $sgn $grav $nrm
 fi
+# worker logs: one name for the whole call, so a %TM% list does not
+# leak the placeholder into file names
+logb=`echo "$out" | sed 's/%TM%/all/'`
 echo "$0: $nc workers over source columns"
 pids=""
 for i in `seq 0 $((nc-1))`;do
     python3 $sdir/bp3_ve_kernels.py $geom $H $tm $out $np $sgn $grav $nrm \
-	$i $nc > $out.w$i.log 2>&1 &
+	$i $nc > $logb.w$i.log 2>&1 &
     pids="$pids $!"
 done
 fail=0
 for p in $pids;do wait $p || fail=1;done
 if [ $fail -ne 0 ];then
-    echo "$0: a worker FAILED, see $out.w*.log"; exit 1
+    echo "$0: a worker FAILED, see $logb.w*.log"; exit 1
 fi
-grep -h "part .* done" $out.w*.log | sed 's/^/  /'
+grep -h "part .* done" $logb.w*.log | sed 's/^/  /'
 python3 $sdir/bp3_ve_kernels.py $geom $H $tm $out $np $sgn $grav $nrm \
     -1 $nc || exit 1
-rm -f $out.w*.log
-echo "$0: wrote $out (parts kept as $out.part*.npz; delete to redo)"
+rm -f $logb.w*.log
+echo "$0: wrote $out (parts kept next to it as ve_kernels_*.part*.npz;"
+echo "    they are shared by every Maxwell time in that directory,"
+echo "    delete them to resample)"

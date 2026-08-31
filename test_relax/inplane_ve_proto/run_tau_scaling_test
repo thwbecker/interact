@@ -1,0 +1,97 @@
+#!/bin/bash
+#
+# run_tau_scaling_test: gate for the MAXWELL-TIME SCALING symmetry of
+# the plane-strain plate-over-Maxwell relaxation kernels.
+#
+# The substrate enters the wavenumber-domain system only through
+# mu2(s) = mu2 s/(s + 1/tau) (the buoyancy rows carry no s), so with
+# s = sigma/tau the solution depends on s only through s*tau and the
+# relaxation kernel is a function of t/tau alone,
+#
+#     dK(t; tau) = dKtilde(t/tau).
+#
+# bp3_ve_kernels.py therefore samples once, in dimensionless time,
+# and writes a file per Maxwell time by scaling the ladder.  This
+# test compares such a scaled file against a DIRECTLY generated one,
+# which is the only non-circular check of the claim.
+#
+# Gates:
+#   S1 list mode: one sampling pass writes one file per Maxwell time,
+#      and the shared cache is reused rather than resampled
+#   S2 scaled vs direct: identical amplitude blocks and elastic gate
+#      blocks, ladder scaled by exactly the Maxwell-time ratio
+#      (tau_scale_compare.py; expected at roundoff level, since the
+#      dimensionless sample set is the same for every Maxwell time)
+#   S3 gravity off: the same, with the buoyancy rows removed, since
+#      those rows are the one place where an s-independent term
+#      enters the matcher
+#
+# NOTE: the sampling pass is the cost here (a few minutes at the
+# default ds = 5 km, n = 8 columns).  Every generation caches and
+# resumes, so an interrupted run continues where it stopped.
+#
+# usage: run_tau_scaling_test [workdir] [ds_km] [tm_ref] [tm_scaled]
+#        defaults        tmp_tau_scaling 5.0    15       45
+#
+sdir=`cd \`dirname $0\` && pwd`
+gendir=`cd $sdir/../../seas_bp_tests/bp3 && pwd`
+dir=${1-tmp_tau_scaling}
+ds=${2-5.0}
+tmr=${3-15}
+tms=${4-45}
+mkdir -p $dir && cd $dir
+fail=0
+if [ ! -f bp3_geom.in ];then
+    python3 $gendir/gen_bp3.py $ds 60 bp3 > gen.log || exit 1
+fi
+ratio=`awk -v a=$tms -v b=$tmr 'BEGIN{printf "%.12g", a/b}'`
+echo "$0: ds = $ds km, tM $tmr -> $tms yr (ratio $ratio)"
+
+for grav in 1 0;do
+    tag=g$grav
+    echo "=== $tag: one sampling pass, two Maxwell times"
+    mkdir -p list_$tag direct_$tag
+    python3 $sdir/bp3_ve_kernels.py bp3_geom.in 40e3 "$tmr,$tms" \
+	list_$tag/bp3_tm%TM%.prony 5 -1 $grav 1 > list_$tag/kern.log 2>&1 \
+	|| { echo "  list-mode generation FAILED, see list_$tag/kern.log"
+	     fail=1; continue; }
+    grep -E "held-out|wrote|scaled" list_$tag/kern.log | sed 's/^/  /'
+    nsamp=`grep -c "source .* done" list_$tag/kern.log`
+    ncol=`wc -l < bp3_geom.in`
+    if [ "$nsamp" -le "$ncol" ];then
+	echo "  S1a one sampling pass for both files ($nsamp column samples"\
+	     "for $ncol columns)  PASS"
+    else
+	echo "  S1a resampled: $nsamp column samples for $ncol columns  FAIL"
+	fail=1
+    fi
+    # a SEPARATE invocation for a further Maxwell time must find the
+    # shared cache and sample nothing at all
+    tm3=`awk -v a=$tmr 'BEGIN{printf "%g", 7*a}'`
+    python3 $sdir/bp3_ve_kernels.py bp3_geom.in 40e3 $tm3 \
+	list_$tag/bp3_tm$tm3.prony 5 -1 $grav 1 \
+	> list_$tag/kern3.log 2>&1 \
+	|| { echo "  S1b reuse run FAILED, see list_$tag/kern3.log"; fail=1; }
+    n3=`grep -c "source .* done" list_$tag/kern3.log`
+    if [ -f list_$tag/bp3_tm$tm3.prony ] && [ "$n3" = "0" ];then
+	echo "  S1b later Maxwell time ($tm3 yr) reused the cache, 0 samples  PASS"
+    else
+	echo "  S1b later Maxwell time resampled ($n3 columns)  FAIL"; fail=1
+    fi
+    echo "=== $tag: direct generation at tM = $tms yr"
+    python3 $sdir/bp3_ve_kernels.py bp3_geom.in 40e3 $tms \
+	direct_$tag/bp3_tm$tms.prony 5 -1 $grav 1 \
+	> direct_$tag/kern.log 2>&1 \
+	|| { echo "  direct generation FAILED, see direct_$tag/kern.log"
+	     fail=1; continue; }
+    grep -E "held-out" direct_$tag/kern.log | sed 's/^/  /'
+    echo "=== $tag: scaled vs direct"
+    python3 $sdir/tau_scale_compare.py list_$tag/bp3_tm$tmr.prony \
+	direct_$tag/bp3_tm$tms.prony $ratio || fail=1
+    # the scaled file and the direct file should agree with ratio 1
+    python3 $sdir/tau_scale_compare.py list_$tag/bp3_tm$tms.prony \
+	direct_$tag/bp3_tm$tms.prony 1.0 || fail=1
+done
+[ $fail -eq 0 ] && echo "run_tau_scaling_test: ALL GATES PASS" || \
+    echo "run_tau_scaling_test: FAILURES (see above)"
+exit $fail

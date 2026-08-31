@@ -14,18 +14,24 @@
 #              parallel=1 additionally runs 2 of the 3 cases at once,
 #              so peak load is about 2 x ncore
 #
-# COST at 25 m (1600 patches): kernels are ~5-6 h per file on one
-# core and the cycle runs are hours each, so the full sweep is a
-# couple of days serially.  Two savings are built in:
+# COST at 25 m (1600 patches): kernels are ~5-6 h on one core for
+# the FIRST Maxwell time of a case and minutes for each further one
+# (the sampled kernels depend on t/tau, not on tau, so the cache is
+# shared by every Maxwell time in a run directory; see
+# bp3_ve_kernels.py, "MAXWELL-TIME SCALING"), and the cycle runs are
+# hours each.  Three savings are built in:
 #   * ve_shear reuses ve_g1's SHEAR blocks (the same kernels; only
 #     the normal family is dropped), by truncating the two-family
 #     file instead of generating a third one;
 #   * ve_g0 reuses ve_g1's ELASTIC reference (the elastic run knows
-#     nothing about gravity, it is the same computation).
+#     nothing about gravity, it is the same computation);
+#   * every Maxwell time of one case shares one sampling pass, so
+#     the tmlist is nearly free after its first entry (gravity on
+#     and off are separate cases and each pays once).
 # parallel=1 runs the remaining two cases concurrently.  Kernel
 # generation itself is spread over `ncore` cores per file
 # (bp3_ve_kernels_par), which is where nearly all the time goes:
-# 25 m is ~5-6 h on one core, ~45 min on eight.
+# 25 m is ~5-6 h on one core, ~45 min on eight, once per case.
 #
 # SMOKE TEST FIRST: ./run_many_bp3ve_demo 0.1 "45" 1500
 # exercises every path in about an hour before you commit to 25 m.
