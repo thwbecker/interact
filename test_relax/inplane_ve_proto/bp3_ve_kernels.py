@@ -50,7 +50,8 @@ usage: bp3_ve_kernels.py geom_file H_m tM_yr out_file [np] [sign] [g] [normal]
 """
 import sys
 import numpy as np
-from inplane2d import fields_xz, ve_fields_xz, segment_sources
+from inplane2d import (fields_xz, ve_fields_xz, fields_pairs,
+                       ve_fields_pairs, segment_sources)
 
 geomf = sys.argv[1]
 H = float(sys.argv[2])
@@ -140,32 +141,32 @@ for j in range(n):
         'shear' = t.sigma.n projected on the tangent, 'normal' =
         n.sigma.n (positive in tension here; the sign convention is
         fixed once by the runtime gate against In)"""
-        S = {c: np.diag(F[c]) for c in ("sxx", "sxz", "szz")}
+        S = {c: F[c] for c in ("sxx", "sxz", "szz")}
         tx_ = S["sxx"]*nxr + S["sxz"]*nzr
         tz_ = S["sxz"]*nxr + S["szz"]*nzr
         if comp == "normal":
             return tx_*nxr + tz_*nzr
         return tx_*txr + tz_*tzr
-    el = fields_xz(xs, zs, src, lam, mu, lam, mu, H,
-                   rho1=rho1, rho2=rho2, g=g, **kw)
+    el = fields_pairs(xs, zs, src, lam, mu, lam, mu, H,
+                      rho1=rho1, rho2=rho2, g=g, **kw)
     r0 = rows(el)
     # K0 (gate block) needs the high-k content the smooth-dK grid
     # truncates: separate elastic pass with kmax set by the minimum
     # off-diagonal receiver separation (|i-j| > 2 entries only)
-    elhi = fields_xz(xs, zs, src, lam, mu, lam, mu, H,
-                     rho1=rho1, rho2=rho2, g=g,
-                     kmin=1e-7, kmax=25.0/(3.0*2.0*np.min(hl)),
-                     npanel=56, nquad=6)
+    elhi = fields_pairs(xs, zs, src, lam, mu, lam, mu, H,
+                        rho1=rho1, rho2=rho2, g=g,
+                        kmin=1e-7, kmax=25.0/(3.0*2.0*np.min(hl)),
+                        npanel=56, nquad=6)
     K0[:, j] = sgn*rows(elhi)
     n0 = rows(el, "normal")
     N0[:, j] = sgnn*rows(elhi, "normal")
-    elr = fields_xz(xs, zs, src, lam, mu, K2 - 2*mur/3, mur, H,
-                    rho1=rho1, rho2=rho2, g=g, **kw)
+    elr = fields_pairs(xs, zs, src, lam, mu, K2 - 2*mur/3, mur, H,
+                       rho1=rho1, rho2=rho2, g=g, **kw)
     DKinf[:, j] = sgn*(rows(elr) - r0)
     DNinf[:, j] = sgnn*(rows(elr, "normal") - n0)
     for k, t in enumerate(ts):
-        ve = ve_fields_xz(xs, zs, src, lam, mu, lam, mu, H, tM, t,
-                          M=10, rho1=rho1, rho2=rho2, g=g, **kw)
+        ve = ve_fields_pairs(xs, zs, src, lam, mu, lam, mu, H, tM, t,
+                             M=10, rho1=rho1, rho2=rho2, g=g, **kw)
         vr = {c: np.real(ve[c]) for c in ("sxx", "sxz", "szz")}
         DK[k, :, j] = sgn*(rows(vr) - r0)
         DN[k, :, j] = sgnn*(rows(vr, "normal") - n0)
@@ -181,21 +182,23 @@ fit_rows = [k for k in range(len(ts)) if k != ihold]
 A = np.vstack([E[fit_rows], -np.ones((1, npr))])  # last row: t = inf
 
 def fit_family(D, Dinf, label):
-    """per-pair amplitudes C_p from sampled dK(t) and dK(inf);
-    returns (C, worst held-out residual relative to the relaxation
+    """per-pair amplitudes C_p from sampled dK(t) and dK(inf).
+    ALL pairs are solved at once through the (small, well
+    conditioned) weighted normal equations A^T W A c = A^T W b,
+    which is the same least-squares solution as a per-pair lstsq
+    but O(n^2) numpy work instead of n^2 python calls; returns
+    (C, worst held-out residual relative to the relaxation
     scale)"""
-    C = np.zeros((npr, n, n))
-    worst = 0.0
     scl = np.max(np.abs(Dinf)) + 1e-30
-    for i in range(n):
-        for j in range(n):
-            b = np.concatenate([D[fit_rows, i, j], [Dinf[i, j]]])
-            w = np.ones(len(b)); w[-1] = 3.0      # weight the limit
-            cij, *_ = np.linalg.lstsq(A*w[:, None], b*w, rcond=None)
-            C[:, i, j] = cij
-            r = abs(E[ihold] @ cij - D[ihold, i, j])/scl
-            if r > worst:
-                worst = r
+    w = np.ones(A.shape[0]); w[-1] = 3.0          # weight the limit
+    Aw = A*w[:, None]
+    G = Aw.T @ Aw                                  # (np, np)
+    # right-hand sides for every pair: (nfit+1, n, n)
+    B = np.concatenate([D[fit_rows], Dinf[None]], axis=0)*w[:, None, None]
+    rhs = np.einsum("kp,kij->pij", Aw, B)          # (np, n, n)
+    C = np.linalg.solve(G, rhs.reshape(npr, -1)).reshape(npr, n, n)
+    worst = float(np.max(np.abs(np.einsum("p,pij->ij", E[ihold], C)
+                                - D[ihold])))/scl
     print(f"bp3_ve_kernels: {label}: held-out worst residual "
           f"{worst:.3e} (of max |d{label[0].upper()}_inf| = "
           f"{scl:.3e} Pa/m)")

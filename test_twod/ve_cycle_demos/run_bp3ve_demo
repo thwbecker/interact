@@ -18,6 +18,11 @@
 # SIGN of the viscoelastic effect on recurrence depends on it, see
 # test_relax/inplane_ve_proto/README_inplane_ve_proto.md.
 #
+# Each run also writes the 12 SEAS station time series, kept per
+# case in st_el/ and st_tm<tM>/ (t, slip, log10 V, tau, sigma_n,
+# log10 theta), so the normal-stress history can be plotted with
+# ../../seas_bp_tests/bp3/plot_bp3.py.
+#
 # Physics: contained-fault loading-pathway relaxation, the
 # Rundle/Thatcher-Rundle regime, cf. the antiplane loading-condition
 # map in test_twod/anti_plane/ve_loading_conditions.md.
@@ -26,10 +31,12 @@
 # the point is the elastic-vs-VE contrast at fixed mesh).  Kernel
 # generation takes ~10 min per Maxwell time and caches/resumes.
 #
-# usage: run_bp3ve_demo [outdir] [tmlist_yr] [stop_yr] [sigma] [ds_km]
-#        defaults  bp3ve_demo "15 30 45 75 120 200 400" 1500 1 0.6667
+# usage: run_bp3ve_demo [outdir] [tmlist_yr] [stop_yr] [sigma] [ds_km] [gravity]
+#        defaults  bp3ve_demo "15 30 45 75 120 200 400" 1500 1 0.6667 1
 #        sigma 1 (default): shear + normal tractions (-calc_sigma_dot
 #              plus two-family kernels); 0: shear only, sigma frozen
+#        gravity 1 (default) / 0: buoyancy in the kernels; use
+#              SEPARATE output directories for the two cases
 #        (kernels dominate the cost, ~10 min per tM, cached in the
 #         run dir; pass fewer Maxwell times for a quick look)
 #
@@ -41,6 +48,7 @@ tmlist=${2-"15 30 45 75 120 200 400"}
 stop=${3-1500}
 sigma=${4-1}
 ds=${5-0.6667}
+grav=${6-1}
 if [ "$sigma" = "1" ];then
     sigopt="-calc_sigma_dot"; nrm=1
     echo "$0: shear + normal tractions (two-family kernels)"
@@ -48,6 +56,11 @@ else
     sigopt=""; nrm=0
     echo "$0: shear only, sigma_n frozen"
 fi
+[ "$grav" = "1" ] && echo "$0: gravity ON (rho 2800/3300, 9.81)" || \
+    echo "$0: gravity OFF"
+# kernels depend on tM AND on the gravity setting, so the file name
+# carries both: a run never picks up a stale file from the other case
+ktag=g$grav
 mkdir -p $dir && cd $dir
 python3 $sdir/../../seas_bp_tests/bp3/gen_bp3.py $ds 60 bp3 > gen.log
 common="-geom_file bp3_geom.in -rsf_file bp3_rsf.dat -rsf_ic_file bp3_ic.in \
@@ -55,25 +68,29 @@ common="-geom_file bp3_geom.in -rsf_file bp3_rsf.dat -rsf_ic_file bp3_ic.in \
  -shear_modulus 3.204e10 -s_wave_speed 3464 -rtol 1e-4 -ts_rk_type 3bs \
  -ts_max_steps 2000000000 -dt_monitor_yr 10 -track_events -rsf_catalog \
  -vel_event 1e-3 -rsf_checkpoint 20000 -rsf_checkpoint_wall 60 \
+ -rsf_stations bp3_stations.dat -rsf_station_dt_yr 0.5 \
  -stop_time_yr $stop $sigopt"
 if [ ! -f cat_el.dat ];then
     echo "$0: elastic reference"
     rm -f rsf_catalog* rsf_events.dat rsf_monitor* rsf_checkpoint.bin
     $bindir/rsf_solve $common > run_el.log 2>&1
     cp rsf_catalog.dat cat_el.dat
+    mkdir -p st_el && mv fltst_*.dat st_el/ 2>/dev/null
 fi
 for tm in $tmlist;do
     [ -f cat_tm$tm.dat ] && continue
-    if [ ! -f bp3_tm$tm.prony ];then
+    if [ ! -f bp3_tm${tm}_$ktag.prony ];then
 	echo "$0: generating kernels for tM = $tm yr (~10 min, resumable)"
 	dd=`pwd`
 	(cd $proto && python3 bp3_ve_kernels.py $dd/bp3_geom.in 40e3 $tm \
-	    $dd/bp3_tm$tm.prony 5 -1 1 $nrm) || exit 1
+	    $dd/bp3_tm${tm}_$ktag.prony 5 -1 $grav $nrm) || exit 1
     fi
     echo "$0: VE run tM = $tm yr"
     rm -f rsf_catalog* rsf_events.dat rsf_monitor* rsf_checkpoint.bin
-    $bindir/rsf_solve $common -ve_mode 3 -ve_prony_file bp3_tm$tm.prony \
+    $bindir/rsf_solve $common -ve_mode 3 \
+      -ve_prony_file bp3_tm${tm}_$ktag.prony \
       -ve_h_init 1 > run_tm$tm.log 2>&1
     cp rsf_catalog.dat cat_tm$tm.dat
+    mkdir -p st_tm$tm && mv fltst_*.dat st_tm$tm/ 2>/dev/null
 done
 python3 $sdir/plot_bp3ve_demo.py . && echo "$0: see $dir/bp3ve_demo.png"
