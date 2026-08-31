@@ -92,6 +92,17 @@ usage: bp3_ve_kernels.py geom_file H_m tM_yr out_file [np] [sign] [g] [normal]
 """
 import sys
 import os
+# BLAS threads.  The batched evaluation path (inplane2d._PairCtx)
+# spends its time in small complex GEMMs, five columns wide, where
+# library threading does not pay even for a single process, while
+# kernel generation is already parallel over source columns.  Left at
+# the library default, several workers on one node oversubscribe the
+# cores: a two-worker test on two cores ran 4.7 times slower that way
+# (3.06 s per column and core against 0.66 s).  This must be set
+# before numpy is imported; anything already in the environment wins.
+for _v in ("OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS",
+           "NUMEXPR_NUM_THREADS", "VECLIB_MAXIMUM_THREADS"):
+    os.environ.setdefault(_v, "1")
 import glob
 import hashlib
 import numpy as np
