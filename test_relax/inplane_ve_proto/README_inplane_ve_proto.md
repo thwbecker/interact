@@ -92,6 +92,14 @@ T3  plate over Maxwell substrate: t->0+ reproduces the unrelaxed
     sxz, szz continuous through time at machine precision while sxx
     develops the legitimate modulus-contrast jump; plate-point
     stress evolves monotonically between the limits.
+T7  the batched matched-pair evaluation path (what kernel generation
+    actually runs) against the original per-wavenumber loop, kept as
+    fields_pairs_ref: separated bases reproduce basis/basis_cs to
+    4e-16; the batched matcher agrees with solve_k to 7e-11 at
+    condition numbers up to 2e8, with both solutions leaving a scaled
+    residual of 2e-15, i.e. both are backward stable and the
+    difference is the conditioning; assembled fields agree to 2e-13,
+    and to 4e-14 against the diagonal of the untouched fields_xz.
 T6  Maxwell-time scaling: the relaxation part of both traction
     families, sampled at matched t/tau for Maxwell times in integer
     and non-integer ratios, agrees to 1e-13 of the relaxation scale
@@ -244,6 +252,55 @@ generation of it only through the rounding of the scaled ladder.
 The array-level statement is gate T6 (1e-13), which is the cleaner
 number because it is not limited by the 8-digit kernel file format.
 
+## Cost of kernel generation
+
+The wavenumber quadrature is evaluated in batched form.  Both region
+bases are separable in depth,
+
+    B(z) = sum_m f_m(z) C_m ,     C_m independent of z,
+
+with f = (ch, sh, kz ch, kz sh) in the cosh/sinh form and
+(ed, eg, kz ed, kz eg) in the exponential one, so the state vector at
+a receiver is a sum of four small matrix-vector products rather than a
+4x4 basis built per receiver, and the quadrature over wavenumbers
+becomes a matrix product.  The factor that carries the geometry,
+
+    g_m[k, i] = w_k e^{i k x_i} f_m[k, z_i],
+
+contains no material parameters, so it is built once per source and
+reused for every node of the Laplace contour and every sample time;
+the negative-k parity contribution reuses it as its conjugate.  What
+remains per contour node is the batched 10x10 matcher solve and one
+matrix product per source, region and parity.
+
+Measured on the SEAS BP3 dip-60 geometry at ds = 25 m (1600 columns,
+one core of a 2-core container): 11.4 s per column before, 1.16 s
+after, i.e. 0.5 h instead of 5.1 h for a full kernel file, and about
+15 minutes on two cores.  Combined with the Maxwell-time scaling
+above, a three-Maxwell-time sweep for one case costs one such pass
+rather than three.  Smaller consequences of the same change: the
+gate suites now run in tens of seconds (run_tau_scaling_test 16 s,
+run_ve_normal_test 19 s), and the ds = 2 km demo including both
+viscoelastic cycle runs finishes in 9 s.
+
+The sampled values move by about 1e-11 relative to the previous
+per-wavenumber loop, which is four orders below the fit's own
+held-out residual; kernel files are therefore no longer bit-identical
+to ones generated before this change, and the cache version was
+deliberately NOT bumped so that a part-way sampling run survives.
+The per-column cache write was also put on a wall-clock cadence
+(SAVE_EVERY_S): at 25 m the cache is 450 MB, so writing it after
+every column had become the dominant cost once the sampling itself
+was fast.  An interrupted run now loses at most that much sampling.
+
+Not batched: fields_xz, the full source-by-receiver-grid routine used
+by the validation gates T1 to T5 and by the PSGRN and Rundle
+comparisons.  It is not on the kernel-generation path, and leaving it
+alone keeps those gates as an independent reference.  A worthwhile
+follow-up for large runs is the memory of the parallel path: each
+worker currently allocates the whole (nt, n, n) sample array although
+it fills only its own columns, which is 450 MB per worker at 25 m.
+
 ## Hereditary NORMAL-stress relaxation (two-family kernels)
 
 On a dipping fault, slip changes the fault-normal traction as well as
@@ -318,10 +375,12 @@ machinery, it does not measure the effect.
 ## Files
 
 inplane2d.py  the solver module (basis, matcher, sources, k
-    integration, Maxwell moduli, Talbot, ve_fields_xz)
+    integration, Maxwell moduli, Talbot, ve_fields_xz; and the
+    batched matched-pair path pair_ctx / fields_pairs_ctx, with the
+    original loop kept as fields_pairs_ref for the T7 gate)
 fem2d.py      independent FEM reference (bilinear quads, split nodes)
 t0_basis.py t1_elastic.py t2_maxwell_corr.py t3_plate_maxwell.py
-t4_gravity.py t6_tau_scaling.py
+t4_gravity.py t6_tau_scaling.py t7_batched_fields.py
 run_inplane_proto_test   gate driver
 run_tau_scaling_test     file-level Maxwell-time scaling gate
     (bp3_ve_kernels.py scaled emission vs direct generation)

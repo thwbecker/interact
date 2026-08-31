@@ -14,8 +14,8 @@
 #              parallel=1 additionally runs 2 of the 3 cases at once,
 #              so peak load is about 2 x ncore
 #
-# COST at 25 m (1600 patches): kernels are ~5-6 h on one core for
-# the FIRST Maxwell time of a case and minutes for each further one
+# COST at 25 m (1600 patches): kernels are about half an hour on one
+# core for the FIRST Maxwell time of a case, seconds for each further one
 # (the sampled kernels depend on t/tau, not on tau, so the cache is
 # shared by every Maxwell time in a run directory; see
 # bp3_ve_kernels.py, "MAXWELL-TIME SCALING"), and the cycle runs are
@@ -29,12 +29,14 @@
 #     the tmlist is nearly free after its first entry (gravity on
 #     and off are separate cases and each pays once).
 # parallel=1 runs the remaining two cases concurrently.  Kernel
-# generation itself is spread over `ncore` cores per file
-# (bp3_ve_kernels_par), which is where nearly all the time goes:
-# 25 m is ~5-6 h on one core, ~45 min on eight, once per case.
+# generation is spread over `ncore` cores per file
+# (bp3_ve_kernels_par): 25 m is about 0.5 h on one core and a few
+# minutes on eight, once per case.  Since the batched evaluation
+# path landed the CYCLE RUNS, not the kernels, dominate the wall
+# clock at 25 m.
 #
 # SMOKE TEST FIRST: ./run_many_bp3ve_demo 0.1 "45" 1500
-# exercises every path in about an hour before you commit to 25 m.
+# exercises every path in a few minutes before you commit to 25 m.
 #
 ds=${1-0.025}
 tms=${2-"15 45 200"}

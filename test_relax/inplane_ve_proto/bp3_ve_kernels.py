@@ -96,13 +96,25 @@ import glob
 import hashlib
 import numpy as np
 from inplane2d import (fields_xz, ve_fields_xz, fields_pairs,
-                       ve_fields_pairs, segment_sources)
+                       ve_fields_pairs, segment_sources,
+                       pair_ctx, fields_pairs_ctx)
 
 YR = 3.15576e7
 # bump when anything that changes the SAMPLED arrays changes (grids,
 # sample times, projections, sign folding): old caches are then not
 # picked up by accident
 CACHE_VERSION = "v2-dimensionless"
+# NOT bumped for the batched evaluation path (inplane2d._PairCtx): it
+# changes the sampled values only at the 1e-11 level, four orders
+# below the fit's own held-out residual, so existing caches stay
+# usable and a part-way 25 m sampling run is not thrown away.
+
+# the cache is a few hundred MB at 25 m (the (nt, n, n) sample
+# arrays), so writing it after every column would cost more than the
+# sampling itself: checkpoint on a wall-clock cadence instead, and
+# once at the end.  An interrupted run then loses at most this much
+# sampling.
+SAVE_EVERY_S = 60.0
 
 geomf = sys.argv[1]
 H = float(sys.argv[2])
@@ -360,7 +372,8 @@ done = cache["done"]
 # ----------------------------------------------------------------------
 # sampling pass
 import time as _time
-t0_ = _time.time()
+t0_ = tsave = _time.time()
+nnew = 0
 cols = range(n) if not worker else range(ipart, n, npart)
 for j in cols:
     if done[j]:
@@ -368,8 +381,13 @@ for j in cols:
     x1, z1 = xc[j] - hl[j]*tx[j], zc[j] - hl[j]*tz[j]
     x2, z2 = xc[j] + hl[j]*tx[j], zc[j] + hl[j]*tz[j]
     src = segment_sources(x1, z1, x2, z2, 1.0, ns=nsrc)
-    el = fields_pairs(xs, zs, src, lam, mu, lam, mu, H,
-                      rho1=rho1, rho2=rho2, g=g, **kw)
+    # the geometric part of the matched-pair evaluation depends on the
+    # source and the k-grid but not on the moduli, so it is built once
+    # here and reused by the elastic passes and by every sample time
+    # (see inplane2d._PairCtx)
+    ctx = pair_ctx(xs, zs, src, H, **kw)
+    el = fields_pairs_ctx(ctx, lam, mu, lam, mu,
+                          rho1=rho1, rho2=rho2, g=g)
     r0 = rows(el)
     # K0 (gate block) needs the high-k content the smooth-dK grid
     # truncates: separate elastic pass with kmax set by the minimum
@@ -379,21 +397,25 @@ for j in cols:
     K0[:, j] = sgn*rows(elhi)
     n0 = rows(el, "normal")
     N0[:, j] = sgnn*rows(elhi, "normal")
-    elr = fields_pairs(xs, zs, src, lam, mu, K2 - 2*mur/3, mur, H,
-                       rho1=rho1, rho2=rho2, g=g, **kw)
+    elr = fields_pairs_ctx(ctx, lam, mu, K2 - 2*mur/3, mur,
+                           rho1=rho1, rho2=rho2, g=g)
     DKinf[:, j] = sgn*(rows(elr) - r0)
     DNinf[:, j] = sgnn*(rows(elr, "normal") - n0)
     for k, t in enumerate(ts):
         ve = ve_fields_pairs(xs, zs, src, lam, mu, lam, mu, H, tM, t,
-                             M=10, rho1=rho1, rho2=rho2, g=g, **kw)
+                             M=10, rho1=rho1, rho2=rho2, g=g, ctx=ctx)
         vr = {c: np.real(ve[c]) for c in ("sxx", "sxz", "szz")}
         DK[k, :, j] = sgn*(rows(vr) - r0)
         DN[k, :, j] = sgnn*(rows(vr, "normal") - n0)
     done[j] = True
-    save_cache(cachef, dict(K0=K0, DK=DK, DKinf=DKinf, N0=N0, DN=DN,
-                            DNinf=DNinf, done=done))
+    nnew += 1
+    if _time.time() - tsave > SAVE_EVERY_S:
+        save_cache(cachef, cache)
+        tsave = _time.time()
     print(f"  source {j+1}/{n} done  ({_time.time()-t0_:.0f} s)",
           flush=True)
+if nnew:
+    save_cache(cachef, cache)
 
 if worker:
     nd = int(done[ipart::npart].sum())
