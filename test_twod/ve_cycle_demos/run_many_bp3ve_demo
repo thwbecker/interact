@@ -1,0 +1,7 @@
+#!/bin/bash
+
+for tm in 15 45 200;do
+    ./run_bp3ve_demo ve_g1    $tm 1500 1 0.025 1     # shear+normal, gravity ON,  25 m
+    ./run_bp3ve_demo ve_g0    $tm 1500 1 0.025 0     # shear+normal, gravity OFF, 25 m
+    ./run_bp3ve_demo ve_shear $tm 1500 0 0.025 1     # shear only (σ frozen), for contrast
+done
