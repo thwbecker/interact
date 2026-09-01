@@ -21,7 +21,13 @@
 # Each run also writes the 12 SEAS station time series, kept per
 # case in st_el/ and st_tm<tM>/ (t, slip, log10 V, tau, sigma_n,
 # log10 theta), so the normal-stress history can be plotted with
-# ../../seas_bp_tests/bp3/plot_bp3.py.
+# ../../seas_bp_tests/bp3/plot_bp3.py.  The catalog, event list and
+# monitor are kept per case too, as cat_<tag>.dat, ev_<tag>.dat and
+# mon_<tag>.dat: rsf_solve writes the same three file names for every
+# run, so without the copies only the last case of a sweep survives.
+#
+# Re-running with a LONGER -stop_time_yr extends each case from its
+# own checkpoint rather than doing nothing; see run_case below.
 #
 # Physics: contained-fault loading-pathway relaxation, the
 # Rundle/Thatcher-Rundle regime, cf. the antiplane loading-condition
@@ -83,27 +89,77 @@ common="-geom_file bp3_geom.in -rsf_file bp3_rsf.dat -rsf_ic_file bp3_ic.in \
  -vel_event 1e-3 -rsf_checkpoint 20000 -rsf_checkpoint_wall 60 \
  -rsf_stations bp3_stations.dat -rsf_station_dt_yr 0.5 \
  -stop_time_yr $stop $sigopt $extra"
-if [ ! -f cat_el.dat ];then
-    echo "$0: elastic reference"
-    rm -f rsf_catalog* rsf_events.dat rsf_monitor* rsf_checkpoint.bin
-    $bindir/rsf_solve $common > run_el.log 2>&1
-    cp rsf_catalog.dat cat_el.dat
-    mkdir -p st_el && mv fltst_*.dat st_el/ 2>/dev/null
-fi
+# One case: the elastic reference (tag el) or one Maxwell time (tag
+# tm<tM>).  A case counts as done only if it was run to at least the
+# CURRENTLY requested stop time, which is recorded in stop_<tag>.yr.
+# A later call with a longer -stop_time_yr therefore extends the case
+# from its own checkpoint instead of silently doing nothing, which is
+# what a bare "does cat_<tag>.dat exist" test did.  rsf_solve opens
+# its outputs in append mode on restart and writes a "# restarted"
+# line, so the catalog, events, monitor and station series of the
+# extended run continue the old ones; they are staged back into place
+# before the restart for that reason.
+#
+# Checkpoints are per case.  rsf_solve refuses to restart an elastic
+# run from a viscoelastic checkpoint and the reverse, but nothing
+# would catch restarting tM = 30 yr from a tM = 15 yr checkpoint, and
+# a single shared rsf_checkpoint.bin invited exactly that.
+run_case ()
+{
+    tag=$1; shift
+    cat=cat_$tag.dat; stamp=stop_$tag.yr; ck=ckpt_$tag.bin
+    have=0
+    [ -f "$stamp" ] && have=`cat $stamp`
+    if awk -v a="$have" -v b="$stop" 'BEGIN{exit !(a+0 >= b+0)}';then
+	echo "$0: $tag already run to $have yr, at or past $stop, skipping"
+	return 0
+    fi
+    rm -f rsf_catalog* rsf_events.dat rsf_monitor* fltst_*.dat
+    # the run writes its checkpoint to a SCRATCH name and it is
+    # committed only together with the catalog.  Otherwise an
+    # interrupted extension leaves a checkpoint ahead of the saved
+    # catalog, and the next attempt restarts from there and silently
+    # drops the events in between.
+    [ -f "$ck.run" ] && echo "$0: $tag: discarding an interrupted"\
+	"extension (checkpoint $ck.run)"
+    rm -f $ck.run $ck.run.prev $ck.run.info
+    rst=
+    if [ -f "$ck" ] && [ -f "$cat" ];then
+	echo "$0: extending $tag from $have to $stop yr"
+	cp $cat rsf_catalog.dat
+	[ -f ev_$tag.dat ] && cp ev_$tag.dat rsf_events.dat
+	[ -f mon_$tag.dat ] && cp mon_$tag.dat rsf_monitor.dat
+	[ -d st_$tag ] && cp st_$tag/fltst_*.dat . 2>/dev/null
+	rst="-rsf_restart $ck"
+    else
+	echo "$0: $tag from scratch to $stop yr"
+	rm -f $ck $ck.prev $ck.info
+	: > run_$tag.log
+    fi
+    $bindir/rsf_solve $common -rsf_checkpoint_file $ck.run $rst "$@" \
+	>> run_$tag.log 2>&1 || {
+	echo "$0: $tag FAILED, see $dir/run_$tag.log"; return 1; }
+    cp rsf_catalog.dat $cat
+    [ -f rsf_events.dat ] && cp rsf_events.dat ev_$tag.dat
+    [ -f rsf_monitor.dat ] && cp rsf_monitor.dat mon_$tag.dat
+    mkdir -p st_$tag && mv fltst_*.dat st_$tag/ 2>/dev/null
+    if [ -f "$ck.run" ];then                 # commit, with the catalog
+	mv $ck.run $ck
+	[ -f $ck.run.info ] && mv $ck.run.info $ck.info
+	rm -f $ck.run.prev
+    fi
+    echo $stop > $stamp
+    return 0
+}
+run_case el || exit 1
 for tm in $tmlist;do
-    [ -f cat_tm$tm.dat ] && continue
     if [ ! -f bp3_tm${tm}_$ktag.prony ];then
 	echo "$0: generating kernels for tM = $tm yr on $ncore core(s), resumable"
 	dd=`pwd`
 	(cd $proto && ./bp3_ve_kernels_par $dd/bp3_geom.in 40e3 $tm \
 	    $dd/bp3_tm${tm}_$ktag.prony $ncore 5 -1 $grav $nrm) || exit 1
     fi
-    echo "$0: VE run tM = $tm yr"
-    rm -f rsf_catalog* rsf_events.dat rsf_monitor* rsf_checkpoint.bin
-    $bindir/rsf_solve $common -ve_mode 3 \
-      -ve_prony_file bp3_tm${tm}_$ktag.prony \
-      -ve_h_init 1 > run_tm$tm.log 2>&1
-    cp rsf_catalog.dat cat_tm$tm.dat
-    mkdir -p st_tm$tm && mv fltst_*.dat st_tm$tm/ 2>/dev/null
+    run_case tm$tm -ve_mode 3 -ve_prony_file bp3_tm${tm}_$ktag.prony \
+	-ve_h_init 1 || exit 1
 done
 python3 $sdir/plot_bp3ve_demo.py . && echo "$0: see $dir/bp3ve_demo.png"

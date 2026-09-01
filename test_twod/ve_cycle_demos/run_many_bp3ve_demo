@@ -24,7 +24,8 @@
 #     the normal family is dropped), by truncating the two-family
 #     file instead of generating a third one;
 #   * ve_g0 reuses ve_g1's ELASTIC reference (the elastic run knows
-#     nothing about gravity, it is the same computation);
+#     nothing about gravity, it is the same computation), including
+#     its checkpoint, so it can be extended without being redone;
 #   * every Maxwell time of one case shares one sampling pass, so
 #     the tmlist is nearly free after its first entry (gravity on
 #     and off are separate cases and each pays once).
@@ -74,10 +75,20 @@ for tm in $tms;do
     # 2. reuse: shear-only kernels by truncation, elastic reference by copy
     mkdir -p ve_shear ve_g0
     trunc_shear ve_g1/bp3_tm${tm}_g1n1.prony ve_shear/bp3_tm${tm}_g1n0.prony
-    for f in cat_el.dat;do
-	[ -f ve_g1/$f ] && [ ! -f ve_g0/$f ] && cp ve_g1/$f ve_g0/$f
-    done
-    [ -d ve_g1/st_el ] && [ ! -d ve_g0/st_el ] && cp -r ve_g1/st_el ve_g0/
+    # the elastic reference knows nothing about gravity, so ve_g0 takes
+    # ve_g1's whole elastic case: catalog, events, monitor, stations,
+    # checkpoint and the stop-time stamp, so that ve_g0 can be extended
+    # from it later just as ve_g1 can.  Refreshed when ve_g1's is newer,
+    # which is what happens after ve_g1 itself has been extended.
+    if [ -f ve_g1/cat_el.dat ] && { [ ! -f ve_g0/cat_el.dat ] || \
+	    [ ve_g1/cat_el.dat -nt ve_g0/cat_el.dat ]; };then
+	for f in cat_el.dat ev_el.dat mon_el.dat ckpt_el.bin stop_el.yr;do
+	    [ -f ve_g1/$f ] && cp ve_g1/$f ve_g0/$f
+	done
+	rm -rf ve_g0/st_el
+	[ -d ve_g1/st_el ] && cp -r ve_g1/st_el ve_g0/
+	echo "$0: ve_g0 reuses ve_g1's elastic reference"
+    fi
     # 3. the other two cases
     if [ "$par" = "1" ];then
 	./run_bp3ve_demo ve_g0    "$tm" $stop 1 $ds 0 "$extra" $ncore &
