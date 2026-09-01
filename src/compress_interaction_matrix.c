@@ -37,10 +37,10 @@ int main(int argc, char **argv)
   Mat KT;
   PetscReal nrmK,nrmD;
 #endif
-  KSP               ksp,ksph;
+  KSP               ksp=NULL,ksph=NULL;
   PC                pc,pch;
-  Vec         x, xh, b, bh, bout,d;
-  Mat         Adense,AH,AH_dense;
+  Vec         x=NULL, xh=NULL, b=NULL, bh=NULL, bout=NULL,d=NULL;
+  Mat         Adense=NULL,AH=NULL,AH_dense=NULL;
   PetscReal   *coords=NULL,*avalues=NULL,*bvalues=NULL,norm[3];
   PetscInt    ndim, n, m, lm,ln,i,j,k,dn,on, *col_idx=NULL,rs,re;
   PetscInt nrandom = 0;	/* for timing tests */
@@ -101,7 +101,7 @@ int main(int argc, char **argv)
   /* optional external dumps (see -dump_matrix / -dump_coords below) */
   char dump_matrix_file[STRLEN]="",dump_coords_file[STRLEN]="";
   PetscBool do_dump_matrix=PETSC_FALSE,do_dump_coords=PETSC_FALSE;
-  hmat_helper_shell_ctx *hsc_dense,*hsc_h;
+  hmat_helper_shell_ctx *hsc_dense=NULL,*hsc_h=NULL;
 #if ( defined(USE_HMMVP) || defined(USE_HACAPK) )
   double *xc,*yc,*zc;
   Vec xd;
@@ -802,19 +802,25 @@ int main(int argc, char **argv)
   }
   /* 
    */
-  if(!skip_dense)
+  if(!skip_dense){
     PetscCall(MatCreateVecs(Adense, &x, &b));/* For A x = b: x -> left, b -> right */
+  }
   PetscCall(MatCreateVecs(AH, &xh, &bh));/* For A x = b: x -> left, b -> right */
+  HEADNODE
+    fprintf(stderr,"%s: made it to testing stage\n",argv[0]);
   if(test_forward){
     
     /* 
        test matrix multiplication 
        b = A x
     */
-    PetscCall(VecSet(x, 1.0));
+    if(!skip_dense){
+      PetscCall(VecSet(x, 1.0));
+      PetscCall(VecAssemblyBegin(x));PetscCall(VecAssemblyEnd(x));
+    }
     PetscCall(VecSet(xh,1.0));
     /* do we need those? */
-    PetscCall(VecAssemblyBegin(x));PetscCall(VecAssemblyEnd(x));
+
     PetscCall(VecAssemblyBegin(xh));PetscCall(VecAssemblyEnd(xh));
     
     if(!skip_dense){
@@ -926,33 +932,33 @@ int main(int argc, char **argv)
 
     */
     /* make context for solver */
-    /* dense */
-    PetscCall(KSPCreate(PETSC_COMM_WORLD, &ksp));
-    PetscCall(KSPSetOperators(ksp, Adense, Adense));
-    PetscCall(KSPGetPC(ksp, &pc));
-    if(medium->comm_size > 1){
-      /*
-	the dense reference matrix is mpidense under MPI, and sequential
-	PCLU cannot factor it; unless PETSc was built with a parallel
-	direct solver (MUMPS or SuperLU_DIST) MatGetFactor() fails with
-	"Could not locate a solver type for factorization type LU and
-	matrix type mpidense". fall back to an iterative reference solve
-	(unpreconditioned GMRES to a tight tolerance) so the inverse
-	accuracy comparison still runs in parallel. configure PETSc with
-	--download-mumps (then this branch can use PCLU/MATSOLVERMUMPS)
-	for a parallel DIRECT reference instead.
-      */
-      PetscCall(PCSetType(pc, PCNONE));
-      PetscCall(KSPSetType(ksp, KSPGMRES));
-      PetscCall(KSPSetTolerances(ksp, 1.0e-10, PETSC_DEFAULT, PETSC_DEFAULT, 100000));
-    }else{
-      PetscCall(PCSetType(pc, PCLU)); /* exact direct reference solve in serial */
-    }
-    PetscCall(KSPSetFromOptions(ksp)); /* command line still overrides the above */
-    PetscCall(VecSet(b, 1.0));
-    /* do we need those? */
-    PetscCall(VecAssemblyBegin(b));PetscCall(VecAssemblyEnd(b));
     if(!skip_dense){
+      /* dense */
+      PetscCall(KSPCreate(PETSC_COMM_WORLD, &ksp));
+      PetscCall(KSPSetOperators(ksp, Adense, Adense));
+      PetscCall(KSPGetPC(ksp, &pc));
+      if(medium->comm_size > 1){
+	/*
+	  the dense reference matrix is mpidense under MPI, and sequential
+	  PCLU cannot factor it; unless PETSc was built with a parallel
+	  direct solver (MUMPS or SuperLU_DIST) MatGetFactor() fails with
+	  "Could not locate a solver type for factorization type LU and
+	  matrix type mpidense". fall back to an iterative reference solve
+	  (unpreconditioned GMRES to a tight tolerance) so the inverse
+	  accuracy comparison still runs in parallel. configure PETSc with
+	  --download-mumps (then this branch can use PCLU/MATSOLVERMUMPS)
+	  for a parallel DIRECT reference instead.
+	*/
+	PetscCall(PCSetType(pc, PCNONE));
+	PetscCall(KSPSetType(ksp, KSPGMRES));
+	PetscCall(KSPSetTolerances(ksp, 1.0e-10, PETSC_DEFAULT, PETSC_DEFAULT, 100000));
+      }else{
+	PetscCall(PCSetType(pc, PCLU)); /* exact direct reference solve in serial */
+      }
+      PetscCall(KSPSetFromOptions(ksp)); /* command line still overrides the above */
+      PetscCall(VecSet(b, 1.0));
+      /* do we need those? */
+      PetscCall(VecAssemblyBegin(b));PetscCall(VecAssemblyEnd(b));
       /* 
 	 
 	 dense solver 
@@ -990,6 +996,7 @@ int main(int argc, char **argv)
       PetscCall(KSPSetFromOptions(ksph));
       PetscCall(KSPGetPC(ksph, &pch));
       PetscCall(PetscObjectTypeCompare((PetscObject)pch, PCHPDDM, &flg));
+      /*  */
       PetscCall(VecSet(bh,1.0));
       PetscCall(VecAssemblyBegin(bh));
       PetscCall(VecAssemblyEnd(bh));
