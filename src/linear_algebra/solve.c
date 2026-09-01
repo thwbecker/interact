@@ -89,6 +89,9 @@ int solve(struct med *medium,struct flt *fault)
      LU, SVD, or other  Ax=b solver      Y           N
      Lawson-Hanson original NNLS         N           Y
 
+     (note, this is all outside Petsc - see Petsc options for other
+     solvers)
+
 
   */
   if((medium->nreq) && (medium->nreq_con)){
@@ -214,11 +217,11 @@ int solve(struct med *medium,struct flt *fault)
     if(medium->force_petsc || (medium->comm_size>1)){
       /* 
 
-	 parallel matrix solve 
+	 Petsc and/or parallel matrix solve 
 	 
       */
       HEADNODE{
-	sprintf(out_string,"attempting Petsc LU solve, %i core(s) requested",
+	sprintf(out_string,"attempting Petsc matrix solve, %i core(s) requested",
 	       medium->comm_size);
 	time_report("solve",out_string,medium);
       }
@@ -239,7 +242,7 @@ int solve(struct med *medium,struct flt *fault)
 #else
       /* 
 
-	 Petsc parallel LU 
+	 Petsc parallel solve
 	 
       */
       m = n = medium->nreq;
@@ -270,16 +273,18 @@ int solve(struct med *medium,struct flt *fault)
       /* set up A matrix */
       PetscCall(MatCreate(PETSC_COMM_WORLD, &(medium->Is)));
       PetscCall(MatSetSizes(medium->Is, PETSC_DECIDE, PETSC_DECIDE, m, n));
-      PetscCall(MatSetType(medium->Is, MATDENSE));
-      PetscCall(MatSetFromOptions(medium->Is));
-      PetscCall(MatSetUp(medium->Is));
-      /* preallocate */
-      PetscCall(MatGetLocalSize(medium->Is, &lm, &ln));
-      dn = ln;
-      on = n - ln;
-
-      PetscCall(MatSeqAIJSetPreallocation(medium->Is, n, NULL));
-      PetscCall(MatMPIAIJSetPreallocation(medium->Is, dn, NULL, on, NULL));
+      {
+	/* dense matrix assembly */
+	PetscCall(MatSetType(medium->Is, MATDENSE));
+	PetscCall(MatSetFromOptions(medium->Is));
+	PetscCall(MatSetUp(medium->Is));
+	/* local rabge */
+	PetscCall(MatGetLocalSize(medium->Is, &lm, &ln));
+	dn = ln;on = n - ln;
+	/* preallocate */
+	PetscCall(MatSeqAIJSetPreallocation(medium->Is, n, NULL));
+	PetscCall(MatMPIAIJSetPreallocation(medium->Is, dn, NULL, on, NULL));
+      }
       /* 
 	 parallel assembly 
       */
@@ -301,12 +306,12 @@ int solve(struct med *medium,struct flt *fault)
       PetscCall(MatAssemblyBegin(medium->Is, MAT_FINAL_ASSEMBLY));
       PetscCall(MatAssemblyEnd(medium->Is, MAT_FINAL_ASSEMBLY));
 
-      /* Convert MATDENSE to another format required by solver package */
+      /* Convert MATDENSE to another format if required by solver package */
       PetscCall(PetscOptionsGetString(NULL, NULL, "-mat_type", mattype, PETSC_HELPER_STR_LEN, &pset));
       if (pset) { /* Convert MATDENSE to desired format */
 	PetscCall(MatConvert(medium->Is, mattype, MAT_INPLACE_MATRIX, &medium->Is));
       }
-
+      
       PetscCall(MatCreateVecs(medium->Is, &pbs, &x)); 
       
       /* 
@@ -789,7 +794,11 @@ void assemble_ap_matrix(A_MATRIX_PREC *a,int naflt,int naflt_con,
 
 #ifdef USE_PETSC
 
+/* 
 
+   parallel interaction matrix assembly - this mirrors calc_petsc_Isn_matrices
+
+ */
 int par_assemble_a_matrix(int naflt,my_boolean *sma,int nreq,int *nameaf,
 			  struct flt *fault,struct med *medium)
 {

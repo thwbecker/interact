@@ -215,7 +215,7 @@ int main(int argc, char **argv)
     /* 
        make all the matrices here in this program, only for testing purposes
 
-     */
+    */
     HEADNODE{
       fprintf(stderr,"%s: computing %i by %i matrix LOCALLY\n",argv[0], m,n);
       
@@ -245,44 +245,44 @@ int main(int argc, char **argv)
     }
 
     if(!skip_dense){
-    PetscCall(MatCreate(PETSC_COMM_WORLD, &Adense));
-    PetscCall(MatSetSizes(Adense, PETSC_DECIDE, PETSC_DECIDE, m, n));
-    PetscCall(MatSetType(Adense, MATDENSE));
-    PetscCall(MatSetFromOptions(Adense));
+      PetscCall(MatCreate(PETSC_COMM_WORLD, &Adense));
+      PetscCall(MatSetSizes(Adense, PETSC_DECIDE, PETSC_DECIDE, m, n));
+      PetscCall(MatSetType(Adense, MATDENSE));
+      PetscCall(MatSetFromOptions(Adense));
     
-    PetscCall(MatSetUp(Adense));
-    PetscCall(MatGetLocalSize(Adense, &lm, &ln));
-    dn = ln;on = n - ln;
-    PetscCall(MatSeqAIJSetPreallocation(Adense, n, NULL));
-    PetscCall(MatMPIAIJSetPreallocation(Adense, dn, NULL, on, NULL));
-    PetscCall(MatGetOwnershipRange(Adense, &medium->rs, &medium->re));
+      PetscCall(MatSetUp(Adense));
+      PetscCall(MatGetLocalSize(Adense, &lm, &ln));
+      dn = ln;on = n - ln;
+      PetscCall(MatSeqAIJSetPreallocation(Adense, n, NULL));
+      PetscCall(MatMPIAIJSetPreallocation(Adense, dn, NULL, on, NULL));
+      PetscCall(MatGetOwnershipRange(Adense, &medium->rs, &medium->re));
     
-    /*  */
-    medium->rn = medium->re  - medium->rs; /* number of local elements */
-    //fprintf(stderr,"%s: core %i: dn %i on %i n %i rs %i re %i \n",argv[0],medium->comm_rank,dn,on,n,medium->rs,medium->re);
-    /*  */
-    PetscCall(PetscCalloc(m*sizeof(PetscScalar), &avalues));
-    PetscCall(PetscCalloc(n*sizeof(PetscInt), &col_idx));
-    for (i=0; i < n; i++) 
-      col_idx[i] = i;
-    /* 
-       assemble dense matrix 
-    */
-    fprintf(stderr,"%s: core %03i/%03i: assigning dense  row %5i to %5i\n",
-	    argv[0],medium->comm_rank,medium->comm_size,medium->rs,medium->re);
-    PetscTime(&t0);
-    for(j=medium->rs;j <  medium->re;j++){// rupturing faults for this CPU
-      GenKEntries_petsc(ndim,1,n,&j, col_idx, avalues,ictx);
-      PetscCall(MatSetValues(Adense, 1, &j, n, col_idx,avalues, INSERT_VALUES));
-    }
-    PetscCall(PetscFree(avalues));
-    PetscCall(PetscFree(col_idx));
-    PetscCall(MatAssemblyBegin(Adense, MAT_FINAL_ASSEMBLY));
-    PetscCall(MatAssemblyEnd(Adense, MAT_FINAL_ASSEMBLY));
-    PetscTime(&t1);
-    HEADNODE
-      fprintf(stderr,"%s: dense assembly took %12.4f s\n",argv[0],t1-t0);
-    /* dense done */
+      /*  */
+      medium->rn = medium->re  - medium->rs; /* number of local elements */
+      //fprintf(stderr,"%s: core %i: dn %i on %i n %i rs %i re %i \n",argv[0],medium->comm_rank,dn,on,n,medium->rs,medium->re);
+      /*  */
+      PetscCall(PetscCalloc(m*sizeof(PetscScalar), &avalues));
+      PetscCall(PetscCalloc(n*sizeof(PetscInt), &col_idx));
+      for (i=0; i < n; i++) 
+	col_idx[i] = i;
+      /* 
+	 assemble dense matrix 
+      */
+      fprintf(stderr,"%s: core %03i/%03i: assigning dense  row %5i to %5i\n",
+	      argv[0],medium->comm_rank,medium->comm_size,medium->rs,medium->re);
+      PetscTime(&t0);
+      for(j=medium->rs;j <  medium->re;j++){// rupturing faults for this CPU
+	GenKEntries_petsc(ndim,1,n,&j, col_idx, avalues,ictx);
+	PetscCall(MatSetValues(Adense, 1, &j, n, col_idx,avalues, INSERT_VALUES));
+      }
+      PetscCall(PetscFree(avalues));
+      PetscCall(PetscFree(col_idx));
+      PetscCall(MatAssemblyBegin(Adense, MAT_FINAL_ASSEMBLY));
+      PetscCall(MatAssemblyEnd(Adense, MAT_FINAL_ASSEMBLY));
+      PetscTime(&t1);
+      HEADNODE
+	fprintf(stderr,"%s: dense assembly took %12.4f s\n",argv[0],t1-t0);
+      /* dense done */
     }else{
       /* -skip_dense: do not build the dense reference. Create a tiny empty
          AIJ matrix with the same global size only to reproduce the row
@@ -303,21 +303,21 @@ int main(int argc, char **argv)
     }
 
     /*
-       optional external dumps of the operator and its point cloud, so
-       that alternative cluster trees / admissibility choices can be
-       explored outside interact (e.g. fault-split vs joint geometric
-       clustering for H-matrix compression).
+      optional external dumps of the operator and its point cloud, so
+      that alternative cluster trees / admissibility choices can be
+      explored outside interact (e.g. fault-split vs joint geometric
+      clustering for H-matrix compression).
 
-       -dump_matrix <file>: the dense interaction matrix as raw
-          row-major float64, A[i*n+j] = stress at receiver i from unit
-          slip at source j (the same operator the H-matrix backends
-          approximate). a companion <file>.info records "m n" and the
-          layout. needs a single MPI rank so the full matrix is local.
+      -dump_matrix <file>: the dense interaction matrix as raw
+      row-major float64, A[i*n+j] = stress at receiver i from unit
+      slip at source j (the same operator the H-matrix backends
+      approximate). a companion <file>.info records "m n" and the
+      layout. needs a single MPI rank so the full matrix is local.
 
-       -dump_coords <file>: one ASCII row per patch with centroid,
-          orientation, half-sizes, area, unit normal and group id, i.e.
-          everything a clustering routine needs, including the normal so
-          that orientation (not just centroid position) can be used.
+      -dump_coords <file>: one ASCII row per patch with centroid,
+      orientation, half-sizes, area, unit normal and group id, i.e.
+      everything a clustering routine needs, including the normal so
+      that orientation (not just centroid position) can be used.
     */
     if(do_dump_matrix){
       if(medium->comm_size != 1){
@@ -651,8 +651,8 @@ int main(int argc, char **argv)
 	  PetscCall(VecView(ab0,aviewer));
 	  PetscCall(PetscViewerDestroy(&aviewer));
 	  HEADNODE
-	  fprintf(stderr,"%s: accuracy_reference wrote b0 = A x0 to %s (|b0| %.6e)\n",
-		  argv[0],accuracy_ref_file,(double)anrm);
+	    fprintf(stderr,"%s: accuracy_reference wrote b0 = A x0 to %s (|b0| %.6e)\n",
+		    argv[0],accuracy_ref_file,(double)anrm);
 	  PetscCall(VecDestroy(&ax0));
 	  PetscCall(VecDestroy(&ab0));
 	}
@@ -715,11 +715,11 @@ int main(int argc, char **argv)
   }
 
   /*
-     unified H-operator report: for HTOOL print the operator info (which
-     includes the compression ratio; the other backends print their
-     storage on their own assembly lines), then time nrandom matvecs.
-     This block runs also under -skip_dense, which exits right after,
-     since everything below needs the dense reference.
+    unified H-operator report: for HTOOL print the operator info (which
+    includes the compression ratio; the other backends print their
+    storage on their own assembly lines), then time nrandom matvecs.
+    This block runs also under -skip_dense, which exits right after,
+    since everything below needs the dense reference.
   */
   if(medium->use_hmatrix==IHMAT_TYPE_HTOOLS)
     PetscCall(MatView(AH,PETSC_VIEWER_STDOUT_WORLD));
@@ -770,14 +770,7 @@ int main(int argc, char **argv)
 		(double)solve_s,(int)sreason);
     }
   }
-  if(skip_dense){
-    HEADNODE
-      fprintf(stderr,"%s: -skip_dense: exiting after H-matrix assembly and matvec timing (no error check)\n",argv[0]);
-    PetscCall(MatDestroy(&AH));
-    PetscCall(MatDestroy(&Adense));
-    PetscCall(PetscFinalize());
-    return 0;
-  }
+ 
 
   /* 
 
@@ -787,12 +780,13 @@ int main(int argc, char **argv)
      
   */
 
-  
-  /* dense */
-  if(n < 20){
-    HEADNODE
-      fprintf(stderr,"%s: dense matrix:\n",argv[0]);
-    PetscCall(MatView(Adense,PETSC_VIEWER_STDOUT_WORLD));
+  if(!skip_dense){
+    /* dense */
+    if(n < 20){
+      HEADNODE
+	fprintf(stderr,"%s: dense matrix:\n",argv[0]);
+      PetscCall(MatView(Adense,PETSC_VIEWER_STDOUT_WORLD));
+    }
   }
   /* get info on H matrix (skip for the use_hmatrix=0 dense reference,
      where In is a full dense copy of Is and MatView would print every
@@ -808,7 +802,8 @@ int main(int argc, char **argv)
   }
   /* 
    */
-  PetscCall(MatCreateVecs(Adense, &x, &b));/* For A x = b: x -> left, b -> right */
+  if(!skip_dense)
+    PetscCall(MatCreateVecs(Adense, &x, &b));/* For A x = b: x -> left, b -> right */
   PetscCall(MatCreateVecs(AH, &xh, &bh));/* For A x = b: x -> left, b -> right */
   if(test_forward){
     
@@ -822,21 +817,21 @@ int main(int argc, char **argv)
     PetscCall(VecAssemblyBegin(x));PetscCall(VecAssemblyEnd(x));
     PetscCall(VecAssemblyBegin(xh));PetscCall(VecAssemblyEnd(xh));
     
-    
-    start_time = clock();
-    /* dense solver */
-    PetscCall(MatMult(Adense, x, b));
-    for(i=0;i<nrandom;i++){
-      PetscCall(VecSetRandom(x,rand_str));
+    if(!skip_dense){
+      start_time = clock();
+      /* dense solver */
       PetscCall(MatMult(Adense, x, b));
+      for(i=0;i<nrandom;i++){
+	PetscCall(VecSetRandom(x,rand_str));
+	PetscCall(MatMult(Adense, x, b));
+      }
+      stop_time = clock();  
+      cpu_time_used = ((double)stop_time-start_time)/CLOCKS_PER_SEC;
+      HEADNODE
+	fprintf(stderr,"%s: it took %20.3fs for %05i dense solves\n",argv[0],cpu_time_used,nrandom+1);
+      if((m<20)&&(nrandom==0))
+	VecView(b,PETSC_VIEWER_STDOUT_WORLD);
     }
-    stop_time = clock();  
-    cpu_time_used = ((double)stop_time-start_time)/CLOCKS_PER_SEC;
-    HEADNODE
-      fprintf(stderr,"%s: it took %20.3fs for %05i dense solves\n",argv[0],cpu_time_used,nrandom+1);
-    if((m<20)&&(nrandom==0))
-      VecView(b,PETSC_VIEWER_STDOUT_WORLD);
-    
     start_time = clock();
     /* 
        H matrix solve 
@@ -855,10 +850,11 @@ int main(int argc, char **argv)
     if((m<20)&&(nrandom==0))
       VecView(bh,PETSC_VIEWER_STDOUT_WORLD);
 
-    if(1){			/* accuracy of the x=1 product (random
-				   loops above are pure timing and leave
-				   b, bh from their last random x, so
-				   recompute with x=1 here) */
+    if(!skip_dense){
+      /* accuracy of the x=1 product (random
+	 loops above are pure timing and leave
+	 b, bh from their last random x, so
+	 recompute with x=1 here) */
       /* generic accuracy: relative matvec error on a random x, an estimate
          of the operator error ||A_h-A||/||A|| in a typical direction, the
          fundamental b = A x quality decoupled from the x=1 coherent/loading
@@ -925,7 +921,9 @@ int main(int argc, char **argv)
     }
   }else{
     /* 
+
        test inverse  x = A^-1 b
+
     */
     /* make context for solver */
     /* dense */
@@ -934,15 +932,15 @@ int main(int argc, char **argv)
     PetscCall(KSPGetPC(ksp, &pc));
     if(medium->comm_size > 1){
       /*
-	 the dense reference matrix is mpidense under MPI, and sequential
-	 PCLU cannot factor it; unless PETSc was built with a parallel
-	 direct solver (MUMPS or SuperLU_DIST) MatGetFactor() fails with
-	 "Could not locate a solver type for factorization type LU and
-	 matrix type mpidense". fall back to an iterative reference solve
-	 (unpreconditioned GMRES to a tight tolerance) so the inverse
-	 accuracy comparison still runs in parallel. configure PETSc with
-	 --download-mumps (then this branch can use PCLU/MATSOLVERMUMPS)
-	 for a parallel DIRECT reference instead.
+	the dense reference matrix is mpidense under MPI, and sequential
+	PCLU cannot factor it; unless PETSc was built with a parallel
+	direct solver (MUMPS or SuperLU_DIST) MatGetFactor() fails with
+	"Could not locate a solver type for factorization type LU and
+	matrix type mpidense". fall back to an iterative reference solve
+	(unpreconditioned GMRES to a tight tolerance) so the inverse
+	accuracy comparison still runs in parallel. configure PETSc with
+	--download-mumps (then this branch can use PCLU/MATSOLVERMUMPS)
+	for a parallel DIRECT reference instead.
       */
       PetscCall(PCSetType(pc, PCNONE));
       PetscCall(KSPSetType(ksp, KSPGMRES));
@@ -954,25 +952,34 @@ int main(int argc, char **argv)
     PetscCall(VecSet(b, 1.0));
     /* do we need those? */
     PetscCall(VecAssemblyBegin(b));PetscCall(VecAssemblyEnd(b));
-    /* 
-
-       dense solver 
-
-    */
-    start_time = clock();
-    PetscCall(KSPSolve(ksp, b, x));
-    for(i=0;i<nrandom;i++){	/* random trials */
-      PetscCall(VecSetRandom(b,rand_str));
+    if(!skip_dense){
+      /* 
+	 
+	 dense solver 
+	 
+      */
+      start_time = clock();
       PetscCall(KSPSolve(ksp, b, x));
+      if(nrandom==0){
+	{			/* save the solution vector */
+	  PetscViewer viewer;
+	  PetscViewerBinaryOpen(PETSC_COMM_WORLD, "xdsolve.bin", FILE_MODE_WRITE, &viewer);
+	  VecView(x, viewer);
+	  PetscViewerDestroy(&viewer);
+	}
+      }
+      for(i=0;i<nrandom;i++){	/* random trials */
+	PetscCall(VecSetRandom(b,rand_str));
+	PetscCall(KSPSolve(ksp, b, x));
+      }
+      stop_time = clock();  
+      cpu_time_used = ((double)stop_time-start_time)/CLOCKS_PER_SEC;
+      HEADNODE
+	fprintf(stderr,"%s: it took %20.3fs for %05i dense inverse solves\n",
+		argv[0],cpu_time_used,nrandom+1);
+      if((m<20)&&(nrandom==0))
+	VecView(x,PETSC_VIEWER_STDOUT_WORLD);
     }
-    stop_time = clock();  
-    cpu_time_used = ((double)stop_time-start_time)/CLOCKS_PER_SEC;
-    HEADNODE
-      fprintf(stderr,"%s: it took %20.3fs for %05i dense inverse solves\n",
-	      argv[0],cpu_time_used,nrandom+1);
-    if((m<20)&&(nrandom==0))
-      VecView(x,PETSC_VIEWER_STDOUT_WORLD);
-    
     if(1){
       /* 
 	 H 
@@ -1006,17 +1013,26 @@ int main(int argc, char **argv)
 	VecView(xh,PETSC_VIEWER_STDOUT_WORLD);
       
       if(nrandom==0){
-	/* compute difference */
-	PetscCall(VecDuplicate(x, &d));
-	PetscCall(VecCopy(x, d));
-	PetscCall(VecAXPY(d,-1.0,xh));
-	PetscCall(VecNorm(x,NORM_2,norm));
-	PetscCall(VecNorm(xh,NORM_2,(norm+1)));
-	PetscCall(VecNorm(d,NORM_2,(norm+2)));
-	HEADNODE
-	  fprintf(stdout,"%s: |x| = %20.10e |x_h| = %20.10e |x-x_h|/|x| = %20.10e\n",
-		  argv[0],norm[0],norm[1],norm[2]/norm[0]);
-	PetscCall(VecDestroy(&d));
+	{			/* save the solution vector */
+	  PetscViewer viewer;
+	  PetscViewerBinaryOpen(PETSC_COMM_WORLD, "xhsolve.bin", FILE_MODE_WRITE, &viewer);
+	  VecView(xh, viewer);
+	  PetscViewerDestroy(&viewer);
+	  
+	}
+	if(!skip_dense){
+	  /* compute difference */
+	  PetscCall(VecDuplicate(x, &d));
+	  PetscCall(VecCopy(x, d));
+	  PetscCall(VecAXPY(d,-1.0,xh));
+	  PetscCall(VecNorm(x,NORM_2,norm));
+	  PetscCall(VecNorm(xh,NORM_2,(norm+1)));
+	  PetscCall(VecNorm(d,NORM_2,(norm+2)));
+	  HEADNODE
+	    fprintf(stdout,"%s: |x| = %20.10e |x_h| = %20.10e |x-x_h|/|x| = %20.10e\n",
+		    argv[0],norm[0],norm[1],norm[2]/norm[0]);
+	  PetscCall(VecDestroy(&d));
+	}
       }
       PetscCall(VecDestroy(&xh));
     }

@@ -364,11 +364,11 @@ void report_hmat_storage(struct med *medium, const char *backend,
   HEADNODE{
     double dense = (double)m * (double)n;
     if(stored > 0)
-      fprintf(stderr,"calc_petsc_Isn_matrices: hmat_storage backend %s m %ld n %ld stored_scalars %ld dense_ratio %.6g mbytes %.6g\n",
+      fprintf(stderr,"report_hmat_storage: hmat_storage backend %s m %ld n %ld stored_scalars %ld dense_ratio %.6g mbytes %.6g\n",
 	      backend,(long)m,(long)n,stored,dense/(double)stored,
 	      (double)stored*(double)sizeof(double)/1048576.0);
     else
-      fprintf(stderr,"calc_petsc_Isn_matrices: hmat_storage backend %s m %ld n %ld stored_scalars NA dense_ratio NA mbytes NA\n",
+      fprintf(stderr,"report_hmat_storage: hmat_storage backend %s m %ld n %ld stored_scalars NA dense_ratio NA mbytes NA\n",
 	      backend,(long)m,(long)n);
   }
 }
@@ -380,7 +380,7 @@ void report_hmat_storage(struct med *medium, const char *backend,
 */
 PetscErrorCode calc_petsc_Isn_matrices(struct med *medium, struct flt *fault,
 				       PetscInt use_hmatrix,PetscReal scale, int receive_mode,
-				       int slip_dir,Mat *this_mat, hmat_helper_shell_ctx *hctx)
+				       int slip_dir, Mat *this_mat, hmat_helper_shell_ctx *hctx)
 {
   /* context */
   struct interact_ctx ictx[1];
@@ -679,7 +679,7 @@ PetscErrorCode calc_petsc_Isn_matrices(struct med *medium, struct flt *fault,
 	      mode,ictx->rec_stress_mode);
     hmmvp_handle = chmmvp_compress_in_memory((int)m,xc,yc,zc,(double)medium->hmmvp_tol,
 					     (double)medium->hmmvp_eta,medium->hmmvp_inorm,medium->hmmvp_nthreads,
-					       (void *)ictx);
+					     (void *)ictx);
     if(!hmmvp_handle){
       fprintf(stderr,"hmmvp compression failed\n");
       exit(-1);

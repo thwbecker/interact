@@ -61,6 +61,6 @@ run_one () {     # label extra-ksp-flags...
 
 echo "diagnosing on: $backend (rtol $rtol, maxit $maxit)"
 run_one gmres30    -pc_type jacobi -ksp_type gmres -ksp_gmres_restart 30
-run_one gmres2000  -pc_type jacobi -ksp_type gmres -ksp_gmres_restart 2000
+run_one gmres2000  -pc_type jacobi -ksp_type gmres -ksp_gmres_restart 2000 
 run_one bcgs       -pc_type jacobi -ksp_type bcgs
 run_one gmres30_ns -pc_type none   -ksp_type gmres -ksp_gmres_restart 30

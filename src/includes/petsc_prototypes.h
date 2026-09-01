@@ -50,6 +50,7 @@ PetscErrorCode interact_petsc_initialize(int *, char ***);
 PetscErrorCode calc_petsc_Isn_matrices(struct med *, struct flt *,PetscInt ,PetscReal, int, int, Mat *,hmat_helper_shell_ctx *);
 PetscErrorCode set_hmat_defaults_and_options(struct med *,int);
 
+PetscErrorCode fill_accuracy_x0(Vec );
 
 #ifdef USE_PETSC_HMAT
 PetscScalar GenKEntries_h2opus(PetscInt, PetscReal [], PetscReal [], void *);
