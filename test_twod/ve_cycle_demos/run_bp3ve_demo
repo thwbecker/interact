@@ -96,9 +96,17 @@ fi
 ktag=g${grav}n$nrm	# kernels depend on gravity AND family count
 mkdir -p $dir && cd $dir
 # the branch is a property of the whole directory: the elastic
-# reference and the viscoelastic runs are only comparable within one
-if [ -f branch.txt ] && [ "`cat branch.txt`" != "$branch" ];then
-    echo "$0: $dir holds the `cat branch.txt` branch, refusing to add $branch"
+# reference and the viscoelastic runs are only comparable within one.
+# A directory written before the branch flag existed carries results
+# that can only be normal-sense, so treat a missing stamp next to
+# existing output as +1 rather than adopting whatever is asked for:
+# otherwise a thrust call would stamp the directory, then skip every
+# case as already past its stop time, and the label would be a lie.
+had=
+[ -f branch.txt ] && had=`cat branch.txt`
+[ -z "$had" ] && [ -f cat_el.dat ] && had=1
+if [ -n "$had" ] && [ "$had" != "$branch" ];then
+    echo "$0: $dir holds the $had branch, refusing to add $branch"
     exit 1
 fi
 echo $branch > branch.txt
