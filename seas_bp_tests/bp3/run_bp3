@@ -8,19 +8,38 @@
 bindir=`cd ../../bin && pwd`
 sdir=`pwd`
 RTOL=${RTOL-1e-4}
-ds=${1-0.1}
+ds=${1-0.025}
 dip=${2-60}
 vpl=${3-1e-9}
 dir=${4-bp3_d60r_100m}
 stop=${5-1500}
 branch=${6-1}
 sig=${7-}
+case "$branch" in
+    1|+1) branch=1 ;;
+    -1)   branch=-1 ;;
+    *) echo "run_bp3: branch must be +1 (normal) or -1 (thrust)"; exit 1 ;;
+esac
 if awk -v v="$vpl" -v b="$branch" 'BEGIN{exit !((v<0)==(b<0))}';then :;else
     echo "run_bp3: vpl $vpl and branch $branch disagree in sign;"
     echo "         use vpl > 0 with branch +1 (normal), vpl < 0 with branch -1 (thrust)"
     exit 1
 fi
 mkdir -p $dir && cd $dir
+# the branch is a property of the directory.  This script resumes from
+# rsf_checkpoint.bin whenever it finds one, and rsf_solve's checkpoint
+# check only separates elastic from viscoelastic, so without this a
+# thrust run started in an old directory would silently continue a
+# normal-sense state.  A directory with a checkpoint but no stamp
+# predates the branch flag and can only be normal-sense.
+had=
+[ -f branch.txt ] && had=`cat branch.txt`
+[ -z "$had" ] && [ -f rsf_checkpoint.bin ] && had=1
+if [ -n "$had" ] && [ "$had" != "$branch" ];then
+    echo "run_bp3: $dir holds the $had branch, refusing to run $branch here"
+    exit 1
+fi
+echo $branch > branch.txt
 python3 $sdir/gen_bp3.py $ds $dip bp3 $branch > gen.log
 restart=""
 [ -f rsf_checkpoint.bin ] && restart="-rsf_restart rsf_checkpoint.bin"
