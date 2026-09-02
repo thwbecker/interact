@@ -20,13 +20,38 @@ segment's in-plane direction is set by strike: alpha = 90 - strike
 (CCW from +x), so a fault dipping at theta toward +x uses
 strike = 90 + theta (tangent (cos theta, -sin theta), pointing
 down-dip).  Positive along-segment (STRIKE-component) slip with this
-tangent is hanging-wall-DOWN, i.e. NORMAL-sense; run with
--vpl -1e-9 for the thrust branch (or +1e-9 for normal) and check
-the surface-displacement sense.
+tangent is hanging-wall-DOWN, i.e. NORMAL-sense: for the dip-60
+geometry a unit of positive slip subsides the hanging wall by
+0.134 m at 5 km from the trace and uplifts the footwall by 0.065 m.
 
-usage: gen_bp3.py ds_km dip_deg [prefix] [sense]
-       sense +1 (default) or -1: flips the segment tangent
-       (positive slip direction), switching thrust vs normal
+BRANCH.  The sense of faulting is set by the SIGN OF THE SLIP against
+this fixed tangent, i.e. by the sign of -vpl, because that is what
+reverses the slip-induced normal-stress change.  It matters: at 100 m
+the elastic sigma-coupled cycle is period 2 with 66.8/87.8 yr and
+sigma_n up to 84.9 MPa on the normal branch, and near a single 95 yr
+interval with sigma_n down to 35.0 MPa on the thrust branch.
+
+Two traps this argument exists to close:
+
+  * flipping the segment tangent does NOT switch the branch.  The
+    normal is derived from the tangent, so both flip together, and a
+    dislocation with Burgers vector +b along t across a plane with
+    normal n is the same physical dislocation as -b along -t across
+    normal -n.  Both interaction matrices are invariant and the run
+    is unchanged (checked: identical event times to four decimals
+    over 950 yr).  An earlier version of this script flipped the
+    tangent for sense = -1, which is why that had no effect.
+  * the initial condition has to be mirrored with the loading.  The
+    prestress and Vinit below are the steady state at +Vp; used with
+    -vpl -1e-9 they start the fault on the opposite branch, and at
+    100 m the result is NO events in 1500 yr, with sigma_n creeping
+    down to 27 MPa until the velocity-weakening patch is subcritical.
+
+usage: gen_bp3.py ds_km dip_deg [prefix] [branch]
+       branch +1 (default) normal-sense, or -1 thrust: negates the
+       prestress and Vinit.  The caller MUST pass the matching -vpl,
+       which the script prints; run_bp3 and run_bp3ve_demo derive
+       both from one flag so they cannot disagree.
 writes <prefix>_{geom.in,rsf.dat,ic.in}
 """
 import sys
@@ -35,7 +60,9 @@ import numpy as np
 ds = float(sys.argv[1])*1e3 if len(sys.argv) > 1 else 200.0
 dip = np.deg2rad(float(sys.argv[2])) if len(sys.argv) > 2 else np.deg2rad(60.0)
 pref = sys.argv[3] if len(sys.argv) > 3 else "bp3"
-sense = float(sys.argv[4]) if len(sys.argv) > 4 else 1.0
+branch = float(sys.argv[4]) if len(sys.argv) > 4 else 1.0
+if branch not in (1.0, -1.0):
+    sys.exit("gen_bp3: branch must be +1 (normal) or -1 (thrust)")
 
 Wf = 40e3                 # frictional down-dip extent
 H, h = 15e3, 3e3          # VW extent, transition (down-dip distances)
@@ -45,12 +72,15 @@ Vp = 1e-9
 G, cs = 32.04e9, 3464.0
 eta = G/(2.0*cs)
 n = int(round(Wf/ds))
-strike = 90.0 + np.rad2deg(dip) + (180.0 if sense < 0 else 0.0)
+strike = 90.0 + np.rad2deg(dip)      # tangent down-dip, both branches
 
 fg = open(pref + "_geom.in", "w")
 fr = open(pref + "_rsf.dat", "w")
 fi = open(pref + "_ic.in", "w")
-tau0 = sig0*amax*np.arcsinh(Vp/(2*V0)*np.exp((f0 + b0*np.log(V0/Vp))/amax)) + eta*Vp
+# prestress and initial velocity carry the sign of the branch: they
+# are the steady state of the loading the run will actually apply
+tau0 = branch*(sig0*amax*np.arcsinh(Vp/(2*V0)*np.exp((f0 + b0*np.log(V0/Vp))/amax))
+               + eta*Vp)
 for i in range(n):
     d = (i + 0.5)*ds                       # down-dip center distance
     x, y = d*np.cos(dip), -d*np.sin(dip)
@@ -62,7 +92,7 @@ for i in range(n):
     else:
         a = amax
     fr.write(f"{a:.6f} {b0:.6f}\n")
-    fi.write(f"{tau0:.8e} {Vp:.6e}\n")
+    fi.write(f"{tau0:.8e} {branch*Vp:.6e}\n")
 # SEAS station file: 12 stations by down-dip distance (spec sec. 6)
 with open(pref + "_stations.dat", "w") as fs:
     for xd_km in (0, 2.5, 5, 7.5, 10, 12.5, 15, 17.5, 20, 25, 30, 35):
@@ -70,6 +100,7 @@ with open(pref + "_stations.dat", "w") as fs:
         fs.write(f"dp{int(round(xd_km*10)):03d} {idx}\n")
 
 print(f"gen_bp3: {n} segments, ds {ds:.0f} m, dip {np.rad2deg(dip):.0f}, "
-      f"tau0 {tau0/1e6:.4f} MPa")
+      f"tau0 {tau0/1e6:.4f} MPa, "
+      f"{'NORMAL' if branch > 0 else 'THRUST'} branch")
 print(f"opts: -dc {dc} -sigma_init {sig0:.3e} -f0 {f0} -v0 {V0} "
-      f"-shear_modulus {G:.4e} -s_wave_speed {cs}")
+      f"-shear_modulus {G:.4e} -s_wave_speed {cs} -vpl {branch*Vp:.3e}")

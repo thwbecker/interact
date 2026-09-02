@@ -8,8 +8,13 @@
 #   ve_shear  shear only (sigma_n frozen), gravity ON, for contrast
 #
 # usage: run_many_bp3ve_demo [ds_km] [tmlist_yr] [stop_yr] [parallel]
-#                            [ncore]
-#        defaults           0.025    "15 45 200"  1500      0     4
+#                            [ncore] [branch]
+#        defaults           0.025    "15 45 200"  1500      0     4    1
+#        branch +1 (default) normal-sense or -1 thrust; passed through
+#              to run_bp3ve_demo, which stamps it into each run
+#              directory and refuses to mix.  The thrust cases get a
+#              _thrust suffix, so both branches can sit side by side
+#              in one working directory.
 #        ncore: cores per kernel generation (bp3_ve_kernels_par);
 #              parallel=1 additionally runs 2 of the 3 cases at once,
 #              so peak load is about 2 x ncore
@@ -44,6 +49,11 @@ tms=${2-"15 45 200"}
 stop=${3-1500}
 par=${4-0}
 ncore=${5-4}		# cores for kernel generation (the slow part)
+branch=${6-1}		# +1 normal-sense, -1 thrust
+# the two branches are different physics, so they get their own case
+# directories and can sit side by side in one working directory
+sfx=; [ "$branch" = "-1" ] && sfx=_thrust
+g1=ve_g1$sfx; g0=ve_g0$sfx; vs=ve_shear$sfx
 extra="-imex"		# fine meshes with sigma coupling need it
 np=5
 
@@ -71,36 +81,36 @@ for tm in $tms;do
     echo "=== tM = $tm yr, ds = $ds km"
     # 1. gravity ON, shear + normal: this generates the kernels the
     #    other two cases reuse, so it goes first even in parallel mode
-    ./run_bp3ve_demo ve_g1 "$tm" $stop 1 $ds 1 "$extra" $ncore
+    ./run_bp3ve_demo $g1 "$tm" $stop 1 $ds 1 "$extra" $ncore $branch
     # 2. reuse: shear-only kernels by truncation, elastic reference by copy
-    mkdir -p ve_shear ve_g0
-    trunc_shear ve_g1/bp3_tm${tm}_g1n1.prony ve_shear/bp3_tm${tm}_g1n0.prony
-    # the elastic reference knows nothing about gravity, so ve_g0 takes
-    # ve_g1's whole elastic case: catalog, events, monitor, stations,
-    # checkpoint and the stop-time stamp, so that ve_g0 can be extended
-    # from it later just as ve_g1 can.  Refreshed when ve_g1's is newer,
-    # which is what happens after ve_g1 itself has been extended.
-    if [ -f ve_g1/cat_el.dat ] && { [ ! -f ve_g0/cat_el.dat ] || \
-	    [ ve_g1/cat_el.dat -nt ve_g0/cat_el.dat ]; };then
+    mkdir -p $vs $g0
+    trunc_shear $g1/bp3_tm${tm}_g1n1.prony $vs/bp3_tm${tm}_g1n0.prony
+    # the elastic reference knows nothing about gravity, so $g0 takes
+    # $g1's whole elastic case: catalog, events, monitor, stations,
+    # checkpoint and the stop-time stamp, so that $g0 can be extended
+    # from it later just as $g1 can.  Refreshed when $g1's is newer,
+    # which is what happens after $g1 itself has been extended.
+    if [ -f $g1/cat_el.dat ] && { [ ! -f $g0/cat_el.dat ] || \
+	    [ $g1/cat_el.dat -nt $g0/cat_el.dat ]; };then
 	for f in cat_el.dat ev_el.dat mon_el.dat ckpt_el.bin stop_el.yr;do
-	    [ -f ve_g1/$f ] && cp ve_g1/$f ve_g0/$f
+	    [ -f $g1/$f ] && cp $g1/$f $g0/$f
 	done
-	rm -rf ve_g0/st_el
-	[ -d ve_g1/st_el ] && cp -r ve_g1/st_el ve_g0/
-	echo "$0: ve_g0 reuses ve_g1's elastic reference"
+	rm -rf $g0/st_el
+	[ -d $g1/st_el ] && cp -r $g1/st_el $g0/
+	echo "$0: $g0 reuses $g1's elastic reference"
     fi
     # 3. the other two cases
     if [ "$par" = "1" ];then
-	./run_bp3ve_demo ve_g0    "$tm" $stop 1 $ds 0 "$extra" $ncore &
-	./run_bp3ve_demo ve_shear "$tm" $stop 0 $ds 1 "$extra" $ncore &
+	./run_bp3ve_demo $g0    "$tm" $stop 1 $ds 0 "$extra" $ncore $branch &
+	./run_bp3ve_demo $vs "$tm" $stop 0 $ds 1 "$extra" $ncore $branch &
 	wait
     else
-	./run_bp3ve_demo ve_g0    "$tm" $stop 1 $ds 0 "$extra" $ncore
-	./run_bp3ve_demo ve_shear "$tm" $stop 0 $ds 1 "$extra" $ncore
+	./run_bp3ve_demo $g0    "$tm" $stop 1 $ds 0 "$extra" $ncore $branch
+	./run_bp3ve_demo $vs "$tm" $stop 0 $ds 1 "$extra" $ncore $branch
     fi
 done
 echo "=== summary"
-for d in ve_g1 ve_g0 ve_shear;do
+for d in $g1 $g0 $vs;do
     [ -d $d ] && { echo "--- $d"; python3 plot_bp3ve_demo.py $d 2>&1 | \
 	sed 's/^/    /'; }
 done
