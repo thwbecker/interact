@@ -1025,6 +1025,8 @@ int main(int argc, char **argv)
 	  PetscViewerBinaryOpen(PETSC_COMM_WORLD, "xhsolve.bin", FILE_MODE_WRITE, &viewer);
 	  VecView(xh, viewer);
 	  PetscViewerDestroy(&viewer);
+	  /* also assign to fault slip and print */
+
 	  
 	}
 	if(!skip_dense){
