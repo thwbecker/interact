@@ -181,18 +181,15 @@ contains
  lpmd => st_ctl%lpmd(:); lnp(0:) => st_ctl%lnp; lsp(0:) => st_ctl%lsp;lthr(0:) => st_ctl%lthr;lod => st_ctl%lod(:); param=>st_ctl%param(:)
  mpinr=lpmd(3); mpilog=lpmd(4); nrank=lpmd(2); icomm=lpmd(1); nthr=lpmd(20)
  param(91)=ztol
+ lrtrn=0
  if(st_ctl%param(1)>0 .and. mpinr==0) print*,'HACApK_solve start'
  nofc=st_bemv%nd;nffc=1;ndim=3
  nd=nofc*nffc
  if(st_ctl%param(1)>1) write(*,*) 'irank=',mpinr,' lthr=',lthr(0:nthr-1)
  allocate(u(nd),b(nd)); u(:nd)=sol(lod(:nd)); b(:nd)=rhs(lod(:nd))
- if(param(61)==3)then
-!   do il=ndnr_s,ndnr_e
-   do il=1,nd
-     u(il)=u(il)/st_bemv%ao(lod(il))
-     b(il)=b(il)*st_bemv%ao(lod(il))
-   enddo
- endif
+! NOTE: ao scaling of rhs/sol removed here; in this C-interface variant
+! HACApK_entry_ij returns unscaled kernel values, so the matrix is not
+! D*A*D and scaling only the vectors gave sol = ao**2 * true solution.
  if(param(83)>0) then
    allocate(ao(nd))
    do il=1,nd
@@ -217,11 +214,6 @@ contains
    allocate(www(nd))
    sol(:nd)=0.0d0; www(lod(:nd))=u(:nd); sol(:nd)=www(:nd)
    deallocate(www)
-   if(param(61)==3)then
-     do il=1,nd
-       sol(il)=sol(il)*st_bemv%ao(il)
-     enddo
-   endif
  endif
 9999 continue
  HACApK_solve=lrtrn
