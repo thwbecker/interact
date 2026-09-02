@@ -967,7 +967,7 @@ int main(int argc, char **argv)
       start_time = clock();
       PetscCall(KSPSolve(ksp, b, x));
       if(nrandom==0){
-	{			/* save the solution vector */
+	{			/* save the dense solution vector */
 	  PetscViewer viewer;
 	  PetscViewerBinaryOpen(PETSC_COMM_WORLD, "xdsolve.bin", FILE_MODE_WRITE, &viewer);
 	  VecView(x, viewer);
@@ -1020,14 +1020,54 @@ int main(int argc, char **argv)
 	VecView(xh,PETSC_VIEWER_STDOUT_WORLD);
       
       if(nrandom==0){
-	{			/* save the solution vector */
+	{			/* save the H based solution vector */
 	  PetscViewer viewer;
 	  PetscViewerBinaryOpen(PETSC_COMM_WORLD, "xhsolve.bin", FILE_MODE_WRITE, &viewer);
 	  VecView(xh, viewer);
 	  PetscViewerDestroy(&viewer);
-	  /* also assign to fault slip and print */
+	}
+	{
+	  /*
+	     also assign the H-matrix solution to the fault slip and
+	     print it through the regular interact output routine.
 
-	  
+	     the operator here maps slip in direction src_slip_mode on
+	     patch j to stress in the same direction on patch i, with
+	     one row/column per patch (m = n = nrflt, index = patch
+	     number). so xh[i] is the src_slip_mode slip of patch i
+	     that produces the uniform unit stress change b = 1. the
+	     other slip components and the stress entries of fault[]
+	     are zero (no post-slip stress evaluation is done here),
+	     so flt.dat carries the slip columns only.
+	  */
+	  Vec xhout;
+	  const PetscScalar *xhv;
+	  if((ictx->src_slip_mode < 0)||(ictx->src_slip_mode > 2)){
+	    HEADNODE
+	      fprintf(stderr,"%s: src_slip_mode %i is not a single slip component, not writing %s\n",
+		      argv[0],(int)ictx->src_slip_mode,ONE_STEP_FAULT_DATA_FILE);
+	  }else{
+	    PetscCall(VecScatterCreateToZero(xh,&ctx,&xhout));
+	    PetscCall(VecScatterBegin(ctx,xh,xhout,INSERT_VALUES,SCATTER_FORWARD));
+	    PetscCall(VecScatterEnd(ctx,xh,xhout,INSERT_VALUES,SCATTER_FORWARD));
+	    HEADNODE{
+	      PetscCall(VecGetArrayRead(xhout,&xhv));
+	      for(i=0;i < medium->nrflt;i++){
+		for(k=0;k < 3;k++){
+		  fault[i].u[k] = 0.0;
+		  fault[i].s[k] = 0.0;
+		}
+		fault[i].u[ictx->src_slip_mode] = (COMP_PRECISION)xhv[i];
+	      }
+	      PetscCall(VecRestoreArrayRead(xhout,&xhv));
+	      fprintf(stderr,"%s: assigning H-matrix(%i) solution to slip component %i, stresses left zero\n",
+		      argv[0],(int)medium->use_hmatrix,(int)ictx->src_slip_mode);
+	      print_fault_data(ONE_STEP_FAULT_DATA_FILE,medium,fault); /* print to file */
+	    }
+	    PetscCall(VecScatterDestroy(&ctx));
+	    PetscCall(VecDestroy(&xhout));
+
+	  }
 	}
 	if(!skip_dense){
 	  /* compute difference */
