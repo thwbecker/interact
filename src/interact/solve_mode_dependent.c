@@ -163,7 +163,7 @@ void assemble_ap_matrix_4(A_MATRIX_PREC *a,int naflt,int naflt_con,
 	      /* reset to zero if there are no interactions between
 		 faults wanted */
 	      if(medium->no_interactions)
-		if(fault[i].group != fault[k].group)
+		if(fault[namef1tmp].group != fault[namef2tmp].group)
 		  a[eqc2m+eqc1] = 0.0;
 #ifdef SUPER_DEBUG
 	      fprintf(stderr,"assemble_ap_matrix: i:%3i j:%i(%i) %e\n",
@@ -290,7 +290,7 @@ void assemble_a_matrix_4(A_MATRIX_PREC *a,int naflt,
 	      }
 #endif
 	      if(medium->no_interactions)
-		if(fault[i].group != fault[k].group)
+		if(fault[nameaf[i]].group != fault[nameaf[k]].group)
 		  a[eqc2nreq+eqc1] = 0.0;
 	      eqc2++;
 	      eqc2nreq += nreq;
@@ -352,8 +352,10 @@ void add_quake_stress_4(my_boolean *sma,COMP_PRECISION *slip,
 #endif
 #endif
   for(i=0;i < medium->nrflt;i++){/* loop through all flts */
-   
-	
+    /* -ni: no stress transfer between different fault groups, 
+       consistent with the A matrix assembly */
+    if(medium->no_interactions && (fault[i].group != fault[r_flt].group))
+      continue;
 #ifdef COMP_MODE_1
     /* 
        we have the interactions precomputed

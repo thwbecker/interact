@@ -60,6 +60,7 @@ void check_parameters_and_init_interact(int argc, char **argv,
 			   &variable_time_step,&debug,&wcutoff,
 			   &no_interactions,&force_petsc,&tri_eval_mode,&full_space,
 			   &((*medium)->no_post_slip_fault_stress_eval),
+			   &((*medium)->post_slip_fault_stress_par),
 			   (*medium)->comm_rank);
   // load files, etc
   initialize_interact(medium,fault,read_fault_friction,read_fault_rake,max_nr_flt_files,
@@ -106,7 +107,7 @@ void initialize_interact(struct med **medium, struct flt **fault,
 			 MODE_TYPE tri_eval_mode, my_boolean full_space)
 {
 #ifdef USE_PETSC
-  int fchunk;
+  int fchunk,fchunkn;
 #endif
   char tmpstring[STRLEN];
   //
@@ -132,20 +133,18 @@ void initialize_interact(struct med **medium, struct flt **fault,
     (*medium)->myfaultn = (*medium)->nrflt;
   }else{
     /* 
-       distribute fault ranges to cores 
+       distribute fault ranges to cores: balanced contiguous
+       partition, remainder on the first ranks, ranges never exceed
+       nrflt (the former rounded chunk size could overshoot on
+       non-last ranks). ranks beyond nrflt get an empty range.
     */
-    fchunk = (int)((float)(*medium)->nrflt / (float)(*medium)->comm_size + 0.5);
-    if(fchunk < 1){
-      fprintf(stderr,"initialize_interact: too many cores (%i) for the number of faults (%i), chunk %i\n",
-	      (*medium)->comm_size,(*medium)->nrflt,fchunk);
-       exit(-1);
-    }
-    (*medium)->myfault0 = (*medium)->comm_rank       * fchunk;
-    (*medium)->myfaultn = ((*medium)->comm_rank + 1) * fchunk;
-    if((*medium)->comm_rank == (*medium)->comm_size-1){
-      if((*medium)->myfaultn  != (*medium)->nrflt)
-	(*medium)->myfaultn = (*medium)->nrflt;
-    }
+    par_receiver_range((int)(*medium)->nrflt,(int)(*medium)->comm_size,
+		       (int)(*medium)->comm_rank,&fchunk,&fchunkn);
+    (*medium)->myfault0 = (unsigned int)fchunk;
+    (*medium)->myfaultn = (unsigned int)fchunkn;
+    if(((*medium)->comm_rank == 0) && ((*medium)->comm_size > (*medium)->nrflt))
+      fprintf(stderr,"initialize_interact: WARNING: more cores (%i) than faults (%i), some ranks idle in fault loops\n",
+	      (*medium)->comm_size,(*medium)->nrflt);
 #ifdef DEBUG
     fprintf(stderr,"core %03i/%03i: flt %010i to %010i\n",
 	    (*medium)->comm_rank,(*medium)->comm_size,
@@ -421,6 +420,7 @@ void init_parameters_interact(char **argv, int argc,
 			      MODE_TYPE *tri_eval_mode,
 			      my_boolean *full_space,
 			      my_boolean *no_post_slip_fault_stress_eval,
+			      int *post_slip_fault_stress_par,
 			      int rank)
 {
   int i,itmp;
@@ -461,6 +461,7 @@ void init_parameters_interact(char **argv, int argc,
   *force_petsc = FALSE;
   *full_space = FULL_SPACE_DEF;
   *no_post_slip_fault_stress_eval = FALSE; /* default: do evaluate post slip fault stress */
+  *post_slip_fault_stress_par = -1;	/* default: automatic (parallel if comm_size > 1) */
   /* 
      check for input options 
   */
@@ -557,6 +558,10 @@ void init_parameters_interact(char **argv, int argc,
       toggle(force_petsc);
     }else if(strcmp(argv[i],"-npsfse")==0){/* no post slip fault stress evaluation */
       toggle(no_post_slip_fault_stress_eval);
+    }else if(strcmp(argv[i],"-spsfse")==0){/* force serial post slip fault stress evaluation */
+      *post_slip_fault_stress_par = 0;
+    }else if(strcmp(argv[i],"-ppsfse")==0){/* force parallel post slip fault stress evaluation */
+      *post_slip_fault_stress_par = 1;
     }else{
       if((rank == 0)&&(!warned)){
 	fprintf(stderr,"init_parameters_interact: encountered at least one parameter which cannot be interpreted by interact\n");

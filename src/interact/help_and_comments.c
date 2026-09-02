@@ -514,6 +514,7 @@ void phelp(void)
   
   PE("");
   PE(" -ni suppress all interactions between faults except the interactions of patches within the fault group");
+  PE("     applies to the A matrix and to the post slip fault stress evaluation (cross group stress not added)");
   PE("");
   PE(" -full");
   fprintf(stderr,"     toggles space/plane for Okada (rectangular or point) or 2D, default is %s space/plane.\n",
@@ -723,6 +724,15 @@ void phelp(void)
   PE("     no post slip fault stress evaluation: after a one-step solve, print");
   PE("     the slip solution without the serial resolved-stress evaluation on");
   PE("     all patches (default off, i.e. the stress evaluation is performed)");
+  PE("");
+  PE(" -spsfse");
+  PE("     force the serial post slip fault stress evaluation (add_solution on every");
+  PE("     rank) in one-step mode, even when running on several MPI ranks");
+  PE("");
+  PE(" -ppsfse");
+  PE("     force the parallel post slip fault stress evaluation (receivers split");
+  PE("     over ranks, then gathered) in one-step mode, even on a single rank.");
+  PE("     default is serial on one rank, parallel on several ranks");
   PE("")
 #ifdef ALLOW_NON_3DQUAD_GEOM
   fprintf(stderr," -pstress Change the default 2-D elastic approximation for segments from plane-%s to plane-%s.\n",

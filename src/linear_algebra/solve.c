@@ -718,6 +718,191 @@ void add_solution(int naflt,my_boolean *sma,A_MATRIX_PREC *xsol,int *nameaf,
 }
 
 /*
+
+  contiguous, balanced partition of n receiver patches over np ranks:
+  rank gets [*i0, *i1). the remainder n % np is spread over the first
+  ranks, so no range can extend beyond n (the myfault0/myfaultn chunking
+  in initialize_interact rounds and can overshoot for some n/np).
+
+*/
+void par_receiver_range(int n, int np, int rank, int *i0, int *i1)
+{
+  int base,rem;
+  base = n / np;
+  rem  = n % np;
+  *i0 = rank * base + ((rank < rem)?(rank):(rem));
+  *i1 = *i0 + base + ((rank < rem)?(1):(0));
+}
+
+/*
+
+  parallel version of the one-step post slip fault stress evaluation,
+  i.e. of
+
+    add_solution(naflt,sma,xsol,nameaf,medium,fault,FALSE,TRUE,sfac)
+
+  the slip increments for all active patches are computed from xsol
+  with the same sign logic as in add_solution and added to fault[].u on
+  every rank. the stress change on the nrflt receiver patches is then
+  evaluated with the receivers split contiguously over the MPI ranks
+  and gathered with MPI_Allgatherv, so that every rank ends up with the
+  complete fault[].s.
+
+  for each receiver, the contributions of the active patches are added
+  in the same order and with the same routine
+  (eval_green_and_project_stress_to_fault, multi-point receivers) as in
+  add_quake_stress_3, starting from the pre-solve fault[].s, so results
+  are identical to the serial path bit for bit.
+
+  -ni (medium->no_interactions) skips source/receiver pairs from
+  different fault groups, consistent with the A matrix assembly.
+
+  restrictions: only for I matrix mode CALC_I_COEFF_NOW and solver
+  modes other than SPARSE_SOLVER (the serial path has a separate one by
+  one loop with a cutoff there). in all other cases falls back to
+  add_solution on every rank. mark_quake is always FALSE (one-step).
+
+*/
+void par_add_solution_stress(int naflt,my_boolean *sma,A_MATRIX_PREC *xsol,int *nameaf,
+			     struct med *medium,struct flt *fault,
+			     COMP_PRECISION sfac)
+{
+  int i,j,eqc,ip,i0,i1,ir,rank,np,nloc,rmode;
+  COMP_PRECISION *slip,*sloc,*sall;
+#ifdef USE_PETSC
+  int *counts=NULL,*displs=NULL,r0,r1;
+  MPI_Datatype mpi_cp;
+  double t0;
+#endif
+  if((select_i_coeff_calc_mode(medium) != CALC_I_COEFF_NOW) ||
+     (medium->solver_mode == SPARSE_SOLVER)){
+    HEADNODE
+      fprintf(stderr,"par_add_solution_stress: I matrix mode %i solver mode %i, using serial add_solution\n",
+	      select_i_coeff_calc_mode(medium),medium->solver_mode);
+    add_solution(naflt,sma,xsol,nameaf,medium,fault,FALSE,TRUE,sfac);
+    return;
+  }
+  if(naflt <= 0)
+    return;
+  rank = (int)medium->comm_rank;
+  np   = (int)medium->comm_size;
+#ifdef USE_PETSC
+  t0 = MPI_Wtime();
+#endif
+  /* 
+     slip increments for all active patches, same logic as add_solution
+     (mode[j] for nr_flt_mode == 3, else mode[0] for all j)
+  */
+  slip = (COMP_PRECISION *)calloc(3*naflt,sizeof(COMP_PRECISION));
+  if(!slip)
+    MEMERROR("par_add_solution_stress: slip");
+  for(eqc=i=ip=0;i < naflt;i++,ip += 3){
+    for(j=0;j < 3;j++){
+      rmode = (medium->nr_flt_mode == 3)?(fault[nameaf[i]].mode[j]):(fault[nameaf[i]].mode[0]);
+      switch(rmode){
+      case COULOMB_STRIKE_SLIP_RIGHTLATERAL:
+      case COULOMB_DIP_SLIP_DOWNWARD:
+      case STRIKE_SLIP_RIGHTLATERAL:
+      case DIP_SLIP_DOWNWARD:
+      case NORMAL_SLIP_INWARD:{
+	if(sma[ip + j]){
+	  slip[ip+j] = -((COMP_PRECISION)xsol[eqc] * sfac);
+	  eqc++;
+	}
+	break;
+      }
+      default:{
+	if(sma[ip + j]){
+	  slip[ip+j] =  ((COMP_PRECISION)xsol[eqc] * sfac);
+	  eqc++;
+	}
+	break;
+      }}
+    }
+  }
+  /* 
+     bookkeeping that quake() and add_quake_stress() do on every call,
+     replicated on all ranks: moment release init and slip on the
+     active patches
+  */
+  if(!medium->moment_release_init){
+    medium->moment_release_init = TRUE;
+    if(medium->events_init)
+      medium->old_moment_time = medium->time;
+  }
+  for(i=ip=0;i < naflt;i++,ip += 3)
+    for(j=0;j < 3;j++)
+      if(sma[ip+j])
+	fault[nameaf[i]].u[j] += slip[ip+j];
+  /* 
+     local receiver range 
+  */
+  par_receiver_range((int)medium->nrflt,np,rank,&i0,&i1);
+  nloc = i1 - i0;
+  /* 
+     local stress buffer, initialized with the pre-solve stresses so
+     that the accumulation order matches the serial path exactly
+  */
+  sloc = (COMP_PRECISION *)malloc(sizeof(COMP_PRECISION)*3*((nloc > 0)?(nloc):(1)));
+  if(!sloc)
+    MEMERROR("par_add_solution_stress: sloc");
+  for(i=i0;i < i1;i++)
+    for(j=0;j < 3;j++)
+      sloc[(i-i0)*3+j] = fault[i].s[j];
+  /* 
+     receiver loop, sources in ascending active patch order as in
+     add_solution
+  */
+  for(i=i0;i < i1;i++){
+    for(ir=ip=0;ir < naflt;ir++,ip += 3){
+      /* -ni: no interactions between different fault groups, as in
+	 the A matrix assembly and add_quake_stress */
+      if(medium->no_interactions && (fault[i].group != fault[nameaf[ir]].group))
+	continue;
+      eval_green_and_project_stress_to_fault(fault,i,nameaf[ir],(slip+ip),(sloc+(i-i0)*3),TRUE,
+					     medium->full_space,medium->elastic);
+    }
+  }
+  /*
+    gather
+  */
+  if(np > 1){
+#ifdef USE_PETSC
+    sall = (COMP_PRECISION *)malloc(sizeof(COMP_PRECISION)*3*medium->nrflt);
+    counts = (int *)malloc(sizeof(int)*np);
+    displs = (int *)malloc(sizeof(int)*np);
+    if((!sall)||(!counts)||(!displs))
+      MEMERROR("par_add_solution_stress: gather arrays");
+    for(i=0;i < np;i++){
+      par_receiver_range((int)medium->nrflt,np,i,&r0,&r1);
+      counts[i] = 3*(r1-r0);
+      displs[i] = 3*r0;
+    }
+    mpi_cp = (sizeof(COMP_PRECISION) == sizeof(double))?(MPI_DOUBLE):(MPI_FLOAT);
+    MPI_Allgatherv(sloc,3*nloc,mpi_cp,sall,counts,displs,mpi_cp,MPI_COMM_WORLD);
+    for(i=0;i < medium->nrflt;i++)
+      for(j=0;j < 3;j++)
+	fault[i].s[j] = sall[i*3+j];
+    free(sall);free(counts);free(displs);
+#else
+    fprintf(stderr,"par_add_solution_stress: comm_size %i but no MPI compiled in\n",np);
+    exit(-1);
+#endif
+  }else{
+    for(i=i0;i < i1;i++)
+      for(j=0;j < 3;j++)
+	fault[i].s[j] = sloc[(i-i0)*3+j];
+  }
+  free(sloc);
+  free(slip);
+#ifdef USE_PETSC
+  HEADNODE
+    fprintf(stderr,"par_add_solution_stress: %i active patches on %i receivers, %i ranks, %.2f s\n",
+	    naflt,medium->nrflt,np,MPI_Wtime()-t0);
+#endif
+}
+
+/*
   assemble the A matrix
 */
 
@@ -879,7 +1064,7 @@ int par_assemble_a_matrix(int naflt,my_boolean *sma,int nreq,int *nameaf,
 		  exit(-1);
 		}
 #endif
-		if(medium->no_interactions && (fault[i].group != fault[k].group)){
+		if(medium->no_interactions && (fault[nameaf[i]].group != fault[nameaf[k]].group)){
 		  avalues[eqc2] = 0;
 		}else{
 		  //

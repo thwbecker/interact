@@ -59,7 +59,7 @@ char *comment_on_code_bc(short int, float);
 void check_parameters_and_init_interact(int, char **, struct med **, struct flt **, unsigned char *, float *, float *);
 void initialize_interact(struct med **, struct flt **, unsigned char, unsigned char, int, unsigned char, unsigned char, float, float *, float *, unsigned char, unsigned char, unsigned char, float, unsigned char, float, unsigned char, unsigned char, unsigned char, unsigned char, unsigned char, unsigned char, unsigned char, short int, unsigned char, float, unsigned char, unsigned char, unsigned char, unsigned char, unsigned char, float, unsigned char, unsigned char, unsigned char, unsigned char);
 void init_files_interact(struct med **, struct flt **);
-void init_parameters_interact(char **, int, unsigned char *, unsigned char *, unsigned char *, unsigned char *, unsigned char *, float *, int *, unsigned char *, unsigned char *, unsigned char *, float *, unsigned char *, float *, unsigned char *, unsigned char *, unsigned char *, unsigned char *, unsigned char *, unsigned char *, unsigned char *, short int *, unsigned char *, float *, unsigned char *, unsigned char *, unsigned char *, unsigned char *, float *, unsigned char *, unsigned char *, unsigned char *, unsigned char *, unsigned char *, int);
+void init_parameters_interact(char **, int, unsigned char *, unsigned char *, unsigned char *, unsigned char *, unsigned char *, float *, int *, unsigned char *, unsigned char *, unsigned char *, float *, unsigned char *, float *, unsigned char *, unsigned char *, unsigned char *, unsigned char *, unsigned char *, unsigned char *, unsigned char *, short int *, unsigned char *, float *, unsigned char *, unsigned char *, unsigned char *, unsigned char *, float *, unsigned char *, unsigned char *, unsigned char *, unsigned char *, unsigned char *, int *, int);
 void advance_argument(int *, int, char **);
 char *name_boolean(unsigned char);
 unsigned char toggle(unsigned char *);
@@ -154,6 +154,8 @@ void nnls_driver_i(float *, float *, float *, int, int);
 /* src/linear_algebra/solve.c */
 int solve(struct med *, struct flt *);
 void add_solution(int, unsigned char *, float *, int *, struct med *, struct flt *, unsigned char, unsigned char, float);
+void par_add_solution_stress(int, unsigned char *, float *, int *, struct med *, struct flt *, float);
+void par_receiver_range(int, int, int, int *, int *);
 void assemble_a_matrix(float *, int, unsigned char *, int, int *, struct flt *, struct med *);
 int par_assemble_a_matrix(int, unsigned char *, int, int *, struct flt *, struct med *);
 /* src/linear_algebra/sparse.c */

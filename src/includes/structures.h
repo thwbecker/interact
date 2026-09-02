@@ -491,6 +491,11 @@ struct med{
   /* -npsfse: if true, skip the post slip fault stress evaluation after a
      one step solve (assemble, solve, print slip only). default false. */
   my_boolean no_post_slip_fault_stress_eval;
+  /* how to evaluate the post slip fault stress in one-step mode:
+     -1: automatic (parallel routine if comm_size > 1, else serial)
+      0: -spsfse, serial add_solution() on every rank
+      1: -ppsfse, parallel par_add_solution_stress() even on one rank */
+  int post_slip_fault_stress_par;
   unsigned int myfault0,myfaultn;
 #ifdef USE_PETSC
   PetscMPIInt comm_size, comm_rank;
