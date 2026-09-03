@@ -569,8 +569,9 @@ void init_parameters_interact(char **argv, int argc,
     }else if(strcmp(argv[i],"-ppsfse")==0){/* force parallel post slip fault stress evaluation */
       *post_slip_fault_stress_par = 1;
     }else if(strcmp(argv[i],"-geom")==0){
-      strncpy(geomfile,argv[i],STRLEN);
       advance_argument(&i,argc,argv);
+      strncpy(geomfile,argv[i],STRLEN);
+
     }else{
       if((rank == 0)&&(!warned)){
 	fprintf(stderr,"init_parameters_interact: encountered at least one parameter which cannot be interpreted by interact\n");
