@@ -757,6 +757,10 @@ void par_receiver_range(int n, int np, int rank, int *i0, int *i1)
   -ni (medium->no_interactions) skips source/receiver pairs from
   different fault groups, consistent with the A matrix assembly.
 
+  if eval_stress is FALSE (-npsfse), only the slip increments are
+  assigned to fault[].u (on every rank) and the routine returns; the
+  fault stresses are then not updated.
+
   restrictions: only for I matrix mode CALC_I_COEFF_NOW and solver
   modes other than SPARSE_SOLVER (the serial path has a separate one by
   one loop with a cutoff there). in all other cases falls back to
@@ -765,7 +769,7 @@ void par_receiver_range(int n, int np, int rank, int *i0, int *i1)
 */
 void par_add_solution_stress(int naflt,my_boolean *sma,A_MATRIX_PREC *xsol,int *nameaf,
 			     struct med *medium,struct flt *fault,
-			     COMP_PRECISION sfac)
+			     COMP_PRECISION sfac, my_boolean eval_stress)
 {
   int i,j,eqc,ip,i0,i1,ir,rank,np,nloc,rmode;
   COMP_PRECISION *slip,*sloc,*sall;
@@ -774,8 +778,9 @@ void par_add_solution_stress(int naflt,my_boolean *sma,A_MATRIX_PREC *xsol,int *
   MPI_Datatype mpi_cp;
   double t0;
 #endif
-  if((select_i_coeff_calc_mode(medium) != CALC_I_COEFF_NOW) ||
-     (medium->solver_mode == SPARSE_SOLVER)){
+  if(eval_stress && 
+     ((select_i_coeff_calc_mode(medium) != CALC_I_COEFF_NOW) ||
+      (medium->solver_mode == SPARSE_SOLVER))){
     HEADNODE
       fprintf(stderr,"par_add_solution_stress: I matrix mode %i solver mode %i, using serial add_solution\n",
 	      select_i_coeff_calc_mode(medium),medium->solver_mode);
@@ -834,6 +839,14 @@ void par_add_solution_stress(int naflt,my_boolean *sma,A_MATRIX_PREC *xsol,int *
     for(j=0;j < 3;j++)
       if(sma[ip+j])
 	fault[nameaf[i]].u[j] += slip[ip+j];
+  if(!eval_stress){
+    /* -npsfse: slip only, fault[].s stays at the pre-solve values */
+    free(slip);
+    HEADNODE
+      fprintf(stderr,"par_add_solution_stress: slip assigned to %i active patches, no stress evaluation\n",
+	      naflt);
+    return;
+  }
   /* 
      local receiver range 
   */

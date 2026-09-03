@@ -31,6 +31,7 @@ void check_parameters_and_init_interact(int argc, char **argv,
     suppress_nan_output,full_space,
     twod_approx_is_plane_stress,print_plane_coord,
     variable_time_step,debug,no_interactions,force_petsc;
+  char geomfile[STRLEN];
   MODE_TYPE tri_eval_mode;  
   short int solver_mode;
   COMP_PRECISION pressure,med_cohesion,min_stress_drop,wcutoff;
@@ -60,7 +61,7 @@ void check_parameters_and_init_interact(int argc, char **argv,
 			   &variable_time_step,&debug,&wcutoff,
 			   &no_interactions,&force_petsc,&tri_eval_mode,&full_space,
 			   &((*medium)->no_post_slip_fault_stress_eval),
-			   &((*medium)->post_slip_fault_stress_par),
+			   &((*medium)->post_slip_fault_stress_par),geomfile,
 			   (*medium)->comm_rank);
   // load files, etc
   initialize_interact(medium,fault,read_fault_friction,read_fault_rake,max_nr_flt_files,
@@ -71,7 +72,7 @@ void check_parameters_and_init_interact(int argc, char **argv,
 		      keep_slipping,attempt_restart,solver_mode,suppress_nan_output,
 		      pressure,twod_approx_is_plane_stress,
 		      print_plane_coord,variable_time_step,debug,TRUE,wcutoff,
-		      no_interactions,force_petsc,tri_eval_mode,full_space);
+		      no_interactions,force_petsc,tri_eval_mode,full_space,geomfile);
 }
 /*
 
@@ -104,7 +105,7 @@ void initialize_interact(struct med **medium, struct flt **fault,
 			 my_boolean variable_time_step,my_boolean debug,
 			 my_boolean init_system,COMP_PRECISION wcutoff,
 			 my_boolean no_interactions,my_boolean force_petsc,
-			 MODE_TYPE tri_eval_mode, my_boolean full_space)
+			 MODE_TYPE tri_eval_mode, my_boolean full_space, char *geomfile)
 {
 #ifdef USE_PETSC
   int fchunk,fchunkn;
@@ -119,9 +120,10 @@ void initialize_interact(struct med **medium, struct flt **fault,
   /* for triangle stresses */
   (*medium)->tri_eval_mode = tri_eval_mode;
   (*medium)->plane_stress = twod_approx_is_plane_stress;
-  
+  /*  */
+  strncpy((*medium)->geomfile,geomfile,STRLEN);
   /* all nodes need to know geometry */
-  read_geometry(GEOMETRY_FILE,medium,fault,read_fault_friction,read_fault_rake,TRUE);
+  read_geometry((*medium)->geomfile,medium,fault,read_fault_friction,read_fault_rake,TRUE);
   if((*medium)->comm_rank==0)
     fprintf(stderr,"initialize_interact: all stress values are based on a shear modulus of %g\n",
 	    (*medium)->elastic.shear);
@@ -248,7 +250,9 @@ void initialize_interact(struct med **medium, struct flt **fault,
     fprintf(stderr,"initialize_interact: sparse storage only works for loading simulation!\n");
     exit(-1);
   }
-
+  
+  
+  
   /* cutout */
   (*medium)->i_mat_cutoff = i_mat_cutoff;
   (*medium)->use_old_imat = use_old_imat;
@@ -421,6 +425,7 @@ void init_parameters_interact(char **argv, int argc,
 			      my_boolean *full_space,
 			      my_boolean *no_post_slip_fault_stress_eval,
 			      int *post_slip_fault_stress_par,
+			      char *geomfile,
 			      int rank)
 {
   int i,itmp;
@@ -462,6 +467,7 @@ void init_parameters_interact(char **argv, int argc,
   *full_space = FULL_SPACE_DEF;
   *no_post_slip_fault_stress_eval = FALSE; /* default: do evaluate post slip fault stress */
   *post_slip_fault_stress_par = -1;	/* default: automatic (parallel if comm_size > 1) */
+  strncpy(geomfile,GEOMETRY_FILE,STRLEN);
   /* 
      check for input options 
   */
@@ -562,6 +568,9 @@ void init_parameters_interact(char **argv, int argc,
       *post_slip_fault_stress_par = 0;
     }else if(strcmp(argv[i],"-ppsfse")==0){/* force parallel post slip fault stress evaluation */
       *post_slip_fault_stress_par = 1;
+    }else if(strcmp(argv[i],"-geom")==0){
+      strncpy(geomfile,argv[i],STRLEN);
+      advance_argument(&i,argc,argv);
     }else{
       if((rank == 0)&&(!warned)){
 	fprintf(stderr,"init_parameters_interact: encountered at least one parameter which cannot be interpreted by interact\n");

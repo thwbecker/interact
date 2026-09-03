@@ -175,6 +175,10 @@ MAIN_DEFINES = $(COMMON_DEFINES)
 ODIR = objects
 # directory for binaries
 BDIR = bin
+
+# make sure directories exist
+$(shell mkdir -p $(ODIR) $(BDIR))
+
 #
 # choice of Okada routine
 OKROUTINE = $(ODIR)/dc3dmod.o	# my modified version
@@ -389,7 +393,7 @@ LIBS_DEBUG = $(MY_LIBDIR_SPEC)$(ODIR)/     -linput.dbg -lpatchio.dbg $(TGF_LIB) 
 # list of all programs in groups
 #
 
-all: obj_directories libraries main_prog \
+all:  libraries main_prog \
 	tools converters geom_converters
 
 really_all: all debug_libraries  relax testing $(BDIR)/$(INTERACT_BINARY_NAME).sgl  \
@@ -448,14 +452,6 @@ clean:
 
 dist_clean:		
 	rm -rf  $(ODIR)/*.o $(ODIR)/*.a $(BDIR)/* src/includes/auto_proto.h src/includes/auto_proto.sgl.h
-
-obj_directories:
-	if [ ! -s $(ODIR) ];then \
-		mkdir -p $(ODIR);\
-	fi;\
-	if [ ! -s $(BDIR) ];then\
-		mkdir -p $(BDIR);\
-	fi;\
 
 
 # individual programs

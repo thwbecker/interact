@@ -453,7 +453,7 @@ struct med{
   short int nr_flt_mode;
   
   // matrix filenames
-  char mfname[STRLEN],hfname[STRLEN];
+  char mfname[STRLEN],hfname[STRLEN],geomfile[STRLEN];
   /*
 
     re-used arrays for spatial correlation calculations

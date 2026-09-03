@@ -49,7 +49,7 @@ void phelp(void)
   PE("(Petsc support not compiled in, if parallel support is desired, check makefile.)");
 #endif
   PE("");
-  fprintf(stderr,"(1) The fault geometry is input via the file \"%s\",\n    a list of fault patches.\n",
+  fprintf(stderr,"(1) The fault geometry is read from file \"%s\" (unless changed by -geom),\n    a list of fault patches.\n",
 	  GEOMETRY_FILE);
   PE("    This file has the following (\"patch\") format for regular, rectangular (Okada) faults or point sources");
   PE("    The default is to use half-space, but the -full flag can switch Okada point sources and rectangles to full");
@@ -516,6 +516,9 @@ void phelp(void)
   PE(" -ni suppress all interactions between faults except the interactions of patches within the fault group");
   PE("     applies to the A matrix and to the post slip fault stress evaluation (cross group stress not added)");
   PE("");
+  fprintf(stderr," -geom file_name\tassigns different geometry file, default is %s\n",GEOMETRY_FILE);
+  PE("");
+
   PE(" -full");
   fprintf(stderr,"     toggles space/plane for Okada (rectangular or point) or 2D, default is %s space/plane.\n",
 	  (FULL_SPACE_DEF)?("full"):("half"));
@@ -721,9 +724,10 @@ void phelp(void)
   PE("");
 #endif
   PE(" -npsfse");
-  PE("     no post slip fault stress evaluation: after a one-step solve, print");
-  PE("     the slip solution without the serial resolved-stress evaluation on");
-  PE("     all patches (default off, i.e. the stress evaluation is performed)");
+  PE("     no post slip fault stress evaluation: after a one-step solve, assign");
+  PE("     the slip solution to the patches and print it, but skip the resolved");
+  PE("     stress evaluation on all patches, i.e. flt.dat stresses stay at the");
+  PE("     pre-solve values (default off, i.e. the stress evaluation is performed)");
   PE("");
   PE(" -spsfse");
   PE("     force the serial post slip fault stress evaluation (add_solution on every");

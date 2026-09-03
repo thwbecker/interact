@@ -201,7 +201,7 @@ int main(int argc, char **argv)
       HEADNODE
 	fprintf(stderr,"main: one-step: post slip fault stress evaluation %s\n",
 		(medium->no_post_slip_fault_stress_eval)?
-		("OFF (-npsfse): slip solution only, flt.dat stresses left at pre-solve values"):
+		("OFF (-npsfse): slip assigned to patches, flt.dat stresses left at pre-solve values"):
 		("ON (default)"));
       /* parallel stress evaluation: automatic for comm_size > 1,
 	 forced by -ppsfse, disabled by -spsfse */
@@ -212,25 +212,32 @@ int main(int argc, char **argv)
 	else if((medium->post_slip_fault_stress_par == -1) && (medium->comm_size > 1))
 	  use_par_psfse = TRUE;
       }
-      if(use_par_psfse){
+      if(medium->no_post_slip_fault_stress_eval){
+	/* slip only: assign the solution to fault[].u without any
+	   stress evaluation (add_solution would skip both) */
+	if(medium->naflt)
+	  par_add_solution_stress(medium->naflt,medium->sma,medium->xsol,
+				  medium->nameaf,medium,fault,1.0,FALSE);
+	if(medium->naflt_con)
+	  par_add_solution_stress(medium->naflt_con,medium->sma_con,
+				  medium->xsol_con,medium->nameaf_con,medium,fault,1.0,FALSE);
+      }else if(use_par_psfse){
 	HEADNODE
 	  fprintf(stderr,"main: one-step: using parallel post slip fault stress evaluation\n");
 	if(medium->naflt)
 	  par_add_solution_stress(medium->naflt,medium->sma,medium->xsol,
-				  medium->nameaf,medium,fault,1.0);
+				  medium->nameaf,medium,fault,1.0,TRUE);
 	if(medium->naflt_con)
 	  par_add_solution_stress(medium->naflt_con,medium->sma_con,
-				  medium->xsol_con,medium->nameaf_con,medium,fault,1.0);
+				  medium->xsol_con,medium->nameaf_con,medium,fault,1.0,TRUE);
       }else{
 	if(medium->naflt)
 	  add_solution(medium->naflt,medium->sma,medium->xsol,
-		       medium->nameaf,medium,fault,FALSE,
-		       (medium->no_post_slip_fault_stress_eval)?(FALSE):(TRUE),1.0);
+		       medium->nameaf,medium,fault,FALSE,TRUE,1.0);
 	if(medium->naflt_con)
 	  add_solution(medium->naflt_con,medium->sma_con,
 		       medium->xsol_con,medium->nameaf_con,
-		       medium,fault,FALSE,
-		       (medium->no_post_slip_fault_stress_eval)?(FALSE):(TRUE),1.0);
+		       medium,fault,FALSE,TRUE,1.0);
       }
     }
     HEADNODE{
