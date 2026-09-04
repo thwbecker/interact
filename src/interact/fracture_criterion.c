@@ -273,6 +273,10 @@ void two_dir_slip_check(my_boolean *sma,COMP_PRECISION *tstress_drop,
   if((critical) && (stress_drop > medium->min_stress_drop)){
     //
     // reset possible Coulomb corrections
+    /* NOTE: the sign of cf assigned below (+mu_d when the shear stress is
+       positive and the target drop negative) is the opposite of what the
+       one-step 1xx codes in read_boundary_conditions.c assign for the
+       same situation; see the QUESTION note there */
     fault[flt].cf[STRIKE]=fault[flt].cf[DIP]=0.0;
     // obtain stress drop resolved on strike and
     // dip directions

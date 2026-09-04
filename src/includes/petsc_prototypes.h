@@ -18,6 +18,7 @@ PetscErrorCode rsf_ODE_RHSFunction(TS, PetscReal, Vec, Vec, void*);
 PetscErrorCode rsf_TS_Monitor(TS, PetscInt, PetscReal, Vec, void*);
 PetscErrorCode rsf_write_checkpoint(TS, Vec, struct rsf_out_ctx *);
 PetscErrorCode rsf_read_checkpoint(const char *, Vec, struct rsf_out_ctx *, PetscReal *, PetscReal *, PetscInt *);
+PetscErrorCode time_solves(Mat , PetscInt , PetscReal *,PetscInt *, KSPConvergedReason *);
 PetscErrorCode rsf_domain_check(TS, PetscReal, Vec, PetscBool*);
 /* shared between the explicit and IMEX paths (rsf_engine.c) */
 PetscReal rsf_state_rate(PetscInt, PetscReal, PetscReal, struct interact_ctx *,
@@ -118,6 +119,13 @@ extern void  chmmvp_mpi_delete(void *);
 
 
 PetscErrorCode MatMult_hmmvp(Mat , Vec , Vec );
+#endif
+
+#if ( defined(USE_HMMVP) || defined(USE_HACAPK) )
+/* diagonal cache for the MATSHELL H-matrix operators (petsc_matrix_operations.c),
+   needed for MatGetDiagonal and hence PCJACOBI */
+void fill_hmat_shell_diagonal(hmat_helper_shell_ctx *, struct interact_ctx *, int);
+PetscErrorCode MatGetDiagonal_hmat_shell(Mat , Vec );
 #endif
 
 #ifdef USE_BIGWHAM

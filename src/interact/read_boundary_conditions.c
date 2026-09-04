@@ -640,6 +640,16 @@ void read_one_step_bc(FILE *in,struct med *medium,struct flt *fault,
 	// assign strike mode
 	fault[patch_nr].mode[STRIKE]=(MODE_TYPE)bc_code;
 	if(bc_code > OS_C_OFFSET){// need to correct for normal stress changes
+	  /* QUESTION (sign convention, unchanged for now): this sets
+	     cf = -mu_d for rhs < 0, i.e. for the case where a positive
+	     shear stress is to be reduced. fracture_criterion.c
+	     (loading simulation) uses cf = +mu_d for s > 0 with a negative
+	     target drop, i.e. the opposite sign for the same situation.
+	     With extension-positive sigma_n the dynamic strength for
+	     tau > 0 is -mu_d sigma_n, so tau + dtau = -mu_d (sigma_n +
+	     dsigma_n) gives dtau + mu_d dsigma_n = -(drop), which matches
+	     fracture_criterion.c. Check which convention is intended
+	     before relying on the 1xx one-step codes. */
 	  if(fault[patch_nr].mu_sa == 0.0){
 	    HEADNODE
 	      fprintf(stderr,"read_boundary_conditions: for friction adjustment, need mu_s first\n");
@@ -687,6 +697,8 @@ void read_one_step_bc(FILE *in,struct med *medium,struct flt *fault,
 	fault[patch_nr].mode[DIP]=(MODE_TYPE)bc_code;
 	//
 	if(bc_code > OS_C_OFFSET){// need to correct for normal stress changes
+	  /* QUESTION: same sign-convention question as for the strike
+	     component above, see the note there and fracture_criterion.c */
 	  if(fault[patch_nr].mu_sa == 0.0){
 	    HEADNODE
 	      fprintf(stderr,"read_boundary_conditions: for friction adjustment, need mu_s first\n");

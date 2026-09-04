@@ -369,7 +369,7 @@ PetscErrorCode rsf_ve_setup(struct interact_ctx *par, Vec negvpl_in,
     int cache_on;
     long ndx=0,nuz=0,ncache=0;
     COMP_PRECISION *udx=NULL,*uzz=NULL,*csamp=NULL;
-    int *dxof=NULL,*izof=NULL;
+    int *izof=NULL;
     char *cset=NULL;
     if((np < 2)||(np > VE_MAX_NP))
       SETERRQ(PETSC_COMM_WORLD,PETSC_ERR_USER,"rsf_ve_setup: -ve_np %ld out of [2, %d]",(long)np,VE_MAX_NP);
@@ -431,7 +431,6 @@ PetscErrorCode rsf_ve_setup(struct interact_ctx *par, Vec negvpl_in,
       long ii,jj,nn;
       tmpv = (COMP_PRECISION *)malloc((size_t)medium->nrflt*sizeof(COMP_PRECISION));
       izof = (int *)malloc((size_t)medium->nrflt*sizeof(int));
-      dxof = NULL;
       if((!tmpv)||(!izof))MEMERROR("rsf_ve_setup: cache");
       /* unique z (INT_Y) values, 1e-4 m quantization */
       for(ii=0;ii < medium->nrflt;ii++)tmpv[ii] = fault[ii].x[INT_Y];

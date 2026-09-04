@@ -676,7 +676,7 @@ PetscErrorCode calc_petsc_Isn_matrices(struct med *medium, struct flt *fault,
 #else  /* in-memory OpenMP/serial path */
     HEADNODE
       fprintf(stderr,"calc_petsc_Isn_matrices: creating HMMVP matrix for stress mode %i stress type %i OpenMP\n",
-	      mode,ictx->rec_stress_mode);
+	      receive_mode,ictx->rec_stress_mode);
     hmmvp_handle = chmmvp_compress_in_memory((int)m,xc,yc,zc,(double)medium->hmmvp_tol,
 					     (double)medium->hmmvp_eta,medium->hmmvp_inorm,medium->hmmvp_nthreads,
 					     (void *)ictx);
@@ -709,8 +709,21 @@ PetscErrorCode calc_petsc_Isn_matrices(struct med *medium, struct flt *fault,
 #ifdef USE_BIGWHAM
     /* BigWham builds its own mesh from the patch geometry, so it needs none of
        the htool coords or the hacapk/hmmvp xc/yc/zc arrays. It overwrites the
-       AIJ *this_mat created above with its MATSHELL, like cases 3 and 4. */
-    PetscCall(setup_bigwham_matshell(medium,fault,scale,mode,this_mat,&hctx));
+       AIJ *this_mat created above with its MATSHELL, like cases 3 and 4.
+
+       the shim only implements the strike-slip -> strike-shear sub-block,
+       so reject anything else here (compress_interaction_matrix does the
+       same). the scale factor is passed as 1: it is applied once for all
+       backends by the MatScale() below, and passing it here as well would
+       scale the BigWham operator by scale^2 (only the sign convention
+       BIGWHAM_STRESS_SIGN stays inside bscale). */
+    if((slip_dir != STRIKE) || (receive_mode != 0)){
+      HEADNODE
+	fprintf(stderr,"calc_petsc_Isn_matrices: BigWham is only set up for strike slip -> strike shear stress (slip_dir %i receive_mode %i requested)\n",
+		slip_dir,receive_mode);
+      exit(-1);
+    }
+    PetscCall(setup_bigwham_matshell(medium,fault,1.0,receive_mode,this_mat,&hctx));
 #endif
     break;
   }

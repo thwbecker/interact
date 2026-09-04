@@ -473,12 +473,18 @@ int main(int argc, char **argv)
       hsc_h = (hmat_helper_shell_ctx *)malloc(sizeof(hmat_helper_shell_ctx));
       hsc_h->handle = hacapk_handle;
       hsc_h->ball = (double *)malloc(sizeof(double)*m);
+      hsc_h->diag = NULL;
       PetscCall(MatCreateShell(PETSC_COMM_WORLD,PETSC_DECIDE,PETSC_DECIDE,m,n,
 			       (void *)hsc_h,&AH));
       PetscCall(MatShellSetOperation(AH,MATOP_MULT,(void (*)(void))MatMult_HACApK));
+      /* diagonal cache, as in calc_petsc_Isn_matrices, so that -pc_type
+	 jacobi (and anything else calling MatGetDiagonal) works on this
+	 path too */
+      PetscCall(MatShellSetOperation(AH,MATOP_GET_DIAGONAL,(void (*)(void))MatGetDiagonal_hmat_shell));
       PetscCall(MatCreateVecs(AH,&xd,NULL));
       PetscCall(VecScatterCreateToAll(xd,&hsc_h->scat,&hsc_h->xall));
       PetscCall(VecGetOwnershipRange(xd,&hsc_h->rs,&hsc_h->re));
+      fill_hmat_shell_diagonal(hsc_h,ictx,(int)ndim);
       PetscCall(VecDestroy(&xd));
       PetscCall(MatSetOption(AH, MAT_SYMMETRIC, PETSC_FALSE));
 #endif
@@ -528,12 +534,15 @@ int main(int argc, char **argv)
       hsc_h = (hmat_helper_shell_ctx *)malloc(sizeof(hmat_helper_shell_ctx));
       hsc_h->handle = hmmvp_handle;
       hsc_h->ball = (double *)malloc(sizeof(double)*m); /* full y on every rank */
+      hsc_h->diag = NULL;
       PetscCall(MatCreateShell(PETSC_COMM_WORLD,PETSC_DECIDE,PETSC_DECIDE,m,n,
 			       (void *)hsc_h,&AH));
       PetscCall(MatShellSetOperation(AH,MATOP_MULT,(void (*)(void))MatMult_hmmvp));
+      PetscCall(MatShellSetOperation(AH,MATOP_GET_DIAGONAL,(void (*)(void))MatGetDiagonal_hmat_shell));
       PetscCall(MatCreateVecs(AH,&xd,NULL));
       PetscCall(VecScatterCreateToZero(xd,&hsc_h->scat,&hsc_h->xall)); /* gather-to-root */
       PetscCall(VecGetOwnershipRange(xd,&hsc_h->rs,&hsc_h->re));
+      fill_hmat_shell_diagonal(hsc_h,ictx,(int)ndim);
       PetscCall(VecDestroy(&xd));
       PetscCall(MatSetOption(AH, MAT_SYMMETRIC, PETSC_FALSE));
 #else
@@ -562,12 +571,15 @@ int main(int argc, char **argv)
       hsc_h = (hmat_helper_shell_ctx *)malloc(sizeof(hmat_helper_shell_ctx));
       hsc_h->handle = hmmvp_handle;
       hsc_h->ball = (double *)malloc(sizeof(double)*m);
+      hsc_h->diag = NULL;
       PetscCall(MatCreateShell(PETSC_COMM_WORLD,PETSC_DECIDE,PETSC_DECIDE,m,n,
 			       (void *)hsc_h,&AH));
       PetscCall(MatShellSetOperation(AH,MATOP_MULT,(void (*)(void))MatMult_hmmvp));
+      PetscCall(MatShellSetOperation(AH,MATOP_GET_DIAGONAL,(void (*)(void))MatGetDiagonal_hmat_shell));
       PetscCall(MatCreateVecs(AH,&xd,NULL));
       PetscCall(VecScatterCreateToAll(xd,&hsc_h->scat,&hsc_h->xall));
       PetscCall(VecGetOwnershipRange(xd,&hsc_h->rs,&hsc_h->re));
+      fill_hmat_shell_diagonal(hsc_h,ictx,(int)ndim);
       PetscCall(VecDestroy(&xd));
       PetscCall(MatSetOption(AH, MAT_SYMMETRIC, PETSC_FALSE));
 #endif /* USE_HMMVP_MPI */
