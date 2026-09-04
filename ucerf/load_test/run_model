@@ -1,8 +1,52 @@
 #!/bin/bash
+#
+# one-step interact solve of the UCERF geometry with a unit strike
+# stress drop on all patches (bc code 10, value 1), dense operator,
+# PETSc iterative solvers. several solver modes are run so that the
+# convergence behavior with and without the near-field preconditioner
+# (-near_pc_radius) can be compared from the logs.
+#
+# usage: run_model [ncore] [modes] [geometry] [rtol] [rfac]
+#
+#   ncore    MPI ranks (4)
+#   modes    space separated list of modes to run, or "all" (all)
+#   geometry geometry file name without .in (test)
+#   rtol     KSP relative tolerance (1e-6)
+#   rfac     near-field radius in units of the mean patch length (4)
+#
+# modes (all use -npsfse, i.e. slip only, unless noted):
+#
+#   1  fgmres(2000), modified Gram-Schmidt, Jacobi         (previous default)
+#   2  fgmres(2000), no preconditioner                      (is Jacobi doing anything?)
+#   3  gmres(30), near-field PC, ASM with sub-block LU      (proposed default)
+#   4  gmres(30), near-field PC, ASM with sub-block ILU     (cheaper factorization)
+#   5  bcgs,      near-field PC, ASM with sub-block LU      (two matvecs per iteration)
+#   6  gmres(30), near-field PC, block Jacobi, sub-block LU (no overlap, for comparison)
+#   7  as 3, but WITH post-slip stress evaluation (full flt.dat)
+#
+# output per mode: log.<mode>.dat (full interact output, KSP monitor
+# with true residual, converged reason, -log_view), flt.<mode>.dat
+# (slip and, for mode 7, stresses), and a line in summary.dat with
+# iterations, timings, and the slip difference to mode 1 (or to the
+# first mode run). the KSP norm type is set to unpreconditioned so that
+# rtol refers to the true residual for all modes.
+#
 ncore=${1-4}
-rtol=${2-1e-5}
-#g=geom
-g=test
+modes=${2-all}
+g=${3-test}
+rtol=${4-1e-6}
+rfac=${5-4}
+
+maxit=20000
+bin=interact			# assumed in PATH
+
+if [ ! -s $g.in ];then
+    echo $0: geometry file $g.in not found
+    exit 1
+fi
+if [ "$modes" = "all" ];then
+    modes="1 2 3 4 5 6 7"
+fi
 
 cat <<EOF > bc.in
 1 0
@@ -11,21 +55,60 @@ EOF
 
 export OMP_NUM_THREADS=1
 
-for mode in 1 2;do
-    if [ $mode = 1 ];then
-	options="-npsfse"
-    else
-	options=""
+# near-field radius from the mean patch length (2 * half-length,
+# column 6 of the geometry file), in geometry units
+rnear=$(gawk -v f=$rfac '{s+=2*$6;n++}END{printf("%g",f*s/n)}' $g.in)
+npatch=$(gawk 'END{print NR}' $g.in)
+echo $0: $npatch patches, mean patch length $(gawk -v r=$rnear -v f=$rfac 'BEGIN{printf("%g",r/f)}'), near-field radius $rnear \($rfac patch lengths\)
+
+# KSP monitoring common to all modes
+monitor="-ksp_converged_reason -ksp_monitor_true_residual -ksp_norm_type unpreconditioned -ksp_rtol $rtol -ksp_max_it $maxit -log_view"
+
+if [ ! -s summary.dat ];then
+    echo "# mode ncore npatch rtol its reason assembly_s solve_s psfse_s total_s rel_slip_diff_to_ref ref_mode settings" > summary.dat
+fi
+ref=""
+for mode in $modes;do
+    psfse="-npsfse"
+    case $mode in
+	1) options="-ksp_type fgmres -ksp_gmres_restart 2000 -ksp_gmres_modifiedgramschmidt -pc_type jacobi";;
+	2) options="-ksp_type fgmres -ksp_gmres_restart 2000 -pc_type none";;
+	3) options="-ksp_type gmres -near_pc_radius $rnear -pc_type asm -sub_pc_type lu";;
+	4) options="-ksp_type gmres -near_pc_radius $rnear -pc_type asm -sub_pc_type ilu";;
+	5) options="-ksp_type bcgs  -near_pc_radius $rnear -pc_type asm -sub_pc_type lu";;
+	6) options="-ksp_type gmres -near_pc_radius $rnear -pc_type bjacobi -sub_pc_type lu";;
+	7) options="-ksp_type gmres -near_pc_radius $rnear -pc_type asm -sub_pc_type lu"; psfse="";;
+	*) echo $0: mode $mode undefined; continue;;
+    esac
+    log=log.$mode.dat
+    echo $0: mode $mode: $options $psfse
+    t0=$(date +%s.%N)
+    mpirun -bind-to core -np $ncore $bin $psfse -geom $g.in $options $monitor > $log 2>&1
+    rc=$?
+    t1=$(date +%s.%N)
+    total=$(gawk -v a=$t0 -v b=$t1 'BEGIN{printf("%.1f",b-a)}')
+    if [ $rc -ne 0 ];then
+	echo $0: mode $mode: interact returned $rc, see $log
+	continue
     fi
-
-    mpirun -bind-to core -np $ncore interact $options -geom $g.in \
-	     -ksp_type fgmres -ksp_gmres_restart 2000  -ksp_gmres_modifiedgramschmidt \
-	     -pc_type jacobi -ksp_rtol $rtol -ksp_max_it 20000 \
-	     -ksp_converged_reason -ksp_monitor -log_view > log.$mode.dat
-
-
     mv flt.dat flt.$mode.dat
-    #    cat $g.in |patch2vtk flt.$mode.dat  > ~/Dropbox/tmp/ucerf2.$mode.vtk
+    # timings from interact's own reports (seconds since init)
+    tasm=$(gawk '/solve: parallel assembly done/{for(i=1;i<=NF;i++)if($i=="s")print $(i-1)}' $log)
+    tsol=$(gawk '/solve: parallel solve completed/{for(i=1;i<=NF;i++)if($i=="s")print $(i-1)}' $log)
+    solve_s=$(gawk -v a=$tasm -v b=$tsol 'BEGIN{printf("%.2f",b-a)}')
+    tps=$(gawk '/par_add_solution_stress:.*ranks,/{print $(NF-1)}' $log)
+    if [ -z "$tps" ];then tps="-"; fi
+    its=$(gawk '/Linear solve/{print $(NF)}' $log)
+    reason=$(gawk '/Linear solve/{print $(NF-2)}' $log)
+    # reference for slip differences: mode 1 if its solution exists
+    # (possibly from an earlier call), else the first mode of this run
+    if [ -z "$ref" ];then
+	if [ -s flt.1.dat ];then ref=1; else ref=$mode; fi
+    fi
+    # relative L2 difference of the strike slip (column 6 of flt.dat) to the reference
+    diff=$(paste flt.$ref.dat flt.$mode.dat | gawk '$1!~/^#/{d=$6-$19;s+=d*d;r+=$6*$6}END{printf("%.3e",sqrt(s/r))}')
+    echo "$mode $ncore $npatch $rtol $its $reason $tasm $solve_s $tps $total $diff $ref \"$options $psfse\"" >> summary.dat
+    echo $0: mode $mode: $its iterations \($reason\), assembly $tasm s, solve $solve_s s, stress eval $tps s, total $total s, slip diff to mode $ref: $diff
     ./plot_sol $g flt.$mode
 done
-
+echo $0: summary in summary.dat
