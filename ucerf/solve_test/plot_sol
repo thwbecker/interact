@@ -1,0 +1,25 @@
+#!/bin/bash
+g=${1-test}			# geometry file
+f=${2-flt}			# fault slip file
+
+#g=geom;reg=-R-300/700/3450/4730/-20/0
+
+reg=-R-300/700/3450/4730/-20/0
+#reg=-R130/450/3750/4500/-20/0
+
+if [[ ! -s $g.in || ! -s $f.dat ]];then
+    echo $0: either $g.in or $f.dat not found
+    exit
+fi
+cat $g.in |patch2xyz $f.dat 0  > tmp.gmt
+
+#cat $g.in |patch2vtk flt.dat  > ~/Dropbox/tmp/ucerf.vtk
+
+makecpt -T-0.005/0/0.0005 -Croma > tmp.cpt
+
+ofile=ucerf.$g.$f.ps
+psxyz -Jx0.01 -Jz0.05 -L -m -Ctmp.cpt $reg tmp.gmt  -Ba100f10:"x":/a100f10:"y":/a5f1:"z":WESNZ+ -E30/30 -P -K > $ofile
+psscale -Ctmp.cpt -B0.001/:u@-s@-: -D1/2/2.5/.15 -E -O >> $ofile
+modifybb $ofile 1
+
+rm tmp*

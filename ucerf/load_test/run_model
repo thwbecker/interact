@@ -1,0 +1,31 @@
+#!/bin/bash
+ncore=${1-4}
+rtol=${2-1e-4}
+#g=geom
+g=test
+
+cat <<EOF > bc.in
+1 0
+-1 -1 -1 10 1
+EOF
+
+export OMP_NUM_THREADS=1
+
+for mode in 1 2;do
+    if [ $mode = 1 ];then
+	options="-npsfse"
+    else
+	options=""
+    fi
+
+    mpirun -bind-to core -np $ncore interact $options -geom $g.in \
+	     -ksp_type fgmres -ksp_gmres_restart 2000  -ksp_gmres_modifiedgramschmidt \
+	     -pc_type jacobi -ksp_rtol $rtol -ksp_max_it 20000 \
+	     -ksp_converged_reason -ksp_monitor -log_view > log.$mode.dat
+
+
+    mv flt.dat flt.$mode.dat
+    #    cat $g.in |patch2vtk flt.$mode.dat  > ~/Dropbox/tmp/ucerf2.$mode.vtk
+    ./plot_sol $g flt.$mode
+done
+
