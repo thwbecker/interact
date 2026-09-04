@@ -30,7 +30,7 @@ maxit=10000
 rtol=1e-6
 backend="-use_hmatrix 4 -hmmvp_inorm 3 -hmmvp_tol 1e-4"
 
-common="-geom_file $geom -make_matrix_externally -skip_dense -nrandom 0 -nsolve 1"
+common="-geom_file $geom -skip_dense -nrandom 0 -nsolve 1"
 
 run_one () {     # label extra-ksp-flags...
     label=$1; shift

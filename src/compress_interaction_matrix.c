@@ -29,28 +29,19 @@ int main(int argc, char **argv)
   struct interact_ctx ictx[1];
   /* timing */
   clock_t start_time,stop_time;
-  PetscLogDouble t0,t1;
   my_boolean read_rake=FALSE,read_fric=FALSE;
   double *bglobal,cpu_time_used;
-#ifdef USE_PETSC_HMAT		
-  MatHtoolKernelFn *htools_kernel = GenKEntries_petsc;
-  Mat KT;
-  PetscReal nrmK,nrmD;
-#endif
   KSP               ksp=NULL,ksph=NULL;
   PC                pc,pch;
   Vec         x=NULL, xh=NULL, b=NULL, bh=NULL, bout=NULL,d=NULL;
   Mat         Adense=NULL,AH=NULL,AH_dense=NULL;
-  PetscReal   *coords=NULL,*avalues=NULL,*bvalues=NULL,norm[3];
-  PetscInt    ndim, n, m, lm,ln,i,j,k,dn,on, *col_idx=NULL,rs,re;
+  PetscReal   *bvalues=NULL,norm[3];
+  PetscInt    n, m, lm,ln,i,k,rs;
   PetscInt nrandom = 0;	/* for timing tests */
   VecScatter ctx;
   PetscRandom rand_str;
   PetscBool read_value,flg,test_forward=PETSC_TRUE,use_full_space=PETSC_FALSE;
-  PetscBool make_matrix_externally=PETSC_FALSE; /* make matrices here
-						   on in external
-						   routine (for
-						   testing) */
+  PetscBool make_matrix_externally=PETSC_FALSE; /* deprecated, ignored */
   /* -skip_dense: build only the H-matrix, time it, and exit before the
      dense reference and the error/solve check. The dense reference is
      m*n entries, which exceeds 32-bit PetscInt and a single rank's memory
@@ -102,22 +93,6 @@ int main(int argc, char **argv)
   char dump_matrix_file[STRLEN]="",dump_coords_file[STRLEN]="";
   PetscBool do_dump_matrix=PETSC_FALSE,do_dump_coords=PETSC_FALSE;
   hmat_helper_shell_ctx *hsc_dense=NULL,*hsc_h=NULL;
-#if ( defined(USE_HMMVP) || defined(USE_HACAPK) )
-  double *xc,*yc,*zc;
-  Vec xd;
-#endif
-#ifdef USE_HMMVP
-#ifdef USE_HMMVP_MPI
-  char hmmvp_fn[STRLEN], hmmvp_tmp[STRLEN];
-  int cret;
-#endif
-  void *hmmvp_handle;
-  long hmmvp_nnz;
-  int hmm,hmn;
-#endif 
-#ifdef USE_HACAPK
-  void *hacapk_handle;
-#endif
   /* IMPORTANT */
   PetscFunctionBeginUser;
 
@@ -131,7 +106,6 @@ int main(int argc, char **argv)
   ictx->src_slip_mode = STRIKE;	/* slip mode (STRIKE, DIP, NORMAL, RAKE */
   ictx->rec_stress_mode = STRIKE; /* recording stress mode */
   
-  ndim = 3;
   /* 
      start up petsc 
   */
@@ -149,7 +123,10 @@ int main(int argc, char **argv)
   /* options */
   PetscCall(PetscOptionsGetInt(NULL, NULL, "-nrandom", &nrandom,&read_value));
   PetscCall(PetscOptionsGetBool(NULL, NULL, "-test_forward", &test_forward,&read_value));
-  PetscCall(PetscOptionsGetBool(NULL, NULL, "-make_matrix_externally", &make_matrix_externally,NULL));
+  PetscCall(PetscOptionsGetBool(NULL, NULL, "-make_matrix_externally", &make_matrix_externally,&read_value));
+  if(read_value)
+    HEADNODE
+      fprintf(stderr,"%s: NOTE: -make_matrix_externally is deprecated and ignored, matrices are always assembled by calc_petsc_Isn_matrices\n",argv[0]);
   PetscCall(PetscOptionsGetBool(NULL, NULL, "-skip_dense", &skip_dense,NULL));
   PetscCall(PetscOptionsGetBool(NULL, NULL, "-dense_reference_only", &dense_reference_only,NULL));
   PetscCall(PetscOptionsGetInt(NULL, NULL, "-nsolve", &nsolve,NULL));
@@ -211,427 +188,23 @@ int main(int argc, char **argv)
   bglobal = (double *)malloc(sizeof(double)*m);
 
   
-  if(!make_matrix_externally){
-    /* 
-       make all the matrices here in this program, only for testing purposes
-
-    */
-    HEADNODE{
-      fprintf(stderr,"%s: computing %i by %i matrix LOCALLY\n",argv[0], m,n);
-      
-    }
-    /* 
-       dense matrix setup, using Adense
-    */
-    /* The dense reference is a MATDENSE of m by n. With 32-bit PetscInt a
-       local block of local_rows*n entries overflows the index once it
-       exceeds PETSC_MAX_INT, which segfaults rather than erroring cleanly.
-       Detect that up front from the row split and fall back to the
-       H-matrix-only path (as if -skip_dense) with a warning, so the run
-       still produces the assembly instead of crashing. Adding MPI ranks
-       lowers local_rows. A 64-bit PetscInt build removes the limit but is
-       not an option when use_hmatrix selects HTOOL, which does not support
-       64-bit indices, so adding ranks (or -skip_dense) is the way out. */
-    if(!skip_dense){
-      PetscInt local_rows=PETSC_DECIDE,glob=m;
-      PetscCall(PetscSplitOwnership(PETSC_COMM_WORLD,&local_rows,&glob));
-      if((PetscInt64)local_rows*(PetscInt64)n > (PetscInt64)PETSC_MAX_INT){
-	HEADNODE
-	  fprintf(stderr,"%s: WARNING: dense reference local block %ld x %i = %lld entries exceeds the PetscInt limit (%lld); skipping the dense reference and the error check. Add MPI ranks so each rank's block stays under the limit, or pass -skip_dense. (A 64-bit PetscInt build removes the limit but is incompatible with HTOOL.)\n",
-		  argv[0],(long)local_rows,n,
-		  (long long)((PetscInt64)local_rows*(PetscInt64)n),(long long)PETSC_MAX_INT);
-	skip_dense = PETSC_TRUE;
-      }
-    }
-
-    if(!skip_dense){
-      PetscCall(MatCreate(PETSC_COMM_WORLD, &Adense));
-      PetscCall(MatSetSizes(Adense, PETSC_DECIDE, PETSC_DECIDE, m, n));
-      PetscCall(MatSetType(Adense, MATDENSE));
-      PetscCall(MatSetFromOptions(Adense));
-    
-      PetscCall(MatSetUp(Adense));
-      PetscCall(MatGetLocalSize(Adense, &lm, &ln));
-      dn = ln;on = n - ln;
-      PetscCall(MatSeqAIJSetPreallocation(Adense, n, NULL));
-      PetscCall(MatMPIAIJSetPreallocation(Adense, dn, NULL, on, NULL));
-      PetscCall(MatGetOwnershipRange(Adense, &medium->rs, &medium->re));
-    
-      /*  */
-      medium->rn = medium->re  - medium->rs; /* number of local elements */
-      //fprintf(stderr,"%s: core %i: dn %i on %i n %i rs %i re %i \n",argv[0],medium->comm_rank,dn,on,n,medium->rs,medium->re);
-      /*  */
-      PetscCall(PetscCalloc(m*sizeof(PetscScalar), &avalues));
-      PetscCall(PetscCalloc(n*sizeof(PetscInt), &col_idx));
-      for (i=0; i < n; i++) 
-	col_idx[i] = i;
-      /* 
-	 assemble dense matrix 
-      */
-      fprintf(stderr,"%s: core %03i/%03i: assigning dense  row %5i to %5i\n",
-	      argv[0],medium->comm_rank,medium->comm_size,medium->rs,medium->re);
-      PetscTime(&t0);
-      for(j=medium->rs;j <  medium->re;j++){// rupturing faults for this CPU
-	GenKEntries_petsc(ndim,1,n,&j, col_idx, avalues,ictx);
-	PetscCall(MatSetValues(Adense, 1, &j, n, col_idx,avalues, INSERT_VALUES));
-      }
-      PetscCall(PetscFree(avalues));
-      PetscCall(PetscFree(col_idx));
-      PetscCall(MatAssemblyBegin(Adense, MAT_FINAL_ASSEMBLY));
-      PetscCall(MatAssemblyEnd(Adense, MAT_FINAL_ASSEMBLY));
-      PetscTime(&t1);
-      HEADNODE
-	fprintf(stderr,"%s: dense assembly took %12.4f s\n",argv[0],t1-t0);
-      /* dense done */
-    }else{
-      /* -skip_dense: do not build the dense reference. Create a tiny empty
-         AIJ matrix with the same global size only to reproduce the row
-         distribution (lm, ln, rs, re, rn) that the H-matrix build below
-         relies on. The error/solve check is skipped (we exit right after
-         the H-matrix assembly is timed). */
-      PetscCall(MatCreate(PETSC_COMM_WORLD, &Adense));
-      PetscCall(MatSetSizes(Adense, PETSC_DECIDE, PETSC_DECIDE, m, n));
-      PetscCall(MatSetType(Adense, MATAIJ));
-      PetscCall(MatSeqAIJSetPreallocation(Adense, 0, NULL));
-      PetscCall(MatMPIAIJSetPreallocation(Adense, 0, NULL, 0, NULL));
-      PetscCall(MatSetUp(Adense));
-      PetscCall(MatGetLocalSize(Adense, &lm, &ln));
-      PetscCall(MatGetOwnershipRange(Adense, &medium->rs, &medium->re));
-      medium->rn = medium->re - medium->rs;
-      HEADNODE
-	fprintf(stderr,"%s: -skip_dense: no dense reference (H-matrix assembly timing only)\n",argv[0]);
-    }
-
-    /*
-      optional external dumps of the operator and its point cloud, so
-      that alternative cluster trees / admissibility choices can be
-      explored outside interact (e.g. fault-split vs joint geometric
-      clustering for H-matrix compression).
-
-      -dump_matrix <file>: the dense interaction matrix as raw
-      row-major float64, A[i*n+j] = stress at receiver i from unit
-      slip at source j (the same operator the H-matrix backends
-      approximate). a companion <file>.info records "m n" and the
-      layout. needs a single MPI rank so the full matrix is local.
-
-      -dump_coords <file>: one ASCII row per patch with centroid,
-      orientation, half-sizes, area, unit normal and group id, i.e.
-      everything a clustering routine needs, including the normal so
-      that orientation (not just centroid position) can be used.
-    */
-    if(do_dump_matrix){
-      if(medium->comm_size != 1){
-	HEADNODE
-	  fprintf(stderr,"%s: -dump_matrix needs a single MPI rank (rerun with -np 1); skipping matrix dump\n",argv[0]);
-      }else{
-	print_petsc_matrix(Adense,n,m,dump_matrix_file);
-      }
-    }
-    if(do_dump_coords)
-      HEADNODE
-	print_fault_geometry_and_normals(fault,medium->nrflt,dump_coords_file);
-    
-    /* 
-       
-       ASSEMBLE DIFFERENT KINDS OF H MATRICES
-       
-    */
-    /* 
-       prepare with coordinates and such  
-    */
-#ifdef USE_PETSC_HMAT
-    if((medium->use_hmatrix==IHMAT_TYPE_HTOOLS)||(medium->use_hmatrix==IHMAT_TYPE_H2OPUS)){	
-      coords = (PetscReal *)malloc(sizeof(PetscReal)*ndim*medium->nrflt);
-      for(i=0;i < medium->nrflt;i++)		/* all sources or receiveer coordinates  */
-	for(k=0;k < ndim;k++)
-	  coords[i*ndim+k] = fault[i].x[k];
-    }
-#endif
-#if ( defined(USE_HMMVP) || defined(USE_HACAPK) )
-    if((medium->use_hmatrix==IHMAT_TYPE_HACAPK)||(medium->use_hmatrix==IHMAT_TYPE_HMMVP)){	
-      xc = (double *)malloc(sizeof(double)*m);
-      yc = (double *)malloc(sizeof(double)*m);
-      zc = (double *)malloc(sizeof(double)*m);
-      for(i=0;i < m;i++){
-	xc[i] = (double)ictx->fault[i].x[INT_X];
-	yc[i] = (double)ictx->fault[i].x[INT_Y];
-	zc[i] = (double)ictx->fault[i].x[INT_Z];
-      }
-    }
-#endif
-    PetscTime(&t0);
-    switch(medium->use_hmatrix){
-    case IHMAT_TYPE_DENSE:
-      /*
-	DENSE REFERENCE (use_hmatrix=0): build In as a dense copy of Is
-	so that the forward (b = A x) and inverse (x = A\b) tests below
-	compare the dense operator against itself. This is a
-	self-consistency check; |b-b_h|/|b| should be at the level of
-	machine precision and |x-x_h|/|x| at the level of the KSP solver
-	tolerance. Note that the dense baseline used for the comparison
-	is always Adense - use_hmatrix=0 simply makes the second
-	("H") operator dense as well. 
-	
-	Previously this value fell through to the MATH2OPUS branch
-	without the (use_hmatrix==2 gated) coordinate/kdtree setup and
-	aborted in MatAssemblyEnd.
-      */
-      HEADNODE
-	fprintf(stderr,"%s: core %03i/%03i: assigning dense (use_hmatrix=0 self-consistency reference) m %i n %i\n",
-		argv[0],medium->comm_rank,medium->comm_size,m,n);
-      PetscCall(MatDuplicate(Adense, MAT_COPY_VALUES, &AH));
-      break;
-    case IHMAT_TYPE_HTOOLS:
-    case IHMAT_TYPE_H2OPUS:
-#ifdef USE_PETSC_HMAT
-      /* HTOOLS or H2OPUS */
-      PetscCall(MatCreate(PETSC_COMM_WORLD, &AH));
-      PetscCall(MatSetSizes(AH, PETSC_DECIDE, PETSC_DECIDE, m, n));  
-      if(medium->use_hmatrix==IHMAT_TYPE_HTOOLS)
-	PetscCall(MatSetType(AH,MATHTOOL));
-      else
-	PetscCall(MatSetType(AH,MATH2OPUS));
-      /*  */
-      PetscCall(MatSetUp(AH));
-      PetscCall(MatGetLocalSize(AH, &lm, &ln));
-      dn = ln;on = n - ln;
-      PetscCall(MatSeqAIJSetPreallocation(AH, n, NULL));
-      PetscCall(MatMPIAIJSetPreallocation(AH, dn, NULL, on, NULL));
-      PetscCall(MatGetOwnershipRange(AH, &rs, &re));
-      
-      fprintf(stderr,"%s: core %03i/%03i: assigning %s row %5i to %5i, lm %i ln %i m %i n %i\n",
-	      argv[0],medium->comm_rank,medium->comm_size,(medium->use_hmatrix==IHMAT_TYPE_HTOOLS)?"HTOOLS":"H2OPUS",
-	      rs,re,lm,ln,m,n);
-      if(medium->use_hmatrix == IHMAT_TYPE_HTOOLS){
-	/* 
-	   HTOOLS 
-	*/
-	PetscCall(MatCreateHtoolFromKernel(PETSC_COMM_WORLD,lm,ln, m, n,
-					   ndim,(coords+rs*ndim),
-					   (coords+rs*ndim), htools_kernel, ictx, &AH));
-	PetscCall(MatSetOption(AH, MAT_SYMMETRIC, PETSC_FALSE));
-      }else{
-	/* H2opUS */
-#if defined(PETSC_HAVE_H2OPUS)
-	/* 
-	   construct the H2 matrix by hierarchical randomized sampling of
-	   the assembled dense operator (HARA), rather than from the
-	   kernel callback: the FromKernel interface evaluates the kernel
-	   by Chebyshev interpolation at arbitrary points within cluster
-	   bounding boxes, which is incompatible with patch-pair Green's
-	   functions that are only defined at element centers (the nearest
-	   neighbor mapping yields a piecewise constant surrogate whose
-	   polynomial interpolation has O(1) errors in all admissible
-	   blocks); sampling-based construction only requires matrix
-	   vector products and reproduces the true BEM operator to
-	   -mat_h2opus_rtol (default 1e-4)
-	*/
-	PetscCall(MatCreateH2OpusFromMat(Adense, ndim, coords, PETSC_FALSE,
-					 medium->h2opus_eta, medium->h2opus_leafsize,
-					 PETSC_DECIDE, PETSC_DECIDE, PETSC_DECIDE,
-					 &AH));
-      
-	/* 
-	   this version of h2opus only implements sampling-based
-	   construction for symmetric matrices (hlru_sym assertion); the
-	   result therefore approximates the symmetrized operator
-	   (K+K^T)/2 - check the printed operator asymmetry to judge the
-	   error this introduces
-	*/
-	PetscCall(MatTranspose(Adense,MAT_INITIAL_MATRIX,&KT));
-	PetscCall(MatNorm(Adense,NORM_FROBENIUS,&nrmK));
-	PetscCall(MatAXPY(KT,-1.0,Adense,SAME_NONZERO_PATTERN));
-	PetscCall(MatNorm(KT,NORM_FROBENIUS,&nrmD));
-	HEADNODE
-	  fprintf(stderr,"%s: operator asymmetry |K-K^T|_F/|K|_F = %.6e (h2opus approximates the symmetrized operator)\n",
-		  argv[0],(double)(nrmD/nrmK));
-	PetscCall(MatDestroy(&KT));
-	PetscCall(MatSetOption(AH, MAT_SYMMETRIC, PETSC_TRUE));
-#else
-	fprintf(stderr,"%s: H2OPUS requested but PETSc was built without h2opus\n",argv[0]);
-	exit(-1);
-#endif
-      }
-#endif
-      break;
-    case IHMAT_TYPE_HACAPK:
-      /* 
-	 HACApK via MATSHELL 
-      */
-#ifdef USE_HACAPK
-      hacapk_handle = cinit_hacapk_struct((int)m,(void *)ictx);
-      cset_hacapk_struct_coord(hacapk_handle,xc,yc,zc);
-      cset_hacapk_eta(hacapk_handle,(double)medium->hacapk_eta); /* override param(51) before the build, eta */
-      cset_hacapk_inorm(hacapk_handle,medium->hacapk_inorm);     /* error norm mode */
-      
-      fprintf(stderr,"%s: core %03i/%03i: assigning HACApK m %i n %i ztol %g eta %g inorm: %i\n",
-	      argv[0],medium->comm_rank,medium->comm_size,m,n,(double)medium->hacapk_ztol,
-	      (double)medium->hacapk_eta,medium->hacapk_inorm);
-
-      cmake_hacapk_struct_hmat(hacapk_handle,(double)medium->hacapk_ztol);
-
-      hsc_h = (hmat_helper_shell_ctx *)malloc(sizeof(hmat_helper_shell_ctx));
-      hsc_h->handle = hacapk_handle;
-      hsc_h->ball = (double *)malloc(sizeof(double)*m);
-      hsc_h->diag = NULL;
-      PetscCall(MatCreateShell(PETSC_COMM_WORLD,PETSC_DECIDE,PETSC_DECIDE,m,n,
-			       (void *)hsc_h,&AH));
-      PetscCall(MatShellSetOperation(AH,MATOP_MULT,(void (*)(void))MatMult_HACApK));
-      /* diagonal cache, as in calc_petsc_Isn_matrices, so that -pc_type
-	 jacobi (and anything else calling MatGetDiagonal) works on this
-	 path too */
-      PetscCall(MatShellSetOperation(AH,MATOP_GET_DIAGONAL,(void (*)(void))MatGetDiagonal_hmat_shell));
-      PetscCall(MatCreateVecs(AH,&xd,NULL));
-      PetscCall(VecScatterCreateToAll(xd,&hsc_h->scat,&hsc_h->xall));
-      PetscCall(VecGetOwnershipRange(xd,&hsc_h->rs,&hsc_h->re));
-      fill_hmat_shell_diagonal(hsc_h,ictx,(int)ndim);
-      PetscCall(VecDestroy(&xd));
-      PetscCall(MatSetOption(AH, MAT_SYMMETRIC, PETSC_FALSE));
-#endif
-      break;
-    case IHMAT_TYPE_HMMVP:
-      /* 
-	 hmmvp via MATSHELL 
-      */
-#ifdef USE_HMMVP
-      
-#ifdef USE_HMMVP_MPI
-      /* MPI: compress with distributed assembly to a temporary file
-	 (collective), load as a distributed MpiHmat; MatMult_hmmvp
-	 gathers x to the root and scatters y back */
-      HEADNODE  		/* make /tmp filename with PID */
-	snprintf(hmmvp_fn,STRLEN,"/tmp/hmmvp_interact_%d.hm",(int)getpid());
-      PetscCallMPI(MPI_Bcast(hmmvp_fn,STRLEN,MPI_CHAR,0,PETSC_COMM_WORLD));
-      HEADNODE
-	fprintf(stderr,"%s: hmmvp MPI compress m %i n %i tol %g eta %g -> %s\n",
-		argv[0],m,n,(double)medium->hmmvp_tol,(double)medium->hmmvp_eta,hmmvp_fn);
-      cret = chmmvp_compress_to_file((int)m,xc,yc,zc,(double)medium->hmmvp_tol,
-				     (double)medium->hmmvp_eta,medium->hmmvp_inorm,(void *)ictx,hmmvp_fn);
-      if(cret != 0){
-	HEADNODE
-	  fprintf(stderr,"%s: hmmvp MPI compression failed\n",argv[0]);
-	exit(-1);
-      }
-      hmmvp_handle = chmmvp_mpi_load(hmmvp_fn,medium->hmmvp_nthreads);
-      if(!hmmvp_handle){
-	HEADNODE
-	  fprintf(stderr,"%s: hmmvp MPI load failed\n",argv[0]);
-	exit(-1);
-      }
-      chmmvp_mpi_get_info(hmmvp_handle,&hmm,&hmn,&hmmvp_nnz);
-      /* each rank removes its own hmmvp scratch file "<hmmvp_fn>_<rank>"
-	 left by the parallel compressor (root concatenates these over MPI but
-	 never unlinks them); /tmp is typically node-local, so root cannot do it */
-      if(medium->comm_rank > 0){
-	snprintf(hmmvp_tmp,STRLEN,"%s_%d",hmmvp_fn,medium->comm_rank);
-	remove(hmmvp_tmp);
-      }
-      HEADNODE{			/* clean up */
-	remove(hmmvp_fn);
-	fprintf(stderr,"%s: hmmvp(MPI) %i by %i, %ld stored scalars, compression ratio %.5g\n",
-		argv[0],hmm,hmn,hmmvp_nnz,(double)((double)m*(double)n/(double)hmmvp_nnz));
-      }
-      hsc_h = (hmat_helper_shell_ctx *)malloc(sizeof(hmat_helper_shell_ctx));
-      hsc_h->handle = hmmvp_handle;
-      hsc_h->ball = (double *)malloc(sizeof(double)*m); /* full y on every rank */
-      hsc_h->diag = NULL;
-      PetscCall(MatCreateShell(PETSC_COMM_WORLD,PETSC_DECIDE,PETSC_DECIDE,m,n,
-			       (void *)hsc_h,&AH));
-      PetscCall(MatShellSetOperation(AH,MATOP_MULT,(void (*)(void))MatMult_hmmvp));
-      PetscCall(MatShellSetOperation(AH,MATOP_GET_DIAGONAL,(void (*)(void))MatGetDiagonal_hmat_shell));
-      PetscCall(MatCreateVecs(AH,&xd,NULL));
-      PetscCall(VecScatterCreateToZero(xd,&hsc_h->scat,&hsc_h->xall)); /* gather-to-root */
-      PetscCall(VecGetOwnershipRange(xd,&hsc_h->rs,&hsc_h->re));
-      fill_hmat_shell_diagonal(hsc_h,ictx,(int)ndim);
-      PetscCall(VecDestroy(&xd));
-      PetscCall(MatSetOption(AH, MAT_SYMMETRIC, PETSC_FALSE));
-#else
-      if((medium->hmmvp_nthreads > 1) && (dc3dts() == 0)){
-	fprintf(stderr,"%s: -hmmvp_nthreads %i requested but dc3d.F was compiled WITHOUT\n%s: -fopenmp: the THREADPRIVATE directives are inactive and threaded kernel\n%s: calls would corrupt the matrix - rebuild with -fopenmp in FFLAGS/LDFLAGS\n",
-		argv[0],medium->hmmvp_nthreads,argv[0],argv[0]);
-	exit(-1);
-      }
-      /* in-memory OpenMP/serial path */
-      fprintf(stderr,"%s: core %03i/%03i: assigning hmmvp m %i n %i tol %g (whole-matrix rel Frobenius) eta %g nthreads %i\n",
-	      argv[0],medium->comm_rank,medium->comm_size,m,n,(double)medium->hmmvp_tol,
-	      (double)medium->hmmvp_eta,medium->hmmvp_nthreads);
-      hmmvp_handle = chmmvp_compress_in_memory((int)m,xc,yc,zc,(double)medium->hmmvp_tol,
-					       (double)medium->hmmvp_eta,medium->hmmvp_inorm,medium->hmmvp_nthreads,
-					       (void *)ictx);
-      if(!hmmvp_handle){
-	HEADNODE
-	  fprintf(stderr,"%s: hmmvp compression failed\n",argv[0]);
-	exit(-1);
-      }
-      chmmvp_get_info(hmmvp_handle,&hmm,&hmn,&hmmvp_nnz);
-      HEADNODE
-	fprintf(stderr,"%s: hmmvp %i by %i, %ld stored scalars, compression ratio %.5g\n",
-		argv[0],hmm,hmn,hmmvp_nnz,
-		(double)((double)m*(double)n/(double)hmmvp_nnz));
-      hsc_h = (hmat_helper_shell_ctx *)malloc(sizeof(hmat_helper_shell_ctx));
-      hsc_h->handle = hmmvp_handle;
-      hsc_h->ball = (double *)malloc(sizeof(double)*m);
-      hsc_h->diag = NULL;
-      PetscCall(MatCreateShell(PETSC_COMM_WORLD,PETSC_DECIDE,PETSC_DECIDE,m,n,
-			       (void *)hsc_h,&AH));
-      PetscCall(MatShellSetOperation(AH,MATOP_MULT,(void (*)(void))MatMult_hmmvp));
-      PetscCall(MatShellSetOperation(AH,MATOP_GET_DIAGONAL,(void (*)(void))MatGetDiagonal_hmat_shell));
-      PetscCall(MatCreateVecs(AH,&xd,NULL));
-      PetscCall(VecScatterCreateToAll(xd,&hsc_h->scat,&hsc_h->xall));
-      PetscCall(VecGetOwnershipRange(xd,&hsc_h->rs,&hsc_h->re));
-      fill_hmat_shell_diagonal(hsc_h,ictx,(int)ndim);
-      PetscCall(VecDestroy(&xd));
-      PetscCall(MatSetOption(AH, MAT_SYMMETRIC, PETSC_FALSE));
-#endif /* USE_HMMVP_MPI */
-#endif /* USE_HMMVP */
-      break;
-    case IHMAT_TYPE_BIGWHAM:
-#ifdef USE_BIGWHAM
-      /* BigWham full-space H matrix as a MATSHELL; builds its own mesh from
-	 the patch geometry and applies the strike-slip -> strike-shear
-	 sub-block of the 3N x 3N operator (see setup_bigwham_matshell). */
-      if(ictx->src_slip_mode != STRIKE){
-	HEADNODE
-	  fprintf(stderr,"bigwham only set up for strike\n");
-	exit(-1);
-      }
-      PetscCall(setup_bigwham_matshell(medium,fault,1.0,0,&AH,&hsc_h));
-      PetscCall(MatSetOption(AH, MAT_SYMMETRIC, PETSC_FALSE));
-#else
-      fprintf(stderr,"%s: BigWham requested but not compiled in\n",argv[0]);
-      exit(-1);
-#endif
-      break;
-    }
-    
-    if((medium->use_hmatrix==IHMAT_TYPE_HTOOLS)||(medium->use_hmatrix==IHMAT_TYPE_H2OPUS))
-      free(coords);
-#if ( defined(USE_HMMVP) || defined(USE_HACAPK) )
-    if((medium->use_hmatrix==IHMAT_TYPE_HACAPK )||(medium->use_hmatrix==IHMAT_TYPE_HMMVP)){
-      free(xc);free(yc);free(zc);
-    }
-#endif    
-    PetscCall(MatSetFromOptions(AH));
-    
-    PetscCall(MatAssemblyBegin(AH, MAT_FINAL_ASSEMBLY));
-    PetscCall(MatAssemblyEnd(AH, MAT_FINAL_ASSEMBLY));
-    PetscTime(&t1);
-    HEADNODE
-      fprintf(stderr,"%s: H matrix assembly took %12.4f s\n",argv[0],t1-t0);
-
-  }else{
-    /* 
-       use external routines. honor -skip_dense here as well, and apply
-       the same 32-bit dense-block overflow guard as the local branch:
-       the dense reference preallocates local_rows*n AIJ entries inside
-       calc_petsc_Isn_matrices, which overflows PetscInt at large N
-       (e.g. 265k patches on 24 ranks) and previously aborted the run
-       before the H matrix was ever built.
-    */
-    if(!skip_dense){
-      PetscInt local_rows=PETSC_DECIDE,glob=m;
-      PetscCall(PetscSplitOwnership(PETSC_COMM_WORLD,&local_rows,&glob));
-      if((PetscInt64)local_rows*(PetscInt64)n > (PetscInt64)PETSC_MAX_INT){
+  /*
+     assemble the operators through calc_petsc_Isn_matrices, the same
+     routine rsf_solve uses (the former in-program copy of the assembly
+     was removed; -make_matrix_externally is accepted and ignored)
+  */
+  /* 
+     use external routines. honor -skip_dense here as well, and apply
+     the same 32-bit dense-block overflow guard as the local branch:
+     the dense reference preallocates local_rows*n AIJ entries inside
+     calc_petsc_Isn_matrices, which overflows PetscInt at large N
+     (e.g. 265k patches on 24 ranks) and previously aborted the run
+     before the H matrix was ever built.
+  */
+  if(!skip_dense){
+    PetscInt local_rows=PETSC_DECIDE,glob=m;
+    PetscCall(PetscSplitOwnership(PETSC_COMM_WORLD,&local_rows,&glob));
+    if((PetscInt64)local_rows*(PetscInt64)n > (PetscInt64)PETSC_MAX_INT){
 	if(dense_reference_only){
 	  /* the user explicitly asked for dense; do not silently skip */
 	  HEADNODE
@@ -645,13 +218,13 @@ int main(int argc, char **argv)
 		  argv[0],(long)local_rows,n,
 		  (long long)((PetscInt64)local_rows*(PetscInt64)n),(long long)PETSC_MAX_INT);
 	skip_dense = PETSC_TRUE;
-      }
     }
-    if(!skip_dense){
-      PetscCall(PetscTime(&dt0));
-      calc_petsc_Isn_matrices(medium, fault,IHMAT_TYPE_DENSE,1.0,0,ictx->src_slip_mode,&Adense,hsc_dense); /* dense */
-      PetscCall(PetscTime(&dt1));
-      if(dense_reference_only){
+  }
+  if(!skip_dense){
+    PetscCall(PetscTime(&dt0));
+    calc_petsc_Isn_matrices(medium, fault,IHMAT_TYPE_DENSE,1.0,0,ictx->src_slip_mode,&Adense,hsc_dense); /* dense */
+    PetscCall(PetscTime(&dt1));
+    if(dense_reference_only){
 	/* time matvecs on the dense operator and leave; one line holds
 	   everything the sweep script needs */
 	if(have_accref){
@@ -702,29 +275,60 @@ int main(int argc, char **argv)
 	PetscCall(MatDestroy(&Adense));
 	PetscCall(PetscFinalize());
 	return 0;
-      }
-    }else{
-      /* row-distribution placeholder instead of the dense reference,
-         as in the local -skip_dense path */
-      PetscCall(MatCreate(PETSC_COMM_WORLD, &Adense));
-      PetscCall(MatSetSizes(Adense, PETSC_DECIDE, PETSC_DECIDE, m, n));
-      PetscCall(MatSetType(Adense, MATAIJ));
-      PetscCall(MatSeqAIJSetPreallocation(Adense, 0, NULL));
-      PetscCall(MatMPIAIJSetPreallocation(Adense, 0, NULL, 0, NULL));
-      PetscCall(MatSetUp(Adense));
-      PetscCall(MatGetLocalSize(Adense, &lm, &ln));
-      PetscCall(MatGetOwnershipRange(Adense, &medium->rs, &medium->re));
-      medium->rn = medium->re - medium->rs;
-      HEADNODE
-	fprintf(stderr,"%s: -skip_dense: no dense reference (H-matrix assembly and matvec timing only)\n",argv[0]);
     }
-    PetscCall(PetscTime(&at0));
-    calc_petsc_Isn_matrices(medium,fault,medium->use_hmatrix,1.0,0,ictx->src_slip_mode,&AH,hsc_h); /* Htools, H2opus, HACApK, or HMVVP */
-    PetscCall(PetscTime(&at1));
+  }else{
+    /* row-distribution placeholder instead of the dense reference,
+       as in the local -skip_dense path */
+    PetscCall(MatCreate(PETSC_COMM_WORLD, &Adense));
+    PetscCall(MatSetSizes(Adense, PETSC_DECIDE, PETSC_DECIDE, m, n));
+    PetscCall(MatSetType(Adense, MATAIJ));
+    PetscCall(MatSeqAIJSetPreallocation(Adense, 0, NULL));
+    PetscCall(MatMPIAIJSetPreallocation(Adense, 0, NULL, 0, NULL));
+    PetscCall(MatSetUp(Adense));
+    PetscCall(MatGetLocalSize(Adense, &lm, &ln));
+    PetscCall(MatGetOwnershipRange(Adense, &medium->rs, &medium->re));
+    medium->rn = medium->re - medium->rs;
     HEADNODE
-      fprintf(stderr,"%s: hmat_assembly backend %i m %i assembly_s %.3f\n",
-	      argv[0],(int)medium->use_hmatrix,m,(double)(at1-at0));
+	fprintf(stderr,"%s: -skip_dense: no dense reference (H-matrix assembly and matvec timing only)\n",argv[0]);
   }
+  PetscCall(PetscTime(&at0));
+  calc_petsc_Isn_matrices(medium,fault,medium->use_hmatrix,1.0,0,ictx->src_slip_mode,&AH,hsc_h); /* Htools, H2opus, HACApK, or HMVVP */
+  PetscCall(PetscTime(&at1));
+  HEADNODE
+    fprintf(stderr,"%s: hmat_assembly backend %i m %i assembly_s %.3f\n",
+	      argv[0],(int)medium->use_hmatrix,m,(double)(at1-at0));
+  /*
+    optional external dumps of the operator and its point cloud, so
+    that alternative cluster trees / admissibility choices can be
+    explored outside interact (e.g. fault-split vs joint geometric
+    clustering for H-matrix compression).
+
+    -dump_matrix <file>: the dense interaction matrix as raw
+    row-major float64, A[i*n+j] = stress at receiver i from unit
+    slip at source j (the same operator the H-matrix backends
+    approximate). a companion <file>.info records "m n" and the
+    layout. needs a single MPI rank so the full matrix is local,
+    and the dense reference (not -skip_dense).
+
+    -dump_coords <file>: one ASCII row per patch with centroid,
+    orientation, half-sizes, area, unit normal and group id, i.e.
+    everything a clustering routine needs, including the normal so
+    that orientation (not just centroid position) can be used.
+  */
+  if(do_dump_matrix){
+    if(medium->comm_size != 1){
+      HEADNODE
+	fprintf(stderr,"%s: -dump_matrix needs a single MPI rank (rerun with -np 1); skipping matrix dump\n",argv[0]);
+    }else if(skip_dense){
+      fprintf(stderr,"%s: -dump_matrix needs the dense reference (no -skip_dense); skipping matrix dump\n",argv[0]);
+    }else{
+      print_petsc_matrix(Adense,n,m,dump_matrix_file);
+    }
+  }
+  if(do_dump_coords)
+    HEADNODE
+      print_fault_geometry_and_normals(fault,medium->nrflt,dump_coords_file);
+
 
   /*
     unified H-operator report: for HTOOL print the operator info (which
