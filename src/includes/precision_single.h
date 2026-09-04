@@ -32,5 +32,5 @@
 #define FLTDAT_FORMAT "%f %f %f %f %f %f %f %f %f %f %f %i %i"
 #define FLTDAT_BLK_FORMAT "%*f %*f %*f %*f %*f %f %f %f %*f %*f %*f %*i %*i"
 
-#define EISPACK_RS s_rs_
+#define EISPACK_RS eispack_s_rs_
 

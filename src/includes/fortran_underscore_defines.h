@@ -17,9 +17,6 @@
 
 // pgplot
 #define palett palett_
-// eispack
-#define rs rs_
-#define s_rs s_rs_
 
 #define ilwvd ilwvd_
 

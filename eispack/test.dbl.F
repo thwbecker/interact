@@ -17,7 +17,7 @@ c
 
       n=ndim
       icvec=1
-      call rs(n,n,a,val,icvec,vec,fv1,fv2,ierr)
+      call eispack_rs(n,n,a,val,icvec,vec,fv1,fv2,ierr)
       if(ierr.ne.0)then
          print *,'error: ',ierr
          stop

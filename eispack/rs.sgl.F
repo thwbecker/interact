@@ -1,4 +1,4 @@
-      subroutine s_rs(nm,n,a,w,matz,z,fv1,fv2,ierr)
+      subroutine eispack_s_rs(nm,n,a,w,matz,z,fv1,fv2,ierr)
 c
       integer n,nm,ierr,matz
       real*4 a(nm,n),w(n),z(nm,n),fv1(n),fv2(n)

@@ -2,22 +2,22 @@
 #ncore=32
 #ncore=4
 
-ncore=2
+ncore=16
 
 #g=geom;reg=-R-300/700/3450/4730/-20/0
 g=test;reg=-R130/450/3750/4500/-20/0
 
 
 maxit=2000
-rtol=1e-4
-backend="-use_hmatrix 4 -hmmvp_inorm 3 -hmmvp_tol 1e-4"
+#backend="-use_hmatrix 4 -hmmvp_inorm 1 -hmmvp_tol 1e-4"
+backend="-use_hmatrix 3  -hacapk_ztol 1e-4"
 
 common="-geom_file $g.in -make_matrix_externally  -skip_dense -nrandom 0 -nsolve 1 -test_forward 0"
 
 mpirun -bind-to core -np $ncore compress_interaction_matrix \
-       $common $backend  -pc_type jacobi -ksp_type gmres -ksp_gmres_restart 2000 
+       $common $backend  -ksp_type gmres -ksp_gmres_restart 2000 
 #       -ksp_converged_reason -ksp_monitor_true_residual -log_view
 
 
-./plot_sol
+./plot_sol $g
 

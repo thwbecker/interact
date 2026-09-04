@@ -36,7 +36,7 @@ int main(int argc, char **argv)
   Vec         x=NULL, xh=NULL, b=NULL, bh=NULL, bout=NULL,d=NULL;
   Mat         Adense=NULL,AH=NULL,AH_dense=NULL;
   PetscReal   *bvalues=NULL,norm[3];
-  PetscInt    n, m, lm,ln,i,k,rs;
+  PetscInt    n, m, lm,ln,i,k;
   PetscInt nrandom = 0;	/* for timing tests */
   VecScatter ctx;
   PetscRandom rand_str;

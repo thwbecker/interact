@@ -36,4 +36,4 @@
 #define IF_CP_FORMAT "%i %lf"
 #define FLTDAT_FORMAT "%f %f %lf %lf %lf %lf %lf %lf %lf %lf %lf %i %i"
 #define FLTDAT_BLK_FORMAT "%*f %*f %*f %*f %*f %lf %lf %lf %*f %*f %*f %*i %*i"
-#define EISPACK_RS rs_
+#define EISPACK_RS eispack_rs_
