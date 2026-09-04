@@ -722,6 +722,12 @@ void phelp(void)
   PE(" -fpetsc");
   PE("     force Petsc solvers even for serial runs (else LAPACK for LU)");
   PE("");
+  PE(" -near_pc_radius value");
+  PE("     for the Petsc one-step solve, also assemble a sparse matrix from the A entries with");
+  PE("     source-receiver distance < value (geometry length units) and hand it to the KSP as");
+  PE("     the preconditioning matrix. Use with e.g. -pc_type asm -sub_pc_type lu (or ilu);");
+  PE("     -pc_type jacobi/none ignore it. Off by default. Experimental.");
+  PE("");
 #endif
   PE(" -npsfse");
   PE("     no post slip fault stress evaluation: after a one-step solve, assign");

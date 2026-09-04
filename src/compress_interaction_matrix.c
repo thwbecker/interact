@@ -680,7 +680,7 @@ int main(int argc, char **argv)
 	  PetscCallMPI(MPI_Barrier(PETSC_COMM_WORLD));
 	  PetscCall(PetscTime(&mt1));
 	  if(nsolve > 0){
-	    PetscCall(time_solves(Adense,nsolve,&solve_s,&sits_total,&sreason));
+	    PetscCall(time_solves(Adense,medium->Pnear,nsolve,&solve_s,&sits_total,&sreason));
 	    HEADNODE
 	      fprintf(stderr,"%s: dense_solve m %i nsolve %i its_total %i per_solve_s %.4f reason %i\n",
 		      argv[0],m,(int)nsolve,(int)sits_total,(double)solve_s,(int)sreason);
@@ -775,7 +775,7 @@ int main(int argc, char **argv)
       PetscCall(VecDestroy(&ab0));
     }
     if(nsolve > 0){
-      PetscCall(time_solves(AH,nsolve,&solve_s,&sits_total,&sreason));
+      PetscCall(time_solves(AH,medium->Pnear,nsolve,&solve_s,&sits_total,&sreason));
       HEADNODE
 	fprintf(stderr,"%s: hmat_solve backend %i m %i nsolve %i its_total %i per_solve_s %.4f reason %i\n",
 		argv[0],(int)medium->use_hmatrix,m,(int)nsolve,(int)sits_total,
@@ -1004,7 +1004,9 @@ int main(int argc, char **argv)
       */
       PetscCall(KSPCreate(PETSC_COMM_WORLD, &ksph));
       PetscCall(KSPSetOptionsPrefix(ksph,"htool_"));
-      PetscCall(KSPSetOperators(ksph, AH, AH));
+      /* medium->Pnear (from -near_pc_radius, external assembly path only) as
+	 preconditioning matrix, if built */
+      PetscCall(KSPSetOperators(ksph, AH, (medium->Pnear)?(medium->Pnear):(AH)));
       PetscCall(KSPSetFromOptions(ksph));
       PetscCall(KSPGetPC(ksph, &pch));
       PetscCall(PetscObjectTypeCompare((PetscObject)pch, PCHPDDM, &flg));

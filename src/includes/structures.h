@@ -501,6 +501,8 @@ struct med{
   PetscMPIInt comm_size, comm_rank;
   PetscInt    rs, re, rn;
   Mat         Is,In;
+  Mat         Pnear;		/* near-field sparse preconditioner matrix (one-step PETSc solve, -near_pc_radius) */
+  PetscReal   near_pc_radius;	/* > 0: build Pnear from entries with |x_i - x_j| < radius */
 
   PetscInt use_hmatrix;		/* 0,1,2,3,4 (5 = BigWham full-space, if compiled) */
   struct rsf_vars *rsf;

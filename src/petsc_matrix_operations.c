@@ -750,6 +750,65 @@ PetscErrorCode calc_petsc_Isn_matrices(struct med *medium, struct flt *fault,
   PetscCall(MatScale(*this_mat,scale));
 
   /* 
+     optional near-field sparse preconditioner matrix (same idea as in
+     interact's solve()): -near_pc_radius r > 0 evaluates the kernel for
+     all source-receiver pairs closer than r and stores them, scaled, in
+     the distributed AIJ matrix medium->Pnear with the row layout of
+     *this_mat. callers can pass it to KSPSetOperators() as the
+     preconditioning matrix. the pair search is a plain N^2/np distance
+     test, which is cheap next to the Green's function evaluations.
+     only the most recently built operator's Pnear is kept (an existing
+     one is destroyed), so with Is and In the caller has to save it in
+     between. EXPERIMENTAL
+  */
+  {
+    PetscReal r2;
+    PetscInt ii,jj,nn,*pcol;
+    PetscScalar *pval;
+    MatInfo pinfo;
+    medium->near_pc_radius = -1.0;
+    PetscCall(PetscOptionsGetReal(NULL,NULL,"-near_pc_radius",&medium->near_pc_radius,NULL));
+    if(medium->Pnear)
+      PetscCall(MatDestroy(&medium->Pnear));
+    medium->Pnear = NULL;
+    if(medium->near_pc_radius > 0.0){
+      r2 = medium->near_pc_radius * medium->near_pc_radius;
+      PetscCall(MatCreate(PETSC_COMM_WORLD, &(medium->Pnear)));
+      PetscCall(MatSetSizes(medium->Pnear, lm, ln, m, n));
+      PetscCall(MatSetType(medium->Pnear, MATAIJ));
+      PetscCall(MatSeqAIJSetPreallocation(medium->Pnear, 64, NULL));
+      PetscCall(MatMPIAIJSetPreallocation(medium->Pnear, 64, NULL, 64, NULL));
+      PetscCall(MatSetOption(medium->Pnear, MAT_NEW_NONZERO_ALLOCATION_ERR, PETSC_FALSE));
+      PetscCall(MatSetUp(medium->Pnear));
+      PetscCall(PetscCalloc(n*sizeof(PetscInt), &pcol));
+      PetscCall(PetscCalloc(n*sizeof(PetscScalar), &pval));
+      for(ii=medium->rs;ii < medium->re;ii++){
+	nn = 0;
+	for(jj=0;jj < n;jj++){
+	  if(distance_squared_3d(fault[ii].x,fault[jj].x) < r2){
+	    pcol[nn] = jj;
+	    nn++;
+	  }
+	}
+	for(jj=0;jj < nn;jj++){
+	  GenKEntries_petsc(ndim,1,1,&ii,(pcol+jj),(pval+jj),ictx);
+	  pval[jj] *= scale;
+	}
+	PetscCall(MatSetValues(medium->Pnear, 1, &ii, nn, pcol, pval, INSERT_VALUES));
+      }
+      PetscCall(PetscFree(pcol));
+      PetscCall(PetscFree(pval));
+      PetscCall(MatAssemblyBegin(medium->Pnear, MAT_FINAL_ASSEMBLY));
+      PetscCall(MatAssemblyEnd(medium->Pnear, MAT_FINAL_ASSEMBLY));
+      PetscCall(MatGetInfo(medium->Pnear, MAT_GLOBAL_SUM, &pinfo));
+      HEADNODE
+	fprintf(stderr,"calc_petsc_Isn_matrices: near-field preconditioner matrix, radius %g: %.0f nonzeros, %.1f per row, %.3f%% of dense\n",
+		(double)medium->near_pc_radius,pinfo.nz_used,pinfo.nz_used/(double)m,
+		100.0*pinfo.nz_used/((double)m*(double)n));
+    }
+  }
+
+  /* 
      unified H-matrix storage report: collect a GLOBAL stored-scalar count
      from whichever source the active backend exposes, then emit one common
      line (see report_hmat_storage above). This is post-assembly so the
@@ -1004,7 +1063,7 @@ PetscErrorCode set_hmat_defaults_and_options(struct med *medium, int hmat) /*  t
 
 /* time nsolve GMRES(no PC) solves A x = b with fresh random b each time;
    returns average per-solve seconds, total iterations, last reason */
-PetscErrorCode time_solves(Mat A, PetscInt nsolve, PetscReal *solve_s,
+PetscErrorCode time_solves(Mat A, Mat P, PetscInt nsolve, PetscReal *solve_s,
 			   PetscInt *its_total, KSPConvergedReason *reason)
 {
   KSP ksp;
@@ -1016,7 +1075,7 @@ PetscErrorCode time_solves(Mat A, PetscInt nsolve, PetscReal *solve_s,
   PetscFunctionBegin;
   *its_total = 0; *solve_s = 0.0; *reason = KSP_CONVERGED_ITERATING;
   PetscCall(KSPCreate(PETSC_COMM_WORLD,&ksp));
-  PetscCall(KSPSetOperators(ksp,A,A));
+  PetscCall(KSPSetOperators(ksp,A,(P)?(P):(A))); /* P: optional preconditioning matrix */
   PetscCall(KSPSetType(ksp,KSPGMRES));
   PetscCall(KSPGetPC(ksp,&pc));
   PetscCall(PCSetType(pc,PCNONE));

@@ -290,6 +290,30 @@ int solve(struct med *medium,struct flt *fault)
       */
       PetscCall(MatGetOwnershipRange(medium->Is, &medium->rs, &medium->re));
       medium->rn = medium->re  - medium->rs; /* number of local elements */
+      /* 
+	 optional near-field sparse preconditioner: -near_pc_radius r
+	 keeps the entries of A with |x_rec - x_src| < r in a
+	 distributed AIJ matrix Pnear with the same row layout, which is
+	 handed to the KSP as the preconditioning matrix (the operator
+	 itself stays the dense A). the PC type is then chosen with
+	 -pc_type (bjacobi, asm, ilu, ...); -pc_type jacobi/none still
+	 work and ignore Pnear. r is in the geometry length units.
+	 EXPERIMENTAL 
+      */
+      medium->near_pc_radius = -1.0;
+      PetscCall(PetscOptionsGetReal(NULL,NULL,"-near_pc_radius",&medium->near_pc_radius,NULL));
+      medium->Pnear = NULL;
+      if(medium->near_pc_radius > 0.0){
+	PetscCall(MatCreate(PETSC_COMM_WORLD, &(medium->Pnear)));
+	PetscCall(MatSetSizes(medium->Pnear, lm, ln, m, n));
+	PetscCall(MatSetType(medium->Pnear, MATAIJ));
+	PetscCall(MatSeqAIJSetPreallocation(medium->Pnear, 64, NULL));
+	PetscCall(MatMPIAIJSetPreallocation(medium->Pnear, 64, NULL, 64, NULL));
+	PetscCall(MatSetOption(medium->Pnear, MAT_NEW_NONZERO_ALLOCATION_ERR, PETSC_FALSE));
+	PetscCall(MatSetUp(medium->Pnear));
+	HEADNODE
+	  fprintf(stderr,"solve: building near-field preconditioner matrix, radius %g\n",(double)medium->near_pc_radius);
+      }
       
 #ifdef DEBUG
       fprintf(stderr,"solve: core %i: dn %i on %i n %i rs %i re %i \n",
@@ -305,6 +329,15 @@ int solve(struct med *medium,struct flt *fault)
       */
       PetscCall(MatAssemblyBegin(medium->Is, MAT_FINAL_ASSEMBLY));
       PetscCall(MatAssemblyEnd(medium->Is, MAT_FINAL_ASSEMBLY));
+      if(medium->Pnear){
+	MatInfo pinfo;
+	PetscCall(MatAssemblyBegin(medium->Pnear, MAT_FINAL_ASSEMBLY));
+	PetscCall(MatAssemblyEnd(medium->Pnear, MAT_FINAL_ASSEMBLY));
+	PetscCall(MatGetInfo(medium->Pnear, MAT_GLOBAL_SUM, &pinfo));
+	HEADNODE
+	  fprintf(stderr,"solve: near-field preconditioner matrix has %.0f nonzeros, %.1f per row, %.3f%% of dense\n",
+		  pinfo.nz_used,pinfo.nz_used/(double)m,100.0*pinfo.nz_used/((double)m*(double)n));
+      }
 
       /* Convert MATDENSE to another format if required by solver package */
       PetscCall(PetscOptionsGetString(NULL, NULL, "-mat_type", mattype, PETSC_HELPER_STR_LEN, &pset));
@@ -331,7 +364,7 @@ int solve(struct med *medium,struct flt *fault)
 	 solver
       */
       PetscCall(KSPCreate(PETSC_COMM_WORLD, &pksp));
-      PetscCall(KSPSetOperators(pksp, medium->Is, medium->Is));
+      PetscCall(KSPSetOperators(pksp, medium->Is, (medium->Pnear)?(medium->Pnear):(medium->Is)));
       PetscCall(KSPSetType(pksp, KSPPREONLY));
       PetscCall(KSPGetPC(pksp, &ppc));
       PetscCall(PCSetType(ppc, PCLU));
@@ -406,6 +439,8 @@ int solve(struct med *medium,struct flt *fault)
       PetscCall(VecDestroy(&x));
       PetscCall(VecDestroy(&pbs));
       PetscCall(MatDestroy(&medium->Is));
+      if(medium->Pnear)
+	PetscCall(MatDestroy(&medium->Pnear));
       PetscCall(KSPDestroy(&pksp));
       /* 
 	 petsc done 
@@ -1008,6 +1043,15 @@ int par_assemble_a_matrix(int naflt,my_boolean *sma,int nreq,int *nameaf,
   PetscInt *col_idx=NULL;
   my_boolean in_range;
   int iret;
+  /* near-field preconditioner bookkeeping */
+  PetscInt *ncol=NULL,nnear;
+  PetscScalar *nval=NULL;
+  PetscReal r2near = -1.0;
+  if(medium->Pnear){
+    r2near = medium->near_pc_radius * medium->near_pc_radius;
+    PetscCall(PetscCalloc(nreq*sizeof(PetscInt), &ncol));
+    PetscCall(PetscCalloc(nreq*sizeof(PetscScalar), &nval));
+  }
 #ifdef DEBUG
   my_boolean *assigned;
   PetscScalar amin,amax;
@@ -1057,6 +1101,7 @@ int par_assemble_a_matrix(int naflt,my_boolean *sma,int nreq,int *nameaf,
 	  // normal correction for Coulomb?
 	  cf = (j==NORMAL)?(0.0):fault[nameaf[i]].cf[j];
 
+	  nnear = 0;
 	  for(eqc2=ip2=k=0;k < naflt;k++,ip2+=3){ /* fast fault loop */
 	    for(l=0;l < 3;l++){			  /* direction */
 	      if(sma[ip2+l]){// flip around matrix ordering
@@ -1101,6 +1146,13 @@ int par_assemble_a_matrix(int naflt,my_boolean *sma,int nreq,int *nameaf,
 #ifdef DEBUG
 		assigned[eqc2] = TRUE;
 #endif
+		if(medium->Pnear){	/* near-field entry? */
+		  if(distance_squared_3d(fault[nameaf[i]].x,fault[nameaf[k]].x) < r2near){
+		    ncol[nnear] = eqc2;
+		    nval[nnear] = avalues[eqc2];
+		    nnear++;
+		  }
+		}
 	   	//PetscCall(MatSetValue(medium->Is, eqc1, eqc2, avalues[eqc2], ADD_VALUES));
 	      	/* end value work part */
 		eqc2++;
@@ -1123,6 +1175,8 @@ int par_assemble_a_matrix(int naflt,my_boolean *sma,int nreq,int *nameaf,
 	  
 #endif 
 	  PetscCall(MatSetValues(medium->Is, 1, &eqc1, nreq, col_idx,avalues, INSERT_VALUES));
+	  if(medium->Pnear)
+	    PetscCall(MatSetValues(medium->Pnear, 1, &eqc1, nnear, ncol, nval, INSERT_VALUES));
 	}
 	eqc1++; 
       }
@@ -1130,6 +1184,10 @@ int par_assemble_a_matrix(int naflt,my_boolean *sma,int nreq,int *nameaf,
   }
   PetscCall(PetscFree(col_idx));
   PetscCall(PetscFree(avalues));
+  if(medium->Pnear){
+    PetscCall(PetscFree(ncol));
+    PetscCall(PetscFree(nval));
+  }
 #ifdef DEBUG
   free(assigned);
 #endif
