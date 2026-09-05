@@ -1,4 +1,3 @@
-#include "interact.h"
 /*
 
   solving ordinary differential equations originally based on
@@ -13,7 +12,6 @@
 #ifdef USE_PETSC
 
 
-#include "petscts.h"
 #include "ode_headers.h"
 
 /* 
@@ -44,6 +42,16 @@ PetscErrorCode RHSFunction3D(TS ts,PetscReal time,Vec X,Vec F,void *ptr)
   PetscCall(VecRestoreArrayRead(X,&x));PetscCall(VecRestoreArray(F,&f));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
+
+/* plain state RHS evaluation for crossing interpolation */
+void eval_rhs(const struct AppCtx *par,const PetscReal x[3],PetscReal f[3])
+{
+  PetscReal E = PetscExpReal(x[0]);
+  f[1] =  (1.0 - E) * par->k;
+  f[2] = -E * par->r * (par->b2 * x[0] + x[2]);
+  f[0] =  E * ((par->b1 - 1.0) * x[0] + x[1] - x[2]) + f[1] - f[2];
+}
+
 
 /* state + tangent RHS; tangent columns v1=x[3..5], v2=x[6..8], v3=x[9..11],
    dv/dt = J(x) v with the analytical Jacobian given in the header */

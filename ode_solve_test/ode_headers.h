@@ -55,5 +55,5 @@ User-defined routines
 PetscErrorCode RHSFunction3D(TS,PetscReal,Vec,Vec,void*);
 PetscErrorCode RHSFunction4D(TS,PetscReal,Vec,Vec,void*);
 PetscErrorCode RHSFunction3DTangent(TS ,PetscReal ,Vec ,Vec ,void *);
-
+void eval_rhs(const struct AppCtx *,const PetscReal [3],PetscReal [3]);
 #endif
