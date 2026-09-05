@@ -1,5 +1,4 @@
-#include "interact.h"
-#define LHEADNODE if(par->medium->comm_rank==0)
+
 /*
 
   solving ordinary differential equations originally based on
@@ -11,88 +10,19 @@
 #ifdef USE_PETSC
 
 
-#include "petscts.h"
+#include "ode_headers.h"	/* shared functions */
+
 /*
-  parameters needed by the derivative function, and the monitor/event
-  functions
+  local User-defined routines
 */
-struct AppCtx{
-  int n,nevent,imode;
-  PetscReal b1,b2,r,k,knd;
-  struct med medium[1];
-  PetscReal old_time,event_tmin,t_final,monitor_tmin,dt_monitor,adx_monitor,rdx_monitor;
-  PetscBool track_events,log_state;
-  FILE *fout_monitor,*fout_event;
-  char fname_monitor[PETSC_MAX_PATH_LEN],fname_event[PETSC_MAX_PATH_LEN];
-  Vec Xold;
-};
-/*
-User-defined routines
-*/
-static PetscErrorCode RHSFunction3D(TS,PetscReal,Vec,Vec,void*);
-static PetscErrorCode RHSFunction4D(TS,PetscReal,Vec,Vec,void*);
 static PetscErrorCode myMonitor(TS , PetscInt , PetscReal , Vec , void *);
-static PetscErrorCode init_monitor_and_event(void *, PetscReal ,PetscReal ,  PetscReal ,PetscReal,PetscReal,PetscReal , Vec , PetscBool,PetscBool);
+static PetscErrorCode init_monitor_and_event(void *, PetscReal ,PetscReal ,
+					     PetscReal ,PetscReal,PetscReal,PetscReal , Vec , PetscBool,PetscBool);
 static PetscErrorCode finalize_monitor_and_event(void *);
 static PetscErrorCode myEventFunction(TS, PetscReal , Vec ,PetscScalar *,void *);
 static PetscErrorCode myPostEventFunction(TS , PetscInt ,PetscInt [], PetscReal, Vec,PetscBool ,void *);
 static PetscErrorCode myDomainError(TS,PetscReal,Vec,PetscBool *);
-/* 
-   two state variable RHS ODE - x = log(v/v0), y = (tau-tau0)/a, z = b2 log(v0*theta2/dc2), steady state = {0,0,0}
-*/
-static PetscErrorCode RHSFunction3D(TS ts,PetscReal time,Vec X,Vec F,void *ptr)
-{
-  PetscScalar *f;
-  const PetscScalar *x;
-  struct AppCtx *par;
-  PetscScalar expx;
-  PetscFunctionBeginUser;
-  par = (struct AppCtx *)ptr;
-  PetscCall(VecGetArrayRead(X,&x));PetscCall(VecGetArray(F,&f));
-  expx = PetscExpReal(x[0]);
-  if(!isfinite(expx)){
-    /* a stage state went out of range; emit a non-finite RHS so the adaptive
-       controller rejects this step and retries with a smaller dt, instead of
-       aborting the whole run. myDomainError() normally catches this at the
-       accepted-state level before it happens. */
-    f[0] = f[1] = f[2] = PETSC_INFINITY;
-    PetscCall(VecRestoreArrayRead(X,&x));PetscCall(VecRestoreArray(F,&f));
-    PetscFunctionReturn(PETSC_SUCCESS);
-  } /* keep this order, we are using f[1] and f[2] for f[0]! */
-  f[1] =  (1.0 - expx) * par->k;
-  f[2] = -expx * par->r * (par->b2 * x[0] + x[2]);
-  f[0] = expx * ((par->b1 - 1.0) * x[0] + x[1] - x[2]) + f[1] -  f[2];
-  PetscCall(VecRestoreArrayRead(X,&x));PetscCall(VecRestoreArray(F,&f));
-  PetscFunctionReturn(PETSC_SUCCESS);
-}
-static PetscErrorCode RHSFunction4D(TS ts,PetscReal time,Vec X,Vec F,void *ptr) /* 4D
-										   version
-										   with
-										   exponential
-										   solve */
-{
-  PetscScalar *f;
-  const PetscScalar *x;
-  struct AppCtx *par;
-  PetscFunctionBeginUser;
-  par = (struct AppCtx *)ptr;
-  PetscCall(VecGetArrayRead(X,&x));PetscCall(VecGetArray(F,&f));
-  if(!isfinite(PetscRealPart(x[3]))){
-    /* exp-state out of range; force a step rejection (see RHSFunction3D) */
-    f[0] = f[1] = f[2] = f[3] = PETSC_INFINITY;
-    PetscCall(VecRestoreArrayRead(X,&x));PetscCall(VecRestoreArray(F,&f));
-    PetscFunctionReturn(PETSC_SUCCESS);
-  }
-  /* 
-     
-  */  
-  f[1] =  (1.0 - x[3]) * par->k;
-  f[2] = -x[3] * par->r * (par->b2 * x[0] + x[2]);
-  f[0] =  x[3] * ((par->b1 - 1.0) * x[0] + x[1] - x[2]) + f[1] -  f[2];
-  f[3] = f[0] * x[3]; // x[3] = exp(x), \dot{x[3]} = x[3] \dot{x} 
-  PetscCall(VecRestoreArrayRead(X,&x));PetscCall(VecRestoreArray(F,&f));
-  PetscFunctionReturn(PETSC_SUCCESS);
-}
+
 
 /* 
    reject any step whose accepted state would overflow exp(x[0]) or has gone
@@ -117,7 +47,6 @@ static PetscErrorCode myDomainError(TS ts,PetscReal time,Vec X,PetscBool *accept
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-#endif
 /* 
 
    flags:
@@ -146,7 +75,6 @@ static PetscErrorCode myDomainError(TS ts,PetscReal time,Vec X,PetscBool *accept
  */
 int main(int argc,char **argv)
 {
-#ifdef USE_PETSC
   TS ts; /* timestepping context */
   Vec X; /* solution, residual vectors */
   PetscReal time,t_init,atol,rtol,eps,monitor_tmin,event_tmin;
@@ -171,7 +99,7 @@ int main(int argc,char **argv)
   /* the RHS reads the full state from one local array, which is only valid on
      a single rank; PETSC_DECIDE would otherwise scatter the 3-4 entries */
   PetscCheck(par->medium->comm_size == 1, PETSC_COMM_WORLD, PETSC_ERR_SUP,
-	     "ode_solve_test integrates a low-D ODE whose full state must be local; run on a single MPI rank");
+	     "rs2_solver integrates a low-D ODE whose full state must be local; run on a single MPI rank");
   PetscCall(PetscRandomCreate(PETSC_COMM_WORLD, &rctx));
   /*  
 
@@ -408,14 +336,11 @@ int main(int argc,char **argv)
   PetscCall(TSDestroy(&ts));PetscCall(PetscRandomDestroy(&rctx));
   PetscCall(PetscFinalize());
   exit(0); 
-#else
   fprintf(stderr,"%s only petsc version implemented, but not compiled as such\n",argv[0]);
   exit(-1); 
-#endif
 
 }
 
-#ifdef USE_PETSC
 
 /* set output checks */
 static PetscErrorCode init_monitor_and_event(void *ctx, PetscReal dt_monitor, PetscReal adx_monitor,

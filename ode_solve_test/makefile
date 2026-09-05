@@ -6,7 +6,6 @@ include ../config/makefile.petsc
 ifndef MPILD
 MPILD = $(LD)
 endif
-
 LOCAL_INCLUDES = -I../src/includes/ -I../src/util/ -I../src/block/
 
 INCLUDES = $(LOCAL_INCLUDES) $(PETSC_INCLUDES)
@@ -14,11 +13,16 @@ BDIR = bin/
 ODIR = objects/
 
 # petsc h2opus and htool examples
-all: $(BDIR)/ode_solve_test
+all: $(BDIR)/rs2_solver $(BDIR)/basin_rs2
 
 
-$(BDIR)/ode_solve_test: $(ODIR)/ode_solve_test.o $(LIBLIST) 
-	$(MPILD) -o $(BDIR)/ode_solve_test $(ODIR)/ode_solve_test.o \
+$(BDIR)/rs2_solver: $(ODIR)/rs2_solver.o $(LIBLIST) $(ODIR)/rs2_rhs_functions.o
+	$(MPILD) -o $(BDIR)/rs2_solver $(ODIR)/rs2_solver.o $(ODIR)/rs2_rhs_functions.o \
+	$(PETSC_LIBS) $(LIBS) $(SUPERLU_LIBS)  $(SLATEC_LIBS)   $(LDFLAGS)
+
+
+$(BDIR)/basin_rs2: $(ODIR)/basin_rs2.o $(LIBLIST) $(ODIR)/rs2_rhs_functions.o
+	$(MPILD) -o $(BDIR)/basin_rs2 $(ODIR)/basin_rs2.o $(ODIR)/rs2_rhs_functions.o \
 	$(PETSC_LIBS) $(LIBS) $(SUPERLU_LIBS)  $(SLATEC_LIBS)   $(LDFLAGS)
 
 

@@ -30,7 +30,7 @@ if [[ $skip_check -eq 1 || `lc $tmpd/tmp` -eq 0 ]];then
 	    flags="$def_flags -use_exp_solve"
 	fi
 	    
-	$cwd/bin/ode_solve_test $popt -eps $eps -imode $imode -knd $k  $flags  > /dev/null 2> /dev/null
+	$cwd/bin/rs2_solver $popt -eps $eps -imode $imode -knd $k  $flags  > /dev/null 2> /dev/null
 	if [  -s $f ];then
 	    gawk '{printf("%9.6f\n",$3)}' $f  | sort -g | uniq | \
 		gawk -v k=$k -v i=$imode -v eps=$eps -v ues=$use_exp_solve \

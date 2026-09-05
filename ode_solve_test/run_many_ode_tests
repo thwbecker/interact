@@ -23,7 +23,7 @@ for k in $ks;do
     echo
     #rm  $kf > /dev/null
     if [[ ! -s $kf || $force -eq 1 ]];then
-	bin/ode_solve_test $popt -knd $k
+	bin/rs2_solver $popt -knd $k
 	if [[ ! -s $kf || `wc -l $kf | awk '{print($1)}'` -lt 1000 ]];then
 	    echo $0: solver error for $k could not find $kf `wc -l $kf`
 	    exit
