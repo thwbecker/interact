@@ -1,0 +1,150 @@
+#!/bin/bash
+#pimodes=`seq 10 -1 0`
+#pimodes="1"
+pimodes="0 1"
+quad_plot=1			# 0: 1 and 2 in one plot 1: 1,2,3,4 next to each other
+
+tmpn=`mktemp`
+trap "rm -f $tmpn*" EXIT
+#   2     4        8         16         32       64       128          256        512
+ks="1 0.866259 0.857038 0.85539350 0.85504990 0.85497670 0.85496100 0.85495770 0.85495690"
+# Feigenbaum number
+echo $ks | awk '{n=NF;for(i=1;i<=n;i++)k[i]=$i;}END{
+for(i=2;i<n;i++)
+print(i,(k[i]-k[i-1])/(k[i+1]-k[i]));
+}'
+# mid values
+
+echo $ks | awk '{n=NF;for(i=1;i<=n;i++)k[i]=$i;}END{
+     p=1;
+     for(i=2;i<=n;i++)
+          printf("//par->knd = %10.8f; // %i orbit\n",
+	  (k[i-1]+k[i])/2,p*=2);
+}'
+#
+lfile=px0log.old.dat
+#lfile=px0log.dat
+
+if [ ! -s $lfile ];then
+    echo $0: unpacking
+    for imode in $pimodes;do
+	echo $imode
+	(zcat $lfile.gz | gawk -v i=$imode '{if($3==i)print($1,$2)}' > $tmpn.$imode)&
+    done
+    wait
+else
+    for imode in $pimodes;do
+	echo $imode
+	(cat $lfile | gawk -v i=$imode '{if($3==i)print($1,$2)}' > $tmpn.$imode)&
+    done
+    wait
+fi
+
+echo $0: unpacking done
+for imode in $pimodes;do
+    echo $imode nentries `lc $tmpn.$imode`
+done
+
+gs_small=0.002
+gs_smaller=0.001
+#gs_small=0.05
+
+gawk 'BEGIN{i=0;for(x=0.8;x<=1.025;x+=0.0025){if(!i)print(x,"a");else print(x,"f");i++;if(i==10)i=0;}}' > tmp.xtics
+gawk 'BEGIN{i=0;for(x=0.8;x<=1.025;x+=0.00025){if(!i)print(x,"a");else print(x,"f");i++;if(i==10)i=0;}}' > tmp.x3tics
+gawk 'BEGIN{i=0;for(x=0.8;x<=1.025;x+=0.00005){if(!i)print(x,"a");else print(x,"f");i++;if(i==10)i=0;}}' > tmp.x2tics
+gawk 'BEGIN{i=0;for(x=0.8;x<=1.025;x+=0.0000025){if(!i)print(x,"a");else print(x,"f");i++;if(i==10)i=0;}}' > tmp.x4tics
+
+#proj=-JX-5l/4
+#fs=""
+ofile=px0k.new.ps
+if [ $quad_plot = 1 ];then
+    is="1 3 2 4"
+else
+    is="1 2"
+fi
+pc=1
+for i in $is;do
+    if [ $quad_plot -eq 1 ];then
+	proj=-JX-3l/4.5
+    else
+	proj=-JX-12l/6
+    fi
+    if [ $i = 1 ];then
+	ymin=-2.5;ymax=0.18
+	reg=-R0.851/1.0005/$ymin/$ymax
+	#ann=-Ba0.02f0.002:"@~k@~'":/a0.5f0.05:y:
+	#ann=-Ba3f22:"@~k@~'":/a0.5f0.05:y:
+	ann="-Bxctmp.xtics+l@~k@~' -Bya0.5f0.05+ly -BWeSn"
+	#	gs=0.001
+	gs=$gs_small
+    elif [ $i = 2 ];then
+	if [ $quad_plot -eq 0 ];then
+	    proj=-JX-5l/3
+	fi
+	#ymin=-2.2;ymax=-0.8
+	#reg=-R0.8516/0.8555/$ymin/$ymax
+	ymin=-1.9;ymax=-1.44
+	reg=-R0.854/0.8555/$ymin/$ymax
+	#ann=-Ba0.0005f0.00005:"@~k@~'":/a0.1f.01:y:
+	#ann=-Ba3f2:"@~k@~'":/a0.1f.01:y:
+	if [ $quad_plot -eq 1 ];then
+	    ann="-Bxctmp.x2tics+l@~k@~' -Bya0.1f0.01 -BWeSn"
+	else
+	    ann="-Bxctmp.x2tics+l@~k@~' -Bya0.1f0.01+ly -BWeSn"
+	fi
+	#gs=0.1
+	gs=$gs_small
+    elif [ $i = 3 ];then
+	#ymin=-2.5;ymax=0.3
+	ymin=-2.2;ymax=0.2
+	reg=-R0.8516/.858/$ymin/$ymax
+	ann="-Bxctmp.x3tics+l@~k@~' -Bya0.5f0.05 -BWeSn"
+	gs=$gs_smaller
+    else
+	ymin=-1.645;ymax=-1.565
+	reg=-R0.8549/0.85498/$ymin/$ymax
+	ann="-Bxctmp.x4tics+l@~k@~' -Bya0.01f0.001 -BWeSn"
+	gs=$gs_smaller
+    fi
+    #ann=-Ba3f2:"@~k@~'":/a0.01f.001:y:
+    if [ $quad_plot -eq 1 ];then
+	if [ $pc -eq 1 ];then
+	    psbasemap $reg $proj -K -P $ann -Y12 > $ofile
+	else
+	    psbasemap $reg $proj -K -O $ann -X3.65  >> $ofile
+	fi
+    else
+	if [ $pc -eq 1 ];then
+	    psbasemap $reg $proj -K -P $ann"WeSn" -Y12 > $ofile
+	else
+	    psbasemap $reg $proj -K -O $ann"WeSn" -X.8 -Y.6 >> $ofile
+	fi
+    fi
+	
+#    if [[ $i -ge 1 ]];then
+#	for k in $ks;do
+#	    cat <<EOF | psxy $reg $proj -O -K -W.25,gray >> $ofile
+#$k $ymin
+#$k $ymax
+#EOF
+#	done
+    #    fi
+    echo $i $proj $reg 
+    for imode in $pimodes;do
+	((c=imode+1))
+	#col=`platecolor $c`
+	col=`platecolor 1`
+	echo $imode $c $col
+	psxy $tmpn.$imode -Sc$gs -G$col $reg $proj -O -K >> $ofile
+    done
+    ((pc=pc+1))
+done
+psxy -T  $reg $proj -O >> $ofile
+
+psconvert -Tg -A+m0.1 $ofile
+#modifybb $ofile 1
+rm $fs px0k.new.ps tmp*
+cp px0k.new.png $HOME/Dropbox/tmp/
+
+
+

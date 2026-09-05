@@ -1,0 +1,15 @@
+#!/bin/bash
+lfile=px0log.dat
+
+rm tmp.add tmp.list
+ls | grep tmp.k > tmp.list
+n=`lc tmp.list`
+
+for i in `seq 1 $n`;do
+    f=`oneline $i tmp.list`
+    echo $f
+    cat $f >> tmp.add
+    rm $f
+done
+cat tmp.add >> $lfile
+sort -g $lfile | uniq > tmp.dat ; mv tmp.dat $lfile

@@ -107,8 +107,8 @@ EOF
     fi
     for imode in $pimodes;do
 	((c=imode+1))
-	col=`platecolor $c`
-	#col=`platecolor 1`
+	#col=`platecolor $c`
+	col=`platecolor 1`
 	echo $imode $c $col
 	psxy $tmpn.$imode -Sc$gs -G$col $reg $proj -O -K >> $ofile
     done
