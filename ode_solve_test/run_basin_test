@@ -1,3 +1,11 @@
 #!/bin/bash
+mode=${1-1}
 
-mpirun -np 16 ./bin/basin_rs2 -knd 0.8574 -n1 257 -n2 257 -t_trans 20000 -t_run 10000 -oprefix b74
+t_trans=20000
+if [ $mode = 1 ];then
+    mpirun -np 16 ./bin/basin_rs2 -knd 0.8574 -n1 257 -n2 257 -t_trans $t_trans -t_run 10000 -oprefix b74
+elif [ $mode = 2 ];then
+    mpirun -np 16 ./bin/basin_rs2 -knd 0.8577 -n1 257 -n2 257 \
+    -e1min -2.5e-3 -e1max 2.5e-3 -e2min -2.5e-3 -e2max 2.5e-3 \
+    -t_trans $t_trans -t_run 10000 -oprefix b77
+fi
