@@ -1,11 +1,28 @@
 #!/bin/bash
-mode=${1-1}
+#
+# basin sweeps; mode 1/2: coordinate plane (x, y perturbations, z = 0),
+# mode 3/4: unstable eigenplane of J(0)
+#
+modes=${1-"1 2 3 4"}
+np=${2-16}
 
 t_trans=20000
-if [ $mode = 1 ];then
-    mpirun -np 16 ./bin/basin_rs2 -knd 0.8574 -n1 257 -n2 257 -t_trans $t_trans -t_run 10000 -oprefix b74
-elif [ $mode = 2 ];then
-    mpirun -np 16 ./bin/basin_rs2 -knd 0.8577 -n1 257 -n2 257 \
-    -e1min -2.5e-3 -e1max 2.5e-3 -e2min -2.5e-3 -e2max 2.5e-3 \
-    -t_trans $t_trans -t_run 10000 -oprefix b77
-fi
+t_run=10000
+for mode in $modes;do
+    
+    if [ $mode = 1 ];then
+	mpirun -np $np ./bin/basin_rs2 -knd 0.8574 -n1 257 -n2 257 \
+	       -t_trans $t_trans -t_run $t_run -oprefix b74
+    elif [ $mode = 2 ];then
+	mpirun -np $np ./bin/basin_rs2 -knd 0.8577 -n1 257 -n2 257 \
+	       -e1min -2.5e-3 -e1max 2.5e-3 -e2min -2.5e-3 -e2max 2.5e-3 \
+	       -t_trans $t_trans -t_run $t_run -oprefix b77
+    elif [ $mode = 3 ];then
+	mpirun -np $np ./bin/basin_rs2 -knd 0.8574 -eig_plane -n1 257 -n2 257 \
+	       -t_trans $t_trans -t_run $t_run -oprefix b74e
+    elif [ $mode = 4 ];then
+	mpirun -np $np ./bin/basin_rs2 -knd 0.8577 -eig_plane -n1 257 -n2 257 \
+	       -e1min -2.5e-3 -e1max 2.5e-3 -e2min -2.5e-3 -e2max 2.5e-3 \
+	       -t_trans $t_trans -t_run $t_run -oprefix b77e
+    fi
+done

@@ -146,4 +146,155 @@ PetscErrorCode RHSFunction4D(TS ts,PetscReal time,Vec X,Vec F,void *ptr) /* 4D
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+
+/*
+   orthonormal basis {d1, d2} of the most unstable invariant plane of
+   the Jacobian at the steady sliding fixed point {0,0,0}.
+
+   the eigenvalues of J(0) are found from the characteristic cubic
+   (closed form, cf. Numerical Recipes sec. 5.6). for a complex
+   conjugate pair (the generic Hopf-unstable case for knd < 1, cf.
+   Rice & Ruina 1983; Gu et al. 1984), the plane is spanned by the
+   real and imaginary parts of the corresponding eigenvector; if all
+   eigenvalues are real, the eigenvectors of the two largest are used.
+   eigenvectors are obtained as complex cross products of two rows of
+   (J - lambda I). returns Re and Im of the leading eigenvalue.
+   signs are fixed such that the largest-magnitude component of each
+   basis vector is positive.
+*/
+#include <complex.h>
+PetscErrorCode unstable_plane(const struct AppCtx *par,PetscReal d1[3],PetscReal d2[3],
+			      PetscReal *re_lam,PetscReal *im_lam)
+{
+  PetscReal J[3][3],a,b,c,Q,R,theta,A,B,sq,nrm,dot,amax;
+  double complex lam[3],rows[3][3],v[3],w[3],tmp;
+  PetscInt i,j,imax,i1,i2;
+  PetscFunctionBeginUser;
+  /* Jacobian at the origin (E = 1, f = 0) */
+  J[0][0] = par->b1 - 1.0 - par->k + par->r * par->b2;
+  J[0][1] = 1.0;
+  J[0][2] = par->r - 1.0;
+  J[1][0] = -par->k;  J[1][1] = 0.0; J[1][2] = 0.0;
+  J[2][0] = -par->r * par->b2; J[2][1] = 0.0; J[2][2] = -par->r;
+  /* characteristic cubic lam^3 + a lam^2 + b lam + c = 0 */
+  a = -(J[0][0] + J[1][1] + J[2][2]);
+  b =  (J[0][0]*J[1][1] - J[0][1]*J[1][0]) +
+       (J[0][0]*J[2][2] - J[0][2]*J[2][0]) +
+       (J[1][1]*J[2][2] - J[1][2]*J[2][1]);
+  c = -(J[0][0]*(J[1][1]*J[2][2] - J[1][2]*J[2][1])
+      - J[0][1]*(J[1][0]*J[2][2] - J[1][2]*J[2][0])
+      + J[0][2]*(J[1][0]*J[2][1] - J[1][1]*J[2][0]));
+  Q = (a*a - 3.0*b)/9.0;
+  R = (2.0*a*a*a - 9.0*a*b + 27.0*c)/54.0;
+  if(R*R < Q*Q*Q){		/* three real roots */
+    theta = acos(R/PetscSqrtReal(Q*Q*Q));
+    for(i=0;i < 3;i++)
+      lam[i] = -2.0*PetscSqrtReal(Q)*cos((theta + 2.0*M_PI*(PetscReal)i)/3.0) - a/3.0;
+  }else{			/* one real root, complex pair */
+    A = -copysign(pow(fabs(R) + PetscSqrtReal(R*R - Q*Q*Q),1.0/3.0),R);
+    B = (A != 0.0) ? Q/A : 0.0;
+    sq = 0.5*sqrt(3.0)*(A - B);
+    lam[0] = (A + B) - a/3.0;			  /* real */
+    lam[1] = -0.5*(A + B) - a/3.0 + sq*I;
+    lam[2] = -0.5*(A + B) - a/3.0 - sq*I;
+  }
+  /* sort by descending real part (i1: leading, i2: second) */
+  i1 = 0;
+  for(i=1;i < 3;i++)
+    if(creal(lam[i]) > creal(lam[i1]))
+      i1 = i;
+  i2 = (i1 == 0) ? 1 : 0;
+  for(i=0;i < 3;i++)
+    if((i != i1) && (creal(lam[i]) > creal(lam[i2])))
+      i2 = i;
+  *re_lam = creal(lam[i1]);
+  *im_lam = fabs(cimag(lam[i1]));
+  /* eigenvector of lam[i1] via complex cross product of two rows of (J - lam I),
+     picking the pair with the largest norm for robustness */
+  for(i=0;i < 3;i++)
+    for(j=0;j < 3;j++)
+      rows[i][j] = J[i][j] - ((i == j) ? lam[i1] : 0.0);
+  {
+    double complex cr[3][3];
+    PetscReal cn,cnmax = -1.0;
+    PetscInt ic,jc,ibest = 0,jbest = 1;
+    for(ic=0;ic < 3;ic++)
+      for(jc=ic+1;jc < 3;jc++){
+	cr[0][0] = rows[ic][1]*rows[jc][2] - rows[ic][2]*rows[jc][1];
+	cr[0][1] = rows[ic][2]*rows[jc][0] - rows[ic][0]*rows[jc][2];
+	cr[0][2] = rows[ic][0]*rows[jc][1] - rows[ic][1]*rows[jc][0];
+	cn = 0.0;
+	for(i=0;i < 3;i++)
+	  cn += creal(cr[0][i]*conj(cr[0][i]));
+	if(cn > cnmax){
+	  cnmax = cn; ibest = ic; jbest = jc;
+	  for(i=0;i < 3;i++)
+	    v[i] = cr[0][i];
+	}
+      }
+    (void)ibest;(void)jbest;
+  }
+  if(cimag(lam[i1]) != 0.0){
+    /* complex pair: plane from Re(v), Im(v) */
+    for(i=0;i < 3;i++){
+      d1[i] = creal(v[i]);
+      d2[i] = cimag(v[i]);
+    }
+  }else{
+    /* all real: second direction from the eigenvector of lam[i2] */
+    for(i=0;i < 3;i++){
+      d1[i] = creal(v[i]);
+      for(j=0;j < 3;j++)
+	rows[i][j] = J[i][j] - ((i == j) ? lam[i2] : 0.0);
+    }
+    w[0] = rows[0][1]*rows[1][2] - rows[0][2]*rows[1][1];
+    w[1] = rows[0][2]*rows[1][0] - rows[0][0]*rows[1][2];
+    w[2] = rows[0][0]*rows[1][1] - rows[0][1]*rows[1][0];
+    tmp = w[0]*conj(w[0]) + w[1]*conj(w[1]) + w[2]*conj(w[2]);
+    if(creal(tmp) < 1e-20){	/* degenerate pair of rows, use other rows */
+      w[0] = rows[1][1]*rows[2][2] - rows[1][2]*rows[2][1];
+      w[1] = rows[1][2]*rows[2][0] - rows[1][0]*rows[2][2];
+      w[2] = rows[1][0]*rows[2][1] - rows[1][1]*rows[2][0];
+    }
+    for(i=0;i < 3;i++)
+      d2[i] = creal(w[i]);
+  }
+  /* orthonormalize {d1, d2} by Gram-Schmidt */
+  nrm = 0.0;
+  for(i=0;i < 3;i++)
+    nrm += d1[i]*d1[i];
+  nrm = PetscSqrtReal(nrm);
+  for(i=0;i < 3;i++)
+    d1[i] /= nrm;
+  dot = 0.0;
+  for(i=0;i < 3;i++)
+    dot += d2[i]*d1[i];
+  for(i=0;i < 3;i++)
+    d2[i] -= dot*d1[i];
+  nrm = 0.0;
+  for(i=0;i < 3;i++)
+    nrm += d2[i]*d2[i];
+  nrm = PetscSqrtReal(nrm);
+  for(i=0;i < 3;i++)
+    d2[i] /= nrm;
+  /* sign convention: largest-magnitude component positive */
+  imax = 0; amax = fabs(d1[0]);
+  for(i=1;i < 3;i++)
+    if(fabs(d1[i]) > amax){
+      amax = fabs(d1[i]); imax = i;
+    }
+  if(d1[imax] < 0.0)
+    for(i=0;i < 3;i++)
+      d1[i] = -d1[i];
+  imax = 0; amax = fabs(d2[0]);
+  for(i=1;i < 3;i++)
+    if(fabs(d2[i]) > amax){
+      amax = fabs(d2[i]); imax = i;
+    }
+  if(d2[imax] < 0.0)
+    for(i=0;i < 3;i++)
+      d2[i] = -d2[i];
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 #endif

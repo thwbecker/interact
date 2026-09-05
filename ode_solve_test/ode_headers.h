@@ -57,5 +57,7 @@ PetscErrorCode RHSFunction4D(TS,PetscReal,Vec,Vec,void*);
 PetscErrorCode RHSFunction3DTangent(TS ,PetscReal ,Vec ,Vec ,void *);
 void eval_rhs(const struct AppCtx *,const PetscReal [3],PetscReal [3]);
 PetscErrorCode  init_stiff_par(struct AppCtx *, PetscReal );
+PetscErrorCode unstable_plane(const struct AppCtx *,PetscReal [3],PetscReal [3],
+			      PetscReal *,PetscReal *);
 
 #endif

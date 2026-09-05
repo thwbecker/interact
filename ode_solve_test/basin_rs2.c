@@ -29,9 +29,10 @@
       accumulating the Lyapunov spectrum via Gram-Schmidt
       renormalization (Benettin et al., 1980),
 
-  (3) records Poincare section crossings x=0 (one direction) via the
-      TS event handler and clusters the (y,z) section values to count
-      the orbit period,
+  (3) records Poincare section crossings x=0 (both directions,
+      detected between accepted steps with cubic Hermite
+      interpolation) and clusters the (y,z) section values per
+      direction to count the orbit period,
 
   (4) classifies the attractor: chaotic if lambda_1 > lam_tol,
       otherwise periodic with the clustered period count.
@@ -51,6 +52,11 @@
     -knd <val>      normalized stiffness kappa' (0.8574)
     -c1,-c2 <0..2>  perturbed components spanning the IC plane (0,1)
     -c3val <val>    value of the remaining component (0)
+    -eig_plane      span the IC plane by the orthonormalized real and
+                    imaginary parts of the unstable eigenvector of
+                    J(0) instead of coordinate directions
+    -d1,-d2 <x,y,z> explicit direction vectors (normalized internally);
+                    override -c1/-c2, overridden by -eig_plane
     -e1min,-e1max,-n1, -e2min,-e2max,-n2   grid (-2e-3..2e-3, 32)
     -t_trans <val>  transient time, state only (2e4)
     -t_run <val>    Lyapunov/event accumulation time (2e4)
@@ -366,6 +372,9 @@ int main(int argc,char **argv)
   char oprefix[PETSC_MAX_PATH_LEN-32],fname[PETSC_MAX_PATH_LEN];
   FILE *fout;
   PetscReal xinit[3],lam[3],e1,e2;
+  PetscReal d1[3],d2[3],base[3],re_lam,im_lam,nrm,dot;
+  PetscInt nd1,nd2,id;
+  PetscBool eig_plane,have_d1,have_d2;
   PetscInt nperiod,class,nevents;
   PetscFunctionBeginUser;
   PetscCall(PetscInitialize(&argc,&argv,NULL,NULL));
@@ -411,6 +420,50 @@ int main(int argc,char **argv)
   PetscCheck((c1 >= 0) && (c1 <= 2) && (c2 >= 0) && (c2 <= 2) && (c1 != c2),
 	     PETSC_COMM_WORLD,PETSC_ERR_ARG_OUTOFRANGE,"-c1/-c2 must be distinct and in 0..2");
   c3 = 3 - c1 - c2;		/* remaining component */
+  /*
+     perturbation directions: IC = base + e1 * d1 + e2 * d2. default
+     reproduces the coordinate-plane behavior; -d1/-d2 give explicit
+     directions; -eig_plane uses the unstable eigenplane of J(0)
+  */
+  for(id=0;id < 3;id++){
+    d1[id] = d2[id] = base[id] = 0.0;
+  }
+  d1[c1] = 1.0; d2[c2] = 1.0; base[c3] = c3val;
+  eig_plane = PETSC_FALSE;
+  have_d1 = have_d2 = PETSC_FALSE;
+  nd1 = nd2 = 3;
+  PetscCall(PetscOptionsGetBool(NULL,NULL,"-eig_plane",&eig_plane,NULL));
+  PetscCall(PetscOptionsGetRealArray(NULL,NULL,"-d1",d1,&nd1,&have_d1));
+  PetscCall(PetscOptionsGetRealArray(NULL,NULL,"-d2",d2,&nd2,&have_d2));
+  if(have_d1 || have_d2){
+    PetscCheck(have_d1 && have_d2 && (nd1 == 3) && (nd2 == 3),PETSC_COMM_WORLD,
+	       PETSC_ERR_ARG_OUTOFRANGE,"-d1 and -d2 both require three components");
+    for(id=0;id < 3;id++)
+      base[id] = 0.0;
+  }
+  if(eig_plane){
+    PetscCall(unstable_plane(par,d1,d2,&re_lam,&im_lam));
+    for(id=0;id < 3;id++)
+      base[id] = 0.0;
+    if(rank == 0)
+      fprintf(stderr,"%s: unstable plane of J(0): lambda %g +/- %g i, d1 (%g, %g, %g) d2 (%g, %g, %g)\n",
+	      argv[0],(double)re_lam,(double)im_lam,
+	      (double)d1[0],(double)d1[1],(double)d1[2],
+	      (double)d2[0],(double)d2[1],(double)d2[2]);
+  }else{
+    /* normalize and orthogonalize user-supplied directions */
+    nrm = PetscSqrtReal(d1[0]*d1[0]+d1[1]*d1[1]+d1[2]*d1[2]);
+    PetscCheck(nrm > 0.0,PETSC_COMM_WORLD,PETSC_ERR_ARG_OUTOFRANGE,"-d1 must be non-zero");
+    for(id=0;id < 3;id++)
+      d1[id] /= nrm;
+    dot = d2[0]*d1[0]+d2[1]*d1[1]+d2[2]*d1[2];
+    for(id=0;id < 3;id++)
+      d2[id] -= dot*d1[id];
+    nrm = PetscSqrtReal(d2[0]*d2[0]+d2[1]*d2[1]+d2[2]*d2[2]);
+    PetscCheck(nrm > 0.0,PETSC_COMM_WORLD,PETSC_ERR_ARG_OUTOFRANGE,"-d1 and -d2 must be linearly independent");
+    for(id=0;id < 3;id++)
+      d2[id] /= nrm;
+  }
 
   /* event storage */
   par->mevent = 100000;
@@ -428,6 +481,10 @@ int main(int argc,char **argv)
   if(rank == 0){
     fprintf(fout,"# knd %.15f c1 %d c2 %d c3 %d c3val %g t_trans %g t_run %g lyap %d\n",
 	    (double)par->knd,(int)c1,(int)c2,(int)c3,(double)c3val,(double)t_trans,(double)t_run,(int)par->do_lyap);
+    fprintf(fout,"# d1 %.10e %.10e %.10e d2 %.10e %.10e %.10e base %g %g %g eig_plane %d\n",
+	    (double)d1[0],(double)d1[1],(double)d1[2],
+	    (double)d2[0],(double)d2[1],(double)d2[2],
+	    (double)base[0],(double)base[1],(double)base[2],(int)eig_plane);
     fprintf(fout,"# e1 e2 lambda1 lambda2 lambda3 nperiod class nevents\n");
   }
   npt = n1 * n2;
@@ -436,7 +493,8 @@ int main(int argc,char **argv)
     i2 = ipt / n1;
     e1 = (n1 > 1) ? (e1min + (e1max - e1min) * i1 / (PetscReal)(n1 - 1)) : e1min;
     e2 = (n2 > 1) ? (e2min + (e2max - e2min) * i2 / (PetscReal)(n2 - 1)) : e2min;
-    xinit[c1] = e1; xinit[c2] = e2; xinit[c3] = c3val;
+    for(id=0;id < 3;id++)
+      xinit[id] = base[id] + e1 * d1[id] + e2 * d2[id];
     PetscCall(run_one(par,xinit,t_trans,t_run,atol,rtol,cluster_tol,lam_tol,verbose,
 		      lam,&nperiod,&class,&nevents));
     fprintf(fout,"%17.10e %17.10e %13.6e %13.6e %13.6e %5d %2d %6d\n",
