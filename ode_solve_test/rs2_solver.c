@@ -78,7 +78,7 @@ int main(int argc,char **argv)
   TS ts; /* timestepping context */
   Vec X; /* solution, residual vectors */
   PetscReal time,t_init,atol,rtol,eps,monitor_tmin,event_tmin;
-  PetscReal kcr1,kcr2,adx_monitor,rdx_monitor,dt_monitor;
+  PetscReal knd_default,adx_monitor,rdx_monitor,dt_monitor;
   PetscBool flag_set,track_events,log_state,use_exp_solve;
   /* for init */
   PetscInt  *ind,i;
@@ -106,32 +106,33 @@ int main(int argc,char **argv)
       control parmater: non dimensional stiffness
 
   */
-  PetscOptionsGetReal(NULL, NULL, "-knd", &par->knd, &flag_set);
-  if(!flag_set){
-    /* 
-       these are the bifurcation values
-
-       #   2     4        8         16         32       64       128          256        512
-       ks="1 0.866259 0.857038 0.85539350 0.85504990 0.85497670 0.85496100 0.85495770 0.85495690"
-       
-    */
-
-    //par->knd = 0.93312950; // 2 orbit
-    //par->knd = 0.86164850; // 4 orbit
-    //par->knd = 0.85621575; // 8 orbit
-    //par->knd = 0.85522170; // 16 orbit
-    //par->knd = 0.85501330; // 32 orbit
-    //par->knd = 0.85496885; // 64 orbit
-    //par->knd = 0.85495935; // 128 orbit
-    //par->knd = 0.85495730; // 256 orbit
-    //par->knd = 0.88; % 2 orbit
-    par->knd = 0.86;// % 4 
-    //par->knd = 0.856; //% 8 
-    //par->knd = 0.8552; //% 16
-    //par->knd = 0.8525 ; // attractor
+  knd_default = 0.86;		/* default */
+  init_stiff_par(par,knd_default);
+  /* 
+     these are the bifurcation values
+     
+     #   2     4        8         16         32       64       128          256        512
+     ks="1 0.866259 0.857038 0.85539350 0.85504990 0.85497670 0.85496100 0.85495770 0.85495690"
+     
+  */
+  
+  //par->knd = 0.93312950; // 2 orbit
+  //par->knd = 0.86164850; // 4 orbit
+  //par->knd = 0.85621575; // 8 orbit
+  //par->knd = 0.85522170; // 16 orbit
+  //par->knd = 0.85501330; // 32 orbit
+  //par->knd = 0.85496885; // 64 orbit
+  //par->knd = 0.85495935; // 128 orbit
+  //par->knd = 0.85495730; // 256 orbit
+  //par->knd = 0.88; % 2 orbit
+  //par->knd = 0.86;// % 4 
+  //par->knd = 0.856; //% 8 
+  //par->knd = 0.8552; //% 16
+  //par->knd = 0.8525 ; // attractor
+  if(par->knd == knd_default){
     LHEADNODE
       fprintf(stderr,"%s: using default nd stiffness of %g\n",argv[0],par->knd);
-  }else{
+  }else{			/* was overridden */
     LHEADNODE
       fprintf(stderr,"%s: command line override nd stiffness of %g\n",argv[0],par->knd);
   }
@@ -198,16 +199,6 @@ int main(int argc,char **argv)
     par->n = 4;
   else
     par->n = 3;
-  /*  */
-  par->b1=1.0;
-  par->b2=0.84;
-  par->r=0.048;
-  /* non dim stiffnesses */
-  kcr1 = par->b1 - 1.0;
-  kcr2=(kcr1+par->r*(2.*par->b1+(par->b2-1.)*(2.+par->r))+
-	sqrt(4.*par->r*par->r*(kcr1+par->b2)+
-	     pow(kcr1+par->r*par->r*(par->b2-1.),2)))/(2.+2.*par->r);
-  par->k = par->knd * kcr2;	/* set actual stiffness */
   
   /*  */
   PetscCall(VecCreate(PETSC_COMM_WORLD,&X));

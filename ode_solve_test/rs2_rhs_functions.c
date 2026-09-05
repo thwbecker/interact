@@ -14,6 +14,26 @@
 
 #include "ode_headers.h"
 
+PetscErrorCode  init_stiff_par(struct AppCtx *par, PetscReal knd_default)
+{
+  PetscReal kcr1,kcr2;
+  par->knd = knd_default;  
+  PetscCall(PetscOptionsGetReal(NULL,NULL,"-knd",&par->knd,NULL));
+
+
+  par->b1 = 1.0;
+  par->b2 = 0.84;
+  par->r  = 0.048;
+  
+  kcr1 = par->b1 - 1.0;
+  kcr2 = (kcr1 + par->r*(2.*par->b1 + (par->b2 - 1.)*(2. + par->r)) +
+	  sqrt(4.*par->r*par->r*(kcr1 + par->b2) +
+	       pow(kcr1 + par->r*par->r*(par->b2 - 1.),2)))/(2. + 2.*par->r);
+  par->k = par->knd * kcr2;
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+
 /* 
    two state variable RHS ODE - x = log(v/v0), y = (tau-tau0)/a, z = b2 log(v0*theta2/dc2), steady state = {0,0,0}
 */

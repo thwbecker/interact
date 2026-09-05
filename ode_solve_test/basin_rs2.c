@@ -92,14 +92,6 @@ static PetscErrorCode myDomainError(TS ts,PetscReal time,Vec X,PetscBool *accept
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-/* plain state RHS evaluation for crossing interpolation */
-static void eval_rhs(const struct AppCtx *par,const PetscReal x[3],PetscReal f[3])
-{
-  PetscReal E = PetscExpReal(x[0]);
-  f[1] =  (1.0 - E) * par->k;
-  f[2] = -E * par->r * (par->b2 * x[0] + x[2]);
-  f[0] =  E * ((par->b1 - 1.0) * x[0] + x[1] - x[2]) + f[1] - f[2];
-}
 /* cubic Hermite value on [0,1] given endpoint values/derivatives (dt-scaled) */
 static PetscReal hermite(PetscReal s,PetscReal p0,PetscReal m0,PetscReal p1,PetscReal m1)
 {
@@ -366,7 +358,6 @@ static PetscErrorCode run_one(struct AppCtx *par,const PetscReal xinit[3],
 int main(int argc,char **argv)
 {
   struct AppCtx par[1];
-  PetscReal kcr1,kcr2;
   PetscReal t_trans,t_run,atol,rtol,cluster_tol,lam_tol;
   PetscReal e1min,e1max,e2min,e2max,c3val;
   PetscInt n1,n2,c1,c2,c3,i1,i2,ipt,npt;
@@ -382,14 +373,8 @@ int main(int argc,char **argv)
   PetscCallMPI(MPI_Comm_size(PETSC_COMM_WORLD,&size));
 
   /* model parameters as in ode_solve_test.c */
-  par->b1 = 1.0; par->b2 = 0.84; par->r = 0.048;
-  par->knd = 0.8574;
-  PetscCall(PetscOptionsGetReal(NULL,NULL,"-knd",&par->knd,NULL));
-  kcr1 = par->b1 - 1.0;
-  kcr2 = (kcr1 + par->r*(2.*par->b1 + (par->b2 - 1.)*(2. + par->r)) +
-	  sqrt(4.*par->r*par->r*(kcr1 + par->b2) +
-	       pow(kcr1 + par->r*par->r*(par->b2 - 1.),2)))/(2. + 2.*par->r);
-  par->k = par->knd * kcr2;
+  init_stiff_par(par, 0.8574);
+
 
   /* run control */
   t_trans = 2e4; t_run = 2e4;
@@ -432,8 +417,8 @@ int main(int argc,char **argv)
   PetscCall(PetscMalloc3(par->mevent,&par->ey,par->mevent,&par->ez,par->mevent,&par->edir));
 
   if(rank == 0){
-    fprintf(stderr,"%s: knd %g k %g (kcr %g) grid %d x %d on components %d/%d (comp %d = %g)\n",
-	    argv[0],(double)par->knd,(double)par->k,(double)kcr2,(int)n1,(int)n2,(int)c1,(int)c2,(int)c3,(double)c3val);
+    fprintf(stderr,"%s: knd %g k %g grid %d x %d on components %d/%d (comp %d = %g)\n",
+	    argv[0],(double)par->knd,(double)par->k,(int)n1,(int)n2,(int)c1,(int)c2,(int)c3,(double)c3val);
     fprintf(stderr,"%s: t_trans %g t_run %g lyap %d lam_tol %g cluster_tol %g ranks %d\n",
 	    argv[0],(double)t_trans,(double)t_run,(int)par->do_lyap,(double)lam_tol,(double)cluster_tol,(int)size);
   }
