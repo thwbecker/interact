@@ -1,17 +1,17 @@
 #!/bin/bash
 #
-# plot basins of attraction and Lyapunov exponents from basin_rs2
+# plot basins of attraction and Lyapunov exponents from run_basin_test
 # output, one row per stiffness case (attractor type map, lambda_1 map)
 #
 # usage: plot_basins [prefix1] [prefix2] [ofile] [clip]
 #
 # each prefix refers to <prefix>.<rank>.dat files as written by
-# basin_rs2; a single-prefix plot results if prefix2 is an empty
+# basin_test and basin_rs2 a single-prefix plot results if prefix2 is an empty
 # string. clip > 0 truncates the lambda_1 color scale at that value.
 #
 p1=${1-basin_08574}
 p2=${2-basin_08577}
-ofile=${3-basins.ps}
+ofile=${3-basins}		# without .ps
 lclip=${4-0}			# 0: automatic lambda_1 scale
 
 tmpn=`mktemp`
@@ -19,14 +19,14 @@ trap "rm -f $tmpn*" EXIT
 
 prefixes="$p1"
 if [ "X$p2" != "X" ];then
-    prefixes="$p1 $p2"
+    prefixes="basin_files/$p1 basin_files/$p2"
 fi
 
 # panel layout
-pwidth=7			# panel width (cm)
+pwidth=4.5			# panel width 
 proj=-JX$pwidth/$pwidth
-dx=9.5				# panel offsets
-dy=9.5
+dx=5.5				# panel offsets
+dy=5.5
 
 # collect data, determine common period levels and lambda range
 np=0
@@ -69,10 +69,10 @@ echo $pvals | gawk -v cols="$cols" '{
   }}' > $tmpn.per.cpt
 # continuous CPT for lambda_1
 lmin=`gawk 'BEGIN{m=0}{if($3<m)m=$3}END{print(m)}' $tmpn.*.lam | sort -g | head -1`
-gmt makecpt -Cinferno -T$lmin/$lmax/50+n -D > $tmpn.lam.cpt
 
-gmt gmtset PS_MEDIA A4 FONT_ANNOT_PRIMARY 12p FONT_LABEL 14p FONT_TITLE 14p \
-    MAP_FRAME_PEN 0.75p MAP_TICK_LENGTH_PRIMARY 3p
+gmt makecpt -Cinferno -T$lmin/$lmax/30+n -D > $tmpn.lam.cpt
+#gmt makecpt -Cvik+h0 -T$lmin/$lmax/0.1 > $tmpn.lam.cpt
+
 
 labels="a b c d e f g h"
 first=1
@@ -80,8 +80,7 @@ ip=`expr $np - 1`
 while [ $ip -ge 0 ];do
     # region and grid spacing from the data
     reg=`gmt gmtinfo -I- $tmpn.$ip.per`
-    inc=`gawk '{print($1)}' $tmpn.$ip.per | sort -g | uniq | \
-    	 gawk '{if(NR==2)print($1-x);x=$1}'`
+    inc=`gawk '{print($1)}' $tmpn.$ip.per | sort -g | uniq | gawk '{if(NR==2)printf("%.12e\n",$1-x);x=$1}'`
     kl=`echo ${knd[$ip]} | gawk '{printf("%g",$1)}'`
     la=`echo $labels | gawk -v i=$ip '{print($(2*i+1))}'`
     lb=`echo $labels | gawk -v i=$ip '{print($(2*i+2))}'`
@@ -90,35 +89,36 @@ while [ $ip -ge 0 ];do
     gmt xyz2grd $tmpn.$ip.per $reg -I$inc -G$tmpn.per.grd
     if [ $first -eq 1 ];then
 	gmt grdimage $tmpn.per.grd $reg $proj -C$tmpn.per.cpt \
-	    -Ba1f0.25:"@~e@~@-1@- (10@+-3@+)":/a1f0.25:"@~e@~@-2@- (10@+-3@+)":WeSn \
-	    -X2.5 -Y4 -P -K > $ofile
-	gmt psscale -C$tmpn.per.cpt -D`echo $pwidth | gawk '{print($1/2)}'`/-2/6/0.4h -L0.1 -O -K >> $ofile
+	    -Ba1f0.25:"@~e@~@-1@- [10@+-3@+]":/a1f0.25:"@~e@~@-2@- [10@+-3@+]":WeSn \
+	    -X2.5 -Y4 -P -K > $ofile.ps
+	gmt psscale -C$tmpn.per.cpt -D`echo $pwidth | gawk '{print($1/2)}'`/-1/4/0.4h -L0.1 -O -K >> $ofile.ps
     else
 	gmt grdimage $tmpn.per.grd $reg $proj -C$tmpn.per.cpt \
-	    -Ba1f0.25:"@~e@~@-1@- (10@+-3@+)":/a1f0.25:"@~e@~@-2@- (10@+-3@+)":WeSn \
-	    -X-$dx -Y$dy -O -K >> $ofile
+	    -Ba1f0.25:"@~e@~@-1@- [10@+-3@+]":/a1f0.25:"@~e@~@-2@- [10@+-3@+]":WeSn \
+	    -X-$dx -Y$dy -O -K >> $ofile.ps
     fi
     echo $reg | gawk -F/ '{gsub("-R","",$1);print($1,$4)}' | \
-	gmt pstext $reg $proj -F+f14p+jTL+cTL+t"$la) @~k@~' = $kl" -D0.25/-0.25 \
-	    -Gwhite -W0.5p -O -K >> $ofile
+	gmt pstext $reg $proj -F+f18p+jTL+cTL+t"$la) @~k@~' = $kl" -D0.25/-0.25 \
+	    -Gwhite -W0.5p -O -K >> $ofile.ps
 
     # lambda_1 panel
     gmt xyz2grd $tmpn.$ip.lam $reg -I$inc -G$tmpn.lam.grd
     gmt grdimage $tmpn.lam.grd $reg $proj -C$tmpn.lam.cpt \
-	-Ba1f0.25:"@~e@~@-1@- (10@+-3@+)":/a1f0.25:"@~e@~@-2@- (10@+-3@+)":wESn \
-	-X$dx -O -K >> $ofile
+	-Ba1f0.25:"@~e@~@-1@- [10@+-3@+]":/a1f0.25:"@~e@~@-2@- [10@+-3@+]":wESn \
+	-X$dx -O -K >> $ofile.ps
     echo $reg | gawk -F/ '{gsub("-R","",$1);print($1,$4)}' | \
-	gmt pstext $reg $proj -F+f14p+jTL+cTL+t"$lb)" -D0.25/-0.25 \
-	    -Gwhite -W0.5p -O -K >> $ofile
+	gmt pstext $reg $proj -F+f18p+jTL+cTL+t"$lb)" -D0.25/-0.25 \
+	    -Gwhite -W0.5p -O -K >> $ofile.ps
     if [ $first -eq 1 ];then
-	gmt psscale -C$tmpn.lam.cpt -D`echo $pwidth | gawk '{print($1/2)}'`/-2/6/0.4h \
-	    -Ba${lann}f`echo $lann | gawk '{print($1/2)}'`:"@~l@~@-1@- (10@+-3@+)": -O -K >> $ofile
+	gmt psscale -C$tmpn.lam.cpt -D`echo $pwidth | gawk '{print($1/2)}'`/-1/4/0.2h \
+	    -Ba${lann}f`echo $lann | gawk '{print($1/2)}'`:"@~l@~@-1@- [10@+-3@+]": -O -K >> $ofile.ps
 	first=0
     fi
 
     ip=`expr $ip - 1`
 done
-echo 1000 1000 | gmt psxy -R0/1/0/1 -JX1 -Sa0.1 -O >> $ofile
+gmt psxy -T  -O >> $ofile.ps
 
-gmt psconvert -Tf -A0.5 $ofile
-echo $0: written to $ofile and `echo $ofile | sed 's/\.ps/.pdf/'`
+modifybb $ofile.ps 1
+echo $0: written to $ofile.pdf
+
