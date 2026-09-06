@@ -13,7 +13,7 @@
 #   modes    space separated list of modes, or "all" (all)
 #   geometry geometry file name without .in (test)
 #   rtol     KSP relative tolerance (1e-6)
-#   rfac     near-field radius in mean patch lengths (4)
+#   rfac     near-field radius in mean patch lengths sqrt(area) (4)
 #   backend  H-matrix backend options, quoted (hmmvp, block-relative 1e-3)
 #
 # modes:
@@ -54,9 +54,8 @@ if [ "$modes" = "all" ];then
 fi
 export OMP_NUM_THREADS=1
 
-rnear=$(gawk -v f=$rfac '{s+=2*$6;n++}END{printf("%g",f*s/n)}' $g.in)
 npatch=$(gawk 'END{print NR}' $g.in)
-echo $0: $npatch patches, near-field radius $rnear \($rfac patch lengths\), backend: $backend
+echo $0: $npatch patches, near-field radius $rfac mean patch lengths \(computed from the patch areas\), backend: $backend
 
 common="-geom_file $g.in -skip_dense -nrandom 0 -nsolve 0 -test_forward 0"
 monitor="-htool_ksp_converged_reason -htool_ksp_monitor_true_residual -htool_ksp_norm_type unpreconditioned -htool_ksp_rtol $rtol -htool_ksp_max_it $maxit"
@@ -69,8 +68,8 @@ for mode in $modes;do
     case $mode in
 	1) options="-htool_ksp_type fgmres -htool_ksp_gmres_restart 2000 -htool_pc_type none";;
 	2) options="-htool_ksp_type gmres -htool_pc_type none";;
-	3) options="-htool_ksp_type gmres -near_pc_radius $rnear -htool_pc_type asm -htool_sub_pc_type lu";;
-	4) options="-htool_ksp_type bcgs  -near_pc_radius $rnear -htool_pc_type asm -htool_sub_pc_type lu";;
+	3) options="-htool_ksp_type gmres -near_pc_rfac $rfac -htool_pc_type asm -htool_sub_pc_type lu";;
+	4) options="-htool_ksp_type bcgs  -near_pc_rfac $rfac -htool_pc_type asm -htool_sub_pc_type lu";;
 	*) echo $0: mode $mode undefined; continue;;
     esac
     log=log.$mode.dat

@@ -12,7 +12,7 @@
 #   modes    space separated list of modes to run, or "all" (all)
 #   geometry geometry file name without .in (test)
 #   rtol     KSP relative tolerance (1e-6)
-#   rfac     near-field radius in units of the mean patch length (4)
+#   rfac     near-field radius in units of the mean patch length sqrt(area) (4)
 #
 # modes (all use -npsfse, i.e. slip only, unless noted):
 #
@@ -55,11 +55,10 @@ EOF
 
 export OMP_NUM_THREADS=1
 
-# near-field radius from the mean patch length (2 * half-length,
-# column 6 of the geometry file), in geometry units
-rnear=$(gawk -v f=$rfac '{s+=2*$6;n++}END{printf("%g",f*s/n)}' $g.in)
+# the near-field radius is computed inside the code as rfac times the
+# mean patch length sqrt(area), so this also works for triangles
 npatch=$(gawk 'END{print NR}' $g.in)
-echo $0: $npatch patches, mean patch length $(gawk -v r=$rnear -v f=$rfac 'BEGIN{printf("%g",r/f)}'), near-field radius $rnear \($rfac patch lengths\)
+echo $0: $npatch patches, near-field radius $rfac mean patch lengths \(computed by interact from the patch areas\)
 
 # KSP monitoring common to all modes
 monitor="-ksp_converged_reason -ksp_monitor_true_residual -ksp_norm_type unpreconditioned -ksp_rtol $rtol -ksp_max_it $maxit -log_view"
@@ -73,11 +72,11 @@ for mode in $modes;do
     case $mode in
 	1) options="-ksp_type fgmres -ksp_gmres_restart 2000 -ksp_gmres_modifiedgramschmidt -pc_type jacobi";;
 	2) options="-ksp_type fgmres -ksp_gmres_restart 2000 -pc_type none";;
-	3) options="-ksp_type gmres -near_pc_radius $rnear -pc_type asm -sub_pc_type lu";;
-	4) options="-ksp_type gmres -near_pc_radius $rnear -pc_type asm -sub_pc_type ilu";;
-	5) options="-ksp_type bcgs  -near_pc_radius $rnear -pc_type asm -sub_pc_type lu";;
-	6) options="-ksp_type gmres -near_pc_radius $rnear -pc_type bjacobi -sub_pc_type lu";;
-	7) options="-ksp_type gmres -near_pc_radius $rnear -pc_type asm -sub_pc_type lu"; psfse="";;
+	3) options="-ksp_type gmres -near_pc_rfac $rfac -pc_type asm -sub_pc_type lu";;
+	4) options="-ksp_type gmres -near_pc_rfac $rfac -pc_type asm -sub_pc_type ilu";;
+	5) options="-ksp_type bcgs  -near_pc_rfac $rfac -pc_type asm -sub_pc_type lu";;
+	6) options="-ksp_type gmres -near_pc_rfac $rfac -pc_type bjacobi -sub_pc_type lu";;
+	7) options="-ksp_type gmres -near_pc_rfac $rfac -pc_type asm -sub_pc_type lu"; psfse="";;
 	*) echo $0: mode $mode undefined; continue;;
     esac
     log=log.$mode.dat

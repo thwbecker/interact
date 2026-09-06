@@ -18,6 +18,7 @@ PetscErrorCode rsf_ODE_RHSFunction(TS, PetscReal, Vec, Vec, void*);
 PetscErrorCode rsf_TS_Monitor(TS, PetscInt, PetscReal, Vec, void*);
 PetscErrorCode rsf_write_checkpoint(TS, Vec, struct rsf_out_ctx *);
 PetscErrorCode rsf_read_checkpoint(const char *, Vec, struct rsf_out_ctx *, PetscReal *, PetscReal *, PetscInt *);
+PetscReal get_near_pc_radius(struct med *, struct flt *, const char *);
 PetscErrorCode time_solves(Mat , Mat , PetscInt , PetscReal *,PetscInt *, KSPConvergedReason *);
 PetscErrorCode rsf_domain_check(TS, PetscReal, Vec, PetscBool*);
 /* shared between the explicit and IMEX paths (rsf_engine.c) */

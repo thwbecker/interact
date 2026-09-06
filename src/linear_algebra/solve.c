@@ -13,6 +13,9 @@
 
 */
 #include "interact.h"
+#ifdef USE_PETSC
+#include "petsc_prototypes.h"	/* get_near_pc_radius */
+#endif
 
 int solve(struct med *medium,struct flt *fault)
 {
@@ -292,6 +295,7 @@ int solve(struct med *medium,struct flt *fault)
       medium->rn = medium->re  - medium->rs; /* number of local elements */
       /* 
 	 optional near-field sparse preconditioner: -near_pc_radius r
+	 or -near_pc_rfac f (f mean patch lengths, see get_near_pc_radius)
 	 keeps the entries of A with |x_rec - x_src| < r in a
 	 distributed AIJ matrix Pnear with the same row layout, which is
 	 handed to the KSP as the preconditioning matrix (the operator
@@ -300,8 +304,7 @@ int solve(struct med *medium,struct flt *fault)
 	 work and ignore Pnear. r is in the geometry length units.
 	 EXPERIMENTAL 
       */
-      medium->near_pc_radius = -1.0;
-      PetscCall(PetscOptionsGetReal(NULL,NULL,"-near_pc_radius",&medium->near_pc_radius,NULL));
+      medium->near_pc_radius = get_near_pc_radius(medium,fault,"solve");
       medium->Pnear = NULL;
       if(medium->near_pc_radius > 0.0){
 	PetscCall(MatCreate(PETSC_COMM_WORLD, &(medium->Pnear)));

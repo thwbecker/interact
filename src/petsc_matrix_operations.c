@@ -372,6 +372,54 @@ void report_hmat_storage(struct med *medium, const char *backend,
 	      backend,(long)m,(long)n);
   }
 }
+
+/* 
+   near-field preconditioner radius from the command line, shared by
+   interact's solve() and calc_petsc_Isn_matrices:
+
+   -near_pc_rfac f     radius = f * mean over patches of sqrt(area),
+                       i.e. f mean patch lengths; works for rectangles,
+                       triangles, iquads and 2-D segments alike
+   -near_pc_radius r   absolute radius in geometry length units
+
+   returns the radius (<= 0: preconditioner off). aborts if an option
+   is present but has no usable value (e.g. an empty shell variable
+   left "-near_pc_radius -pc_type ..." on the command line), since the
+   PC would otherwise silently run on the dense operator or fail with
+   "No method increaseoverlap for Mat of type mpidense"
+*/
+PetscReal get_near_pc_radius(struct med *medium, struct flt *fault, const char *caller)
+{
+  PetscReal radius = -1.0, rfac = -1.0, mean_len;
+  PetscBool has_r = PETSC_FALSE, has_f = PETSC_FALSE;
+  int i;
+  PetscOptionsGetReal(NULL,NULL,"-near_pc_radius",&radius,NULL);
+  PetscOptionsHasName(NULL,NULL,"-near_pc_radius",&has_r);
+  PetscOptionsGetReal(NULL,NULL,"-near_pc_rfac",&rfac,NULL);
+  PetscOptionsHasName(NULL,NULL,"-near_pc_rfac",&has_f);
+  if(has_r && has_f){
+    HEADNODE
+      fprintf(stderr,"%s: give either -near_pc_radius or -near_pc_rfac, not both\n",caller);
+    MPI_Abort(MPI_COMM_WORLD,-1);
+  }
+  if((has_r && (radius <= 0.0)) || (has_f && (rfac <= 0.0))){
+    HEADNODE
+      fprintf(stderr,"%s: -near_pc_radius (%g) or -near_pc_rfac (%g) given but not > 0 (missing value on the command line?)\n",
+	      caller,(double)radius,(double)rfac);
+    MPI_Abort(MPI_COMM_WORLD,-1);
+  }
+  if(has_f){
+    for(mean_len=0.0,i=0;i < medium->nrflt;i++)
+      mean_len += sqrt(fabs((double)fault[i].area));
+    mean_len /= (PetscReal)medium->nrflt;
+    radius = rfac * mean_len;
+    HEADNODE
+      fprintf(stderr,"%s: near-field radius %g = %g times mean patch length sqrt(area) %g\n",
+	      caller,(double)radius,(double)rfac,(double)mean_len);
+  }
+  return radius;
+}
+
 /* 
    compute an interaction matrix for slip_dir 
    
@@ -751,7 +799,8 @@ PetscErrorCode calc_petsc_Isn_matrices(struct med *medium, struct flt *fault,
 
   /* 
      optional near-field sparse preconditioner matrix (same idea as in
-     interact's solve()): -near_pc_radius r > 0 evaluates the kernel for
+     interact's solve()): -near_pc_radius r or -near_pc_rfac f (see
+     get_near_pc_radius) evaluates the kernel for
      all source-receiver pairs closer than r and stores them, scaled, in
      the distributed AIJ matrix medium->Pnear with the row layout of
      *this_mat. callers can pass it to KSPSetOperators() as the
@@ -766,8 +815,7 @@ PetscErrorCode calc_petsc_Isn_matrices(struct med *medium, struct flt *fault,
     PetscInt ii,jj,nn,*pcol;
     PetscScalar *pval;
     MatInfo pinfo;
-    medium->near_pc_radius = -1.0;
-    PetscCall(PetscOptionsGetReal(NULL,NULL,"-near_pc_radius",&medium->near_pc_radius,NULL));
+    medium->near_pc_radius = get_near_pc_radius(medium,fault,"calc_petsc_Isn_matrices");
     if(medium->Pnear)
       PetscCall(MatDestroy(&medium->Pnear));
     medium->Pnear = NULL;

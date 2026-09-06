@@ -722,11 +722,12 @@ void phelp(void)
   PE(" -fpetsc");
   PE("     force Petsc solvers even for serial runs (else LAPACK for LU)");
   PE("");
-  PE(" -near_pc_radius value");
+  PE(" -near_pc_radius value   or   -near_pc_rfac factor");
   PE("     for the Petsc one-step solve, also assemble a sparse matrix from the A entries with");
-  PE("     source-receiver distance < value (geometry length units) and hand it to the KSP as");
-  PE("     the preconditioning matrix. Use with e.g. -pc_type asm -sub_pc_type lu (or ilu);");
-  PE("     -pc_type jacobi/none ignore it. Off by default. Experimental.");
+  PE("     source-receiver distance < radius and hand it to the KSP as the preconditioning");
+  PE("     matrix. The radius is either given directly (geometry length units) or as factor");
+  PE("     times the mean patch length sqrt(area) (e.g. -near_pc_rfac 4). Use with e.g.");
+  PE("     -pc_type asm -sub_pc_type lu (or ilu); -pc_type jacobi/none ignore it. Off by default.");
   PE("");
 #endif
   PE(" -npsfse");
