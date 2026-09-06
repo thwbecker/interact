@@ -142,34 +142,31 @@ preconditioner a few seconds to a minute.
 
 ## 4. Recommendation for production solves of the full UCERF set
 
-Primary: H-matrix solve with compress_interaction_matrix
+For general boundary conditions (which is what the experiments need)
+the dense interact route is the only one available, and with the
+near-field preconditioner its solve is no longer the bottleneck:
 
-    compress_interaction_matrix -geom_file geom.in -skip_dense -nrandom 0 -nsolve 0 -test_forward 0 \
-      -use_hmatrix 4 -hmmvp_inorm 1 -hmmvp_tol 1e-3 \
-      -near_pc_rfac 4 -htool_ksp_type gmres -htool_pc_type asm -htool_sub_pc_type lu \
-      -htool_ksp_norm_type unpreconditioned -htool_ksp_rtol 1e-6 -htool_ksp_max_it 2000 \
-      -htool_ksp_converged_reason
+    interact [-npsfse] -geom geom.in -near_pc_rfac 4 -ksp_type gmres -pc_type asm -sub_pc_type lu \
+      -ksp_norm_type unpreconditioned -ksp_rtol 1e-6 -ksp_max_it 5000 -ksp_converged_reason
 
-Expected at 265k on 64 ranks: minutes of assembly, tens of iterations,
-seconds of solve, operator error about 1e-4 in slip.
+`ucerf/load_test/run_production` wraps exactly this: geometry, bc
+file, stress evaluation on/off, output tag, and checks the convergence
+reason. Expected at 265k on 64 ranks: about 2 h assembly, another 2 h
+for the post-slip stress evaluation if requested, 560 GB distributed
+memory, about a minute of solve. Use `-npsfse` (stress 0) while
+exploring boundary conditions, and evaluate stresses only for the runs
+that are kept.
 
-Backup: dense solve with interact, only if the H solve does not
-converge or the problem needs general boundary conditions
+Fallback (`solver safe` in the script): fgmres(2000) without
+preconditioner. It converges on these operators but needs about 25x
+the iterations (12 minutes instead of 30 s at 100k on 16 ranks). Only
+for the case that the preconditioned solve reports a non-converged
+reason; the first thing to try before that is rfac 6.
 
-    interact -npsfse -geom geom.in -near_pc_rfac 4 -ksp_type gmres -pc_type asm -sub_pc_type lu \
-      -ksp_norm_type unpreconditioned -ksp_rtol 1e-6 -ksp_max_it 2000 -ksp_converged_reason
-
-Expected at 265k on 64 ranks: about 2 h assembly (plus 2 h stress
-pass without -npsfse), 560 GB distributed, a minute of solve.
-
-Independent check (recommended once per geometry): repeat the H solve
-with `-use_hmatrix 3 -hacapk_ztol 1e-4` and compare flt.dat; the two
-operators are approximated differently, so agreement to about 1e-4 in
-the relative L2 slip norm indicates the operator error is under
-control. Disagreement points to the tolerance, not the solver.
-
-`ucerf/run_production` implements this sequence (H solve, optional
-HACApK cross-check, dense fallback) with the convergence checks.
+The H-matrix route (compress_interaction_matrix, `solve_test/run_test`)
+removes the two N^2 Okada passes and the memory requirement but only
+solves the uniform b = 1 strike problem; it is the option to develop
+if the dense assembly time becomes limiting.
 
 ## 5. Open items
 

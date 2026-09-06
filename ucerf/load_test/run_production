@@ -1,0 +1,113 @@
+#!/bin/bash
+#
+# one-step interact solve of a large fault geometry (e.g. UCERF) with
+# the dense operator and the solver settings that performed best in
+# the load_test runs (see run_model and ../SOLVER_NOTES.md):
+#
+#   gmres(30) with the near-field preconditioner (-near_pc_rfac 4,
+#   -pc_type asm -sub_pc_type lu), rtol on the true residual.
+#
+#   100k patches, 16 ranks: 20 iterations, 33 s solve, vs. 490
+#   iterations and 733 s for fgmres(2000)/jacobi. Assembly (about
+#   3770 s) and the optional post-slip stress evaluation (about the
+#   same) dominate the run time; both scale with N^2/ncore.
+#
+# usage: run_production [ncore] [geometry] [bcfile] [stress] [tag] [solver] [rtol] [rfac]
+#
+#   ncore    MPI ranks (16)
+#   geometry geometry file name without .in (geom)
+#   bcfile   boundary condition file to use as bc.in (bc.in, i.e. use
+#            the existing one; if missing, a unit strike stress drop on
+#            all patches is written)
+#   stress   1: evaluate post-slip stresses (full flt.dat, doubles the
+#            run time), 0: slip only (-npsfse) (1)
+#   tag      output name: flt.<tag>.dat, log.<tag>.dat (prod)
+#   solver   fast: gmres(30), near-field asm/lu (default)
+#            safe: fgmres(2000), no preconditioner (25x more iterations,
+#            known to converge; only if fast does not)
+#   rtol     KSP relative tolerance, true residual norm (1e-6)
+#   rfac     near-field radius in mean patch lengths (4; 6 halves the
+#            iteration count again at a few times the sparse-matrix memory)
+#
+# the script checks the KSP convergence reason and exits non-zero if
+# the solve did not converge (flt.dat is then still written by
+# interact but renamed flt.<tag>.FAILED.dat).
+#
+ncore=${1-16}
+g=${2-geom}
+bcfile=${3-bc.in}
+stress=${4-1}
+tag=${5-prod}
+solver=${6-fast}
+rtol=${7-1e-6}
+rfac=${8-4}
+
+maxit=5000
+bin=interact			# assumed in PATH
+
+if [ ! -s $g.in ];then
+    echo $0: geometry file $g.in not found
+    exit 1
+fi
+if [ "$bcfile" != "bc.in" ];then
+    if [ ! -s $bcfile ];then
+	echo $0: boundary condition file $bcfile not found
+	exit 1
+    fi
+    cp $bcfile bc.in
+elif [ ! -s bc.in ];then
+    echo $0: no bc.in, writing unit strike stress drop on all patches
+    cat <<EOF > bc.in
+1 0
+-1 -1 -1 10 1
+EOF
+fi
+export OMP_NUM_THREADS=1
+
+case $solver in
+    fast) options="-ksp_type gmres -near_pc_rfac $rfac -pc_type asm -sub_pc_type lu";;
+    safe) options="-ksp_type fgmres -ksp_gmres_restart 2000 -pc_type none";;
+    *) echo $0: solver $solver undefined \(fast or safe\); exit 1;;
+esac
+if [ $stress = 1 ];then psfse=""; else psfse="-npsfse"; fi
+monitor="-ksp_norm_type unpreconditioned -ksp_rtol $rtol -ksp_max_it $maxit -ksp_converged_reason -ksp_monitor_true_residual"
+
+npatch=$(gawk 'END{print NR}' $g.in)
+log=log.$tag.dat
+echo $0: $npatch patches, $ncore ranks, bc from $bcfile, stress evaluation $stress, solver $solver
+echo $0: interact $psfse -geom $g.in $options
+t0=$(date +%s.%N)
+mpirun -bind-to core -np $ncore $bin $psfse -geom $g.in $options $monitor > $log 2>&1
+rc=$?
+t1=$(date +%s.%N)
+total=$(gawk -v a=$t0 -v b=$t1 'BEGIN{printf("%.1f",b-a)}')
+
+its=$(gawk '/Linear solve/{print $NF}' $log)
+reason=$(gawk '/Linear solve/{print $(NF-2)}' $log)
+tasm=$(gawk '/solve: parallel assembly done/{for(i=1;i<=NF;i++)if($i=="s")print $(i-1)}' $log)
+tend=$(gawk '/solve: parallel solve completed/{for(i=1;i<=NF;i++)if($i=="s")print $(i-1)}' $log)
+tsol=$(gawk -v a=$tasm -v b=$tend 'BEGIN{if(a!=""&&b!="")printf("%.2f",b-a);else print "-"}')
+tps=$(gawk '/par_add_solution_stress:.*ranks,/{print $(NF-1)}' $log)
+if [ -z "$tps" ];then tps="-"; fi
+if [ -z "$tasm" ];then tasm="-"; fi
+if [ -z "$its" ];then its="-"; fi
+if [ -z "$reason" ];then reason="FAILED_rc_$rc"; fi
+
+if [ ! -s production.dat ];then
+    echo "# tag ncore npatch rtol its reason assembly_s solve_s stress_s total_s bcfile settings" > production.dat
+fi
+echo "$tag $ncore $npatch $rtol $its $reason $tasm $tsol $tps $total $bcfile \"$options $psfse\"" >> production.dat
+
+if [ $rc -eq 0 ] && [ -s flt.dat ] && [ "$reason" = "CONVERGED_RTOL" ];then
+    mv flt.dat flt.$tag.dat
+    echo $0: converged in $its iterations, assembly $tasm s, solve $tsol s, stress eval $tps s, total $total s
+    echo $0: solution in flt.$tag.dat, log in $log
+    exit 0
+else
+    if [ -s flt.dat ];then mv flt.dat flt.$tag.FAILED.dat; fi
+    echo $0: solve NOT converged \($reason, $its iterations\), see $log
+    if [ $solver = fast ];then
+	echo $0: retry with a larger radius \(rfac 6\) or with solver safe
+    fi
+    exit 1
+fi
