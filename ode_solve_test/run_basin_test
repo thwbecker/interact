@@ -9,7 +9,7 @@
 #            exponent and test basin self-similarity; 7/8: same for
 #            the period 4/6 case
 #
-modes=${1-"1 2 3 4 5 6 7 8"}
+modes=${1-"1 2 3 4 5 6 7 8 9 10 11"} 	# 7,8,9,10 are additional zoom ins, 11 for alpha computation
 np=${2-16}
 
 k_46=0.8577 			# approximate k for coexistence of period 4 and 6
@@ -23,6 +23,7 @@ emax=2.5e-3
 # higher resolution eigenplane runs
 nsample_hi=513
 emax_zoom=5e-4
+emax_zoom2=1.25e-4
 
 odir=basin_files/
 mkdir -p $odir
@@ -58,5 +59,17 @@ for mode in $modes;do
 	mpirun -np $np ./bin/basin_rs2 -knd $k_46 -eig_plane -n1 $nsample_hi -n2 $nsample_hi \
 	       -e1min -$emax_zoom -e1max $emax_zoom -e2min -$emax_zoom -e2max $emax_zoom \
 	       -t_trans $t_trans -t_run $t_run -oprefix $odir/b77e_513z
+    elif [ $mode = 9 ];then	# further zoom
+	mpirun -np $np ./bin/basin_rs2 -knd $k_4c -eig_plane -n1 $nsample_hi -n2 $nsample_hi \
+	       -e1min -$emax_zoom2 -e1max $emax_zoom2 -e2min -$emax_zoom2 -e2max $emax_zoom2 \
+	       -t_trans $t_trans -t_run $t_run -oprefix $odir/b74e_513zz
+    elif [ $mode = 10 ];then	# further zoom
+	mpirun -np $np ./bin/basin_rs2 -knd $k_46 -eig_plane -n1 $nsample_hi -n2 $nsample_hi \
+	       -e1min -$emax_zoom2 -e1max $emax_zoom2 -e2min -$emax_zoom2 -e2max $emax_zoom2 \
+	       -t_trans $t_trans -t_run $t_run -oprefix $odir/b77e_513zz
+    elif [ $mode = 11 ];then	# shifted
+	mpirun -np $np ./bin/basin_rs2 -knd $k_4c -eig_plane -n1 $nsample_hi -n2 $nsample_hi \
+	       -e1min 9.5e-4 -e1max 1.05e-3 -e2min -5e-5 -e2max 5e-5 \
+	       -t_trans $t_trans -t_run $t_run -oprefix $odir/b74e_patch
     fi
 done

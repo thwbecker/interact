@@ -1,5 +1,13 @@
 #!/bin/bash
+# analyze the minority basin strucutre
+#
 # run run_basin_test first
+#
+# large, zoom, double zoom
+
 python3 basin_analyze.py basin_files/b74e basin_files/b77e \
-        basin_files/b74e_513z basin_files/b77e_513z > balog.dat
+        basin_files/b74e_513z basin_files/b77e_513z \
+	basin_files/b74e_513zz  basin_files/b77e_513zz  \
+	basin_files/b74e_patch \
+	> balog.dat
 
