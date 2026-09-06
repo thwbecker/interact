@@ -17,7 +17,7 @@ lclip=${4-0}			# 0: automatic lambda_1 scale
 tmpn=`mktemp`
 trap "rm -f $tmpn*" EXIT
 
-prefixes="$p1"
+prefixes="basin_files/$p1"
 if [ "X$p2" != "X" ];then
     prefixes="basin_files/$p1 basin_files/$p2"
 fi
@@ -37,10 +37,11 @@ for p in $prefixes;do
     # header for label
     knd[$np]=`gawk '{if($2=="knd"){print($3);exit}}' $p.0.dat`
     # period map: chaotic = -1, unclassified skipped
-    gawk '{if($7==0)print($1*1e3,$2*1e3,$6);else if($7==1)print($1*1e3,$2*1e3,-1)}' \
+    gawk '{if($7==0)printf("%.12g %.12g %g\n",$1*1e3,$2*1e3,$6);
+	   else if($7==1)printf("%.12g %.12g -1\n",$1*1e3,$2*1e3)}' \
 	 $tmpn.$np.d > $tmpn.$np.per
     # lambda_1 map, scaled by 1e3, unclassified (e.g. fixed point) skipped
-    gawk '{if($7!=2)print($1*1e3,$2*1e3,$3*1e3)}' $tmpn.$np.d > $tmpn.$np.lam
+    gawk '{if($7!=2)printf("%.12g %.12g %.12g\n",$1*1e3,$2*1e3,$3*1e3)}' $tmpn.$np.d > $tmpn.$np.lam
     allper="$allper "`gawk '{print($3)}' $tmpn.$np.per | sort -g | uniq`
     lm=`gawk 'BEGIN{m=0}{if($3>m)m=$3}END{print(m)}' $tmpn.$np.lam`
     lmax=`echo $lmax $lm | gawk '{print(($1>$2)?$1:$2)}'`

@@ -3,6 +3,12 @@
 # compute regular (x-y) or Hopf eigenvector eps_1 eps_2 perturbations around critical values
 # to get an estimate of the basin structure 
 #
+# modes 1/2: coordinate plane, 3/4: unstable eigenplane (257^2)
+# modes 5/6: eigenplane at higher resolution (513^2), full window and
+#            4x zoom, to extend the scaling range of the uncertainty
+#            exponent and test basin self-similarity; 7/8: same for
+#            the period 4/6 case
+#
 modes=${1-"1 2 3 4"}
 np=${2-16}
 
@@ -14,8 +20,12 @@ t_run=10000
 
 nsample=257
 emax=2.5e-3
+# higher resolution eigenplane runs
+nsample_hi=513
+emax_zoom=5e-4
 
 odir=basin_files/
+mkdir -p $odir
 
 for mode in $modes;do
     
@@ -33,5 +43,20 @@ for mode in $modes;do
 	mpirun -np $np ./bin/basin_rs2 -knd $k_46 -eig_plane -n1 $nsample -n2 $nsample \
 	       -e1min -$emax -e1max $emax -e2min -$emax -e2max $emax \
 	       -t_trans $t_trans -t_run $t_run -oprefix $odir/b77e
+    elif [ $mode = 5 ];then
+	mpirun -np $np ./bin/basin_rs2 -knd $k_4c -eig_plane -n1 $nsample_hi -n2 $nsample_hi \
+	       -t_trans $t_trans -t_run $t_run -oprefix $odir/b74e_513
+    elif [ $mode = 6 ];then
+	mpirun -np $np ./bin/basin_rs2 -knd $k_4c -eig_plane -n1 $nsample_hi -n2 $nsample_hi \
+	       -e1min -$emax_zoom -e1max $emax_zoom -e2min -$emax_zoom -e2max $emax_zoom \
+	       -t_trans $t_trans -t_run $t_run -oprefix $odir/b74e_513z
+    elif [ $mode = 7 ];then
+	mpirun -np $np ./bin/basin_rs2 -knd $k_46 -eig_plane -n1 $nsample_hi -n2 $nsample_hi \
+	       -e1min -$emax -e1max $emax -e2min -$emax -e2max $emax \
+	       -t_trans $t_trans -t_run $t_run -oprefix $odir/b77e_513
+    elif [ $mode = 8 ];then
+	mpirun -np $np ./bin/basin_rs2 -knd $k_46 -eig_plane -n1 $nsample_hi -n2 $nsample_hi \
+	       -e1min -$emax_zoom -e1max $emax_zoom -e2min -$emax_zoom -e2max $emax_zoom \
+	       -t_trans $t_trans -t_run $t_run -oprefix $odir/b77e_513z
     fi
 done
