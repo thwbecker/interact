@@ -1,0 +1,17 @@
+#!/bin/bash
+RTOL=1e-4 ./run_bp3 0.025 90  1e-9 bp3_d90_n_25m 1500  1 "-calc_sigma_dot"
+RTOL=1e-4 ./run_bp3 0.025 90 -1e-9 bp3_d90_t_25m 1500 -1 "-calc_sigma_dot"
+
+
+RTOL=1e-5 ./run_bp3 0.025 60  1e-9 bp3_d60_n_25m_r5 1500  1 "-calc_sigma_dot"
+RTOL=1e-5 ./run_bp3 0.025 60 -1e-9 bp3_d60_t_25m_r5 1500 -1 "-calc_sigma_dot"
+
+RTOL=1e-6 ./run_bp3 0.025 60  1e-9 bp3_d60_n_25m_r6 1500  1 "-calc_sigma_dot"
+RTOL=1e-6 ./run_bp3 0.025 60 -1e-9 bp3_d60_t_25m_r6 1500 -1 "-calc_sigma_dot"
+
+
+RTOL=1e-5 ./run_bp3 0.025 30  1e-9 bp3_d30_n_25m_r5 1500  1 "-calc_sigma_dot"
+RTOL=1e-5 ./run_bp3 0.025 30 -1e-9 bp3_d30_t_25m_r5 1500 -1 "-calc_sigma_dot"
+
+
+#RTOL=1e-5 ./run_bp3 0.025 60 <vpl> bp3_d60_<b>_25m_imex 1500 <branch> "-calc_sigma_dot -imex"

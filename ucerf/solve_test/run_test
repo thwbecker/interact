@@ -32,7 +32,8 @@
 #
 # output per mode: log.<mode>.dat, flt.<mode>.dat, and a line in
 # summary.dat (iterations, timings, slip difference to the first mode
-# run and, if present, to ../load_test/flt.<refmode>.dat from run_model).
+# run and, if present, to the interact solution ../load_test/flt.3.dat,
+# flt.7.dat or flt.1.dat from run_model, whichever exists first).
 #
 ncore=${1-2}
 modes=${2-all}
@@ -43,7 +44,11 @@ backend=${6-"-use_hmatrix 4 -hmmvp_inorm 1 -hmmvp_tol 1e-3"}
 
 maxit=20000
 bin=compress_interaction_matrix	# assumed in PATH
-dense_ref=../load_test/flt.3.dat	# interact solution to compare with, if it exists
+# interact (dense) solution to compare with: first existing of these
+dense_ref=""
+for f in ../load_test/flt.3.dat ../load_test/flt.7.dat ../load_test/flt.1.dat;do
+    if [ -s $f ] && [ -z "$dense_ref" ];then dense_ref=$f; fi
+done
 
 if [ ! -s $g.in ];then
     echo $0: geometry file $g.in not found
@@ -96,13 +101,13 @@ for mode in $modes;do
     fi
     # relative L2 difference of the strike slip (column 6 of flt.dat) to the reference
     diff=$(paste flt.$ref.dat flt.$mode.dat | gawk '$1!~/^#/{d=$6-$19;s+=d*d;r+=$6*$6}END{printf("%.3e",sqrt(s/r))}')
-    if [ -s $dense_ref ];then
+    if [ -n "$dense_ref" ];then
 	ddiff=$(paste $dense_ref flt.$mode.dat | gawk '$1!~/^#/{d=$6-$19;s+=d*d;r+=$6*$6}END{printf("%.3e",sqrt(s/r))}')
     else
 	ddiff="-"
     fi
     echo "$mode $ncore $npatch $rtol $its $reason $tasm $tsol $total $ratio $diff $ref $ddiff \"$backend $options\"" >> summary.dat
-    echo $0: mode $mode: $its iterations \($reason\), H assembly $tasm s, solve $tsol s, total $total s, ratio $ratio, slip diff to mode $ref: $diff, to dense: $ddiff
+    echo $0: mode $mode: $its iterations \($reason\), H assembly $tasm s, solve $tsol s, total $total s, ratio $ratio, slip diff to mode $ref: $diff, to dense \($dense_ref\): $ddiff
     ./plot_sol $g flt.$mode
 done
 echo $0: summary in summary.dat

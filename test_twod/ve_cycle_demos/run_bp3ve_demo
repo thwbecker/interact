@@ -73,12 +73,12 @@ stop=${3-1500}
 sigma=${4-1}
 ds=${5-0.6667}
 grav=${6-1}
-extra=${7-}			# extra rsf_solve options, e.g. "-imex"
+extra=${7-""}			# extra rsf_solve options, e.g. "-imex"
 ncore=${8-1}			# cores for KERNEL GENERATION (the slow part)
 branch=${9-1}			# +1 normal-sense, -1 thrust
 case "$branch" in
-    1|+1) vpl=1e-9;  bname=NORMAL ;;
-    -1)   vpl=-1e-9; bname=THRUST ;;
+    1|+1) vpl=1e-9;  bname=NORMAL; branch=1 ;;
+    -1)   vpl=-1e-9; bname=THRUST; branch=-1 ;;
     *) echo "$0: branch must be +1 (normal) or -1 (thrust)"; exit 1 ;;
 esac
 echo "$0: $bname branch (vpl $vpl)"
@@ -113,7 +113,7 @@ echo $branch > branch.txt
 python3 $sdir/../../seas_bp_tests/bp3/gen_bp3.py $ds 60 bp3 $branch > gen.log
 common="-geom_file bp3_geom.in -rsf_file bp3_rsf.dat -rsf_ic_file bp3_ic.in \
  -dc 0.008 -sigma_init 5e7 -f0 0.6 -v0 1e-6 -vpl $vpl \
- -shear_modulus 3.204e10 -s_wave_speed 3464 -rtol 1e-4 -ts_rk_type 3bs \
+ -shear_modulus 3.204e10 -s_wave_speed 3464 -rtol 1e-5 -ts_rk_type 3bs \
  -ts_max_steps 2000000000 -dt_monitor_yr 10 -track_events -rsf_catalog \
  -vel_event 1e-3 -rsf_checkpoint 20000 -rsf_checkpoint_wall 60 \
  -rsf_stations bp3_stations.dat -rsf_station_dt_yr 0.5 \

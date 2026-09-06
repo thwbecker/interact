@@ -54,7 +54,8 @@ branch=${6-1}		# +1 normal-sense, -1 thrust
 # directories and can sit side by side in one working directory
 sfx=; [ "$branch" = "-1" ] && sfx=_thrust
 g1=ve_g1$sfx; g0=ve_g0$sfx; vs=ve_shear$sfx
-extra="-imex"		# fine meshes with sigma coupling need it
+#extra="-imex"		# fine meshes with sigma coupling need it
+extra=""
 np=5
 
 trunc_shear ()		# derive shear-only kernels from a two-family file
