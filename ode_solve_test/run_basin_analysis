@@ -1,0 +1,5 @@
+#!/bin/bash
+# run run_basin_test first
+python3 basin_analyze.py basin_files/b74e basin_files/b77e \
+        basin_files/b74e_513z basin_files/b77e_513z > balog.dat
+

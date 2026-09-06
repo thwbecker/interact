@@ -12,21 +12,33 @@
 p1=${1-basin_08574}
 p2=${2-basin_08577}
 ofile=${3-basins}		# without .ps
-lclip=${4-0}			# 0: automatic lambda_1 scale
+eps_scale=${4-1e3}		# scale for perturbation
+
+lclip=0			# 0: automatic Lyapunov scale, or clip?
 
 tmpn=`mktemp`
 trap "rm -f $tmpn*" EXIT
 
-prefixes="basin_files/$p1"
+prefixes="basin_files/$p1"	# input ddirectory
 if [ "X$p2" != "X" ];then
     prefixes="basin_files/$p1 basin_files/$p2"
 fi
 
+eps_scale_label=`echo $eps_scale | gawk '{print(1/$1)}' | gawk -f log10.awk | gawk '{printf("10@+%g@+",$1)}'`
+
+if [ $eps_scale = "1e3" ];then
+    add_box=1
+else
+    add_box=0
+fi
+echo $0: eps scale $eps_scale label $eps_scale_label add_box $add_box
+
+
 # panel layout
 pwidth=4.5			# panel width 
 proj=-JX$pwidth/$pwidth
-dx=5.5				# panel offsets
-dy=5.5
+dx=5.125				# panel offsets
+dy=5.25
 
 # collect data, determine common period levels and lambda range
 np=0
@@ -37,11 +49,11 @@ for p in $prefixes;do
     # header for label
     knd[$np]=`gawk '{if($2=="knd"){print($3);exit}}' $p.0.dat`
     # period map: chaotic = -1, unclassified skipped
-    gawk '{if($7==0)printf("%.12g %.12g %g\n",$1*1e3,$2*1e3,$6);
-	   else if($7==1)printf("%.12g %.12g -1\n",$1*1e3,$2*1e3)}' \
+    gawk -v s=$eps_scale '{if($7==0)printf("%.12g %.12g %g\n",$1*s,$2*s,$6);
+	   else if($7==1)printf("%.12g %.12g -1\n",$1*s,$2*s)}' \
 	 $tmpn.$np.d > $tmpn.$np.per
-    # lambda_1 map, scaled by 1e3, unclassified (e.g. fixed point) skipped
-    gawk '{if($7!=2)printf("%.12g %.12g %.12g\n",$1*1e3,$2*1e3,$3*1e3)}' $tmpn.$np.d > $tmpn.$np.lam
+    # lambda_1 map, scaled by $pse_sclae, unclassified (e.g. fixed point) skipped
+    gawk -v s=$eps_scale '{if($7!=2)printf("%.12g %.12g %.12g\n",$1*s,$2*s,$3*1e3)}' $tmpn.$np.d > $tmpn.$np.lam
     allper="$allper "`gawk '{print($3)}' $tmpn.$np.per | sort -g | uniq`
     lm=`gawk 'BEGIN{m=0}{if($3>m)m=$3}END{print(m)}' $tmpn.$np.lam`
     lmax=`echo $lmax $lm | gawk '{print(($1>$2)?$1:$2)}'`
@@ -49,13 +61,15 @@ for p in $prefixes;do
 done
 pvals=`echo $allper | tr ' ' '\n' | sort -g | uniq`
 if [ `echo $lclip | gawk '{print(($1>0)?1:0)}'` -eq 1 ];then
-    lmax=`echo $lclip | gawk '{print($1*1e3)}'`
+    lmax=`echo $lclip | gawk -v s=1e3 '{print($1*s)}'` # fix Lyapunov
 fi
+# spacing for lya colorscale 
 lann=`echo $lmax | gawk '{a=$1/3;e=10^int(log(a)/log(10));print(int(a/e+0.5)*e)}'`
 
 # categorical CPT for attractor type; chaotic dark red, periods from a
 # fixed palette so colors are consistent across panels
 cols="0/114/178 0/158/115 230/159/0 204/121/167 86/180/233 240/228/66"
+
 # contiguous slices with boundaries at category midpoints
 echo $pvals | gawk -v cols="$cols" '{
   n=NF;for(i=1;i<=n;i++)v[i]=$i;
@@ -68,10 +82,12 @@ echo $pvals | gawk -v cols="$cols" '{
     lab=(v[i]==-1)?"chaotic":sprintf("period %i",v[i]);
     printf("%g\t%s\t%g\t%s\t;%s\n",lo,col,hi,col,lab);
   }}' > $tmpn.per.cpt
+
+
 # continuous CPT for lambda_1
 lmin=`gawk 'BEGIN{m=0}{if($3<m)m=$3}END{print(m)}' $tmpn.*.lam | sort -g | head -1`
 
-gmt makecpt -Cinferno -T$lmin/$lmax/30+n -D > $tmpn.lam.cpt
+gmt makecpt -Cinferno -T$lmin/$lmax/20+n -D > $tmpn.lam.cpt
 #gmt makecpt -Cvik+h0 -T$lmin/$lmax/0.1 > $tmpn.lam.cpt
 
 
@@ -85,38 +101,47 @@ while [ $ip -ge 0 ];do
     kl=`echo ${knd[$ip]} | gawk '{printf("%g",$1)}'`
     la=`echo $labels | gawk -v i=$ip '{print($(2*i+1))}'`
     lb=`echo $labels | gawk -v i=$ip '{print($(2*i+2))}'`
-
+    echo $ip $la $lb
     # attractor type panel
     gmt xyz2grd $tmpn.$ip.per $reg -I$inc -G$tmpn.per.grd
     if [ $first -eq 1 ];then
 	gmt grdimage $tmpn.per.grd $reg $proj -C$tmpn.per.cpt \
-	    -Ba1f0.25:"@~e@~@-1@- [10@+-3@+]":/a1f0.25:"@~e@~@-2@- [10@+-3@+]":WeSn \
+	    -Ba1f0.25:"@~e@~@-1@- [$eps_scale_label]":/a1f0.25:"@~e@~@-2@- [$eps_scale_label]":WeSn \
 	    -X2.5 -Y4 -P -K > $ofile.ps
-	gmt psscale -C$tmpn.per.cpt -D`echo $pwidth | gawk '{print($1/2)}'`/-1/4/0.4h -L0.1 -O -K >> $ofile.ps
+	gmt psscale -C$tmpn.per.cpt -D`echo $pwidth | gawk '{print($1/2)}'`/-.7/4/0.2h -L0.1 -O -K >> $ofile.ps
     else
 	gmt grdimage $tmpn.per.grd $reg $proj -C$tmpn.per.cpt \
-	    -Ba1f0.25:"@~e@~@-1@- [10@+-3@+]":/a1f0.25:"@~e@~@-2@- [10@+-3@+]":WeSn \
+	    -Ba1f0.25:"@~e@~@-1@- [$eps_scale_label]":/a1f0.25:"@~e@~@-2@- [$eps_scale_label]":WeSn \
 	    -X-$dx -Y$dy -O -K >> $ofile.ps
     fi
     echo $reg | gawk -F/ '{gsub("-R","",$1);print($1,$4)}' | \
-	gmt pstext $reg $proj -F+f18p+jTL+cTL+t"$la) @~k@~' = $kl" -D0.25/-0.25 \
-	    -Gwhite -W0.5p -O -K >> $ofile.ps
+	gmt pstext $reg $proj -F+f24p+jTL+cTL+t"$la) @~k@~' = $kl" -D0.15/-0.15 \
+	    -Gwhite -t20 -W0.5p -O -K >> $ofile.ps
 
     # lambda_1 panel
     gmt xyz2grd $tmpn.$ip.lam $reg -I$inc -G$tmpn.lam.grd
     gmt grdimage $tmpn.lam.grd $reg $proj -C$tmpn.lam.cpt \
-	-Ba1f0.25:"@~e@~@-1@- [10@+-3@+]":/a1f0.25:"@~e@~@-2@- [10@+-3@+]":wESn \
+	-Ba1f0.25:"@~e@~@-1@- [$eps_scale_label]":/a1f0.25:"@~e@~@-2@- [$eps_scale_label]":wESn \
 	-X$dx -O -K >> $ofile.ps
     echo $reg | gawk -F/ '{gsub("-R","",$1);print($1,$4)}' | \
-	gmt pstext $reg $proj -F+f18p+jTL+cTL+t"$lb)" -D0.25/-0.25 \
-	    -Gwhite -W0.5p -O -K >> $ofile.ps
+	gmt pstext $reg $proj -F+f24p+jTL+cTL+t"$lb)" -D0.15/-0.15 \
+	    -Gwhite -W0.5p -O -K -t20 >> $ofile.ps
     if [ $first -eq 1 ];then
-	gmt psscale -C$tmpn.lam.cpt -D`echo $pwidth | gawk '{print($1/2)}'`/-1/4/0.2h \
-	    -Ba${lann}f`echo $lann | gawk '{print($1/2)}'`:"@~l@~@-1@- [10@+-3@+]": -O -K >> $ofile.ps
+	gmt psscale -C$tmpn.lam.cpt -D`echo $pwidth | gawk '{print($1/2)}'`/-.7/4/0.15h \
+	    -Ba${lann}f`echo $lann | gawk '{print($1/2)}'`:"@~L@~@-1@- [$eps_scale_label]": -O -K >> $ofile.ps
 	first=0
     fi
-
-    ip=`expr $ip - 1`
+    if [[ $add_box -eq 1 && $ip = 1 ]];then
+	echo $0: adding zoom in box
+	cat <<EOF | gmt psxy $reg $proj -W2,gray  -O -K >> $ofile.ps
+-0.5 -0.5
+ 0.5 -0.5
+ 0.5  0.5
+-0.5 0.5 
+-0.5 -0.5 
+EOF
+    fi
+    ((ip=ip-1))
 done
 gmt psxy -T  -O >> $ofile.ps
 

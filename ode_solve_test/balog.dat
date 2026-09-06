@@ -1,0 +1,44 @@
+== basin_files/b74e (knd 0.857400, eig_plane 1, 257 x 257)
+   classes: chaotic 4899, period-4 61149
+   minority basin fraction (r > 1.0e-03): 7.454%
+   uncertainty fraction f(d), d in pixels of 1.563e-05:
+     global:  f = 0.1055 0.1338 0.1375 0.1379  alpha = 0.12
+     r/rmax [0.00, 0.25]: f = 0.1363 0.1410 0.1438 0.1388  alpha = 0.01
+     r/rmax [0.25, 0.50]: f = 0.1355 0.1348 0.1356 0.1374  alpha = 0.01
+     r/rmax [0.50, 0.75]: f = 0.1188 0.1383 0.1334 0.1388  alpha = 0.06
+     r/rmax [0.75, 1.00]: f = 0.0979 0.1390 0.1429 0.1414  alpha = 0.16
+   spiral test: predicted Delta ln r = 0.360, autocorr peak at 0.363 (norm. value 0.373)
+
+== basin_files/b77e (knd 0.857700, eig_plane 1, 257 x 257)
+   classes: period-4 63184, period-6 2864
+   minority basin fraction (r > 1.3e-03): 4.341%
+   uncertainty fraction f(d), d in pixels of 1.953e-05:
+     global:  f = 0.0715 0.0823 0.0839 0.0837  alpha = 0.07
+     r/rmax [0.00, 0.25]: f = 0.0882 0.0865 0.0880 0.0879  alpha = 0.00
+     r/rmax [0.25, 0.50]: f = 0.0822 0.0836 0.0813 0.0834  alpha = 0.00
+     r/rmax [0.50, 0.75]: f = 0.0801 0.0856 0.0872 0.0842  alpha = 0.02
+     r/rmax [0.75, 1.00]: f = 0.0692 0.0817 0.0830 0.0799  alpha = 0.06
+   spiral test: predicted Delta ln r = 0.359, autocorr peak at 0.363 (norm. value 0.365)
+
+== basin_files/b74e_513z (knd 0.857400, eig_plane 1, 513 x 513)
+   classes: chaotic 19236, period-4 243932
+   minority basin fraction (r > 2.5e-04): 7.303%
+   uncertainty fraction f(d), d in pixels of 1.953e-06:
+     global:  f = 0.0704 0.1050 0.1325 0.1357  alpha = 0.32
+     r/rmax [0.00, 0.25]: f = 0.1391 0.1362 0.1350 0.1390  alpha = -0.00
+     r/rmax [0.25, 0.50]: f = 0.1052 0.1357 0.1356 0.1345  alpha = 0.11
+     r/rmax [0.50, 0.75]: f = 0.0730 0.1186 0.1377 0.1342  alpha = 0.28
+     r/rmax [0.75, 1.00]: f = 0.0585 0.0962 0.1355 0.1379  alpha = 0.42
+   spiral test: predicted Delta ln r = 0.360, autocorr peak at 0.363 (norm. value 1.118)
+
+== basin_files/b77e_513z (knd 0.857700, eig_plane 1, 513 x 513)
+   classes: period-4 251743, period-6 11425
+   minority basin fraction (r > 2.5e-04): 4.357%
+   uncertainty fraction f(d), d in pixels of 1.953e-06:
+     global:  f = 0.0475 0.0717 0.0825 0.0843  alpha = 0.27
+     r/rmax [0.00, 0.25]: f = 0.0811 0.0829 0.0820 0.0810  alpha = -0.00
+     r/rmax [0.25, 0.50]: f = 0.0738 0.0827 0.0844 0.0834  alpha = 0.06
+     r/rmax [0.50, 0.75]: f = 0.0541 0.0801 0.0846 0.0850  alpha = 0.20
+     r/rmax [0.75, 1.00]: f = 0.0391 0.0706 0.0837 0.0871  alpha = 0.37
+   spiral test: predicted Delta ln r = 0.359, autocorr peak at 0.363 (norm. value 0.808)
+

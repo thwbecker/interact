@@ -9,7 +9,7 @@
 #            exponent and test basin self-similarity; 7/8: same for
 #            the period 4/6 case
 #
-modes=${1-"1 2 3 4"}
+modes=${1-"1 2 3 4 5 6 7 8"}
 np=${2-16}
 
 k_46=0.8577 			# approximate k for coexistence of period 4 and 6
@@ -29,14 +29,14 @@ mkdir -p $odir
 
 for mode in $modes;do
     
-    if [ $mode = 1 ];then
+    if [ $mode = 1 ];then	# regular x-y
 	mpirun -np $np ./bin/basin_rs2 -knd $k_4c -n1 $nsample -n2 $nsample \
 	       -t_trans $t_trans -t_run $t_run -oprefix $odir/b74
-    elif [ $mode = 2 ];then
+    elif [ $mode = 2 ];then	
 	mpirun -np $np ./bin/basin_rs2 -knd $k_46 -n1 $nsample -n2 $nsample \
 	       -e1min -$emax -e1max $emax -e2min -$emax -e2max $emax \
 	       -t_trans $t_trans -t_run $t_run -oprefix $odir/b77
-    elif [ $mode = 3 ];then
+    elif [ $mode = 3 ];then	# eigenplane 
 	mpirun -np $np ./bin/basin_rs2 -knd $k_4c -eig_plane -n1 $nsample -n2 $nsample \
 	       -t_trans $t_trans -t_run $t_run -oprefix $odir/b74e
     elif [ $mode = 4 ];then

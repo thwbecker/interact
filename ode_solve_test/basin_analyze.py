@@ -10,6 +10,9 @@ usage: basin_analyze.py <prefix> [<prefix> ...]
 
 reads <prefix>.*.dat rank files; grid geometry and knd are taken from
 the data and header. requires numpy and scipy.
+
+most of this written by Claude 
+
 """
 import sys
 import glob
@@ -29,6 +32,7 @@ def eig_growth(knd):
     wl = w[np.argmax(w.real)]
     if abs(wl.imag) < 1e-12:
         return np.nan
+    # return 
     return 2*np.pi*wl.real/abs(wl.imag)
 
 
