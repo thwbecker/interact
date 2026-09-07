@@ -1,11 +1,11 @@
-== basin_files/b74e (257 x 257, minority fraction 0.0742)
+== basin_files/b74e (257 x 257, minority fraction 0.0733)
    delta(px)   N(delta)   local D0
           1          0
-          2       3170
-          4       1741      0.86
-          8        684      1.35
-         16        236      1.54
-         32         64      1.88
+          2       3129
+          4       1734      0.85
+          8        682      1.35
+         16        230      1.57
+         32         64      1.85
          64         16      2.00
    overall D0 (fit over all delta): 1.54
 
@@ -31,6 +31,17 @@
          64         64      1.86
    overall D0 (fit over all delta): 1.44
 
+== basin_files/b74e_1025z (1025 x 1025, minority fraction 0.0733)
+   delta(px)   N(delta)   local D0
+          1          0
+          2      23697
+          4      15081      0.65
+          8       6376      1.24
+         16       2133      1.58
+         32        711      1.58
+         64        234      1.60
+   overall D0 (fit over all delta): 1.37
+
 == basin_files/b77e_513z (513 x 513, minority fraction 0.0434)
    delta(px)   N(delta)   local D0
           1          0
@@ -41,6 +52,17 @@
          32        225      1.55
          64         64      1.81
    overall D0 (fit over all delta): 1.30
+
+== basin_files/b77e_1025z (1025 x 1025, minority fraction 0.0435)
+   delta(px)   N(delta)   local D0
+          1          0
+          2      13681
+          4       8328      0.72
+          8       3870      1.11
+         16       1715      1.17
+         32        671      1.35
+         64        227      1.56
+   overall D0 (fit over all delta): 1.19
 
 == basin_files/b74e_513zz (513 x 513, minority fraction 0.0745)
    delta(px)   N(delta)   local D0

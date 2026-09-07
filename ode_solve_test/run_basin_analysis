@@ -4,7 +4,7 @@
 # run run_basin_test first
 #
 # large, zoom, double zoom
-models="basin_files/b74e basin_files/b77e basin_files/b74e_513z basin_files/b77e_513z basin_files/b74e_513zz  basin_files/b77e_513zz  basin_files/b74e_patch basin_files//b74e_patch90  basin_files//b74e_patch90d"
+models="basin_files/b74e basin_files/b77e basin_files/b74e_513z basin_files/b74e_1025z basin_files/b77e_513z basin_files/b77e_1025z basin_files/b74e_513zz  basin_files/b77e_513zz  basin_files/b74e_patch basin_files//b74e_patch90  basin_files//b74e_patch90d"
 
 
 python3 basin_analyze.py  $models > balog.dat
@@ -12,3 +12,4 @@ python3 basin_analyze.py  $models > balog.dat
 python3 basin_boxcount.py $models > bclog.dat
 
 
+ 

@@ -4,4 +4,6 @@
 
 ./plot_basins b74e_513z b77e_513z basins_eig_zoom 1e4
 
+./plot_basins b74e_1025z b77e_1025z basins_eig_zoomh 1e4
+
 ./plot_basins b74e_513zz b77e_513zz basins_eig_zoom2 1e5
