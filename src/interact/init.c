@@ -428,8 +428,11 @@ void init_parameters_interact(char **argv, int argc,
 			      char *geomfile,
 			      int rank)
 {
-  int i,itmp;
-  my_boolean warned = FALSE;
+  int i,itmp,iarg;
+  my_boolean warned = FALSE,recognized;
+#ifdef USE_PETSC
+  PetscBool pflg;
+#endif
   /* 
      assign default values 
   */
@@ -472,6 +475,8 @@ void init_parameters_interact(char **argv, int argc,
      check for input options 
   */
   for(i=1;i<argc;i++){
+    iarg = i;			/* remember where this option started */
+    recognized = TRUE;
     if(strcmp(argv[i],"-h")==0 || strcmp(argv[i],"-?")==0){// help
       if(rank==0)
 	phelp();
@@ -573,11 +578,21 @@ void init_parameters_interact(char **argv, int argc,
       strncpy(geomfile,argv[i],STRLEN);
 
     }else{
+      recognized = FALSE;
       if((rank == 0)&&(!warned)){
 	fprintf(stderr,"init_parameters_interact: encountered at least one parameter which cannot be interpreted by interact\n");
 	warned = TRUE;
       }
     }
+#ifdef USE_PETSC
+    if(recognized){
+      /* interact's own options also end up in the PETSc options
+	 database (PetscInitialize sees the whole command line); query
+	 them once so that PETSc does not list them as unused at exit
+	 ("WARNING! There are options you set that were not used") */
+      PetscOptionsHasName(NULL,NULL,argv[iarg],&pflg);
+    }
+#endif
   }
 }
 
