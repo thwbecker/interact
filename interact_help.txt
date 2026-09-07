@@ -1,7 +1,7 @@
 interact: internal double prec, A matrix double prec
-main: initializing on 2026-08-23 17:41:25 ncore: 1
+main: initializing on 2026-09-07 10:08:19 ncore: 1
 interact: nu: 0.25000 mu: 1.000e+04  lambda/mu: 1.00000 alpha: 0.66667
-check_parameters_and_init_interact: compiled on Aug 23 2026 14:41:25, running in serial
+check_parameters_and_init_interact: compiled on Sep  7 2026 10:05:56, running in serial
 
 interact: calculate fault stresses and displacements in a half or full space or in 2-D
           using a boundary element approach.
@@ -30,7 +30,7 @@ PetSc support was compiled in, providing limited access to parallel solves for o
       The code can interface with HTOOLS, H2OPUS, HACApK, and HMMVP H matrix packages.
       HTOOLS and H2OPUS have to be provided via Petsc packages, HACApK and HMMVP can be compiled locally.
 
-(1) The fault geometry is input via the file "geom.in",
+(1) The fault geometry is read from file "geom.in" (unless changed by -geom),
     a list of fault patches.
     This file has the following ("patch") format for regular, rectangular (Okada) faults or point sources
     The default is to use half-space, but the -full flag can switch Okada point sources and rectangles to full
@@ -329,7 +329,8 @@ PetSc support was compiled in, providing limited access to parallel solves for o
 PARAMETERS:
 
  Elastic and frictional properties have defaults which are set in the "properties.h" file.
- Stress drop (1) normalization was chosen with shear modulus 1.000000e+04 and Poisson 0.25
+ Stress drop (1) normalization was chosen with default shear modulus 1.000000e+04 and Poisson 0.25
+ Note that -nu allow setting the Poisson ratio on run time.
 
  In the following, we will refer to two different matrices, A and I. The interaction, or I, matrix is
  assembled once for the loading simulations and holds all possible stress influence coefficients for all
@@ -410,6 +411,9 @@ OPTIONS:
      OFF by default, if switch is set will be ON. See -ni for suppressed interactions in one step.
 
  -ni suppress all interactions between faults except the interactions of patches within the fault group
+     applies to the A matrix and to the post slip fault stress evaluation (cross group stress not added)
+
+ -geom file_name	assigns different geometry file, default is geom.in
 
  -full
      toggles space/plane for Okada (rectangular or point) or 2D, default is half space/plane.
@@ -549,10 +553,27 @@ OPTIONS:
  -fpetsc
      force Petsc solvers even for serial runs (else LAPACK for LU)
 
+ -near_pc_radius value   or   -near_pc_rfac factor
+     for the Petsc one-step solve, also assemble a sparse matrix from the A entries with
+     source-receiver distance < radius and hand it to the KSP as the preconditioning
+     matrix. The radius is either given directly (geometry length units) or as factor
+     times the mean patch length sqrt(area) (e.g. -near_pc_rfac 4). Use with e.g.
+     -pc_type asm -sub_pc_type lu (or ilu); -pc_type jacobi/none ignore it. Off by default.
+
  -npsfse
-     no post slip fault stress evaluation: after a one-step solve, print
-     the slip solution without the serial resolved-stress evaluation on
-     all patches (default off, i.e. the stress evaluation is performed)
+     no post slip fault stress evaluation: after a one-step solve, assign
+     the slip solution to the patches and print it, but skip the resolved
+     stress evaluation on all patches, i.e. flt.dat stresses stay at the
+     pre-solve values (default off, i.e. the stress evaluation is performed)
+
+ -spsfse
+     force the serial post slip fault stress evaluation (add_solution on every
+     rank) in one-step mode, even when running on several MPI ranks
+
+ -ppsfse
+     force the parallel post slip fault stress evaluation (receivers split
+     over ranks, then gathered) in one-step mode, even on a single rank.
+     default is serial on one rank, parallel on several ranks
 
  -pstress Change the default 2-D elastic approximation for segments from plane-strain to plane-stress.
      OFF by default, if switch is set will be ON.

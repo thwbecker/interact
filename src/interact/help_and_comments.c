@@ -409,12 +409,13 @@ void phelp(void)
   PE("");
   PE(" Elastic and frictional properties have defaults which are set in the \"properties.h\" file.");
 #ifdef STRESS_DROP_NORM
-  fprintf(stderr," Stress drop (%g) normalization was chosen with shear modulus %e and Poisson %g\n",
+  fprintf(stderr," Stress drop (%g) normalization was chosen with default shear modulus %e and Poisson %g\n",
 	  STRESS_DROP_DEF,SHEAR_MODULUS_DEF,POISSON_NU_DEF);
 #else
-  fprintf(stderr," Shear modulus (%g) normalization was chosen with stress drop %e and Poisson %g\n",
+  fprintf(stderr," Shear modulus (%g) normalization was chosen with detault stress drop %e and Poisson %g\n",
 	  SHEAR_MODULUS_DEF,STRESS_DROP_DEF,POISSON_NU_DEF);
 #endif
+  PE(" Note that -nu allow setting the Poisson ratio on run time.");
   PE("");
   PE(" In the following, we will refer to two different matrices, A and I. The interaction, or I, matrix is");
   PE(" assembled once for the loading simulations and holds all possible stress influence coefficients for all");

@@ -7,10 +7,6 @@
 #   gmres(30) with the near-field preconditioner (-near_pc_rfac 4,
 #   -pc_type asm -sub_pc_type lu), rtol on the true residual.
 #
-#   100k patches, 16 ranks: 20 iterations, 33 s solve, vs. 490
-#   iterations and 733 s for fgmres(2000)/jacobi. Assembly (about
-#   3770 s) and the optional post-slip stress evaluation (about the
-#   same) dominate the run time; both scale with N^2/ncore.
 #
 # usage: run_production [ncore] [geometry] [bcfile] [stress] [tag] [solver] [rtol] [rfac]
 #

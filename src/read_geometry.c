@@ -48,7 +48,7 @@ void read_geometry(char *patch_filename,struct med **medium,
   if((*medium)->comm_rank != 0)
     verbose = 0;
   /* 
-     initialize the elastic parameeters here
+     initialize the elastic parameters with defaults here
   */
   calc_medium_elastic_parameters(&((*medium)->elastic),SHEAR_MODULUS_DEF, POISSON_NU_DEF);
   /* 

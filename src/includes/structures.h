@@ -4,9 +4,9 @@
 */
 
 struct el_par{
-  /* elastic parameters, redundant but pre-computed for speed */
-  double shear,poisson;
-  double alpha,mu2,lambda;
+  /* elastic parameters, latter are redundant but pre-computed for speed */
+  double shear,poisson;		/* those are set */  
+  double alpha,mu2,lambda;	/* those are derived */
 };
 
 /*

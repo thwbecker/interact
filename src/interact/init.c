@@ -34,7 +34,7 @@ void check_parameters_and_init_interact(int argc, char **argv,
   char geomfile[STRLEN];
   MODE_TYPE tri_eval_mode;  
   short int solver_mode;
-  COMP_PRECISION pressure,med_cohesion,min_stress_drop,wcutoff;
+  COMP_PRECISION pressure,med_cohesion,min_stress_drop,wcutoff,poisson;
   I_MATRIX_PREC i_mat_cutoff;
 
   if((*medium)->comm_rank==0){
@@ -62,7 +62,7 @@ void check_parameters_and_init_interact(int argc, char **argv,
 			   &no_interactions,&force_petsc,&tri_eval_mode,&full_space,
 			   &((*medium)->no_post_slip_fault_stress_eval),
 			   &((*medium)->post_slip_fault_stress_par),geomfile,
-			   (*medium)->comm_rank);
+			   &poisson,(*medium)->comm_rank);
   // load files, etc
   initialize_interact(medium,fault,read_fault_friction,read_fault_rake,max_nr_flt_files,
 		      suppress_interactions,whole_fault_mode,med_cohesion,a,b,
@@ -72,7 +72,7 @@ void check_parameters_and_init_interact(int argc, char **argv,
 		      keep_slipping,attempt_restart,solver_mode,suppress_nan_output,
 		      pressure,twod_approx_is_plane_stress,
 		      print_plane_coord,variable_time_step,debug,TRUE,wcutoff,
-		      no_interactions,force_petsc,tri_eval_mode,full_space,geomfile);
+		      no_interactions,force_petsc,tri_eval_mode,full_space,geomfile,poisson);
 }
 /*
 
@@ -105,7 +105,8 @@ void initialize_interact(struct med **medium, struct flt **fault,
 			 my_boolean variable_time_step,my_boolean debug,
 			 my_boolean init_system,COMP_PRECISION wcutoff,
 			 my_boolean no_interactions,my_boolean force_petsc,
-			 MODE_TYPE tri_eval_mode, my_boolean full_space, char *geomfile)
+			 MODE_TYPE tri_eval_mode, my_boolean full_space, char *geomfile,
+			 COMP_PRECISION poisson)
 {
 #ifdef USE_PETSC
   int fchunk,fchunkn;
@@ -122,11 +123,14 @@ void initialize_interact(struct med **medium, struct flt **fault,
   (*medium)->plane_stress = twod_approx_is_plane_stress;
   /*  */
   strncpy((*medium)->geomfile,geomfile,STRLEN);
-  /* all nodes need to know geometry */
+  /* all nodes need to know geometry and set default elasticity */
   read_geometry((*medium)->geomfile,medium,fault,read_fault_friction,read_fault_rake,TRUE);
+  /* reset with optional values */
+  calc_medium_elastic_parameters(&((*medium)->elastic),SHEAR_MODULUS_DEF, poisson);
+  /*  */
   if((*medium)->comm_rank==0)
-    fprintf(stderr,"initialize_interact: all stress values are based on a shear modulus of %g\n",
-	    (*medium)->elastic.shear);
+    fprintf(stderr,"initialize_interact: all stress values are based on a shear modulus of %g and Poisson of %g\n",
+	    (*medium)->elastic.shear,(*medium)->elastic.poisson);
 
   /* assign faults to processors */
 #ifdef USE_PETSC
@@ -425,7 +429,7 @@ void init_parameters_interact(char **argv, int argc,
 			      my_boolean *full_space,
 			      my_boolean *no_post_slip_fault_stress_eval,
 			      int *post_slip_fault_stress_par,
-			      char *geomfile,
+			      char *geomfile,COMP_PRECISION *poisson,
 			      int rank)
 {
   int i,itmp,iarg;
@@ -557,6 +561,9 @@ void init_parameters_interact(char **argv, int argc,
     }else if(strcmp(argv[i],"-wc")==0){// SVD wmax
       advance_argument(&i,argc,argv);
       sscanf(argv[i],ONE_CP_FORMAT,wcutoff);
+    }else if(strcmp(argv[i],"-nu")==0){// Poission ratio
+      advance_argument(&i,argc,argv);
+      sscanf(argv[i],ONE_CP_FORMAT,poisson);
     }else if(strcmp(argv[i],"-tv")==0){// tri eval mode
       advance_argument(&i,argc,argv);
       sscanf(argv[i],"%i",&itmp);
