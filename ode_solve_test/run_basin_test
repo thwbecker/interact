@@ -9,7 +9,7 @@
 #            exponent and test basin self-similarity; 7/8: same for
 #            the period 4/6 case
 #
-modes=${1-"1 2 3 4 5 6 7 8 9 10 11"} 	# 7,8,9,10 are additional zoom ins, 11 for alpha computation
+modes=${1-"1 2 3 4 5 6 7 8 9 10 11 12"} 	# 7,8,9,10 are additional zoom ins, 11 for alpha computation
 np=${2-16}
 
 k_46=0.8577 			# approximate k for coexistence of period 4 and 6
@@ -71,5 +71,9 @@ for mode in $modes;do
 	mpirun -np $np ./bin/basin_rs2 -knd $k_4c -eig_plane -n1 $nsample_hi -n2 $nsample_hi \
 	       -e1min 9.5e-4 -e1max 1.05e-3 -e2min -5e-5 -e2max 5e-5 \
 	       -t_trans $t_trans -t_run $t_run -oprefix $odir/b74e_patch
+    elif [ $mode = 12 ];then	# shifted, orthogonal direction
+	mpirun -np $np ./bin/basin_rs2 -knd $k_4c -eig_plane -n1 $nsample_hi -n2 $nsample_hi \
+	       -e1min -5e-5 -e1max 5e-5 -e2min 9.5e-4 -e2max 1.05e-3 \
+	       -t_trans $t_trans -t_run $t_run -oprefix $odir/b74e_patch90
     fi
 done

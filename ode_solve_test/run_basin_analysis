@@ -8,6 +8,12 @@
 python3 basin_analyze.py basin_files/b74e basin_files/b77e \
         basin_files/b74e_513z basin_files/b77e_513z \
 	basin_files/b74e_513zz  basin_files/b77e_513zz  \
-	basin_files/b74e_patch \
+	basin_files/b74e_patch basin_files//b74e_patch90 \
 	> balog.dat
+
+python3 basin_boxcount.py basin_files/b74e basin_files/b77e \
+        basin_files/b74e_513z basin_files/b77e_513z \
+	basin_files/b74e_513zz  basin_files/b77e_513zz  \
+	basin_files/b74e_patch basin_files//b74e_patch90 \
+	> bclog.dat
 

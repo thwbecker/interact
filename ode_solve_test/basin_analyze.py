@@ -24,6 +24,8 @@ B1, B2, RHO = 1.0, 0.84, 0.048
 
 def eig_growth(knd):
     """ln of the once-around radial growth factor of the fixed point"""
+    if not np.isfinite(knd):
+        return np.nan
     kcr = ((B1-1) + RHO*(2*B1+(B2-1)*(2+RHO)) +
            np.sqrt(4*RHO*RHO*((B1-1)+B2) + ((B1-1)+RHO*RHO*(B2-1))**2))/(2+2*RHO)
     k = knd*kcr
@@ -82,10 +84,18 @@ for prefix in sys.argv[1:]:
         for v, c in zip(vals, cnts)))
     X, Y = np.meshgrid(x, y)
     R = np.hypot(X, Y)
-    rmax = min(x[-1], y[-1])
-    sel = ok & (R > 0.5*rmax)
-    print("   minority basin fraction (r > %.1e): %.3f%%" %
-          (0.5*rmax, 100*np.mean(P[sel] != 4)))
+    offcenter = R.min() > 0.2*R.max()   # window does not contain the origin
+    if offcenter:
+        print("   off-center window (r = %.2e ... %.2e): radial "
+              "decomposition and spiral test skipped" % (R.min(), R.max()))
+        print("   minority basin fraction (whole window): %.3f%%" %
+              (100*np.mean(P[ok] != 4)))
+        rmax = np.nan
+    else:
+        rmax = min(x[-1], y[-1])
+        sel = ok & (R > 0.5*rmax)
+        print("   minority basin fraction (r > %.1e): %.3f%%" %
+              (0.5*rmax, 100*np.mean(P[sel] != 4)))
     ds = np.array([1, 2, 4, 8])
     dgrid = x[1] - x[0]
     print("   uncertainty fraction f(d), d in pixels of %.3e:" % dgrid)
@@ -93,14 +103,15 @@ for prefix in sys.argv[1:]:
     a = np.polyfit(np.log(ds), np.log(fg), 1)[0]
     print("     global:  f = %s  alpha = %.2f" %
           (" ".join("%.4f" % v for v in fg), a))
-    for r0, r1 in ((0.0, 0.25), (0.25, 0.5), (0.5, 0.75), (0.75, 1.0)):
+    for r0, r1 in (() if offcenter else
+                   ((0.0, 0.25), (0.25, 0.5), (0.5, 0.75), (0.75, 1.0))):
         fa = uncertainty(P, ok, (R >= r0*rmax) & (R < r1*rmax), ds)
         aa = np.polyfit(np.log(ds), np.log(np.maximum(fa, 1e-9)), 1)[0]
         print("     r/rmax [%.2f, %.2f]: f = %s  alpha = %.2f" %
               (r0, r1, " ".join("%.4f" % v for v in fa), aa))
     # spiral self-similarity (eigenplane grids)
     lng = eig_growth(knd)
-    if eig and np.isfinite(lng):
+    if eig and np.isfinite(lng) and not offcenter:
         Bm = (P != 4).astype(float)   # minority basin indicator
         nth, nlr = 360, 240
         lr = np.linspace(np.log(0.05*rmax), np.log(rmax), nlr)
@@ -115,6 +126,10 @@ for prefix in sys.argv[1:]:
         ac = np.array([np.mean(np.sum(LPm[:, :-l]*LPm[:, l:], axis=1)/(nlr-l))
                        for l in range(1, maxlag)])
         lags = np.arange(1, maxlag)*dlr
+        if ac[0] <= 0:
+            print("   spiral test: no radial variance in log-polar window, skipped")
+            print()
+            continue
         w = (lags > 0.5*lng) & (lags < 1.5*lng)
         ipk = np.where(w)[0][np.argmax(ac[w])]
         print("   spiral test: predicted Delta ln r = %.3f, "

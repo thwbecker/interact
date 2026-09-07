@@ -1,0 +1,7 @@
+#!/bin/bash
+
+./plot_basins b74e b77e basins_eig 1e3
+
+./plot_basins b74e_513z b77e_513z basins_eig_zoom 1e4
+
+./plot_basins b74e_513zz b77e_513zz basins_eig_zoom2 1e5
