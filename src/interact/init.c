@@ -472,6 +472,7 @@ void init_parameters_interact(char **argv, int argc,
   *no_interactions = FALSE;
   *force_petsc = FALSE;
   *full_space = FULL_SPACE_DEF;
+  *poisson =  POISSON_NU_DEF;
   *no_post_slip_fault_stress_eval = FALSE; /* default: do evaluate post slip fault stress */
   *post_slip_fault_stress_par = -1;	/* default: automatic (parallel if comm_size > 1) */
   strncpy(geomfile,GEOMETRY_FILE,STRLEN);

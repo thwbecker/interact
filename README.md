@@ -416,9 +416,9 @@ ________________________________________________________________________________
 Output from interact -h follows (run code for updated versions!)
 ________________________________________________________________________________
 interact: internal double prec, A matrix double prec
-main: initializing on 2026-09-07 10:08:19 ncore: 1
+main: initializing on 2026-09-07 11:48:09 ncore: 1
 interact: nu: 0.25000 mu: 1.000e+04  lambda/mu: 1.00000 alpha: 0.66667
-check_parameters_and_init_interact: compiled on Sep  7 2026 10:05:56, running in serial
+check_parameters_and_init_interact: compiled on Sep  7 2026 11:47:08, running in serial
 
 interact: calculate fault stresses and displacements in a half or full space or in 2-D
           using a boundary element approach.

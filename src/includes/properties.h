@@ -33,6 +33,7 @@
 #define SHEAR_MODULUS_DEF  1.0
 #define STRESS_DROP_DEF 1.0e-4
 #endif
+
 #define POISSON_NU_DEF 0.25
 
 /* 
