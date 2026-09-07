@@ -452,6 +452,19 @@ PetscErrorCode rsf_init_catalog(struct rsf_out_ctx *uc,struct interact_ctx *par,
   }
   HEADNODE{
     if(uc->cat_enable){
+      if(uc->restarted){
+	/* continue the event numbering from the rows already in the file */
+	FILE *fin = fopen(RSF_CATALOG_FILE,"r");
+	if(fin){
+	  char line[1024];
+	  int nrow = 0;
+	  while(fgets(line,sizeof(line),fin))
+	    if((line[0] != '#') && (strspn(line," \t\r\n") < strlen(line)))
+	      nrow++;
+	  fclose(fin);
+	  uc->ncat = nrow;
+	}
+      }
       uc->fout_catalog = myopen(RSF_CATALOG_FILE,(uc->restarted)?("a"):("w"));
       if(uc->restarted) fprintf(uc->fout_catalog,"# restarted\n");
       fprintf(uc->fout_catalog,
@@ -571,7 +584,7 @@ PetscErrorCode rsf_finalize_catalog(struct rsf_out_ctx *uc)
   HEADNODE{
     if(uc->fout_catalog){
       fclose(uc->fout_catalog);
-      fprintf(stderr,"rsf_finalize_catalog: wrote event catalog (%i completed events)\n",uc->ncat);
+      fprintf(stderr,"rsf_finalize_catalog: wrote event catalog (%i completed events in total, including any before a restart)\n",uc->ncat);
     }
     if(uc->cgrp_fout){
       int ig;
@@ -637,6 +650,7 @@ PetscErrorCode rsf_write_checkpoint(TS ts, Vec X, struct rsf_out_ctx *uc)
   PetscCall(TSGetTime(ts,&t));
   PetscCall(TSGetTimeStep(ts,&dt));
   PetscCall(TSGetStepNumber(ts,&step));
+  step += uc->step_offset;	/* absolute step, continuous across restarts */
   PetscCall(VecCreate(PETSC_COMM_WORLD,&meta));
   PetscCall(VecSetSizes(meta,PETSC_DECIDE,RSF_CKPT_NMETA));
   PetscCall(VecSetFromOptions(meta));
@@ -800,17 +814,34 @@ PetscErrorCode rsf_TS_Monitor(TS ts,PetscInt step,PetscReal time,Vec X,void *ptr
   PetscReal v,lsum[MGRP_NSUM],gsum[MGRP_NSUM],lminmax[3],gminmax[3],dt,d1,d2,d3,dx_norm,x_norm;
   struct rsf_vars *rsf;
   PetscFunctionBeginUser;
+  /* PETSc's step counter restarts at 0 on a restart; the absolute step
+     (monitor column, checkpoint cadence, field-frame cadence) is
+     step + step_offset.  Interpolated calls carry a negative step and
+     are tested on the raw value below. */
+  if(step >= 0)
+    step += ((struct rsf_out_ctx *)ptr)->step_offset;
   {
     struct rsf_out_ctx *uc_ck = (struct rsf_out_ctx *)ptr;
     PetscBool do_ck = PETSC_FALSE;
-    if((uc_ck->ckpt_every > 0) && (step > uc_ck->ckpt_step0) &&
+    if((uc_ck->ckpt_every > 0) && (step > uc_ck->ckpt_step0 + uc_ck->step_offset) &&
        (step % uc_ck->ckpt_every == 0))
       do_ck = PETSC_TRUE;
-    if((!do_ck) && (uc_ck->ckpt_wall > 0.0) && (step > uc_ck->ckpt_step0)){
+    if((!do_ck) && (uc_ck->ckpt_wall > 0.0) && (step > uc_ck->ckpt_step0 + uc_ck->step_offset)){
       PetscLogDouble now;
       PetscCall(PetscTime(&now));
       if(now - uc_ck->ckpt_last_wtime > (PetscLogDouble)uc_ck->ckpt_wall)
 	do_ck = PETSC_TRUE;
+    }
+    /* no checkpoints mid-event: defer to the first step after the arrest.
+       A restart from a mid-event checkpoint cannot rebuild the per-event
+       tracker state (which cells have ruptured, the onset snapshots), so
+       that event would be lost from the catalog or mis-logged. */
+    if(do_ck && uc_ck->slipping){
+      uc_ck->ckpt_pending = PETSC_TRUE;
+      do_ck = PETSC_FALSE;
+    }else if(uc_ck->ckpt_pending && (!uc_ck->slipping) && (step > uc_ck->ckpt_step0 + uc_ck->step_offset)){
+      uc_ck->ckpt_pending = PETSC_FALSE;
+      do_ck = PETSC_TRUE;
     }
     if(do_ck){
       PetscCall(rsf_write_checkpoint(ts,X,uc_ck));

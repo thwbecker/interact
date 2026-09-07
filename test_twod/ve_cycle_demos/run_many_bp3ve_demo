@@ -10,11 +10,14 @@
 # usage: run_many_bp3ve_demo [ds_km] [tmlist_yr] [stop_yr] [parallel]
 #                            [ncore] [branch]
 #        defaults           0.025    "15 45 200"  1500      0     4    1
-#        branch +1 (default) normal-sense or -1 thrust; passed through
+#        branch +1 (default) thrust or -1 normal; passed through
 #              to run_bp3ve_demo, which stamps it into each run
-#              directory and refuses to mix.  The thrust cases get a
-#              _thrust suffix, so both branches can sit side by side
-#              in one working directory.
+#              directory and refuses to mix.  The normal cases get a
+#              _normal suffix, so both branches can sit side by side
+#              in one working directory.  (Directories written while
+#              the branches were mislabelled carry a _thrust suffix
+#              for branch -1 and hold NORMAL-sense results; rename
+#              them to _normal to keep using them.)
 #        ncore: cores per kernel generation (bp3_ve_kernels_par);
 #              parallel=1 additionally runs 2 of the 3 cases at once,
 #              so peak load is about 2 x ncore
@@ -49,10 +52,10 @@ tms=${2-"15 45 200"}
 stop=${3-1500}
 par=${4-0}
 ncore=${5-4}		# cores for kernel generation (the slow part)
-branch=${6-1}		# +1 normal-sense, -1 thrust
+branch=${6-1}		# +1 thrust, -1 normal
 # the two branches are different physics, so they get their own case
 # directories and can sit side by side in one working directory
-sfx=; [ "$branch" = "-1" ] && sfx=_thrust
+sfx=; [ "$branch" = "-1" ] && sfx=_normal
 g1=ve_g1$sfx; g0=ve_g0$sfx; vs=ve_shear$sfx
 #extra="-imex"		# fine meshes with sigma coupling need it
 extra=""

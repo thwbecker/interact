@@ -1,6 +1,6 @@
 #!/bin/bash
 # run_bp3 ds_km dip vpl outdir [stop_yr] [branch] [sigma opts]
-#   branch +1 normal-sense (default) or -1 thrust; it sets the sign of
+#   branch +1 thrust (default) or -1 normal; it sets the sign of
 #   the prestress and Vinit that gen_bp3.py writes, and vpl MUST carry
 #   the same sign.  The check below refuses the mismatch, which would
 #   otherwise start the fault on the opposite steady-state branch and
@@ -18,20 +18,20 @@ sig=${7-}
 case "$branch" in
     1|+1) branch=1 ;;
     -1)   branch=-1 ;;
-    *) echo "run_bp3: branch must be +1 (normal) or -1 (thrust)"; exit 1 ;;
+    *) echo "run_bp3: branch must be +1 (thrust) or -1 (normal)"; exit 1 ;;
 esac
 if awk -v v="$vpl" -v b="$branch" 'BEGIN{exit !((v<0)==(b<0))}';then :;else
     echo "run_bp3: vpl $vpl and branch $branch disagree in sign;"
-    echo "         use vpl > 0 with branch +1 (normal), vpl < 0 with branch -1 (thrust)"
+    echo "         use vpl > 0 with branch +1 (thrust), vpl < 0 with branch -1 (normal)"
     exit 1
 fi
 mkdir -p $dir && cd $dir
 # the branch is a property of the directory.  This script resumes from
 # rsf_checkpoint.bin whenever it finds one, and rsf_solve's checkpoint
 # check only separates elastic from viscoelastic, so without this a
-# thrust run started in an old directory would silently continue a
-# normal-sense state.  A directory with a checkpoint but no stamp
-# predates the branch flag and can only be normal-sense.
+# normal run started in an old directory would silently continue a
+# thrust state.  A directory with a checkpoint but no stamp predates
+# the branch flag and can only be thrust (branch +1).
 had=
 [ -f branch.txt ] && had=`cat branch.txt`
 [ -z "$had" ] && [ -f rsf_checkpoint.bin ] && had=1

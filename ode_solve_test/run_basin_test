@@ -9,8 +9,8 @@
 #            exponent and test basin self-similarity; 7/8: same for
 #            the period 4/6 case
 #
-modes=${1-"1 2 3 4 5 6 7 8 9 10 11 12"} 	# 7,8,9,10 are additional zoom ins, 11 for alpha computation
-np=${2-16}
+modes=${1-"1 2 3 4 5 6 6f 7 8 8f 9 10 11 12 13"} 	# 7,8,9,10 are additional zoom ins, 11 for alpha computation
+np=${2-32}
 
 k_46=0.8577 			# approximate k for coexistence of period 4 and 6
 k_4c=0.8574 			# approximate for period 4 and chaotic
@@ -22,6 +22,7 @@ nsample=257
 emax=2.5e-3
 # higher resolution eigenplane runs
 nsample_hi=513
+nsample_hi2=1025
 emax_zoom=5e-4
 emax_zoom2=1.25e-4
 
@@ -51,6 +52,10 @@ for mode in $modes;do
 	mpirun -np $np ./bin/basin_rs2 -knd $k_4c -eig_plane -n1 $nsample_hi -n2 $nsample_hi \
 	       -e1min -$emax_zoom -e1max $emax_zoom -e2min -$emax_zoom -e2max $emax_zoom \
 	       -t_trans $t_trans -t_run $t_run -oprefix $odir/b74e_513z
+    elif [ $mode = 6f ];then
+	mpirun -np $np ./bin/basin_rs2 -knd $k_4c -eig_plane -n1 $nsample_hi2 -n2 $nsample_hi2 \
+	       -e1min -$emax_zoom -e1max $emax_zoom -e2min -$emax_zoom -e2max $emax_zoom \
+	       -t_trans $t_trans -t_run $t_run -oprefix $odir/b74e_1025z
     elif [ $mode = 7 ];then
 	mpirun -np $np ./bin/basin_rs2 -knd $k_46 -eig_plane -n1 $nsample_hi -n2 $nsample_hi \
 	       -e1min -$emax -e1max $emax -e2min -$emax -e2max $emax \
@@ -59,6 +64,10 @@ for mode in $modes;do
 	mpirun -np $np ./bin/basin_rs2 -knd $k_46 -eig_plane -n1 $nsample_hi -n2 $nsample_hi \
 	       -e1min -$emax_zoom -e1max $emax_zoom -e2min -$emax_zoom -e2max $emax_zoom \
 	       -t_trans $t_trans -t_run $t_run -oprefix $odir/b77e_513z
+   elif [ $mode = 8f ];then
+	mpirun -np $np ./bin/basin_rs2 -knd $k_46 -eig_plane -n1 $nsample_hi2 -n2 $nsample_hi2 \
+	       -e1min -$emax_zoom -e1max $emax_zoom -e2min -$emax_zoom -e2max $emax_zoom \
+	       -t_trans $t_trans -t_run $t_run -oprefix $odir/b77e_1025z
     elif [ $mode = 9 ];then	# further zoom
 	mpirun -np $np ./bin/basin_rs2 -knd $k_4c -eig_plane -n1 $nsample_hi -n2 $nsample_hi \
 	       -e1min -$emax_zoom2 -e1max $emax_zoom2 -e2min -$emax_zoom2 -e2max $emax_zoom2 \
@@ -75,5 +84,9 @@ for mode in $modes;do
 	mpirun -np $np ./bin/basin_rs2 -knd $k_4c -eig_plane -n1 $nsample_hi -n2 $nsample_hi \
 	       -e1min -5e-5 -e1max 5e-5 -e2min 9.5e-4 -e2max 1.05e-3 \
 	       -t_trans $t_trans -t_run $t_run -oprefix $odir/b74e_patch90
+    elif [ $mode = 13 ];then	# shifted, orthogonal, deeper
+	mpirun -np $np ./bin/basin_rs2 -knd $k_4c -eig_plane -n1 $nsample_hi -n2 $nsample_hi \
+	       -e1min -1.25e-5 -e1max 1.25e-5 -e2min 9.875e-4 -e2max 1.0125e-3 \
+	       -t_trans $t_trans -t_run $t_run -oprefix $odir/b74e_patch90d
     fi
 done

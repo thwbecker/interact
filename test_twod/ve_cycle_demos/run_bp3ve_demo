@@ -44,7 +44,7 @@
 # usage: run_bp3ve_demo [outdir] [tmlist_yr] [stop_yr] [sigma] [ds_km]
 #                       [gravity] [extra rsf_solve options] [ncore]
 #                       [branch]
-#        branch +1 (default) NORMAL-sense or -1 THRUST.  It sets the
+#        branch +1 (default) THRUST or -1 NORMAL.  It sets the
 #              sign of vpl and of the initial conditions together, so
 #              the two cannot disagree; see gen_bp3.py, "BRANCH".  The
 #              branch is stamped into the run directory and a later
@@ -75,11 +75,11 @@ ds=${5-0.6667}
 grav=${6-1}
 extra=${7-""}			# extra rsf_solve options, e.g. "-imex"
 ncore=${8-1}			# cores for KERNEL GENERATION (the slow part)
-branch=${9-1}			# +1 normal-sense, -1 thrust
+branch=${9-1}			# +1 thrust, -1 normal (see gen_bp3.py, BRANCH)
 case "$branch" in
-    1|+1) vpl=1e-9;  bname=NORMAL; branch=1 ;;
-    -1)   vpl=-1e-9; bname=THRUST; branch=-1 ;;
-    *) echo "$0: branch must be +1 (normal) or -1 (thrust)"; exit 1 ;;
+    1|+1) vpl=1e-9;  bname=THRUST; branch=1 ;;
+    -1)   vpl=-1e-9; bname=NORMAL; branch=-1 ;;
+    *) echo "$0: branch must be +1 (thrust) or -1 (normal)"; exit 1 ;;
 esac
 echo "$0: $bname branch (vpl $vpl)"
 if [ "$sigma" = "1" ];then
@@ -98,9 +98,9 @@ mkdir -p $dir && cd $dir
 # the branch is a property of the whole directory: the elastic
 # reference and the viscoelastic runs are only comparable within one.
 # A directory written before the branch flag existed carries results
-# that can only be normal-sense, so treat a missing stamp next to
+# that can only be thrust (+1), so treat a missing stamp next to
 # existing output as +1 rather than adopting whatever is asked for:
-# otherwise a thrust call would stamp the directory, then skip every
+# otherwise a normal call would stamp the directory, then skip every
 # case as already past its stop time, and the label would be a lie.
 had=
 [ -f branch.txt ] && had=`cat branch.txt`

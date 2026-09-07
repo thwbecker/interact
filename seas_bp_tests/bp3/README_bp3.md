@@ -21,30 +21,67 @@ the benchmark; runs without it converge to a different (wrong)
 attractor.  Driver: run_bp3 ds_km dip vpl outdir stop sense "extra
 opts"; idempotent, resumes from checkpoints.
 
+## Sense of faulting
+
+branch +1 (vpl = +1e-9, the default of run_bp3 and gen_bp3.py) is
+THRUST: positive along-segment slip against the down-dip tangent
+lifts the hanging wall (checked with interact on the 2 km dip-60
+geometry: +0.51 m at 5 km on the hanging-wall side, -0.29 m on the
+footwall), and the fault-normal stress change of that slip agrees
+with an independent Okada (1992) evaluation to 0.1 percent at every
+cell for dip 30 and 60 (positive slip unclamps the shallow fault).
+This is also the spec's convention (thrust = positive slip and
+positive Vp).  branch -1 is NORMAL.  Between 2026-09-01 and
+2026-09-06 the scripts and notes carried these labels the other way
+round; directories stamped in that period with branch -1 and named
+*_thrust or *_t_* hold NORMAL-sense results and vice versa.  The
+physics of rsf_solve was never affected, only the labels.
+
 ## Results vs the community (their section "BP3-QD", Figure 8)
 
+  The paper's Figure 8 gives interevent times for the THRUST cases
+  only (normal cases are in its supplement).  25 m, 1500 yr, 3bs.
+
   dip 90 (slip induces no dsigma; verified sigma stays 50 MPa):
-    25 m cells, 1500 yr: characteristic events every 89.83 yr.
-    Community: ~90 yr.  MATCH.
+    both branches identical, characteristic events every 89.83 yr.
+    Community: ~90 yr (first event ~185 yr).  MATCH.
 
-  dip 60 thrust, sigma-coupled, 100 m survey resolution:
-    interevent set {63.3, 87.4, 91.0, 91.5, 92.3, 95.0} yr.
-    Community (25 m): four characteristic events {~60, 87, 90, 95}.
-    Pattern and values already reproduced at 4x coarser cells; the
-    25-m run (bp3_d60A_sig_25m) is checkpointed at t = 744/1500 yr
-    and resumes with the same command (finish locally: it is in a
-    coseismic crawl that outlives this sandbox's per-call cap).
+  dip 60 thrust (branch +1), rtol 1e-5 and 1e-6 agree to 0.06 %:
+    first event 179.3 yr, then 90.9, 59.0, 85.6, 88.7, 66.4, 85.8,
+    88.5, settling on a 3-cycle {66.5, 85.8, 88.5} yr.
+    Community: first event ~178 yr, then ~98, 57, 87, 92, 97, 62, 87,
+    92, 97, ... i.e. a 4-cycle {~60, 87, 92, 97}; the codes disagree
+    among themselves at this level (sbplib settles on a 1-cycle near
+    87, TriBIE on a 2-cycle 62/95).  The first five events match to
+    a few years; the long-term attractor is within the community
+    spread but not the majority one.
 
-  dip 30 thrust, sigma-coupled, 100 m:
-    period-2 {64.40, 86.51} yr.  Community: two characteristic
-    events {~65, ~80} yr.  First matches to 1 percent; second is 8
-    percent high at survey resolution.
+  dip 30 thrust (branch +1), rtol 1e-5:
+    first event 182.3 yr, then 65.5, 68.7, then a 1-cycle at 68.5.
+    Community: first event ~172 yr, then a 2-cycle {~63, ~82}.
+    NOT reproduced at 25 m.  The 100 m run gives first event 177.2
+    and a 2-cycle {64.5, 86.7}, closer to the community; 50 m gives a
+    deep partial first event at 164.7 yr (7-20 km down-dip, not
+    surface breaking, 0.63 m) and then a 1-cycle at 69.4; a 12.5 m
+    run reached its first event at 169.6 yr.  The first event is
+    thus not converged with cell size at either 25 or 12.5 m, while
+    the eight community codes agree on ~172 yr.  These differences
+    are tolerance-independent (100 and 50 m identical at rtol 1e-5,
+    1e-6, 1e-7).  Open.
 
-  Resolution sensitivity: without sigma coupling the dip-60 ladder
-  (200/100/50/25 m) wandered through period-2 artifacts before
-  converging to a single 85.93-yr event; BP3 needs the suggested
-  25 m (Lb/14) for converged patterns, matching the paper's warning
-  that resolution is critical.
+  dip 60 normal (branch -1): 1-cycle 86.75 yr at 25 m (rtol 1e-5 and
+    1e-6), against 94.0 at 100 m and 94.5 at 50 m; first event 174.9
+    (25 m) vs 195.0 (100 m), 180.1 (50 m), 187.6 (12.5 m).
+  dip 30 normal (branch -1): 1-cycle 80.63 yr at 25 m; 100 m gives a
+    2-cycle {74.7, 106.0}.
+    No community numbers in the main text for either.
+
+  Resolution: without sigma coupling the dip-60 ladder (200/100/50/
+  25 m) converged to a single 85.93-yr event.  With sigma coupling the
+  first-event time and the attractor type still move between 50, 25
+  and 12.5 m on both branches, so the spec's 25 m is not sufficient
+  for convergence of the sequence here, although the interval scale
+  (65-95 yr) is stable from 200 m down.
 
 ## Numerical notes
 

@@ -42,3 +42,46 @@
      r/rmax [0.75, 1.00]: f = 0.0391 0.0706 0.0837 0.0871  alpha = 0.37
    spiral test: predicted Delta ln r = 0.359, autocorr peak at 0.363 (norm. value 0.808)
 
+== basin_files/b74e_513zz (knd 0.857400, eig_plane 1, 513 x 513)
+   classes: chaotic 19606, period-4 243562
+   minority basin fraction (r > 6.3e-05): 7.441%
+   uncertainty fraction f(d), d in pixels of 4.883e-07:
+     global:  f = 0.0715 0.1064 0.1341 0.1370  alpha = 0.31
+     r/rmax [0.00, 0.25]: f = 0.1391 0.1379 0.1379 0.1369  alpha = -0.01
+     r/rmax [0.25, 0.50]: f = 0.1078 0.1386 0.1374 0.1372  alpha = 0.10
+     r/rmax [0.50, 0.75]: f = 0.0749 0.1188 0.1380 0.1353  alpha = 0.28
+     r/rmax [0.75, 1.00]: f = 0.0580 0.0974 0.1376 0.1381  alpha = 0.43
+   spiral test: predicted Delta ln r = 0.360, autocorr peak at 0.363 (norm. value 0.993)
+
+== basin_files/b77e_513zz (knd 0.857700, eig_plane 1, 513 x 513)
+   classes: period-4 251820, period-6 11348
+   minority basin fraction (r > 6.3e-05): 4.314%
+   uncertainty fraction f(d), d in pixels of 4.883e-07:
+     global:  f = 0.0475 0.0713 0.0822 0.0841  alpha = 0.27
+     r/rmax [0.00, 0.25]: f = 0.0864 0.0874 0.0867 0.0863  alpha = -0.00
+     r/rmax [0.25, 0.50]: f = 0.0723 0.0814 0.0831 0.0820  alpha = 0.06
+     r/rmax [0.50, 0.75]: f = 0.0537 0.0785 0.0838 0.0849  alpha = 0.21
+     r/rmax [0.75, 1.00]: f = 0.0389 0.0699 0.0819 0.0845  alpha = 0.36
+   spiral test: predicted Delta ln r = 0.359, autocorr peak at 0.363 (norm. value 0.832)
+
+== basin_files/b74e_patch (knd 0.857400, eig_plane 1, 513 x 513)
+   classes: chaotic 15943, period-4 247226
+   off-center window (r = 9.50e-04 ... 1.05e-03): radial decomposition and spiral test skipped
+   minority basin fraction (whole window): 6.058%
+   uncertainty fraction f(d), d in pixels of 1.953e-07:
+     global:  f = 0.0015 0.0029 0.0058 0.0116  alpha = 1.00
+
+== basin_files//b74e_patch90 (knd 0.857400, eig_plane 1, 513 x 513)
+   classes: chaotic 24207, period-4 238962
+   off-center window (r = 9.50e-04 ... 1.05e-03): radial decomposition and spiral test skipped
+   minority basin fraction (whole window): 9.198%
+   uncertainty fraction f(d), d in pixels of 1.953e-07:
+     global:  f = 0.0085 0.0149 0.0275 0.0402  alpha = 0.76
+
+== basin_files//b74e_patch90d (knd 0.857400, eig_plane 1, 513 x 513)
+   classes: chaotic 5097, period-4 258072
+   off-center window (r = 9.88e-04 ... 1.01e-03): radial decomposition and spiral test skipped
+   minority basin fraction (whole window): 1.937%
+   uncertainty fraction f(d), d in pixels of 4.883e-08:
+     global:  f = 0.0004 0.0008 0.0015 0.0030  alpha = 0.99
+

@@ -103,6 +103,7 @@ PetscErrorCode rsf_solve_run(int argc,char **argv,struct interact_ctx *par,
   struct rsf_out_ctx uc[1];
   /* checkpoint/restart */
   PetscInt ckpt_every=0,restart_step=0;
+  PetscReal t_start;
   PetscBool restart_done=PETSC_FALSE;
   char ckpt_file[300],restart_file[300];
   PetscBool have_restart=PETSC_FALSE;
@@ -664,21 +665,38 @@ PetscErrorCode rsf_solve_run(int argc,char **argv,struct interact_ctx *par,
   PetscCall(PetscOptionsGetString(NULL,NULL,"-rsf_checkpoint_file",ckpt_file,300,NULL));
   PetscCall(PetscOptionsGetString(NULL,NULL,"-rsf_restart",restart_file,300,&have_restart));
   uc->ckpt_every = ckpt_every;
-  uc->ckpt_step0 = 0;		/* raised to the restored step on restart */
+  uc->ckpt_step0 = 0;
+  uc->step_offset = 0;
   strcpy(uc->ckpt_file,ckpt_file);
   uc->restarted = have_restart;
   uc->ckpt_dim = rsf->dim;
   uc->ckpt_slip_mode = rsf->slip_mode;
   uc->ckpt_law = rsf->state_law;
+  uc->ckpt_pending = PETSC_FALSE;
+  /*
+     on a restart, load the checkpoint BEFORE the monitor, event tracker
+     and catalog are initialised, so that they start from the restored
+     state and time rather than from the fresh initial condition: the
+     tracker's slipping flag, the seeded-event snapshot and the first
+     monitor sample all derive from x and t here.  The TS itself is
+     told about the restored time and step size further down.
+  */
+  uc->par = par;		/* rsf_read_checkpoint needs it; rsf_init_monitor_and_event sets it again */
+  if(have_restart){
+    PetscCall(rsf_read_checkpoint(restart_file,x,uc,&restart_t,&restart_dt,&restart_step));
+    t_start = restart_t;
+  }else{
+    t_start = medium->time;
+  }
   /* set up monitoring */
   PetscCall(rsf_init_monitor_and_event(uc,par,dt_monitor,adx_monitor,rdx_monitor,
 				       monitor_tmin,event_tmin,vel_event,vel_event_hyst,
-				       track_events,medium->time,x,vel_init,
+				       track_events,t_start,x,vel_init,
 				       set->field_enable,set->field_step_interval,set->field_tmin,
 				       rsf_groups,rsf_ngroup,rsf_vbuf,
 				       set->monitor_by_group));
   /* SEAS catalog, rupture-time, slip-budget; reads x0 for the seeded event */
-  PetscCall(rsf_init_catalog(uc,par,set,shear_modulus_si,rsf->vpl,x,medium->time));
+  PetscCall(rsf_init_catalog(uc,par,set,shear_modulus_si,rsf->vpl,x,t_start));
   if(rsf->ve_np > 0)		/* accepted-step h update, before output */
     PetscCall(TSMonitorSet(ts,rsf_ve_monitor,(void *)par,NULL));
   PetscCall(TSMonitorSet(ts,rsf_TS_Monitor,(void *)uc,NULL));
@@ -700,14 +718,27 @@ PetscErrorCode rsf_solve_run(int argc,char **argv,struct interact_ctx *par,
      and by the event handler
   */
   PetscCall(TSSetMaxTime(ts,medium->stop_time));
-  if(have_restart){
-    PetscCall(rsf_read_checkpoint(restart_file,x,uc,&restart_t,&restart_dt,&restart_step));
+  if(have_restart){		/* checkpoint already loaded above */
     PetscCall(TSSetTime(ts,restart_t));
-    PetscCall(TSSetStepNumber(ts,restart_step));
     PetscCall(TSSetTimeStep(ts,restart_dt));
-    uc->ckpt_step0 = restart_step;
+    /*
+       do NOT hand the restored step count to PETSc.  TSSolve initialises
+       the event handler (fvalue_prev, fsign_prev, ptime_prev of the
+       velocity-threshold event) only when ts->steps == 0; with a nonzero
+       step number those fields keep their PetscMalloc contents, and the
+       first step after a restart then sees a spurious sign change against
+       garbage, rolls back, and hands the step-size controller a bracket
+       based on ptime_prev = 0.  Observed as an unrecoverable domain-check
+       rejection storm (dt -> nan) on roughly two of three restarts taken
+       mid-event, and as 25-30 rejections per accepted step otherwise.
+       PETSc's counter therefore starts at 0 here and the absolute step is
+       carried as an offset for the monitor and checkpoint bookkeeping;
+       -ts_max_steps counts steps of THIS run.
+    */
+    uc->step_offset = restart_step;
+    uc->ckpt_step0 = 0;
     HEADNODE
-      fprintf(stderr,"%s: restart: -ts_max_steps counts absolute steps; raise it beyond %ld when chaining\n",
+      fprintf(stderr,"%s: restart: absolute step %ld carried as an offset; -ts_max_steps counts steps of this run\n",
 	      argv[0],(long)restart_step);
     if(restart_t >= medium->stop_time - 1.0){
       /* the checkpoint is already at (or past) the requested stop

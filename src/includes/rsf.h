@@ -157,6 +157,18 @@ struct rsf_out_ctx{
 				   robust companion to the step cadence,
 				   whose meaning varies with problem size */
   PetscLogDouble ckpt_last_wtime;
+  PetscBool ckpt_pending;	/* a checkpoint fell due while an event was in
+				   progress; written at the first accepted step
+				   after the arrest instead.  Checkpoints are
+				   never taken mid-event: a restart from one would
+				   have to reconstruct the tracker's per-event
+				   state (ruptured mask, onset snapshots), which
+				   the checkpoint does not carry */
+  PetscInt step_offset;		/* absolute step of PETSc's step 0 (the restored
+				   step on restart, 0 otherwise).  PETSc's own
+				   counter is left at 0 on restart so that
+				   TSSolve runs TSEventInitialize, see the
+				   restart block in rsf_solve.c */
   PetscInt ckpt_step0;		/* step at (re)start; suppresses the spurious
 				   re-write the monitor would otherwise emit at
 				   the restart step itself (step %% ckpt_every
