@@ -162,7 +162,11 @@ for r in range(Nd):
                 v   = vpl
             sig = sigma_surf + (sigma_deep-sigma_surf)*(depth/max(1e-9,(-rows[-1][2])))
 
-        fg.write(f"{x_c*KM:.6e} {y_c*KM:.6e} {z_c*KM:.6e} 0.0 {theta:.6f} {Lhalf:.1f} {Whalf:.1f} 0\n")
+        # full precision: rounded centres leave neighbouring patches
+        # slightly non-coplanar, and a slip patch then induces a spurious
+        # normal traction on its neighbours that grows with resolution
+        # (see seas_bp_tests/bp3/gen_bp3.py, 2026-09-07)
+        fg.write(f"{x_c*KM:.15e} {y_c*KM:.15e} {z_c*KM:.15e} 0.0 {theta:.12f} {Lhalf:.6f} {Whalf:.6f} 0\n")
         fr.write(f"{a:.6e} {b0:.6e}\n")
         fi.write(f"{tau:.8e} {v:.6e}\n")
         fsig.write(f"{sig:.8e}\n")

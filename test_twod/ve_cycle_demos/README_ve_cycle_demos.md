@@ -40,8 +40,15 @@ lengthens recurrence (+14 percent at t_M = 45 yr ~ 0.36 T_rec in the
 demo), the loading-pathway mechanism of the antiplane
 ve_loading_conditions.md map in its in-plane form, i.e. the
 Rundle (1982) / Thatcher & Rundle (1984) regime with resolved
-rate-and-state events instead of imposed ones.  sigma_n held fixed
-(hereditary normal-stress relaxation not yet implemented).
+rate-and-state events instead of imposed ones.  The default branch
+(+1, vpl > 0) is the thrust case and is the one the demo is about;
+branch -1 (normal) is available for comparison and gets a _normal
+suffix in run_many_bp3ve_demo.  (Between 2026-09-01 and 2026-09-06
+the branch labels in these scripts were the other way round; run
+directories stamped -1 in that period and named *_thrust hold
+normal-sense results.)  The percentages quoted above predate the
+tolerance-converged reruns (3bs at rtol 1e-5 rather than -imex at
+1e-4) and should be taken from the current catalogs.
 
 ## Conventions
 

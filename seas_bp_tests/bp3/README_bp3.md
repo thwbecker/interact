@@ -40,48 +40,51 @@ physics of rsf_solve was never affected, only the labels.
 ## Results vs the community (their section "BP3-QD", Figure 8)
 
   The paper's Figure 8 gives interevent times for the THRUST cases
-  only (normal cases are in its supplement).  25 m, 1500 yr, 3bs.
+  only (normal cases are in its supplement).  25 m, 3bs, rtol 1e-5,
+  -calc_sigma_dot.  Community station files can be downloaded per
+  station from the SEAS platform without a login; the HBI (Ozawa)
+  fltst_dp125 file for dip 30 thrust is the reference used below.
 
   dip 90 (slip induces no dsigma; verified sigma stays 50 MPa):
     both branches identical, characteristic events every 89.83 yr.
     Community: ~90 yr (first event ~185 yr).  MATCH.
 
-  dip 60 thrust (branch +1), rtol 1e-5 and 1e-6 agree to 0.06 %:
-    first event 179.3 yr, then 90.9, 59.0, 85.6, 88.7, 66.4, 85.8,
-    88.5, settling on a 3-cycle {66.5, 85.8, 88.5} yr.
-    Community: first event ~178 yr, then ~98, 57, 87, 92, 97, 62, 87,
-    92, 97, ... i.e. a 4-cycle {~60, 87, 92, 97}; the codes disagree
-    among themselves at this level (sbplib settles on a 1-cycle near
-    87, TriBIE on a 2-cycle 62/95).  The first five events match to
-    a few years; the long-term attractor is within the community
-    spread but not the majority one.
+  dip 30 thrust (branch +1): onsets 176.18, 263.23, 327.90, 414.48,
+    479.13, 565.71 yr against HBI 176.18, 263.23, 327.93, 414.51,
+    479.19, 565.77: within 0.06 yr over six events; interevent
+    2-cycle {87.05, 64.67} against HBI {87.06, 64.68}.  At dp125 the
+    interseismic tau and sigma agree with HBI to 1e-4 MPa.  MATCH.
+    (50 m gives the same onsets to 0.05 yr; 100 m to 1 yr.)
 
-  dip 30 thrust (branch +1), rtol 1e-5:
-    first event 182.3 yr, then 65.5, 68.7, then a 1-cycle at 68.5.
-    Community: first event ~172 yr, then a 2-cycle {~63, ~82}.
-    NOT reproduced at 25 m.  The 100 m run gives first event 177.2
-    and a 2-cycle {64.5, 86.7}, closer to the community; 50 m gives a
-    deep partial first event at 164.7 yr (7-20 km down-dip, not
-    surface breaking, 0.63 m) and then a 1-cycle at 69.4; a 12.5 m
-    run reached its first event at 169.6 yr.  The first event is
-    thus not converged with cell size at either 25 or 12.5 m, while
-    the eight community codes agree on ~172 yr.  These differences
-    are tolerance-independent (100 and 50 m identical at rtol 1e-5,
-    1e-6, 1e-7).  Open.
+  dip 60 thrust (branch +1): onsets 177.1, 277.2, 334.2, 421.2, 513.6
+    yr, intervals 100.1, 57.0, 86.9, 92.4, against the community's
+    ~178, then ~98, 57, 87, 92, 97 (a 4-cycle {60, 87, 92, 97}; sbplib
+    and TriBIE differ among themselves at this level).  MATCH through
+    the events run so far; the long-term attractor is to be confirmed
+    with a full 1500 yr run.
 
-  dip 60 normal (branch -1): 1-cycle 86.75 yr at 25 m (rtol 1e-5 and
-    1e-6), against 94.0 at 100 m and 94.5 at 50 m; first event 174.9
-    (25 m) vs 195.0 (100 m), 180.1 (50 m), 187.6 (12.5 m).
-  dip 30 normal (branch -1): 1-cycle 80.63 yr at 25 m; 100 m gives a
-    2-cycle {74.7, 106.0}.
-    No community numbers in the main text for either.
+  dip 60 and 30 normal (branch -1): no community numbers in the main
+    text; the runs made before 2026-09-07 (86.75 and 80.63 yr 1-cycles
+    at 25 m) are affected by the geometry-precision artifact below and
+    need repeating.
 
-  Resolution: without sigma coupling the dip-60 ladder (200/100/50/
-  25 m) converged to a single 85.93-yr event.  With sigma coupling the
-  first-event time and the attractor type still move between 50, 25
-  and 12.5 m on both branches, so the spec's 25 m is not sufficient
-  for convergence of the sequence here, although the interval scale
-  (65-95 yr) is stable from 200 m down.
+  Geometry precision (2026-09-07).  Until this date gen_bp3.py wrote
+  the segment centres with %.6e, i.e. to about 1e-2 m at 12 km.  The
+  centres of a dipping fault are then collinear only to that level,
+  and a glide segment, which produces exactly zero normal traction on
+  its own plane, produces a spurious normal traction on its slightly
+  misaligned neighbours that grows as 1/ds: at 25 m it was ten times
+  the physical free-surface term at the adjacent cells.  Dip 90 is
+  immune (x = 0 exactly), which is why it matched while the dipping
+  cases drifted with resolution: dip 30 thrust first events 177 / 165
+  / 182 / 170 yr at 100 / 50 / 25 / 12.5 m, a deep partial first
+  event at 50 m, a 1-cycle instead of the 2-cycle at 25 m.  With
+  full-precision centres the sequence converges and matches HBI.  All
+  dipping-fault results produced before this date, including the
+  viscoelastic demo's elastic references at 100 m, carry the artifact
+  (small at 100 m: first event 177.2 against 176.2 yr).  Any
+  generator that writes centres of a non-vertical fault should write
+  them at full precision; make_thrust.py was changed as well.
 
 ## Numerical notes
 

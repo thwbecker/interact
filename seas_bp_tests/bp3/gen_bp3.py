@@ -96,7 +96,11 @@ tau0 = branch*(sig0*amax*np.arcsinh(Vp/(2*V0)*np.exp((f0 + b0*np.log(V0/Vp))/ama
 for i in range(n):
     d = (i + 0.5)*ds                       # down-dip center distance
     x, y = d*np.cos(dip), -d*np.sin(dip)
-    fg.write(f"{x:.6e} {y:.6e} 0 {strike:.8f} 90 {ds/2:.6e} 0 0\n")
+    # full precision: with %.6e the centres are only collinear to about
+    # 1e-2 m, and a glide segment then produces a spurious normal
+    # traction on its misaligned neighbours that grows as 1/ds (found
+    # 2026-09-07; it moved the dip-30 first event by 5 yr at 25 m)
+    fg.write(f"{x:.15e} {y:.15e} 0 {strike:.12f} 90 {ds/2:.15e} 0 0\n")
     if d < H:
         a = a0
     elif d < H + h:

@@ -81,7 +81,9 @@ the substrate (cf. Shi, Wei & Barbot, JGR 2022, for the 3-D analog).
   from rsf_checkpoint.bin, and checkpoints every 10000 accepted steps
   or 120 s of wallclock, whichever comes first (CKPT_INT / CKPT_WALL
   override; -rsf_checkpoint_wall is the underlying rsf_solve option),
-  so interrupted runs resume with at most ~2 minutes lost.  The driver reports "reached t = ... of ...
+  so interrupted runs resume with at most ~2 minutes lost (a
+  checkpoint falling due during an event is written after the
+  arrest, so a resume never starts inside an event).  The driver reports "reached t = ... of ...
   requested" at the end; an INCOMPLETE run was killed externally
   (queue/time limit), not by any internal step limit (max steps is
   effectively unbounded).  Note the VE runs are 3-5x slower than

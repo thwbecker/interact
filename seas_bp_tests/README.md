@@ -29,9 +29,10 @@ against Erickson et al. (SRL 2020).
 ## Quick start
 
     cd bp5   && less README.md          # the fullest documented case
-    cd bp3   && ./run_bp3 0.025 60 1e-9 bp3_d60_thrust 1500 1 \
-                  "-calc_sigma_dot -limit_sigma 1 -min_sigma 1e6 -max_sigma 2e8"
-             && python3 plot_bp3.py bp3_d60_thrust
+    cd bp3   && RTOL=1e-5 ./run_bp3 0.025 60 1e-9 bp3_d60_t_25m 1500 1 "-calc_sigma_dot" \
+             && python3 plot_bp3.py bp3_d60_t_25m
+             # branch +1 (vpl > 0) is thrust, -1 normal; run_many_bp3_tests
+             # holds the validation matrix
     cd bp4   && ./run_bp4.sh
     cd bp_thrust && ./test_thrust.sh
 
@@ -70,7 +71,13 @@ These options exist largely because of the benchmarks; see
   writes the station file for the 12 official BP3 stations.
 - `-rsf_checkpoint`, `-rsf_checkpoint_wall`, `-rsf_restart`: long
   benchmark runs are chained; the wallclock cadence is usually what
-  you want.
+  you want.  Checkpoints are never taken during an event (deferred
+  to after the arrest), a restart re-initialises the event tracker
+  and catalog from the restored state, and `-ts_max_steps` counts
+  the steps of the current invocation.  Output rows written by an
+  interrupted run after its last checkpoint are not removed on
+  restart; they follow a `# restarted` marker and can be dropped by
+  time.
 
 ## Notes on running these
 
@@ -79,6 +86,12 @@ These options exist largely because of the benchmarks; see
   converged until the suggested 25 m, and intermediate resolutions
   produce spurious period-2 event patterns (documented in
   `bp3/README_bp3.md`).
+- **Geometry precision.**  Write patch centres at full precision.
+  Rounded centres of a dipping fault are only approximately
+  collinear/coplanar, and a slipping patch then induces a spurious
+  normal traction on its neighbours that grows with resolution
+  (`bp3/README_bp3.md`, "Geometry precision").  Vertical faults are
+  immune, which is why BP1, BP4, BP5 and BP3 dip 90 never showed it.
 - **Integrator.**  The explicit RK path (`-ts_rk_type 3bs`) is
   usually fastest and most robust.  The exception is BP3 with
   normal-stress coupling, where trial stages can drive sigma
@@ -87,8 +100,11 @@ These options exist largely because of the benchmarks; see
   `-domain_check_max_reject`).
 - **Comparing against the community.**  The station files are
   directly comparable to the submissions on the SEAS platform,
-  column for column.  Our slip sign follows the segment tangent, so
-  check the sense convention first if curves come out mirrored.
+  column for column.  Our slip sign follows the segment tangent; for
+  `gen_bp3.py`'s geometry positive slip is thrust, matching the
+  spec's sign convention (see "Sense of faulting" in
+  `bp3/README_bp3.md`), so thrust runs compare directly and normal
+  runs come out with the spec's negative signs as they should.
 
 ## Viscoelastic extensions
 
