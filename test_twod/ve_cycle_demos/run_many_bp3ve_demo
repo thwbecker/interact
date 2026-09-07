@@ -48,10 +48,10 @@
 # exercises every path in a few minutes before you commit to 25 m.
 #
 ds=${1-0.025}
-tms=${2-"15 45 200"}
-stop=${3-1500}
+tms=${2-"5 15 25 50 100 250 500 1000"}
+stop=${3-5000}
 par=${4-0}
-ncore=${5-4}		# cores for kernel generation (the slow part)
+ncore=${5-16}		# cores for kernel generation (the slow part)
 branch=${6-1}		# +1 thrust, -1 normal
 # the two branches are different physics, so they get their own case
 # directories and can sit side by side in one working directory

@@ -588,6 +588,61 @@ void read_geometry(char *patch_filename,struct med **medium,
     exit(-1);
   }
   *fault=(struct flt *)realloc(*fault,sizeof(struct flt)*(*medium)->nrflt);
+  /*
+     coplanarity check.  Neighbouring patches of the same group whose
+     normals are (numerically) parallel are meant to lie in one plane;
+     if the next centre is off the current patch's plane by more than
+     rounding allows, the geometry file was written with too few
+     digits.  That matters: a glide dislocation produces exactly zero
+     normal traction on its own plane, but a receiver a few millimetres
+     off it sees a normal traction of order G slip offset/distance^2,
+     which for fixed offset grows with resolution and acted as a
+     spurious normal-stress coupling in the BP3 dipping-fault runs
+     (2026-09-07; gen_bp3.py wrote %.6e).  Offsets that are explained
+     by an actual change of normal between the two patches (curved
+     faults) are not flagged.
+  */
+  {
+    int nwarn = 0, iworst = -1, jworst = -1, jmax;
+    COMP_PRECISION dx[3], off, size, dn, dist, worst = 0.0, worst_rel = 0.0, angle_allow;
+    /* neighbours are searched among all later patches of the same
+       group within 1.5 element sizes when that is affordable, else
+       only the next patch in the file */
+    my_boolean all_pairs = ((*medium)->nrflt <= 20000) ? TRUE : FALSE;
+    for(i=0;i < (*medium)->nrflt - 1;i++){
+      size = 2.0 * (((*fault+i)->l > 0.0) ? ((*fault+i)->l) : (sqrt((*fault+i)->area)/2.0));
+      if(size <= 0.0)
+	continue;
+      jmax = all_pairs ? (*medium)->nrflt : i + 2;
+      for(j=i+1;j < jmax;j++){
+	if((*fault+i)->group != (*fault+j)->group)
+	  continue;
+	for(k=0;k < 3;k++)
+	  dx[k] = (*fault+j)->x[k] - (*fault+i)->x[k];
+	dist = norm_3d(dx);
+	if(dist > 1.5 * size)
+	  continue;
+	off = fabs(dotp_3d(dx,(*fault+i)->normal));
+	/* offset that a change of normal between the two patches could
+	   produce: distance times the angle between the normals */
+	dn = 1.0 - fabs(dotp_3d((*fault+i)->normal,(*fault+j)->normal));
+	angle_allow = dist * sqrt(2.0 * ((dn > 0.0) ? dn : 0.0));
+	if((off > 1e-6 * size) && (off > 10.0 * angle_allow)){
+	  nwarn++;
+	  if(off/size > worst_rel){
+	    worst_rel = off/size; worst = off; iworst = i; jworst = j;
+	  }
+	}
+      }
+    }
+    if(nwarn && ((*medium)->comm_rank == 0)){
+      fprintf(stderr,"read_geometry: WARNING: %i neighbouring same-group patch pairs with parallel normals\n",nwarn);
+      fprintf(stderr,"read_geometry: WARNING: are not coplanar beyond rounding; worst: patch %i -> %i off-plane by %.3e (%.1e of the element size)\n",
+	      iworst,jworst,(double)worst,(double)worst_rel);
+      fprintf(stderr,"read_geometry: WARNING: write patch centres at full precision, otherwise neighbouring patches\n");
+      fprintf(stderr,"read_geometry: WARNING: pick up a spurious normal traction that grows with resolution\n");
+    }
+  }
   /* 
 
      check if we need the rake (0 = strike ... 90 = dip, up from strike, in degrees)

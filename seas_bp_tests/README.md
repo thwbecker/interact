@@ -92,6 +92,9 @@ These options exist largely because of the benchmarks; see
   normal traction on its neighbours that grows with resolution
   (`bp3/README_bp3.md`, "Geometry precision").  Vertical faults are
   immune, which is why BP1, BP4, BP5 and BP3 dip 90 never showed it.
+  `read_geometry` now warns when neighbouring same-group patches with
+  parallel normals are off each other's plane by more than 1e-6 of
+  the element size.
 - **Integrator.**  The explicit RK path (`-ts_rk_type 3bs`) is
   usually fastest and most robust.  The exception is BP3 with
   normal-stress coupling, where trial stages can drive sigma
