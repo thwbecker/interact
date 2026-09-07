@@ -175,7 +175,7 @@ with open(outfile, "w") as f:
         x, d = trim_shallow(np.asarray(x), np.asarray(d), min_depth)
         f.write("> %s\n" % name)
         for xx, dd in zip(x, d):
-            f.write("%10.5f %10.5f\n" % (xx, dd))
+            f.write("%.12e %.12e\n" % (xx, dd))  # full precision, see cascadia/make_faults_cascadia.py
         dips = np.degrees(np.arctan2(np.diff(d), np.diff(x)))
         print("%-11s n=%5d  depth %6.3f-%7.3f km  dip %5.2f-%5.2f deg  L=%8.3f km"
               % (name, len(x), d.min(), d.max(), dips.min(), dips.max(),

@@ -46,11 +46,18 @@ dsigma_dz = 0.0               # their sigma_n is CONSTANT
 sigma_cap = 50.0e6            # cap [Pa]
 sigma_min = 50.0e6            # = cap: constant 50 MPa everywhere
 
-slip_sense = 1.0              # thrust
-#slip_sense = -1.0              # normal
-#slip_sense = -1.0             # sign of slip in interact's 2D convention that
-                              # corresponds to normal (extensional) faulting on
-                              # this geometry.  vpl, v_ic and tau_ic below all
+slip_sense = -1.0             # NORMAL: Uphoff et al. (2023) section 8 is "a
+                              # shallowly dipping normal fault with four curved
+                              # splay faults".  All groups have down-dip
+                              # tangents here (strike > 90), so -1 is normal
+                              # sense on the main fault and the splays alike.
+                              # History: -1 until 2026-07-28, +1 (thrust) from
+                              # then until 2026-09-07; runs from that period
+                              # are thrust-sense and not their scenario.
+#slip_sense = 1.0             # thrust variant, for comparison with cascadia/
+                              # -1 is the sign of slip in interact's 2D convention
+                              # that corresponds to normal (extensional) faulting
+                              # on this geometry.  vpl, v_ic and tau_ic below all
                               # carry it, so the initial state sits on the same
                               # branch of the (odd) friction law that the
                               # backslip loading drives towards.  Confirm the

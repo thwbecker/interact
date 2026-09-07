@@ -643,6 +643,64 @@ void read_geometry(char *patch_filename,struct med **medium,
       fprintf(stderr,"read_geometry: WARNING: pick up a spurious normal traction that grows with resolution\n");
     }
   }
+#ifdef ALLOW_NON_3DQUAD_GEOM
+  /*
+     strike-jitter check for 2-D segment traces.  Segments of a group in
+     file order form the trace; for a smooth trace the second difference
+     of the strike series is much smaller than the first difference,
+     while for a trace built from rounded coordinates the two are of the
+     same size (the strike flips back and forth from segment to segment).
+     That roughness is self-consistent geometry, so the coplanarity
+     check above does not see it, but it couples neighbouring segments
+     through the normal traction in the same way (Cascadia and Uphoff
+     traces written with 4 to 5 decimals in km, 2026-09-07).
+  */
+  {
+    int g, ng = 0, nseg, gflag = 0, worst_g = -1;
+    COMP_PRECISION d1med, d2med, worst_ratio = 0.0, worst_d2 = 0.0, *d1 = NULL, *d2 = NULL;
+    for(i=0;i < (*medium)->nrflt;i++)
+      if((*fault+i)->group + 1 > ng)
+	ng = (*fault+i)->group + 1;
+    d1 = (COMP_PRECISION *)malloc(sizeof(COMP_PRECISION)*(*medium)->nrflt);
+    d2 = (COMP_PRECISION *)malloc(sizeof(COMP_PRECISION)*(*medium)->nrflt);
+    if(d1 && d2){
+      for(g=0;g < ng;g++){
+	/* collect strike of 2-D segments of this group in file order */
+	nseg = 0;
+	for(i=0;i < (*medium)->nrflt;i++)
+	  if(((*fault+i)->group == g) && patch_is_2d((*fault+i)->type))
+	    d1[nseg++] = (COMP_PRECISION)(*fault+i)->strike;
+	if(nseg < 12)
+	  continue;
+	for(i=0;i < nseg-1;i++)	/* first differences, then second */
+	  d2[i] = d1[i+1] - d1[i];
+	for(i=0;i < nseg-2;i++)
+	  d1[i] = fabs(d2[i+1] - d2[i]);
+	for(i=0;i < nseg-1;i++)
+	  d2[i] = fabs(d2[i]);
+	/* medians by sorting */
+	qsort(d1,(size_t)(nseg-2),sizeof(COMP_PRECISION),compare_flt);
+	qsort(d2,(size_t)(nseg-1),sizeof(COMP_PRECISION),compare_flt);
+	d2med = d1[(nseg-2)/2]; d1med = d2[(nseg-1)/2];
+	if((d2med > 1e-4) && (d2med > 1.2 * d1med)){
+	  gflag++;
+	  if(d2med/(d1med + 1e-30) > worst_ratio){
+	    worst_ratio = d2med/(d1med + 1e-30); worst_d2 = d2med; worst_g = g;
+	  }
+	}
+      }
+    }
+    if(d1)free(d1);
+    if(d2)free(d2);
+    if(gflag && ((*medium)->comm_rank == 0)){
+      fprintf(stderr,"read_geometry: WARNING: the strike of the 2-D segments of %i group(s) jitters from segment to segment\n",gflag);
+      fprintf(stderr,"read_geometry: WARNING: (group %i: median |d2 strike| %.2e deg, %.1f times the median |d strike|); if the trace\n",
+	      worst_g,(double)worst_d2,(double)worst_ratio);
+      fprintf(stderr,"read_geometry: WARNING: is meant to be smooth, its coordinates were written with too few digits, and the\n");
+      fprintf(stderr,"read_geometry: WARNING: kinks act as a normal-traction coupling between neighbours\n");
+    }
+  }
+#endif
   /* 
 
      check if we need the rake (0 = strike ... 90 = dip, up from strike, in degrees)

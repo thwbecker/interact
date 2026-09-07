@@ -42,7 +42,14 @@
 #     built from them;
 #   ext_depth_km in make_faults_cascadia.py has to reach past the
 #     downdip end of the velocity-weakening band, which the generator
-#     checks and reports.
+#     checks and reports;
+#   dx in faults2geom_cascadia.py sets the element length; the committed
+#     geom_*.in were made with dx = 0.1 (half length 50 m) while the
+#     script currently says 0.025, so regenerating changes the mesh;
+#   faults_*.d must be written at full precision (make_faults_cascadia.py
+#     does since 2026-09-07; with 4 decimals in km the 100 m elements had
+#     a strike jitter of 0.06 deg, which acted as a spurious normal-stress
+#     coupling between neighbours; read_geometry now warns about it).
 #
 # All parameters are plain assignments below; no environment variables.
 

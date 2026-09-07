@@ -251,14 +251,17 @@ for prof in profiles:
                 % (deg_mega, rms_mega, fit[-1, 0], ext_depth_km, dip_end, dip_deep_deg))
         f.write("# splays: degree %d polynomials, numbered seaward to landward, deep tips\n"
                 "# held %.2f km clear of the interface.\n" % (deg_splay, junction_gap_km))
-        f.write("# columns: distance_km depth_km (depth positive down)\n")
+        f.write("# columns: distance_km depth_km (depth positive down); full precision on\n"
+                "# purpose: rounding to 1e-4 km left the 100 m elements built from these\n"
+                "# points misaligned by up to 1e-3 of their length (strike jitter 0.06 deg),\n"
+                "# which acts as a spurious normal-stress coupling between neighbours\n")
         f.write("> megathrust\n")
         for xx, zz in out[prof]["curve"]:
-            f.write("%10.4f %10.4f\n" % (xx, zz))
+            f.write("%.12e %.12e\n" % (xx, zz))
         for k, q in enumerate(sp_out):
             f.write("> splay%d\n" % (k + 1))
             for xx, zz in q:
-                f.write("%10.4f %10.4f\n" % (xx, zz))
+                f.write("%.12e %.12e\n" % (xx, zz))
 
     gaps = [perp_gap(q[-1], out[prof]["curve"]) for q in sp_out]
     print("%s  rotated %+.2f deg, seafloor residual %.3f km RMS" % (prof, np.degrees(ang), rms_flat))

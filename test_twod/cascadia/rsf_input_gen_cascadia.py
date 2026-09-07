@@ -80,7 +80,23 @@ dsigma_dz = 18.0e6            # effective normal stress gradient [Pa/km],
 sigma_cap = 50.0e6            # cap [Pa]
 sigma_min = 2.0e6             # floor [Pa] for the shallowest patches
 
-slip_sense = 1.0              # thrust, the sense of a subduction megathrust
+slip_sense = 1.0              # thrust, the PHYSICAL sense of the megathrust.
+                              # interact's positive slip is hanging-wall-up only
+                              # where the segment tangent points down-dip (strike
+                              # > 90, fault dipping toward +x); on the seaward-
+                              # dipping PD06/PD07 splays (strike < 90) positive
+                              # slip is normal sense.  The per-patch sign
+                              # `orient` below folds that in, so tau_ic and v_ic
+                              # prestress EVERY fault in the same physical sense
+                              # (thrust), the way Uphoff et al. prestress their
+                              # splays with the main fault's sense.  This does
+                              # not prescribe splay motion: the splays carry no
+                              # vpl and slip whichever way the stress transfer
+                              # drives them; it only avoids starting half of
+                              # them a full 2 f0 sigma away from the thrust
+                              # branch by an accident of segment orientation.
+                              # Catalog splay slip rates are still in interact's
+                              # convention: negative = thrust on those splays.
 #slip_sense = -1.0            # sign of slip in interact's 2D convention that
                               # corresponds to normal (extensional) faulting on
                               # this geometry.  vpl, v_ic and tau_ic below all
@@ -106,10 +122,14 @@ ic_uniform_tau = None         # per-patch steady state; a uniform tau0 over
                               # a depth-varying sigma freezes the fault
 coord_unit_km = 0.001         # geometry length unit in km (0.001: meters)
 
-rows = np.loadtxt(geom, usecols=(0, 1, 5, 7))
-gids = rows[:, 3].astype(int)
+rows = np.loadtxt(geom, usecols=(0, 1, 3, 5, 7))
+strike = rows[:, 2]
+# +1 where the tangent points down-dip (strike > 90), -1 where it points
+# up-dip; multiplies slip_sense so the prestress has one physical sense
+orient = np.where(strike > 90.0, 1.0, -1.0)
+gids = rows[:, 4].astype(int)
 depth_km = -rows[:, 1] * coord_unit_km
-hl_km = rows[:, 2] * coord_unit_km
+hl_km = rows[:, 3] * coord_unit_km
 n = len(rows)
 
 profiles = {}
@@ -128,7 +148,7 @@ for i in range(n):
     b[i] = np.interp(depth_km[i], p[:, 0], p[:, 2])
     dc[i] = dc_by_group.get(gids[i], dc_default)
     sig[i] = min(max(dsigma_dz*depth_km[i], sigma_min), sigma_cap)
-    vpl[i] = vpl_by_group.get(gids[i], 0.0)
+    vpl[i] = vpl_by_group.get(gids[i], 0.0)*orient[i] + 0.0   # + 0.0 avoids -0
 
 for od in outdirs:
     os.makedirs(od, exist_ok=True)
@@ -137,11 +157,11 @@ for od in outdirs:
     np.savetxt(od + "rsf_sigma.in", sig, fmt="%.6e")
     np.savetxt(od + "rsf_vpl.in", vpl, fmt="%.6e")
 if ic_uniform_tau is None:
-    tau_ic = slip_sense*sig*(f0 + (a - b)*np.log(abs(v_ic)/v0))
+    tau_ic = orient*slip_sense*sig*(f0 + (a - b)*np.log(abs(v_ic)/v0))
 else:
-    tau_ic = np.full(n, ic_uniform_tau)
+    tau_ic = orient*np.full(n, ic_uniform_tau)
 for od in outdirs:
-    np.savetxt(od + "rsf_ic.in", np.column_stack([tau_ic, np.full(n, v_ic)]),
+    np.savetxt(od + "rsf_ic.in", np.column_stack([tau_ic, orient*v_ic]),
                fmt="%.6e %.6e")
 
 print("wrote rsf_ab.in rsf_dc.in rsf_sigma.in rsf_vpl.in rsf_ic.in for "
