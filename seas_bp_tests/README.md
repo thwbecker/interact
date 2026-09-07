@@ -81,11 +81,12 @@ These options exist largely because of the benchmarks; see
 
 ## Notes on running these
 
-- **Resolution matters more for some problems than others.**  BP5
-  and BP1 are converged at their suggested cell sizes; BP3 is not
-  converged until the suggested 25 m, and intermediate resolutions
-  produce spurious period-2 event patterns (documented in
-  `bp3/README_bp3.md`).
+- **Resolution.**  BP1, BP5 and BP3 are converged at their suggested
+  cell sizes.  For BP3 with clean geometry, 100 m already gives the
+  first event within 1 yr of the 25 m reference and the right event
+  pattern, and 50 m is within 0.05 yr; the earlier statement here that
+  BP3 needed 25 m for convergence came from runs affected by the
+  geometry-precision artifact below (`bp3/README_bp3.md`).
 - **Geometry precision.**  Write patch centres at full precision.
   Rounded centres of a dipping fault are only approximately
   collinear/coplanar, and a slipping patch then induces a spurious

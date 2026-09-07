@@ -49,24 +49,26 @@ physics of rsf_solve was never affected, only the labels.
     both branches identical, characteristic events every 89.83 yr.
     Community: ~90 yr (first event ~185 yr).  MATCH.
 
-  dip 30 thrust (branch +1): onsets 176.18, 263.23, 327.90, 414.48,
-    479.13, 565.71 yr against HBI 176.18, 263.23, 327.93, 414.51,
-    479.19, 565.77: within 0.06 yr over six events; interevent
-    2-cycle {87.05, 64.67} against HBI {87.06, 64.68}.  At dp125 the
-    interseismic tau and sigma agree with HBI to 1e-4 MPa.  MATCH.
-    (50 m gives the same onsets to 0.05 yr; 100 m to 1 yr.)
+  dip 30 thrust (branch +1), 1500 yr: 18 events, onsets within 0.23 yr
+    of HBI's 18 over the whole run (drift 0.014 yr per event);
+    interevent 2-cycle {86.58, 64.65} against HBI {86.58, 64.68}; slip,
+    tau and sigma at dp125 agree to 0.4 percent, 0.01 MPa and 0.003 MPa
+    at 1400 yr.  MATCH.  Clean-geometry resolution ladder: first event
+    177.2 (100 m), 176.19 (50 m), 176.18 yr (25 m), the 2-cycle present
+    at all three.
 
-  dip 60 thrust (branch +1): onsets 177.1, 277.2, 334.2, 421.2, 513.6
-    yr, intervals 100.1, 57.0, 86.9, 92.4, against the community's
-    ~178, then ~98, 57, 87, 92, 97 (a 4-cycle {60, 87, 92, 97}; sbplib
-    and TriBIE differ among themselves at this level).  MATCH through
-    the events run so far; the long-term attractor is to be confirmed
-    with a full 1500 yr run.
+  dip 60 thrust (branch +1), 1500 yr: first event 177.12 yr, then
+    100.1, 57.0, 86.9, 92.4, 97.4, 63.2, 87.1, 91.1, 97.5, 63.3, 87.1,
+    91.1, 97.5, settling on the 4-cycle {63.3, 87.1, 91.1, 97.5};
+    rtol 1e-6 gives the same to 0.15 yr.  Community (Figure 8e): ~178,
+    then ~98, 57, 87, 92, 97, 62, ..., the 4-cycle {~60, 87, 92, 97}.
+    MATCH.
 
-  dip 60 and 30 normal (branch -1): no community numbers in the main
-    text; the runs made before 2026-09-07 (86.75 and 80.63 yr 1-cycles
-    at 25 m) are affected by the geometry-precision artifact below and
-    need repeating.
+  dip 60 normal (branch -1): first event 194.49 yr, 1-cycle 95.15
+    (95.16 at rtol 1e-6).
+  dip 30 normal (branch -1): first event 206.72 yr, 2-cycle {74.04,
+    109.73}.
+    No community numbers in the main text; the supplement has them.
 
   Geometry precision (2026-09-07).  Until this date gen_bp3.py wrote
   the segment centres with %.6e, i.e. to about 1e-2 m at 12 km.  The
