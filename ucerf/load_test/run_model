@@ -4,7 +4,7 @@
 # stress drop on all patches (bc code 10, value 1), dense operator,
 # PETSc iterative solvers. several solver modes are run so that the
 # convergence behavior with and without the near-field preconditioner
-# (-near_pc_radius) can be compared from the logs.
+# (-near_pc_rfac) can be compared from the logs.
 #
 # usage: run_model [ncore] [modes] [geometry] [rtol] [rfac]
 #

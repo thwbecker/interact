@@ -62,10 +62,24 @@ Matvec timing (adds n random-vector multiplies, timed for dense and H):
     compress_interaction_matrix -geom_file geom.in -use_hmatrix 3 \
         -hacapk_ztol 1e-5 -nrandom 300
 
-Inverse solve test (dense LU vs unpreconditioned KSP on the H operator):
+Inverse solve test (dense LU vs KSP on the H operator):
 
     compress_interaction_matrix -geom_file geom.in -use_hmatrix 1 \
         -mat_htool_epsilon 3e-5 -mat_htool_eta 10 -test_forward false
+
+The KSP that solves on the H operator (and writes the slip to flt.dat)
+has the options prefix `htool_` for all backends, so solver settings
+are given as `-htool_ksp_type`, `-htool_pc_type`, `-htool_ksp_rtol`
+etc.; un-prefixed `-ksp_*` options only affect the optional `-nsolve`
+timing solves with random right-hand sides. For fault networks the
+unpreconditioned solve stagnates; use the near-field preconditioner
+(`-near_pc_rfac 4 -htool_ksp_type gmres -htool_pc_type asm
+-htool_sub_pc_type lu`), see ucerf/SOLVER_NOTES.md and
+ucerf/solve_test/run_test. For inverse problems prefer the block-local
+hmmvp tolerance (`-hmmvp_inorm 1 -hmmvp_tol 1e-3`) or HACApK
+(`-hacapk_ztol 1e-4`); the whole-matrix hmmvp norm (`-hmmvp_inorm 3`)
+at 1e-4 gave a 2 percent slip error on an intersecting-fault test where
+the block-local setting gave 2e-4.
 
 Assembly times for the dense and the H matrix are printed on stderr
 ("dense assembly took", "H matrix assembly took").

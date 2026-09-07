@@ -38,10 +38,12 @@ void phelp(void)
   PE("PetSc support was compiled in, providing limited access to parallel solves for one-step problems.");
   PE("      For direct solve, use    \"-pc_factor_mat_solver_type scalapack -mat_type scalapack\" or");
   PE("                           \"-pc_factor_mat_solver_type elemental -mat_type elemental\".");
-  PE("      For iterative solve \"-ksp_type fgmres -pc_type none   -ksp_max_it 10000 -ksp_rtol 1.0e-8\", ");
-  PE("                          \"-ksp_type fgmres -pc_type jacobi -ksp_max_it 10000 -ksp_rtol 1.0e-8\", or for complex systems");
-  PE("                          \"-ksp_type gmres  -pc_type none   -ksp_gmres_restart 6000 -ksp_rtol 1e-4\".");
-  PE("      Check the makefile for other solver options and MPI settings.");
+  PE("      For iterative solve, the recommended setting is the near-field preconditioner (see -near_pc_rfac below):");
+  PE("                          \"-near_pc_rfac 4 -ksp_type gmres -pc_type asm -sub_pc_type lu -ksp_norm_type unpreconditioned -ksp_rtol 1e-6\"");
+  PE("      (tested to 265k patches; without the preconditioner, fgmres with a long restart, e.g.");
+  PE("      \"-ksp_type fgmres -pc_type none -ksp_gmres_restart 2000 -ksp_rtol 1e-6\", needs 25x more iterations");
+  PE("      and may not converge for large fault networks; Jacobi does not help for near-uniform patch sizes).");
+  PE("      Add -ksp_converged_reason to check convergence. See ucerf/SOLVER_NOTES.md for tests.");
   PE("      When running a one-step computation, will also compute stress fields in parallel.");
   PE("      The code can interface with HTOOLS, H2OPUS, HACApK, and HMMVP H matrix packages.");
   PE("      HTOOLS and H2OPUS have to be provided via Petsc packages, HACApK and HMMVP can be compiled locally.");

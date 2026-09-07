@@ -439,10 +439,12 @@ Output is written to files and in real-time to X11 if PGPLOT support was compile
 PetSc support was compiled in, providing limited access to parallel solves for one-step problems.
       For direct solve, use    "-pc_factor_mat_solver_type scalapack -mat_type scalapack" or
                            "-pc_factor_mat_solver_type elemental -mat_type elemental".
-      For iterative solve "-ksp_type fgmres -pc_type none   -ksp_max_it 10000 -ksp_rtol 1.0e-8", 
-                          "-ksp_type fgmres -pc_type jacobi -ksp_max_it 10000 -ksp_rtol 1.0e-8", or for complex systems
-                          "-ksp_type gmres  -pc_type none   -ksp_gmres_restart 6000 -ksp_rtol 1e-4".
-      Check the makefile for other solver options and MPI settings.
+      For iterative solve, the recommended setting is the near-field preconditioner (see -near_pc_rfac below):
+                          "-near_pc_rfac 4 -ksp_type gmres -pc_type asm -sub_pc_type lu -ksp_norm_type unpreconditioned -ksp_rtol 1e-6"
+      (tested to 265k patches; without the preconditioner, fgmres with a long restart, e.g.
+      "-ksp_type fgmres -pc_type none -ksp_gmres_restart 2000 -ksp_rtol 1e-6", needs 25x more iterations
+      and may not converge for large fault networks; Jacobi does not help for near-uniform patch sizes).
+      Add -ksp_converged_reason to check convergence. See ucerf/SOLVER_NOTES.md for tests.
       When running a one-step computation, will also compute stress fields in parallel.
       The code can interface with HTOOLS, H2OPUS, HACApK, and HMMVP H matrix packages.
       HTOOLS and H2OPUS have to be provided via Petsc packages, HACApK and HMMVP can be compiled locally.

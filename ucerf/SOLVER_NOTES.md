@@ -1,8 +1,8 @@
 # Solving the UCERF one-step interaction problem: tests and recommendations
 
-Status as of 2026-09-06, interact master with the near-field
-preconditioner (`-near_pc_rfac`) and the single assembly path in
-compress_interaction_matrix. Problem considered throughout: strike slip
+Status as of 2026-09-07, interact master with the near-field
+preconditioner (`-near_pc_rfac`), the single assembly path in
+compress_interaction_matrix, and the full-set (265k) runs included. Problem considered throughout: strike slip
 on all patches from a unit strike stress drop (bc code 10, value 1),
 i.e. one N x N operator, strike slip -> strike shear stress. Numbers
 are from one machine (theo6, 16 MPI ranks) and one sandbox (2 ranks);
@@ -102,7 +102,19 @@ Preconditioner sweep (dense, rtol 1e-6): none 375 its; near-field
 asm/lu at 2, 3, 4, 6 patch lengths: 94, 31, 21, 9 its; the same 21 at
 4 patch lengths for hmmvp (BREM 1e-3) and HACApK (1e-4) operators.
 
-### 2.4 Scaling to the full set (265k patches)
+### 2.4 Full set, 265464 patches, 64 ranks (run_production, rtol 1e-6, stress evaluation on)
+
+    gmres(30), near-field asm/lu, rfac 4:  86 iterations, solve 381 s, assembly 7051 s, stress pass 6971 s
+    fgmres(2000), no preconditioner:       not converged after 5000 iterations (true residual 4.8e-4), aborted
+
+Near-field matrix 14.6 M nonzeros (55 per row, 0.02 percent of dense),
+one dense matvec 4.4 s. The residual history shows plateaus (30 to 50
+iterations near 1e-3), i.e. at full size the preconditioner captures
+less of the coupling than at 100k (20 iterations); a larger radius
+(rfac 6) is the first thing to try. The unpreconditioned solve is not a
+usable fallback at this size.
+
+### 2.5 Scaling estimates
 
 From the 100k measurements and N^2 scaling: dense assembly about
 7.3 h on 16 ranks or 1.8 h on 64 (consistent with the 6835 s measured
@@ -151,17 +163,18 @@ near-field preconditioner its solve is no longer the bottleneck:
 
 `ucerf/load_test/run_production` wraps exactly this: geometry, bc
 file, stress evaluation on/off, output tag, and checks the convergence
-reason. Expected at 265k on 64 ranks: about 2 h assembly, another 2 h
-for the post-slip stress evaluation if requested, 560 GB distributed
-memory, about a minute of solve. Use `-npsfse` (stress 0) while
-exploring boundary conditions, and evaluate stresses only for the runs
-that are kept.
+reason. Measured at 265k on 64 ranks (section 2.4): 2 h assembly,
+another 2 h for the post-slip stress evaluation if requested, 560 GB
+distributed memory, 86 iterations and 6 minutes of solve at rfac 4.
+Use `-npsfse` (stress 0) while exploring boundary conditions, and
+evaluate stresses only for the runs that are kept.
 
-Fallback (`solver safe` in the script): fgmres(2000) without
-preconditioner. It converges on these operators but needs about 25x
-the iterations (12 minutes instead of 30 s at 100k on 16 ranks). Only
-for the case that the preconditioned solve reports a non-converged
-reason; the first thing to try before that is rfac 6.
+There is no unpreconditioned fallback: fgmres(2000) without
+preconditioner needed 25x the iterations at 100k and did not converge
+within 5000 iterations at 265k (section 2.4). If the preconditioned
+solve reports a non-converged reason, increase the radius (rfac 6)
+first; on the 4000 patch case that halved the iteration count at about
+2.3x the sparse-matrix memory.
 
 The H-matrix route (compress_interaction_matrix, `solve_test/run_test`)
 removes the two N^2 Okada passes and the memory requirement but only
