@@ -435,7 +435,7 @@ void phelp(void)
   PE(" -nu value      set Poisson ratio");
   PE("");
 #ifdef NO_COHESION 
-  PE(" -c option for cohesion was switched off, always assuming that cohesion C=0");
+  PE(" -c option for cohesion was switched off, always assuming that cohesion C = 0");
 #else
   fprintf(stderr," -c  value      sets the cohesion term of the friction law to value, by default: %g\n",
 	  COHESION_DEF);
