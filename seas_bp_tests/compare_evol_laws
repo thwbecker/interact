@@ -20,6 +20,9 @@ tsxl=260			# x of the law labels in the time series panel.
 laws="aging slip prz sato"
 plaws="$laws"
 
+ft=rsf_monitor.dat
+#ft=rsf_monitor.g001.dat
+
 for hmode in $hmodes;do
     for res in $ress;do
 	
@@ -42,8 +45,8 @@ for hmode in $hmodes;do
 	    sll=`echo $sl | gawk '{print(toupper($1))}'`
 	    col=`platecolor $pc`
 	    dir=`./find_directory $sl $res 0 $hmode 2>/dev/null`
-	    if [[ $dir != NaN && `lc $dir/rsf_monitor.dat` -gt 1 ]];then
-		gawk '{if(NR>1)print($3,$5)}' $dir/rsf_monitor.dat | \
+	    if [[ $dir != NaN && `lc $dir/$ft` -gt 1 ]];then
+		gawk '{if(NR>1)print($3,$5)}' $dir/$ft | \
 		    psxy -W2,$col $reg $proj -O -K >> $ofile
 		echo $xl $yl 18 0 29 LM $sll | pstext -R -J -O -K -F+f$col >> $ofile
 	    else
@@ -51,7 +54,7 @@ for hmode in $hmodes;do
 	    fi
 	    dir=`./find_directory $sl $res 1 $hmode 2>/dev/null`
 	    if [ $dir != NaN ];then
-		gawk '{if(NR>1)print($3,$5)}' $dir/rsf_monitor.dat | \
+		gawk '{if(NR>1)print($3,$5)}' $dir/$ft | \
 		    psxy -W3,$col,. $reg $proj -O -K >> $ofile
 
 	    else
@@ -63,7 +66,7 @@ for hmode in $hmodes;do
 	#psxy -T -O -R >> $ofile;modifybb $ofile
 
 
-	pc=1;xl=0.52;xl2=0.5;yl=-2
+	pc=1;xl=0.52;xl2=0.49;yl=-2
 	reg=-R0.48/0.6/-10/1.5		# phase space
 	by_color=0			# colored lines single plot, 0: several plots
 	pc=1
@@ -76,7 +79,7 @@ for hmode in $hmodes;do
 		sll=`echo $sl | gawk '{print(toupper($1))}'`
 		col=`platecolor $pc`
 		if [ $dir != NaN ];then
-		    gawk '{if(NR>1)if($3>1000)if($3>1250)print($7,$5)}' $dir/rsf_monitor.dat | \
+		    gawk '{if(NR>1)if($3>1000)if($3>1250)print($7,$5)}' $dir/$ft | \
 			psxy -W1,$col $reg $proj -O -K >> $ofile
 		    
 		    echo $xl $yl 18 0 29 LM $sll | pstext -R -J -O -K -F+f$col >> $ofile
@@ -135,7 +138,7 @@ for hmode in $hmodes;do
 		    fi
 		    read t1 t2 < tmp.val; rm tmp.val
 		    echo $sl $t1 $t2 $dir
-		    gawk -v t1=$t1 -v t2=$t2 '{if(NR>1)if($3>=t1)if($3<=t2)print($7,$5,($3-t1)/(t2-t1))}' $dir/rsf_monitor.dat > tmp.dat
+		    gawk -v t1=$t1 -v t2=$t2 '{if(NR>1)if($3>=t1)if($3<=t2)print($7,$5,($3-t1)/(t2-t1))}' $dir/$ft > tmp.dat
 		    if [ $pc -eq 1 ];then
 			gawk '{print($1,$2)}' tmp.dat > tmp.back
 		    fi
@@ -147,14 +150,14 @@ for hmode in $hmodes;do
 		    if [ $pc -eq 2 ];then
 			psscale -D0/-0.3/4/.15h -Ctime.cpt -O -K -B0.2/:"t/T": >> $ofile
 		    fi
-		    echo $xl2 -2 22 0 29 LM "$sll" | pstext $reg $proj  -Gwhite  -O -K >> $ofile
+		    echo $xl2 -2 22 0 29 LM "$sll" | pstext $reg $proj -t30  -Gwhite  -O -K >> $ofile
 		    #
 		    # the phase panel and the velocity time series above cover
 		    # different intervals, so label the cycle actually shown
 		    #
 		    trec=`echo $t1 $t2 | gawk '{printf("%.0f",$2-$1)}'`
-		    echo 0.4825 -8.6 10 0 0 LM "@~\104@~t = $trec yr" | \
-			pstext $reg $proj -Gwhite -O -K >> $ofile
+		    echo $xl2 -3 20 0 29 LM "@~\104@~t = $trec yr" | \
+			pstext $reg $proj -t30 -Gwhite -O -K >> $ofile
 		    rm tmp.dat
 		else
 		    echo "$0: no phase panel for $sl at $res hmode $hmode:" \

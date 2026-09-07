@@ -1,13 +1,23 @@
 #!/bin/bash
+ress=${1-"0.1km"}
+hmode=${2-1}
 
-for res in 0.5km 0.25km;do
+for res in $ress;do
     for law in aging slip prz sato;do
 
-	for i in 0 1;do
-	    dir=`./find_directory $law $res $i`
-
-	    echo $res $law i $i `lc $dir/rsf_events.dat`
-	    head $dir/rsf_events.dat
+	#for i in 0 1;do
+	for i in 0 ;do
+	    dir=`./find_directory $law $res $i $hmode`
+	    if [ -s $dir ];then
+		if [ -s $dir/rsf_events.dat ];then
+		    echo $res $law i $i `lc $dir/rsf_events.dat`
+		    head $dir/rsf_events.dat
+		else
+		    echo $dir exists but no rsf_events.dat file
+		fi
+	    else
+		echo $dir not found
+	    fi
 
 	done
     done

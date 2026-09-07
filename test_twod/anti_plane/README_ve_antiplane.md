@@ -21,8 +21,17 @@ the actual elements, per-pair 6-pole ladder fit with a held-out gate).
 Options: -ve_mode, -ve_tmaxwell_yr, -ve_plate_h, -ve_g2fac, -ve_np,
 -ve_h_init (1 backslip-spun memory, 0 virgin), -ve_h_stage (1 default:
 stage-consistent sink forcing under TS error control; 0: cheaper lagged
-forcing).  VE-aware checkpoint/restart.  A future -ve_prony_file slots
-3-D kernels into the same architecture.
+forcing).  VE-aware checkpoint/restart.  -ve_mode 3 (-ve_prony_file)
+takes kernels from an external generator and slots any geometry into
+the same architecture; see the in-plane work below.
+
+SCOPE: this file is the ANTIPLANE ledger.  The 2-D IN-PLANE
+(plane-strain, dipping-fault) viscoelastic machinery, its
+literature validation (Rundle 1982 relaxation with and without
+gravity, PSGRN/PSCMP cross-check) and the kernel generator for
+-ve_mode 3 live in test_relax/inplane_ve_proto/ (see
+README_inplane_ve_proto.md); the SEAS BP3 elastic and viscoelastic
+cycle cases in seas_bp_tests/bp3/ and test_twod/ve_cycle_demos/.
 
 ## Validation ledger (all antiplane cases conducted)
 
@@ -99,19 +108,30 @@ forcing).  VE-aware checkpoint/restart.  A future -ve_prony_file slots
    Barbot, JGR 2022).
 
 8. Off-fault stress cross sections (run_xsection, plot_xsection.py,
-   this directory): sigma_xy(x, z, t) and sigma_yz through plate AND
-   relaxing substrate, reconstructed from -field_slip frames via the
-   validated image series (plate: Erlang-weighted two-family images;
-   substrate: the transmitted series, whose stress weights reduce to
-   Poisson masses p_n(bt) obtained from the same memory chains).
-   Driver: fault reaching a fraction of H (default 0.5), elastic plus
-   tM/T_rec = 0.1, 0.5, 1, 2, 10, all spun; snapshots through the last
-   full cycle plus the coseismic change.  Built-in checks: on-fault
-   kernel match, free-surface traction, and interface-traction
-   continuity at every snapshot time (jointly tests image positions
-   and both media's time weights).  Note this configuration produces
-   period-2 cycles (alternating small/large events); T_rec is the mean
-   clustered interval.
+   plot_xsection_overview.py, this directory): the fault-loading
+   sigma_xz(x, z, t) and sigma_yz through plate AND relaxing
+   substrate, reconstructed from -field_slip frames via the validated
+   image series (plate: Erlang-weighted two-family images; substrate:
+   the transmitted series, whose stress weights reduce to Poisson
+   masses p_n(bt) obtained from the same memory chains).  Driver:
+   fault reaching a fraction of H (default 0.75), elastic plus
+   tM/T_rec = 0.1, 0.5, 1, 2, 10, all spun; snapshots through one
+   late cycle plus the coseismic change, and a cross-model overview
+   figure (rows ordered by increasing tM, elastic as the tM -> inf
+   limit at the bottom).  Built-in checks: on-fault kernel match,
+   free-surface traction, and interface-traction continuity at every
+   snapshot time (jointly tests image positions and both media's time
+   weights).  Two comparability findings baked into the tools: (a)
+   this configuration is period-2 (alternating small/large events),
+   so every run snapshots the cycle following its LARGE event (the
+   selection is printed); (b) the absolute reconstructed field
+   includes each run's STANDING slip-deficit level, genuine solver
+   output but only partly comparable across models (the elastic
+   level is pinned by the initial stress forever; the viscoelastic
+   level equilibrates on the slow ladder tail, tens of tM), so the
+   overview offers MODE=abs (actual fields, default) and MODE=cyc
+   (each run around its own cycle mean, in which the large-tM rows
+   visibly converge to elastic).
 
 9. Loading conditions (documented in ve_loading_conditions.md, this
    directory):

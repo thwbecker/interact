@@ -4,7 +4,7 @@ includepoints=${2-0}
 fixedrange=${3-0}
 testcircle=${4-0}
 usethree=0
-
+scale=1e-4
 if [ ! -s $infile.in ];then
     echo $0: can not find $infile.in
     exit
@@ -17,7 +17,8 @@ file=$infile.2d.ps
 if [ $fixedrange -eq 0 ];then
     minmax -C tmp.xyz > tmp.dat
     read xmin xmax ymin ymax zmin zmax < tmp.dat ; rm tmp.dat
-    ann1=-Bf.5a5:x:/f.5a5:y:SWen
+    #ann1=-Bf.5a5:x:/f.5a5:y:SWen
+    ann1=-Bf1000a10000:"x [m]":/f1000a10000:"y [m]":SWen
 
 else
     ann1=-Bf1a2g1:x:/f1a2g1:y:SWen
@@ -34,11 +35,11 @@ reg1=-R$xmin/$xmax/$ymin/$ymax
 reg2=-R$ymin/$ymax/$zmin/$zmax
 reg3=-R$xmin/$xmax/$zmin/$zmax
 
-proj="-Jx.2 -P"
+proj="-Jx$scale -P"
 #
 #psxy tmp.xyz $reg1 $ann1  -m $proj -K  -W1,darkgreen > $file
 # shrunk patches
-psxy tmp.s.xyz $reg1 $ann1  -m $proj -K  -W1,darkgreen > $file
+psxy tmp.s.xyz $reg1 "$ann1"  -m $proj -K  -W1,darkgreen > $file
 
 if [ $usethree -eq 1 ];then
     if [ ! $testcircle -eq 1 ]
@@ -61,6 +62,6 @@ else
     psxy -T $reg1  $proj -O  >> $file
 fi
 
-modifybb $file
+modifybb $file 1
 
 rm tmp.xyz tmp.s.xyz

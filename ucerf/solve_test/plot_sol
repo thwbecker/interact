@@ -14,11 +14,12 @@ fi
 cat $g.in |patch2xyz $f.dat 0  > tmp.gmt
 
 #cat $g.in |patch2vtk flt.dat  > ~/Dropbox/tmp/ucerf.vtk
-
-makecpt -T-0.005/0/0.0005 -Croma > tmp.cpt
+scale=0.01
+makecpt -T-0.005/0/0.00025 -Croma > tmp.cpt
 
 ofile=ucerf.$g.$f.ps
-psxyz -Jx0.01 -Jz0.05 -L -m -Ctmp.cpt $reg tmp.gmt  -Ba100f10:"x":/a100f10:"y":/a5f1:"z":WESNZ+ -E30/30 -P -K > $ofile
+psxyz -Jx$scale -t20 -Jz$scale -L -m -Ctmp.cpt $reg tmp.gmt \
+      -Ba100f10:"x":/a100f10:"y":/a15f5:"z":WESNZ+ -E210/30 -P -K > $ofile
 psscale -Ctmp.cpt -B0.001/:u@-s@-: -D1/2/2.5/.15 -E -O >> $ofile
 modifybb $ofile 1
 

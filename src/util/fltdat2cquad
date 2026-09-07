@@ -3,7 +3,7 @@
 # reads flt patch geometry and slip from flt.dat and geom.in
 # and writes to a geomview cquad file
 #
-# $Id: fltdat2cquad,v 1.1 2002/12/03 17:24:55 becker Exp becker $
+# part of interact, (C) Thorsten Becker; see README.md and COPYRIGHT
 #
 # types of output: 
 # 1: absolute slip value

@@ -23,8 +23,6 @@
 #            run time), 0: slip only (-npsfse) (1)
 #   tag      output name: flt.<tag>.dat, log.<tag>.dat (prod)
 #   solver   fast: gmres(30), near-field asm/lu (default)
-#            safe: fgmres(2000), no preconditioner (25x more iterations,
-#            known to converge; only if fast does not)
 #   rtol     KSP relative tolerance, true residual norm (1e-6)
 #   rfac     near-field radius in mean patch lengths (4; 6 halves the
 #            iteration count again at a few times the sparse-matrix memory)
@@ -66,8 +64,7 @@ export OMP_NUM_THREADS=1
 
 case $solver in
     fast) options="-ksp_type gmres -near_pc_rfac $rfac -pc_type asm -sub_pc_type lu";;
-    safe) options="-ksp_type fgmres -ksp_gmres_restart 2000 -pc_type none";;
-    *) echo $0: solver $solver undefined \(fast or safe\); exit 1;;
+    *) echo $0: solver $solver undefined; exit 1;;
 esac
 if [ $stress = 1 ];then psfse=""; else psfse="-npsfse"; fi
 monitor="-ksp_norm_type unpreconditioned -ksp_rtol $rtol -ksp_max_it $maxit -ksp_converged_reason -ksp_monitor_true_residual"
@@ -102,12 +99,14 @@ if [ $rc -eq 0 ] && [ -s flt.dat ] && [ "$reason" = "CONVERGED_RTOL" ];then
     mv flt.dat flt.$tag.dat
     echo $0: converged in $its iterations, assembly $tasm s, solve $tsol s, stress eval $tps s, total $total s
     echo $0: solution in flt.$tag.dat, log in $log
+    # plot solution
+    ./plot_sol $g flt.$tag
     exit 0
 else
     if [ -s flt.dat ];then mv flt.dat flt.$tag.FAILED.dat; fi
     echo $0: solve NOT converged \($reason, $its iterations\), see $log
     if [ $solver = fast ];then
-	echo $0: retry with a larger radius \(rfac 6\) or with solver safe
+	echo $0: retry with a larger radius \(rfac 6\) 
     fi
     exit 1
 fi
