@@ -1,6 +1,6 @@
 # Solving the UCERF one-step interaction problem: tests and recommendations
 
-Status as of 2026-09-07, interact master with the near-field
+Status as of 2026-09-08, interact master with the near-field
 preconditioner (`-near_pc_rfac`), the single assembly path in
 compress_interaction_matrix, and the full-set (265k) runs included. Problem considered throughout: strike slip
 on all patches from a unit strike stress drop (bc code 10, value 1),
@@ -105,14 +105,17 @@ asm/lu at 2, 3, 4, 6 patch lengths: 94, 31, 21, 9 its; the same 21 at
 ### 2.4 Full set, 265464 patches, 64 ranks (run_production, rtol 1e-6, stress evaluation on)
 
     gmres(30), near-field asm/lu, rfac 4:  86 iterations, solve 381 s, assembly 7051 s, stress pass 6971 s
+    gmres(30), near-field asm/lu, rfac 6:  50 iterations, solve 233 s, assembly 7038 s, stress pass 6973 s
     fgmres(2000), no preconditioner:       not converged after 5000 iterations (true residual 4.8e-4), aborted
 
-Near-field matrix 14.6 M nonzeros (55 per row, 0.02 percent of dense),
-one dense matvec 4.4 s. The residual history shows plateaus (30 to 50
-iterations near 1e-3), i.e. at full size the preconditioner captures
-less of the coupling than at 100k (20 iterations); a larger radius
-(rfac 6) is the first thing to try. The unpreconditioned solve is not a
-usable fallback at this size.
+Near-field matrix at rfac 4: 14.6 M nonzeros (55 per row, 0.02 percent
+of dense); at rfac 6: 35.6 M nonzeros (134 per row, 0.05 percent). One
+dense matvec 4.4 s. With rfac 4 the residual history shows plateaus
+(30 to 50 iterations near 1e-3); with rfac 6 it decreases steadily.
+The two slip solutions agree to 1.1e-5 (rel L2), consistent with two
+solves converged to a true residual of 1e-6. rfac 6 is the default in
+run_production. The unpreconditioned solve is not a usable fallback at
+this size.
 
 ### 2.5 Scaling estimates
 
@@ -127,8 +130,9 @@ preconditioner a few seconds to a minute.
 ## 3. Best practices
 
 - Always use the near-field preconditioner with ASM and sub-block LU.
-  rfac 4 is a good default; rfac 6 halves the iterations again at a
-  few times the (small) memory. Never bjacobi (no overlap) or ILU.
+  rfac 6 is the default (50 iterations at 265k); rfac 4 is sufficient
+  at 100k (20 iterations) and costs 2.4x fewer nonzeros, which is
+  negligible either way. Never bjacobi (no overlap) or ILU.
 - gmres(30) is sufficient with the preconditioner; the restart-2000
   Krylov memory is not needed. bcgs is an equivalent alternative.
 - Judge convergence in the unpreconditioned (true residual) norm:
@@ -165,16 +169,15 @@ near-field preconditioner its solve is no longer the bottleneck:
 file, stress evaluation on/off, output tag, and checks the convergence
 reason. Measured at 265k on 64 ranks (section 2.4): 2 h assembly,
 another 2 h for the post-slip stress evaluation if requested, 560 GB
-distributed memory, 86 iterations and 6 minutes of solve at rfac 4.
+distributed memory, 50 iterations and 4 minutes of solve at rfac 6.
 Use `-npsfse` (stress 0) while exploring boundary conditions, and
 evaluate stresses only for the runs that are kept.
 
 There is no unpreconditioned fallback: fgmres(2000) without
 preconditioner needed 25x the iterations at 100k and did not converge
 within 5000 iterations at 265k (section 2.4). If the preconditioned
-solve reports a non-converged reason, increase the radius (rfac 6)
-first; on the 4000 patch case that halved the iteration count at about
-2.3x the sparse-matrix memory.
+solve reports a non-converged reason, increase the radius (rfac 8)
+first; from 4 to 6 the iteration count dropped from 86 to 50 at 265k.
 
 The H-matrix route (compress_interaction_matrix, `solve_test/run_test`)
 removes the two N^2 Okada passes and the memory requirement but only

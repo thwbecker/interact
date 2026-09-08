@@ -4,7 +4,7 @@
 # the dense operator and the solver settings that performed best in
 # the load_test runs (see run_model and ../SOLVER_NOTES.md):
 #
-#   gmres(30) with the near-field preconditioner (-near_pc_rfac 4,
+#   gmres(30) with the near-field preconditioner (-near_pc_rfac 6,
 #   -pc_type asm -sub_pc_type lu), rtol on the true residual.
 #
 #
@@ -20,8 +20,8 @@
 #   tag      output name: flt.<tag>.dat, log.<tag>.dat (prod)
 #   solver   fast: gmres(30), near-field asm/lu (default)
 #   rtol     KSP relative tolerance, true residual norm (1e-6)
-#   rfac     near-field radius in mean patch lengths (4; 6 halves the
-#            iteration count again at a few times the sparse-matrix memory)
+#   rfac     near-field radius in mean patch lengths (6; 265k: 50 iterations
+#            vs. 86 at rfac 4, 35.6 M vs 14.6 M nonzeros)
 #
 # the script checks the KSP convergence reason and exits non-zero if
 # the solve did not converge (flt.dat is then still written by
@@ -102,7 +102,7 @@ else
     if [ -s flt.dat ];then mv flt.dat flt.$tag.FAILED.dat; fi
     echo $0: solve NOT converged \($reason, $its iterations\), see $log
     if [ $solver = fast ];then
-	echo $0: retry with a larger radius \(rfac 6\) 
+	echo $0: retry with a larger radius \(rfac 8\)
     fi
     exit 1
 fi

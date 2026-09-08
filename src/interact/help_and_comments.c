@@ -39,7 +39,7 @@ void phelp(void)
   PE("      For direct solve, use    \"-pc_factor_mat_solver_type scalapack -mat_type scalapack\" or");
   PE("                           \"-pc_factor_mat_solver_type elemental -mat_type elemental\".");
   PE("      For iterative solve, the recommended setting is the near-field preconditioner (see -near_pc_rfac below):");
-  PE("                          \"-near_pc_rfac 4 -ksp_type gmres -pc_type asm -sub_pc_type lu -ksp_norm_type unpreconditioned -ksp_rtol 1e-6\"");
+  PE("                          \"-near_pc_rfac 6 -ksp_type gmres -pc_type asm -sub_pc_type lu -ksp_norm_type unpreconditioned -ksp_rtol 1e-6\"");
   PE("      (tested to 265k patches; without the preconditioner, fgmres with a long restart, e.g.");
   PE("      \"-ksp_type fgmres -pc_type none -ksp_gmres_restart 2000 -ksp_rtol 1e-6\", needs 25x more iterations");
   PE("      and may not converge for large fault networks; Jacobi does not help for near-uniform patch sizes).");
