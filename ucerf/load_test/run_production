@@ -34,7 +34,7 @@ stress=${4-1}
 tag=${5-prod}
 solver=${6-fast}
 rtol=${7-1e-6}
-rfac=${8-4}
+rfac=${8-6}
 
 maxit=5000
 bin=interact			# assumed in PATH
