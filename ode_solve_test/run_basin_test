@@ -10,13 +10,15 @@
 #            the period 4/6 case
 #
 modes=${1-"1 2 3 4 5 6 6f 7 8 8f 9 10 11 12 13"} 	# 7,8,9,10 are additional zoom ins, 11 for alpha computation
-np=${2-32}
+np=${2-64}
 
 k_46=0.8577 			# approximate k for coexistence of period 4 and 6
 k_4c=0.8574 			# approximate for period 4 and chaotic
 
-t_trans=20000
-t_run=10000
+#t_trans=20000
+t_trans=5e4
+#t_run=10000
+t_run=5e4
 
 nsample=257
 emax=2.5e-3
