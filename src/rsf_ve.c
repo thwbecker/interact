@@ -630,13 +630,22 @@ PetscErrorCode rsf_ve_setup(struct interact_ctx *par, Vec negvpl_in,
   PetscCall(VecCopy(negvpl_in,rsf->ve_negvpl));
   /*
      initial memory states (-ve_h_init, default 1): 1 = the backslip
-     steady state h_p = C_p (-vpl) tau_p, i.e. the medium has been
-     loaded by steady plate motion since forever, which removes the
-     secular VE spin-up (time scale 3x the slowest ladder pole, about
-     3 x 90 t_M for the layered default) from cycle studies; 0 = a
-     virgin (unrelaxed) medium with zero memory, appropriate for
-     relaxation-from-scratch tests such as the locked-fault
-     hereditary-loading check.  NOTE for -ve_mode 1 (uniform Maxwell):
+     steady state h_p = C_p (-vpl) tau_p, i.e. a fault LOCKED under
+     steady plate motion since forever: the fault loading starts at
+     the relaxed rate C_inf (-vpl) and, once the fault cycles with
+     mean slip rate vpl, the memory decays toward its cycle mean of
+     zero over the tau ladder, raising the loading toward the elastic
+     mean.  That decay is itself a secular transient (a one-off slip
+     deficit of about sum_p (C_p/K) vpl tau_p, with the corresponding
+     normal-stress offset for the normal family); it was seen in the
+     BP3 in-plane demo at tM >= 250 yr (2026-09-16).  0 = zero memory,
+     which is the cycle-mean state of a fault slipping at vpl on
+     average and leaves only the periodic part of the memory to spin
+     up; also the right start for relaxation-from-scratch tests such
+     as the locked-fault hereditary-loading check.  For cycle studies
+     0 is therefore the safer choice; the antiplane cycles2d notes
+     that recommend 1 predate this observation and should be re-read
+     with it in mind.  NOTE for -ve_mode 1 (uniform Maxwell):
      the spun state has ZERO net fault loading (the memory sink
      exactly cancels the backslip products, the C_inf = 0
      saturation), so steady-state uniform-Maxwell backslip cycles do

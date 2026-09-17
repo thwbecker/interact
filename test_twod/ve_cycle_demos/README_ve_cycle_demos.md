@@ -48,7 +48,15 @@ the branch labels in these scripts were the other way round; run
 directories stamped -1 in that period and named *_thrust hold
 normal-sense results.)  The percentages quoted above predate the
 tolerance-converged reruns (3bs at rtol 1e-5 rather than -imex at
-1e-4) and should be taken from the current catalogs.
+1e-4) and should be taken from the current catalogs.  Since
+2026-09-16 the driver runs with -ve_h_init 0: the previous default
+(memory of a fault locked since forever) produced a secular slip
+deficit and a falling normal stress over the tau ladder, up to 20 tM,
+which contaminated every case whose 20 tM is not small against the
+analysis window (see cumulative notes, READING_ve_25m_clean.md).
+The hereditary machinery itself was checked against the analytic
+response of the kernel file for a locked fault (both traction
+families, 4 digits).
 
 ## Conventions
 

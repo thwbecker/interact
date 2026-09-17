@@ -188,7 +188,17 @@ for tm in $tmlist;do
 	(cd $proto && ./bp3_ve_kernels_par $dd/bp3_geom.in 40e3 $tm \
 	    $dd/bp3_tm${tm}_$ktag.prony $ncore 5 -1 $grav $nrm) || exit 1
     fi
+    # -ve_h_init 0: zero initial memory, which is the cycle-mean state
+    # of a fault that has been slipping at vpl on average.  The default
+    # 1 (memory of a fault locked since forever, h_p = C_p (-vpl) tau_p)
+    # starts the loading at the RELAXED rate (7 to 30 percent of
+    # elastic in the VW zone here) and decays to the elastic-mean rate
+    # over the tau ladder (up to 20 tM), which showed up as a secular
+    # slip deficit, lengthened recurrence and a falling sigma_n for
+    # tM >= 250 yr in 5000 yr runs (2026-09-16).  Discard the first
+    # ~2 x 20 tM of the catalog in either case; with 0 there is no
+    # secular component to wait out.
     run_case tm$tm -ve_mode 3 -ve_prony_file bp3_tm${tm}_$ktag.prony \
-	-ve_h_init 1 || exit 1
+	-ve_h_init 0 || exit 1
 done
 python3 $sdir/plot_bp3ve_demo.py . && echo "$0: see $dir/bp3ve_demo.png"
