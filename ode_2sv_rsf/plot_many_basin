@@ -1,6 +1,6 @@
 #!/bin/bash
 redo=${1-0}
-npanel=${2-4}
+npanel=${2-3}
 
 ./plot_basins b74e b77e basins_eig 1e3 $npanel $redo 
 
