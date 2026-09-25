@@ -217,7 +217,7 @@ PetscErrorCode unstable_plane(const struct AppCtx *par,PetscReal d1[3],PetscReal
   {
     double complex cr[3][3];
     PetscReal cn,cnmax = -1.0;
-    PetscInt ic,jc,ibest = 0,jbest = 1;
+    PetscInt ic,jc;
     for(ic=0;ic < 3;ic++)
       for(jc=ic+1;jc < 3;jc++){
 	cr[0][0] = rows[ic][1]*rows[jc][2] - rows[ic][2]*rows[jc][1];
@@ -227,12 +227,11 @@ PetscErrorCode unstable_plane(const struct AppCtx *par,PetscReal d1[3],PetscReal
 	for(i=0;i < 3;i++)
 	  cn += creal(cr[0][i]*conj(cr[0][i]));
 	if(cn > cnmax){
-	  cnmax = cn; ibest = ic; jbest = jc;
+	  cnmax = cn; 
 	  for(i=0;i < 3;i++)
 	    v[i] = cr[0][i];
 	}
       }
-    (void)ibest;(void)jbest;
   }
   if(cimag(lam[i1]) != 0.0){
     /* complex pair: plane from Re(v), Im(v) */
