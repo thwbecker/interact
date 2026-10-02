@@ -1,0 +1,33 @@
+#!/bin/bash
+# Run the BP1 pseudo-transient prototype for two fault treatments (robin, layer)
+# at two resolutions (250 m, 125 m) in a 30 x 50 km box, then compare.
+#
+# usage: ./run_compare [threads] [t_end_yr] [tol_pa]
+# Reruns resume from the checkpoint files ck_<fault>_<dx>.npz if present.
+# Delete those (and the matching run_<fault>_<dx>.csv) for a fresh start.
+dxs=${1-"125 60"}
+faults=${2-"robin layer"}
+threads=${3-4}
+t_end=${4-1000}
+tol=${5-1.0}
+
+for dx in $dxs; do
+    for fault in $faults; do
+        if [ $dx -eq 250 ]; then
+            nx=120; nz=200
+        elif [ $dx -eq 125 ];then
+            nx=240; nz=400
+        elif [ $dx -eq 60 ];then
+            nx=480; nz=800
+        fi
+        log=run_${fault}_${dx}.csv
+        ck=ck_${fault}_${dx}.npz
+        echo "=== $fault dx=$dx m ($nx x $nz), log $log"
+        python3 bp1_pt.py --numba --threads $threads --fault $fault \
+            --nx $nx --nz $nz --Lx 30e3 --Lz 50e3 \
+            --t_end_yr $t_end --tol_pa $tol --out_every 500 \
+            --log $log --checkpoint $ck
+    done
+done
+
+python3 compare_runs.py --align run_robin_125.csv run_layer_125.csv run_robin_60.csv run_layer_60.csv
