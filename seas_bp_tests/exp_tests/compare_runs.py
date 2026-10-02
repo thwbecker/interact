@@ -88,7 +88,9 @@ def summarize(label, d):
     return ev
 
 
-def main(paths):
+def main(paths, align=False):
+    """align=True shifts each run's time axis so that its first full event is at t = 0,
+    removing the noise-controlled timing of the first event (unstable initial state)."""
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
@@ -99,19 +101,28 @@ def main(paths):
             print("missing:", p)
     if not runs:
         return
+    shifts = {}
     for label, d in runs:
-        summarize(label, d)
+        ev = summarize(label, d)
+        fulls = [e for e in ev if e["full"]]
+        shifts[label] = fulls[0]["t_on"] if (align and fulls) else 0.0
+        if align and fulls:
+            print(f"  time axis shifted by -{shifts[label]:.3f} yr (first full event)")
 
     fig, ax = plt.subplots(3, 1, figsize=(9, 9), sharex=True)
     for label, d in runs:
-        ax[0].semilogy(d["t_yr"], d["Vmax"], lw=0.8, label=label)
-        ax[1].plot(d["t_yr"], d["slip_7p5km"], lw=0.8, label=label)
-        ax[2].plot(d["t_yr"], d["tau_7p5km_MPa"], lw=0.8, label=label)
+        t = d["t_yr"] - shifts[label]
+        s0 = d["slip_7p5km"][np.searchsorted(d["t_yr"], shifts[label])] if align else 0.0
+        ax[0].semilogy(t, d["Vmax"], lw=0.8, label=label)
+        ax[1].plot(t, d["slip_7p5km"] - s0, lw=0.8, label=label)
+        ax[2].plot(t, d["tau_7p5km_MPa"], lw=0.8, label=label)
     ax[0].axhline(V_SEIS, color="k", ls=":", lw=0.6)
     ax[0].set_ylabel("max slip rate [m/s]")
     ax[1].set_ylabel("slip at 7.5 km [m]")
     ax[2].set_ylabel("shear stress at 7.5 km [MPa]")
-    ax[2].set_xlabel("time [yr]")
+    ax[2].set_xlabel("time since first full event [yr]" if align else "time [yr]")
+    if align:
+        ax[1].set_ylabel("slip at 7.5 km since first full event [m]")
     ax[0].legend(fontsize=8)
     for a in ax:
         a.grid(alpha=0.3)
@@ -121,7 +132,9 @@ def main(paths):
 
 
 if __name__ == "__main__":
-    if len(sys.argv) < 2:
+    args = [a for a in sys.argv[1:] if a != "--align"]
+    if not args:
         print(__doc__)
+        print("options: --align   shift each run so its first full event is at t = 0")
         sys.exit(1)
-    main(sys.argv[1:])
+    main(args, align="--align" in sys.argv)
