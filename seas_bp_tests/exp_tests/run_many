@@ -1,0 +1,8 @@
+#!/bin/bash
+
+for dx in 250 125 60;do
+    for f in robin layer;do
+	run_compare $dx $f 4 1000 1 &
+    done
+done
+	  

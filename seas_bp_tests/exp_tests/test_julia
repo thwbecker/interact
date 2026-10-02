@@ -1,0 +1,7 @@
+#!/bin/python3
+import numpy as np
+a = np.genfromtxt("py6.csv", delimiter=",", names=True)
+b = np.genfromtxt("jl6.csv", delimiter=",", names=True)
+n = min(len(a), len(b))
+print("it identical:", np.array_equal(a["it"][:n], b["it"][:n]))
+print("max rel diff Vmax:", np.max(np.abs(a["Vmax"][:n] / b["Vmax"][:n] - 1)))
