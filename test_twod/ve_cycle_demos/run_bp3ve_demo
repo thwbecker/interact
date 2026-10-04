@@ -112,8 +112,8 @@ fi
 echo $branch > branch.txt
 python3 $sdir/../../seas_bp_tests/bp3/gen_bp3.py $ds 60 bp3 $branch > gen.log
 common="-geom_file bp3_geom.in -rsf_file bp3_rsf.dat -rsf_ic_file bp3_ic.in \
- -dc 0.008 -sigma_init 5e7 -f0 0.6 -v0 1e-6 -vpl $vpl \
- -shear_modulus 3.204e10 -s_wave_speed 3464 -rtol 1e-5 -ts_rk_type 3bs \
+ -dc 0.008 -sigma_init 5e7 -f0 0.6 -v0 1e-6 -dt_max 1.6e7 -vpl $vpl \
+ -shear_modulus 3.204e10 -s_wave_speed 3464 -rtol 1e-6 -ts_rk_type 3bs \
  -ts_max_steps 2000000000 -dt_monitor_yr 10 -track_events -rsf_catalog \
  -vel_event 1e-3 -rsf_checkpoint 20000 -rsf_checkpoint_wall 60 \
  -rsf_stations bp3_stations.dat -rsf_station_dt_yr 0.5 \
