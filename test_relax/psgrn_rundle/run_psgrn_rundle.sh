@@ -38,7 +38,7 @@ bindir=${1-../../tools/psgrn/psgrn_pscmp/bin}
 lengths=${2-"200 600 2000"}
 gravs=${3-"0 1"}
 twin=${4-90}
-nt=${5-128}
+nt=${5-256}
 bindir=`cd "$bindir" && pwd` || { echo "$0: no bindir $1"; exit 1; }
 [ -x $bindir/psgrn2020 ] && [ -x $bindir/pscmp2020 ] || { echo "$0: psgrn2020/pscmp2020 not in $bindir"; exit 1; }
 tdays=`awk -v y="$twin" 'BEGIN{printf "%.1f", y*365.25}'`

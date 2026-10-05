@@ -1,18 +1,20 @@
 
 === gravity off
+coseismic, L = 2000 km vs 2-D: max |d uz| 41.87, max |d ux| 56.26 (x100 slip; 2-D peak uz 38.2)
   t =  10 tM  L =   200: basin   -25.1 at x =  0.67 H, zeros [-0.84, 2.3], depth ratio to L = 2000: 0.983, rms vs Rundle 1.2 (peak 26)
   t =  10 tM  L =   600: basin   -25.6 at x =  0.67 H, zeros [-0.87, 2.25], depth ratio to L = 2000: 0.999
-  t =  10 tM  L =  2000: basin   -25.6 at x =  0.67 H, zeros [-0.87, 2.25]
+  t =  10 tM  L =  2000: basin   -25.6 at x =  0.67 H, zeros [-0.87, 2.25], rms vs 2-D 0.36
   t =  90 tM  L =   200: basin   -73.6 at x =  0.75 H, zeros [-2.14, 3.78], depth ratio to L = 2000: 0.860, rms vs Rundle 7.5 (peak 75)
   t =  90 tM  L =   600: basin   -85.2 at x =  0.67 H, zeros [-2.26, 3.67], depth ratio to L = 2000: 0.995
-  t =  90 tM  L =  2000: basin   -85.6 at x =  0.67 H, zeros [-2.28, 3.67]
+  t =  90 tM  L =  2000: basin   -85.6 at x =  0.67 H, zeros [-2.28, 3.67], rms vs 2-D 1.04
 
 === gravity on
+coseismic, L = 2000 km vs 2-D: max |d uz| 41.26, max |d ux| 56.14 (x100 slip; 2-D peak uz 37.9)
   t =  10 tM  L =   200: basin   -23.9 at x =  0.67 H, zeros [-0.83, 2.22], depth ratio to L = 2000: 0.983
   t =  10 tM  L =   600: basin   -24.2 at x =  0.67 H, zeros [-0.85, 2.18], depth ratio to L = 2000: 0.998
-  t =  10 tM  L =  2000: basin   -24.3 at x =  0.67 H, zeros [-0.85, 2.18]
+  t =  10 tM  L =  2000: basin   -24.3 at x =  0.67 H, zeros [-0.85, 2.18], rms vs 2-D 0.61
   t =  90 tM  L =   200: basin   -42.6 at x =  0.67 H, zeros [-1.25, 2.67], depth ratio to L = 2000: 0.988
   t =  90 tM  L =   600: basin   -43.2 at x =  0.67 H, zeros [-1.21, 2.52], depth ratio to L = 2000: 1.002
-  t =  90 tM  L =  2000: basin   -43.1 at x =  0.67 H, zeros [-1.21, 2.52]
+  t =  90 tM  L =  2000: basin   -43.1 at x =  0.67 H, zeros [-1.21, 2.52], rms vs 2-D 0.72
 wrote psgrn_rundle.png
 wrote psgrn_rundle_horizontal.png
