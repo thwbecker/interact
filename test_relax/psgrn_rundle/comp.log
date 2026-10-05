@@ -1,6 +1,6 @@
 
 === gravity off
-coseismic, L = 2000 km vs 2-D: max |d uz| 41.87, max |d ux| 56.26 (x100 slip; 2-D peak uz 38.2)
+coseismic, L = 2000 km vs 2-D (|x| > 0.1 H): uz max |d| 0.43 rms 0.23, ux max |d| 0.34 rms 0.08 (x100 slip; 2-D peaks uz 38.2, ux 51.0)
   t =  10 tM  L =   200: basin   -25.1 at x =  0.67 H, zeros [-0.84, 2.3], depth ratio to L = 2000: 0.983, rms vs Rundle 1.2 (peak 26)
   t =  10 tM  L =   600: basin   -25.6 at x =  0.67 H, zeros [-0.87, 2.25], depth ratio to L = 2000: 0.999
   t =  10 tM  L =  2000: basin   -25.6 at x =  0.67 H, zeros [-0.87, 2.25], rms vs 2-D 0.36
@@ -9,7 +9,7 @@ coseismic, L = 2000 km vs 2-D: max |d uz| 41.87, max |d ux| 56.26 (x100 slip; 2-
   t =  90 tM  L =  2000: basin   -85.6 at x =  0.67 H, zeros [-2.28, 3.67], rms vs 2-D 1.04
 
 === gravity on
-coseismic, L = 2000 km vs 2-D: max |d uz| 41.26, max |d ux| 56.14 (x100 slip; 2-D peak uz 37.9)
+coseismic, L = 2000 km vs 2-D (|x| > 0.1 H): uz max |d| 1.09 rms 0.30, ux max |d| 0.39 rms 0.20 (x100 slip; 2-D peaks uz 37.9, ux 51.0)
   t =  10 tM  L =   200: basin   -23.9 at x =  0.67 H, zeros [-0.83, 2.22], depth ratio to L = 2000: 0.983
   t =  10 tM  L =   600: basin   -24.2 at x =  0.67 H, zeros [-0.85, 2.18], depth ratio to L = 2000: 0.998
   t =  10 tM  L =  2000: basin   -24.3 at x =  0.67 H, zeros [-0.85, 2.18], rms vs 2-D 0.61

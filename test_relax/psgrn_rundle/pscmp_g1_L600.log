@@ -1,0 +1,48 @@
+ ########################################################
+ #                                                      #
+ #                  Welcome to                          #
+ #                                                      #
+ #       PPPP     SSSS    CCCC   M   M    PPPP          #
+ #       P   P   S       C       MM MM    P   P         #
+ #       PPPP     SSS    C       M M M    PPPP          #
+ #       P           S   C       M   M    P             #
+ #       P       SSSS     CCCC   M   M    P             #
+ #                                                      #
+ #                    Version 2020                      #
+ #                                                      #
+ #                        by                            #
+ #                   Rongjiang Wang                     #
+ #                   (wang@gfz.de)                      #
+ #                                                      #
+ #           GFZ Helmholtz Centre for Geoscience        #
+ #               Last modified: Nov 30, 2025            #
+ ########################################################
+                                                         
+ Please type the file name of input data:  ... read input data ...
+ ... using the numerical Green function approach ...
+ ... discretise rectangular fault segments:
+     1. segment re-discretised to 1800 patches.
+ ----------------------------------------------------------------
+     total number of fault patches:         1800
+ ----------------------------------------------------------------
+ ... superposition of all discrete point sources ...
+ processing  360 source patches at depth       1.8750 km
+ processing  120 source patches at depth       3.6250 km
+ processing  240 source patches at depth       5.3750 km
+ processing  240 source patches at depth       7.1250 km
+ processing  240 source patches at depth       8.8750 km
+ processing  120 source patches at depth      10.6250 km
+ processing  240 source patches at depth      12.3750 km
+ processing  240 source patches at depth      14.1250 km
+ ... outputs ...
+ ----------------------------------------------------------------
+ Seismic moment =   0.5400E+21 Nm (Mw = 7.75) by tensor summation 
+ or   0.5400E+21 Nm (Mw = 7.75) by scalar summation used for
+ calculating the deformation field.
+ ----------------------------------------------------------------
+################################################
+#                                              #
+#        End of computations with PSCMP        #
+#                                              #
+#        Run time:         16 sec              #
+################################################

@@ -1,0 +1,565 @@
+ ######################################################
+ #                                                    #
+ #                  Welcome to                        #
+ #                                                    #
+ #     PPPP     SSSS    GGGG   RRRR    N   N          #
+ #     P   P   S       G       R   R   NN  N          #
+ #     PPPP     SSS    G GGG   RRRR    N N N          #
+ #     P           S   G   G   R R     N  NN          #
+ #     P       SSSS     GGGG   R  R    N   N          #
+ #                                                    #
+ #                  Version 2020                      #
+ # (update of version 2008b -> use of dynamic memory) #
+ #                                                    #
+ #                      by                            #
+ #                 Rongjiang Wang                     #
+ #              (wang@gfz-potsdam.de)                 #
+ #                                                    #
+ #             Helmholtz Centre Potsdam               #
+ #    GFZ German Research Centre for Geosciences      #
+ #             Last modified: June 2020               #
+ ######################################################
+                                                       
+ Please type the file name of input data:  the multi-layered poroelastic model:
+  no thick(m)      la(Pa)      mu(Pa)    rho(kg/m^3)   etk(Pa*s)   etm(Pa*s)    alpha
+   1 30000.0000  0.3000E+11  0.3000E+11  0.3300E+04  0.0000E+00  0.0000E+00  0.1000E+01
+   2     0.0000  0.3001E+11  0.3001E+11  0.3800E+04  0.0000E+00  0.9468E+18  0.1000E+01
+
+ Processing for the source at depth:   0.1875E+04 m.
+  ==================================================
+  1. sub-profile:       0.0000 ->      12.0000 km
+     Coseismic response: samples =     583 x_max =   100.1037
+  Finding upper cut-off frequency
+      1. 0.00000E+00 Hz: samples =     583 x_max =   100.1037
+      2. 0.17536E-09 Hz: samples =     583 x_max =   100.1037
+      3. 0.52607E-09 Hz: samples =     583 x_max =   100.1037
+      4. 0.12275E-08 Hz: samples =     583 x_max =   100.1037
+      5. 0.26304E-08 Hz: samples =     583 x_max =   100.1037
+      6. 0.54361E-08 Hz: samples =     583 x_max =   100.1037
+      7. 0.11048E-07 Hz: samples =     583 x_max =   100.1037
+      8. 0.22270E-07 Hz: samples =     583 x_max =   100.1037
+      9. 0.44716E-07 Hz: samples =     583 x_max =   100.1037
+   256 frequencies will be used, cut-off:  0.44716E-07Hz
+  ======================================================
+      1. 0.00000E+00 Hz: samples =     583 x_max =   100.1037
+      2. 0.17536E-09 Hz: samples =     583 x_max =   100.1037
+      4. 0.52607E-09 Hz: samples =     583 x_max =   100.1037
+      8. 0.12275E-08 Hz: samples =     583 x_max =   100.1037
+     16. 0.26304E-08 Hz: samples =     583 x_max =   100.1037
+     32. 0.54361E-08 Hz: samples =     583 x_max =   100.1037
+     64. 0.11048E-07 Hz: samples =     583 x_max =   100.1037
+    128. 0.22270E-07 Hz: samples =     583 x_max =   100.1037
+    256. 0.44716E-07 Hz: samples =     583 x_max =   100.1037
+  ==================================================
+  2. sub-profile:      16.0000 ->     104.0000 km
+  Warning #1 in psgspec: accuracy worse than required!
+     Coseismic response: samples =    2276 x_max =   695.4689
+  Finding upper cut-off frequency
+      1. 0.00000E+00 Hz: samples =    2276 x_max =   695.4689
+      2. 0.17536E-09 Hz: samples =    2276 x_max =   695.4689
+      3. 0.52607E-09 Hz: samples =    2276 x_max =   695.4689
+      4. 0.12275E-08 Hz: samples =    2276 x_max =   695.4689
+      5. 0.26304E-08 Hz: samples =    2276 x_max =   695.4689
+      6. 0.54361E-08 Hz: samples =    2276 x_max =   695.4689
+      7. 0.11048E-07 Hz: samples =    2276 x_max =   695.4689
+      8. 0.22270E-07 Hz: samples =    2276 x_max =   695.4689
+   128 frequencies will be used, cut-off:  0.22270E-07Hz
+  ======================================================
+      1. 0.00000E+00 Hz: samples =    2276 x_max =   695.4689
+      2. 0.17536E-09 Hz: samples =    2276 x_max =   695.4689
+      4. 0.52607E-09 Hz: samples =    2276 x_max =   695.4689
+      8. 0.12275E-08 Hz: samples =    2276 x_max =   695.4689
+     16. 0.26304E-08 Hz: samples =    2276 x_max =   695.4689
+     32. 0.54361E-08 Hz: samples =    2276 x_max =   695.4689
+     64. 0.11048E-07 Hz: samples =    2276 x_max =   695.4689
+    128. 0.22270E-07 Hz: samples =    2276 x_max =   695.4689
+  ==================================================
+  3. sub-profile:     108.0000 ->     500.0000 km
+  Warning #1 in psgspec: accuracy worse than required!
+     Coseismic response: samples =    2627 x_max =  1321.7506
+  Finding upper cut-off frequency
+      1. 0.00000E+00 Hz: samples =    2627 x_max =  1321.7506
+      2. 0.17536E-09 Hz: samples =    2627 x_max =  1321.7506
+      3. 0.52607E-09 Hz: samples =    2627 x_max =  1321.7506
+      4. 0.12275E-08 Hz: samples =    2627 x_max =  1321.7506
+      5. 0.26304E-08 Hz: samples =    2627 x_max =  1321.7506
+      6. 0.54361E-08 Hz: samples =    2627 x_max =  1321.7506
+      7. 0.11048E-07 Hz: samples =    2627 x_max =  1321.7506
+      8. 0.22270E-07 Hz: samples =    2627 x_max =  1321.7506
+      9. 0.44716E-07 Hz: samples =    2627 x_max =  1321.7506
+   256 frequencies will be used, cut-off:  0.44716E-07Hz
+  ======================================================
+      1. 0.00000E+00 Hz: samples =    2627 x_max =  1321.7506
+      2. 0.17536E-09 Hz: samples =    2627 x_max =  1321.7506
+      4. 0.52607E-09 Hz: samples =    2627 x_max =  1321.7506
+      8. 0.12275E-08 Hz: samples =    2627 x_max =  1321.7506
+     16. 0.26304E-08 Hz: samples =    2627 x_max =  1321.7506
+     32. 0.54361E-08 Hz: samples =    2627 x_max =  1321.7506
+     64. 0.11048E-07 Hz: samples =    2627 x_max =  1321.7506
+    128. 0.22270E-07 Hz: samples =    2627 x_max =  1321.7506
+    256. 0.44716E-07 Hz: samples =    2627 x_max =  1321.7506
+
+ Processing for the source at depth:   0.3625E+04 m.
+  ==================================================
+  1. sub-profile:       0.0000 ->      16.0000 km
+     Coseismic response: samples =     313 x_max =    99.7927
+  Finding upper cut-off frequency
+      1. 0.00000E+00 Hz: samples =     313 x_max =    99.7927
+      2. 0.17536E-09 Hz: samples =     313 x_max =    99.7927
+      3. 0.52607E-09 Hz: samples =     313 x_max =    99.7927
+      4. 0.12275E-08 Hz: samples =     313 x_max =    99.7927
+      5. 0.26304E-08 Hz: samples =     313 x_max =    99.7927
+      6. 0.54361E-08 Hz: samples =     313 x_max =    99.7927
+      7. 0.11048E-07 Hz: samples =     313 x_max =    99.7927
+      8. 0.22270E-07 Hz: samples =     313 x_max =    99.7927
+      9. 0.44716E-07 Hz: samples =     313 x_max =    99.7927
+   256 frequencies will be used, cut-off:  0.44716E-07Hz
+  ======================================================
+      1. 0.00000E+00 Hz: samples =     313 x_max =    99.7927
+      2. 0.17536E-09 Hz: samples =     313 x_max =    99.7927
+      4. 0.52607E-09 Hz: samples =     313 x_max =    99.7927
+      8. 0.12275E-08 Hz: samples =     313 x_max =    99.7927
+     16. 0.26304E-08 Hz: samples =     313 x_max =    99.7927
+     32. 0.54361E-08 Hz: samples =     313 x_max =    99.7927
+     64. 0.11048E-07 Hz: samples =     313 x_max =    99.7927
+    128. 0.22270E-07 Hz: samples =     313 x_max =    99.7927
+    256. 0.44716E-07 Hz: samples =     313 x_max =    99.7927
+  ==================================================
+  2. sub-profile:      20.0000 ->     104.0000 km
+  Warning #1 in psgspec: accuracy worse than required!
+  Warning #2 in psgspec: accuracy worse than required!
+     Coseismic response: samples =    2284 x_max =   671.8532
+  Finding upper cut-off frequency
+      1. 0.00000E+00 Hz: samples =    2284 x_max =   671.8532
+      2. 0.17536E-09 Hz: samples =    2284 x_max =   671.8532
+      3. 0.52607E-09 Hz: samples =    2284 x_max =   671.8532
+      4. 0.12275E-08 Hz: samples =    2284 x_max =   671.8532
+      5. 0.26304E-08 Hz: samples =    2284 x_max =   671.8532
+      6. 0.54361E-08 Hz: samples =    2284 x_max =   671.8532
+      7. 0.11048E-07 Hz: samples =    2284 x_max =   671.8532
+      8. 0.22270E-07 Hz: samples =    2284 x_max =   671.8532
+   128 frequencies will be used, cut-off:  0.22270E-07Hz
+  ======================================================
+      1. 0.00000E+00 Hz: samples =    2284 x_max =   671.8532
+      2. 0.17536E-09 Hz: samples =    2284 x_max =   671.8532
+      4. 0.52607E-09 Hz: samples =    2284 x_max =   671.8532
+      8. 0.12275E-08 Hz: samples =    2284 x_max =   671.8532
+     16. 0.26304E-08 Hz: samples =    2284 x_max =   671.8532
+     32. 0.54361E-08 Hz: samples =    2284 x_max =   671.8532
+     64. 0.11048E-07 Hz: samples =    2284 x_max =   671.8532
+    128. 0.22270E-07 Hz: samples =    2284 x_max =   671.8532
+  ==================================================
+  3. sub-profile:     108.0000 ->     500.0000 km
+  Warning #1 in psgspec: accuracy worse than required!
+     Coseismic response: samples =    2627 x_max =  1321.6803
+  Finding upper cut-off frequency
+      1. 0.00000E+00 Hz: samples =    2627 x_max =  1321.6803
+      2. 0.17536E-09 Hz: samples =    2627 x_max =  1321.6803
+      3. 0.52607E-09 Hz: samples =    2627 x_max =  1321.6803
+      4. 0.12275E-08 Hz: samples =    2627 x_max =  1321.6803
+      5. 0.26304E-08 Hz: samples =    2627 x_max =  1321.6803
+      6. 0.54361E-08 Hz: samples =    2627 x_max =  1321.6803
+      7. 0.11048E-07 Hz: samples =    2627 x_max =  1321.6803
+      8. 0.22270E-07 Hz: samples =    2627 x_max =  1321.6803
+      9. 0.44716E-07 Hz: samples =    2627 x_max =  1321.6803
+   256 frequencies will be used, cut-off:  0.44716E-07Hz
+  ======================================================
+      1. 0.00000E+00 Hz: samples =    2627 x_max =  1321.6803
+      2. 0.17536E-09 Hz: samples =    2627 x_max =  1321.6803
+      4. 0.52607E-09 Hz: samples =    2627 x_max =  1321.6803
+      8. 0.12275E-08 Hz: samples =    2627 x_max =  1321.6803
+     16. 0.26304E-08 Hz: samples =    2627 x_max =  1321.6803
+     32. 0.54361E-08 Hz: samples =    2627 x_max =  1321.6803
+     64. 0.11048E-07 Hz: samples =    2627 x_max =  1321.6803
+    128. 0.22270E-07 Hz: samples =    2627 x_max =  1321.6803
+    256. 0.44716E-07 Hz: samples =    2627 x_max =  1321.6803
+
+ Processing for the source at depth:   0.5375E+04 m.
+  ==================================================
+  1. sub-profile:       0.0000 ->      24.0000 km
+     Coseismic response: samples =     330 x_max =   100.0852
+  Finding upper cut-off frequency
+      1. 0.00000E+00 Hz: samples =     330 x_max =   100.0852
+      2. 0.17536E-09 Hz: samples =     330 x_max =   100.0852
+      3. 0.52607E-09 Hz: samples =     330 x_max =   100.0852
+      4. 0.12275E-08 Hz: samples =     330 x_max =   100.0852
+      5. 0.26304E-08 Hz: samples =     330 x_max =   100.0852
+      6. 0.54361E-08 Hz: samples =     330 x_max =   100.0852
+      7. 0.11048E-07 Hz: samples =     330 x_max =   100.0852
+      8. 0.22270E-07 Hz: samples =     330 x_max =   100.0852
+      9. 0.44716E-07 Hz: samples =     330 x_max =   100.0852
+   256 frequencies will be used, cut-off:  0.44716E-07Hz
+  ======================================================
+      1. 0.00000E+00 Hz: samples =     330 x_max =   100.0852
+      2. 0.17536E-09 Hz: samples =     330 x_max =   100.0852
+      4. 0.52607E-09 Hz: samples =     330 x_max =   100.0852
+      8. 0.12275E-08 Hz: samples =     330 x_max =   100.0852
+     16. 0.26304E-08 Hz: samples =     330 x_max =   100.0852
+     32. 0.54361E-08 Hz: samples =     330 x_max =   100.0852
+     64. 0.11048E-07 Hz: samples =     330 x_max =   100.0852
+    128. 0.22270E-07 Hz: samples =     330 x_max =   100.0852
+    256. 0.44716E-07 Hz: samples =     330 x_max =   100.0852
+  ==================================================
+  2. sub-profile:      28.0000 ->     128.0000 km
+     Coseismic response: samples =    2346 x_max =   656.8189
+  Finding upper cut-off frequency
+      1. 0.00000E+00 Hz: samples =    1322 x_max =   328.8866
+      2. 0.17536E-09 Hz: samples =    1322 x_max =   328.8866
+      3. 0.52607E-09 Hz: samples =    2346 x_max =   656.8189
+      4. 0.12275E-08 Hz: samples =    2346 x_max =   656.8189
+      5. 0.26304E-08 Hz: samples =    2346 x_max =   656.8189
+      6. 0.54361E-08 Hz: samples =    2346 x_max =   656.8189
+      7. 0.11048E-07 Hz: samples =    2346 x_max =   656.8189
+      8. 0.22270E-07 Hz: samples =    2346 x_max =   656.8189
+   128 frequencies will be used, cut-off:  0.22270E-07Hz
+  ======================================================
+      1. 0.00000E+00 Hz: samples =    1322 x_max =   328.8866
+      2. 0.17536E-09 Hz: samples =    1322 x_max =   328.8866
+      4. 0.52607E-09 Hz: samples =    2346 x_max =   656.8189
+      8. 0.12275E-08 Hz: samples =    2346 x_max =   656.8189
+     16. 0.26304E-08 Hz: samples =    2346 x_max =   656.8189
+     32. 0.54361E-08 Hz: samples =    2346 x_max =   656.8189
+     64. 0.11048E-07 Hz: samples =    2346 x_max =   656.8189
+    128. 0.22270E-07 Hz: samples =    2346 x_max =   656.8189
+  ==================================================
+  3. sub-profile:     132.0000 ->     500.0000 km
+  Warning #1 in psgspec: accuracy worse than required!
+     Coseismic response: samples =    2650 x_max =  1270.7486
+  Finding upper cut-off frequency
+      1. 0.00000E+00 Hz: samples =    2650 x_max =  1270.7486
+      2. 0.17536E-09 Hz: samples =    2650 x_max =  1270.7486
+      3. 0.52607E-09 Hz: samples =    2650 x_max =  1270.7486
+      4. 0.12275E-08 Hz: samples =    2650 x_max =  1270.7486
+      5. 0.26304E-08 Hz: samples =    2650 x_max =  1270.7486
+      6. 0.54361E-08 Hz: samples =    2650 x_max =  1270.7486
+      7. 0.11048E-07 Hz: samples =    2650 x_max =  1270.7486
+      8. 0.22270E-07 Hz: samples =    2650 x_max =  1270.7486
+      9. 0.44716E-07 Hz: samples =    2650 x_max =  1270.7486
+   256 frequencies will be used, cut-off:  0.44716E-07Hz
+  ======================================================
+      1. 0.00000E+00 Hz: samples =    2650 x_max =  1270.7486
+      2. 0.17536E-09 Hz: samples =    2650 x_max =  1270.7486
+      4. 0.52607E-09 Hz: samples =    2650 x_max =  1270.7486
+      8. 0.12275E-08 Hz: samples =    2650 x_max =  1270.7486
+     16. 0.26304E-08 Hz: samples =    2650 x_max =  1270.7486
+     32. 0.54361E-08 Hz: samples =    2650 x_max =  1270.7486
+     64. 0.11048E-07 Hz: samples =    2650 x_max =  1270.7486
+    128. 0.22270E-07 Hz: samples =    2650 x_max =  1270.7486
+    256. 0.44716E-07 Hz: samples =    2650 x_max =  1270.7486
+
+ Processing for the source at depth:   0.7125E+04 m.
+  ==================================================
+  1. sub-profile:       0.0000 ->      28.0000 km
+     Coseismic response: samples =     343 x_max =    99.1441
+  Finding upper cut-off frequency
+      1. 0.00000E+00 Hz: samples =     343 x_max =    99.1441
+      2. 0.17536E-09 Hz: samples =     343 x_max =    99.1441
+      3. 0.52607E-09 Hz: samples =     343 x_max =    99.1441
+      4. 0.12275E-08 Hz: samples =     343 x_max =    99.1441
+      5. 0.26304E-08 Hz: samples =     343 x_max =    99.1441
+      6. 0.54361E-08 Hz: samples =     343 x_max =    99.1441
+      7. 0.11048E-07 Hz: samples =     343 x_max =    99.1441
+      8. 0.22270E-07 Hz: samples =     343 x_max =    99.1441
+      9. 0.44716E-07 Hz: samples =     343 x_max =    99.1441
+   256 frequencies will be used, cut-off:  0.44716E-07Hz
+  ======================================================
+      1. 0.00000E+00 Hz: samples =     343 x_max =    99.1441
+      2. 0.17536E-09 Hz: samples =     343 x_max =    99.1441
+      4. 0.52607E-09 Hz: samples =     343 x_max =    99.1441
+      8. 0.12275E-08 Hz: samples =     343 x_max =    99.1441
+     16. 0.26304E-08 Hz: samples =     343 x_max =    99.1441
+     32. 0.54361E-08 Hz: samples =     343 x_max =    99.1441
+     64. 0.11048E-07 Hz: samples =     343 x_max =    99.1441
+    128. 0.22270E-07 Hz: samples =     343 x_max =    99.1441
+    256. 0.44716E-07 Hz: samples =     343 x_max =    99.1441
+  ==================================================
+  2. sub-profile:      32.0000 ->     136.0000 km
+     Coseismic response: samples =    2369 x_max =   647.1607
+  Finding upper cut-off frequency
+      1. 0.00000E+00 Hz: samples =    1345 x_max =   324.0867
+      2. 0.17536E-09 Hz: samples =    1345 x_max =   324.0867
+      3. 0.52607E-09 Hz: samples =    1345 x_max =   324.0867
+      4. 0.12275E-08 Hz: samples =    1345 x_max =   324.0867
+      5. 0.26304E-08 Hz: samples =    1345 x_max =   324.0867
+      6. 0.54361E-08 Hz: samples =    2369 x_max =   647.1607
+      7. 0.11048E-07 Hz: samples =    2369 x_max =   647.1607
+      8. 0.22270E-07 Hz: samples =    2369 x_max =   647.1607
+      9. 0.44716E-07 Hz: samples =    2369 x_max =   647.1607
+   256 frequencies will be used, cut-off:  0.44716E-07Hz
+  ======================================================
+      1. 0.00000E+00 Hz: samples =    1345 x_max =   324.0867
+      2. 0.17536E-09 Hz: samples =    1345 x_max =   324.0867
+      4. 0.52607E-09 Hz: samples =    1345 x_max =   324.0867
+      8. 0.12275E-08 Hz: samples =    1345 x_max =   324.0867
+     16. 0.26304E-08 Hz: samples =    1345 x_max =   324.0867
+     32. 0.54361E-08 Hz: samples =    2369 x_max =   647.1607
+     64. 0.11048E-07 Hz: samples =    2369 x_max =   647.1607
+    128. 0.22270E-07 Hz: samples =    2369 x_max =   647.1607
+    256. 0.44716E-07 Hz: samples =    2369 x_max =   647.1607
+  ==================================================
+  3. sub-profile:     140.0000 ->     500.0000 km
+  Warning #1 in psgspec: accuracy worse than required!
+     Coseismic response: samples =    2658 x_max =  1254.5355
+  Finding upper cut-off frequency
+      1. 0.00000E+00 Hz: samples =    2658 x_max =  1254.5355
+      2. 0.17536E-09 Hz: samples =    2658 x_max =  1254.5355
+      3. 0.52607E-09 Hz: samples =    2658 x_max =  1254.5355
+      4. 0.12275E-08 Hz: samples =    2658 x_max =  1254.5355
+      5. 0.26304E-08 Hz: samples =    2658 x_max =  1254.5355
+      6. 0.54361E-08 Hz: samples =    2658 x_max =  1254.5355
+      7. 0.11048E-07 Hz: samples =    2658 x_max =  1254.5355
+      8. 0.22270E-07 Hz: samples =    2658 x_max =  1254.5355
+      9. 0.44716E-07 Hz: samples =    2658 x_max =  1254.5355
+   256 frequencies will be used, cut-off:  0.44716E-07Hz
+  ======================================================
+      1. 0.00000E+00 Hz: samples =    2658 x_max =  1254.5355
+      2. 0.17536E-09 Hz: samples =    2658 x_max =  1254.5355
+      4. 0.52607E-09 Hz: samples =    2658 x_max =  1254.5355
+      8. 0.12275E-08 Hz: samples =    2658 x_max =  1254.5355
+     16. 0.26304E-08 Hz: samples =    2658 x_max =  1254.5355
+     32. 0.54361E-08 Hz: samples =    2658 x_max =  1254.5355
+     64. 0.11048E-07 Hz: samples =    2658 x_max =  1254.5355
+    128. 0.22270E-07 Hz: samples =    2658 x_max =  1254.5355
+    256. 0.44716E-07 Hz: samples =    2658 x_max =  1254.5355
+
+ Processing for the source at depth:   0.8875E+04 m.
+  ==================================================
+  1. sub-profile:       0.0000 ->      32.0000 km
+     Coseismic response: samples =     431 x_max =    50.1393
+  Finding upper cut-off frequency
+      1. 0.00000E+00 Hz: samples =     431 x_max =    50.1393
+      2. 0.17536E-09 Hz: samples =     431 x_max =    50.1393
+      3. 0.52607E-09 Hz: samples =     431 x_max =    50.1393
+      4. 0.12275E-08 Hz: samples =     431 x_max =    50.1393
+      5. 0.26304E-08 Hz: samples =     431 x_max =    50.1393
+      6. 0.54361E-08 Hz: samples =     431 x_max =    50.1393
+      7. 0.11048E-07 Hz: samples =     431 x_max =    50.1393
+      8. 0.22270E-07 Hz: samples =     431 x_max =    50.1393
+      9. 0.44716E-07 Hz: samples =     431 x_max =    50.1393
+   256 frequencies will be used, cut-off:  0.44716E-07Hz
+  ======================================================
+      1. 0.00000E+00 Hz: samples =     431 x_max =    50.1393
+      2. 0.17536E-09 Hz: samples =     431 x_max =    50.1393
+      4. 0.52607E-09 Hz: samples =     431 x_max =    50.1393
+      8. 0.12275E-08 Hz: samples =     431 x_max =    50.1393
+     16. 0.26304E-08 Hz: samples =     431 x_max =    50.1393
+     32. 0.54361E-08 Hz: samples =     431 x_max =    50.1393
+     64. 0.11048E-07 Hz: samples =     431 x_max =    50.1393
+    128. 0.22270E-07 Hz: samples =     431 x_max =    50.1393
+    256. 0.44716E-07 Hz: samples =     431 x_max =    50.1393
+  ==================================================
+  2. sub-profile:      36.0000 ->     144.0000 km
+     Coseismic response: samples =    2393 x_max =   638.6949
+  Finding upper cut-off frequency
+      1. 0.00000E+00 Hz: samples =    1369 x_max =   319.8845
+      2. 0.17536E-09 Hz: samples =    1369 x_max =   319.8845
+      3. 0.52607E-09 Hz: samples =    1369 x_max =   319.8845
+      4. 0.12275E-08 Hz: samples =    1369 x_max =   319.8845
+      5. 0.26304E-08 Hz: samples =    1369 x_max =   319.8845
+      6. 0.54361E-08 Hz: samples =    1369 x_max =   319.8845
+      7. 0.11048E-07 Hz: samples =    1369 x_max =   319.8845
+      8. 0.22270E-07 Hz: samples =    1369 x_max =   319.8845
+      9. 0.44716E-07 Hz: samples =    1369 x_max =   319.8845
+   256 frequencies will be used, cut-off:  0.44716E-07Hz
+  ======================================================
+      1. 0.00000E+00 Hz: samples =    1369 x_max =   319.8845
+      2. 0.17536E-09 Hz: samples =    1369 x_max =   319.8845
+      4. 0.52607E-09 Hz: samples =    1369 x_max =   319.8845
+      8. 0.12275E-08 Hz: samples =    1369 x_max =   319.8845
+     16. 0.26304E-08 Hz: samples =    1369 x_max =   319.8845
+     32. 0.54361E-08 Hz: samples =    1369 x_max =   319.8845
+     64. 0.11048E-07 Hz: samples =    1369 x_max =   319.8845
+    128. 0.22270E-07 Hz: samples =    1369 x_max =   319.8845
+    256. 0.44716E-07 Hz: samples =    1369 x_max =   319.8845
+  ==================================================
+  3. sub-profile:     148.0000 ->     500.0000 km
+  Warning #1 in psgspec: accuracy worse than required!
+     Coseismic response: samples =    2666 x_max =  1238.6991
+  Finding upper cut-off frequency
+      1. 0.00000E+00 Hz: samples =    2666 x_max =  1238.6991
+      2. 0.17536E-09 Hz: samples =    2666 x_max =  1238.6991
+      3. 0.52607E-09 Hz: samples =    2666 x_max =  1238.6991
+      4. 0.12275E-08 Hz: samples =    2666 x_max =  1238.6991
+      5. 0.26304E-08 Hz: samples =    2666 x_max =  1238.6991
+      6. 0.54361E-08 Hz: samples =    2666 x_max =  1238.6991
+      7. 0.11048E-07 Hz: samples =    2666 x_max =  1238.6991
+      8. 0.22270E-07 Hz: samples =    2666 x_max =  1238.6991
+      9. 0.44716E-07 Hz: samples =    2666 x_max =  1238.6991
+   256 frequencies will be used, cut-off:  0.44716E-07Hz
+  ======================================================
+      1. 0.00000E+00 Hz: samples =    2666 x_max =  1238.6991
+      2. 0.17536E-09 Hz: samples =    2666 x_max =  1238.6991
+      4. 0.52607E-09 Hz: samples =    2666 x_max =  1238.6991
+      8. 0.12275E-08 Hz: samples =    2666 x_max =  1238.6991
+     16. 0.26304E-08 Hz: samples =    2666 x_max =  1238.6991
+     32. 0.54361E-08 Hz: samples =    2666 x_max =  1238.6991
+     64. 0.11048E-07 Hz: samples =    2666 x_max =  1238.6991
+    128. 0.22270E-07 Hz: samples =    2666 x_max =  1238.6991
+    256. 0.44716E-07 Hz: samples =    2666 x_max =  1238.6991
+
+ Processing for the source at depth:   0.1062E+05 m.
+  ==================================================
+  1. sub-profile:       0.0000 ->      72.0000 km
+  Warning #1 in psgspec: accuracy worse than required!
+  Warning #2 in psgspec: accuracy worse than required!
+     Coseismic response: samples =     407 x_max =    99.6748
+  Finding upper cut-off frequency
+      1. 0.00000E+00 Hz: samples =     407 x_max =    99.6748
+      2. 0.17536E-09 Hz: samples =     407 x_max =    99.6748
+      3. 0.52607E-09 Hz: samples =     407 x_max =    99.6748
+      4. 0.12275E-08 Hz: samples =     407 x_max =    99.6748
+      5. 0.26304E-08 Hz: samples =     407 x_max =    99.6748
+      6. 0.54361E-08 Hz: samples =     407 x_max =    99.6748
+      7. 0.11048E-07 Hz: samples =     407 x_max =    99.6748
+      8. 0.22270E-07 Hz: samples =     407 x_max =    99.6748
+      9. 0.44716E-07 Hz: samples =     407 x_max =    99.6748
+   256 frequencies will be used, cut-off:  0.44716E-07Hz
+  ======================================================
+      1. 0.00000E+00 Hz: samples =     407 x_max =    99.6748
+      2. 0.17536E-09 Hz: samples =     407 x_max =    99.6748
+      4. 0.52607E-09 Hz: samples =     407 x_max =    99.6748
+      8. 0.12275E-08 Hz: samples =     407 x_max =    99.6748
+     16. 0.26304E-08 Hz: samples =     407 x_max =    99.6748
+     32. 0.54361E-08 Hz: samples =     407 x_max =    99.6748
+     64. 0.11048E-07 Hz: samples =     407 x_max =    99.6748
+    128. 0.22270E-07 Hz: samples =     407 x_max =    99.6748
+    256. 0.44716E-07 Hz: samples =     407 x_max =    99.6748
+  ==================================================
+  2. sub-profile:      76.0000 ->     500.0000 km
+  Warning #1 in psgspec: accuracy worse than required!
+     Coseismic response: samples =    2596 x_max =  1395.2866
+  Finding upper cut-off frequency
+      1. 0.00000E+00 Hz: samples =    1572 x_max =   699.5051
+      2. 0.17536E-09 Hz: samples =    1572 x_max =   699.5051
+      3. 0.52607E-09 Hz: samples =    1572 x_max =   699.5051
+      4. 0.12275E-08 Hz: samples =    2596 x_max =  1395.2866
+      5. 0.26304E-08 Hz: samples =    2596 x_max =  1395.2866
+      6. 0.54361E-08 Hz: samples =    2596 x_max =  1395.2866
+      7. 0.11048E-07 Hz: samples =    2596 x_max =  1395.2866
+      8. 0.22270E-07 Hz: samples =    2596 x_max =  1395.2866
+      9. 0.44716E-07 Hz: samples =    2596 x_max =  1395.2866
+   256 frequencies will be used, cut-off:  0.44716E-07Hz
+  ======================================================
+      1. 0.00000E+00 Hz: samples =    1572 x_max =   699.5051
+      2. 0.17536E-09 Hz: samples =    1572 x_max =   699.5051
+      4. 0.52607E-09 Hz: samples =    1572 x_max =   699.5051
+      8. 0.12275E-08 Hz: samples =    2596 x_max =  1395.2866
+     16. 0.26304E-08 Hz: samples =    2596 x_max =  1395.2866
+     32. 0.54361E-08 Hz: samples =    2596 x_max =  1395.2866
+     64. 0.11048E-07 Hz: samples =    2596 x_max =  1395.2866
+    128. 0.22270E-07 Hz: samples =    2596 x_max =  1395.2866
+    256. 0.44716E-07 Hz: samples =    2596 x_max =  1395.2866
+
+ Processing for the source at depth:   0.1238E+05 m.
+  ==================================================
+  1. sub-profile:       0.0000 ->      76.0000 km
+  Warning #1 in psgspec: accuracy worse than required!
+  Warning #2 in psgspec: accuracy worse than required!
+     Coseismic response: samples =     420 x_max =   100.3189
+  Finding upper cut-off frequency
+      1. 0.00000E+00 Hz: samples =     420 x_max =   100.3189
+      2. 0.17536E-09 Hz: samples =     420 x_max =   100.3189
+      3. 0.52607E-09 Hz: samples =     420 x_max =   100.3189
+      4. 0.12275E-08 Hz: samples =     420 x_max =   100.3189
+      5. 0.26304E-08 Hz: samples =     420 x_max =   100.3189
+      6. 0.54361E-08 Hz: samples =     420 x_max =   100.3189
+      7. 0.11048E-07 Hz: samples =     420 x_max =   100.3189
+      8. 0.22270E-07 Hz: samples =     420 x_max =   100.3189
+      9. 0.44716E-07 Hz: samples =     420 x_max =   100.3189
+   256 frequencies will be used, cut-off:  0.44716E-07Hz
+  ======================================================
+      1. 0.00000E+00 Hz: samples =     420 x_max =   100.3189
+      2. 0.17536E-09 Hz: samples =     420 x_max =   100.3189
+      4. 0.52607E-09 Hz: samples =     420 x_max =   100.3189
+      8. 0.12275E-08 Hz: samples =     420 x_max =   100.3189
+     16. 0.26304E-08 Hz: samples =     420 x_max =   100.3189
+     32. 0.54361E-08 Hz: samples =     420 x_max =   100.3189
+     64. 0.11048E-07 Hz: samples =     420 x_max =   100.3189
+    128. 0.22270E-07 Hz: samples =     420 x_max =   100.3189
+    256. 0.44716E-07 Hz: samples =     420 x_max =   100.3189
+  ==================================================
+  2. sub-profile:      80.0000 ->     500.0000 km
+  Warning #1 in psgspec: accuracy worse than required!
+     Coseismic response: samples =    2600 x_max =  1385.1999
+  Finding upper cut-off frequency
+      1. 0.00000E+00 Hz: samples =    1576 x_max =   694.4617
+      2. 0.17536E-09 Hz: samples =    1576 x_max =   694.4617
+      3. 0.52607E-09 Hz: samples =    1576 x_max =   694.4617
+      4. 0.12275E-08 Hz: samples =    1576 x_max =   694.4617
+      5. 0.26304E-08 Hz: samples =    2600 x_max =  1385.1999
+      6. 0.54361E-08 Hz: samples =    2600 x_max =  1385.1999
+      7. 0.11048E-07 Hz: samples =    2600 x_max =  1385.1999
+      8. 0.22270E-07 Hz: samples =    2600 x_max =  1385.1999
+      9. 0.44716E-07 Hz: samples =    2600 x_max =  1385.1999
+   256 frequencies will be used, cut-off:  0.44716E-07Hz
+  ======================================================
+Note: The following floating-point exceptions are signalling: IEEE_UNDERFLOW_FLAG IEEE_DENORMAL
+      1. 0.00000E+00 Hz: samples =    1576 x_max =   694.4617
+      2. 0.17536E-09 Hz: samples =    1576 x_max =   694.4617
+      4. 0.52607E-09 Hz: samples =    1576 x_max =   694.4617
+      8. 0.12275E-08 Hz: samples =    1576 x_max =   694.4617
+     16. 0.26304E-08 Hz: samples =    2600 x_max =  1385.1999
+     32. 0.54361E-08 Hz: samples =    2600 x_max =  1385.1999
+     64. 0.11048E-07 Hz: samples =    2600 x_max =  1385.1999
+    128. 0.22270E-07 Hz: samples =    2600 x_max =  1385.1999
+    256. 0.44716E-07 Hz: samples =    2600 x_max =  1385.1999
+
+ Processing for the source at depth:   0.1412E+05 m.
+  ==================================================
+  1. sub-profile:       0.0000 ->      84.0000 km
+  Warning #1 in psgspec: accuracy worse than required!
+  Warning #2 in psgspec: accuracy worse than required!
+     Coseismic response: samples =     436 x_max =   100.0547
+  Finding upper cut-off frequency
+      1. 0.00000E+00 Hz: samples =     436 x_max =   100.0547
+      2. 0.17536E-09 Hz: samples =     436 x_max =   100.0547
+      3. 0.52607E-09 Hz: samples =     436 x_max =   100.0547
+      4. 0.12275E-08 Hz: samples =     436 x_max =   100.0547
+      5. 0.26304E-08 Hz: samples =     436 x_max =   100.0547
+      6. 0.54361E-08 Hz: samples =     436 x_max =   100.0547
+      7. 0.11048E-07 Hz: samples =     436 x_max =   100.0547
+      8. 0.22270E-07 Hz: samples =     436 x_max =   100.0547
+      9. 0.44716E-07 Hz: samples =     436 x_max =   100.0547
+   256 frequencies will be used, cut-off:  0.44716E-07Hz
+  ======================================================
+      1. 0.00000E+00 Hz: samples =     436 x_max =   100.0547
+      2. 0.17536E-09 Hz: samples =     436 x_max =   100.0547
+      4. 0.52607E-09 Hz: samples =     436 x_max =   100.0547
+      8. 0.12275E-08 Hz: samples =     436 x_max =   100.0547
+     16. 0.26304E-08 Hz: samples =     436 x_max =   100.0547
+     32. 0.54361E-08 Hz: samples =     436 x_max =   100.0547
+     64. 0.11048E-07 Hz: samples =     436 x_max =   100.0547
+    128. 0.22270E-07 Hz: samples =     436 x_max =   100.0547
+    256. 0.44716E-07 Hz: samples =     436 x_max =   100.0547
+  ==================================================
+  2. sub-profile:      88.0000 ->     500.0000 km
+  Warning #1 in psgspec: accuracy worse than required!
+     Coseismic response: samples =    2608 x_max =  1365.7510
+  Finding upper cut-off frequency
+      1. 0.00000E+00 Hz: samples =    1584 x_max =   684.7376
+      2. 0.17536E-09 Hz: samples =    1584 x_max =   684.7376
+      3. 0.52607E-09 Hz: samples =    1584 x_max =   684.7376
+      4. 0.12275E-08 Hz: samples =    1584 x_max =   684.7376
+      5. 0.26304E-08 Hz: samples =    1584 x_max =   684.7376
+      6. 0.54361E-08 Hz: samples =    1584 x_max =   684.7376
+      7. 0.11048E-07 Hz: samples =    2608 x_max =  1365.7510
+      8. 0.22270E-07 Hz: samples =    2608 x_max =  1365.7510
+      9. 0.44716E-07 Hz: samples =    2608 x_max =  1365.7510
+   256 frequencies will be used, cut-off:  0.44716E-07Hz
+  ======================================================
+      1. 0.00000E+00 Hz: samples =    1584 x_max =   684.7376
+      2. 0.17536E-09 Hz: samples =    1584 x_max =   684.7376
+      4. 0.52607E-09 Hz: samples =    1584 x_max =   684.7376
+      8. 0.12275E-08 Hz: samples =    1584 x_max =   684.7376
+     16. 0.26304E-08 Hz: samples =    1584 x_max =   684.7376
+     32. 0.54361E-08 Hz: samples =    1584 x_max =   684.7376
+     64. 0.11048E-07 Hz: samples =    2608 x_max =  1365.7510
+    128. 0.22270E-07 Hz: samples =    2608 x_max =  1365.7510
+    256. 0.44716E-07 Hz: samples =    2608 x_max =  1365.7510
+################################################
+#                                              #
+#        End of computations with PSGRN        #
+#                                              #
+#        Run time:        217 sec              #
+#        Warnings:         17                  #
+################################################

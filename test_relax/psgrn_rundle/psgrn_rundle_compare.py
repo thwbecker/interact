@@ -98,9 +98,15 @@ for comp, fname in (('uz', 'psgrn_rundle.png'), ('ux', 'psgrn_rundle_horizontal.
         if comp == 'uz':
             print(f'\n=== gravity {"on" if g else "off"}')
             if ref is not None:
-                e0 = R[Lmax]['uz0'] - ref['uz0']; ex = R[Lmax]['ux0'] - ref['ux0']
-                print(f'coseismic, L = {Lmax} km vs 2-D: max |d uz| {np.abs(e0).max():.2f}, '
-                      f'max |d ux| {np.abs(ex).max():.2f} (x100 slip; 2-D peak uz {np.abs(ref["uz0"]).max():.1f})')
+                # the receiver on the trace (x = 0) sits on the coseismic
+                # step (45 vertical, 85 horizontal x 1e-2 slip) and the two
+                # codes resolve it differently; exclude |x| < 0.1 H
+                off = np.abs(xH) > 0.1
+                e0 = (R[Lmax]['uz0'] - ref['uz0'])[off]; ex = (R[Lmax]['ux0'] - ref['ux0'])[off]
+                print(f'coseismic, L = {Lmax} km vs 2-D (|x| > 0.1 H): uz max |d| {np.abs(e0).max():.2f} '
+                      f'rms {np.sqrt(np.mean(e0**2)):.2f}, ux max |d| {np.abs(ex).max():.2f} '
+                      f'rms {np.sqrt(np.mean(ex**2)):.2f} (x100 slip; 2-D peaks uz {np.abs(ref["uz0"][off]).max():.1f}, '
+                      f'ux {np.abs(ref["ux0"][off]).max():.1f})')
         for it, tt in enumerate(times):
             a = ax[ig, it]
             for L in lengths:
