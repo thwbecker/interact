@@ -153,3 +153,50 @@ symmetric color range across frames; decimated horizontal vectors;
 fault trace), and assembles mp4 and gif output with ffmpeg. All
 parameters (fault, rheology, grid, times, scales) are plain
 assignments at the top of the script.
+
+## Conventions and checks added 2026-10-05
+
+Relaxation time.  `tR`, `tR1`, `tR2` are relaxation times in Johnson's
+convention, tR = 2 eta / mu, i.e. TWICE the Maxwell time eta / mu (the
+m-file header of the layer code says so: "Maxwell relaxation time
+(2*eta/mu, ...)"; this is the Savage and Prescott 1978 tau_a).  The
+rest of interact uses eta / mu: rsf_solve `-ve_tmaxwell_yr`, the
+inplane_ve_proto `tau`, and the Miyake-Noda, Kato and Rundle anchors
+state the factor 2 explicitly.  To run this code at a Maxwell time
+t_M, pass tR = 2 t_M.  The help text now says so.
+
+Exact test of the time dependence (`run_sp_test.sh`).  An infinitely
+long vertical strike-slip fault cutting the whole plate over a Maxwell
+half-space of the same rigidity has the closed-form postseismic
+solution of Savage and Prescott (1978), an image series with time
+factors 1 - e^{-t/tau_a} sum_{m<n} (t/tau_a)^m/m!.  With tR read as
+tau_a the layer code matches it (x = 12 to 100 km, H = 30 km); with
+tR read as the Maxwell time it is 50 percent off at t = 2 tR.  The
+original wavenumber sampling (NK = 100, uniform to 0.5/km) is 1 to 3
+percent low at t = 2 tR and 7 to 12 percent low at t = 50 tR, because
+late relaxation lives at long wavelengths the grid barely samples;
+with 1000 samples the deficit is 0.2 to 0.8 percent at 2 tR and 2 to
+4 percent at 50 tR.  Hence the new options `-nk n` (wavenumber
+samples, default 100 as in the m-files) and `-rg v` (buoyancy term at
+the plate base, default 3e-3 as in the m-files, 0 switches it off).
+With the defaults the output is byte-identical to the previous
+version.
+
+Open item, dip-slip on a dipping plane.  In the 2-D limit (L = 1000
+km, mid-strike) the postseismic change of a 30-deg surface-breaking
+thrust (W = 30 km, bottom edge 15 km, plate 30 km, no buoyancy) does
+not match the two independent 2-D codes in the repository
+(test_relax/inplane_ve_proto/inplane2d.py and ve_thrust_relax.py, which
+agree with each other to 1e-3 slip and with Rundle 1982 at 5 tau_a):
+the basin is centred near the trace instead of 0.75 H down-dip.  It
+does match the 2-D solution computed with the moment tensor of the
+mirrored plane (dipping the other way) while the point sources stay on
+the +dip-direction line, to 0.1 to 0.3 x 1e-2 slip in both components.
+A vertical dip-slip fault gives an exactly antisymmetric field and the
+strike-slip test above passes, so station and trace conventions are
+not the cause.  The port reproduces the m-files to 1e-7, so this is in
+the original or in a convention not yet understood; `pom_momtensor`
+and the source rotation look mutually consistent on reading.  Until
+resolved, results for dipping faults should not be used as a
+reference.  Record of the comparison: ve_relax/pom_check/NOTES_pom_check.md
+in the working folder of 2026-10-05.

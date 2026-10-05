@@ -43,7 +43,12 @@
 #
 # usage: run_bp3ve_demo [outdir] [tmlist_yr] [stop_yr] [sigma] [ds_km]
 #                       [gravity] [extra rsf_solve options] [ncore]
-#                       [branch]
+#                       [branch] [dip_deg]
+#        dip_deg: fault dip (default 60, the BP3 geometry).  Like the
+#              branch it is stamped into the run directory and a later
+#              call with another dip is refused.  Dip 30 is the other
+#              BP3 variant (elastic 2-cycle at 25 m, README_bp3.md);
+#              its fault bottoms at 20 km, inside the 40 km plate.
 #        branch +1 (default) THRUST or -1 NORMAL.  It sets the
 #              sign of vpl and of the initial conditions together, so
 #              the two cannot disagree; see gen_bp3.py, "BRANCH".  The
@@ -53,7 +58,7 @@
 #        ncore: cores for KERNEL GENERATION, which dominates the cost
 #              (trivially parallel over source columns; the cycle runs
 #              themselves are seconds to minutes and single core)
-#        defaults  bp3ve_demo "15 30 45 75 120 200 400" 1500 1 0.6667 1 "" 1 1
+#        defaults  bp3ve_demo "15 30 45 75 120 200 400" 1500 1 0.6667 1 "" 1 1 60
 #        extra: passed through to rsf_solve, e.g. "-imex" (needed at
 #              fine resolution with sigma coupling: explicit RK can
 #              hit domain-check rejection storms during large events)
@@ -76,6 +81,7 @@ grav=${6-1}
 extra=${7-""}			# extra rsf_solve options, e.g. "-imex"
 ncore=${8-1}			# cores for KERNEL GENERATION (the slow part)
 branch=${9-1}			# +1 thrust, -1 normal (see gen_bp3.py, BRANCH)
+dip=${10-60}			# fault dip in degrees (gen_bp3.py)
 case "$branch" in
     1|+1) vpl=1e-9;  bname=THRUST; branch=1 ;;
     -1)   vpl=-1e-9; bname=NORMAL; branch=-1 ;;
@@ -110,7 +116,20 @@ if [ -n "$had" ] && [ "$had" != "$branch" ];then
     exit 1
 fi
 echo $branch > branch.txt
-python3 $sdir/../../seas_bp_tests/bp3/gen_bp3.py $ds 60 bp3 $branch > gen.log
+# the dip is a directory property as well: the geometry file is
+# regenerated on every call, so without the stamp a call with another
+# dip would rewrite bp3_geom.in under existing catalogs and then skip
+# the cases as already run
+hadd=
+[ -f dip.txt ] && hadd=`cat dip.txt`
+[ -z "$hadd" ] && [ -f cat_el.dat ] && hadd=60
+if [ -n "$hadd" ] && [ "$hadd" != "$dip" ];then
+    echo "$0: $dir holds dip $hadd, refusing to run dip $dip"
+    exit 1
+fi
+echo $dip > dip.txt
+echo "$0: dip $dip"
+python3 $sdir/../../seas_bp_tests/bp3/gen_bp3.py $ds $dip bp3 $branch > gen.log
 common="-geom_file bp3_geom.in -rsf_file bp3_rsf.dat -rsf_ic_file bp3_ic.in \
  -dc 0.008 -sigma_init 5e7 -f0 0.6 -v0 1e-6 -dt_max 1.6e7 -vpl $vpl \
  -shear_modulus 3.204e10 -s_wave_speed 3464 -rtol 1e-6 -ts_rk_type 3bs \

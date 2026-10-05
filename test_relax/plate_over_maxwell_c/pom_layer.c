@@ -18,11 +18,28 @@
 #include <stdio.h>
 #include "pom.h"
 
-#define NK 100			/* wavenumber samples (N in the m-files) */
+/* wavenumber samples (N in the m-files) and the buoyancy term at the
+   plate base (rg in the m-files); both as in the originals by default,
+   settable from the command line (-nk, -rg) through pom_layer_numerics.
+   The original NK = 100 under-resolves the long wavelengths that
+   dominate late relaxation: against the Savage and Prescott (1978)
+   image series for an infinitely long strike-slip fault through the
+   plate it is 7 to 12 percent low at t = 50 tR, 1 to 3 percent at 2 tR;
+   NK = 1000 brings this to 2 to 4 and 0.2 to 0.8 percent. */
+static int NK = 100;
+static double RG = 3.0e-3;
+
+void pom_layer_numerics(int nk, double rg)
+{
+  if (nk >= 2)
+    NK = nk;
+  if (rg >= 0.0)
+    RG = rg;
+}
+
 #define KMIN 0.000001
 #define KMAX 0.5		/* 1/km, as in the m-files */
 #define NORD 5			/* Fourier orders 0,-1,+1,-2,+2 */
-#define RG 3.0e-3		/* gravity correction, as in the m-files */
 
 static const int order_m[NORD] = { 0, -1, 1, -2, 2 };
 

@@ -42,6 +42,11 @@
  *
  * returns 0 on success, nonzero on error
  */
+/* numerical settings of the layer code: nk wavenumber samples (default
+   100 as in the m-files), rg buoyancy term at the plate base (default
+   3e-3 as in the m-files, 0 switches it off) */
+void pom_layer_numerics(int nk, double rg);
+
 int pom_layer(const double *m, const double *xs, const double *ys, int n,
 	      double H1, double H2, double nu, double t,
 	      double tR1, double tR2, int mode, int nl, int nw,

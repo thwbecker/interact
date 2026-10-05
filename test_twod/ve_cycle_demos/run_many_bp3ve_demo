@@ -8,8 +8,11 @@
 #   ve_shear  shear only (sigma_n frozen), gravity ON, for contrast
 #
 # usage: run_many_bp3ve_demo [ds_km] [tmlist_yr] [stop_yr] [parallel]
-#                            [ncore] [branch]
-#        defaults           0.025    "15 45 200"  1500      0     4    1
+#                            [ncore] [branch] [dip_deg]
+#        defaults           0.025    "15 45 200"  1500      0     4    1   60
+#        dip_deg: passed through to run_bp3ve_demo; a dip other than
+#              60 adds a _dip<dip> suffix to the case directories, so
+#              that the geometries sit side by side like the branches
 #        branch +1 (default) thrust or -1 normal; passed through
 #              to run_bp3ve_demo, which stamps it into each run
 #              directory and refuses to mix.  The normal cases get a
@@ -53,9 +56,12 @@ stop=${3-15000}
 par=${4-1}
 ncore=${5-16}		# cores for kernel generation (the slow part)
 branch=${6-1}		# +1 thrust, -1 normal
+dip=${7-60}		# fault dip, degrees
 # the two branches are different physics, so they get their own case
-# directories and can sit side by side in one working directory
+# directories and can sit side by side in one working directory; the
+# same for a non-default dip
 sfx=; [ "$branch" = "-1" ] && sfx=_normal
+[ "$dip" != "60" ] && sfx=${sfx}_dip$dip
 g1=ve_g1$sfx; g0=ve_g0$sfx; vs=ve_shear$sfx
 #extra="-imex"		# fine meshes with sigma coupling need it
 extra=""
@@ -85,7 +91,7 @@ for tm in $tms;do
     echo "=== tM = $tm yr, ds = $ds km"
     # 1. gravity ON, shear + normal: this generates the kernels the
     #    other two cases reuse, so it goes first even in parallel mode
-    ./run_bp3ve_demo $g1 "$tm" $stop 1 $ds 1 "$extra" $ncore $branch
+    ./run_bp3ve_demo $g1 "$tm" $stop 1 $ds 1 "$extra" $ncore $branch $dip
     # 2. reuse: shear-only kernels by truncation, elastic reference by copy
     mkdir -p $vs $g0
     trunc_shear $g1/bp3_tm${tm}_g1n1.prony $vs/bp3_tm${tm}_g1n0.prony
@@ -96,7 +102,12 @@ for tm in $tms;do
     # which is what happens after $g1 itself has been extended.
     if [ -f $g1/cat_el.dat ] && { [ ! -f $g0/cat_el.dat ] || \
 	    [ $g1/cat_el.dat -nt $g0/cat_el.dat ]; };then
-	for f in cat_el.dat ev_el.dat mon_el.dat ckpt_el.bin stop_el.yr;do
+	# the branch and dip stamps go with it: run_bp3ve_demo treats a
+	# directory holding catalogs but no stamp as thrust, dip 60, and
+	# would refuse the normal branch (this left ve_g0_normal with
+	# the elastic reference only in the 2026-09 sweep)
+	for f in cat_el.dat ev_el.dat mon_el.dat ckpt_el.bin ckpt_el.bin.info \
+		 stop_el.yr branch.txt dip.txt;do
 	    [ -f $g1/$f ] && cp $g1/$f $g0/$f
 	done
 	rm -rf $g0/st_el
@@ -105,12 +116,12 @@ for tm in $tms;do
     fi
     # 3. the other two cases
     if [ "$par" = "1" ];then
-	./run_bp3ve_demo $g0    "$tm" $stop 1 $ds 0 "$extra" $ncore $branch &
-	./run_bp3ve_demo $vs "$tm" $stop 0 $ds 1 "$extra" $ncore $branch &
+	./run_bp3ve_demo $g0    "$tm" $stop 1 $ds 0 "$extra" $ncore $branch $dip &
+	./run_bp3ve_demo $vs "$tm" $stop 0 $ds 1 "$extra" $ncore $branch $dip &
 	wait
     else
-	./run_bp3ve_demo $g0    "$tm" $stop 1 $ds 0 "$extra" $ncore $branch
-	./run_bp3ve_demo $vs "$tm" $stop 0 $ds 1 "$extra" $ncore $branch
+	./run_bp3ve_demo $g0    "$tm" $stop 1 $ds 0 "$extra" $ncore $branch $dip
+	./run_bp3ve_demo $vs "$tm" $stop 0 $ds 1 "$extra" $ncore $branch $dip
     fi
 done
 echo "=== summary"

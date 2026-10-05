@@ -18,6 +18,13 @@
  *   -t time                                        years since earthquake
  *   -vel                                           velocities, not displacements
  *   -H1 v -H2 v -nu v -tR1 v -tR2 v                layer model parameters
+ *       tR1, tR2 (and tR of the maxwell model) are RELAXATION TIMES IN
+ *       JOHNSON'S CONVENTION tR = 2 eta / mu, i.e. TWICE the Maxwell
+ *       time eta/mu (the Savage and Prescott 1978 tau_a); interact's
+ *       rsf_solve -ve_tmaxwell_yr and the inplane_ve_proto tau are
+ *       eta/mu.  Verified against the Savage-Prescott image series.
+ *   -nk n                                          wavenumber samples of the layer code (default 100)
+ *   -rg v                                          buoyancy term at the plate base (default 3e-3, 0: off)
  *   -H v -mulam v -tR v                            maxwell model parameters
  *   -nl n -nw n                                    quadrature override (layer)
  *   -o file                                        output file (default stdout)
@@ -34,7 +41,8 @@ static void usage(void)
 	  "usage: pom layer|maxwell [-m L W depth dip strike east north ss ds ten]\n"
 	  "  [-grid xmin xmax nx ymin ymax ny] [-sta file] [-t time] [-vel]\n"
 	  "  [-H1 v] [-H2 v] [-nu v] [-tR1 v] [-tR2 v]\n"
-	  "  [-H v] [-mulam v] [-tR v] [-nl n] [-nw n] [-o file]\n");
+	  "  [-H v] [-mulam v] [-tR v] [-nl n] [-nw n] [-nk n] [-rg v] [-o file]\n"
+	  "  tR, tR1, tR2 are 2 eta/mu (twice the Maxwell time eta/mu)\n");
   exit(1);
 }
 
@@ -46,6 +54,8 @@ int main(int argc, char **argv)
   int nx = 24, ny = 24;
   double H1 = 20, H2 = 40, nu = 0.25, tR1 = 25, tR2 = 25;
   double H = 20, mulam = 1.0, tR = 25;
+  int nk = 0;
+  double rg = -1.0;
   double zr = 0.0;
   double *szz = NULL, *sxz = NULL, *syz = NULL;
   double t = 1.0;
@@ -97,6 +107,10 @@ int main(int argc, char **argv)
       mulam = atof(argv[++i]);
     } else if (strcmp(argv[i], "-tR") == 0 && i + 1 < argc) {
       tR = atof(argv[++i]);
+    } else if (strcmp(argv[i], "-nk") == 0 && i + 1 < argc) {
+      nk = atoi(argv[++i]);
+    } else if (strcmp(argv[i], "-rg") == 0 && i + 1 < argc) {
+      rg = atof(argv[++i]);
     } else if (strcmp(argv[i], "-nl") == 0 && i + 1 < argc) {
       nl = atoi(argv[++i]);
     } else if (strcmp(argv[i], "-nw") == 0 && i + 1 < argc) {
@@ -164,6 +178,7 @@ int main(int argc, char **argv)
       rc = pom_maxwell(m, xs, ys, n, H, mulam, &t, 1, tR, ue, un, uz);
     }
   } else {
+    pom_layer_numerics(nk, rg);
     rc = pom_layer(m, xs, ys, n, H1, H2, nu, t, tR1, tR2, mode,
 		   nl, nw, ue, un, uz);
   }
