@@ -34,7 +34,7 @@ one_fig ()	# one_fig <xrange_H> <suffix>
     xmax=`awk 'NR==2{print -$1}' $f0`
     [ "$xr" = "full" ] && xr=$xmax
     gmt begin ${pre}_$sfx pdf
-    gmt subplot begin 2x2 -Fs9c/6c -M0.6c/0.9c -SRl -SCb -A -T"thrust $title, H = $H km, elastic layer over Maxwell half-space"
+    gmt subplot begin 2x2 -Fs13.5c/9c -M1.5c/1.2c -SRl -SCb -A -T"thrust $title, H = $H km, elastic layer over Maxwell half-space"
     for row in 0 1;do
 	for g in 0 1;do
 	    f=${pre}_g${g}_profiles.txt
