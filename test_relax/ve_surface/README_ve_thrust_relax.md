@@ -160,6 +160,17 @@ of the horizontal field are removed in k and added back analytically.
   u_x at 50 tM); k cutoff 40 vs 60 /H 1e-6.  Overall accuracy about
   1e-4 slip, set by the source discretisation near the trace.
 
+## Driver
+
+`run_thrust_relax.sh [dip] [extent] [times] [H] [xmax] [prefix]` runs
+one fault (default: the SEAS BP3 geometry of run_bp3ve_demo, dip 60 to
+0.866 H in the 40 km plate; the Rundle 1982 geometry, dip 30 to 0.5 H,
+is given as a commented example) without and with interface-buoyancy
+gravity at the given Maxwell times, writes GMT-ready profile tables
+and calls `plot_ve_thrust_gmt.sh` for a near-field and a full-window
+PDF with u_x and u_z against gravity off and on.  Run it from a
+scratch directory; it finds the Python tool through its own location.
+
 ## Usage
 
     python3 ve_thrust_relax.py -h
