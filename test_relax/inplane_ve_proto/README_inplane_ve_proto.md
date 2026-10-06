@@ -386,3 +386,25 @@ run_tau_scaling_test     file-level Maxwell-time scaling gate
     (bp3_ve_kernels.py scaled emission vs direct generation)
 tau_scale_compare.py     the comparison it uses (also usable on any
     two kernel files that should differ only in the Maxwell time)
+
+## Update 2026-10-06 (see test_relax/psgrn_rundle and test_relax/ve_surface)
+
+- Rundle Fig. 2 at 45 tau_a: PSCMP run at Rundle's fault length (2L =
+  200 km) gives -73.6 against his -75 with a finite-length factor of
+  0.860 relative to the 2-D limit, so the 15 percent discrepancy of
+  the 2-D curve above is his finite fault, as conjectured; the
+  remaining difference is the steepness of his hanging-wall flank.
+- psgrn_compare: the PSGRN templates in psgrn_inputs/ had 8 source
+  depths from 1 to 15 km while the shallowest PSCMP patch row sits at
+  0.5 km; that extrapolation accounts for most of the 1 to 3 percent
+  residuals quoted above (with 29 depths on the patch centres the
+  no-gravity agreement is 0.2 to 0.5 percent).  The templates now
+  read "29 0.5 14.5"; psgrn_compare.png was made with the old grid.
+- Gravity: against PSGRN's full gravity the buoyancy rows here
+  overstate the early-time gravity effect by about a factor two
+  (PSCMP 4.5 percent deeper at 10 tM) and agree at late times (1.3
+  percent at 90 tM); the dropped term is rho g div u.  Consistent
+  with the 9 percent rms at 5 tau_a vs 1.3 percent at 45 tau_a in
+  the Rundle Fig. 3 comparison above.
+- An independent 2-D code for the same problem, ve_surface/
+  ve_thrust_relax.py, agrees with inplane2d.py to 1e-3 slip.

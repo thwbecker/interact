@@ -28,7 +28,7 @@ import numpy as np
 d = sys.argv[1] if len(sys.argv) > 1 else '.'
 lengths = [int(v) for v in (sys.argv[2] if len(sys.argv) > 2 else '200 600 2000').split()]
 gravs = [int(v) for v in (sys.argv[3] if len(sys.argv) > 3 else '0 1').split()]
-script = sys.argv[4] if len(sys.argv) > 4 else 've_thrust_relax.py'
+script = sys.argv[4] if len(sys.argv) > 4 else '../ve_surface/ve_thrust_relax.py'
 H = 30.0
 KM = 111.195
 lat = np.linspace(90.0 / KM, -160.0 / KM, 101)

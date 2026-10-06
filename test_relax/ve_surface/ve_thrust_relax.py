@@ -32,7 +32,17 @@ Filon-trapezoid rule.
 Usage: ve_thrust_relax.py [options]; -h lists them.  Lengths in km,
 moduli in GPa, densities in kg/m3, slip in m, times in Maxwell times.
 Output: <out>.npz with x, times and the displacement arrays, <out>.txt
-with a far-field table, <out>_near.png, <out>_far.png.
+with a far-field table, <out>_profiles.txt (GMT-ready: x/H, x km, u_x
+per time, u_z per time, relaxed), <out>_near.png, <out>_far.png.
+
+Gravity: --gravity 1 is the interface-buoyancy formulation that
+rsf_solve's -ve_mode 3 kernels (bp3_ve_kernels.py / inplane2d.py) use;
+the two codes agree to 1e-3 slip.  Against PSGRN's full gravity it
+overstates the early-time (t < ~10 tM) gravity effect by about a
+factor two and agrees late; the no-gravity physics agrees with PSGRN
+to 0.5 percent.  A PSGRN-style formulation (pre-stress advection plus
+gravitational potential, 6x6) is not implemented; --gravity 2 is an
+experimental partial step, see README.
 
 Conventions in the output: x positive towards the hanging wall, u_x
 positive towards +x, u_z positive UP (the code's internal z is down).
@@ -338,6 +348,105 @@ def layered_response(kgrid, src, lam1, mu1, lam2_of_s, mu2_of_s, s_nodes, g1, dg
     return T0p[:, None, :] + np.einsum('kab,ksb->ksa', T0N, yy)
 
 
+def A_matrix_grav(k, lam, mu, rg):
+    """dY/dz = A Y for Y = (Ux, Uz, Txz, Tzz) with the Hookean
+    (incremental Lagrangian) stress T and the pre-stress advection terms
+    of a hydrostatically pre-stressed layer of density rho (rg = rho g in
+    the code's units): x: d_x Txx + d_z Txz + rg d_x u_z = 0,
+    z: d_x Txz + d_z Tzz - rg d_x u_x = 0.  With this stress the free
+    surface is traction free and T is continuous across interfaces (the
+    buoyancy terms of the Eulerian form are absorbed); the Eulerian form
+    with buoyancy rows (layered_response) differs from it by the body
+    force of the density perturbation, -rg (div u) z, i.e. by a term of
+    relative size rho g H / mu."""
+    A = A_matrix(k, lam, mu)
+    A[2, 1] += -1j * k * rg
+    A[3, 0] += 1j * k * rg
+    return A
+
+
+def _stable_unstable(A):
+    """Orthonormal bases Qs, Qu (4x2) of the stable (Re < 0) and unstable
+    invariant subspaces of A and the restricted matrices Ts, Tu (2x2) with
+    A Qs = Qs Ts, A Qu = Qu Tu, by sorted Schur decomposition."""
+    from scipy.linalg import schur
+    Ts, Zs, k1 = schur(A, output='complex', sort=lambda x: x.real < 0)
+    Tu, Zu, k2 = schur(A, output='complex', sort=lambda x: x.real > 0)
+    if k1 != 2 or k2 != 2:
+        raise RuntimeError('unexpected eigenvalue split in the gravity system')
+    return Zs[:, :2], Ts[:2, :2], Zu[:, :2], Tu[:2, :2]
+
+
+def layered_response_full(kgrid, src, lam1, mu1, lam2_of_s, mu2_of_s, s_nodes, rg1, rg2, H=1.0):
+    """Same as layered_response but with the full pre-stress advection
+    formulation (A_matrix_grav; rg1, rg2 = rho g of layer and half-space
+    in the code's units), bases by Schur decomposition per k and per
+    (k, s).  Slower (python loop over k); used for --gravity 2."""
+    from scipy.linalg import expm
+    xs, zs, mxx, mxz, mzz = src
+    if s_nodes is None:
+        lam2, mu2 = np.array([lam2_of_s], complex), np.array([mu2_of_s], complex)
+    else:
+        lam2, mu2 = np.asarray(lam2_of_s(s_nodes), complex), np.asarray(mu2_of_s(s_nodes), complex)
+    nk, ns = len(kgrid), len(mu2)
+    l2m = lam1 + 2 * mu1
+    nodes, inv = np.unique(np.round(zs, 12), return_inverse=True)
+    zb = np.r_[0.0, nodes, H]
+    M = len(zb) - 1
+    n = 4 * M
+    dz = np.diff(zb)
+    out = np.zeros((nk, ns, 2), complex)
+    for ik, k in enumerate(kgrid):
+        Qs, Ts, Qu, Tu = _stable_unstable(A_matrix_grav(k, lam1, mu1, rg1))
+        ph = np.exp(-1j * k * xs)
+        Jsrc = np.stack([mxz / mu1 * ph, mzz / l2m * ph,
+                         1j * k * (mxx - lam1 * mzz / l2m) * ph, 0 * ph], -1)
+        J = np.zeros((len(nodes), 4), complex)
+        for j in range(len(xs)):
+            J[inv[j]] += Jsrc[j]
+        Es = [expm(Ts * d) for d in dz]          # decaying downward over a sub-layer
+        Eu = [expm(-Tu * d) for d in dz]         # decaying upward
+        def top(j):
+            return np.column_stack([Qs, Qu @ Eu[j]])
+        def bot(j):
+            return np.column_stack([Qs @ Es[j], Qu])
+        E = np.zeros((n - 2, n), complex)
+        rhs = np.zeros(n - 2, complex)
+        T0 = top(0)
+        E[0, 0:4] = T0[2]                       # Txz(0) = 0
+        E[1, 0:4] = T0[3]                       # Tzz(0) = 0
+        r = 2
+        for j in range(1, M):
+            E[r:r + 4, 4 * j:4 * j + 4] = top(j)
+            E[r:r + 4, 4 * (j - 1):4 * j] = -bot(j - 1)
+            rhs[r:r + 4] = J[j - 1]
+            r += 4
+        Q, R = np.linalg.qr(E.conj().T, mode='complete')
+        N = Q[:, n - 2:]
+        y = np.linalg.solve(R[:n - 2, :].conj().T, rhs)
+        xp = Q[:, :n - 2] @ y
+        Bm = bot(M - 1)
+        BN = Bm @ N[4 * (M - 1):, :]            # (4, 2); T continuous at H
+        Bp = Bm @ xp[4 * (M - 1):]
+        T0N = T0[:2] @ N[0:4]
+        T0p = T0[:2] @ xp[0:4]
+        # half-space stable subspace per s: batched eigen-decomposition,
+        # orthonormalised (only the subspace is needed)
+        A2 = np.zeros((ns, 4, 4), complex)
+        for i in range(ns):
+            A2[i] = A_matrix_grav(k, lam2[i], mu2[i], rg2)
+        w, V = np.linalg.eig(A2)                # (ns, 4), (ns, 4, 4)
+        idx = np.argsort(w.real, axis=1)[:, :2]
+        Vs = np.take_along_axis(V, idx[:, None, :], axis=2)   # (ns, 4, 2)
+        Vs, _ = np.linalg.qr(Vs)
+        Mx = np.zeros((ns, 4, 4), complex)
+        Mx[:, :, 0:2] = BN
+        Mx[:, :, 2:4] = -Vs
+        sol = np.linalg.solve(Mx, np.broadcast_to(-Bp, (ns, 4))[..., None])[..., 0]
+        out[ik] = T0p[None, :] + sol[:, :2] @ T0N.T
+    return out
+
+
 def halfspace_response(kgrid, src, lam, mu):
     """Surface response (nk, 2) of the homogeneous elastic half-space
     without gravity, closed form: for a point double couple (mxx, mxz,
@@ -514,6 +623,27 @@ def run(p):
     m2e, K2n = mu2 / mu1, K2 / mu1
     g1 = p.rho1 * p.g * H / mu1 if p.gravity else 0.0
     dg = (p.rho2 - p.rho1) * p.g * H / mu1 if p.gravity else 0.0
+    rg1, rg2 = p.rho1 * p.g * H / mu1, p.rho2 * p.g * H / mu1
+    if p.gravity == 2:
+        # full pre-stress advection where the system is hyperbolic in z
+        # (k H > kcut; without self-gravitation a pair of eigenvalues turns
+        # imaginary below k H ~ rho g H / mu = %.3f and the half-space has
+        # no decaying solution), buoyancy rows below the cutoff; the
+        # result must not depend on kcut (default 3 rho g H / mu)
+        kcut = p.kcut if p.kcut > 0 else 3.0 * rg2
+        print(f'# gravity 2: full advection for k H > {kcut:.3f}, buoyancy rows below')
+        print('# WARNING gravity 2 is EXPERIMENTAL: without self-gravitation the pre-stress '
+              'advection system is ill-behaved at long wavelengths and the late-time basin '
+              'depends on kcut (-45.5 vs -50.6 for kcut 0.25 vs 0.11 in the H = 30 km test); '
+              'a well-posed version needs the gravitational potential (6x6 system).', file=sys.stderr)
+        def LR(kk, sr, a, b, c, d, e, _g1, _dg):
+            hi = kk > kcut
+            out = layered_response(kk, sr, a, b, c, d, e, _g1, _dg)
+            if hi.any():
+                out[hi] = layered_response_full(kk[hi], sr, a, b, c, d, e, rg1, rg2)
+            return out
+    else:
+        LR = layered_response
     xs, zs, mxx, mxz, mzz, xi, sprof = fault_sources(p.dip, p.extent, p.top,
                                                      p.taper, p.taper_width, p.nsrc)
     src = (xs, zs, mxx, mxz, mzz)                      # fine: homogeneous part
@@ -534,14 +664,14 @@ def run(p):
     x = np.linspace(-xmax, xmax, p.nx)
     times = [t for t in p.times if t > 0]
     print(f'# H {p.H:g} km, dip {p.dip:g}, extent {p.extent:g} H (bottom {p.extent*p.H:g} km), '
-          f'top {p.top:g} H, slip {p.taper}, nsrc {p.nsrc}/{p.nsrc_layer}, gravity {"on" if p.gravity else "off"}, '
+          f'top {p.top:g} H, slip {p.taper}, nsrc {p.nsrc}/{p.nsrc_layer}, gravity {["off", "buoyancy rows", "full advection"][p.gravity]}, '
           f'mu2/mu1 {p.mu2_ratio:g}, nu {nu:g}')
     print(f'# layered k grid: {len(kc)} nodes to {kmax_c:g}/H; '
           f'x to +-{xmax:g} H, {p.nx} points; Talbot M {p.talbot}')
     # 2. layered elastic (t = 0+) and relaxed (mu2 -> 0) on the coarse grid
-    Ue = layered_response(kc, srcc, l1, m1, l1 * p.mu2_ratio, m2e, None, g1, dg)[:, 0, :]
+    Ue = LR(kc, srcc, l1, m1, l1 * p.mu2_ratio, m2e, None, g1, dg)[:, 0, :]
     lam_rel = l1 * p.mu2_ratio if p.lam_const else K2n - 2 / 3 * m2e * 1e-9
-    Ur = layered_response(kc, srcc, l1, m1, lam_rel, m2e * 1e-9, None, g1, dg)[:, 0, :]
+    Ur = LR(kc, srcc, l1, m1, lam_rel, m2e * 1e-9, None, g1, dg)[:, 0, :]
     Uh_c = halfspace_response(kc, srcc, l1, m1)
     # 3. viscoelastic times through Talbot (nodes and conjugates)
     s_all, w_all, idx_conj, slices = [], [], [], []
@@ -552,7 +682,7 @@ def run(p):
         idx_conj.append(np.r_[n0, n0 + len(s) + np.arange(len(s) - 1)])
         w_all.append(w); slices.append((n0, len(s)))
     s_all = np.array(s_all)
-    Us = layered_response(kc, srcc, l1, m1, lam2_of_s, mu2_of_s, s_all, g1, dg)  # (nk, ns, 2)
+    Us = LR(kc, srcc, l1, m1, lam2_of_s, mu2_of_s, s_all, g1, dg)  # (nk, ns, 2)
     Ut = np.zeros((len(kc), len(times), 2), complex)
     for it, t in enumerate(times):
         n0, ns = slices[it]
@@ -659,7 +789,9 @@ def main(argv=None):
     ap.add_argument('--rho1', type=float, default=2800.0)
     ap.add_argument('--rho2', type=float, default=3300.0)
     ap.add_argument('--g', type=float, default=9.81)
-    ap.add_argument('--gravity', type=int, default=1, help='1: buoyancy at surface and layer base; 0: off')
+    ap.add_argument('--gravity', type=int, default=1,
+                    help='0: off; 1: buoyancy at surface and layer base (Eulerian stress, drops the '
+                         'rho g div u body force); 2: full pre-stress advection (needs scipy, slower)')
     ap.add_argument('--times', type=float, nargs='+', default=[0.5, 1, 2, 5, 10, 50], help='in Maxwell times')
     ap.add_argument('--nsrc', type=int, default=96, help='point sources along the fault (homogeneous part)')
     ap.add_argument('--nsrc-layer', type=int, default=24,
@@ -668,6 +800,7 @@ def main(argv=None):
     ap.add_argument('--xmax', type=float, default=50.0, help='half width of the x window / H')
     ap.add_argument('--kmax-coarse', type=float, default=40.0, help='k H cutoff of the layered difference')
     ap.add_argument('--talbot', type=int, default=32)
+    ap.add_argument('--kcut', type=float, default=0.0, help='gravity 2: k H above which full advection is used (0: 3 rho2 g H / mu)')
     ap.add_argument('--lam-const', action='store_true',
                     help='hold lambda of the half-space constant instead of the bulk modulus (Rundle 1982)')
     ap.add_argument('--nsmall', type=int, default=400, help='dense k points below k H = 0.2')
@@ -685,6 +818,15 @@ def main(argv=None):
     with open(p.out + '.txt', 'w') as fh:
         fh.write('# ' + ' '.join(sys.argv) + '\n')
         far_table(res, fh)
+    # GMT-ready profile table: x/H, x_km, then u_x for every time (coseismic
+    # first), then u_z for every time, then the relaxed u_x and u_z (NaN
+    # when gravity is off); displacements in units of slip
+    t = res['times']
+    hdr = ('# x_H x_km ' + ' '.join(f'ux_t{tt:g}' for tt in t) + ' '
+           + ' '.join(f'uz_t{tt:g}' for tt in t) + ' ux_relaxed uz_relaxed')
+    tab = np.column_stack([res['x'], res['x'] * p.H, res['ux'], res['uz'],
+                           res['ux_relaxed'], res['uz_relaxed']])
+    np.savetxt(p.out + '_profiles.txt', tab, fmt='%.6e', header=hdr, comments='')
     print(open(p.out + '.txt').read())
     if not p.no_plot:
         plot(res, p.out, p)

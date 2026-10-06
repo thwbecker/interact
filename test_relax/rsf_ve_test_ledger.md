@@ -159,3 +159,46 @@ from the generator matrix and finite-difference calibration.
    -ve_mode 2 assembly caches samples by (x_i - x_j, z_i, z_j)
    (exact; 8x at 16 faults); (c) -field_stress adds shear-stress
    field frames alongside the slip-rate frames.
+
+## UPDATE, 2026-10-06 (appended): in-plane plate-over-Maxwell surface displacements
+
+Validation chain for the physics behind -ve_mode 3 kernels
+(inplane_ve_proto), established with surface displacements of a
+surface-breaking 30 deg thrust to 0.5 H (Rundle 1982 geometry), no
+gravity and interface-buoyancy gravity.  Details and numbers in
+test_relax/psgrn_rundle/README.md and test_relax/ve_surface/
+README_ve_thrust_relax.md.
+
+- Two independent 2-D codes (inplane2d.py; ve_surface/
+  ve_thrust_relax.py, written independently, closed-form half-space
+  part, graded k grid with Filon rule): postseismic change agrees to
+  1e-3 slip at 10 and 90 tM, gravity on and off.  Coseismic field vs
+  cutde (Nikkhoo triangular dislocations): 5e-5 slip.  Relaxed
+  far-field offset = Saint-Venant value exactly in four geometries.
+- PSGRN/PSCMP (3-D, 2-D limit with L = 2000 km), no gravity: -0.2
+  percent at 10 tM, +0.5 percent at 90 tM once the PSGRN source
+  depths sit on the patch centres; insensitive to every other PSGRN/
+  PSCMP numerical parameter.  Rundle (1982) Fig. 2 reproduced by
+  PSCMP at his fault length (-25.1/-73.6 vs -26/-75); the 2-D
+  infinite-fault basin is 15 percent deeper at 45 tau_a for that
+  reason only.
+- Gravity: interface buoyancy (ours) vs PSGRN full gravity: factor
+  ~2 overstatement of the early-time gravity effect (4.5 percent of
+  the basin at 10 tM), agreement late (1.3 percent at 90 tM); dropped
+  term rho g div u, relative size rho g H/mu = 0.03.  A pre-stress-
+  advection variant without self-gravitation is ill-posed at long
+  wavelength; the proper fix is the 6x6 system with the potential.
+  For cycles this is a few percent of the gravity part of the
+  relaxation, itself a 1-2 point recurrence modifier.
+- Relaxation-time conventions: interact uses tau_M = eta/mu
+  throughout (-ve_tmaxwell_yr, inplane2d tau, bp3_ve_kernels tM).
+  Johnson's plate_over_maxwell codes (and their C port) use tR =
+  2 eta/mu = Savage-Prescott tau_a; verified by an exact test
+  (plate_over_maxwell_c/run_sp_test.sh) and now stated in that
+  README and help.  Rundle's tau_a, Kato's and Miyake-Noda's t_r are
+  also 2 eta/mu, as the respective notes say.
+- plate_over_maxwell_c: the original 100-point wavenumber grid is 7
+  to 12 percent low at 50 tR (option -nk added); the dip-slip field
+  on a dipping plane matches the 2-D codes only with the mirrored
+  moment tensor (open item, in that README); it is not a reference
+  for dipping faults until resolved.
