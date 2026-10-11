@@ -383,3 +383,25 @@ Done and tested (see fdkern/README.md). Findings that touch the plan:
 Next: WP4 (adaptive QD integrator on the same operators, hand-off on a
 slip-rate threshold, fine-grid history reconstruction) and the rate-and-state
 single-fault cycle against the rsf_solve QD anchor.
+
+## 11. WP3 external validation (2026-10-11)
+
+- Exact self-similar solutions (Broberg 1999, section 6.9): mode III factor
+  1/E(k) and mode II factor 2(1-k^2)(k^2-b^2)/g2(b) are reproduced to 1e-3
+  and better by the space-time code; the mode II check covers the in-plane
+  kernels, the history convolution and the stepper together.
+- SCEC TPV205-2D against Dunham's MDSBI 6.25 m solution: first-order
+  convergence of arrival times (errors 0.27/0.14/0.07 s at 100/50/25 m,
+  Richardson extrapolation within 1 ms of the reference), final slip within
+  0.2 to 1.4 percent at 25 m.
+- Implications: the stepover ensembles should use dx of 50 m or finer for
+  TPV5-like parameters (the cohesive zone is about 600 m static); a 25 m
+  run of a 30 km fault over 12 s takes about 10 minutes in the Python
+  prototype on one core, dominated by the history convolution (L = 3300
+  lags, M = 4096), so the 2-D ensembles are feasible but the C port will
+  matter for the finer resolutions.
+- Harris and Day (1993) setup noted for WP6: 2-D plane strain, 28 km
+  segments, overlap 5 km, step widths -5 to +5 km in 0.5 km increments,
+  slip weakening, four friction cases (A: mu_s 0.75, mu_d 0.3, supershear;
+  D: mu_d 0.51, subshear, jumps only 0.5 km). Their Table 1 holds the
+  initial stresses needed to reproduce it.

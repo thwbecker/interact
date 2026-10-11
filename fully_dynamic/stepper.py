@@ -44,6 +44,40 @@ class PrescribedTip:
         return V, state
 
 
+class SlipWeakening:
+    """Linear slip-weakening friction (TPV5 type), no cohesion, no back slip:
+        strength = sigma * (mu_s - (mu_s - mu_d) min(delta/d0, 1)),
+    with the strength evaluated at the end-of-step slip delta^n + V dt.
+    Elements outside [xmin, xmax] (or where mu_s is huge) stay locked.
+    Predictor-corrector: diagonal of K1 implicit, neighbours explicit."""
+    def __init__(self, mu_s, mu_d, d0, locked=None):
+        self.mu_s = np.asarray(mu_s, float); self.mu_d = np.asarray(mu_d, float); self.d0 = float(d0)
+        self.locked = locked
+
+    def _solve_local(self, Hloc, k11, sigma, delta, dt):
+        """Per element: find V >= 0 with Hloc + k11 V = strength(delta + V dt),
+        or V = 0 if Hloc <= strength(delta) (k11 < 0)."""
+        mus, mud, d0 = self.mu_s, self.mu_d, self.d0
+        str0 = sigma * (mus - (mus - mud) * np.minimum(delta / d0, 1.0))
+        slope = np.where(delta < d0, sigma * (mus - mud) * dt / d0, 0.0)   # strength decrease per unit V
+        V = np.where(Hloc > str0, (Hloc - str0) / (-k11 + slope), 0.0)
+        # if the step crosses d0, strength saturates at mu_d sigma
+        cross = (delta < d0) & (delta + V * dt > d0) & (V > 0)
+        Vc = (Hloc - sigma * mud) / (-k11)
+        V = np.where(cross, np.maximum(Vc, 0.0), V)
+        if self.locked is not None:
+            V = np.where(self.locked, 0.0, V)
+        return V
+
+    def solve(self, H, K1, sigma_fun, t, state, Vguess, dt, delta):
+        k11 = np.diag(K1); Koff = K1 - np.diag(k11)
+        sig = sigma_fun(Vguess)
+        Vs = self._solve_local(H + Koff @ Vguess, k11, sig, delta, dt)
+        sig = sigma_fun(Vs)
+        Vss = self._solve_local(H + Koff @ Vs, k11, sig, delta, dt)
+        return Vss, state
+
+
 class RateState:
     """Regularized rate-and-state friction with the aging law, psi form
     (as in rsf_solve):
@@ -142,6 +176,8 @@ class Stepper:
         if isinstance(self.fr, PrescribedTip):
             # H here includes tau0; the prescribed model wants tau(t_{n+1}) = tau0 - dsigma
             V, self.state = self.fr.solve(H - self.tau0, self.K1, None, t1, self.state, self.V)
+        elif isinstance(self.fr, SlipWeakening):
+            V, self.state = self.fr.solve(H, self.K1, self.sigma_fun_factory(Hn), t1, self.state, self.V, dt, self.delta)
         else:
             V, self.state = self.fr.solve(H, self.K1, self.sigma_fun_factory(Hn), t1, self.state, self.V, dt)
         self.tau = H + self.K1 @ V

@@ -2,8 +2,10 @@
 
 Python prototype of the 2-D plane-strain (mode II) space-time BIEM
 planned in fd_plan.md. Status: WP1 (kernels), WP2 (windowed tables, history
-convolution) and WP3 (fixed-step dynamic stepper) done and tested; WP4
-(adaptive QD integrator and hand-off) and the rate-and-state runs are next.
+convolution) and WP3 (fixed-step dynamic stepper, slip-weakening and
+rate-and-state friction) done and tested against exact solutions and the
+SCEC TPV205-2D benchmark; WP4 (adaptive QD integrator and hand-off) and the
+rate-and-state cycle runs are next.
 
 Files
 - gen_inplane.py: derivation and verification. Builds the 2-D full-space
@@ -60,12 +62,13 @@ Files
 - spectral_ap.py: independent spectral BIEM (Perrin-Rice-Zheng kernel,
   periodic domain, trapezoid time convolution) for the antiplane
   self-similar crack; shares nothing with the space-time code.
+- run_tpv205.py, ref/: TPV205-2D driver and the SCEC reference series.
 - test_shells.py, test_stepper.py: table consistency, FFT versus dense
   convolution, window behaviour, kinematic self-similar crack (constant
   stress in time, zero normal stress on the plane), dynamic self-similar
-  crack with prescribed tip speed against the spectral solver (antiplane,
-  agreement 1e-3) and against the kinematic factor (in-plane), QD static
-  limit.
+  crack with prescribed tip speed against the exact Kostrov (mode III) and
+  Broberg (mode II) factors, QD static limit, TPV205-2D at 100 m against the
+  Dunham reference (about 20 s).
 - test_inplane.py: pytest suite (both engines where applicable): static limits
   (point and segment, off-line, collinear, self), causality and arrival
   regions, plane-wave identity, self element early-time value -mu/(2 beta),
@@ -107,12 +110,27 @@ Validation status (two independent routes agree)
   limits, plane S-wave identity, exact early-time self value -mu/(2 beta),
   zero before the P wave from the segment ends (uniform slip radiates P
   only from the slip-gradient discontinuities at the ends).
-- Time marching: the self-similar (Kostrov) crack with prescribed tip speed
-  gives dynamic factors C(v)/C(0) = 0.826 (v = 0.5 beta) and 0.705 (0.8
-  beta) in antiplane from the space-time code, against 0.826 and 0.704 from
-  the independent spectral solver. In-plane, stepper and kinematic routes
-  agree to 0.3 percent (shared kernels). Not yet done: TPV205-2D
-  (rate-independent slip weakening) if reference data become available.
+- Time marching, exact solutions: the symmetrically expanding crack with
+  prescribed tip speed. Mode III: Kostrov (1964) / Broberg (1999, eq.
+  6.9.145), slip = (2 tau/mu) sqrt(a^2 - x^2)/E(k), k^2 = 1 - (v/beta)^2;
+  exact C(v)/C(0) = 0.8257 and 0.7052 at v/beta = 0.5 and 0.8, against
+  0.8265 and 0.7051 from the space-time code at dx = 100 m and 0.8258 and
+  0.7042 from the independent spectral solver (spectral_ap.py). Mode II:
+  Broberg (1999, eqs 6.9.85-6.9.87, elliptic-integral function g2); exact
+  0.9631, 0.8651, 0.7662 at v/beta = 0.2, 0.5, 0.8, against 0.9630, 0.8651,
+  0.7649 (kinematic route, converged in dx) and the stepper within 6e-3 at
+  dx = 100 m.
+- Time marching, community benchmark: TPV205-2D (SCEC; 2-D slice of TPV5,
+  linear slip weakening, overstressed nucleation, two stress asperities)
+  against E. Dunham's MDSBI solution at 6.25 m (run_tpv205.py, reference
+  series in ref/). At dx = 100, 50, 25 m the rupture arrival at the three
+  stations is late by 0.271/0.141/0.068 s, 0.229/0.114/0.059 s and
+  0.455/0.224/0.116 s, a clean first-order discretisation delay whose
+  Richardson extrapolation matches the reference to about 1 ms; final slip
+  differs by 1.4, 0.4, 0.2 percent at 25 m; rms slip difference over 12 s is
+  0.34/0.18/0.09 m. Peak slip rates converge more slowly (within 10 percent
+  at 25 m), as expected for a feature of width comparable to the cohesive
+  zone.
 - Observation: imposing the elliptical slip kinematically produces a clean
   uniform stress in antiplane (1e-4) but a grid-scale oscillation of several
   percent in-plane, consistent with Rayleigh waves excited by the discrete
