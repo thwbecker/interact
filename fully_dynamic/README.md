@@ -81,6 +81,11 @@ Files
 - run_cycle1.py, test_cycle.py: single in-plane fault with a 16 km
   velocity-weakening patch (h* about 5 km, cohesive zone about 800 m,
   dx = 100 m).
+- compare_qd_fd.py: runs the QD and FD sequences on that fault (results
+  saved per event, resumable with --plot-only, --only fd|qd to split the
+  work) and draws the comparison figure: slip per event, recurrence, x-t
+  slip rate of a recorded event, slip-rate time series, coseismic stress
+  change. Four events each take about 4 minutes at dx = 100 m.
 - test_shells.py, test_stepper.py: table consistency, FFT versus dense
   convolution, window behaviour, kinematic self-similar crack (constant
   stress in time, zero normal stress on the plane), dynamic self-similar

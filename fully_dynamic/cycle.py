@@ -35,6 +35,7 @@ class CycleModel:
                  xi=0.25, kmax=64, dynamic=True):
         self.xi, self.kmax = xi, kmax
         self.dynamic = dynamic
+        self.record = 0            # if > 0: store snapshots every `record` steps and every step above 1e-2 m/s
         self.sys = system; self.fr = friction
         self.N = system.N
         self.tau0 = np.broadcast_to(np.asarray(tau0, float), (self.N,)).copy()
@@ -112,7 +113,7 @@ class CycleModel:
                 print(f"  QD -> FD at t = {tq/3.15576e7:10.4f} yr (max V = {Vq.max():.2e})")
             self.seed_history_from_qd(sol, tq)
             S = self.make_fd_stepper(y, tq, Vq)
-            ev = dict(t_start=tq, Vmax=0.0, slip0=S.delta.copy())
+            ev = dict(t_start=tq, Vmax=0.0, slip0=S.delta.copy(), snaps=[])
             below = 0.0; n = 0
             dcmin = np.min(self.fr.dc)
             Vmax = Vq.max()
@@ -123,6 +124,8 @@ class CycleModel:
                 V = S.step()
                 Vmax = V.max()
                 n += 1
+                if self.record and (n % self.record == 0 or Vmax > 1e-2):
+                    ev["snaps"].append((S.t, V.copy(), S.tau.copy()))
                 ev["Vmax"] = max(ev["Vmax"], V.max())
                 if V.max() < self.V_back:
                     below += self.sys.dt * k
