@@ -44,15 +44,47 @@ class PrescribedTip:
         return V, state
 
 
+def banded_from_dense(A):
+    """Extract the band of a dense matrix in scipy solve_banded (ab) layout."""
+    from scipy.linalg import solve_banded  # noqa
+    N = A.shape[0]
+    nz = np.nonzero(A)
+    bw = int(np.max(np.abs(nz[0] - nz[1]))) if nz[0].size else 0
+    ab = np.zeros((2 * bw + 1, N))
+    for d in range(-bw, bw + 1):
+        diag = np.diagonal(A, offset=d)
+        if d >= 0:
+            ab[bw - d, d:] = diag
+        else:
+            ab[bw - d, :N + d] = diag
+    return ab, bw
+
+
+def banded_solve(ab, bw, rhs):
+    from scipy.linalg import solve_banded
+    return solve_banded((bw, bw), ab, rhs)
+
+
 class SlipWeakening:
     """Linear slip-weakening friction (TPV5 type), no cohesion, no back slip:
         strength = sigma * (mu_s - (mu_s - mu_d) min(delta/d0, 1)),
     with the strength evaluated at the end-of-step slip delta^n + V dt.
     Elements outside [xmin, xmax] (or where mu_s is huge) stay locked.
     Predictor-corrector: diagonal of K1 implicit, neighbours explicit."""
-    def __init__(self, mu_s, mu_d, d0, locked=None):
+    def __init__(self, mu_s, mu_d, d0, locked=None, force_time=None, force_t0=0.0):
+        """force_time: per-element time at which a forced (nucleation) weakening
+        begins; the strength then decreases linearly from mu_s to mu_d over
+        force_t0 seconds regardless of slip (SCEC-style forced rupture)."""
         self.mu_s = np.asarray(mu_s, float); self.mu_d = np.asarray(mu_d, float); self.d0 = float(d0)
         self.locked = locked
+        self.force_time = None if force_time is None else np.asarray(force_time, float)
+        self.force_t0 = float(force_t0)
+
+    def _mu_forced(self, t):
+        if self.force_time is None:
+            return None
+        f = np.clip((t - self.force_time) / max(self.force_t0, 1e-12), 0.0, 1.0)
+        return self.mu_s - (self.mu_s - self.mu_d) * f
 
     def _solve_local(self, Hloc, k11, sigma, delta, dt):
         """Per element: find V >= 0 with Hloc + k11 V = strength(delta + V dt),
@@ -69,13 +101,76 @@ class SlipWeakening:
             V = np.where(self.locked, 0.0, V)
         return V
 
-    def solve(self, H, K1, sigma_fun, t, state, Vguess, dt, delta):
-        k11 = np.diag(K1); Koff = K1 - np.diag(k11)
+    def solve(self, H, K1, sigma_fun, t, state, Vguess, dt, delta, coupled=True, K1band=None):
+        if not coupled:
+            k11 = np.diag(K1); Koff = K1 - np.diag(k11)
+            sig = sigma_fun(Vguess)
+            Vs = self._solve_local(H + Koff @ Vguess, k11, sig, delta, dt)
+            sig = sigma_fun(Vs)
+            Vss = self._solve_local(H + Koff @ Vs, k11, sig, delta, dt)
+            return Vss, state
+        return self._solve_coupled(H, K1, sigma_fun, Vguess, dt, delta, K1band, t=t), state
+
+    def _solve_coupled(self, H, K1, sigma_fun, Vguess, dt, delta, K1band, max_iter=12, t=None):
+        import scipy.sparse as sps
+        if not sps.issparse(K1):
+            K1 = sps.csr_matrix(K1)
+        """Exact solution of the coupled (banded) system with an active-set
+        loop: rows of locked elements are replaced by V_i = 0. Within a
+        step the strength is linear in V (slope) until delta reaches d0,
+        after which it is mu_d sigma; regime changes are iterated."""
+        ab0, bw = K1band
+        N = H.size
+        mus, mud, d0 = self.mu_s, self.mu_d, self.d0
         sig = sigma_fun(Vguess)
-        Vs = self._solve_local(H + Koff @ Vguess, k11, sig, delta, dt)
-        sig = sigma_fun(Vs)
-        Vss = self._solve_local(H + Koff @ Vs, k11, sig, delta, dt)
-        return Vss, state
+        mu_slip = mus - (mus - mud) * np.minimum(delta / d0, 1.0)
+        slope0 = np.where(delta < d0, sig * (mus - mud) * dt / d0, 0.0)
+        muf = self._mu_forced(t) if t is not None else None
+        if muf is not None:
+            forced = muf < mu_slip
+            mu_slip = np.where(forced, muf, mu_slip)
+            slope0 = np.where(forced, 0.0, slope0)
+        str0 = sig * mu_slip
+        # initial active set: trial stress with V = guess exceeds strength, or currently slipping
+        active = (H + K1 @ Vguess > str0) | (Vguess > 0)
+        saturate = np.zeros(N, bool)
+        if self.locked is not None:
+            active &= ~self.locked
+        V = np.zeros(N)
+        for it in range(max_iter):
+            strength0 = np.where(saturate, sig * mud, str0)
+            slope = np.where(saturate, 0.0, slope0)
+            ab = ab0.copy()
+            # diagonal row index in ab layout is bw
+            ab[bw, :] = ab0[bw, :] + np.where(active, slope, 0.0)
+            rhs = np.where(active, strength0 - H, 0.0)
+            # inactive rows -> identity
+            for d in range(-bw, bw + 1):
+                if d == 0:
+                    continue
+                r = bw - d
+                # entry (i, i+d) stored at ab[r, i+d]
+                i = np.arange(max(0, -d), min(N, N - d))
+                mask = ~active[i]
+                ab[r, i[mask] + d] = 0.0
+            ab[bw, :] = np.where(active, ab[bw, :], 1.0)
+            Vn = banded_solve(ab, bw, rhs)
+            Vn = np.where(active, Vn, 0.0)
+            # checks: negative slip rates -> deactivate; locked elements overstressed -> activate
+            tau = H + K1 @ Vn
+            neg = active & (Vn < 0)
+            over = (~active) & (tau > strength0)
+            if self.locked is not None:
+                over &= ~self.locked
+            cross = active & (~saturate) & (delta < d0) & (delta + Vn * dt > d0)
+            uncross = active & saturate & (delta < d0) & (delta + Vn * dt < d0)
+            changed = neg | over | cross | uncross
+            V = Vn
+            if not changed.any():
+                break
+            active = (active & ~neg) | over
+            saturate = (saturate | cross) & ~uncross
+        return np.maximum(V, 0.0)
 
 
 class RateState:
@@ -99,40 +194,76 @@ class RateState:
         return self.b / self.dc * (self.V0 * np.exp((self.f0 - psi) / self.b) - np.abs(V))
 
     def _solve_local(self, Hloc, k11, sigma, psi, Vg):
-        """Newton on g(V) = Hloc + k11 V - tau_f(V) = 0, elementwise; k11 < 0 and
-        tau_f increasing in V, so g is monotone decreasing: unique root."""
-        V = np.maximum(Vg, 1e-30)
-        for _ in range(self.max_iter):
-            g = Hloc + k11 * V - self.tau_of_V(V, psi, sigma)
-            dg = k11 - self.dtau_dV(V, psi, sigma)
-            dV = -g / dg
-            # damp steps in log space to keep V positive and robust
-            Vn = V + dV
-            bad = Vn <= 0.1 * V
-            Vn = np.where(bad, 0.1 * V, Vn)
-            Vn = np.where(Vn > 10 * V, 10 * V, Vn)
-            conv = np.max(np.abs(Vn - V) / np.maximum(V, 1e-30)) < self.tol
-            V = Vn
+        """Elementwise solution of Hloc + k11 V = tau_f(V) for V > 0 (k11 < 0).
+        g(u) = Hloc + k11 e^u - tau_f(e^u) is strictly decreasing in u = ln V,
+        so a bracketed Newton converges from any start. Elements with
+        Hloc <= 0 (no forward driving stress) get V = 0 for the regularized law's
+        positive branch; back slip is not modelled here."""
+        Hloc = np.asarray(Hloc, float); k11 = np.broadcast_to(k11, Hloc.shape)
+        sigma = np.broadcast_to(sigma, Hloc.shape); psi = np.broadcast_to(psi, Hloc.shape)
+        pos = Hloc > 0
+        u = np.log(np.maximum(np.where(pos, Vg, 1e-30), 1e-300))
+        lo = np.full(Hloc.shape, -700.0); hi = np.full(Hloc.shape, 50.0)
+        def g(uu):
+            V = np.exp(uu)
+            return Hloc + k11 * V - self.tau_of_V(V, psi, sigma)
+        for _ in range(100):
+            gu = g(u)
+            # update bracket (g decreasing: g > 0 means root is above u)
+            lo = np.where(gu > 0, np.maximum(lo, u), lo)
+            hi = np.where(gu <= 0, np.minimum(hi, u), hi)
+            V = np.exp(u)
+            dg = (k11 - self.dtau_dV(V, psi, sigma)) * V
+            with np.errstate(divide="ignore", invalid="ignore"):
+                un = u - gu / dg
+            bad = ~np.isfinite(un) | (un <= lo) | (un >= hi)
+            un = np.where(bad, 0.5 * (lo + hi), un)
+            conv = np.all(np.abs(un - u)[pos] < self.tol) if pos.any() else True
+            u = un
             if conv:
                 break
-        return V
+        return np.where(pos, np.exp(u), 0.0)
 
-    def solve(self, H, K1, sigma_fun, t, state, Vguess, dt):
-        """Predictor-corrector. sigma_fun(V) returns the effective normal stress
-        for a trial current slip rate. state = psi at t_n. Returns V^n, psi(t_{n+1})."""
+    def solve(self, H, K1, sigma_fun, t, state, Vguess, dt, coupled=True, K1band=None):
+        """Predictor-corrector in the state variable; the slip rate is solved
+        from the coupled first-lag system (banded Newton in log V) when
+        coupled=True, otherwise elementwise with the neighbour terms lagged.
+        sigma_fun(V) returns the effective normal stress for a trial current
+        slip rate. state = psi at t_n. Returns V^n, psi(t_{n+1})."""
         psi = state
-        k11 = np.diag(K1)
-        Koff = K1 - np.diag(k11)
-        # predictor
+        if coupled:
+            solve_V = lambda Hh, sig, ps, Vg: self._solve_banded(Hh, K1, K1band, sig, ps, Vg)
+            Koff = None
+        else:
+            k11 = np.diag(K1); Koff = K1 - np.diag(k11)
+            solve_V = lambda Hh, sig, ps, Vg: self._solve_local(Hh + Koff @ Vg, k11, sig, ps, Vg)
         psd0 = self.psidot(Vguess, psi)
         psi_s = psi + dt * psd0
-        sig_s = sigma_fun(Vguess)
-        Vs = self._solve_local(H + Koff @ Vguess, k11, sig_s, psi_s, Vguess)
-        # corrector
+        Vs = solve_V(H, sigma_fun(Vguess), psi_s, Vguess)
         psi_ss = psi + 0.5 * dt * (psd0 + self.psidot(Vs, psi_s))
-        sig_ss = sigma_fun(Vs)
-        Vss = self._solve_local(H + Koff @ Vs, k11, sig_ss, psi_ss, Vs)
+        Vss = solve_V(H, sigma_fun(Vs), psi_ss, Vs)
         return Vss, psi_ss
+
+    def _solve_banded(self, H, K1, K1band, sigma, psi, Vg):
+        """Newton in u = ln V on g(u) = H + K1 e^u - tau_f(e^u) = 0 with the
+        banded Jacobian (K1 - diag(dtau_f/dV)) diag(e^u)."""
+        import scipy.sparse as sps
+        ab0, bw = K1band
+        K1s = K1 if sps.issparse(K1) else sps.csr_matrix(K1)
+        u = np.log(np.maximum(Vg, 1e-30))
+        for _ in range(self.max_iter):
+            V = np.exp(u)
+            g = H + K1s @ V - self.tau_of_V(V, psi, sigma)
+            dgdV = -self.dtau_dV(V, psi, sigma)          # diagonal part beyond K1
+            ab = ab0 * V[None, :]                          # column scaling by e^u
+            # band layout: entry (i, j) at ab[bw + i - j, j]; diagonal row bw
+            ab[bw, :] += dgdV * V
+            du = -banded_solve(ab, bw, g)
+            du = np.clip(du, -2.0, 2.0)
+            u = u + du
+            if np.max(np.abs(du)) < self.tol:
+                break
+        return np.exp(u)
 
 
 class Stepper:
@@ -148,20 +279,44 @@ class Stepper:
         self.V = np.zeros(self.N)
         self.t = 0.0; self.n = 0
         self.state = None
+        self.Hn_dot = np.zeros(self.N)      # rate of the normal-stress change (e.g. backslip), physical sign
         if mode == "fd":
             self.K1 = system.K1s
             self.K1n = system.K1n
         else:
             self.K1 = -system.eta * np.eye(self.N)
             self.K1n = np.zeros((self.N, self.N))
+        self.K1band = banded_from_dense(self.K1)
+        import scipy.sparse as sps
+        self.K1sp = sps.csr_matrix(self.K1)           # banded: use sparse products in the solvers
+        self.coupled = True
+        self._ops = {1: (self.K1, self.K1n, self.K1band, self.K1sp)}
+        self.k = 1
+
+    def set_substeps(self, k):
+        """Use a step of k dt_min (FD mode). Operators for each k are cached."""
+        import scipy.sparse as sps
+        k = int(k)
+        if k not in self._ops:
+            if self.mode == "fd":
+                Ks_k, Kn_k = self.sys.cumulative_kernel(k)
+            else:
+                Ks_k, Kn_k = -self.sys.eta * np.eye(self.N), np.zeros((self.N, self.N))
+            # tiny entries from FFT round trips would widen the band: prune
+            thr = 1e-13 * np.abs(Ks_k).max()
+            Ks_k = np.where(np.abs(Ks_k) > thr, Ks_k, 0.0)
+            Kn_k = np.where(np.abs(Kn_k) > thr, Kn_k, 0.0)
+            self._ops[k] = (Ks_k, Kn_k, banded_from_dense(Ks_k), sps.csr_matrix(Ks_k))
+        self.K1, self.K1n, self.K1band, self.K1sp = self._ops[k]
+        self.k = k
 
     def known_parts(self):
-        dt = self.sys.dt
+        dt = self.sys.dt * self.k
         t1 = self.t + dt
         H = self.tau0 + self.taudot * t1 + self.sys.Ks @ self.delta
-        Hn = self.sys.Kn @ self.delta
+        Hn = self.sys.Kn @ self.delta + self.Hn_dot * t1
         if self.mode == "fd":
-            hs, hn = self.sys.history_stress(lag0=2)
+            hs, hn = self.sys.history_stress(lag0=self.k + 1)
             H = H + hs; Hn = Hn + hn
         return H, Hn, t1
 
@@ -171,19 +326,22 @@ class Stepper:
         return lambda V: self.sigma0 - (Hn + self.K1n @ V)
 
     def step(self):
-        dt = self.sys.dt
+        dt = self.sys.dt * self.k
         H, Hn, t1 = self.known_parts()
         if isinstance(self.fr, PrescribedTip):
             # H here includes tau0; the prescribed model wants tau(t_{n+1}) = tau0 - dsigma
             V, self.state = self.fr.solve(H - self.tau0, self.K1, None, t1, self.state, self.V)
         elif isinstance(self.fr, SlipWeakening):
-            V, self.state = self.fr.solve(H, self.K1, self.sigma_fun_factory(Hn), t1, self.state, self.V, dt, self.delta)
+            V, self.state = self.fr.solve(H, self.K1sp if self.coupled else self.K1, self.sigma_fun_factory(Hn), t1, self.state, self.V, dt, self.delta,
+                                          coupled=self.coupled, K1band=self.K1band)
         else:
-            V, self.state = self.fr.solve(H, self.K1, self.sigma_fun_factory(Hn), t1, self.state, self.V, dt)
-        self.tau = H + self.K1 @ V
+            V, self.state = self.fr.solve(H, self.K1sp if self.coupled else self.K1, self.sigma_fun_factory(Hn), t1, self.state, self.V, dt,
+                                          coupled=self.coupled, K1band=self.K1band)
+        self.tau = H + self.K1sp @ V
         self.sigma = self.sigma0 - (Hn + self.K1n @ V)
         if self.mode == "fd":
-            self.sys.push(V)
+            for _ in range(self.k):
+                self.sys.push(V)
         self.V = V
         self.delta = self.delta + V * dt
         self.t = t1; self.n += 1

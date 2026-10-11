@@ -405,3 +405,52 @@ single-fault cycle against the rsf_solve QD anchor.
   slip weakening, four friction cases (A: mu_s 0.75, mu_d 0.3, supershear;
   D: mu_d 0.51, subshear, jumps only 0.5 km). Their Table 1 holds the
   initial stresses needed to reproduce it.
+
+## 12. TPV205-2D improvement and Harris and Day setup (2026-10-11)
+
+- Cause of the first-order delay found and removed: the first-lag operator
+  K[1] couples neighbours (P wave within one step) and the two-pass
+  predictor-corrector undershot the first-step slip rate of newly
+  activated elements by 10 percent. An exact banded active-set solve brings
+  the main-front arrivals to within one to three time steps of the Dunham
+  reference at 100, 50 and 25 m and the rms slip difference to 0.011 m at
+  25 m. Consequence for WP4: the rate-and-state solver needs the same
+  banded (Newton) treatment; and the stepover geometry needs the band to be
+  computed from the actual K[1] sparsity (cross-fault entries appear only
+  if the step width is below alpha dt, which it never is here).
+- Harris and Day (1993) parameters (their Table 1 and text): plane strain,
+  two 28 km segments, grid 250 m, rho 2.7, alpha 6.0, beta 3.464 km/s;
+  initial shear 20 MPa (left-lateral), normal 33.3 MPa; d0 = 0.10 m;
+  cases A (mu_s 0.75, mu_d 0.30, S = 0.49, supershear), B (0.645/0.51),
+  C (1.10/0.30, S = 1.65, subshear), D (0.75/0.51, S = 1.65, 3 MPa drop);
+  step widths -5 to +5 km in 0.5 km increments (positive dilational in
+  left-lateral shear), overlap 5 km in the main set; nucleation
+  "quasi-dynamically" over a critical radius rc at the centre of fault 1
+  (value not stated); very high static strength beyond the segment ends;
+  artificial damping parameter 0.5 in their finite differences. Headline
+  results: ruptures jump both compressional and dilational steps, wider
+  dilational ones; case A up to 5 km, case D only 0.5 km; dilational steps
+  trigger later and farther along fault 2.
+
+## 13. WP4 done; Harris and Day resolved as far as possible (2026-10-11)
+
+- Variable FD steps implemented (powers of two up to 64 dt_min, chosen as
+  xi dc / V_max; cumulative kernels as implicit operators, fine-grid
+  history unchanged). A full event including nucleation from 1e-3 m/s and
+  the postseismic tail costs about 2000 steps. The switch threshold is now
+  immaterial (1e-3 versus 1e-2 m/s: 1 percent in slip).
+- QD/FD hand-off both ways works; sequences run to periodic behaviour.
+  FD versus QD on the test fault: recurrence +22 percent, slip +30
+  percent, peak slip rate x2.5, extent +9 percent.
+- The elementwise QD closure needed a bracketed log-Newton; the ad hoc
+  damped Newton diverged in the second nucleation.
+- Harris and Day case A: our ruptures run near the P-wave speed and the
+  result is insensitive to nucleation radius and speed and to dx; their
+  slower average speed (and the untriggered 3 to 5 km compressional steps)
+  are attributed to a grid coarser than L_c plus artificial damping.
+  Independent confirmation would come from Andrews (1976b) or Dunham
+  (2007) transition lengths, and from Hu et al. (2016) or Lozos et al.
+  (2012) for stepovers; TPV14/15-2D would test non-parallel interaction
+  but needs the dense (non-Toeplitz) kernel path.
+- Open: 50 m rerun of case C; jump-classification metrics (WP6); the
+  dense kernel path for non-parallel segments.

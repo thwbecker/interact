@@ -5,7 +5,8 @@ planned in fd_plan.md. Status: WP1 (kernels), WP2 (windowed tables, history
 convolution) and WP3 (fixed-step dynamic stepper, slip-weakening and
 rate-and-state friction) done and tested against exact solutions and the
 SCEC TPV205-2D benchmark; WP4 (adaptive QD integrator and hand-off) and the
-rate-and-state cycle runs are next.
+rate-and-state sequence machinery (WP4) in place and tested on a single
+fault; the stepover ensembles (WP6) are next.
 
 Files
 - gen_inplane.py: derivation and verification. Builds the 2-D full-space
@@ -55,14 +56,31 @@ Files
   interaction envelope mu dx^2 dt / (2 pi (1-nu) r^2); for 2-D kernels this
   gives L of order (1/sqrt(tol)) times the S travel time across the pair.
 - stepper.py (WP3): fixed-step dynamic time marching with end-of-step
-  collocation (e_t = 1, beta dt = dx/2), the first-lag self term implicit,
-  neighbour coupling through K[1] (P-wave reach within one step) by
-  predictor-corrector for rate-and-state friction and exactly for the linear
-  prescribed-tip model; QD mode (radiation damping only) on the same code.
+  collocation (e_t = 1, beta dt = dx/2). The first-lag operator K[1]
+  (tridiagonal for a straight fault at this time step) is solved exactly:
+  directly for the prescribed-tip model, by a banded active-set solve for
+  linear slip weakening; rate-and-state friction still uses a two-pass
+  predictor-corrector for the neighbour terms. QD mode (radiation damping
+  only) on the same code.
 - spectral_ap.py: independent spectral BIEM (Perrin-Rice-Zheng kernel,
   periodic domain, trapezoid time convolution) for the antiplane
   self-similar crack; shares nothing with the space-time code.
 - run_tpv205.py, ref/: TPV205-2D driver and the SCEC reference series.
+- run_hd.py, test_hd.py: Harris and Day (1993) stepover experiments (two
+  parallel segments, forced nucleation, normal-stress coupling).
+- cycle.py (WP4): earthquake sequences. Adaptive QD integrator (scipy
+  DOP853 on slip and state, slip rate from the elementwise closure with a
+  bracketed log-Newton), backslip loading in shear and normal stress,
+  QD-to-FD hand-off at a slip-rate threshold with the fine-grid history
+  rebuilt from the QD dense output, variable FD steps of k dt_min (k a
+  power of two up to 64, from xi dc / V_max) using cumulative kernels
+  K_k = sum_{l<=k} K[l] as the implicit operator, FD-to-QD return after
+  the slip rate has stayed below a threshold for one full window.
+  A dynamic=False option runs the same sequence with radiation damping
+  only.
+- run_cycle1.py, test_cycle.py: single in-plane fault with a 16 km
+  velocity-weakening patch (h* about 5 km, cohesive zone about 800 m,
+  dx = 100 m).
 - test_shells.py, test_stepper.py: table consistency, FFT versus dense
   convolution, window behaviour, kinematic self-similar crack (constant
   stress in time, zero normal stress on the plane), dynamic self-similar
@@ -123,14 +141,52 @@ Validation status (two independent routes agree)
 - Time marching, community benchmark: TPV205-2D (SCEC; 2-D slice of TPV5,
   linear slip weakening, overstressed nucleation, two stress asperities)
   against E. Dunham's MDSBI solution at 6.25 m (run_tpv205.py, reference
-  series in ref/). At dx = 100, 50, 25 m the rupture arrival at the three
-  stations is late by 0.271/0.141/0.068 s, 0.229/0.114/0.059 s and
-  0.455/0.224/0.116 s, a clean first-order discretisation delay whose
-  Richardson extrapolation matches the reference to about 1 ms; final slip
-  differs by 1.4, 0.4, 0.2 percent at 25 m; rms slip difference over 12 s is
-  0.34/0.18/0.09 m. Peak slip rates converge more slowly (within 10 percent
-  at 25 m), as expected for a feature of width comparable to the cohesive
-  zone.
+  series in ref/). With the exact coupled solve of the first-lag system
+  (see below), at dx = 100, 50, 25 m the main-front arrival (slip rate
+  exceeding 0.5 m/s) at the stations -4.5, -7.5 and +12 km differs from
+  the reference by +37/+12/-18 ms, +23/+4/+11 ms and +12/+4/+8 ms, i.e.
+  one to three time steps; final slip differs by 0.1 to 0.4 percent at
+  25 m; rms slip difference over 12 s is 0.030/0.019/0.011 m and rms shear
+  stress difference 0.04 to 0.5 MPa. Peak slip rates are within 3 to 14
+  percent at 25 m and converge more slowly. At +12 km a precursory creep
+  appears where the stress hovers at the yield value ahead of the front
+  (40, 14 and 2.5 mm at 100, 50 and 25 m; the reference stress touches
+  the yield value there too but accumulates no slip).
+- Harris and Day (1993) stepovers (100 m, their Table 1): case D reproduces
+  their Fig. 7d (0.5 km steps jumped in both senses with trigger delays
+  +0.23 s dilational and +1.73 s compressional against their +0.3 and
+  +1.5 s, at the same locations; 1 and 2 km steps not triggered). Case A
+  matches delays and trigger locations within 0.2 s and 0.4 km for
+  dilational 1, 2, 4 km and compressional 1, 2 km steps, and runs through
+  the supershear transition stably. Two differences: our case A rupture
+  runs at 5.8 to 6.0 km/s (close to alpha) and crosses 14 km in 2.7 s
+  against their 3.35 s; and a compressional 4 km step is triggered in ours
+  (+2.3 s) but never in theirs. Both are unchanged at 50 m and are
+  insensitive to the forced-nucleation radius (1 to 5 km) and speed (0.3
+  to 0.8 beta), because the spontaneous supershear front overtakes the
+  forced one within the first kilometre (L_c is about 200 m at S = 0.49).
+  Their 250 m grid, coarser than L_c, and artificial damping are the
+  likely cause; the published transition lengths (Andrews 1976b; Dunham
+  2007) would settle it. Case C has the right jump pattern but triggers
+  earlier than theirs; its cohesive zone is about 120 m, so 100 m is
+  under-resolved and a 50 m rerun is pending.
+- Sequences (run_cycle1): switch threshold 1e-3 versus 1e-2 m/s changes
+  the first event's peak slip rate by 0.4 percent and mean slip by 1
+  percent. Over four events the FD sequence settles to recurrence 82.9 yr,
+  mean slip 1.149 m, peak slip rate 2.66 m/s, extent 22.2 km; the QD
+  sequence on the same fault to 68.1 yr, 0.886 m, 1.06 m/s, 20.4 km.
+  An event costs about 2000 variable steps and 30 to 40 s at N = 300.
+- The first-lag coupling matters. With beta dt = dx/2 the P wave from an
+  element's own ends arrives within one step, so the self term K1_ii is
+  about 1.46 eta and the neighbours supply the rest (the row sum of K1 is
+  exactly -eta, a discrete plane-wave identity that is tested). A two-pass
+  predictor-corrector for the neighbour terms recovers only 90 percent of
+  the first-step slip rate of a newly activated element, which produced a
+  first-order rupture delay (0.27/0.14/0.07 s at 100/50/25 m in the first
+  TPV205-2D runs). The slip-weakening solver now solves the coupled banded
+  system exactly with an active-set loop (scipy solve_banded, O(N) per
+  iteration); the rate-and-state solver still uses the predictor-corrector
+  and should get the same treatment (banded Newton) in WP4.
 - Observation: imposing the elliptical slip kinematically produces a clean
   uniform stress in antiplane (1e-4) but a grid-scale oscillation of several
   percent in-plane, consistent with Rayleigh waves excited by the discrete
