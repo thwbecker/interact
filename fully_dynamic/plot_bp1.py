@@ -29,10 +29,13 @@ def ref_events(a, V_thr=1e-3):
     return out
 
 
+OURS = {"QD": "bp1_qd.pkl", "FD": "bp1_fd.pkl"}
+
+
 def summarize():
     rows = []
     for mode in ("QD", "FD"):
-        fn = f"bp1_{mode.lower()}.pkl"
+        fn = OURS[mode]
         if os.path.exists(fn):
             d = pickle.load(open(fn, "rb")); z = d["z"]
             ev = d["events"]
@@ -59,7 +62,7 @@ def summarize():
 def plot(event_index=1, out_png="bp1_compare.png"):
     fig, ax = plt.subplots(2, 3, figsize=(14, 8), sharex="col")
     for r, mode in enumerate(("QD", "FD")):
-        fn = f"bp1_{mode.lower()}.pkl"
+        fn = OURS[mode]
         ours = pickle.load(open(fn, "rb")) if os.path.exists(fn) else None
         for c, dep in enumerate(DEPTHS):
             a = ax[r, c]
@@ -87,5 +90,13 @@ def plot(event_index=1, out_png="bp1_compare.png"):
 
 
 if __name__ == "__main__":
+    import argparse
+    p = argparse.ArgumentParser()
+    p.add_argument("--qd", default="bp1_qd.pkl", help="our QD pickle (from run_bp1.py)")
+    p.add_argument("--fd", default="bp1_fd.pkl", help="our FD pickle")
+    p.add_argument("--event", type=int, default=1, help="event index for the station figure (0 = first)")
+    p.add_argument("--out", default="bp1_compare.png")
+    a = p.parse_args()
+    OURS["QD"] = a.qd; OURS["FD"] = a.fd
     summarize()
-    plot()
+    plot(event_index=a.event, out_png=a.out)

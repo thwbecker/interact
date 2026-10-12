@@ -32,6 +32,15 @@ def run(dynamic, dz=50.0, t_end_yr=520.0, lmax=6000, V_sw=1e-3, tag=None, resume
     return events
 
 if __name__ == "__main__":
-    dyn = (sys.argv[1] == "fd") if len(sys.argv) > 1 else False
-    t_end = float(sys.argv[2]) if len(sys.argv) > 2 else 520.0
-    run(dyn, t_end_yr=t_end, resume=(len(sys.argv) > 3 and sys.argv[3] == "resume"))
+    import argparse
+    p = argparse.ArgumentParser(description="SEAS BP1 with the space-time BIEM prototype")
+    p.add_argument("mode", choices=["qd", "fd"])
+    p.add_argument("--dz", type=float, default=50.0, help="element size (m); the benchmark suggests 25")
+    p.add_argument("--tend", type=float, default=520.0, help="end time (yr)")
+    p.add_argument("--lmax", type=int, default=6000, help="cap on the history window (fine-grid lags); 0 = no cap")
+    p.add_argument("--vsw", type=float, default=1e-3, help="QD to FD switch slip rate (m/s)")
+    p.add_argument("--resume", action="store_true", help="continue from bp1_<tag>.pkl")
+    p.add_argument("--tag", default=None, help="output tag (default: mode_dz<dz>)")
+    a = p.parse_args()
+    tag = a.tag or f"{a.mode}_dz{int(a.dz)}"
+    run(a.mode == "fd", dz=a.dz, t_end_yr=a.tend, lmax=(a.lmax if a.lmax > 0 else None), V_sw=a.vsw, tag=tag, resume=a.resume)
