@@ -2,9 +2,13 @@
 
 Python prototype for the fully dynamic extension of `rsf_solve` (plan and
 status in fd_plan.md). Plane strain (in-plane, mode II) and antiplane,
-homogeneous full space, straight segments, rate-and-state or
+homogeneous full space (antiplane half-space by the image method), straight
+parallel segments, rate-and-state (aging or flash-heating) or
 slip-weakening friction, quasi-dynamic (QD) and fully dynamic (FD) phases on
-the same operators. Everything is numpy/scipy; no compiled code.
+the same operators, earthquake sequences on one or two segments. Checked
+against exact solutions, SCEC TPV205-2D, Harris and Day (1993) case D, the
+Andrews (1976b) and Dunham (2007) transition lengths, and SEAS BP1 in QD and
+FD. Everything is numpy/scipy; no compiled code.
 
 ## Layout
 
@@ -28,10 +32,14 @@ System and time marching
   convolution, first-lag operator K[1] and cumulative kernels K_k).
 - `stepper.py`: FD stepper with end-of-step collocation and variable step
   k dt_min; friction models `PrescribedTip` (self-similar benchmark),
-  `SlipWeakening` (linear, optional forced nucleation, exact banded
-  active-set solve of the coupled first-lag system), `RateState` (aging
-  law, regularized, banded Newton in log V, predictor-corrector in state).
-  QD mode replaces K[1] by radiation damping.
+  `SlipWeakening` (linear or Dugdale, optional forced nucleation, exact
+  banded active-set solve of the coupled first-lag system), `RateState`
+  (aging law, regularized, banded Newton in log V with a bracketed
+  elementwise fallback, state advanced with the exact aging-law solution
+  for piecewise-constant slip rate; an explicit Heun step produced early
+  healing and too little shallow slip in BP1-FD), `FlashRateState` (strong
+  rate weakening of Noda, Dunham and Rice 2009, slip-law state by exact
+  exponential relaxation). QD mode replaces K[1] by radiation damping.
 - `cycle.py`: sequences. Adaptive QD integrator (scipy DOP853 on slip and
   state, elementwise bracketed Newton closure), backslip loading in shear
   and normal stress, QD to FD hand-off at a slip-rate threshold with the
@@ -47,11 +55,32 @@ Drivers and references
 - `run_tpv205.py`, `ref/`: SCEC TPV205-2D and E. Dunham's MDSBI 6.25 m
   on-fault series (stations -4.5, -7.5, +12 km).
 - `run_hd.py`: Harris and Day (1993) parallel stepover experiments.
-- `run_cycle1.py`: single fault with a 16 km velocity-weakening patch.
+- `run_cycle1.py`: single fault with a 16 km velocity-weakening patch
+  (aging or flash-heating friction).
 - `compare_qd_fd.py`: runs QD and FD sequences on that fault and draws the
-  comparison figure (resumable; `--plot-only`, `--only fd|qd`).
+  comparison figure (resumable; `--plot-only`, `--only fd|qd`,
+  `--friction flash`).
+- `bp1.py`, `run_bp1.py`, `plot_bp1.py`: SEAS BP1 (antiplane half-space on
+  a doubled fault, depth-dependent a, BP1 initial conditions), QD and FD
+  with checkpoint and resume (`--dz`, `--tend`, `--lmax`, `--resume`), and
+  the comparison with the reference series in `ref/bp1qd_*.npy` and
+  `ref/bp1fd_*.npy` (Jiang SBIM 25 m QD and FD, group 4 QD, sem2dpack 50 m
+  FD, Yang SCycle 25 and 50 m FD).
+- `run_step.py`: two parallel segments under backslip loading with
+  rate-and-state friction, QD or FD, per-event bookkeeping per segment and
+  a classification of events involving both segments (dynamic,
+  postseismic, delayed by days, single).
+- `run_transition.py`, `run_dunham.py`: supershear transition length
+  (linear slip weakening with Andrews' forced nucleation; Dugdale friction
+  with Dunham's static-crack nucleation).
 - `spectral_ap.py`: independent spectral BIEM (Perrin-Rice-Zheng kernel)
   for the antiplane self-similar crack; shares no code with the above.
+
+Reference data: `ref/` holds the TPV205-2D series (Dunham, MDSBI 6.25 m)
+and the BP1 QD and FD series of four groups as `.npy` arrays (35 MB). It is
+not tracked by git (see `.gitignore`); obtain it once from the archived
+results bundle and place it in this directory. `test_stepper.py` (TPV205
+test) and `plot_bp1.py` need it; everything else runs without it.
 
 Tests (`pytest -q`): `test_inplane.py`, `test_antiplane.py`,
 `test_shells.py`, `test_stepper.py` run in about 20 s plus the TPV205-2D
@@ -94,8 +123,41 @@ case (20 s); `test_cycle.py` about 2 min; `test_hd.py` about 2 min.
   triggered in ours; both robust to dx, nucleation radius and speed;
   attributed to their grid (coarser than L_c) and damping, unconfirmed.
 - Sequences: switch threshold insensitivity (1 percent); FD versus QD on
-  the test fault: recurrence 82.9 against 68.1 yr, mean slip 1.15 against
-  0.89 m, peak slip rate 2.65 against 1.05 m/s.
+  the test fault: recurrence 82.9 against 67.0 yr, mean slip 1.15 against
+  0.89 m, peak slip rate 2.70 against 1.06 m/s; slip and extent differences
+  unchanged at 50 m (compare_qd_fd.py, figure qd_vs_fd.png).
+- Supershear transition length: Andrews (1976b) band at S = 0.75 (6 to 9 of
+  his L_c) reproduced with his nucleation at 38 elements per cohesive zone;
+  Dunham (2007) Dugdale value at S = 0.5 reproduced within the reading of
+  his figure at 40 elements per cohesive zone. At 8 to 20 elements per
+  cohesive zone the transition is 4 to 6 times too early: 40 elements per
+  cohesive zone are required wherever supershear transition or
+  near-threshold triggering matters. The Harris and Day case A results
+  above are in that under-resolved regime and are not evidence either way.
+- SEAS BP1 at 50 and 25 m (25 m on a workstation, 2026-10-12). QD: events
+  at 196.36/271.98/349.82/428.12/506.48 yr (25 m) and 196.37/271.97/
+  349.78/428.07/506.41 (50 m) against group 4's 196.36/271.97/349.78/
+  428.07/506.40; coseismic slip per event within 0.01 m at 2.5, 7.5 and
+  12.5 km at both resolutions, station peak slip rates within 2 percent,
+  station histories overlay. FD: events at 196.36/302.11/420.81 yr (25 m)
+  and 196.37/301.80/420.54 (50 m) against sem2dpack (50 m) 195.67/302.21/
+  420.93 and Jiang (25 m) 210.95/312.84/439.15; recurrence 105.7 and 118.7
+  yr at 25 m against sem2dpack's 106.5 and 118.7; coseismic slip per event
+  4.10/3.33/3.72 m at 2.5 km at both resolutions against 4.11/3.35/3.73
+  (sem2dpack) and 4.00/3.27/3.88 (Jiang). Station peak slip rates are the
+  only quantity that moves with resolution: 4.55/3.56/1.50 m/s at 25 m
+  (first event, 2.5/7.5/12.5 km) against Jiang's 4.70/3.67/2.27 and
+  sem2dpack's 6.08/4.50/2.39; the deep station, inside the nucleation
+  zone, is still 30 percent low and converging at about 18 percent per
+  halving of the element size. Station histories match sem2dpack and Jiang
+  in shape and duration, including the free-surface reflection returning to
+  12.5 km ten seconds after the rupture passage. Yang's SCycle series are
+  the outlier among the references at both resolutions.
+- Window tolerance (BP1-FD, 50 m): tightening the window criterion from
+  1e-2 to 1e-3 of the static interaction envelope (window three times
+  longer) leaves event times, slip per event and station peak slip rates
+  unchanged to the printed precision (0.01 yr, 0.01 m, 0.01 m/s) over two
+  events. The default of 1e-2 is adequate.
 
 ## Known limitations
 
@@ -103,8 +165,8 @@ case (20 s); `test_cycle.py` about 2 min; `test_hd.py` about 2 min.
   tables (not built).
 - Free surface only for antiplane (image method); in-plane and any 3-D
   stage would need half-space kernels or an auxiliary surface.
-- The 2-D window is long (1.3 to 5 S-travel times across a pair); window
-  sensitivity of jump outcomes untested.
+- The 2-D window is long (1.3 to 5 S-travel times across a pair); BP1-FD
+  is insensitive to it (see above), stepover cases not yet spot-checked.
 - Near-front values of the derived point field lose accuracy within 1e-8
   relative time of an arrival (cross-check engine only).
 - Performance: history convolution O(L M) per pair and step in numpy; see

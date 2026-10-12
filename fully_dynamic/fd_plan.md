@@ -47,14 +47,14 @@ below are covered by tests unless marked otherwise.
 | windowed W tables, Toeplitz/FFT for parallel pairs, history buffers | done | dense convolution; kinematic self-similar crack |
 | fixed-step FD stepper, end-of-step collocation, exact banded K[1] solve | done | exact Kostrov/Broberg self-similar factors (mode II 0.9631/0.8651/0.7662 at v/beta 0.2/0.5/0.8, mode III 0.8257/0.7052; reproduced to 1e-3); independent spectral mode III solver |
 | linear slip weakening, forced nucleation | done | SCEC TPV205-2D against Dunham MDSBI 6.25 m: arrivals within 1 to 3 steps at 100/50/25 m, final slip within 0.4 percent, rms slip 0.011 m at 25 m |
-| rate-and-state (aging, regularized), banded Newton in log V, exact aging-law state update | done | SEAS BP1-QD and BP1-FD at 50 m (event times, slip per event, station histories) |
+| rate-and-state (aging, regularized), banded Newton in log V, exact aging-law state update | done | SEAS BP1-QD and BP1-FD at 50 and 25 m (event times, slip per event, station histories; deep-station peak slip rate still resolution-limited) |
 | normal-stress coupling across segments | done | static sign check; Harris and Day cases D and A: trigger delays and locations within 0.2 s and 0.4 km |
 | adaptive QD integrator (DOP853 on slip and state) | done | consistency with FD at slow slip rates; periodic sequences |
 | QD/FD hand-off both ways, history rebuilt from QD dense output | done | switch threshold 1e-3 versus 1e-2 m/s: 1 percent in slip |
 | variable FD steps (k dt_min, k <= 64, from xi dc / Vmax, cumulative kernels) | done | k = 1 versus k = 2 on the self-similar crack; event cost about 2000 steps |
 | FD versus QD sequence on one fault | done | recurrence +24 percent, slip +30 percent, peak slip rate x2.5, extent +9 percent, healing by stopping phases visible (compare_qd_fd.py); unchanged at 50 m |
 | strong rate weakening (flash heating, slip law) | built | steady-state checks only; low-prestress setup not yet run |
-| two-segment sequence driver with jump classification (run_step.py) | built | one QD sequence (predates a clock fix; to be rerun) |
+| two-segment sequence driver with jump classification (run_step.py) | running | 1 km step, 2 km overlap, 100 m: QD and FD both give a delayed jump (segment 2 ruptures 28 d after segment 1 in QD, 16 d dilational and 6 d compressional in FD), no dynamic triggering |
 | non-parallel segment pairs (dense tables) | not built | needed for branches, TPV14/15-2D |
 | free surface, antiplane (image method on a doubled fault) | done | surface-breaking crack relaxes to the static half-space solution; BP1 |
 | free surface, in-plane or 3-D | not built | needed for in-plane half-space problems and the 3-D stage |
@@ -77,8 +77,10 @@ question; Hu et al. (2016) or Lozos et al. (2012) the stepover one.
   done.
 - Window tolerance 1e-2 relative to the static interaction envelope
   mu dx^2 dt / (2 pi (1-nu) r^2); gives L of about 1.3 to 5 S-travel times
-  across a pair depending on geometry. Sensitivity of jump outcomes to the
-  window has not been tested and should be (1e-3 on a subset).
+  across a pair depending on geometry. Tested on BP1-FD at 50 m: 1e-3
+  (window three times longer) changes nothing to the printed precision
+  over two events. A spot check on one stepover case with a dynamic jump
+  remains worthwhile but is no longer a prerequisite.
 - Switch to FD at 1e-3 m/s; return to QD after max V has stayed below
   1e-4 m/s for one full window.
 - Resolution: cohesive zone resolved by at least 5 elements. For
@@ -158,14 +160,17 @@ and FD, with window and resolution sensitivities on a subset.
   delay of order (e_t - 1) dt). Default stays e_t = 1; e_t = 2 is the
   option when noise matters. A systematic (h_T, e_t) scan with
   rate-and-state friction is still open.
-- SEAS BP1-QD/FD: done at 50 m (see README validation summary). QD matches
-  group 4 to 0.01 yr and 0.01 m; FD matches sem2dpack 50 m in event times
-  (within 0.4 yr over three events), recurrence (105.4/118.7 against
-  106.5/118.7 yr) and slip per event (within 0.04 m at 7.5 km), with peak
-  slip rates 10 to 30 percent low at this resolution. A 25 m FD run needs
-  more memory than the sandbox has (doubled fault, N = 3200) and is a
-  workstation job. A comparison with the rsf_solve BP1-QD output is still
-  worth doing when it is available.
+- SEAS BP1-QD/FD: done at 50 m (sandbox) and 25 m (workstation, about 2.5
+  h for the FD sequence). QD matches group 4 to 0.01 yr and 0.01 m at both
+  resolutions; FD matches sem2dpack in event times (302.11 against 302.21
+  yr for the second event at 25 m), recurrence and slip per event, and
+  Jiang's 25 m SBIM in station peak slip rates at 2.5 and 7.5 km (within 3
+  percent at 25 m). Converged with respect to element size: timing, slip,
+  recurrence, station histories. Not converged: peak slip rate at the deep
+  station (12.5 km, in the nucleation zone), 1.50 m/s at 25 m against 2.27
+  (Jiang) and 2.39 (sem2dpack), moving by 18 percent per halving. A 12.5 m
+  run would settle it but is not needed for the stepover work. A comparison
+  with the rsf_solve BP1-QD output is still worth doing.
 - Integration rule adopted from BP1: the aging-law state must be advanced
   with its exact solution over the step; explicit Heun steps produced early
   healing and 40 percent too little shallow slip. The same holds for the
