@@ -6,8 +6,8 @@ warnings.filterwarnings("ignore", category=RuntimeWarning, module="scipy.integra
 
 YR = 3.15576e7
 
-def run(dynamic, dz=50.0, t_end_yr=520.0, lmax=6000, V_sw=1e-3, tag=None, resume=False):
-    model, y0, z, fr = bp1.build(dz=dz, dynamic=dynamic, lmax=lmax, V_sw=V_sw)
+def run(dynamic, dz=50.0, t_end_yr=520.0, lmax=6000, V_sw=1e-3, tag=None, resume=False, tol=1e-2):
+    model, y0, z, fr = bp1.build(dz=dz, dynamic=dynamic, lmax=lmax, V_sw=V_sw, tol=tol)
     model.record = 5
     idx = {d: int(np.argmin(np.abs(z - d))) for d in (2.5e3, 7.5e3, 12.5e3)}
     tag = tag or ("fd" if dynamic else "qd")
@@ -31,7 +31,7 @@ def run(dynamic, dz=50.0, t_end_yr=520.0, lmax=6000, V_sw=1e-3, tag=None, resume
         events.append(dict(t_start=e["t_start"], t_end=e["t_end"], Vmax=e["Vmax"], slip=e["slip"], stations=rec, nsteps=e["nsteps"]))
         print(f"[{tag}] event {len(events)} at {e['t_start']/YR:8.2f} yr: Vmax {e['Vmax']:.2f} m/s, max slip {e['slip'].max():.2f} m, "
               f"slip at 7.5 km {e['slip'][idx[7.5e3]]:.2f} m, {e['nsteps']} steps ({time.time()-t0:.0f} s)", flush=True)
-        pickle.dump(dict(events=events, z=z, log=model.log, y=y, t=t), open(f"bp1_{tag}.pkl", "wb"))
+        pickle.dump(dict(events=events, z=z, log=model.log, y=y, t=t, dz=dz), open(f"bp1_{tag}.pkl", "wb"))
     return events
 
 if __name__ == "__main__":
@@ -43,7 +43,8 @@ if __name__ == "__main__":
     p.add_argument("--lmax", type=int, default=6000, help="cap on the history window (fine-grid lags); 0 = no cap")
     p.add_argument("--vsw", type=float, default=1e-3, help="QD to FD switch slip rate (m/s)")
     p.add_argument("--resume", action="store_true", help="continue from bp1_<tag>.pkl")
+    p.add_argument("--tol", type=float, default=1e-2, help="window tolerance relative to the static interaction envelope")
     p.add_argument("--tag", default=None, help="output tag (default: mode_dz<dz>)")
     a = p.parse_args()
     tag = a.tag or f"{a.mode}_dz{int(a.dz)}"
-    run(a.mode == "fd", dz=a.dz, t_end_yr=a.tend, lmax=(a.lmax if a.lmax > 0 else None), V_sw=a.vsw, tag=tag, resume=a.resume)
+    run(a.mode == "fd", dz=a.dz, t_end_yr=a.tend, lmax=(a.lmax if a.lmax > 0 else None), V_sw=a.vsw, tag=tag, resume=a.resume, tol=a.tol)

@@ -32,6 +32,13 @@ def ref_events(a, V_thr=1e-3):
 OURS = {"QD": "bp1_qd.pkl", "FD": "bp1_fd.pkl"}
 
 
+def _label(mode, d):
+    dz = d.get("dz")
+    if dz is None:                       # older pickles: infer from the element spacing
+        z = d["z"]; dz = float(z[1] - z[0]) if len(z) > 1 else None
+    return f"ours {mode} ({dz:.0f} m)" if dz else f"ours {mode}"
+
+
 def summarize():
     rows = []
     for mode in ("QD", "FD"):
@@ -40,7 +47,7 @@ def summarize():
             d = pickle.load(open(fn, "rb")); z = d["z"]
             ev = d["events"]
             times = np.array([e["t_start"] for e in ev]) / YR
-            rows.append((f"ours {mode} (50 m)", times, {dep: [e["stations"][dep]["V"].max() for e in ev] for dep in DEPTHS},
+            rows.append((_label(mode, d), times, {dep: [e["stations"][dep]["V"].max() for e in ev] for dep in DEPTHS},
                          {dep: [e["slip"][int(np.argmin(np.abs(z - dep)))] for e in ev] for dep in DEPTHS}))
         for name, pref in REFS[mode].items():
             try:
@@ -63,13 +70,18 @@ def plot(event_index=1, out_png="bp1_compare.png"):
     fig, ax = plt.subplots(2, 3, figsize=(14, 8), sharex="col")
     for r, mode in enumerate(("QD", "FD")):
         fn = OURS[mode]
-        ours = pickle.load(open(fn, "rb")) if os.path.exists(fn) else None
+        if not os.path.exists(fn):
+            print(f"{mode}: {fn} not found, nothing of ours plotted"); ours = None
+        else:
+            ours = pickle.load(open(fn, "rb"))
+            if len(ours["events"]) <= event_index:
+                print(f"{mode}: {fn} has {len(ours['events'])} event(s); use --event {len(ours['events']) - 1} or wait for the run")
         for c, dep in enumerate(DEPTHS):
             a = ax[r, c]
             if ours is not None and len(ours["events"]) > event_index:
                 e = ours["events"][event_index]; s = e["stations"][dep]
                 i0 = np.argmax(s["V"] > 1e-3)
-                a.plot(s["t"] - s["t"][i0], np.log10(np.maximum(s["V"], 1e-12)), "k-", lw=1.8, label=f"ours {mode} 50 m")
+                a.plot(s["t"] - s["t"][i0], np.log10(np.maximum(s["V"], 1e-12)), "k-", lw=1.8, label=_label(mode, ours))
             for name, pref in REFS[mode].items():
                 try:
                     arr = np.load(f"ref/{pref}_{c + 1}.npy")
