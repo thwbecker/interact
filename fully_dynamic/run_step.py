@@ -85,8 +85,9 @@ def classify(ev, geom, V_thr=1e-2, t_extra=3.0):
     return out
 
 
-def run(n_events=4, t_end_yr=600.0, verbose=True, delayed_window_yr=1.0, **kw):
+def run(n_events=4, t_end_yr=600.0, verbose=True, delayed_window_yr=1.0, out=None, **kw):
     model, y0, geom = build(**kw)
+    model.record = 5
     t0 = time.time()
     y, t = y0, 0.0
     results = []
@@ -108,9 +109,25 @@ def run(n_events=4, t_end_yr=600.0, verbose=True, delayed_window_yr=1.0, **kw):
             segs = ", ".join(f"seg{j}: on {v['t_on']-c['t_start']:.1f}s off {v['t_off']-c['t_start']:.1f}s slip {v['slip']/1e3:.1f} m km extent {v['extent']/1e3:.1f} km Vmax {v['Vmax']:.2f}" for j, v in c["segments"].items())
             lag = f", lag after arrest {c['lag_after_arrest']:+.2f} s" if "lag_after_arrest" in c else ""
             print(f"event {k+1} at {c['t_start']/YR:8.2f} yr [{c['kind']}{lag}]: {segs}  ({time.time()-t0:.0f}s)")
+        if out is not None:
+            save(out, results, geom, kw)
         if t >= t_end_yr * YR:
             break
     return results, geom
+
+
+def save(out, results, geom, kw):
+    """One npz per configuration: event table and per-event, per-segment numbers."""
+    import json
+    rows = []
+    for c in results:
+        for j, v in c["segments"].items():
+            rows.append((c["t_start"], j, v["t_on"], v["t_off"], v["slip"], v["extent"], v["Vmax"]))
+    kinds = [c["kind"] for c in results]
+    lags = [c.get("lag_after_arrest", np.nan) for c in results]
+    np.savez(out, rows=np.array(rows), kinds=np.array(kinds), lags=np.array(lags),
+             t_start=np.array([c["t_start"] for c in results]), Vmax=np.array([c["Vmax"] for c in results]),
+             W=geom["W"], overlap=geom["overlap"], dx=geom["dx"], params=json.dumps({k: (v if isinstance(v, (int, float, str, bool)) else str(v)) for k, v in kw.items()}))
 
 
 if __name__ == "__main__":
@@ -121,5 +138,10 @@ if __name__ == "__main__":
     p.add_argument("--dx", type=float, default=100.0)
     p.add_argument("--qd", action="store_true")
     p.add_argument("--friction", choices=["aging", "flash"], default="aging")
+    p.add_argument("--vs-end", type=float, default=4.0, help="velocity-strengthening margin at each segment end (km)")
+    p.add_argument("--tol", type=float, default=1e-2, help="window tolerance")
+    p.add_argument("--out", default=None, help="npz file for the results (default: step_<mode>_W<km>_ov<km>_dx<m>.npz)")
     a = p.parse_args()
-    run(n_events=a.events, W=a.W * 1e3, overlap=a.overlap * 1e3, dx=a.dx, dynamic=not a.qd, friction=a.friction)
+    out = a.out or f"step_{'qd' if a.qd else 'fd'}_W{a.W:+.1f}_ov{a.overlap:.1f}_dx{int(a.dx)}.npz"
+    run(n_events=a.events, W=a.W * 1e3, overlap=a.overlap * 1e3, dx=a.dx, dynamic=not a.qd, friction=a.friction,
+        vs_end=a.vs_end * 1e3, tol=a.tol, out=out)

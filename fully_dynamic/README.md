@@ -69,7 +69,11 @@ Drivers and references
 - `run_step.py`: two parallel segments under backslip loading with
   rate-and-state friction, QD or FD, per-event bookkeeping per segment and
   a classification of events involving both segments (dynamic,
-  postseismic, delayed by days, single).
+  postseismic, delayed by days, single); writes one npz per configuration
+  after every event (`--W`, `--overlap`, `--dx`, `--events`, `--qd`,
+  `--friction`, `--vs-end`, `--tol`, `--out`). `sweep_step.sh` runs both
+  senses at 0.5, 1, 2 and 3 km in QD and FD; `summarize_step.py` tabulates
+  the npz files.
 - `run_transition.py`, `run_dunham.py`: supershear transition length
   (linear slip weakening with Andrews' forced nucleation; Dugdale friction
   with Dunham's static-crack nucleation).
