@@ -226,7 +226,7 @@ class RateState:
             hi = np.where(gu <= 0, np.minimum(hi, u), hi)
             V = np.exp(u)
             dg = (k11 - self.dtau_dV(V, psi, sigma)) * V
-            with np.errstate(divide="ignore", invalid="ignore"):
+            with np.errstate(divide="ignore", invalid="ignore", over="ignore"):
                 un = u - gu / dg
             bad = ~np.isfinite(un) | (un <= lo) | (un >= hi)
             un = np.where(bad, 0.5 * (lo + hi), un)

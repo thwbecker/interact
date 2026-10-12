@@ -1,6 +1,9 @@
 """Run SEAS BP1 (QD or FD) and record station series at 2.5, 7.5, 12.5 km."""
 import numpy as np, sys, time, pickle
 import bp1
+import warnings
+warnings.filterwarnings("ignore", category=RuntimeWarning, module="scipy.integrate")
+
 YR = 3.15576e7
 
 def run(dynamic, dz=50.0, t_end_yr=520.0, lmax=6000, V_sw=1e-3, tag=None, resume=False):
