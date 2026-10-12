@@ -27,11 +27,13 @@ import shells as sh
 class PrescribedTip:
     """Frictionless crack with uniform stress drop dsigma expanding at speed v
     from x = 0 (self-similar benchmark); elements outside the tip are locked."""
-    def __init__(self, x, v, dsigma, t0=0.0):
+    def __init__(self, x, v, dsigma, t0=0.0, allowed=None):
         self.x = np.asarray(x, float); self.v = v; self.dsigma = dsigma; self.t0 = t0
+        self.allowed = allowed            # optional mask of elements that may ever slip
 
     def free_mask(self, t):
-        return np.abs(self.x) < self.v * (t - self.t0)
+        m = np.abs(self.x) < self.v * (t - self.t0)
+        return m if self.allowed is None else (m & self.allowed)
 
     def solve(self, H, K1, sigma, t, state, Vguess):
         free = self.free_mask(t)
@@ -71,14 +73,17 @@ class SlipWeakening:
     with the strength evaluated at the end-of-step slip delta^n + V dt.
     Elements outside [xmin, xmax] (or where mu_s is huge) stay locked.
     Predictor-corrector: diagonal of K1 implicit, neighbours explicit."""
-    def __init__(self, mu_s, mu_d, d0, locked=None, force_time=None, force_t0=0.0):
-        """force_time: per-element time at which a forced (nucleation) weakening
+    def __init__(self, mu_s, mu_d, d0, locked=None, force_time=None, force_t0=0.0, dugdale=False):
+        """dugdale: strength stays at mu_s sigma until slip reaches d0, then drops
+        to mu_d sigma (Dugdale law; Dunham 2007). Otherwise linear weakening.
+        force_time: per-element time at which a forced (nucleation) weakening
         begins; the strength then decreases linearly from mu_s to mu_d over
         force_t0 seconds regardless of slip (SCEC-style forced rupture)."""
         self.mu_s = np.asarray(mu_s, float); self.mu_d = np.asarray(mu_d, float); self.d0 = float(d0)
         self.locked = locked
         self.force_time = None if force_time is None else np.asarray(force_time, float)
         self.force_t0 = float(force_t0)
+        self.dugdale = dugdale
 
     def _mu_forced(self, t):
         if self.force_time is None:
@@ -123,8 +128,12 @@ class SlipWeakening:
         N = H.size
         mus, mud, d0 = self.mu_s, self.mu_d, self.d0
         sig = sigma_fun(Vguess)
-        mu_slip = mus - (mus - mud) * np.minimum(delta / d0, 1.0)
-        slope0 = np.where(delta < d0, sig * (mus - mud) * dt / d0, 0.0)
+        if self.dugdale:
+            mu_slip = np.where(delta < d0, mus, mud)
+            slope0 = np.zeros_like(delta)
+        else:
+            mu_slip = mus - (mus - mud) * np.minimum(delta / d0, 1.0)
+            slope0 = np.where(delta < d0, sig * (mus - mud) * dt / d0, 0.0)
         muf = self._mu_forced(t) if t is not None else None
         if muf is not None:
             forced = muf < mu_slip
@@ -184,14 +193,17 @@ class RateState:
         self.V0 = V0; self.f0 = f0; self.tol = newton_tol; self.max_iter = max_iter
 
     def tau_of_V(self, V, psi, sigma):
-        return self.a * sigma * np.arcsinh(V / (2 * self.V0) * np.exp(psi / self.a))
+        with np.errstate(over="ignore", invalid="ignore"):
+            return self.a * sigma * np.arcsinh(V / (2 * self.V0) * np.exp(psi / self.a))
 
     def dtau_dV(self, V, psi, sigma):
-        z = V / (2 * self.V0) * np.exp(psi / self.a)
-        return self.a * sigma * np.exp(psi / self.a) / (2 * self.V0) / np.sqrt(1 + z * z)
+        with np.errstate(over="ignore", invalid="ignore"):
+            z = V / (2 * self.V0) * np.exp(psi / self.a)
+            return self.a * sigma * np.exp(psi / self.a) / (2 * self.V0) / np.sqrt(1 + z * z)
 
     def psidot(self, V, psi):
-        return self.b / self.dc * (self.V0 * np.exp((self.f0 - psi) / self.b) - np.abs(V))
+        with np.errstate(over="ignore", invalid="ignore"):
+            return self.b / self.dc * (self.V0 * np.exp((self.f0 - psi) / self.b) - np.abs(V))
 
     def _solve_local(self, Hloc, k11, sigma, psi, Vg):
         """Elementwise solution of Hloc + k11 V = tau_f(V) for V > 0 (k11 < 0).
@@ -237,12 +249,23 @@ class RateState:
         else:
             k11 = np.diag(K1); Koff = K1 - np.diag(k11)
             solve_V = lambda Hh, sig, ps, Vg: self._solve_local(Hh + Koff @ Vg, k11, sig, ps, Vg)
-        psd0 = self.psidot(Vguess, psi)
-        psi_s = psi + dt * psd0
+        psi_s = self.advance_psi(psi, Vguess, Vguess, dt)
         Vs = solve_V(H, sigma_fun(Vguess), psi_s, Vguess)
-        psi_ss = psi + 0.5 * dt * (psd0 + self.psidot(Vs, psi_s))
+        psi_ss = self.advance_psi(psi, Vguess, Vs, dt)
         Vss = solve_V(H, sigma_fun(Vs), psi_ss, Vs)
         return Vss, psi_ss
+
+    def advance_psi(self, psi, V_a, V_b, dt):
+        """Exact solution of the aging law over one step for a constant slip rate
+        V = mean(|V_a|, |V_b|):  theta(t+dt) = dc/V + (theta - dc/V) exp(-V dt/dc),
+        with theta = (dc/V0) exp((psi - f0)/b). Unconditionally stable, which the
+        explicit Heun step is not once V dt / dc or the healing rate becomes large
+        (Lapusta et al. 2000)."""
+        V = np.maximum(0.5 * (np.abs(V_a) + np.abs(V_b)), 1e-30)
+        with np.errstate(over="ignore", invalid="ignore"):
+            theta = self.dc / self.V0 * np.exp((psi - self.f0) / self.b)
+            theta_n = self.dc / V + (theta - self.dc / V) * np.exp(-V * dt / self.dc)
+            return self.f0 + self.b * np.log(self.V0 * theta_n / self.dc)
 
     def _solve_banded(self, H, K1, K1band, sigma, psi, Vg):
         """Newton in u = ln V on g(u) = H + K1 e^u - tau_f(e^u) = 0 with the
@@ -250,7 +273,8 @@ class RateState:
         import scipy.sparse as sps
         ab0, bw = K1band
         K1s = K1 if sps.issparse(K1) else sps.csr_matrix(K1)
-        u = np.log(np.maximum(Vg, 1e-30))
+        u = np.clip(np.log(np.maximum(Vg, 1e-30)), -70.0, 10.0)
+        converged = False
         for _ in range(self.max_iter):
             V = np.exp(u)
             g = H + K1s @ V - self.tau_of_V(V, psi, sigma)
@@ -258,12 +282,70 @@ class RateState:
             ab = ab0 * V[None, :]                          # column scaling by e^u
             # band layout: entry (i, j) at ab[bw + i - j, j]; diagonal row bw
             ab[bw, :] += dgdV * V
-            du = -banded_solve(ab, bw, g)
-            du = np.clip(du, -2.0, 2.0)
-            u = u + du
-            if np.max(np.abs(du)) < self.tol:
+            if not np.all(np.isfinite(ab)) or not np.all(np.isfinite(g)):
                 break
-        return np.exp(u)
+            du = -banded_solve(ab, bw, g)
+            if not np.all(np.isfinite(du)):
+                break
+            du = np.clip(du, -2.0, 2.0)
+            u = np.clip(u + du, -70.0, 10.0)
+            if np.max(np.abs(du)) < self.tol:
+                converged = True
+                break
+        if converged:
+            return np.exp(u)
+        # fallback: elementwise bracketed solve with the neighbour terms lagged (fixed point);
+        # each inner solve is exact and monotone, the outer iteration converges because the
+        # neighbour coupling is a fraction of the diagonal
+        k11 = K1s.diagonal().copy()
+        Koff = K1s - sps.diags(k11)
+        V = np.exp(np.clip(u, -70.0, 10.0))
+        for _ in range(60):
+            Vn = self._solve_local(H + Koff @ V, k11, sigma, psi, V)
+            if np.max(np.abs(Vn - V) / np.maximum(V, 1e-30)) < self.tol:
+                V = Vn
+                break
+            V = Vn
+        return V
+
+
+class FlashRateState(RateState):
+    """Strong rate weakening (flash heating) in the form of Noda, Dunham and
+    Rice (2009): same regularized tau(V, psi), slip-law evolution towards a
+    steady state that weakens strongly above V_w,
+        f_ss(V)  = f_w + (f_LV(V) - f_w) / (1 + (V/V_w)^8)^(1/8),
+        f_LV(V)  = f0 - (b - a) ln(V/V0),
+        psi_ss(V) = a ln[(2 V0 / V) sinh(f_ss(V)/a)],
+        dpsi/dt  = -(V/L)(psi - psi_ss(V)).
+    No additional state variable; L plays the role of dc."""
+    def __init__(self, a, b, dc, V0, f0, Vw=0.1, fw=0.2, newton_tol=1e-10, max_iter=50):
+        super().__init__(a, b, dc, V0, f0, newton_tol, max_iter)
+        self.Vw = float(Vw); self.fw = float(fw)
+
+    def f_ss(self, V):
+        V = np.maximum(np.abs(V), 1e-30)
+        fLV = self.f0 - (self.b - self.a) * np.log(V / self.V0)
+        return self.fw + (fLV - self.fw) / (1 + (V / self.Vw) ** 8) ** 0.125
+
+    def psi_ss(self, V):
+        V = np.maximum(np.abs(V), 1e-30)
+        with np.errstate(over="ignore", invalid="ignore"):
+            arg = self.f_ss(V) / self.a
+            # ln(2 sinh(x)) = x + ln(1 - exp(-2x)), stable for large x
+            ln2sinh = arg + np.log1p(-np.exp(-2 * arg))
+            return self.a * (np.log(self.V0 / V) + ln2sinh)
+
+    def psidot(self, V, psi):
+        V = np.maximum(np.abs(V), 1e-30)
+        return -(V / self.dc) * (psi - self.psi_ss(V))
+
+    def advance_psi(self, psi, V_a, V_b, dt):
+        """Exact relaxation towards psi_ss at the mean slip rate: the slip law
+        is linear in psi with rate V/L, so this is unconditionally stable."""
+        Vm = 0.5 * (np.abs(V_a) + np.abs(V_b))
+        Vm = np.maximum(Vm, 1e-30)
+        pss = self.psi_ss(Vm)
+        return pss + (psi - pss) * np.exp(-Vm * dt / self.dc)
 
 
 class Stepper:
@@ -281,8 +363,9 @@ class Stepper:
         self.state = None
         self.Hn_dot = np.zeros(self.N)      # rate of the normal-stress change (e.g. backslip), physical sign
         if mode == "fd":
-            self.K1 = system.K1s
-            self.K1n = system.K1n
+            thr = 1e-13 * np.abs(system.K1s).max()
+            self.K1 = np.where(np.abs(system.K1s) > thr, system.K1s, 0.0)
+            self.K1n = np.where(np.abs(system.K1n) > thr, system.K1n, 0.0)
         else:
             self.K1 = -system.eta * np.eye(self.N)
             self.K1n = np.zeros((self.N, self.N))

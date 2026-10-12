@@ -2,7 +2,7 @@
 import numpy as np, time, sys
 import shells as sh, stepper as st
 
-def run(dx=50.0, tend=12.0, tol=1e-2, verbose=True):
+def run(dx=50.0, tend=12.0, tol=1e-2, verbose=True, coupled=True):
     AL, BE, RHO = 6000.0, 3464.0, 2670.0
     L = 30e3; n = int(L / dx)
     f = sh.Fault([-L / 2, 0.0], [1.0, 0.0], L, n)
@@ -19,6 +19,7 @@ def run(dx=50.0, tend=12.0, tol=1e-2, verbose=True):
     sigma0 = 120e6
     fr = st.SlipWeakening(0.677, 0.525, 0.40)
     S = st.Stepper(sys_, fr, tau0=tau0, sigma0=sigma0, normal_coupling=False)
+    S.coupled = coupled
     stations = {"st-045": -4.5e3, "st-075": -7.5e3, "st120": 12.0e3}
     idx = {k: int(np.argmin(np.abs(x - v))) for k, v in stations.items()}
     rec = {k: [] for k in stations}
@@ -35,5 +36,6 @@ def run(dx=50.0, tend=12.0, tol=1e-2, verbose=True):
 
 if __name__ == "__main__":
     dx = float(sys.argv[1]) if len(sys.argv) > 1 else 50.0
-    out = run(dx)
-    np.savez(f"tpv205_2d_dx{int(dx)}.npz", **out)
+    coupled = (sys.argv[2] != "pc") if len(sys.argv) > 2 else True
+    out = run(dx, coupled=coupled)
+    np.savez(f"tpv205_2d_dx{int(dx)}{'' if coupled else '_pc'}.npz", **out)

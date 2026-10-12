@@ -104,18 +104,44 @@ def test_kinematic_factors_match_exact():
 
 
 def test_tpv205_2d_coarse():
-    """TPV205-2D at 100 m against Dunham's MDSBI 6.25 m reference: final
-    slips within 2 percent, rupture arrivals late by a first-order
-    discretisation delay (0.27, 0.23, 0.45 s at 100 m; halved at 50 m; the
-    Richardson-extrapolated values match the reference to 1 ms)."""
+    """TPV205-2D at 100 m against Dunham's MDSBI 6.25 m reference, with the
+    exact coupled (banded, active-set) slip-weakening solve. Main-front
+    arrival (slip rate exceeding 0.5 m/s) within 0.04 s, final slip within
+    1 percent, rms slip difference over 12 s below 0.05 m at all three
+    stations. A precursory creep of a few cm appears at +12 km where the
+    stress hovers at the yield value ahead of the front; it shrinks with
+    resolution (40 mm at 100 m, 15 mm at 50 m)."""
     import run_tpv205
     out = run_tpv205.run(dx=100.0, verbose=False)
     ref_dir = os.path.join(os.path.dirname(__file__), "ref")
-    delays = {"st-045": 0.271, "st-075": 0.229, "st120": 0.455}
     for name in ("st-045", "st-075", "st120"):
         r = np.load(os.path.join(ref_dir, f"tpv205_2d_dunham_{name}.npy"))
         o = out[name]
-        ti = o[np.argmax(o[:, 2] > 1e-3), 0]; tr = r[np.argmax(r[:, 2] > 1e-3), 0]
-        assert abs((ti - tr) - delays[name]) < 0.03
-        assert abs(o[-1, 1] - r[-1, 1]) < 0.02 * r[-1, 1]
+        ti = o[np.argmax(o[:, 2] > 0.5), 0]; tr = r[np.argmax(r[:, 2] > 0.5), 0]
+        assert abs(ti - tr) < 0.04, (name, ti, tr)
+        assert abs(o[-1, 1] - r[-1, 1]) < 0.01 * r[-1, 1]
+        rD = np.interp(o[:, 0], r[:, 0], r[:, 1])
+        assert np.sqrt(np.mean((o[:, 1] - rD) ** 2)) < 0.05
         assert abs(o[-1, 3] - r[-1, 3] * 1e6) < 1e6
+
+
+def test_first_step_slip_rate_of_a_uniform_patch_is_exact():
+    """A uniformly overstressed patch must respond with V = dtau/eta in the
+    first step (plane-wave response): the self term K1_ii exceeds eta because
+    the P wave from the element ends arrives within the step, and the
+    neighbours supply the rest. The coupled solve reproduces this; the
+    two-pass predictor-corrector recovers only about 90 percent."""
+    dx = 100.0; n = 120
+    f = sh.Fault([-n * dx / 2, 0.0], [1.0, 0.0], n * dx, n)
+    dt = 0.5 * dx / BE
+    sys_ = sh.System([f], dt, AL, BE, RHO, tol=1e-2, lmax=50, cap_ok=True)
+    x = f.centers[:, 0]
+    tau0 = np.where(np.abs(x) < 1500.0, 81.6e6, 70e6)
+    fr = st.SlipWeakening(0.677, 0.525, 1e9)      # no weakening within the step
+    S = st.Stepper(sys_, fr, tau0=tau0, sigma0=120e6, normal_coupling=False)
+    V = S.step()
+    i0 = n // 2
+    exact = (81.6e6 - 0.677 * 120e6) / sys_.eta
+    assert abs(V[i0] - exact) < 1e-6 * exact
+    # row sums of K1 give exactly -eta (plane-wave identity of the discrete operator)
+    assert np.allclose(sys_.K1s[i0].sum(), -sys_.eta, rtol=1e-9)

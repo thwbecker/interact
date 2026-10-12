@@ -22,17 +22,17 @@ warnings.filterwarnings("ignore", category=RuntimeWarning, module="scipy.integra
 YR = 3.15576e7
 
 
-def run_sequence(dynamic, n_events, dx, V_sw, prefix, record_event=1, verbose=True):
+def run_sequence(dynamic, n_events, dx, V_sw, prefix, record_event=1, verbose=True, friction="aging"):
     import run_cycle1
     tag = "fd" if dynamic else "qd"
-    model, y0, x = run_cycle1.setup(V_sw=V_sw, dx=dx, dynamic=dynamic)
+    model, y0, x = run_cycle1.setup(V_sw=V_sw, dx=dx, dynamic=dynamic, friction=friction)
     model.record = 20
     model.verbose = False
     out = dict(x=x, dx=dx, dynamic=dynamic, t_start=[], Vmax=[], slip=[], nsteps=[])
     y, t = y0, 0.0
     t0 = time.time()
     for k in range(n_events):
-        y, t = model.run(y, t_end=t + 400 * YR, max_events=1)
+        y, t = model.run(y, t_end=t + 400 * YR, max_events=1, t0=t)
         if len(model.events) <= k:
             print(f"[{tag}] no further event before t_end"); break
         e = model.events[k]
@@ -129,10 +129,11 @@ if __name__ == "__main__":
     p.add_argument("--prefix", default="qd_fd")
     p.add_argument("--plot-only", action="store_true")
     p.add_argument("--only", choices=["fd", "qd"], default=None, help="run just one of the two sequences")
+    p.add_argument("--friction", choices=["aging", "flash"], default="aging", help="aging law, or strong rate weakening (flash heating, slip law)")
     args = p.parse_args()
     if not args.plot_only:
         if args.only in (None, "qd"):
-            run_sequence(False, args.events, args.dx, args.vsw, args.prefix)
+            run_sequence(False, args.events, args.dx, args.vsw, args.prefix, friction=args.friction)
         if args.only in (None, "fd"):
-            run_sequence(True, args.events, args.dx, args.vsw, args.prefix)
+            run_sequence(True, args.events, args.dx, args.vsw, args.prefix, friction=args.friction)
     plot(args.prefix)

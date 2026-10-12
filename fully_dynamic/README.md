@@ -35,9 +35,13 @@ System and time marching
 - `cycle.py`: sequences. Adaptive QD integrator (scipy DOP853 on slip and
   state, elementwise bracketed Newton closure), backslip loading in shear
   and normal stress, QD to FD hand-off at a slip-rate threshold with the
-  fine-grid history rebuilt from the QD dense output, variable FD steps,
-  FD to QD return after one window below a lower threshold. `dynamic=False`
-  runs the same sequence quasi-dynamically.
+  fine-grid history rebuilt from the QD dense output, variable FD steps
+  (k dt_min, k a power of two up to 64, from xi dc / V_max, cumulative
+  kernels as implicit operators), FD to QD return after one window below a
+  lower threshold; `run(..., t0=t)` continues a sequence. `dynamic=False`
+  runs the same sequence quasi-dynamically. The history convolution walks
+  the ring buffer without copies (about 0.06 s per step at N = 800,
+  L = 4300).
 
 Drivers and references
 - `run_tpv205.py`, `ref/`: SCEC TPV205-2D and E. Dunham's MDSBI 6.25 m
@@ -97,7 +101,8 @@ case (20 s); `test_cycle.py` about 2 min; `test_hd.py` about 2 min.
 
 - Parallel segments only (Toeplitz tables); non-parallel pairs need dense
   tables (not built).
-- Full space only; no free surface.
+- Free surface only for antiplane (image method); in-plane and any 3-D
+  stage would need half-space kernels or an auxiliary surface.
 - The 2-D window is long (1.3 to 5 S-travel times across a pair); window
   sensitivity of jump outcomes untested.
 - Near-front values of the derived point field lose accuracy within 1e-8

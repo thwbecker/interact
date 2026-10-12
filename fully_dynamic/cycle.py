@@ -99,8 +99,8 @@ class CycleModel:
         S.delta = d.copy(); S.state = psi.copy(); S.V = V.copy(); S.t = t
         return S
 
-    def run(self, y0, t_end, max_events=None):
-        t = 0.0; y = np.asarray(y0, float).copy()
+    def run(self, y0, t_end, max_events=None, t0=0.0):
+        t = float(t0); y = np.asarray(y0, float).copy()
         while t < t_end:
             sol = self.run_qd(y, t, t_end)
             tq = sol.t[-1]; y = sol.y[:, -1]

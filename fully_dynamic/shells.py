@@ -51,7 +51,7 @@ def _parallel(fs, fr, tol=1e-12):
 class PairTable:
     """Dynamic-correction table W[l] for one (source, receiver) fault pair."""
 
-    def __init__(self, fs, fr, dt, alpha, beta, rho, tol=1e-2, lmax=None, M=None, mode="inplane"):
+    def __init__(self, fs, fr, dt, alpha, beta, rho, tol=1e-2, lmax=None, M=None, mode="inplane", cap_ok=False, et=1.0):
         self.fs, self.fr, self.dt = fs, fr, dt
         mu = rho * beta**2
         nu = (alpha**2 - 2 * beta**2) / (2 * (alpha**2 - beta**2))
@@ -68,10 +68,10 @@ class PairTable:
             perp = d0 - base * fs.s
             Xr = fs.centers[0][None, :] + (base + m * fs.dx)[:, None] * fs.s[None, :] + perp[None, :]
             if mode == "inplane":
-                Ws, Wn, Ss, Sn = ip.W_table(fs.centers[0], fs.s, fs.a, Xr, fr.s, lmax, dt, alpha, beta, rho)
+                Ws, Wn, Ss, Sn = ip.W_table(fs.centers[0], fs.s, fs.a, Xr, fr.s, lmax, dt, alpha, beta, rho, et=et)
             else:
                 from antiplane import W_table_ap
-                Ws, Wn, Ss, Sn = W_table_ap(fs.centers[0], fs.s, fs.a, Xr, fr.s, lmax, dt, alpha, beta, rho)
+                Ws, Wn, Ss, Sn = W_table_ap(fs.centers[0], fs.s, fs.a, Xr, fr.s, lmax, dt, alpha, beta, rho, et=et)
             self.m = m
         else:
             raise NotImplementedError("dense non-parallel pairs: use DensePairTable")
@@ -85,21 +85,27 @@ class PairTable:
         last = np.where(big.any(axis=0))[0]
         self.L = int(last.max()) + 1 if last.size else 1
         if self.L >= lmax:
-            raise RuntimeError("window reached lmax; increase lmax")
+            if not cap_ok:
+                raise RuntimeError("window reached lmax; increase lmax")
+            self.L = lmax - 1          # explicit cap (e.g. the run is shorter than the natural window)
         Ws = Ws[:, :self.L]; Wn = Wn[:, :self.L]
         self.Ks_row, self.Kn_row = Ss, Sn          # static rows over offsets m
         # FFT storage along offsets
         self.M = M if M is not None else int(2 ** np.ceil(np.log2(fr.n + fs.n - 1)))
+        self.has_normal = mode == "inplane"
         self.Ws_hat = np.empty((self.L, self.M), complex)
-        self.Wn_hat = np.empty((self.L, self.M), complex)
+        self.Wn_hat = np.empty((self.L, self.M), complex) if self.has_normal else None
         for arr, hat in ((Ws, self.Ws_hat), (Wn, self.Wn_hat)):
+            if hat is None:
+                continue
             c = np.zeros((self.L, self.M))
             # offsets m >= 0 -> index m ; m < 0 -> index M + m
             pos = m >= 0
             c[:, m[pos]] = arr[pos, :].T
             c[:, self.M + m[~pos]] = arr[~pos, :].T
             hat[:] = np.fft.fft(c, axis=1)
-        self.nbytes = self.Ws_hat.nbytes + self.Wn_hat.nbytes
+        del Ws, Wn
+        self.nbytes = self.Ws_hat.nbytes + (self.Wn_hat.nbytes if self.has_normal else 0)
 
     def static_blocks(self):
         """Dense static blocks Ks[i,j], Kn[i,j] (receiver x source) for this pair."""
@@ -113,7 +119,8 @@ class PairTable:
     def W_dense(self, l):
         """Dense W[l] blocks (for tests)."""
         idx = self.fr_index_minus_src()
-        c = np.fft.ifft(self.Ws_hat[l - 1]).real; cn = np.fft.ifft(self.Wn_hat[l - 1]).real
+        c = np.fft.ifft(self.Ws_hat[l - 1]).real
+        cn = np.fft.ifft(self.Wn_hat[l - 1]).real if self.has_normal else np.zeros(self.M)
         m = self.m
         Ws = np.where(m >= 0, c[np.clip(m, 0, None)], c[(self.M + m) % self.M])
         Wn = np.where(m >= 0, cn[np.clip(m, 0, None)], cn[(self.M + m) % self.M])
@@ -140,9 +147,10 @@ class History:
 
 class System:
     """Fault system with static operators, pair tables and histories."""
-    def __init__(self, faults, dt, alpha, beta, rho, tol=1e-2, lmax=None, mode="inplane"):
+    def __init__(self, faults, dt, alpha, beta, rho, tol=1e-2, lmax=None, mode="inplane", cap_ok=False, et=1.0):
         self.faults = faults
         self.mode = mode
+        self.et = et
         self.dt = dt
         self.alpha, self.beta, self.rho = alpha, beta, rho
         self.mu = rho * beta**2
@@ -155,7 +163,7 @@ class System:
         self.pairs = {}
         for a_, fs in enumerate(faults):
             for b_, fr in enumerate(faults):
-                self.pairs[(a_, b_)] = PairTable(fs, fr, dt, alpha, beta, rho, tol=tol, lmax=lmax, M=self.M, mode=mode)
+                self.pairs[(a_, b_)] = PairTable(fs, fr, dt, alpha, beta, rho, tol=tol, lmax=lmax, M=self.M, mode=mode, cap_ok=cap_ok, et=et)
         self.L = max(p.L for p in self.pairs.values())
         self.hist = [History(f.n, self.M, self.L + 1) for f in faults]
         # dense static operators (receiver x source), physical convention
@@ -172,6 +180,25 @@ class System:
             self.K1s[self.off[b_]:self.off[b_ + 1], self.off[a_]:self.off[a_ + 1]] = w1s + ks * dt
             self.K1n[self.off[b_]:self.off[b_ + 1], self.off[a_]:self.off[a_ + 1]] = w1n + kn * dt
         self.nbytes = sum(p.nbytes for p in self.pairs.values()) + sum(h.buf.nbytes for h in self.hist)
+        self._Kk = {1: (self.K1s, self.K1n)}
+
+    def cumulative_kernel(self, k):
+        """K_k = sum_{l=1}^{k} K[l] = sum_{l<=k} W[l] + k Ks dt: stress at k dt from
+        unit slip rate during [0, k dt). Implicit operator for a step of k dt_min.
+        Cached; dense (banded in practice)."""
+        if k in self._Kk:
+            return self._Kk[k]
+        Kk_s = np.zeros((self.N, self.N)); Kk_n = np.zeros((self.N, self.N))
+        for (a_, b_), p in self.pairs.items():
+            ks, kn = p.static_blocks()
+            acc_s = ks * self.dt * k; acc_n = kn * self.dt * k
+            for l in range(1, min(k, p.L) + 1):
+                ws, wn = p.W_dense(l)
+                acc_s = acc_s + ws; acc_n = acc_n + wn
+            Kk_s[self.off[b_]:self.off[b_ + 1], self.off[a_]:self.off[a_ + 1]] = acc_s
+            Kk_n[self.off[b_]:self.off[b_ + 1], self.off[a_]:self.off[a_ + 1]] = acc_n
+        self._Kk[k] = (Kk_s, Kk_n)
+        return self._Kk[k]
 
     def split(self, v):
         return [v[self.off[a_]:self.off[a_ + 1]] for a_ in range(len(self.faults))]
@@ -189,18 +216,26 @@ class System:
         ts = np.zeros(self.N); tn = np.zeros(self.N)
         for (a_, b_), p in self.pairs.items():
             h = self.hist[a_]
-            idx, valid = h.lagged(1, p.L)
-            sl = slice(lag0 - 1, p.L)
-            idx = idx[sl]; valid = valid[sl]
-            if not valid.any():
+            # lags l = lag0..min(L, k): slice pushed at step k - l sits at position (k - l) mod Lbuf;
+            # walk the ring buffer in at most two contiguous (reversed) segments, no copies
+            Lb = h.L; k = h.k
+            lmax_ = min(p.L, k)
+            if lmax_ < lag0:
                 continue
-            Vh = h.buf[idx[valid]]
-            acc_s = np.einsum("lk,lk->k", p.Ws_hat[sl][valid], Vh)
-            acc_n = np.einsum("lk,lk->k", p.Wn_hat[sl][valid], Vh)
-            rs = np.fft.ifft(acc_s).real[:p.fr.n]
-            rn = np.fft.ifft(acc_n).real[:p.fr.n]
-            ts[self.off[b_]:self.off[b_ + 1]] += rs
-            tn[self.off[b_]:self.off[b_ + 1]] += rn
+            acc_s = np.zeros(p.M, complex); acc_n = np.zeros(p.M, complex) if p.has_normal else None
+            l = lag0
+            while l <= lmax_:
+                pos = (k - l) % Lb                  # position of lag l
+                nseg = min(lmax_ - l + 1, pos + 1)  # lags l..l+nseg-1 occupy positions pos..pos-nseg+1
+                Vh = h.buf[pos - nseg + 1:pos + 1][::-1]
+                Wsl = p.Ws_hat[l - 1:l - 1 + nseg]
+                acc_s += np.einsum("lk,lk->k", Wsl, Vh)
+                if p.has_normal:
+                    acc_n += np.einsum("lk,lk->k", p.Wn_hat[l - 1:l - 1 + nseg], Vh)
+                l += nseg
+            ts[self.off[b_]:self.off[b_ + 1]] += np.fft.ifft(acc_s).real[:p.fr.n]
+            if p.has_normal:
+                tn[self.off[b_]:self.off[b_ + 1]] += np.fft.ifft(acc_n).real[:p.fr.n]
         return ts, tn
 
     def reset_history(self):

@@ -2,7 +2,7 @@
 import numpy as np, time, sys
 import shells as sh, stepper as st, cycle as cy
 
-def setup(dx=100.0, Lf=30e3, Lvw=16e3, V_sw=1e-3, V_back=1e-4, tol=1e-2, lmax=None, dynamic=True):
+def setup(dx=100.0, Lf=30e3, Lvw=16e3, V_sw=1e-3, V_back=1e-4, tol=1e-2, lmax=None, dynamic=True, friction="aging", Vw=0.1, fw=0.2):
     AL, BE, RHO = 6000.0, 3464.0, 2700.0
     n = int(Lf / dx)
     f = sh.Fault([-Lf / 2, 0.0], [1.0, 0.0], Lf, n)
@@ -11,7 +11,7 @@ def setup(dx=100.0, Lf=30e3, Lvw=16e3, V_sw=1e-3, V_back=1e-4, tol=1e-2, lmax=No
     x = f.centers[:, 0]
     a = np.where(np.abs(x) < Lvw / 2, 0.010, 0.020); b = np.full(n, 0.015)
     dc = 0.016; V0 = 1e-6; f0 = 0.6; Vpl = 1e-9; sigma0 = 50e6
-    fr = st.RateState(a, b, dc, V0, f0)
+    fr = st.RateState(a, b, dc, V0, f0) if friction == "aging" else st.FlashRateState(a, b, dc, V0, f0, Vw=Vw, fw=fw)
     psi_ss = f0 + b * np.log(V0 / Vpl)
     # start slightly above steady state in the VW centre to break symmetry in time
     Vinit = Vpl * np.where(np.abs(x) < 2e3, 1.5, 1.0)
