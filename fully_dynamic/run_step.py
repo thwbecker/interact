@@ -58,8 +58,20 @@ def build(W=-1000.0, overlap=0.0, L1=24e3, L2=24e3, dx=100.0, vs_end=4e3, a_vw=0
 
 
 def classify(ev, geom, V_thr=1e-2, t_extra=3.0):
-    t = np.array([s[0] for s in ev["snaps"]]); V = np.array([s[1] for s in ev["snaps"]])
-    seg = geom["seg"]; dx = geom["dx"]
+    """Per segment: onset (first V > V_thr anywhere on it), arrival of the
+    rupture front at the end nearest the step (first V > V_thr on that end
+    element), last slip above V_thr, slip, extent, peak slip rate. For events
+    involving both segments the receiver onset is referred to the source
+    front's arrival at the step:
+        joint       : receiver starts before the source front reaches the step
+        dynamic     : within t_dyn = |W|/beta + t_extra after that arrival
+        postseismic : later in the same FD phase
+    For single-segment events the other segment's peak slip rate during the
+    rupture (onset to arrival + t_dyn) is recorded as rcv_Vpeak."""
+    t = np.array([s_[0] for s_ in ev["snaps"]]); V = np.array([s_[1] for s_ in ev["snaps"]])
+    seg = geom["seg"]; dx = geom["dx"]; x = geom["x"]
+    # element of each segment nearest the step: seg0 ends at x = 0, seg1 starts at x = -overlap
+    end_el = {0: np.where(seg == 0)[0][np.argmax(x[seg == 0])], 1: np.where(seg == 1)[0][np.argmin(x[seg == 1])]}
     out = dict(t_start=ev["t_start"], Vmax=ev["Vmax"])
     per = {}
     for k in (0, 1):
@@ -67,22 +79,30 @@ def classify(ev, geom, V_thr=1e-2, t_extra=3.0):
         active = (V[:, m] > V_thr).any(axis=1)
         if active.any():
             i0 = np.argmax(active); i1 = len(active) - 1 - np.argmax(active[::-1])
-            per[k] = dict(t_on=t[i0], t_off=t[i1], Vmax=V[:, m].max(), slip=ev["slip"][m].sum() * dx,
-                          extent=np.sum(ev["slip"][m] > 1e-2) * dx)
+            at_end = V[:, end_el[k]] > V_thr
+            t_end = t[np.argmax(at_end)] if at_end.any() else t[i1]
+            per[k] = dict(t_on=t[i0], t_end=t_end, t_off=t[i1], Vmax=V[:, m].max(),
+                          slip=ev["slip"][m].sum() * dx, extent=np.sum(ev["slip"][m] > 1e-2) * dx)
     out["segments"] = per
+    t_dyn = abs(geom["W"]) / geom["BE"] + t_extra
     if len(per) == 2:
         src = 0 if per[0]["t_on"] <= per[1]["t_on"] else 1
         rcv = 1 - src
-        lag_after_arrest = per[rcv]["t_on"] - per[src]["t_off"]
-        lag_after_onset = per[rcv]["t_on"] - per[src]["t_on"]
-        t_dyn = abs(geom["W"]) / geom["BE"] + t_extra
-        kind = "dynamic" if lag_after_arrest < t_dyn else "postseismic"
-        if lag_after_onset < 0.5:
-            kind = "simultaneous"
-        out.update(kind=kind, source=src, receiver=rcv, lag_after_arrest=lag_after_arrest, lag_after_onset=lag_after_onset)
+        lag = per[rcv]["t_on"] - per[src]["t_end"]
+        kind = "joint" if lag < 0 else ("dynamic" if lag < t_dyn else "postseismic")
+        out.update(kind=kind, source=src, receiver=rcv, lag_after_arrival=lag,
+                   lag_after_onset=per[rcv]["t_on"] - per[src]["t_on"])
+    elif len(per) == 1:
+        src = list(per.keys())[0]; rcv = 1 - src
+        win = (t >= per[src]["t_on"]) & (t <= per[src]["t_end"] + t_dyn)
+        out.update(kind="single", source=src, rcv_Vpeak=float(V[win][:, seg == rcv].max()) if win.any() else 0.0)
     else:
-        out.update(kind="single", source=list(per.keys())[0] if per else None)
+        out.update(kind="none")
     return out
+
+
+def _fmt_delay(seconds):
+    return f"{seconds/3600:.0f} h" if seconds < 2 * 86400 else f"{seconds/86400:.0f} d"
 
 
 def run(n_events=4, t_end_yr=600.0, verbose=True, delayed_window_yr=1.0, out=None, **kw):
@@ -103,11 +123,11 @@ def run(n_events=4, t_end_yr=600.0, verbose=True, delayed_window_yr=1.0, out=Non
             prev = results[-1]
             if prev["segments"] and c["source"] is not None and c["source"] not in prev["segments"] \
                     and c["t_start"] - prev["t_start"] < delayed_window_yr * YR:
-                c["kind"] = f"delayed ({(c['t_start'] - prev['t_start']) / 86400:.0f} d)"
+                c["kind"] = f"delayed ({_fmt_delay(c['t_start'] - prev['t_start'])})"
         results.append(c)
         if verbose:
             segs = ", ".join(f"seg{j}: on {v['t_on']-c['t_start']:.1f}s off {v['t_off']-c['t_start']:.1f}s slip {v['slip']/1e3:.1f} m km extent {v['extent']/1e3:.1f} km Vmax {v['Vmax']:.2f}" for j, v in c["segments"].items())
-            lag = f", lag after arrest {c['lag_after_arrest']:+.2f} s" if "lag_after_arrest" in c else ""
+            lag = f", receiver onset {c['lag_after_arrival']:+.1f} s after the source front reached the step" if "lag_after_arrival" in c else (f", other segment peak V during rupture {c['rcv_Vpeak']:.1e} m/s" if "rcv_Vpeak" in c else "")
             print(f"event {k+1} at {c['t_start']/YR:8.2f} yr [{c['kind']}{lag}]: {segs}  ({time.time()-t0:.0f}s)")
         if out is not None:
             save(out, results, geom, kw)
@@ -122,10 +142,11 @@ def save(out, results, geom, kw):
     rows = []
     for c in results:
         for j, v in c["segments"].items():
-            rows.append((c["t_start"], j, v["t_on"], v["t_off"], v["slip"], v["extent"], v["Vmax"]))
+            rows.append((c["t_start"], j, v["t_on"], v["t_off"], v["slip"], v["extent"], v["Vmax"], v["t_end"]))
     kinds = [c["kind"] for c in results]
-    lags = [c.get("lag_after_arrest", np.nan) for c in results]
-    np.savez(out, rows=np.array(rows), kinds=np.array(kinds), lags=np.array(lags),
+    lags = [c.get("lag_after_arrival", np.nan) for c in results]
+    rcvV = [c.get("rcv_Vpeak", np.nan) for c in results]
+    np.savez(out, rows=np.array(rows), kinds=np.array(kinds), lags=np.array(lags), rcv_Vpeak=np.array(rcvV),
              t_start=np.array([c["t_start"] for c in results]), Vmax=np.array([c["Vmax"] for c in results]),
              W=geom["W"], overlap=geom["overlap"], dx=geom["dx"], params=json.dumps({k: (v if isinstance(v, (int, float, str, bool)) else str(v)) for k, v in kw.items()}))
 

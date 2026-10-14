@@ -71,9 +71,14 @@ Drivers and references
   a classification of events involving both segments (dynamic,
   postseismic, delayed by days, single); writes one npz per configuration
   after every event (`--W`, `--overlap`, `--dx`, `--events`, `--qd`,
-  `--friction`, `--vs-end`, `--tol`, `--out`). `sweep_step.sh` runs both
-  senses at 0.5, 1, 2 and 3 km in QD and FD; `summarize_step.py` tabulates
-  the npz files.
+  `--friction`, `--vs-end`, `--tol`, `--out`). Classification: joint
+  (receiver starts before the source front reaches the step), dynamic
+  (within |W|/beta + 3 s after it), postseismic (same dynamic phase),
+  delayed (separate event within a year, hours or days), single (with the
+  other segment's peak slip rate during the rupture). `sweep_step.sh` runs
+  both senses at 0.5 to 3 km with 4 km margins; `sweep_step2.sh` the
+  transition region (1 to 2 km, margins 0.5 and 1 km); `summarize_step.py`
+  tabulates the npz files.
 - `run_transition.py`, `run_dunham.py`: supershear transition length
   (linear slip weakening with Andrews' forced nucleation; Dugdale friction
   with Dunham's static-crack nucleation).
