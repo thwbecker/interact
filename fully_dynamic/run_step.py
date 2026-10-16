@@ -18,8 +18,9 @@ events that involve both segments:
     postseismic : receiver starts later in the same FD phase
 Events with only one segment are "single".
 """
-import argparse, time
+import argparse, time, warnings
 import numpy as np
+warnings.filterwarnings("ignore", category=RuntimeWarning, module="scipy.integrate")
 import shells as sh, stepper as st, cycle as cy
 
 YR = 3.15576e7
@@ -89,7 +90,11 @@ def classify(ev, geom, V_thr=1e-2, t_extra=3.0):
         src = 0 if per[0]["t_on"] <= per[1]["t_on"] else 1
         rcv = 1 - src
         lag = per[rcv]["t_on"] - per[src]["t_end"]
-        kind = "joint" if lag < 0 else ("dynamic" if lag < t_dyn else "postseismic")
+        frac = per[rcv]["slip"] / max(per[src]["slip"], 1e-9)
+        if frac < 0.1:
+            kind = f"single, minor re-slip of the other segment ({frac*100:.0f}% of the source slip)"
+        else:
+            kind = "joint" if lag < 0 else ("immediate" if lag < 60.0 else "minutes" if lag < 3600.0 else "postseismic")
         out.update(kind=kind, source=src, receiver=rcv, lag_after_arrival=lag,
                    lag_after_onset=per[rcv]["t_on"] - per[src]["t_on"])
     elif len(per) == 1:
