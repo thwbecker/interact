@@ -8,7 +8,8 @@
 # usage: fully_dynamic/c_port/regress_rsf.sh [ref_commit] [nrep]
 #   ref_commit  commit of the reference binary (default: HEAD)
 #   nrep        timing repetitions per case (default 3)
-# environment: EXTRA_CASES="name:gen:opts;..." adds cases (see below)
+# environment: REFBIN=<path> uses a prebuilt reference binary instead of
+#   building ref_commit; EXTRA_CASES="name|gen|opts;..." adds cases
 #
 # The case set: 2-D antiplane rate-and-state cycles (gen_bp2d.py from
 # test_twod/anti_plane), elastic and with -ve_mode 1 and 2, short enough to
@@ -23,14 +24,27 @@ fail=0
 date > $log
 echo "reference commit: $ref" >> $log
 
-# 1. reference binary via a worktree (reused if the commit is unchanged)
-if [ ! -f $wt/.commit ] || [ "`cat $wt/.commit`" != "`git rev-parse $ref`" ]; then
-  rm -rf $wt; git worktree prune
-  git worktree add -f $wt $ref > /dev/null 2>&1 || { echo "cannot create worktree for $ref"; exit 1; }
-  ( cd $wt && make bin/rsf_solve > make_ref.log 2>&1 ) || { echo "reference build failed, see $wt/make_ref.log"; exit 1; }
-  git rev-parse $ref > $wt/.commit
+# 1. reference binary: REFBIN=<path> uses a prebuilt one (e.g. a copy of
+#    bin/rsf_solve made before applying a patch); otherwise the commit is
+#    built in a git worktree. Built, untracked external libraries of the
+#    main tree (hmat/: HACApK, hmmvp) are linked into the worktree, since
+#    a fresh checkout does not contain them.
+if [ -n "$REFBIN" ]; then
+  refbin=$REFBIN
+  [ -x "$refbin" ] || { echo "REFBIN=$refbin is not executable"; exit 1; }
+  echo "reference binary: $refbin (prebuilt)" >> $log
+else
+  if [ ! -f $wt/.commit ] || [ "`cat $wt/.commit`" != "`git rev-parse $ref`" ]; then
+    rm -rf $wt; git worktree prune
+    git worktree add -f $wt $ref > /dev/null 2>&1 || { echo "cannot create worktree for $ref"; exit 1; }
+    for d in hmat; do
+      if [ -d $root/$d ]; then rm -rf $wt/$d; ln -s $root/$d $wt/$d; fi
+    done
+    ( cd $wt && make bin/rsf_solve > make_ref.log 2>&1 ) || { echo "reference build failed, see $wt/make_ref.log"; exit 1; }
+    git rev-parse $ref > $wt/.commit
+  fi
+  refbin=$wt/bin/rsf_solve
 fi
-refbin=$wt/bin/rsf_solve
 # 2. current binary
 make bin/rsf_solve > make_cur.log 2>&1 || { echo "current build failed, see make_cur.log"; exit 1; }
 curbin=$root/bin/rsf_solve

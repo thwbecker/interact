@@ -6,6 +6,8 @@
 #ifndef FD_H
 #define FD_H
 #include "fd_fft.h"
+#include "fd_tables.h"
+#include "fd_segments.h"
 
 struct fd_vars {
   /* options */
@@ -16,6 +18,19 @@ struct fd_vars {
   PetscReal et;			/* collocation offset in units of dt_min (1 end of step, >1 Peirce-Siebrits) */
   PetscReal xi;			/* variable step: dt <= xi dc / V_max */
   PetscInt  kmax;		/* largest substep multiple (power of two) */
+  PetscReal cfl;		/* beta dt_min / dx */
+  PetscInt  lmax;		/* cap on the window in fine-grid lags, 0 = prototype bound */
+  PetscReal gate_tol;		/* static gate tolerance */
+  PetscReal length_scale;	/* geometry unit in metres */
+  /* medium */
+  int mode2d;			/* FD_MODE_INPLANE or FD_MODE_ANTIPLANE */
+  PetscBool halfplane;
+  PetscReal mu,nu,rho,alpha,beta,dt_min;
+  /* segments and tables */
+  struct fd_seglist *segs;
+  struct fd_pair **pairs;	/* pairs[source*nseg + receiver] */
+  int M,L;			/* padded FFT length, longest window */
+  double nbytes;
   /* state */
   PetscInt  nphase;		/* dynamic phases run so far */
   PetscInt  nflag;		/* accepted steps above vsw seen by the monitor */

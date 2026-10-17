@@ -337,7 +337,7 @@ PetscErrorCode rsf_solve_run(int argc,char **argv,struct interact_ctx *par,
   PetscCall(rsf_ve_setup(par,islip_rate_vec,shear_modulus_si/medium->elastic.shear));
   /* fully dynamic extension: parses -fd_mode and friends, allocates
      rsf->fd; a no-op leaving rsf->fd NULL when the option is absent */
-  PetscCall(rsf_fd_setup(par));
+  PetscCall(rsf_fd_setup(par,shear_modulus_si,s_wave_speed_si));
   PetscCall(VecDestroy(&stress_rate));
   PetscCall(VecDestroy(&islip_rate_vec));
   if(have_sratef){
