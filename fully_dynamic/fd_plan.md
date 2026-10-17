@@ -93,7 +93,38 @@ question; Hu et al. (2016) or Lozos et al. (2012) the stepover one.
 
 ## 4. Plan
 
-### WP6, stepover sequences (next)
+### WP6, stepover sequences: interim results (2026-10-16)
+Two parallel 24 km segments, aging law, sigma 50 MPa, b - a = 0.005 on
+the weakening parts, 2 km overlap, 100 m elements, QD and FD on identical
+setups (run_step.py, sweeps step/step2/step3). Every sequence has the same
+structure: segment 0 ruptures, segment 1 follows after a delay, a full
+cycle passes (87 to 96 yr QD, 104 to 117 yr FD). With identical segments
+the receiver is always within hours to weeks of failure when the source
+ruptures, so the jump probability within a month is 1 in both modes and
+the QD/FD difference is in the delay:
+- 4 km margins (weakening patch 4 km from the step): delayed jumps of
+  days to months at all widths 0.5 to 3 km; FD 1.5 to 2.5 times faster.
+- 0.5 km margins, 0.5 km width: joint ruptures in both modes.
+- 1 km width, dilational, margins 0.25 to 0.5 km: FD immediate (0.4 s
+  after the source front reaches the step) or 10 to 30 min; QD 3 to 8 h.
+  Immediate triggering occurs only in FD and only here; the case sits on
+  the dynamic threshold (a threshold event flips between 0.4 s and 12 min
+  at 50 m and with tol 1e-3, everything else reproduces).
+- 1 km, margins 0.75 to 1 km: FD 0.5 to 5 h, QD 5 to 24 h. Compressional
+  1 km: FD 1 to 3 h, QD 2 to 36 h.
+- 1.5 km: FD 3 to 10 h / QD 30 to 40 h (dilational), FD 17 h to 6 d / QD
+  2 to 43 d (compressional); 2 km: FD 2 to 3 d / QD 6 to 8 d and 12 to 14
+  d / 27 to 30 d (margins 0.5 and 1 km).
+- FD events carry about 25 percent more slip and 3 times the peak slip
+  rate; dilational triggers faster than compressional throughout.
+Design consequence: a probability needs variation of the receiver's
+cycle phase at the time of the source event, which identical segments
+cannot give. Next sweep: unequal segments (24 and 16 km, or different
+a - b on the receiver) so that successive source events find the receiver
+at different loading states; the jump probability within a window is then
+the fraction of source events followed by a receiver rupture, per mode.
+
+### WP6, stepover sequences (plan)
 1. Driver for two parallel segments under backslip loading with
    rate-and-state friction, built from cycle.py (run_step.py exists; its
    first QD sequence predates the clock fix and the state-update fix and
@@ -178,6 +209,28 @@ and FD, with window and resolution sensitivities on a subset.
 - Enhanced weakening: to be added as strong rate weakening in the
   Noda-Dunham-Rice form (flash heating, slip law), which needs no extra
   state and is what Lambert and Lapusta use; thermal pressurization later.
+
+### Performance options for the prototype (noted 2026-10-16, not started)
+About 80 percent of an FD step is the history convolution, which streams
+the whole W table (L x M complex, 280 MB at N = 800) once per step and is
+memory-bound. Consequences:
+- CPU threading buys at most a factor of 2 and is not worth doing;
+  parallelism across configurations is already process-level.
+- The worthwhile change is algorithmic: a uniformly partitioned FFT
+  convolution over the lag axis (per Fourier mode) turns the O(L) work per
+  step into O(log L) amortized, a factor of 20 to 50 at L of a few
+  thousand, in Python or C alike. Compatible with the variable-step scheme
+  because the history stays on the fine grid. Should be prototyped in
+  Python before the C port adopts it.
+- A GPU version is cheap: the convolution is an elementwise product and a
+  reduction, which CuPy runs 20 to 50 times faster than one core, with
+  the tables of a 25 m BP1 run (2.3 GB) fitting an 8 GB card. A backend
+  switch (numpy or cupy) in shells.py and the stepper's matvecs would do
+  it, QD phases staying on the CPU. Cannot be tested in the sandbox;
+  would be delivered as a patch with a --gpu flag and a CPU/GPU identity
+  test on the single-fault sequence.
+Order if pursued: partitioned convolution first (reduces the work), then
+the GPU switch for the remainder.
 
 ### WP7, C implementation in rsf_solve
 - Kernels: Tada-Madariaga primitives for 2-D segments (four primitive

@@ -8,6 +8,7 @@ immediate (< 60 s after the source front reached the step), minutes (< 1 h),
 hours (< 2 d), days; computed from the saved rows, so older files work."""
 import glob, sys, os, numpy as np
 YR = 3.15576e7
+JUMP_WINDOW = YR          # a rupture of the other segment within a year counts as a jump
 
 
 def events_from_rows(d):
@@ -39,7 +40,7 @@ def binname(sec):
 
 
 files = sorted(glob.glob(sys.argv[1] if len(sys.argv) > 1 else "step*.npz"))
-print(f"{'file':44s} {'mode':4s} {'W':>5s} {'margin':>6s}  jumps to the other segment (delay after the source front reached the step)")
+print(f"{'file':44s} {'mode':4s} {'W':>5s} {'margin':>6s}  per event: single, or delay of the jump to the other segment (seconds after the source front reached the step if within one dynamic phase)")
 for f in files:
     d = np.load(f, allow_pickle=True)
     mode = "QD" if "qd" in os.path.basename(f) else "FD"
@@ -49,20 +50,24 @@ for f in files:
     except Exception:
         vs = np.nan
     ev = events_from_rows(d)
-    jumps, desc = [], []
+    jumps, desc, cycles = [], [], []
     for i, e in enumerate(ev):
         if e["rcv"] is not None and e["frac"] > 0.1:              # both segments rupture in one phase
             jumps.append(e["lag"]); desc.append(f"{fmt(max(e['lag'], 0.0))}" + (" [joint]" if e["lag"] < 0 else ""))
         else:
             tag = f" (+re-slip {e['frac']*100:.0f}%)" if e["rcv"] is not None else ""
             # delay since the previous event with the other source
-            prev = [p for p in ev[:i] if p["src"] != e["src"]]
-            if prev and i > 0 and ev[i - 1]["src"] != e["src"]:
+            if i > 0 and ev[i - 1]["src"] != e["src"] and e["t"] - ev[i - 1]["t"] < JUMP_WINDOW:
                 dt = e["t"] - ev[i - 1]["t"]
                 jumps.append(dt); desc.append(f"{fmt(dt)}{tag}")
             else:
+                cycles.append(e["t"] - ev[i - 1]["t"] if i > 0 else np.nan)
                 desc.append(f"single{tag}")
     bins = {b: sum(1 for j in jumps if binname(max(j, 0.0)) == b) for b in ("immediate", "minutes", "hours", "days")}
     print(f"{f:44s} {mode:4s} {float(d['W'])/1e3:+5.1f} {vs:6.2f}  " + "; ".join(desc))
-    print(f"{'':44s}      {len(ev)} events, {len(jumps)} jumps: " + ", ".join(f"{k} {v}" for k, v in bins.items() if v) +
-          (f"; median delay {fmt(float(np.median(np.maximum(jumps, 0))))}" if jumps else ""))
+    src_events = len(ev) - len(jumps)
+    rec = np.nanmedian(cycles) / YR if len(cycles) > 1 else np.nan
+    print(f"{'':44s}      {src_events} source events, {len(jumps)} followed by a jump within a year "
+          f"({100*len(jumps)/max(src_events,1):.0f}%): " + ", ".join(f"{k} {v}" for k, v in bins.items() if v) +
+          (f"; median delay {fmt(float(np.median(np.maximum(jumps, 0))))}" if jumps else "") +
+          (f"; recurrence {rec:.0f} yr" if np.isfinite(rec) else ""))
