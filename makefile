@@ -323,7 +323,7 @@ INTERACT_OBJS_SGL = $(INTERACT_OBJS:.o=.sgl.o)
 # the rsf_* sources live in src/rsf_solve/ (VPATH); rsf_fd.o and fd_fft.o
 # are the fully dynamic extension, inert unless -fd_mode is given
 FD_OBJS = $(ODIR)/fd_fft.o $(ODIR)/fd_kernels.o $(ODIR)/fd_series_coeffs.o \
-	$(ODIR)/fd_tables.o $(ODIR)/fd_segments.o
+	$(ODIR)/fd_tables.o $(ODIR)/fd_segments.o $(ODIR)/fd_march.o $(ODIR)/fd_band.o
 RSF_SOLVE_OBJS = $(ODIR)/rsf_solve.o $(ODIR)/rsf_engine.o $(ODIR)/rsf_imex.o \
 	$(ODIR)/rsf_init.o $(ODIR)/rsf_output.o $(ODIR)/rsf_ve.o \
 	$(ODIR)/rsf_fd.o $(FD_OBJS) $(VE_OBJS)
@@ -449,13 +449,16 @@ testing:	$(BDIR)/noda_crack_test $(BDIR)/ve_check $(BDIR)/ve_laplace_check \
 	$(BDIR)/ve_layered_check $(BDIR)/ve_pom_compare $(BDIR)/ve_pom_compare2
 
 # tests of the rsf_solve extensions (src/testing/rsf_solve)
-rsf_testing: $(BDIR)/test_fd_fft $(BDIR)/test_fd_tables $(BDIR)/test_fd_segments
+rsf_testing: $(BDIR)/test_fd_fft $(BDIR)/test_fd_tables $(BDIR)/test_fd_segments $(BDIR)/fd_dynamic
+
+$(BDIR)/fd_dynamic: $(ODIR)/fd_dynamic.o $(FD_OBJS) $(GEN_P_INC)
+	$(CC) $(ODIR)/fd_dynamic.o $(FD_OBJS) -o $(BDIR)/fd_dynamic $(FFTW_LIBS) $(MATHLIBS) $(LDFLAGS)
 
 $(BDIR)/test_fd_fft: $(ODIR)/test_fd_fft.o $(ODIR)/fd_fft.o $(GEN_P_INC)
 	$(CC) $(ODIR)/test_fd_fft.o $(ODIR)/fd_fft.o -o $(BDIR)/test_fd_fft $(FFTW_LIBS) -lm $(LDFLAGS)
 
 $(BDIR)/test_fd_tables: $(ODIR)/test_fd_tables.o $(FD_OBJS) $(GEN_P_INC)
-	$(CC) $(ODIR)/test_fd_tables.o $(FD_OBJS) -o $(BDIR)/test_fd_tables $(FFTW_LIBS) -lm $(LDFLAGS)
+	$(CC) $(ODIR)/test_fd_tables.o $(FD_OBJS) -o $(BDIR)/test_fd_tables $(FFTW_LIBS) $(MATHLIBS) $(LDFLAGS)
 
 $(BDIR)/test_fd_segments: $(ODIR)/test_fd_segments.o $(ODIR)/fd_segments.o $(GEN_P_INC)
 	$(CC) $(ODIR)/test_fd_segments.o $(ODIR)/fd_segments.o -o $(BDIR)/test_fd_segments -lm $(LDFLAGS)

@@ -238,7 +238,12 @@ changes to the QD code path, bit-identity and timing harness run at every
 step, milestones M1 to M7 with their acceptance tests. M1 (source
 reorganisation, skeleton, FFT, harness) delivered 2026-10-17. M2 (kernels,
 tables, segment detection, static gate against Is; C tables agree with
-the prototype dumps to 1e-12) delivered 2026-10-17.
+the prototype dumps to 1e-12) delivered 2026-10-17. M3 (marcher core:
+fine-grid history with copy-free convolution, cumulative kernels, LAPACK
+banded solve, slip-weakening active-set solve, standalone fd_dynamic
+driver) delivered 2026-10-18: TPV205-2D at 100 and 50 m reproduces the
+prototype station series to 1e-10 relative, 25 times faster than the
+Python; harness identity PASS.
 - Kernels: Tada-Madariaga primitives for 2-D segments (four primitive
   evaluations per pair and lag) plus the large-time series; Tada (2006)
   triangles or space-time quadrature for 3-D.

@@ -50,7 +50,7 @@ make bin/rsf_solve > make_cur.log 2>&1 || { echo "current build failed, see make
 curbin=$root/bin/rsf_solve
 
 # 3. cases: name | generator command | rsf_solve options
-common="-dc 0.14 -sigma_init 25e6 -rtol 1e-4 -ts_rk_type 3bs -dt_monitor_yr 2 -track_events -stop_time_yr 250"
+common="-dc 0.14 -sigma_init 25e6 -rtol 1e-4 -ts_rk_type 3bs -dt_monitor_yr 2 -track_events -stop_time_yr 3000"
 gen="python3 $root/test_twod/anti_plane/gen_bp2d.py 0.5 1 20 20 6"
 cases="ap_elastic|$gen|-geom_file geom_bp2d.in -rsf_file rsf_bp2d.dat -rsf_ic_file ic_bp2d.in $common
 ap_ve2|$gen|-geom_file geom_bp2d.in -rsf_file rsf_bp2d.dat -rsf_ic_file ic_bp2d.in $common -ve_mode 2 -ve_tmaxwell_yr 100 -ve_plate_h 40e3
