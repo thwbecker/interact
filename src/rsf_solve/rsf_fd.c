@@ -39,7 +39,7 @@
 #include "fd.h"
 
 static PetscErrorCode fd_build_tables(struct interact_ctx *par, struct fd_vars *fd);
-static PetscErrorCode fd_gate_static(struct interact_ctx *par, struct fd_vars *fd, PetscReal scale);
+static PetscErrorCode fd_gate_static(struct interact_ctx *par, struct fd_vars *fd);
 
 PetscErrorCode rsf_fd_setup(struct interact_ctx *par, PetscReal shear_modulus_si, PetscReal s_wave_speed_si)
 {
@@ -100,7 +100,7 @@ PetscErrorCode rsf_fd_setup(struct interact_ctx *par, PetscReal shear_modulus_si
   fd->nphase = 0; fd->nflag = 0; fd->t_last_flag = -1.0; fd->restart_done = PETSC_FALSE;
   rsf->fd = fd;
   PetscCall(fd_build_tables(par,fd));
-  PetscCall(fd_gate_static(par,fd,shear_modulus_si/medium->elastic.shear));
+  PetscCall(fd_gate_static(par,fd));
   PetscCall(PetscPrintf(PETSC_COMM_WORLD,
 		"rsf_fd_setup: fully dynamic extension, mode %d (M2: tables only, no marcher yet), %s, %ld segments, dt_min %.3e s, "
 		"vsw %.1e vback %.1e m/s, tol %.1e, et %.2f, xi %.2f, kmax %d, tables %.1f MB, fft %s\n",
@@ -161,29 +161,28 @@ static PetscErrorCode fd_build_tables(struct interact_ctx *par, struct fd_vars *
 }
 
 /*
-   compare the static limit of the tables (stress-from-slip, SI) with the
-   assembled Is (stress-drop convention, interact units times scale):
-   Is*scale should equal -Ks. Near-diagonal entries of the same segment
-   are skipped, as in the VE gate, because the self terms may be
-   regularised differently. A pure sign error gives a deviation of 2.
+   compare the static limit of the tables with the assembled operators.
+   rsf_solve assembles Is in SI with the stress-from-slip sign (positive
+   slip reduces the shear traction on the slipping patch, negative
+   diagonal), so Is must equal +Ks of the tables; In is assembled
+   compression positive, so In must equal -Kn (in-plane only). Near-
+   diagonal entries of the same segment are skipped, as in the VE gate.
+   A pure sign error gives a relative deviation of 2.
 */
-static PetscErrorCode fd_gate_static(struct interact_ctx *par, struct fd_vars *fd, PetscReal scale)
+static PetscErrorCode fd_gate_one(struct fd_vars *fd, Mat A, int normal, double sign, PetscInt nrflt, double *dev2, double *nrm2)
 {
-  struct med *medium = par->medium;
   PetscInt k, l, i, j, gi, gj, ncols, c;
   const PetscInt *cols;
   const PetscScalar *vals;
-  double *Ks, *Kn, dev = 0.0, nrm = 0.0, dv, *row;
+  double *Ks, *Kn, dev = 0.0, nrm = 0.0, dv, *row, ours;
   int ns, nr;
   PetscFunctionBeginUser;
-  PetscCall(PetscCalloc1(medium->nrflt,&row));
-  for(gi = 0;gi < medium->nrflt;gi++){
-    /* assembled row, scaled */
-    for(c = 0;c < medium->nrflt;c++) row[c] = 0.0;
-    PetscCall(MatGetRow(medium->Is,gi,&ncols,&cols,&vals));
-    for(c = 0;c < ncols;c++) row[cols[c]] = PetscRealPart(vals[c])*scale;
-    PetscCall(MatRestoreRow(medium->Is,gi,&ncols,&cols,&vals));
-    /* our value for every source element gj: locate (segment, element) of gi and gj */
+  PetscCall(PetscCalloc1(nrflt,&row));
+  for(gi = 0;gi < nrflt;gi++){
+    for(c = 0;c < nrflt;c++) row[c] = 0.0;
+    PetscCall(MatGetRow(A,gi,&ncols,&cols,&vals));
+    for(c = 0;c < ncols;c++) row[cols[c]] = PetscRealPart(vals[c]);
+    PetscCall(MatRestoreRow(A,gi,&ncols,&cols,&vals));
     for(k = 0;k < fd->segs->nseg;k++)
       for(i = 0;i < fd->segs->seg[k].n;i++)
 	if(fd->segs->gidx[k][i] == gi)
@@ -196,19 +195,42 @@ static PetscErrorCode fd_gate_static(struct interact_ctx *par, struct fd_vars *f
 	      gj = fd->segs->gidx[l][j];
 	      if((l == k) && (labs((long)i - (long)j) <= 1))
 		continue;
-	      dv = row[gj] - (-Ks[i*ns + j]);
+	      ours = sign*(normal ? Kn[i*ns + j] : Ks[i*ns + j]);
+	      dv = row[gj] - ours;
 	      dev += dv*dv; nrm += row[gj]*row[gj];
 	    }
 	    PetscCall(PetscFree2(Ks,Kn));
 	  }
   }
   PetscCall(PetscFree(row));
-  dev = sqrt(dev/(nrm + 1e-300));
-  PetscCall(PetscPrintf(PETSC_COMM_WORLD,"rsf_fd_setup: static gate: rel dev of -Ks(tables) from Is*scale %.3e (tol %g)\n",dev,(double)fd->gate_tol));
+  *dev2 = dev; *nrm2 = nrm;
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+static PetscErrorCode fd_gate_static(struct interact_ctx *par, struct fd_vars *fd)
+{
+  struct med *medium = par->medium;
+  struct rsf_vars *rsf = medium->rsf;
+  double d2, n2, dev, devn = -1.0, dn2, nn2;
+  PetscFunctionBeginUser;
+  PetscCall(fd_gate_one(fd,medium->Is,0,1.0,medium->nrflt,&d2,&n2));
+  dev = sqrt(d2/(n2 + 1e-300));
+  PetscCall(PetscPrintf(PETSC_COMM_WORLD,"rsf_fd_setup: static gate: rel dev of Ks(tables) from Is %.3e (tol %g)\n",dev,(double)fd->gate_tol));
+  if((fd->mode2d == FD_MODE_INPLANE) && rsf->calc_sigma_dot){
+    /* In is assembled compression positive for interact's positive (left-lateral) slip,
+       which equals +Kn of the tables (tension positive for the prototype's right-lateral
+       positive slip); a numerically zero In (single planar segment) is judged against
+       the shear norm */
+    PetscCall(fd_gate_one(fd,medium->In,1,1.0,medium->nrflt,&dn2,&nn2));
+    devn = sqrt(dn2/fmax(nn2,1e-16*n2));
+    PetscCall(PetscPrintf(PETSC_COMM_WORLD,"rsf_fd_setup: static gate: rel dev of Kn(tables) from In %.3e (normal norm / shear norm %.2e)\n",devn,sqrt(nn2/(n2 + 1e-300))));
+  }
   PetscCheck(dev <= 5.0*fd->gate_tol,PETSC_COMM_WORLD,PETSC_ERR_USER,
-	     "rsf_fd_setup: static limit of the dynamic tables deviates %.3e from the assembled operator: convention mismatch (a sign flip gives 2)",dev);
-  if(dev > fd->gate_tol)
-    PetscCall(PetscPrintf(PETSC_COMM_WORLD,"rsf_fd_setup: WARNING: static gate deviation %.3e exceeds %g\n",dev,(double)fd->gate_tol));
+	     "rsf_fd_setup: static limit of the dynamic tables deviates %.3e from the assembled Is: convention mismatch (a sign flip gives 2)",dev);
+  PetscCheck(devn <= 5.0*fd->gate_tol,PETSC_COMM_WORLD,PETSC_ERR_USER,
+	     "rsf_fd_setup: normal static limit deviates %.3e from the assembled In (a sign flip gives 2)",devn);
+  if((dev > fd->gate_tol) || (devn > fd->gate_tol))
+    PetscCall(PetscPrintf(PETSC_COMM_WORLD,"rsf_fd_setup: WARNING: static gate deviation exceeds %g\n",(double)fd->gate_tol));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 

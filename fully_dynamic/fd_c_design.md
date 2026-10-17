@@ -202,3 +202,20 @@ dynamic phase) is M7 work.
   elastic path is covered as well.
 - Whether `-fd_mode -1` behaves on PETSc 3.25.5 as the design assumes
   (the first thing to run after building M1).
+
+## 9. Conventions established on the real operators (M2, 2026-10-18)
+
+Measured with the static gate on rsf_solve's assembled operators (2-D
+full plane, antiplane and in-plane, one and two segments):
+- `Is` is assembled in SI (the scale is applied inside
+  `calc_petsc_Isn_matrices`) with the stress-from-slip sign: `Is` equals
+  `+Ks` of the tables to 3e-16. No scaling, no sign flip.
+- `In` (with `-calc_sigma_dot`) equals `+Kn` of the tables to 2e-16,
+  including the cross-segment blocks. interact's positive slip is
+  left-lateral and `In` is compression positive; the prototype's positive
+  slip is right-lateral and its `Kn` is tension positive; the two flips
+  cancel. The marcher therefore uses the tables as they are and treats
+  `Kn . delta` as a compression-positive change, consistent with the QD
+  path `sigma_dot = In . v`.
+- The element size enters as 2 l (interact's l is the half-length) and
+  `t_strike` gives the tangent; dt_min = CFL dx / beta with CFL 0.5.
