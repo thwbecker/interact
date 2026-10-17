@@ -147,7 +147,7 @@
 # src/block 		is for the routines used for geodetic block modeling in Becker et al. (2005)
 # src/relax		is for the visco-elasticity routines
 #
-VPATH = src src/green src/linear_algebra src/util src/block src/testing/ src/interact src/geometry src/relax 
+VPATH = src src/rsf_solve src/green src/linear_algebra src/util src/block src/testing/ src/testing/rsf_solve src/interact src/geometry src/relax 
 
 LOCAL_INCLUDES = -Isrc/includes/ -Isrc/util/ -Isrc/block/
 
@@ -232,7 +232,13 @@ FLAGS = $(DEFINE_FLAGS) $(PGPLOT_INCLUDES) $(SLATEC_INCLUDES) $(LOCAL_INCLUDES) 
 	$(SUPERLU_INCLUDES) $(GEOPROJECT_INCLUDES) $(PETSC_INCLUDES) 
 # C and FORTRAN compiler specific flags, add them to the 
 # other flags
-CFLAGS =   $(FLAGS) $(SCARGS)   $(MACHINE_DEFINES)
+# optional FFTW backend for the fully dynamic tables: set
+#   FFTW_DEFINES = -DUSE_FFTW -I<fftw include dir>
+#   FFTW_LIBS    = -L<fftw lib dir> -lfftw3
+# in the machine config; the built-in power-of-two FFT is used otherwise
+FFTW_DEFINES ?=
+FFTW_LIBS ?=
+CFLAGS =   $(FLAGS) $(SCARGS)   $(MACHINE_DEFINES) $(FFTW_DEFINES)
 FFLAGS =   $(FLAGS) $(SFARGS)   $(MACHINE_DEFINES)  $(OPENMP_FLAGS)
 F90FLAGS = $(FLAGS) $(SF90ARGS) $(MACHINE_DEFINES)
 
@@ -314,8 +320,11 @@ INTERACT_OBJS_SGL = $(INTERACT_OBJS:.o=.sgl.o)
 
 #
 # objects for rsf_solve
+# the rsf_* sources live in src/rsf_solve/ (VPATH); rsf_fd.o and fd_fft.o
+# are the fully dynamic extension, inert unless -fd_mode is given
 RSF_SOLVE_OBJS = $(ODIR)/rsf_solve.o $(ODIR)/rsf_engine.o $(ODIR)/rsf_imex.o \
-	$(ODIR)/rsf_init.o $(ODIR)/rsf_output.o $(ODIR)/rsf_ve.o $(VE_OBJS)
+	$(ODIR)/rsf_init.o $(ODIR)/rsf_output.o $(ODIR)/rsf_ve.o \
+	$(ODIR)/rsf_fd.o $(ODIR)/fd_fft.o $(VE_OBJS)
 
 #
 # objects for randomflt
@@ -436,6 +445,12 @@ geom_converters: $(BDIR)/points2patch $(BDIR)/tri2patch  $(BDIR)/patchquad2patch
 
 testing:	$(BDIR)/noda_crack_test $(BDIR)/ve_check $(BDIR)/ve_laplace_check \
 	$(BDIR)/ve_layered_check $(BDIR)/ve_pom_compare $(BDIR)/ve_pom_compare2
+
+# tests of the rsf_solve extensions (src/testing/rsf_solve)
+rsf_testing: $(BDIR)/test_fd_fft
+
+$(BDIR)/test_fd_fft: $(ODIR)/test_fd_fft.o $(ODIR)/fd_fft.o $(GEN_P_INC)
+	$(CC) $(ODIR)/test_fd_fft.o $(ODIR)/fd_fft.o -o $(BDIR)/test_fd_fft $(FFTW_LIBS) -lm $(LDFLAGS)
 
 
 matrix_test_progs: $(BDIR)/test_sparse $(BDIR)/test_optimize $(BDIR)/test_solvers \

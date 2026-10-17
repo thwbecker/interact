@@ -29,6 +29,10 @@ PetscErrorCode rsf_compute_vel_and_stressing(Vec, PetscReal, struct interact_ctx
 PetscErrorCode rsf_ve_setup(struct interact_ctx *, Vec, PetscReal);
 PetscErrorCode rsf_ve_apply_sink(struct interact_ctx *, Vec, PetscReal);
 PetscErrorCode rsf_ve_monitor(TS, PetscInt, PetscReal, Vec, void *);
+/* fully dynamic extension, src/rsf_solve/rsf_fd.c */
+PetscErrorCode rsf_fd_setup(struct interact_ctx *);
+PetscErrorCode rsf_fd_monitor(TS, PetscInt, PetscReal, Vec, void *);
+PetscErrorCode rsf_fd_finalize(struct interact_ctx *);
 /* IMEX (ARKIMEX) variant, -imex (rsf_imex.c) */
 PetscErrorCode rsf_IMEX_RHSFunction(TS, PetscReal, Vec, Vec, void*);
 PetscErrorCode rsf_IMEX_IFunction(TS, PetscReal, Vec, Vec, Vec, void*);

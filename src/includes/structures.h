@@ -247,6 +247,10 @@ struct rsf_vars{
   PetscReal ve_t0;		/* time of the last h update [s] */
   /*  */
   short int dim;
+  /* fully dynamic extension (src/rsf_solve/rsf_fd.c); NULL unless
+     -fd_mode is given, in which case the dynamic phases are marched
+     outside the TS by a monitor-attached scheme */
+  struct fd_vars *fd;
 };
 #endif	/* end petsc branch */
 

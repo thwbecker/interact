@@ -335,6 +335,9 @@ PetscErrorCode rsf_solve_run(int argc,char **argv,struct interact_ctx *par,
      when the option is absent.  Needs the -vpl slip-rate vector as
      the loading reference of the h forcing. */
   PetscCall(rsf_ve_setup(par,islip_rate_vec,shear_modulus_si/medium->elastic.shear));
+  /* fully dynamic extension: parses -fd_mode and friends, allocates
+     rsf->fd; a no-op leaving rsf->fd NULL when the option is absent */
+  PetscCall(rsf_fd_setup(par));
   PetscCall(VecDestroy(&stress_rate));
   PetscCall(VecDestroy(&islip_rate_vec));
   if(have_sratef){
@@ -699,6 +702,8 @@ PetscErrorCode rsf_solve_run(int argc,char **argv,struct interact_ctx *par,
   PetscCall(rsf_init_catalog(uc,par,set,shear_modulus_si,rsf->vpl,x,t_start));
   if(rsf->ve_np > 0)		/* accepted-step h update, before output */
     PetscCall(TSMonitorSet(ts,rsf_ve_monitor,(void *)par,NULL));
+  if(rsf->fd)			/* fully dynamic phases, attached only when -fd_mode is on */
+    PetscCall(TSMonitorSet(ts,rsf_fd_monitor,(void *)par,NULL));
   PetscCall(TSMonitorSet(ts,rsf_TS_Monitor,(void *)uc,NULL));
   if(track_events){
     PetscCall(TSSetEventHandler(ts,1,event_direction,event_terminate,
@@ -795,6 +800,7 @@ PetscErrorCode rsf_solve_run(int argc,char **argv,struct interact_ctx *par,
   /*  */
   if(Jimex)
     PetscCall(MatDestroy(&Jimex));
+  PetscCall(rsf_fd_finalize(par));
   PetscCall(TSDestroy(&ts)); 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
