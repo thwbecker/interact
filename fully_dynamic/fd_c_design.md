@@ -203,51 +203,15 @@ dynamic phase) is M7 work.
 - Whether `-fd_mode -1` behaves on PETSc 3.25.5 as the design assumes
   (the first thing to run after building M1).
 
-## 9. Conventions established on the real operators (M2, 2026-10-18)
+## 11. M5 (2026-10-18)
 
-Measured with the static gate on rsf_solve's assembled operators (2-D
-full plane, antiplane and in-plane, one and two segments):
-- `Is` is assembled in SI (the scale is applied inside
-  `calc_petsc_Isn_matrices`) with the stress-from-slip sign: `Is` equals
-  `+Ks` of the tables to 3e-16. No scaling, no sign flip.
-- `In` (with `-calc_sigma_dot`) equals `+Kn` of the tables to 2e-16,
-  including the cross-segment blocks. interact's positive slip is
-  left-lateral and `In` is compression positive; the prototype's positive
-  slip is right-lateral and its `Kn` is tension positive; the two flips
-  cancel. The marcher therefore uses the tables as they are and treats
-  `Kn . delta` as a compression-positive change, consistent with the QD
-  path `sigma_dot = In . v`.
-- The element size enters as 2 l (interact's l is the half-length) and
-  `t_strike` gives the tangent; dt_min = CFL dx / beta with CFL 0.5.
-
-## 10. The hand-over as built (M4, 2026-10-18)
-
-- PETSc 3.25 locks the solution vector during monitors, and replacing the
-  solution in a TSPostStep hook left the event machinery with a stale
-  previous value that it then tried to bracket by re-stepping from a state
-  that no longer existed (a divergent second phase 250 s after the first
-  hand-back, absent without -track_events). The switch is therefore a
-  second TS event in rsf_solve's existing handler (slot
-  uc->fd_event_index, upward crossing of -fd_vsw), and the phase runs in
-  the post-event callback, which PETSc reinitialises the event state
-  after. With -track_events off the handler is registered with the FD
-  event alone. The monitor only records accepted (t, slip rate) pairs for
-  the history seeding.
-- The marcher works in time relative to the switch: tau0 is the elastic
-  stress tau + eta V at the switch, the static term uses slip since the
-  switch, and the backslip loading enters as sinc (t - t_switch). The
-  prototype could use absolute time because its stress origin was t = 0;
-  with absolute time here the deepest BP1 element received 1.3 GPa in the
-  first step.
-- Hand-back: psi, tau = strength at the final slip rate (= elastic stress
-  at the end of the last step, the quantity the QD ODE integrates),
-  sigma, slip += slip of the phase; TSSetTime to the end of the phase
-  (the phase lasts up to half an hour of afterslip) and TSSetTimeStep to
-  -fd_dt_restart.
-- Known cosmetic issue: when the tracker's 1e-3 m/s crossing and the FD
-  switch fire together, rsf_events.dat logs the onset with the post-phase
-  state (peak slip rate below 1e-3). To be fixed by logging before the
-  phase.
-- Verified: BP1-FD three events and the single-fault sequence against the
-  prototype (fd_plan.md); src/testing/rsf_solve/test_fd_sequence.sh is the
-  one-minute regression of the latter.
+Two parallel in-plane segments with `-calc_sigma_dot 1`: the marcher's
+normal coupling (nsign = +1, section 9) is active through the phase,
+`Hn_dot = sinc[1]`, sigma handed back. The prototype's stepover case (two
+24 km segments, 1 km step, 2 km overlap, 0.5 km velocity-strengthening
+margins, 100 m) gives segment 0 at 1.0549 yr with 1.173 m mean slip over
+all 480 elements (prototype 1.175), segment 1 after 53 min (prototype 53
+min) with 1.550 m (prototype 1.546). Gates 4e-16 on both operators. The
+post-event callback now runs the tracker's logging and catalog capture on
+the pre-phase state and the phase afterwards. Sandbox setup for a hand-off
+is in c_port/SANDBOX.md; usage and theory for users in rsf_solve_fd.md.

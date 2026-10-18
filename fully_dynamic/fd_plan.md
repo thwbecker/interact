@@ -232,25 +232,50 @@ memory-bound. Consequences:
 Order if pursued: partitioned convolution first (reduces the work), then
 the GPU switch for the remainder.
 
-### WP7, C implementation in rsf_solve
+### WP7, C implementation in rsf_solve: status (2026-10-18)
+Done, each verified in the sandbox before delivery (details in
+fd_c_design.md sections 6 to 10, usage in rsf_solve_fd.md):
+- M1 source reorganisation (src/rsf_solve/), skeleton, built-in FFT with
+  an FFTW-ready interface, bit-identity and timing harness.
+- M2 kernels, tables, segment detection, static gate against Is/In
+  (1e-16 agreement, including cross-segment normal blocks and the
+  half-plane image).
+- M3 marcher core, LAPACK banded solve, slip weakening, standalone
+  fd_dynamic: TPV205-2D equals the prototype to 1e-10, 25 times faster.
+- M4 rate-and-state, images, history seeding, switch as a TS event with
+  the phase in the post-event callback, hand-back: BP1-FD three events and
+  the single-fault sequence equal the prototype to the printed precision.
+- M5 two parallel segments with normal-stress coupling through the phase:
+  the prototype's stepover case (1 km step, 2 km overlap, 0.5 km margins)
+  reproduced (segment 1 follows segment 0 after 53 min, slips per event
+  within 0.3 percent); event log ordering fixed.
+Harness: identity PASS on every patch; the timing column is noise at the
+run lengths the sandbox allows.
+
+Next, in order:
+1. On the workstation: BP1-FD at 25 m with rsf_solve (prototype numbers in
+   README and fd_plan.md), and the WP6 sweeps rerun in C (sweep_step2
+   configurations, 16 events), to confirm the Python results and get the
+   statistics the Python could not.
+2. M6 performance: partitioned FFT convolution over the lag axis
+   (O(log L) amortised per step, factor 20 to 50 at L of a few thousand),
+   then OpenMP over Fourier modes; identity to 1e-10 against M5.
+3. M7 scope decisions: non-parallel segment pairs (dense lag tables, needed
+   for branches and TPV14/15-2D), VE memory carried through a phase
+   (-ve_mode with -fd_mode), MPI distribution of the tables, slip law and
+   flash heating in the C friction (prototype has them), in-plane half
+   plane, 3-D elements.
+4. Small items: pre-phase onset line in rsf_events.dat is done; station
+   output of the QD stations (-rsf_stations) during phases; checkpoint
+   that includes the FD record; a 3-D case in the harness.
+
+### WP7, C implementation in rsf_solve (original plan)
 Design in fd_c_design.md (2026-10-17): monitor-attached FD phase, no
 changes to the QD code path, bit-identity and timing harness run at every
 step, milestones M1 to M7 with their acceptance tests. M1 (source
 reorganisation, skeleton, FFT, harness) delivered 2026-10-17. M2 (kernels,
 tables, segment detection, static gate against Is; C tables agree with
-the prototype dumps to 1e-12) delivered 2026-10-17. M3 (marcher core:
-fine-grid history with copy-free convolution, cumulative kernels, LAPACK
-banded solve, slip-weakening active-set solve, standalone fd_dynamic
-driver) delivered 2026-10-18: TPV205-2D at 100 and 50 m reproduces the
-prototype station series to 1e-10 relative, 25 times faster than the
-Python; harness identity PASS. M4 (rate-and-state marcher,
-image sources for the antiplane free surface, history seeding from the
-accepted QD steps, switch as a TS event with the phase in the post-event
-callback, hand-back of psi, tau, sigma, slip) delivered 2026-10-18:
-rsf_solve -fd_mode 1 reproduces the prototype's BP1-FD sequence at 50 m
-(196.36/301.78/420.52 yr, steps, durations, peak slip rates and mean slips
-per event to the printed precision) and the single-fault sequence (three
-events, recurrence 82.9 yr); harness identity PASS.
+the prototype dumps to 1e-12) delivered 2026-10-17.
 - Kernels: Tada-Madariaga primitives for 2-D segments (four primitive
   evaluations per pair and lag) plus the large-time series; Tada (2006)
   triangles or space-time quadrature for 3-D.

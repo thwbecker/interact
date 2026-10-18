@@ -412,7 +412,8 @@ int fd_step_rsf(struct fd_sys *s, struct fd_state *st, const struct fd_rsf *f, i
   double dt = s->dt * k, t1 = st->t + dt, *psi_s = st->work, *Vs, *sig;
   struct fd_ops *op = fd_sys_ops(s, k);
   if(!op) return -1;
-  Vs = (double *)malloc(sizeof(double) * N); sig = (double *)malloc(sizeof(double) * N);
+  Vs = (double *)calloc((size_t)N, sizeof(double)); sig = (double *)calloc((size_t)N, sizeof(double));
+  for(i = 0; i < N; i++) sig[i] = st->sigma0[i];
   fd_sys_static(s, st->delta, st->H, st->Hn);
   fd_sys_history(s, k + 1, st->hs, st->hn);
   for(i = 0; i < N; i++){

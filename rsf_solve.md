@@ -1,5 +1,7 @@
 # `rsf_solve`: H-matrix backends and performance notes
 
+Fully dynamic coseismic phases (`-fd_mode`): see `rsf_solve_fd.md`.
+
 `rsf_solve` integrates a rate-and-state quasi-dynamic earthquake cycle on an
 interact patch geometry. The dense elastic interaction operator is applied once
 per Runge-Kutta stage, so the dominant cost at scale is the **matrix-vector
