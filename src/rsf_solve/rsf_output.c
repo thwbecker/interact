@@ -1190,6 +1190,20 @@ PetscErrorCode rsf_post_event(TS ts,PetscInt nevents,PetscInt event_list[],
   uc = (struct rsf_out_ctx *)ctx;
   medium = uc->par->medium;fault = uc->par->fault;
   rsf = medium->rsf;
+  /* fully dynamic switch (rsf_fd.c): run the dynamic phase, which replaces
+     the solution and advances the TS clock; the slip-rate tracker below is
+     then evaluated on the post-phase state only if it fired as well */
+  if(uc->fd_event_index >= 0){
+    PetscBool fd_fired = PETSC_FALSE, vel_fired = PETSC_FALSE;
+    for(i = 0;i < nevents;i++){
+      if(event_list[i] == uc->fd_event_index) fd_fired = PETSC_TRUE;
+      if(event_list[i] == uc->vel_event_index) vel_fired = PETSC_TRUE;
+    }
+    if(fd_fired)
+      PetscCall(rsf_fd_postevent(ts,uc->par,t,X));
+    if(!vel_fired)
+      PetscFunctionReturn(PETSC_SUCCESS);
+  }
   uc->slipping = (uc->slipping)?(PETSC_FALSE):(PETSC_TRUE); /* threshold crossed */
   if(t >= uc->event_tmin){
     lsum[0]=lsum[1]=0.0;lvmax = 0.0;

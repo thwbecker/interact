@@ -6,26 +6,29 @@
 #include "fd_march.h"
 
 /* ---------------- system ---------------- */
-struct fd_sys *fd_sys_create(struct fd_seglist *segs, struct fd_pair **pairs, int mode, double dt,
-                             double alpha, double beta, double rho, int nsign)
+struct fd_sys *fd_sys_create(struct fd_seglist *segs, struct fd_pair **pairs, int nsrc, const int *src_of, const int *src_rev,
+                             int mode, double dt, double alpha, double beta, double rho, int nsign)
 {
   struct fd_sys *s = (struct fd_sys *)calloc(1, sizeof(*s));
-  int k, l, i, j, ns, nr;
+  int k, l, i, j, ns, nr, jj;
   double *Ks, *Kn;
   s->segs = segs; s->pairs = pairs; s->nseg = segs->nseg; s->mode = mode; s->dt = dt;
+  s->nsrc = nsrc > 0 ? nsrc : segs->nseg;
+  s->src_of = (int *)malloc(sizeof(int) * (size_t)s->nsrc); s->src_rev = (int *)malloc(sizeof(int) * (size_t)s->nsrc);
+  for(k = 0; k < s->nsrc; k++){ s->src_of[k] = src_of ? src_of[k] : k; s->src_rev[k] = src_rev ? src_rev[k] : 0; }
   s->alpha = alpha; s->beta = beta; s->rho = rho; s->nsign = nsign;
   s->eta = rho * beta * beta / (2.0 * beta);
   s->has_normal = (mode == FD_MODE_INPLANE);
-  s->off = (int *)malloc(sizeof(int) * (s->nseg + 1));
+  s->off = (int *)malloc(sizeof(int) * (size_t)(s->nseg + 1));
   s->off[0] = 0;
   for(k = 0; k < s->nseg; k++) s->off[k + 1] = s->off[k] + segs->seg[k].n;
   s->N = s->off[s->nseg];
   s->M = pairs[0]->M; s->L = 0;
-  for(k = 0; k < s->nseg * s->nseg; k++) if(pairs[k]->L > s->L) s->L = pairs[k]->L;
+  for(k = 0; k < s->nsrc * s->nseg; k++) if(pairs[k]->L > s->L) s->L = pairs[k]->L;
   s->Lbuf = s->L + 1;
-  s->hist = (double _Complex **)malloc(sizeof(double _Complex *) * s->nseg);
-  s->hk = (int *)calloc(s->nseg, sizeof(int));
-  for(k = 0; k < s->nseg; k++) s->hist[k] = (double _Complex *)calloc((size_t)s->Lbuf * s->M, sizeof(double _Complex));
+  s->hist = (double _Complex **)malloc(sizeof(double _Complex *) * (size_t)s->nsrc);
+  s->hk = (int *)calloc((size_t)s->nsrc, sizeof(int));
+  for(k = 0; k < s->nsrc; k++) s->hist[k] = (double _Complex *)calloc((size_t)s->Lbuf * s->M, sizeof(double _Complex));
   s->pf = fd_fft_plan_create(s->M, FD_FFT_FORWARD); s->pb = fd_fft_plan_create(s->M, FD_FFT_BACKWARD);
   s->w1 = (double _Complex *)malloc(sizeof(double _Complex) * s->M);
   s->w2 = (double _Complex *)malloc(sizeof(double _Complex) * s->M);
@@ -33,16 +36,18 @@ struct fd_sys *fd_sys_create(struct fd_seglist *segs, struct fd_pair **pairs, in
   /* dense static operators in segment order */
   s->Ks = (double *)calloc((size_t)s->N * s->N, sizeof(double));
   s->Kn = (double *)calloc((size_t)s->N * s->N, sizeof(double));
-  for(k = 0; k < s->nseg; k++)
+  for(k = 0; k < s->nsrc; k++)
     for(l = 0; l < s->nseg; l++){
       struct fd_pair *p = pairs[k * s->nseg + l];     /* source k, receiver l */
+      int r = s->src_of[k], rev = s->src_rev[k];
       ns = p->src->n; nr = p->rcv->n;
       Ks = (double *)malloc(sizeof(double) * ns * nr); Kn = (double *)malloc(sizeof(double) * ns * nr);
       fd_pair_static_dense(p, Ks, Kn);
       for(i = 0; i < nr; i++)
         for(j = 0; j < ns; j++){
-          s->Ks[(size_t)(s->off[l] + i) * s->N + s->off[k] + j] = Ks[i * ns + j];
-          s->Kn[(size_t)(s->off[l] + i) * s->N + s->off[k] + j] = Kn[i * ns + j];
+          jj = rev ? ns - 1 - j : j;                 /* column of the real element feeding source element j */
+          s->Ks[(size_t)(s->off[l] + i) * s->N + s->off[r] + jj] += Ks[i * ns + j];
+          s->Kn[(size_t)(s->off[l] + i) * s->N + s->off[r] + jj] += Kn[i * ns + j];
         }
       free(Ks); free(Kn);
     }
@@ -54,8 +59,8 @@ void fd_sys_free(struct fd_sys *s)
 {
   int k;
   if(!s) return;
-  for(k = 0; k < s->nseg; k++) free(s->hist[k]);
-  free(s->hist); free(s->hk); free(s->off); free(s->w1); free(s->w2); free(s->w3); free(s->Ks); free(s->Kn);
+  for(k = 0; k < s->nsrc; k++) free(s->hist[k]);
+  free(s->hist); free(s->hk); free(s->off); free(s->src_of); free(s->src_rev); free(s->w1); free(s->w2); free(s->w3); free(s->Ks); free(s->Kn);
   for(k = 0; k < s->nops; k++){ free(s->ops[k].Ks); free(s->ops[k].Kn); free(s->ops[k].ab); }
   fd_fft_plan_destroy(s->pf); fd_fft_plan_destroy(s->pb);
   free(s);
@@ -64,15 +69,16 @@ void fd_sys_free(struct fd_sys *s)
 void fd_sys_reset_history(struct fd_sys *s)
 {
   int k;
-  for(k = 0; k < s->nseg; k++){ memset(s->hist[k], 0, sizeof(double _Complex) * (size_t)s->Lbuf * s->M); s->hk[k] = 0; }
+  for(k = 0; k < s->nsrc; k++){ memset(s->hist[k], 0, sizeof(double _Complex) * (size_t)s->Lbuf * s->M); s->hk[k] = 0; }
 }
 
 void fd_sys_push(struct fd_sys *s, const double *V)
 {
-  int k, i;
-  for(k = 0; k < s->nseg; k++){
+  int k, i, r, n;
+  for(k = 0; k < s->nsrc; k++){
+    r = s->src_of[k]; n = s->segs->seg[r].n;
     memset(s->w1, 0, sizeof(double _Complex) * s->M);
-    for(i = 0; i < s->segs->seg[k].n; i++) s->w1[i] = V[s->off[k] + i];
+    for(i = 0; i < n; i++) s->w1[i] = V[s->off[r] + (s->src_rev[k] ? n - 1 - i : i)];
     fd_fft_exec(s->pf, s->w1, s->hist[k] + (size_t)(s->hk[k] % s->Lbuf) * s->M);
     s->hk[k]++;
   }
@@ -84,7 +90,7 @@ void fd_sys_history(struct fd_sys *s, int lag0, double *ts, double *tn)
 {
   int a, b, l, lmax, pos, nseg, q, i, m, hk;
   memset(ts, 0, sizeof(double) * s->N); if(tn) memset(tn, 0, sizeof(double) * s->N);
-  for(a = 0; a < s->nseg; a++){          /* source */
+  for(a = 0; a < s->nsrc; a++){          /* source */
     hk = s->hk[a];
     for(b = 0; b < s->nseg; b++){        /* receiver */
       struct fd_pair *p = s->pairs[a * s->nseg + b];
@@ -141,17 +147,19 @@ struct fd_ops *fd_sys_ops(struct fd_sys *s, int k)
   op->Ks = (double *)malloc(sizeof(double) * (size_t)s->N * s->N);
   op->Kn = (double *)malloc(sizeof(double) * (size_t)s->N * s->N);
   for(i = 0; i < (size_t)s->N * s->N; i++){ op->Ks[i] = s->Ks[i] * s->dt * k; op->Kn[i] = s->Kn[i] * s->dt * k; }
-  for(a = 0; a < s->nseg; a++)
+  for(a = 0; a < s->nsrc; a++)
     for(b = 0; b < s->nseg; b++){
       struct fd_pair *p = s->pairs[a * s->nseg + b];
+      int r = s->src_of[a], rev = s->src_rev[a], jj;
       ns = p->src->n; nr = p->rcv->n;
       Ws = (double *)malloc(sizeof(double) * ns * nr); Wn = (double *)malloc(sizeof(double) * ns * nr);
       for(l = 1; l <= (k < p->L ? k : p->L); l++){
         fd_pair_W_dense(p, l, Ws, Wn);
         for(i = 0; i < nr; i++)
           for(j = 0; j < ns; j++){
-            op->Ks[(size_t)(s->off[b] + i) * s->N + s->off[a] + j] += Ws[i * ns + j];
-            op->Kn[(size_t)(s->off[b] + i) * s->N + s->off[a] + j] += Wn[i * ns + j];
+            jj = rev ? ns - 1 - j : j;
+            op->Ks[(size_t)(s->off[b] + i) * s->N + s->off[r] + jj] += Ws[i * ns + j];
+            op->Kn[(size_t)(s->off[b] + i) * s->N + s->off[r] + jj] += Wn[i * ns + j];
           }
       }
       free(Ws); free(Wn);
@@ -295,5 +303,139 @@ int fd_step_slipweak(struct fd_sys *s, struct fd_state *st, struct fd_slipweak *
   for(q = 0; q < k; q++) fd_sys_push(s, st->V);
   for(i = 0; i < N; i++) st->delta[i] += st->V[i] * dt;
   st->t = t1; st->n++; st->k = k;
+  return 0;
+}
+
+/* ---------------- rate and state (aging law) ---------------- */
+double fd_rsf_tau(const struct fd_rsf *f, int i, double V, double psi, double sigma)
+{
+  return f->a[i] * sigma * asinh(V / (2.0 * f->v0) * exp(psi / f->a[i]));
+}
+double fd_rsf_dtau(const struct fd_rsf *f, int i, double V, double psi, double sigma)
+{
+  double e = exp(psi / f->a[i]), z = V / (2.0 * f->v0) * e;
+  return f->a[i] * sigma * e / (2.0 * f->v0) / sqrt(1.0 + z * z);
+}
+/* exact aging-law solution over dt at the mean slip rate (Lapusta et al. 2000):
+   theta = dc/v0 exp((psi - f0)/b); theta' = dc/V + (theta - dc/V) exp(-V dt/dc) */
+double fd_rsf_psi_advance(const struct fd_rsf *f, int i, double psi, double Va, double Vb, double dt)
+{
+  double V = 0.5 * (fabs(Va) + fabs(Vb)), th, thn;
+  if(V < 1e-30) V = 1e-30;
+  th = f->dc[i] / f->v0 * exp((psi - f->f0) / f->b[i]);
+  thn = f->dc[i] / V + (th - f->dc[i] / V) * exp(-V * dt / f->dc[i]);
+  return f->f0 + f->b[i] * log(f->v0 * thn / f->dc[i]);
+}
+
+/* elementwise bracketed Newton in u = ln V on Hloc + k11 V = tau_f(V): g is
+   strictly decreasing in u since k11 < 0 */
+static double rsf_local(const struct fd_rsf *f, int i, double Hloc, double k11, double sigma, double psi, double Vg)
+{
+  double u, lo = -700.0, hi = 50.0, g, dg, un, V;
+  int it;
+  if(Hloc <= 0.0) return 0.0;
+  u = log(Vg > 1e-300 ? Vg : 1e-300);
+  if(u < -700.0) u = -700.0;
+  if(u > 50.0) u = 50.0;
+  for(it = 0; it < 200; it++){
+    V = exp(u);
+    g = Hloc + k11 * V - fd_rsf_tau(f, i, V, psi, sigma);
+    if(g > 0.0){ if(u > lo) lo = u; } else { if(u < hi) hi = u; }
+    dg = (k11 - fd_rsf_dtau(f, i, V, psi, sigma)) * V;
+    un = (dg != 0.0 && isfinite(dg)) ? u - g / dg : 0.5 * (lo + hi);
+    if(!isfinite(un) || un <= lo || un >= hi) un = 0.5 * (lo + hi);
+    if(fabs(un - u) < f->tol){ u = un; break; }
+    u = un;
+  }
+  return exp(u);
+}
+
+int fd_rsf_solve(const struct fd_rsf *f, struct fd_sys *s, struct fd_ops *op, const double *H, const double *sigma,
+                 const double *psi, const double *Vg, double *V)
+{
+  int N = s->N, bw = op->bw, ldab = 3 * bw + 1, i, j, it, converged = 0;
+  double *u = (double *)malloc(sizeof(double) * N), *g = (double *)malloc(sizeof(double) * N), *du = (double *)malloc(sizeof(double) * N);
+  double *ab = (double *)malloc(sizeof(double) * (size_t)ldab * N), *tmp = (double *)malloc(sizeof(double) * N), *k11 = (double *)malloc(sizeof(double) * N);
+  double dmax, Vi;
+  for(i = 0; i < N; i++){ u[i] = log(Vg[i] > 1e-30 ? Vg[i] : 1e-30); if(u[i] < -70.0) u[i] = -70.0; if(u[i] > 10.0) u[i] = 10.0; }
+  for(it = 0; it < f->max_iter; it++){
+    for(i = 0; i < N; i++) V[i] = exp(u[i]);
+    dense_mult(N, op->Ks, V, tmp);
+    for(i = 0; i < N; i++) g[i] = H[i] + tmp[i] - fd_rsf_tau(f, i, V[i], psi[i], sigma[i]);
+    /* Jacobian in u: (K - diag(dtau/dV)) diag(V), band storage: column j scaled by V_j */
+    for(j = 0; j < N; j++)
+      for(i = (j - bw > 0 ? j - bw : 0); i <= (j + bw < N - 1 ? j + bw : N - 1); i++)
+        ab[(2 * bw + i - j) + (size_t)j * ldab] = op->ab[(2 * bw + i - j) + (size_t)j * ldab] * V[j];
+    for(i = 0; i < N; i++) ab[(2 * bw) + (size_t)i * ldab] -= fd_rsf_dtau(f, i, V[i], psi[i], sigma[i]) * V[i];
+    for(i = 0; i < N; i++){ if(!isfinite(g[i]) || !isfinite(ab[(2 * bw) + (size_t)i * ldab])) break; }
+    if(i < N) break;
+    if(fd_band_solve(N, bw, ab, g, du) != 0) break;
+    dmax = 0.0;
+    for(i = 0; i < N; i++){
+      double d = -du[i];
+      if(!isfinite(d)){ dmax = INFINITY; break; }
+      if(d > 2.0) d = 2.0;
+      if(d < -2.0) d = -2.0;
+      u[i] += d; if(u[i] < -70.0) u[i] = -70.0; if(u[i] > 10.0) u[i] = 10.0;
+      if(fabs(d) > dmax) dmax = fabs(d);
+    }
+    if(!isfinite(dmax)) break;
+    if(dmax < f->tol){ converged = 1; break; }
+  }
+  if(converged){
+    for(i = 0; i < N; i++) V[i] = exp(u[i]);
+    free(u); free(g); free(du); free(ab); free(tmp); free(k11);
+    return it;
+  }
+  /* fallback: fixed point of the elementwise solve with lagged neighbours */
+  for(i = 0; i < N; i++){ k11[i] = op->Ks[(size_t)i * N + i]; V[i] = exp(u[i]); }
+  for(it = 0; it < 60; it++){
+    dense_mult(N, op->Ks, V, tmp);
+    dmax = 0.0;
+    for(i = 0; i < N; i++){
+      Vi = rsf_local(f, i, H[i] + tmp[i] - k11[i] * V[i], k11[i], sigma[i], psi[i], V[i]);
+      if(fabs(Vi - V[i]) / (V[i] > 1e-30 ? V[i] : 1e-30) > dmax) dmax = fabs(Vi - V[i]) / (V[i] > 1e-30 ? V[i] : 1e-30);
+      g[i] = Vi;
+    }
+    memcpy(V, g, sizeof(double) * N);
+    if(dmax < f->tol) break;
+  }
+  free(u); free(g); free(du); free(ab); free(tmp); free(k11);
+  return -(it + 1);
+}
+
+/* one step of k dt_min: predictor-corrector in psi (exact aging update at the
+   mean slip rate), coupled solve for V twice (stepper.RateState.solve) */
+int fd_step_rsf(struct fd_sys *s, struct fd_state *st, const struct fd_rsf *f, int k)
+{
+  int i, q, N = s->N;
+  double dt = s->dt * k, t1 = st->t + dt, *psi_s = st->work, *Vs, *sig;
+  struct fd_ops *op = fd_sys_ops(s, k);
+  if(!op) return -1;
+  Vs = (double *)malloc(sizeof(double) * N); sig = (double *)malloc(sizeof(double) * N);
+  fd_sys_static(s, st->delta, st->H, st->Hn);
+  fd_sys_history(s, k + 1, st->hs, st->hn);
+  for(i = 0; i < N; i++){
+    st->H[i] += st->tau0[i] + st->taudot[i] * t1 + st->hs[i];
+    st->Hn[i] += st->Hn_dot[i] * t1 + st->hn[i];
+  }
+  /* predictor */
+  if(st->normal_coupling){ dense_mult(N, op->Kn, st->V, sig); for(i = 0; i < N; i++) sig[i] = st->sigma0[i] + s->nsign * (st->Hn[i] + sig[i]); }
+  else for(i = 0; i < N; i++) sig[i] = st->sigma0[i];
+  for(i = 0; i < N; i++) psi_s[i] = fd_rsf_psi_advance(f, i, st->psi[i], st->V[i], st->V[i], dt);
+  fd_rsf_solve(f, s, op, st->H, sig, psi_s, st->V, Vs);
+  /* corrector */
+  if(st->normal_coupling){ dense_mult(N, op->Kn, Vs, sig); for(i = 0; i < N; i++) sig[i] = st->sigma0[i] + s->nsign * (st->Hn[i] + sig[i]); }
+  for(i = 0; i < N; i++) psi_s[i] = fd_rsf_psi_advance(f, i, st->psi[i], st->V[i], Vs[i], dt);
+  fd_rsf_solve(f, s, op, st->H, sig, psi_s, Vs, st->V);
+  memcpy(st->psi, psi_s, sizeof(double) * N);
+  dense_mult(N, op->Ks, st->V, Vs);
+  for(i = 0; i < N; i++) st->tau[i] = st->H[i] + Vs[i];
+  if(st->normal_coupling){ dense_mult(N, op->Kn, st->V, sig); for(i = 0; i < N; i++) st->sigma[i] = st->sigma0[i] + s->nsign * (st->Hn[i] + sig[i]); }
+  else for(i = 0; i < N; i++) st->sigma[i] = st->sigma0[i];
+  for(q = 0; q < k; q++) fd_sys_push(s, st->V);
+  for(i = 0; i < N; i++) st->delta[i] += st->V[i] * dt;
+  st->t = t1; st->n++; st->k = k;
+  free(Vs); free(sig);
   return 0;
 }

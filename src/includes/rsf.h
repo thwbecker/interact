@@ -89,6 +89,7 @@ struct rsf_out_ctx{
   Vec gathered;
   /* slip velocity threshold crossing events */
   PetscBool track_events,slipping;
+  PetscInt vel_event_index,fd_event_index; /* slots in the TS event vector, -1 if absent (fd: rsf_fd.c switch) */
   PetscReal vel_event,vel_event_hyst,event_tmin;
   int nevent;
   FILE *fout_event;

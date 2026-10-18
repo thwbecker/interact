@@ -243,7 +243,14 @@ fine-grid history with copy-free convolution, cumulative kernels, LAPACK
 banded solve, slip-weakening active-set solve, standalone fd_dynamic
 driver) delivered 2026-10-18: TPV205-2D at 100 and 50 m reproduces the
 prototype station series to 1e-10 relative, 25 times faster than the
-Python; harness identity PASS.
+Python; harness identity PASS. M4 (rate-and-state marcher,
+image sources for the antiplane free surface, history seeding from the
+accepted QD steps, switch as a TS event with the phase in the post-event
+callback, hand-back of psi, tau, sigma, slip) delivered 2026-10-18:
+rsf_solve -fd_mode 1 reproduces the prototype's BP1-FD sequence at 50 m
+(196.36/301.78/420.52 yr, steps, durations, peak slip rates and mean slips
+per event to the printed precision) and the single-fault sequence (three
+events, recurrence 82.9 yr); harness identity PASS.
 - Kernels: Tada-Madariaga primitives for 2-D segments (four primitive
   evaluations per pair and lag) plus the large-time series; Tada (2006)
   triangles or space-time quadrature for 3-D.

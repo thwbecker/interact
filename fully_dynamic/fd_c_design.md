@@ -219,3 +219,35 @@ full plane, antiplane and in-plane, one and two segments):
   path `sigma_dot = In . v`.
 - The element size enters as 2 l (interact's l is the half-length) and
   `t_strike` gives the tangent; dt_min = CFL dx / beta with CFL 0.5.
+
+## 10. The hand-over as built (M4, 2026-10-18)
+
+- PETSc 3.25 locks the solution vector during monitors, and replacing the
+  solution in a TSPostStep hook left the event machinery with a stale
+  previous value that it then tried to bracket by re-stepping from a state
+  that no longer existed (a divergent second phase 250 s after the first
+  hand-back, absent without -track_events). The switch is therefore a
+  second TS event in rsf_solve's existing handler (slot
+  uc->fd_event_index, upward crossing of -fd_vsw), and the phase runs in
+  the post-event callback, which PETSc reinitialises the event state
+  after. With -track_events off the handler is registered with the FD
+  event alone. The monitor only records accepted (t, slip rate) pairs for
+  the history seeding.
+- The marcher works in time relative to the switch: tau0 is the elastic
+  stress tau + eta V at the switch, the static term uses slip since the
+  switch, and the backslip loading enters as sinc (t - t_switch). The
+  prototype could use absolute time because its stress origin was t = 0;
+  with absolute time here the deepest BP1 element received 1.3 GPa in the
+  first step.
+- Hand-back: psi, tau = strength at the final slip rate (= elastic stress
+  at the end of the last step, the quantity the QD ODE integrates),
+  sigma, slip += slip of the phase; TSSetTime to the end of the phase
+  (the phase lasts up to half an hour of afterslip) and TSSetTimeStep to
+  -fd_dt_restart.
+- Known cosmetic issue: when the tracker's 1e-3 m/s crossing and the FD
+  switch fire together, rsf_events.dat logs the onset with the post-phase
+  state (peak slip rate below 1e-3). To be fixed by logging before the
+  phase.
+- Verified: BP1-FD three events and the single-fault sequence against the
+  prototype (fd_plan.md); src/testing/rsf_solve/test_fd_sequence.sh is the
+  one-minute regression of the latter.

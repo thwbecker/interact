@@ -27,10 +27,11 @@ struct fd_ops {                 /* operators for one substep multiple k */
 };
 
 struct fd_sys {
-  int N, nseg, M, L, Lbuf, mode, has_normal, nsign;
+  int N, nseg, nsrc, M, L, Lbuf, mode, has_normal, nsign;
   double dt, eta, alpha, beta, rho;
-  struct fd_seglist *segs;
-  struct fd_pair **pairs;       /* pairs[src*nseg + rcv] */
+  struct fd_seglist *segs;      /* receivers (real segments) */
+  struct fd_pair **pairs;       /* pairs[src*nseg + rcv], src over nsrc sources */
+  int *src_of, *src_rev;        /* source s takes the slip of real segment src_of[s], reversed if src_rev[s] (image) */
   int *off;
   /* history: per source segment a ring of Lbuf FFT'd slices */
   double _Complex **hist;
@@ -44,8 +45,12 @@ struct fd_sys {
   struct fd_ops ops[8];
 };
 
-struct fd_sys *fd_sys_create(struct fd_seglist *segs, struct fd_pair **pairs, int mode, double dt,
-                             double alpha, double beta, double rho, int nsign);
+/* nsrc sources: the first nseg are the real segments themselves (src_of = identity, not
+   reversed); further ones are images (src_of[s] = real segment, src_rev[s] = 1 when the
+   image's element order is the reverse of the real one, as for a vertical antiplane
+   fault mirrored at the free surface). src_of/src_rev may be NULL when nsrc == nseg. */
+struct fd_sys *fd_sys_create(struct fd_seglist *segs, struct fd_pair **pairs, int nsrc, const int *src_of, const int *src_rev,
+                             int mode, double dt, double alpha, double beta, double rho, int nsign);
 void fd_sys_free(struct fd_sys *s);
 void fd_sys_reset_history(struct fd_sys *s);
 void fd_sys_push(struct fd_sys *s, const double *V);                /* one fine-grid slice */
@@ -71,6 +76,22 @@ int fd_slipweak_solve(struct fd_slipweak *f, struct fd_sys *s, struct fd_ops *op
                       const double *sigma0, int normal_coupling, double t, double dt, const double *delta,
                       const double *Vguess, double *V, double *sigma);
 
+/* friction: rate and state, aging law, regularized (rsf_solve's form:
+   V = 2 v0 exp(-psi/a) sinh(tau/(a sigma))) */
+struct fd_rsf {
+  int N;
+  double *a, *b, *dc;
+  double v0, f0, tol;
+  int max_iter;
+};
+double fd_rsf_tau(const struct fd_rsf *f, int i, double V, double psi, double sigma);
+double fd_rsf_dtau(const struct fd_rsf *f, int i, double V, double psi, double sigma);
+double fd_rsf_psi_advance(const struct fd_rsf *f, int i, double psi, double Va, double Vb, double dt);
+/* coupled solve H + K V = tau_f(V, psi, sigma): banded Newton in log V with a bracketed
+   elementwise fallback; returns the number of Newton iterations (negative if the fallback ran) */
+int fd_rsf_solve(const struct fd_rsf *f, struct fd_sys *s, struct fd_ops *op, const double *H, const double *sigma,
+                 const double *psi, const double *Vg, double *V);
+
 /* marcher state */
 struct fd_state {
   int N, k, n;
@@ -81,6 +102,7 @@ struct fd_state {
 };
 struct fd_state *fd_state_create(int N);
 void fd_state_free(struct fd_state *st);
-/* one step of k dt_min with slip weakening */
+/* one step of k dt_min with slip weakening / rate and state */
 int fd_step_slipweak(struct fd_sys *s, struct fd_state *st, struct fd_slipweak *f, int k);
+int fd_step_rsf(struct fd_sys *s, struct fd_state *st, const struct fd_rsf *f, int k);
 #endif

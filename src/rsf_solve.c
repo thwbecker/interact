@@ -38,6 +38,7 @@
 #ifdef USE_PETSC
 #include "petsc_prototypes.h"
 #include "rsf.h"
+#include "fd.h"
 /* single definition of the domain-check context pointer declared in rsf.h
    (the callback registered with TSSetFunctionDomainError has no user pointer) */
 struct interact_ctx *rsf_par_static = NULL;
@@ -97,8 +98,8 @@ PetscErrorCode rsf_solve_run(int argc,char **argv,struct interact_ctx *par,
   PetscInt m,i,n,j,use_hmatrix = medium->use_hmatrix;
   PetscRandom prand;
   PetscReal state,patch_l,stable_l,rand_fac,dummy[3];
-  PetscInt event_direction[1] = {0};		/* detect both crossing directions */
-  PetscBool event_terminate[1] = {PETSC_FALSE};
+  PetscInt event_direction[2] = {0,1},nevents_ts;	/* slip-rate event: both directions; FD switch: upward only */
+  PetscBool event_terminate[2] = {PETSC_FALSE,PETSC_FALSE};
   PetscLogDouble tb0,tb1;
   struct rsf_out_ctx uc[1];
   /* checkpoint/restart */
@@ -702,11 +703,19 @@ PetscErrorCode rsf_solve_run(int argc,char **argv,struct interact_ctx *par,
   PetscCall(rsf_init_catalog(uc,par,set,shear_modulus_si,rsf->vpl,x,t_start));
   if(rsf->ve_np > 0)		/* accepted-step h update, before output */
     PetscCall(TSMonitorSet(ts,rsf_ve_monitor,(void *)par,NULL));
-  if(rsf->fd)			/* fully dynamic phases, attached only when -fd_mode is on */
+  if(rsf->fd)			/* fully dynamic extension: accepted-step record for the history seeding */
     PetscCall(TSMonitorSet(ts,rsf_fd_monitor,(void *)par,NULL));
   PetscCall(TSMonitorSet(ts,rsf_TS_Monitor,(void *)uc,NULL));
-  if(track_events){
-    PetscCall(TSSetEventHandler(ts,1,event_direction,event_terminate,
+  /* TS events: slot 0 the slip-rate crossing tracker (-track_events), the
+     next slot the fully dynamic switch (-fd_mode), whose post-event callback
+     runs the dynamic phase and replaces the solution; the event route is the
+     one PETSc supports for discontinuous changes */
+  uc->vel_event_index = track_events ? 0 : -1;
+  uc->fd_event_index = rsf->fd ? (track_events ? 1 : 0) : -1;
+  nevents_ts = (track_events ? 1 : 0) + (rsf->fd ? 1 : 0);
+  if(nevents_ts > 0){
+    if(!track_events) event_direction[0] = 1;	/* only the FD switch: upward crossing */
+    PetscCall(TSSetEventHandler(ts,nevents_ts,event_direction,event_terminate,
 				rsf_event_function,rsf_post_event,(void *)uc));
     /* locate the crossing to within 0.01 in log10(v) */
     PetscCall(TSSetEventTolerances(ts,1e-2,NULL));
@@ -834,8 +843,11 @@ PetscErrorCode rsf_event_function(TS ts,PetscReal t,Vec X,PetscScalar *fvalue,vo
   /* hysteresis: once slipping, arrest only below vel_event * hyst,
      which debounces phantom crossings from dense-output oscillation
      through the near-singular coseismic acceleration */
-  fvalue[0] = log10((gvmax > 1e-300)?(gvmax):(1e-300)) -
-    log10(uc->vel_event * ((uc->slipping)?(uc->vel_event_hyst):(1.0)));
+  if(uc->vel_event_index >= 0)
+    fvalue[uc->vel_event_index] = log10((gvmax > 1e-300)?(gvmax):(1e-300)) -
+      log10(uc->vel_event * ((uc->slipping)?(uc->vel_event_hyst):(1.0)));
+  if(uc->fd_event_index >= 0)	/* fully dynamic switch, rsf_fd.c */
+    fvalue[uc->fd_event_index] = log10((gvmax > 1e-300)?(gvmax):(1e-300)) - log10(rsf->fd->vsw);
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 

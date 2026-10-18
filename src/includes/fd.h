@@ -5,9 +5,11 @@
 */
 #ifndef FD_H
 #define FD_H
+#include <stdio.h>
 #include "fd_fft.h"
 #include "fd_tables.h"
 #include "fd_segments.h"
+#include "fd_march.h"
 
 struct fd_vars {
   /* options */
@@ -26,11 +28,26 @@ struct fd_vars {
   int mode2d;			/* FD_MODE_INPLANE or FD_MODE_ANTIPLANE */
   PetscBool halfplane;
   PetscReal mu,nu,rho,alpha,beta,dt_min;
-  /* segments and tables */
+  PetscInt  max_steps;		/* abort a phase beyond this many steps */
+  PetscReal dt_restart;		/* TS step after a phase [s] */
+  /* segments, sources (real plus images), tables, marcher system */
   struct fd_seglist *segs;
+  PetscInt nsrc;
+  struct fd_segment *srcseg;
+  int *src_of,*src_rev;
   struct fd_pair **pairs;	/* pairs[source*nseg + receiver] */
+  struct fd_sys *sys;
+  PetscInt *g_of_s;		/* global element index of segment-order index */
   int M,L;			/* padded FFT length, longest window */
   double nbytes;
+  /* stations written during phases */
+  PetscInt nstat,stat[16];
+  int sstat[16];
+  FILE *fstat[16];
+  /* accepted-step record for the history seeding */
+  PetscInt nrec,irec,nrec_used;
+  PetscReal *rec_t;
+  double *rec_v;		/* nrec x N, segment order */
   /* state */
   PetscInt  nphase;		/* dynamic phases run so far */
   PetscInt  nflag;		/* accepted steps above vsw seen by the monitor */

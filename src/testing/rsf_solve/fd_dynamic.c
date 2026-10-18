@@ -38,7 +38,7 @@ int main(int argc, char **argv)
   segs.nseg = 1; segs.seg = &seg; segs.gidx = &gidx;
   pair = fd_pair_build(&seg, &seg, FD_MODE_INPLANE, dt, 1.0, AL, BE, RHO, 1e-2, nsteps + 2, 1, 0, err);
   if(!pair){ fprintf(stderr, "table build failed: %s\n", err); return 1; }
-  s = fd_sys_create(&segs, &pair, FD_MODE_INPLANE, dt, AL, BE, RHO, -1);
+  s = fd_sys_create(&segs, &pair, 1, NULL, NULL, FD_MODE_INPLANE, dt, AL, BE, RHO, -1);
   st = fd_state_create(n);
   st->normal_coupling = 0;
   fr.N = n; fr.dugdale = 0; fr.d0 = 0.40; fr.force_time = NULL; fr.force_t0 = 0.0; fr.locked = NULL;
