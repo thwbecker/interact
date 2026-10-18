@@ -221,7 +221,9 @@ is in c_port/SANDBOX.md; usage and theory for users in rsf_solve_fd.md.
 - The workstation sweep with run_step_fd.sh (16 configurations, 16 cycles
   each, QD and FD) ran without intervention; results in fd_plan.md (WP6,
   C sweep). Per FD cycle on two 24 km segments at 100 m: a few minutes.
-- Pending: BP1-FD at 25 m (run_bp1_fd.sh 25 520 12000).
+- BP1-FD at 25 m: reproduces the prototype (fd_plan.md); about 1 h per
+  phase, no faster than the Python because the history convolution (same
+  algorithm, L M per step and source) dominates; M6 addresses it.
 - Unequal segments are in gen_step.py/run_step_fd.sh (no solver change;
   the defaults reproduce the previous inputs byte for byte).
 - Known limits unchanged (section 3 of rsf_solve_fd.md). Next code items,

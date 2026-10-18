@@ -289,9 +289,18 @@ Harness: identity PASS on every patch; the timing column is noise at the
 run lengths the sandbox allows.
 
 Next, in order:
-1. On the workstation: BP1-FD at 25 m with rsf_solve (run_bp1_fd.sh 25 520
-   12000; prototype numbers 196.36/302.11/420.81 yr) is running; the C
-   stepover sweep is done (table above). Then the unequal-segment sweep.
+1. BP1 at 25 m with rsf_solve (run_bp1_fd.sh 25 520 12000, 2026-10-19):
+   QD events 196.364, 271.983, 349.804, 428.102, 506.448 yr (prototype
+   196.36, 271.98, 349.82, 428.12, 506.48; group 4 at 50 m 196.36, 271.97,
+   349.78, 428.07, 506.40). FD phases at 196.3638, 302.1023, 420.8015 yr
+   with 11077, 9784, 10554 steps and peak slip rates 13.59, 11.56,
+   12.52 m/s (prototype 196.36, 302.11, 420.81 yr; 11074, 9783, 10551
+   steps; 13.59, 11.56, 12.51 m/s). The C code reproduces the prototype at
+   25 m. Wall time about 1 h per phase on one core, no faster than the
+   Python: at 25 m the per-step cost is the history convolution (L M per
+   source, here 12000 x 4096 x 2 complex products per step), which is the
+   same algorithm in both. This makes M6 (partitioned convolution) the
+   next code item. Then the unequal-segment sweep.
 2. M6 performance: partitioned FFT convolution over the lag axis
    (O(log L) amortised per step, factor 20 to 50 at L of a few thousand),
    then OpenMP over Fourier modes; identity to 1e-10 against M5.

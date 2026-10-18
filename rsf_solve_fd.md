@@ -80,7 +80,10 @@ and the prototype was checked against:
 - SEAS BP1 in QD and FD at 50 and 25 m: event times, recurrence (105.7 and
   118.7 yr in FD), slip per event and station histories against the
   community solutions (sem2dpack, Jiang's SBIM); peak slip rates within a
-  few percent at the shallow stations at 25 m.
+  few percent at the shallow stations at 25 m. `rsf_solve -fd_mode 1` at
+  25 m gives FD events at 196.36, 302.10 and 420.80 yr, the prototype's
+  196.36, 302.11 and 420.81 yr, with the same step counts and peak slip
+  rates.
 
 `rsf_solve`'s own QD on the BP1 half-plane geometry agrees with the prototype
 and with group 4's reference to 0.01 yr, and the FD tables' static limit
@@ -121,8 +124,9 @@ pre-phase state, its arrest line the post-phase state).
 Memory and cost. Tables take 16 L M bytes per table (two for in-plane), L
 the window in lags and M the padded FFT length (next power of two above 2 N -
 1 for one segment): BP1 at 50 m needs 0.5 GB with `-fd_lmax 6000`, 25 m
-about 2.3 GB with `-fd_lmax 12000`. A BP1 phase at 50 m takes about 5 min on
-one core; resolution of 5 or more elements per cohesive zone is needed for
+about 2.3 GB with `-fd_lmax 12000`. A BP1 phase takes about 5 min at 50 m
+and about 1 h at 25 m on one core (the history convolution dominates and
+scales as L M per step, i.e. fourfold per halving of the element size); resolution of 5 or more elements per cohesive zone is needed for
 slip and timing, about 40 for supershear transitions or near-threshold
 triggering.
 
