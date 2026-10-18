@@ -135,6 +135,15 @@ part goes through `MatMult`); the dynamic tables are dense per segment pair.
 
 ## 4. Example
 
+Ready-made drivers in `fully_dynamic/c_port/` (run from the repository
+root): `run_bp1_fd.sh [dz] [tend] [lmax]` writes the BP1 files, runs QD and
+FD, prints the event times and phase lines; `run_step_fd.sh W overlap margin
+[tend] [qd|fd|both]` runs a two-segment stepover sequence and
+`summarize_rsf_step.py` tabulates the jumps (delay of the second segment's
+rupture after the first, binned as immediate, minutes, hours, days).
+
+### BP1 by hand
+
 SEAS BP1 (antiplane half plane, 40 km, 50 m):
 
     python3 - << 'EOF'
