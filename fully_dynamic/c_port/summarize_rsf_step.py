@@ -22,12 +22,15 @@ def fmt(sec):
     if sec < 3600: return f"{sec/60:.0f} min"
     if sec < 2 * 86400: return f"{sec/3600:.0f} h"
     return f"{sec/86400:.0f} d"
-def events_fd(d, n1=240, dslip=0.1):
+def events_fd(d, n1=None, dslip=0.1):
     """FD runs: one event per segment per dynamic phase, from the phase lines of
     run.log (time to 1e-8 yr) and fd_phase_<n>_slip.dat (which segment slipped);
     both segments in one phase are listed as the source first (the one with the
     larger slip) and the other at the same time (joint rupture)"""
     import re, glob
+    if n1 is None:
+        f = os.path.join(d, "segments.txt")
+        n1 = int(open(f).read().split()[0]) if os.path.exists(f) else 240
     ev = []
     for line in open(os.path.join(d, "run.log")):
         m = re.match(r"rsf_fd: phase (\d+): t ([0-9.]+) yr", line)
@@ -59,6 +62,8 @@ for d in sys.argv[1:]:
     bins = {"immediate (<60 s)": sum(j < 60 for j in jumps), "minutes": sum(60 <= j < 3600 for j in jumps),
             "hours": sum(3600 <= j < 2 * 86400 for j in jumps), "days": sum(j >= 2 * 86400 for j in jumps)}
     print(f"{d}: {len(ev)} events; " + "; ".join(desc))
+    p1d = sum(j < 86400 for j in jumps) / max(nsrc, 1); p30d = sum(j < 30 * 86400 for j in jumps) / max(nsrc, 1)
+    print(f"    P(jump within 1 d) = {p1d:.2f}, within 30 d = {p30d:.2f} ({nsrc} source events)")
     print(f"    {nsrc} source events, {len(jumps)} followed by a jump within a year: " +
           ", ".join(f"{k} {v}" for k, v in bins.items() if v) +
           (f"; median delay {fmt(float(np.median(jumps)))}" if jumps else "") +

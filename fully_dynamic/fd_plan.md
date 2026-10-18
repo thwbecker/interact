@@ -124,7 +124,43 @@ a - b on the receiver) so that successive source events find the receiver
 at different loading states; the jump probability within a window is then
 the fraction of source events followed by a receiver rupture, per mode.
 
-### WP6, stepover sequences (plan)
+### WP6, C sweep with rsf_solve (2026-10-19, Thor's workstation)
+run_step_fd.sh / summarize_rsf_step.py, two 24 km segments, 100 m, 2 km
+overlap, 16 cycles per configuration, QD and FD on identical setups
+(+W is the dilational side in interact's left-lateral convention):
+
+| width, margin | QD delay | FD delay |
+|---|---|---|
+| 1.0 km, 0.5 km, dilational | 3 h (15/15) | 6 joint ruptures and 7 within 24 to 53 min |
+| 1.0 km, 1.0 km, dilational | 21 h | 2 to 5 h |
+| 1.0 km, 0.5 km, compressional | 2 to 36 h (median 21 h) | 2 to 3 h |
+| 1.0 km, 1.0 km, compressional | 8 to 14 h | 43 min to 2 h |
+| 1.5 km, 0.5 km, dilational | 31 h | 2 to 10 h (median 5 h) |
+| 1.5 km, 1.0 km, dilational | 7 d | 2 d |
+| 1.5 km, 0.5 km, compressional | 11 to 42 d (median 13 d) | 8 h to 6 d (median 3 d) |
+| 1.5 km, 1.0 km, compressional | 7 to 15 d | 23 h to 15 d (median 42 h) |
+
+Every source event is followed by a jump within a year in all 16
+configurations and both modes (identical segments: the receiver is always
+near failure). Inertia shortens the delay by 3 to 10 and lengthens the
+recurrence by about 20 percent (102 to 115 yr against 87 to 97). New with
+16 cycles: at 1 km width, 0.5 km margins, dilational, FD settles into a
+two-cycle rhythm, segment 0 then segment 1 after 25 to 30 min in one
+cycle, segment 1 nucleating and both rupturing in one dynamic phase in the
+next; QD gives 3 h in every cycle. FD delays are also much less variable
+than QD delays at the same configuration. The Python results (step2/step3)
+are confirmed throughout.
+
+Next sweep (to turn delays into a probability): unequal segments, so that
+the receiver's cycle phase at the source event varies. Plan: segment 2 of
+16 km (or b - a reduced on segment 2), both senses, widths 1 and 1.5 km,
+margins 0.5 and 1 km, 30 cycles; report the fraction of source events
+followed by a receiver rupture within one day and within one month, QD
+against FD. Tooling in place: run_step_fd.sh W ov vs tend mode L2 dba2
+(gen_step.py writes segments.txt; stations follow the segment centres),
+summarize_rsf_step.py prints P(jump within 1 d) and within 30 d.
+
+### WP6, stepover sequences (original plan)
 1. Driver for two parallel segments under backslip loading with
    rate-and-state friction, built from cycle.py (run_step.py exists; its
    first QD sequence predates the clock fix and the state-update fix and
@@ -253,10 +289,9 @@ Harness: identity PASS on every patch; the timing column is noise at the
 run lengths the sandbox allows.
 
 Next, in order:
-1. On the workstation: BP1-FD at 25 m with rsf_solve (prototype numbers in
-   README and fd_plan.md), and the WP6 sweeps rerun in C (sweep_step2
-   configurations, 16 events), to confirm the Python results and get the
-   statistics the Python could not.
+1. On the workstation: BP1-FD at 25 m with rsf_solve (run_bp1_fd.sh 25 520
+   12000; prototype numbers 196.36/302.11/420.81 yr) is running; the C
+   stepover sweep is done (table above). Then the unequal-segment sweep.
 2. M6 performance: partitioned FFT convolution over the lag axis
    (O(log L) amortised per step, factor 20 to 50 at L of a few thousand),
    then OpenMP over Fourier modes; identity to 1e-10 against M5.

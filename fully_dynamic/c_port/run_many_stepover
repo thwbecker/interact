@@ -1,0 +1,8 @@
+#!/bin/bash
+
+for W in 1.0 -1.0 1.5 -1.5; do
+  for vs in 0.5 1.0; do
+    ./run_step_fd.sh $W 2.0 $vs 1400 both
+  done
+done
+python3 ./summarize_rsf_step.py step_*_vs*

@@ -142,6 +142,26 @@ FD, prints the event times and phase lines; `run_step_fd.sh W overlap margin
 `summarize_rsf_step.py` tabulates the jumps (delay of the second segment's
 rupture after the first, binned as immediate, minutes, hours, days).
 
+### Stepover sequence
+
+    fully_dynamic/c_port/run_step_fd.sh 1.0 2.0 0.5 1400 both
+    python3 fully_dynamic/c_port/summarize_rsf_step.py step_*_W1.0_ov2.0_vs0.5
+
+Two parallel 24 km in-plane segments (100 m elements, velocity-weakening
+except for the margins), step width W in km (positive W puts the second
+segment at +y, which is the dilational side for interact's left-lateral
+positive slip), overlap and margin in km, end time in years, mode. With 1
+km width and 0.5 km margins the quasi-dynamic run gives the second segment
+3 h after the first in every cycle; the fully dynamic run gives joint
+ruptures and 25 to 50 min delays in alternating cycles (fd_plan.md has the
+full table). Two further arguments, the length of the second segment in
+km and b - a on its weakening part, make the segments unequal, so that the
+receiver's position in its own cycle varies from event to event; the
+summary then reports the fraction of source events followed by a receiver
+rupture within one day and within 30 days:
+
+    fully_dynamic/c_port/run_step_fd.sh 1.0 2.0 0.5 2500 both 16 0.004
+
 ### BP1 by hand
 
 SEAS BP1 (antiplane half plane, 40 km, 50 m):

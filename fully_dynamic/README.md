@@ -1,7 +1,10 @@
 # fdkern: 2-D space-time BIEM prototype for fully dynamic earthquake sequences
 
 Python prototype for the fully dynamic extension of `rsf_solve` (plan and
-status in fd_plan.md). Plane strain (in-plane, mode II) and antiplane,
+status in fd_plan.md). The C implementation in `src/rsf_solve/` (option
+`-fd_mode` of `rsf_solve`, documented in `../rsf_solve_fd.md`) reproduces this
+prototype to roundoff and is the version to use for runs; the prototype
+remains the reference the C tests compare against. Plane strain (in-plane, mode II) and antiplane,
 homogeneous full space (antiplane half-space by the image method), straight
 parallel segments, rate-and-state (aging or flash-heating) or
 slip-weakening friction, quasi-dynamic (QD) and fully dynamic (FD) phases on

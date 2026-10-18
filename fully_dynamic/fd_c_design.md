@@ -215,3 +215,16 @@ min) with 1.550 m (prototype 1.546). Gates 4e-16 on both operators. The
 post-event callback now runs the tracker's logging and catalog capture on
 the pre-phase state and the phase afterwards. Sandbox setup for a hand-off
 is in c_port/SANDBOX.md; usage and theory for users in rsf_solve_fd.md.
+
+## 12. State after the first production use (2026-10-19)
+
+- The workstation sweep with run_step_fd.sh (16 configurations, 16 cycles
+  each, QD and FD) ran without intervention; results in fd_plan.md (WP6,
+  C sweep). Per FD cycle on two 24 km segments at 100 m: a few minutes.
+- Pending: BP1-FD at 25 m (run_bp1_fd.sh 25 520 12000).
+- Unequal segments are in gen_step.py/run_step_fd.sh (no solver change;
+  the defaults reproduce the previous inputs byte for byte).
+- Known limits unchanged (section 3 of rsf_solve_fd.md). Next code items,
+  in order: station output of the QD stations during phases (the
+  coseismic part is currently only in fd_phase_*_st*.dat); M6 partitioned
+  convolution; M7 scope list.
