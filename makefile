@@ -451,6 +451,14 @@ testing:	$(BDIR)/noda_crack_test $(BDIR)/ve_check $(BDIR)/ve_laplace_check \
 # tests of the rsf_solve extensions (src/testing/rsf_solve)
 rsf_testing: $(BDIR)/test_fd_fft $(BDIR)/test_fd_tables $(BDIR)/test_fd_segments $(BDIR)/fd_dynamic
 
+# explicit header dependencies of the fully dynamic sources (the generic
+# pattern rules only depend on the .c file and GEN_P_INC), so that a change
+# to an fd header rebuilds the objects that include it
+FD_HEADERS = src/includes/fd.h src/includes/fd_march.h src/includes/fd_tables.h \
+	src/includes/fd_segments.h src/includes/fd_fft.h src/includes/fd_kernels.h
+$(FD_OBJS) $(ODIR)/rsf_fd.o $(ODIR)/rsf_solve.o $(ODIR)/fd_dynamic.o \
+	$(ODIR)/test_fd_fft.o $(ODIR)/test_fd_tables.o $(ODIR)/test_fd_segments.o: $(FD_HEADERS)
+
 $(BDIR)/fd_dynamic: $(ODIR)/fd_dynamic.o $(FD_OBJS) $(GEN_P_INC)
 	$(CC) $(ODIR)/fd_dynamic.o $(FD_OBJS) -o $(BDIR)/fd_dynamic $(FFTW_LIBS) $(MATHLIBS) $(LDFLAGS)
 
