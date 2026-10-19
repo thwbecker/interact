@@ -1,5 +1,6 @@
 
-rsf_solve: quasi-dynamic rate-and-state earthquake-cycle solver (PETSc TS)
+rsf_solve: quasi-dynamic rate-and-state earthquake-cycle solver (PETSc TS),
+           optionally visco-elastic (-ve_mode) or fully dynamic in coseismic phases (-fd_mode)
 usage: rsf_solve [options]   (Petsc options can  also be placed in petsc_settings.yaml)
 
 geometry and input files
@@ -40,6 +41,10 @@ initial conditions and loading
 
 normal-stress evolution and limiter (for dip slip / nonplanar faults)
   -calc_sigma_dot <bool>  evolve normal stress via the In matrix (default 0 = off)
+  -rsf_stations <file>    SEAS-style per-cell time series: file lines are NAME CELL_INDEX;
+                          writes fltst_NAME.dat (t slip log10|v| tau sigma log10theta)
+  -rsf_station_dt_yr <dt> station output interval when quiescent (default 0.1 yr)
+  -rsf_station_vdense <v> station |v| above which every accepted step is written (default 1e-6)
   -limit_sigma <bool>     clamp sigma to [min,max], as HBI limitsigma (default 0)
   -min_sigma <Pa>         limiter floor (default 1e6)
   -max_sigma <Pa>         limiter ceiling (default 300e6)
@@ -104,10 +109,16 @@ monitor and event detection
 
 check pointing and restart
   -rsf_checkpoint <N>     write a restart checkpoint every N accepted steps and once
-                          after a regular finish (0: off); previous kept as .prev
+                          after a regular finish (0: off); previous kept as .prev.
+                          No checkpoint is written while an event is in progress;
+                          one that falls due then is written after the arrest
+  -rsf_checkpoint_wall <s> also checkpoint every s seconds of wallclock (0 = off);
+                          robust cadence for heavy runs where step counts vary
   -rsf_checkpoint_file <f> checkpoint file name (rsf_checkpoint.bin)
-  -rsf_restart <f>        restart from a checkpoint; outputs append with a marker;
-                          note -ts_max_steps counts absolute step numbers
+  -rsf_restart <f>        restart from a checkpoint; outputs append with a marker.
+                          Rows written after that checkpoint by the interrupted run
+                          are not removed. -ts_max_steps counts steps of this run;
+                          the monitor step column stays absolute
 
 optional outputs (all default off)
   -rsf_catalog            write rsf_catalog.dat (per-event slip, drop, M0, Mw)
@@ -116,9 +127,60 @@ optional outputs (all default off)
   -rupture_vth <m/s>      rupture-front threshold for the two above (default vel_event)
   -field_step_interval <n> slip-rate field frame every n accepted steps (0 = off)
   -field_tmin_yr <yr>     suppress field frames before this time (default 0)
+  -field_stress           also write shear-stress frames rsf_tau.gGGG.NNNNNN.bin
+                          ((x,y,tau[MPa]) triples, same cadence/frame ids)
+  -field_slip             also write signed slip frames rsf_slip.gGGG.NNNNNN.bin
+                          ((x,y,slip[m]); input for off-fault stress reconstruction)
   -slip_line_dt_yr <yr>   tmp_rsf slip-line snapshot cadence (default off)
   -rsf_monitor_by_group <bool> also write one monitor file per fault group (default 0);
                           with -rsf_catalog this also splits the event catalog by group
+
+visco-elastic medium (rudimentary; details in src/rsf_solve/rsf_ve.c)
+  -ve_mode <1|2|3>        switch on hereditary (Prony) stressing: 1 uniform Maxwell
+                          medium (2-D antiplane only, single exponential), 2 elastic
+                          plate over Maxwell half space (2-D antiplane), 3 external
+                          kernel from -ve_prony_file (default off, elastic)
+  -ve_tmaxwell_yr <yr>    Maxwell time of the relaxing medium
+  -ve_plate_h <m>         elastic plate thickness (mode 2)
+  -ve_g2fac <f>           substrate/plate rigidity ratio (mode 2, default 1)
+  -ve_np <n>              exponential terms (mode 2, default 6, max 6)
+  -ve_prony_file <f>      mode 3 kernel file (shared relaxation times, per-pair
+                          amplitudes, K0 block checked against Is)
+  -ve_prony_k0tol <t>     mode 3 K0 consistency tolerance (default 0.05, abort at 5x)
+  -ve_h_init <0|1>        memory states start at the backslip steady state (1,
+                          default) or at zero (0, virgin medium)
+  -ve_h_stage <0|1>       stage-consistent sink forcing (1, default) or frozen (0)
+                          Not combined with -fd_mode; checkpoints are not
+                          interchangeable between elastic and VE runs
+
+fully dynamic coseismic phases (first version; see rsf_solve_fd.md)
+  -fd_mode <0|1|-1>       1: march coseismic phases with inertia and wave propagation
+                          (space-time boundary integral, hereditary correction to the
+                          static operators), QD in between; -1: only report the switch
+                          crossings; 0: off (default, bit-identical QD runs)
+                          Restrictions: one MPI rank, no -ve_mode, aging law, 2-D
+                          elements forming straight, parallel runs of equal elements
+                          (full plane in-plane, full or half plane antiplane)
+  -fd_vsw <m/s>           switch QD to FD at this max slip rate (default 1e-3)
+  -fd_vback <m/s>         back to QD after max slip rate below this for one
+                          window (default 1e-4)
+  -fd_back_eps <f>        > 0: instead, back to QD once all slip rates change by less
+                          than this fraction over one window (default 0 = off)
+  -fd_back_vmax <m/s>     max slip rate allowed at that hand-back (default vsw/2)
+  -fd_tol <f>             history window tolerance (default 1e-2)
+  -fd_lmax <n>            cap on the window in fine time steps (default 0 = none)
+  -fd_cfl <f>             c_s dt / dx of the fine step (default 0.5)
+  -fd_xi <f>              variable step dt <= xi D_c / max v (default 0.25)
+  -fd_kmax <n>            largest step in fine steps, power of two (default 64)
+  -fd_et <f>              collocation offset in steps (default 1, end of step)
+  -fd_conv <0|1|2>        history convolution: 0 direct, 1 partitioned FFT,
+                          2 hybrid (default; about 3x the memory of 0)
+  -fd_conv_block <n>      partition length, power of two (default 0 = automatic)
+  -fd_stations i,j,...    patch indices written during phases to fd_phase_<n>_st<i>.dat
+  -fd_gate_tol <f>        tolerance of the static check against Is/In (default 0.05)
+  -fd_length_scale <m>    geometry unit in metres (default 1)
+  -fd_max_steps <n>       abort a phase after this many steps (default 2e6)
+  -fd_dt_restart <s>      first QD step after a phase (default 1e-2)
 
 interaction-matrix backend
   -use_hmatrix <0..5>     0 dense (default) 1 HTOOL 2 H2OPUS 3 HACApK 4 hmmvp 5 BigWham
@@ -170,4 +232,8 @@ examples
     rsf_solve -geom_file geom_thrust.in -rsf_file rsf_thrust.dat -rsf_ic_file ic_thrust.in \
        -sigma_init 58e6 -dc 0.02 -rsf_slip_mode 1 -calc_sigma_dot -limit_sigma \
        -use_hmatrix 4 -hmmvp_tol 1e-4 -rsf_catalog
+  SEAS BP1 (2-D antiplane half plane) with fully dynamic coseismic phases:
+    rsf_solve -geom_file geom_bp1.in -rsf_file rsf_bp1.dat -rsf_ic_file ic_bp1.in \
+       -dc 0.008 -sigma_init 50e6 -vpl 1e-9 -stop_time_yr 520 -fd_mode 1 -fd_lmax 6000
+       (inputs and the full option set: fully_dynamic/c_port/run_bp1_fd.sh)
 

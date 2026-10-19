@@ -67,7 +67,8 @@ void init_medium_rsf(struct med *medium)
 void rsf_print_help(const char *prog)
 {
   fprintf(stderr,"\n");
-  fprintf(stderr,"rsf_solve: quasi-dynamic rate-and-state earthquake-cycle solver (PETSc TS)\n");
+  fprintf(stderr,"rsf_solve: quasi-dynamic rate-and-state earthquake-cycle solver (PETSc TS),\n");
+  fprintf(stderr,"           optionally visco-elastic (-ve_mode) or fully dynamic in coseismic phases (-fd_mode)\n");
   fprintf(stderr,"usage: %s [options]   (Petsc options can  also be placed in petsc_settings.yaml)\n",prog);
   fprintf(stderr,"\n");
 
@@ -222,6 +223,53 @@ void rsf_print_help(const char *prog)
   fprintf(stderr,"                          with -rsf_catalog this also splits the event catalog by group\n");
   fprintf(stderr,"\n");
 
+  fprintf(stderr,"visco-elastic medium (rudimentary; details in src/rsf_solve/rsf_ve.c)\n");
+  fprintf(stderr,"  -ve_mode <1|2|3>        switch on hereditary (Prony) stressing: 1 uniform Maxwell\n");
+  fprintf(stderr,"                          medium (2-D antiplane only, single exponential), 2 elastic\n");
+  fprintf(stderr,"                          plate over Maxwell half space (2-D antiplane), 3 external\n");
+  fprintf(stderr,"                          kernel from -ve_prony_file (default off, elastic)\n");
+  fprintf(stderr,"  -ve_tmaxwell_yr <yr>    Maxwell time of the relaxing medium\n");
+  fprintf(stderr,"  -ve_plate_h <m>         elastic plate thickness (mode 2)\n");
+  fprintf(stderr,"  -ve_g2fac <f>           substrate/plate rigidity ratio (mode 2, default 1)\n");
+  fprintf(stderr,"  -ve_np <n>              exponential terms (mode 2, default 6, max 6)\n");
+  fprintf(stderr,"  -ve_prony_file <f>      mode 3 kernel file (shared relaxation times, per-pair\n");
+  fprintf(stderr,"                          amplitudes, K0 block checked against Is)\n");
+  fprintf(stderr,"  -ve_prony_k0tol <t>     mode 3 K0 consistency tolerance (default 0.05, abort at 5x)\n");
+  fprintf(stderr,"  -ve_h_init <0|1>        memory states start at the backslip steady state (1,\n");
+  fprintf(stderr,"                          default) or at zero (0, virgin medium)\n");
+  fprintf(stderr,"  -ve_h_stage <0|1>       stage-consistent sink forcing (1, default) or frozen (0)\n");
+  fprintf(stderr,"                          Not combined with -fd_mode; checkpoints are not\n");
+  fprintf(stderr,"                          interchangeable between elastic and VE runs\n");
+  fprintf(stderr,"\n");
+  fprintf(stderr,"fully dynamic coseismic phases (first version; see rsf_solve_fd.md)\n");
+  fprintf(stderr,"  -fd_mode <0|1|-1>       1: march coseismic phases with inertia and wave propagation\n");
+  fprintf(stderr,"                          (space-time boundary integral, hereditary correction to the\n");
+  fprintf(stderr,"                          static operators), QD in between; -1: only report the switch\n");
+  fprintf(stderr,"                          crossings; 0: off (default, bit-identical QD runs)\n");
+  fprintf(stderr,"                          Restrictions: one MPI rank, no -ve_mode, aging law, 2-D\n");
+  fprintf(stderr,"                          elements forming straight, parallel runs of equal elements\n");
+  fprintf(stderr,"                          (full plane in-plane, full or half plane antiplane)\n");
+  fprintf(stderr,"  -fd_vsw <m/s>           switch QD to FD at this max slip rate (default 1e-3)\n");
+  fprintf(stderr,"  -fd_vback <m/s>         back to QD after max slip rate below this for one\n");
+  fprintf(stderr,"                          window (default 1e-4)\n");
+  fprintf(stderr,"  -fd_back_eps <f>        > 0: instead, back to QD once all slip rates change by less\n");
+  fprintf(stderr,"                          than this fraction over one window (default 0 = off)\n");
+  fprintf(stderr,"  -fd_back_vmax <m/s>     max slip rate allowed at that hand-back (default vsw/2)\n");
+  fprintf(stderr,"  -fd_tol <f>             history window tolerance (default 1e-2)\n");
+  fprintf(stderr,"  -fd_lmax <n>            cap on the window in fine time steps (default 0 = none)\n");
+  fprintf(stderr,"  -fd_cfl <f>             c_s dt / dx of the fine step (default 0.5)\n");
+  fprintf(stderr,"  -fd_xi <f>              variable step dt <= xi D_c / max v (default 0.25)\n");
+  fprintf(stderr,"  -fd_kmax <n>            largest step in fine steps, power of two (default 64)\n");
+  fprintf(stderr,"  -fd_et <f>              collocation offset in steps (default 1, end of step)\n");
+  fprintf(stderr,"  -fd_conv <0|1|2>        history convolution: 0 direct, 1 partitioned FFT,\n");
+  fprintf(stderr,"                          2 hybrid (default; about 3x the memory of 0)\n");
+  fprintf(stderr,"  -fd_conv_block <n>      partition length, power of two (default 0 = automatic)\n");
+  fprintf(stderr,"  -fd_stations i,j,...    patch indices written during phases to fd_phase_<n>_st<i>.dat\n");
+  fprintf(stderr,"  -fd_gate_tol <f>        tolerance of the static check against Is/In (default 0.05)\n");
+  fprintf(stderr,"  -fd_length_scale <m>    geometry unit in metres (default 1)\n");
+  fprintf(stderr,"  -fd_max_steps <n>       abort a phase after this many steps (default 2e6)\n");
+  fprintf(stderr,"  -fd_dt_restart <s>      first QD step after a phase (default 1e-2)\n");
+  fprintf(stderr,"\n");
   fprintf(stderr,"interaction-matrix backend\n");
   fprintf(stderr,"  -use_hmatrix <0..5>     0 dense (default) 1 HTOOL 2 H2OPUS 3 HACApK 4 hmmvp 5 BigWham\n");
   fprintf(stderr,"  -hacapk_ztol <val>      HACApK compression tolerance\n");
@@ -275,6 +323,10 @@ void rsf_print_help(const char *prog)
   fprintf(stderr,"    %s -geom_file geom_thrust.in -rsf_file rsf_thrust.dat -rsf_ic_file ic_thrust.in \\\n",prog);
   fprintf(stderr,"       -sigma_init 58e6 -dc 0.02 -rsf_slip_mode 1 -calc_sigma_dot -limit_sigma \\\n");
   fprintf(stderr,"       -use_hmatrix 4 -hmmvp_tol 1e-4 -rsf_catalog\n");
+  fprintf(stderr,"  SEAS BP1 (2-D antiplane half plane) with fully dynamic coseismic phases:\n");
+  fprintf(stderr,"    %s -geom_file geom_bp1.in -rsf_file rsf_bp1.dat -rsf_ic_file ic_bp1.in \\\n",prog);
+  fprintf(stderr,"       -dc 0.008 -sigma_init 50e6 -vpl 1e-9 -stop_time_yr 520 -fd_mode 1 -fd_lmax 6000\n");
+  fprintf(stderr,"       (inputs and the full option set: fully_dynamic/c_port/run_bp1_fd.sh)\n");
   fprintf(stderr,"\n");
 }
 
