@@ -269,3 +269,59 @@ The time accuracy itself (first order, arrivals within about 1.5 steps)
 is a property of end-of-step collocation with piecewise-constant slip
 rate; a second-order variant (midpoint collocation or a corrected
 first-lag operator) is a candidate for later work, not part of M6.
+
+## 14. M6: speed (2026-10-20)
+
+Measured first: on a BP1 phase at 50 m (one core) the history convolution
+was 90 percent of the time, and two thirds of the steps were long
+substeps (k = 64) in the afterslip tail. That step mix limits what a
+block-based convolution can do, because a step that jumps past a whole
+block of output times needs a new block each time. What was done, each
+change checked against the direct code (TPV205 and both Harris and Day
+cases to 1e-8, identical step counts, peak slip rates and slips on the
+sequence and BP1 phases):
+
+1. Friction solves use the band of the first-lag operator (it is pruned to
+   its band, so the band product sums the same nonzero terms in the same
+   order as the dense one): solve time on a BP1 phase 35 s to 10 s.
+2. A step of k substeps pushes its slice with one spatial FFT, copied into
+   k ring slots: push time 8.6 s to 1.3 s.
+3. Partitioned convolution (fd_sys_set_conv): lags 1..D summed directly,
+   lags D+1..L in partitions of B lags by overlap-save FFTs of length 2B
+   along time, per spatial mode, with a frequency-domain delay line of
+   input windows; D = q0 B - 1 with (q0 - 1) B >= kmax, so a far block never
+   needs inputs that a variable step has not pushed yet. Time FFTs are
+   batched over the spatial modes (contiguous butterflies). Mode 1
+   (partitioned only) releases the time-domain tables beyond D and the
+   ring beyond D + 2B + kmax (about twice the direct memory) but is slower
+   than direct for long substeps; mode 2 (hybrid, default) keeps the direct
+   representation (about three times the memory), uses the far blocks for
+   steps with 2k <= B and the direct sum otherwise, and forms input windows
+   only when a far block needs them. B is chosen automatically (64 for
+   BP1 at 50 m); 256 was slower.
+4. Quasi-steady hand-back (-fd_back_eps, off by default): the hereditary
+   term of a slip rate that is constant over one window equals the QD
+   radiation damping, so a phase may end once every slip rate has changed
+   by less than back_eps over a window (and the maximum is below half the
+   switch threshold). With 0.05, BP1 event times move by about 1e-5
+   relative and peak slip rates by under 1 percent; the single-fault
+   sequence by 2e-5 in event times.
+
+BP1 50 m, first phase, one core:
+
+| configuration | wall |
+|---|---|
+| before M6 (direct, -fd_back_eps 0) | 312 s |
+| direct, items 1 and 2 | 262 s |
+| hybrid (default), -fd_back_eps 0 | 183 s |
+| hybrid, -fd_back_eps 0.05 | 110 s (history 95, solve 9, static 4, push 1) |
+
+So 1.7x at unchanged results and 2.8x with the quasi-steady hand-back. The
+remaining time is the direct sum for long substeps. Options not taken: a
+larger maximum substep (-fd_kmax 256/1024: fewer steps but slower per step
+and 0.004 yr different event times; the operator cache was raised to 16
+sizes so they run), larger partitions (slower), a non-uniform partition
+(small blocks for early lags, larger for late ones; the structural fix for
+long substeps, more complex, deferred until the 25 m runs show the
+convolution still dominating). FD_PROFILE=1 in the environment prints the
+per-phase split (history, static, solve, push).

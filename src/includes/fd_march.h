@@ -42,7 +42,21 @@ struct fd_sys {
   double *Ks, *Kn;
   /* cumulative kernels per k (cached) */
   int nops;
-  struct fd_ops ops[8];
+  struct fd_ops ops[16];
+  /* M6: uniformly partitioned convolution over the lag axis (conv = 1).
+     Lags lag0..D are summed directly from the ring; lags D+1..L in
+     partitions of B lags by overlap-save FFTs of length F = 2B along time,
+     per spatial mode, once per block of B output times. */
+  int conv, B, F, D, q0, kmax;
+  int *P;                       /* partitions per pair */
+  double _Complex **Hs, **Hn;   /* kernel spectra per pair, [p][m][f] */
+  double _Complex **X;          /* window spectra per source (frequency-domain delay line), [slot][m][f] */
+  int *nslot;                   /* slots per source */
+  long **Xj;                    /* window index held in each slot, -1 none */
+  double _Complex **Ys, **Yn;   /* far part for the current output block per pair, [m][i] */
+  long *cblk;                   /* block index held in Ys/Yn per pair, -1 none */
+  fd_fft_plan tf, tb;           /* time FFTs of length F */
+  double _Complex *tw1, *tw2, *tz, *tzn;
 };
 
 /* nsrc sources: the first nseg are the real segments themselves (src_of = identity, not
@@ -52,8 +66,15 @@ struct fd_sys {
 struct fd_sys *fd_sys_create(struct fd_seglist *segs, struct fd_pair **pairs, int nsrc, const int *src_of, const int *src_rev,
                              int mode, double dt, double alpha, double beta, double rho, int nsign);
 void fd_sys_free(struct fd_sys *s);
+/* switch to the partitioned convolution (M6); call once after fd_sys_create,
+   before any push. B: partition length (power of two, 0 = automatic),
+   kmax: largest substep multiple the caller will use. Returns 0 on success. */
+int fd_sys_set_partitioned(struct fd_sys *s, int B, int kmax);
+int fd_sys_set_conv(struct fd_sys *s, int mode, int B, int kmax);   /* mode 1 partitioned, 2 hybrid */
+double fd_sys_bytes(const struct fd_sys *s);
 void fd_sys_reset_history(struct fd_sys *s);
-void fd_sys_push(struct fd_sys *s, const double *V);                /* one fine-grid slice */
+void fd_sys_push(struct fd_sys *s, const double *V);
+void fd_sys_push_k(struct fd_sys *s, const double *V, int k);     /* same slice k times */                /* one fine-grid slice */
 void fd_sys_history(struct fd_sys *s, int lag0, double *ts, double *tn); /* sum over lags >= lag0 */
 struct fd_ops *fd_sys_ops(struct fd_sys *s, int k);                /* K_k, built on first use */
 void fd_sys_static(struct fd_sys *s, const double *delta, double *ts, double *tn);

@@ -28,6 +28,14 @@
     -fd_length_scale    geometry unit in metres (default 1.0)
     -fd_max_steps <n>   abort a dynamic phase beyond this many steps (default 2e6)
     -fd_dt_restart <s>  TS step after a phase (default 1e-2)
+    -fd_conv <0|1|2>    history convolution: 0 direct sum, 1 partitioned FFT (about twice
+                        the memory), 2 hybrid: partitioned for short substeps, direct for
+                        long ones (about three times the memory; default)
+    -fd_conv_block <n>  partition length in lags, a power of two (default 0: automatic)
+    -fd_back_eps <f>    0 (default): return to QD after the slip rate has stayed below
+                        -fd_vback for one window; > 0: return once every slip rate has
+                        changed by less than this fraction over one window and the
+                        maximum is below -fd_back_vmax (default 0.5 vsw); see rsf_solve_fd.md
     -fd_stations i,j,.. global patch indices whose t, slip, slip rate, tau are written
                         during every phase to fd_phase_<n>_st<i>.dat; the final slip of
                         each phase goes to fd_phase_<n>_slip.dat
@@ -80,6 +88,8 @@ PetscErrorCode rsf_fd_setup(struct interact_ctx *par, PetscReal shear_modulus_si
   fd->vsw = 1e-3; fd->vback = 1e-4; fd->tol = 1e-2; fd->et = 1.0; fd->xi = 0.25; fd->kmax = 64;
   fd->cfl = 0.5; fd->lmax = 0; fd->gate_tol = 0.05; fd->length_scale = 1.0;
   fd->max_steps = 2000000; fd->dt_restart = 1e-2;
+  fd->conv = 2; fd->conv_block = 0;
+  fd->back_eps = 0.0; fd->back_vmax = -1.0;
   PetscCall(PetscOptionsGetReal(NULL,NULL,"-fd_vsw",&fd->vsw,NULL));
   PetscCall(PetscOptionsGetReal(NULL,NULL,"-fd_vback",&fd->vback,NULL));
   PetscCall(PetscOptionsGetReal(NULL,NULL,"-fd_tol",&fd->tol,NULL));
@@ -92,11 +102,16 @@ PetscErrorCode rsf_fd_setup(struct interact_ctx *par, PetscReal shear_modulus_si
   PetscCall(PetscOptionsGetReal(NULL,NULL,"-fd_length_scale",&fd->length_scale,NULL));
   PetscCall(PetscOptionsGetInt(NULL,NULL,"-fd_max_steps",&fd->max_steps,NULL));
   PetscCall(PetscOptionsGetReal(NULL,NULL,"-fd_dt_restart",&fd->dt_restart,NULL));
+  PetscCall(PetscOptionsGetInt(NULL,NULL,"-fd_conv",&fd->conv,NULL));
+  PetscCall(PetscOptionsGetInt(NULL,NULL,"-fd_conv_block",&fd->conv_block,NULL));
+  PetscCall(PetscOptionsGetReal(NULL,NULL,"-fd_back_eps",&fd->back_eps,NULL));
+  PetscCall(PetscOptionsGetReal(NULL,NULL,"-fd_back_vmax",&fd->back_vmax,NULL));
+  if(fd->back_vmax <= 0.0) fd->back_vmax = 0.5*fd->vsw;
   fd->nstat = 16;
   PetscCall(PetscOptionsGetIntArray(NULL,NULL,"-fd_stations",fd->stat,&fd->nstat,&set));
   if(!set) fd->nstat = 0;
   PetscCheck(fd->vback < fd->vsw,PETSC_COMM_WORLD,PETSC_ERR_ARG_OUTOFRANGE,"-fd_vback must be below -fd_vsw");
-  PetscCheck(fd->kmax >= 1 && (fd->kmax & (fd->kmax - 1)) == 0,PETSC_COMM_WORLD,PETSC_ERR_ARG_OUTOFRANGE,"-fd_kmax must be a power of two");
+  PetscCheck(fd->kmax >= 1 && fd->kmax <= 32768 && (fd->kmax & (fd->kmax - 1)) == 0,PETSC_COMM_WORLD,PETSC_ERR_ARG_OUTOFRANGE,"-fd_kmax must be a power of two up to 32768");
   /* medium: shear modulus and S speed from the run settings (SI), Poisson from interact */
   fd->mode2d = (nanti > 0) ? FD_MODE_ANTIPLANE : FD_MODE_INPLANE;
   fd->halfplane = PETSC_FALSE;
@@ -193,7 +208,17 @@ static PetscErrorCode fd_build_tables(struct interact_ctx *par, struct fd_vars *
     }
   fd->sys = fd_sys_create(fd->segs,fd->pairs,(int)fd->nsrc,fd->src_of,fd->src_rev,fd->mode2d,fd->dt_min,fd->alpha,fd->beta,fd->rho,+1);
   PetscCheck(fd->sys,PETSC_COMM_WORLD,PETSC_ERR_MEM,"rsf_fd_setup: marcher system allocation failed");
-  fd->nbytes += (double)fd->nsrc*fd->sys->Lbuf*fd->M*16.0;
+  if(fd->conv){
+    PetscCheck((fd->conv == 1) || (fd->conv == 2),PETSC_COMM_WORLD,PETSC_ERR_ARG_OUTOFRANGE,"-fd_conv must be 0, 1 or 2");
+    PetscCheck(fd_sys_set_conv(fd->sys,(int)fd->conv,(int)fd->conv_block,(int)fd->kmax) == 0,PETSC_COMM_WORLD,PETSC_ERR_ARG_OUTOFRANGE,
+	       "rsf_fd_setup: -fd_conv_block must be a power of two (or 0 for automatic)");
+    if(fd->sys->conv)
+      PetscCall(PetscPrintf(PETSC_COMM_WORLD,"rsf_fd_setup: %s convolution: blocks of %d lags, lags 1..%d direct, FFT length %d\n",
+			    fd->sys->conv == 2 ? "hybrid partitioned" : "partitioned",fd->sys->B,fd->sys->D,fd->sys->F));
+    else
+      PetscCall(PetscPrintf(PETSC_COMM_WORLD,"rsf_fd_setup: window (%d lags) too short for the partitioned convolution, direct sum used\n",fd->sys->L));
+  }
+  fd->nbytes = fd_sys_bytes(fd->sys);
   /* element map: segment order <-> global */
   PetscCall(PetscMalloc1(medium->nrflt,&fd->g_of_s));
   for(k = 0;k < fd->segs->nseg;k++)
@@ -310,12 +335,13 @@ static PetscErrorCode fd_run_phase(TS ts, struct interact_ctx *par, struct fd_va
   struct fd_rsf fr;
   PetscScalar *x;
   int N = sy->N, i, g, l, k, nsteps = 0, kk;
-  double vmax = 0.0, below = 0.0, dcmin = 1e30, *vtmp, vpeak = 0.0, slipsum = 0.0, t_wall0, t_wall1;
+  double vmax = 0.0, below = 0.0, dcmin = 1e30, *vtmp, *vref, vpeak = 0.0, slipsum = 0.0, t_wall0, t_wall1;
   PetscFunctionBeginUser;
   PetscCall(PetscTime(&t_wall0));
   fr.N = N; fr.v0 = rsf->v0; fr.f0 = rsf->f0; fr.tol = 1e-10; fr.max_iter = 50;
   PetscCall(PetscMalloc3(N,&fr.a,N,&fr.b,N,&fr.dc));
   PetscCall(PetscMalloc1(N,&vtmp));
+  PetscCall(PetscMalloc1(N,&vref));
   st->normal_coupling = (fd->mode2d == FD_MODE_INPLANE) && rsf->calc_sigma_dot;
   PetscCall(VecGetArray(X,&x));
   for(i = 0;i < N;i++){
@@ -377,7 +403,24 @@ static PetscErrorCode fd_run_phase(TS ts, struct interact_ctx *par, struct fd_va
       if(fd->sstat[a] >= 0)
 	fprintf(fd->fstat[a],"%.10e %.10e %.10e %.10e %.4e %d\n",st->t,st->delta[fd->sstat[a]],st->V[fd->sstat[a]],st->tau[fd->sstat[a]],vmax,k);
     if(vmax > vpeak) vpeak = vmax;
-    if(vmax < fd->vback) below += k*sy->dt; else below = 0.0;
+    if(fd->back_eps > 0.0){
+      /* quasi-steady hand-back: the hereditary term of a slip rate that is
+	 constant over one window equals the QD radiation damping, so the
+	 phase can end once every element's slip rate has changed by less
+	 than back_eps (relative, floored at vback) over a full window and the
+	 fault-wide maximum is below back_vmax */
+      int quiet = (vmax < fd->back_vmax);
+      if(quiet && (below > 0.0))
+	for(i = 0;i < N;i++)
+	  if(fabs(st->V[i] - vref[i]) > fd->back_eps*(fabs(vref[i]) + fd->vback)){ quiet = 0; break; }
+      if(!quiet || (below == 0.0)){
+	memcpy(vref,st->V,sizeof(double)*N);
+	below = quiet ? 1e-30 : 0.0;
+      }else
+	below += k*sy->dt;
+    }else{
+      if(vmax < fd->vback) below += k*sy->dt; else below = 0.0;
+    }
     if(below >= sy->L*sy->dt) break;
     if(nsteps >= fd->max_steps)
       SETERRQ(PETSC_COMM_WORLD,PETSC_ERR_CONV_FAILED,"rsf_fd: dynamic phase exceeded -fd_max_steps = %ld steps (t - t_switch = %g s, max V %g)",(long)fd->max_steps,(double)st->t,vmax);
@@ -398,11 +441,16 @@ static PetscErrorCode fd_run_phase(TS ts, struct interact_ctx *par, struct fd_va
   PetscCall(VecRestoreArray(X,&x));
   *t_end = t + st->t;
   PetscCall(PetscTime(&t_wall1));
+  if(getenv("FD_PROFILE")){
+    extern double fd_prof[6];
+    fprintf(stderr,"FD_PROFILE phase: history %.1f s, static %.1f s, solve %.1f s, push %.1f s, other %.1f s\n",fd_prof[0],fd_prof[1],fd_prof[2],fd_prof[3],fd_prof[5]);
+    for(i = 0;i < 6;i++) fd_prof[i] = 0.0;
+  }
   for(kk = 0,i = 0;i < sy->nops;i++) if(sy->ops[i].bw > kk) kk = sy->ops[i].bw;
   PetscCall(PetscPrintf(PETSC_COMM_WORLD,
 		"rsf_fd: phase %ld: t %.8f yr, %d steps over %.1f s, peak slip rate %.3f m/s, mean slip %.4f m, max band %d, wall %.1f s\n",
 		(long)fd->nphase + 1,(double)(t/SEC_PER_YEAR),nsteps,(double)st->t,vpeak,slipsum/N,kk,(double)(t_wall1 - t_wall0)));
-  PetscCall(PetscFree3(fr.a,fr.b,fr.dc)); PetscCall(PetscFree(vtmp));
+  PetscCall(PetscFree3(fr.a,fr.b,fr.dc)); PetscCall(PetscFree(vtmp)); PetscCall(PetscFree(vref));
   fd_state_free(st);
   PetscFunctionReturn(PETSC_SUCCESS);
 }

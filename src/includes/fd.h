@@ -29,6 +29,8 @@ struct fd_vars {
   PetscBool halfplane;
   PetscReal mu,nu,rho,alpha,beta,dt_min;
   PetscInt  max_steps;		/* abort a phase beyond this many steps */
+  PetscInt  conv,conv_block;	/* history convolution: 1 partitioned (M6), 0 direct; partition length */
+  PetscReal back_eps,back_vmax;	/* quasi-steady hand-back criterion (0: off) */
   PetscReal dt_restart;		/* TS step after a phase [s] */
   /* segments, sources (real plus images), tables, marcher system */
   struct fd_seglist *segs;

@@ -329,6 +329,13 @@ Next, in order:
    same algorithm in both. This makes M6 (partitioned convolution) the
    next code item. The unequal-segment sweep is done and pinned (WP6
    above).
+1b. M6 delivered (2026-10-20, fd_c_design.md section 14): hybrid partitioned
+   convolution (default), banded solves, single-FFT pushes, optional
+   quasi-steady hand-back. BP1 50 m phase 312 s to 183 s at unchanged
+   results, 110 s with -fd_back_eps 0.05. Extra tests: Harris and Day case D
+   (two segments, normal coupling) in C against prototype traces to 5e-11.
+   To check on the workstation: BP1 at 25 m with -fd_back_eps 0.05 against
+   the default criterion, before considering it as a default.
 1a. History alignment fix (2026-10-20, fd_c_design.md section 13): found
    while designing M6; prototype and C corrected together; BP1-FD at 50 m
    moves by 0.1 yr in recurrence (105.33 and 118.79 yr against 105.42 and

@@ -112,6 +112,17 @@ Options (defaults in parentheses):
 - `-fd_length_scale <m>` (1) geometry unit in metres.
 - `-fd_max_steps <n>` (2e6) abort a phase beyond this; `-fd_dt_restart <s>`
   (1e-2) first QD step after a phase.
+- `-fd_conv <0|1|2>` (2) history convolution: direct sum; partitioned FFT
+  (about twice the memory); hybrid, partitioned for short substeps and direct
+  for long ones (about three times the memory, fastest). Results agree to
+  roundoff. `-fd_conv_block <n>` (0 = automatic) partition length in lags.
+- `-fd_back_eps <f>` (0) return to QD once every slip rate has changed by
+  less than this fraction over one window and the maximum is below
+  `-fd_back_vmax` (half of `-fd_vsw`), instead of waiting until all slip
+  rates are below `-fd_vback`. Justified because the hereditary term of a
+  slip rate that is constant over a window equals the QD radiation damping;
+  0.05 shortened BP1 phases by about 40 percent and moved event times by
+  about 1e-5 relative.
 - `-fd_stations i,j,...` global patch indices written during every phase to
   `fd_phase_<n>_st<i>.dat` (time since switch, slip, slip rate, shear
   stress, fault-wide max slip rate, substep multiple); the final slip of each
@@ -125,9 +136,12 @@ pre-phase state, its arrest line the post-phase state).
 Memory and cost. Tables take 16 L M bytes per table (two for in-plane), L
 the window in lags and M the padded FFT length (next power of two above 2 N -
 1 for one segment): BP1 at 50 m needs 0.5 GB with `-fd_lmax 6000`, 25 m
-about 2.3 GB with `-fd_lmax 12000`. A BP1 phase takes about 5 min at 50 m
-and about 1 h at 25 m on one core (the history convolution dominates and
-scales as L M per step, i.e. fourfold per halving of the element size); resolution of 5 or more elements per cohesive zone is needed for
+about 2.3 GB with `-fd_lmax 12000` with `-fd_conv 0`, about three times
+that with the default hybrid convolution (use `-fd_conv 0` if memory is
+short). A BP1 phase takes about 3 min at 50 m on one core with the default
+settings (2 min with `-fd_back_eps 0.05`), and about an hour at 25 m before
+the M6 speed-ups; the history convolution dominates and scales as L M per
+step, i.e. fourfold per halving of the element size; resolution of 5 or more elements per cohesive zone is needed for
 slip and timing, about 40 for supershear transitions or near-threshold
 triggering.
 
