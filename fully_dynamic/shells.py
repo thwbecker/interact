@@ -218,14 +218,16 @@ class System:
             h = self.hist[a_]
             # lags l = lag0..min(L, k): slice pushed at step k - l sits at position (k - l) mod Lbuf;
             # walk the ring buffer in at most two contiguous (reversed) segments, no copies
-            Lb = h.L; k = h.k
-            lmax_ = min(p.L, k)
+            # the current step will add lag0 - 1 slices: lag l (counted from the end of
+            # the step) refers to the slice pushed at k + lag0 - 1 - l
+            Lb = h.L; k = h.k; sh_ = lag0 - 1
+            lmax_ = min(p.L, k + sh_)
             if lmax_ < lag0:
                 continue
             acc_s = np.zeros(p.M, complex); acc_n = np.zeros(p.M, complex) if p.has_normal else None
             l = lag0
             while l <= lmax_:
-                pos = (k - l) % Lb                  # position of lag l
+                pos = (k + sh_ - l) % Lb            # position of lag l
                 nseg = min(lmax_ - l + 1, pos + 1)  # lags l..l+nseg-1 occupy positions pos..pos-nseg+1
                 Vh = h.buf[pos - nseg + 1:pos + 1][::-1]
                 Wsl = p.Ws_hat[l - 1:l - 1 + nseg]

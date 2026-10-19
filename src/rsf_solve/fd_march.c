@@ -84,23 +84,28 @@ void fd_sys_push(struct fd_sys *s, const double *V)
   }
 }
 
-/* sum_{l = lag0}^{L} W[l] V^{(next - l)} for all receivers (shear, normal);
-   the ring buffer is walked in at most two contiguous reversed segments */
+/* history term at the end of a step of k = lag0 - 1 fine substeps that
+   have not been pushed yet: sum_{l = lag0}^{L} W[l] V^{(next + lag0 - 1 - l)},
+   i.e. lag l counted from the end of the step (the current step's own
+   lags 1..k enter through the cumulative kernel K_k). Before 2026-10-19
+   this used V^{(next - l)}, a misalignment by k slices (one step for
+   k = 1); see fd_c_design.md section 13. The ring buffer is walked in at
+   most two contiguous reversed segments. */
 void fd_sys_history(struct fd_sys *s, int lag0, double *ts, double *tn)
 {
-  int a, b, l, lmax, pos, nseg, q, i, m, hk;
+  int a, b, l, lmax, pos, nseg, q, i, m, hk, sh = lag0 - 1;
   memset(ts, 0, sizeof(double) * s->N); if(tn) memset(tn, 0, sizeof(double) * s->N);
   for(a = 0; a < s->nsrc; a++){          /* source */
     hk = s->hk[a];
     for(b = 0; b < s->nseg; b++){        /* receiver */
       struct fd_pair *p = s->pairs[a * s->nseg + b];
-      lmax = p->L < hk ? p->L : hk;
+      lmax = p->L < hk + sh ? p->L : hk + sh;
       if(lmax < lag0) continue;
       memset(s->w1, 0, sizeof(double _Complex) * s->M);
       if(p->has_normal) memset(s->w2, 0, sizeof(double _Complex) * s->M);
       l = lag0;
       while(l <= lmax){
-        pos = (hk - l) % s->Lbuf;
+        pos = (hk + sh - l) % s->Lbuf;
         nseg = lmax - l + 1 < pos + 1 ? lmax - l + 1 : pos + 1;
         for(q = 0; q < nseg; q++){
           const double _Complex *Vh = s->hist[a] + (size_t)(pos - q) * s->M;

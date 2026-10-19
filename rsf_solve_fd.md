@@ -72,8 +72,8 @@ and the prototype was checked against:
 - exact solutions: the self-similar (Kostrov/Broberg) crack in modes II and
   III to 1e-3; static limits and the plane-wave identity;
 - SCEC TPV205-2D against E. Dunham's MDSBI reference at 6.25 m: main-front
-  arrivals within 1 to 3 time steps at 100/50/25 m, final slip within 0.4
-  percent;
+  arrivals within about 1.5 time steps (first order in time) at 100 and
+  50 m, final slip within 0.4 percent;
 - Harris and Day (1993) parallel stepovers, case D reproduced (trigger
   delays and locations); supershear transition lengths of Andrews (1976b)
   and Dunham (2007) when the cohesive zone is resolved by about 40 elements;
@@ -81,9 +81,10 @@ and the prototype was checked against:
   118.7 yr in FD), slip per event and station histories against the
   community solutions (sem2dpack, Jiang's SBIM); peak slip rates within a
   few percent at the shallow stations at 25 m. `rsf_solve -fd_mode 1` at
-  25 m gives FD events at 196.36, 302.10 and 420.80 yr, the prototype's
+  25 m gave FD events at 196.36, 302.10 and 420.80 yr, the prototype's
   196.36, 302.11 and 420.81 yr, with the same step counts and peak slip
-  rates.
+  rates (both before the history alignment fix of 2026-10-20, which moves
+  the 50 m event times by 0.1 yr; fully_dynamic/fd_c_design.md section 13).
 
 `rsf_solve`'s own QD on the BP1 half-plane geometry agrees with the prototype
 and with group 4's reference to 0.01 yr, and the FD tables' static limit
@@ -178,8 +179,8 @@ SEAS BP1 (antiplane half plane, 40 km, 50 m):
        -s_wave_speed 3464 -rtol 1e-6 -stop_time_yr 520 -track_events 1 -vel_event 1e-3 \
        -fd_mode 1 -fd_lmax 6000 -fd_stations 49,149,249
 
-gives events at 196.36, 301.78 and 420.52 yr (QD: 196.36, 271.96, 349.78,
-...), with per-event mean slips 1.556, 1.303 and 1.459 m.
+gives events at 196.36, 301.69 and 420.48 yr (QD: 196.36, 271.96, 349.77,
+...), with per-event mean slips 1.561, 1.303 and 1.461 m.
 
 ## 5. References
 

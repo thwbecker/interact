@@ -230,3 +230,42 @@ is in c_port/SANDBOX.md; usage and theory for users in rsf_solve_fd.md.
   in order: station output of the QD stations during phases (the
   coseismic part is currently only in fd_phase_*_st*.dat); M6 partitioned
   convolution; M7 scope list.
+
+## 13. History alignment fix (2026-10-20)
+
+Found while writing down the exact convolution that M6 must reproduce.
+The history term evaluated before a step of k fine substeps must be
+
+    sum_{l >= k+1} W[l] V^(next + k - l),
+
+lag l counted from the end of the step (the step's own lags 1..k enter
+through K_k). The prototype (shells.history_stress) and the C port
+(fd_sys_history) used V^(next - l), i.e. the kernel was misaligned by k
+slices: by one step for k = 1 and by up to 64 steps (kmax) during slow
+phases. Checked against a direct space-time sum of the closed-form kernels
+(n = 12, k = 1, 2, 4): corrected version to 3e-14, old version off by 40
+to 70 percent. Both codes are fixed identically; the C TPV205 test
+reference was regenerated from the corrected prototype and the C code
+again matches it to 1e-10.
+
+Effect of the fix, all with the corrected code:
+- self-similar crack factors: within 2e-3 of the exact values in modes II
+  and III at 100 and 50 m, as before (the old alignment was also within
+  3e-3; this test does not discriminate);
+- TPV205-2D against Dunham's MDSBI 6.25 m: main-front arrivals at -4.5 and
+  -7.5 km are now about 1.5 steps early instead of 1.5 steps late (100 m:
+  -18 and -31 ms against +25 and +13 ms; 50 m: -11 and -16 ms against +11
+  and +5 ms); final slip within 0.015 m (100 m) and 0.009 m (50 m). The
+  scheme is first order in time either way; the corrected version is the
+  one consistent with the stated discretization;
+- single-fault sequence: recurrence 82.23 yr (82.06 before), peak slip
+  rate 2.475 m/s (2.430), mean slip unchanged;
+- BP1-FD at 50 m: events at 196.360, 301.695, 420.482 yr (301.778,
+  420.520 before); recurrence 105.33 and 118.79 yr (sem2dpack 106.5 and
+  118.7); station peak slip rates 4.08, 3.29, 1.43 m/s in event 1 (4.13,
+  3.35, 1.27 before).
+Conclusions drawn from earlier runs are unaffected within these margins.
+The time accuracy itself (first order, arrivals within about 1.5 steps)
+is a property of end-of-step collocation with piecewise-constant slip
+rate; a second-order variant (midpoint collocation or a corrected
+first-lag operator) is a candidate for later work, not part of M6.

@@ -160,6 +160,33 @@ against FD. Tooling in place: run_step_fd.sh W ov vs tend mode L2 dba2
 (gen_step.py writes segments.txt; stations follow the segment centres),
 summarize_rsf_step.py prints P(jump within 1 d) and within 30 d.
 
+### WP6, unequal segments (2026-10-20, Thor's workstation) -- pinned
+Second segment 16 km with b - a = 0.004 (first: 24 km, 0.005), 2 km
+overlap, 2500 yr, run_step_fd.sh ... 2500 both 16 0.004. Fraction of source
+events followed by a rupture of the other segment within 1 d / 30 d:
+
+| width, margin, sense | QD | FD |
+|---|---|---|
+| 1.0, 0.5, dilational | 0.10 / 0.20 | 0.35 / 0.68 |
+| 1.0, 1.0, dilational | 0.03 / 0.31 | 0.20 / 0.51 |
+| 1.0, 0.5, compressional | 0.35 / 0.67 | 0.34 / 0.68 |
+| 1.0, 1.0, compressional | 0.32 / 0.62 | 0.33 / 0.67 |
+| 1.5, 0.5, dilational | 0.00 / 0.09 | 0.08 / 0.30 |
+| 1.5, 1.0, dilational | 0.02 / 0.08 | 0.00 / 0.18 |
+| 1.5, 0.5, compressional | 0.00 / 0.10 | 0.02 / 0.22 |
+| 1.5, 1.0, compressional | 0.00 / 0.17 | 0.08 / 0.26 |
+
+Caveats that limit the meaning of these fractions: most runs are limit
+cycles (periods of about 176 to 300 yr with two or three source events per
+period; 0.33 and 0.67 are 1/3 and 2/3 of one period), so the effective
+sample is a few events, not 40 to 60; jumps in both directions are pooled;
+partial re-ruptures within months are counted as source events. A
+probability needs the periodicity broken (ensembles over initial
+conditions, or along-strike heterogeneity) and per-direction counts. The
+exploratory sweeps are paused here; these runs predate the history
+alignment fix (fd_c_design.md section 13), whose effect on sequences is
+0.1 to 0.2 percent in recurrence.
+
 ### WP6, stepover sequences (original plan)
 1. Driver for two parallel segments under backslip loading with
    rate-and-state friction, built from cycle.py (run_step.py exists; its
@@ -300,7 +327,12 @@ Next, in order:
    Python: at 25 m the per-step cost is the history convolution (L M per
    source, here 12000 x 4096 x 2 complex products per step), which is the
    same algorithm in both. This makes M6 (partitioned convolution) the
-   next code item. Then the unequal-segment sweep.
+   next code item. The unequal-segment sweep is done and pinned (WP6
+   above).
+1a. History alignment fix (2026-10-20, fd_c_design.md section 13): found
+   while designing M6; prototype and C corrected together; BP1-FD at 50 m
+   moves by 0.1 yr in recurrence (105.33 and 118.79 yr against 105.42 and
+   118.74; sem2dpack 106.5 and 118.7).
 2. M6 performance: partitioned FFT convolution over the lag axis
    (O(log L) amortised per step, factor 20 to 50 at L of a few thousand),
    then OpenMP over Fourier modes; identity to 1e-10 against M5.
