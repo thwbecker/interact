@@ -31,6 +31,7 @@ struct fd_vars {
   PetscInt  max_steps;		/* abort a phase beyond this many steps */
   PetscInt  conv,conv_block;	/* history convolution: 1 partitioned (M6), 0 direct; partition length */
   PetscReal back_eps,back_vmax;	/* quasi-steady hand-back criterion (0: off) */
+  PetscInt  coarse;		/* coarse history for aligned long steps (1: on) */
   PetscReal dt_restart;		/* TS step after a phase [s] */
   /* segments, sources (real plus images), tables, marcher system */
   struct fd_seglist *segs;

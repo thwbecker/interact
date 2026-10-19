@@ -325,3 +325,39 @@ sizes so they run), larger partitions (slower), a non-uniform partition
 long substeps, more complex, deferred until the 25 m runs show the
 convolution still dominating). FD_PROFILE=1 in the environment prints the
 per-phase split (history, static, solve, push).
+
+## 15. Coarse history for long substeps (2026-10-21)
+
+The profile after M6 (BP1 at 25 m: history 97 percent of the phase time)
+showed the long substeps of the afterslip tail as the remaining cost. Such
+a step of K = kmax substeps pushes K identical slices. If the steps start
+at multiples of K, the input is constant on aligned blocks of K slices, and
+once a pair's whole window consists of such blocks the history term is
+exactly
+
+    sum_{l >= K+1} W[l] V^(T - l) = sum_{j >= 1} A[j] V_(block n - j),
+    A[j] = sum_{l = jK+1}^{(j+1)K} W[l],
+
+with K times fewer terms. Implemented as fd_sys_set_coarse (aggregated
+tables built once from the full time-domain tables, so not with -fd_conv 1)
+and a step selector that only grows k when the current fine index is a
+multiple of the new k (-fd_coarse 1, default).
+
+Exactness: with the alignment rule in place, switching the coarse sum on or
+off changes the single-fault sequence by roundoff (8e-8 yr in the second
+event time, one step). The alignment rule itself changes the step sequence
+during nucleation and arrest: single-fault event times by 1e-4 relative,
+BP1 50 m event times by 0.003 yr and peak slip rates by about 1 percent
+(the quantity most sensitive to the time discretization).
+
+Speed, BP1 50 m, one core: 50, 43, 47 s per phase against 183 s (M6
+hybrid) and 312 s (before M6); history 20 s, solve 17 s, static 7 s,
+push 3 s per phase. Single-fault sequence: 8 s per phase against 13 to
+16 s.
+
+BP1 25 m with -fd_back_eps 0.05 (Thor, before the coarse history): event
+times 196.3638, 302.0828, 420.8594 yr against 196.3638, 302.0832, 420.8598
+with the default criterion (1e-6 relative), peak slip rates within 0.04
+percent, but only 12 percent faster, because the slip-rate floor
+(-fd_back_vmax) binds for most of the tail at this resolution. With the
+coarse history the tail is cheap anyway; -fd_back_eps stays opt-in.

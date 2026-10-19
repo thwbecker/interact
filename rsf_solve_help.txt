@@ -176,6 +176,9 @@ fully dynamic coseismic phases (first version; see rsf_solve_fd.md)
   -fd_conv <0|1|2>        history convolution: 0 direct, 1 partitioned FFT,
                           2 hybrid (default; about 3x the memory of 0)
   -fd_conv_block <n>      partition length, power of two (default 0 = automatic)
+  -fd_coarse <0|1>        long steps (kmax substeps) start at multiples of kmax and,
+                          once a window holds only such steps, the history is summed
+                          over aligned blocks (exact, kmax times cheaper; default 1)
   -fd_stations i,j,...    patch indices written during phases to fd_phase_<n>_st<i>.dat
   -fd_gate_tol <f>        tolerance of the static check against Is/In (default 0.05)
   -fd_length_scale <m>    geometry unit in metres (default 1)

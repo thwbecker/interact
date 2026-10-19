@@ -32,6 +32,10 @@
                         the memory), 2 hybrid: partitioned for short substeps, direct for
                         long ones (about three times the memory; default)
     -fd_conv_block <n>  partition length in lags, a power of two (default 0: automatic)
+    -fd_coarse <0|1>    1 (default): steps of kmax substeps start at multiples of kmax,
+                        and once a pair's whole window consists of such steps its history
+                        is summed over blocks of kmax with aggregated kernels (exact, kmax
+                        times cheaper); 0: off
     -fd_back_eps <f>    0 (default): return to QD after the slip rate has stayed below
                         -fd_vback for one window; > 0: return once every slip rate has
                         changed by less than this fraction over one window and the
@@ -89,7 +93,7 @@ PetscErrorCode rsf_fd_setup(struct interact_ctx *par, PetscReal shear_modulus_si
   fd->cfl = 0.5; fd->lmax = 0; fd->gate_tol = 0.05; fd->length_scale = 1.0;
   fd->max_steps = 2000000; fd->dt_restart = 1e-2;
   fd->conv = 2; fd->conv_block = 0;
-  fd->back_eps = 0.0; fd->back_vmax = -1.0;
+  fd->back_eps = 0.0; fd->back_vmax = -1.0; fd->coarse = 1;
   PetscCall(PetscOptionsGetReal(NULL,NULL,"-fd_vsw",&fd->vsw,NULL));
   PetscCall(PetscOptionsGetReal(NULL,NULL,"-fd_vback",&fd->vback,NULL));
   PetscCall(PetscOptionsGetReal(NULL,NULL,"-fd_tol",&fd->tol,NULL));
@@ -105,6 +109,7 @@ PetscErrorCode rsf_fd_setup(struct interact_ctx *par, PetscReal shear_modulus_si
   PetscCall(PetscOptionsGetInt(NULL,NULL,"-fd_conv",&fd->conv,NULL));
   PetscCall(PetscOptionsGetInt(NULL,NULL,"-fd_conv_block",&fd->conv_block,NULL));
   PetscCall(PetscOptionsGetReal(NULL,NULL,"-fd_back_eps",&fd->back_eps,NULL));
+  PetscCall(PetscOptionsGetInt(NULL,NULL,"-fd_coarse",&fd->coarse,NULL));
   PetscCall(PetscOptionsGetReal(NULL,NULL,"-fd_back_vmax",&fd->back_vmax,NULL));
   if(fd->back_vmax <= 0.0) fd->back_vmax = 0.5*fd->vsw;
   fd->nstat = 16;
@@ -208,6 +213,10 @@ static PetscErrorCode fd_build_tables(struct interact_ctx *par, struct fd_vars *
     }
   fd->sys = fd_sys_create(fd->segs,fd->pairs,(int)fd->nsrc,fd->src_of,fd->src_rev,fd->mode2d,fd->dt_min,fd->alpha,fd->beta,fd->rho,+1);
   PetscCheck(fd->sys,PETSC_COMM_WORLD,PETSC_ERR_MEM,"rsf_fd_setup: marcher system allocation failed");
+  if(fd->coarse && (fd->conv != 1) && (fd->kmax >= 2)){
+    PetscCheck(fd_sys_set_coarse(fd->sys,(int)fd->kmax) == 0,PETSC_COMM_WORLD,PETSC_ERR_LIB,"rsf_fd_setup: coarse history setup failed");
+    PetscCall(PetscPrintf(PETSC_COMM_WORLD,"rsf_fd_setup: coarse history for aligned steps of %d substeps\n",(int)fd->kmax));
+  }
   if(fd->conv){
     PetscCheck((fd->conv == 1) || (fd->conv == 2),PETSC_COMM_WORLD,PETSC_ERR_ARG_OUTOFRANGE,"-fd_conv must be 0, 1 or 2");
     PetscCheck(fd_sys_set_conv(fd->sys,(int)fd->conv,(int)fd->conv_block,(int)fd->kmax) == 0,PETSC_COMM_WORLD,PETSC_ERR_ARG_OUTOFRANGE,
@@ -387,7 +396,9 @@ static PetscErrorCode fd_run_phase(TS ts, struct interact_ctx *par, struct fd_va
     int a;
     double kd = fd->xi*dcmin/(vmax*sy->dt);
     k = 1;
-    while((2*k <= fd->kmax) && (2*k <= kd)) k *= 2;
+    /* powers of two up to kmax and xi dc / (V dt); with the coarse history the
+       step must also start at a multiple of its length (aligned blocks) */
+    while((2*k <= fd->kmax) && (2*k <= kd) && (!sy->Kc || (sy->hk[0] % (2*k) == 0))) k *= 2;
     if(fd_step_rsf(sy,st,&fr,k) != 0)
       SETERRQ(PETSC_COMM_WORLD,PETSC_ERR_LIB,"rsf_fd: marcher step failed");
     nsteps++;

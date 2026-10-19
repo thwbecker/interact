@@ -116,6 +116,11 @@ Options (defaults in parentheses):
   (about twice the memory); hybrid, partitioned for short substeps and direct
   for long ones (about three times the memory, fastest). Results agree to
   roundoff. `-fd_conv_block <n>` (0 = automatic) partition length in lags.
+- `-fd_coarse <0|1>` (1) steps of `-fd_kmax` substeps start at multiples of
+  `-fd_kmax`; once a window holds only such steps, the history term is summed
+  over the aligned blocks with block-aggregated kernels, which is exact and
+  `-fd_kmax` times cheaper. The alignment rule changes BP1 event times by
+  about 0.003 yr and peak slip rates by about 1 percent at 50 m.
 - `-fd_back_eps <f>` (0) return to QD once every slip rate has changed by
   less than this fraction over one window and the maximum is below
   `-fd_back_vmax` (half of `-fd_vsw`), instead of waiting until all slip
@@ -138,9 +143,9 @@ the window in lags and M the padded FFT length (next power of two above 2 N -
 1 for one segment): BP1 at 50 m needs 0.5 GB with `-fd_lmax 6000`, 25 m
 about 2.3 GB with `-fd_lmax 12000` with `-fd_conv 0`, about three times
 that with the default hybrid convolution (use `-fd_conv 0` if memory is
-short). A BP1 phase takes about 3 min at 50 m on one core with the default
-settings (2 min with `-fd_back_eps 0.05`), and about an hour at 25 m before
-the M6 speed-ups; the history convolution dominates and scales as L M per
+short). A BP1 phase takes under a minute at 50 m on one core with the default
+settings (it took 5 min before the speed-ups of 2026-10-20 and -21), and
+about 45 min at 25 m before the coarse history; the history convolution dominates and scales as L M per
 step, i.e. fourfold per halving of the element size; resolution of 5 or more elements per cohesive zone is needed for
 slip and timing, about 40 for supershear transitions or near-threshold
 triggering.

@@ -329,6 +329,10 @@ Next, in order:
    same algorithm in both. This makes M6 (partitioned convolution) the
    next code item. The unequal-segment sweep is done and pinned (WP6
    above).
+1c. Coarse history for aligned long substeps (2026-10-21, fd_c_design.md
+   section 15): exact; BP1 50 m phase 183 s to 50 s (312 s before M6).
+   -fd_back_eps 0.05 at 25 m: 1e-6 relative in event times, 12 percent
+   faster; stays opt-in.
 1b. M6 delivered (2026-10-20, fd_c_design.md section 14): hybrid partitioned
    convolution (default), banded solves, single-FFT pushes, optional
    quasi-steady hand-back. BP1 50 m phase 312 s to 183 s at unchanged

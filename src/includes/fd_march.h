@@ -55,6 +55,14 @@ struct fd_sys {
   long **Xj;                    /* window index held in each slot, -1 none */
   double _Complex **Ys, **Yn;   /* far part for the current output block per pair, [m][i] */
   long *cblk;                   /* block index held in Ys/Yn per pair, -1 none */
+  /* coarse history for long substeps: when every slice in a pair's window
+     comes from steps of exactly Kc substeps that started at multiples of Kc,
+     the input is constant on aligned Kc blocks and the history equals a sum
+     over blocks with the block-aggregated kernel Ac[j] = sum_{l=jKc+1}^{(j+1)Kc} W[l]
+     (exact, Kc times fewer terms) */
+  int Kc, *Jc;                  /* block length (0: off), blocks per pair */
+  double _Complex **Acs, **Acn; /* aggregated kernels per pair, [j][m], j = 1..Jc */
+  long coarse_from;             /* fine index where the current run of aligned Kc steps began, -1 none */
   fd_fft_plan tf, tb;           /* time FFTs of length F */
   double _Complex *tw1, *tw2, *tz, *tzn;
 };
@@ -71,6 +79,9 @@ void fd_sys_free(struct fd_sys *s);
    kmax: largest substep multiple the caller will use. Returns 0 on success. */
 int fd_sys_set_partitioned(struct fd_sys *s, int B, int kmax);
 int fd_sys_set_conv(struct fd_sys *s, int mode, int B, int kmax);   /* mode 1 partitioned, 2 hybrid */
+/* enable the coarse history for steps of exactly K substeps (call before
+   fd_sys_set_conv with mode 1, which releases the full tables) */
+int fd_sys_set_coarse(struct fd_sys *s, int K);
 double fd_sys_bytes(const struct fd_sys *s);
 void fd_sys_reset_history(struct fd_sys *s);
 void fd_sys_push(struct fd_sys *s, const double *V);

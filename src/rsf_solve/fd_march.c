@@ -123,6 +123,10 @@ void fd_sys_free(struct fd_sys *s)
     free(s->tw1); free(s->tw2); free(s->tz); free(s->tzn);
     fd_fft_plan_destroy(s->tf); fd_fft_plan_destroy(s->tb);
   }
+  if(s->Kc){
+    for(k = 0; k < s->nsrc * s->nseg; k++){ free(s->Acs[k]); free(s->Acn[k]); }
+    free(s->Acs); free(s->Acn); free(s->Jc);
+  }
   free(s->hist); free(s->hk); free(s->off); free(s->src_of); free(s->src_rev); free(s->w1); free(s->w2); free(s->w3); free(s->Ks); free(s->Kn);
   for(k = 0; k < s->nops; k++){ free(s->ops[k].Ks); free(s->ops[k].Kn); free(s->ops[k].ab); }
   fd_fft_plan_destroy(s->pf); fd_fft_plan_destroy(s->pb);
@@ -132,6 +136,7 @@ void fd_sys_free(struct fd_sys *s)
 void fd_sys_reset_history(struct fd_sys *s)
 {
   int k;
+  s->coarse_from = -1;
   for(k = 0; k < s->nsrc; k++){ memset(s->hist[k], 0, sizeof(double _Complex) * (size_t)s->Lbuf * s->M); s->hk[k] = 0; }
   if(s->conv){
     for(k = 0; k < s->nsrc; k++){
@@ -153,6 +158,10 @@ void fd_sys_push(struct fd_sys *s, const double *V)
 void fd_sys_push_k(struct fd_sys *s, const double *V, int kk)
 {
   int k, i, r, n, q;
+  if(s->Kc){
+    if((kk == s->Kc) && (s->hk[0] % s->Kc == 0)){ if(s->coarse_from < 0) s->coarse_from = s->hk[0]; }
+    else s->coarse_from = -1;
+  }
   for(k = 0; k < s->nsrc; k++){
     double _Complex *first = NULL;
     r = s->src_of[k]; n = s->segs->seg[r].n;
@@ -170,6 +179,28 @@ void fd_sys_push_k(struct fd_sys *s, const double *V, int kk)
         form_window(s, k, s->hk[k] / s->B - 1);      /* complete now; the ring will not keep its inputs */
     }
   }
+}
+
+int fd_sys_set_coarse(struct fd_sys *s, int K)
+{
+  int np = s->nsrc * s->nseg, k, j, l, m, comp;
+  if(K < 2 || s->conv == 1) return 1;
+  s->Kc = K; s->coarse_from = -1;
+  s->Jc = calloc((size_t)np, sizeof(int));
+  s->Acs = calloc((size_t)np, sizeof(double _Complex *)); s->Acn = calloc((size_t)np, sizeof(double _Complex *));
+  for(k = 0; k < np; k++){
+    struct fd_pair *p = s->pairs[k];
+    s->Jc[k] = (p->L - 1) / K;                     /* blocks j = 1..Jc with jK + 1 <= L */
+    for(comp = 0; comp < (p->has_normal ? 2 : 1); comp++){
+      const double _Complex *W = comp ? p->Wn_hat : p->Ws_hat;
+      double _Complex *A = calloc((size_t)(s->Jc[k] + 1) * p->M, sizeof(double _Complex));
+      for(j = 1; j <= s->Jc[k]; j++)
+        for(l = j * K + 1; l <= (j + 1) * K && l <= p->L; l++)
+          for(m = 0; m < p->M; m++) A[(size_t)j * p->M + m] += W[(size_t)(l - 1) * p->M + m];
+      if(comp) s->Acn[k] = A; else s->Acs[k] = A;
+    }
+  }
+  return 0;
 }
 
 double fd_sys_bytes(const struct fd_sys *s)
@@ -316,6 +347,29 @@ void fd_sys_history(struct fd_sys *s, int lag0, double *ts, double *tn)
     hk = s->hk[a];
     for(b = 0; b < s->nseg; b++){        /* receiver */
       struct fd_pair *p = s->pairs[a * s->nseg + b];
+      if(s->Kc && (sh == s->Kc) && (s->coarse_from >= 0) && (hk % s->Kc == 0) &&
+         ((long)hk - s->coarse_from >= (long)p->L - s->Kc) && !getenv("FD_COARSE_OFF")){
+        /* coarse path: block j of Kc slices ends Kc*j slices before the end of the step */
+        int kk = a * s->nseg + b, j;
+        memset(s->w1, 0, sizeof(double _Complex) * s->M);
+        if(p->has_normal) memset(s->w2, 0, sizeof(double _Complex) * s->M);
+        for(j = 1; j <= s->Jc[kk]; j++){
+          const double _Complex *Vh = s->hist[a] + (size_t)((hk - j * s->Kc) % s->Lbuf) * s->M;
+          const double _Complex *As = s->Acs[kk] + (size_t)j * s->M;
+          for(m = 0; m < s->M; m++) s->w1[m] += As[m] * Vh[m];
+          if(p->has_normal){
+            const double _Complex *An = s->Acn[kk] + (size_t)j * s->M;
+            for(m = 0; m < s->M; m++) s->w2[m] += An[m] * Vh[m];
+          }
+        }
+        fd_fft_exec(s->pb, s->w1, s->w3);
+        for(i = 0; i < p->rcv->n; i++) ts[s->off[b] + i] += creal(s->w3[i]) / s->M;
+        if(p->has_normal && tn){
+          fd_fft_exec(s->pb, s->w2, s->w3);
+          for(i = 0; i < p->rcv->n; i++) tn[s->off[b] + i] += creal(s->w3[i]) / s->M;
+        }
+        continue;
+      }
       lmax = p->L < hk + sh ? p->L : hk + sh;
       use_far = s->conv && s->P[a * s->nseg + b] > 0 && (s->conv == 1 || 2 * sh <= s->B);
       if(use_far && lmax > s->D) lmax = s->D;
