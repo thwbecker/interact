@@ -238,11 +238,7 @@ FLAGS = $(DEFINE_FLAGS) $(PGPLOT_INCLUDES) $(SLATEC_INCLUDES) $(LOCAL_INCLUDES) 
 # in the machine config; the built-in power-of-two FFT is used otherwise
 FFTW_DEFINES ?=
 FFTW_LIBS ?=
-# header dependencies: every C object also writes $(ODIR)/<name>.d (gcc,
-# clang and icc understand -MMD -MP), which is included at the end of this
-# file, so that changing a header rebuilds the objects that include it
-DEPFLAGS = -MMD -MP
-CFLAGS =   $(FLAGS) $(SCARGS)   $(MACHINE_DEFINES) $(FFTW_DEFINES) $(DEPFLAGS)
+CFLAGS =   $(FLAGS) $(SCARGS)   $(MACHINE_DEFINES) $(FFTW_DEFINES)
 FFLAGS =   $(FLAGS) $(SFARGS)   $(MACHINE_DEFINES)  $(OPENMP_FLAGS)
 F90FLAGS = $(FLAGS) $(SF90ARGS) $(MACHINE_DEFINES)
 
@@ -478,10 +474,10 @@ pgplot_progs:  $(BDIR)/plotevents $(BDIR)/read_bin_events
 #
 
 clean: 
-	rm -rf $(ODIR)/*.o $(ODIR)/*.a $(ODIR)/*.d
+	rm -rf $(ODIR)/*.o $(ODIR)/*.a  
 
 dist_clean:		
-	rm -rf  $(ODIR)/*.o $(ODIR)/*.a $(ODIR)/*.d $(BDIR)/* src/includes/auto_proto.h src/includes/auto_proto.sgl.h
+	rm -rf  $(ODIR)/*.o $(ODIR)/*.a $(BDIR)/* src/includes/auto_proto.h src/includes/auto_proto.sgl.h
 
 
 # individual programs
@@ -1069,6 +1065,3 @@ $(ODIR)/%.sgl.o:	%.F $(GEN_P_INC)
 
 $(ODIR)/%.sgl.o:	%.f90 $(GEN_P_INC)
 	$(F90)  $(F90FLAGS)  $(OPTIM_FLAGS) -c $<  -o $(ODIR)/$*.sgl.o
-
-# generated header dependencies (see DEPFLAGS); absent on a fresh tree
--include $(wildcard $(ODIR)/*.d)
