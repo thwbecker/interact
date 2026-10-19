@@ -21,7 +21,7 @@
 #       effects and are only meant to set the scale.
 #
 # Requires the 2026-07 tool version (-skip_dense honored in the
-# -make_matrix_externally path, hmat_matvec and dense_reference output
+# path, hmat_matvec and dense_reference output
 # lines, -dense_reference_only mode).
 #
 # Backend flags mirror the uniform block-local settings of run_new_tests
@@ -57,7 +57,7 @@ hmmvp_eps="1e-3 1e-4 1e-5 1e-6"
 
 # ---------------------------------------------------------------- dense
 if [ $make_dense_reference -eq 1 ]; then
-    mpirun -bind-to core -np $ncore_dense $bin -geom_file $geom -make_matrix_externally \
+    mpirun -bind-to core -np $ncore_dense $bin -geom_file $geom \
 	   -use_hmatrix 0 -dense_reference_only -nrandom $nrandom -nsolve $nsolve \
 	  $solver_pc_string &> log.dense_ref
     gawk 'BEGIN{si="NA";ss="NA"}
@@ -150,7 +150,7 @@ echo "# backend eps stored_scalars mbytes compression_ratio matvec_ms matvec_spe
 run_one () {                 # label logfile extra-flags...
     label=$1; log=$2; shift 2
     if ! grep -q "hmat_matvec backend" $log 2> /dev/null ; then
-	mpirun -np $ncore $bin -geom_file $geom -make_matrix_externally \
+	mpirun -np $ncore $bin -geom_file $geom \
 	       -skip_dense -nrandom $nrandom -nsolve $nsolve \
 	       $solver_pc_string "$@" &> $log
     fi
