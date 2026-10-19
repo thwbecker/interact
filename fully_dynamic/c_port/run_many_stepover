@@ -1,8 +1,16 @@
 #!/bin/bash
+cd $HOME/progs/src/interact
+
+#for W in 1.0 -1.0 1.5 -1.5; do
+#  for vs in 0.5 1.0; do
+#    fully_dynamic/c_port/run_step_fd.sh $W 2.0 $vs 1400 both
+#  done
+#done
+#python3 fully_dynamic/c_port/summarize_rsf_step.py step_*_vs*
 
 for W in 1.0 -1.0 1.5 -1.5; do
-  for vs in 0.5 1.0; do
-    ./run_step_fd.sh $W 2.0 $vs 1400 both
-  done
+    for vs in 0.5 1.0; do
+	fully_dynamic/c_port/run_step_fd.sh $W 2.0 $vs 2500 both 16 0.004
+    done
 done
-python3 ./summarize_rsf_step.py step_*_vs*
+python3 fully_dynamic/c_port/summarize_rsf_step.py step_*_L16_ba0.004
