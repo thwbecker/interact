@@ -394,10 +394,16 @@ FD3D_SMALL=1; at 300 m the station values equal those on the larger fault):
 | 250 m | 5.81 s | 3.68 s | 7.24 m |
 | 200 m | 5.51 s | 3.61 s | 7.25 m |
 | 150 m (single precision) | 5.22 s | 3.40 s | 7.29 m |
+| 100 m (Thor) | 5.02 s | 3.31 s | 7.34 m |
 
-Not yet in the asymptotic range (the arrival at 9 km moves by 0.3 s per
-step from 250 to 150 m); 100 m and finer are needed, and the SCEC
-reference files for the comparison. Cost: 200 m 7 min, 150 m 13 min on one
+From 200 m on the steps shrink (0.30 then 0.20 s at 9 km, 0.21 then 0.09 s
+at 3 km); a power-law fit to the last three resolutions gives an exponent of
+about 2.2 and extrapolated arrivals of about 4.9 s at (9, 7.5) km and 3.25 s
+at (0, 3) km, i.e. errors of about 0.1 s at 100 m. A 75 m run (Thor) is
+pending. The comparison with other codes is open: the SCEC pages for TPV101
+show cross-code summaries but no station time series we could download
+(2026-10-22); to return to, e.g. by asking the benchmark organisers or
+from published comparisons. Cost: 200 m 7 min, 150 m 13 min on one
 core in this sandbox.
 
 rsf_solve 3-D setup and static gate (2026-10-22): with all elements
@@ -408,6 +414,17 @@ strike or dip) and compares their static limit with the assembled Is: a
 the 3 x 3 self neighbourhood, with the same sign convention as in 2-D
 (Is = +Ks). src/testing/rsf_solve/test_fd3d_gate.sh is the check.
 -fd_mode 1 refuses 3-D until the phases are connected.
+
+BP4: the SEAS BP4 description specifies a quasi-dynamic problem
+(radiation damping); there is no fully dynamic BP4 reference. Plan: BP4-QD
+with rsf_solve first (fully_dynamic/c_port/run_bp4_qd.sh writes the inputs:
+fault |x2| <= 50 km by default, |x3| <= 40 km, a(x2, x3), tau0 from eq. 18
+with 1.1 tau0 in the nucleation square, the 14 SEAS stations; fixed rake;
+the suggested 500 m needs an H-matrix backend), compared with the SEAS
+BP4-QD submissions; then the same setup with -fd_mode 1 as our own fully
+dynamic variant, compared with the QD run as for BP1. A 2 km smoke test in
+the sandbox ran (events at 199, 219, 353 yr; far too coarse to mean
+anything beyond the setup working).
 
 Remaining for M9: the C port (M9): square elements on one planar fault (grid detection
 like fd_segments), the quadrant kernels (tada_quad.py) in C, 2-D Toeplitz
