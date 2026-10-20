@@ -374,7 +374,33 @@ rake), so the C port keeps that: one table (strike slip to strike
 traction) instead of four, and vector slip stays a later extension of both
 the QD and the FD parts (BP4 asks for both slip components).
 
-Next: the C port (M9): square elements on one planar fault (grid detection
+C port, standalone part (2026-10-22): src/rsf_solve/fd3d.c, fd3d.h,
+src/testing/rsf_solve/fd3d_test.c. Tada quadrant kernels, square-element
+tables as 2-D Toeplitz kernels with 2-D FFTs built from the 1-D FFT (only
+the Hermitian half of each spectrum stored; -DFD3D_SINGLE stores it in
+single precision, about 1e-5 relative differences in slip-weakening runs),
+the 3 x 3 first-lag stencil with a Jacobi solve converged to 1e-13, slip
+weakening and rate and state (aging law), slip along a fixed direction.
+Against the prototype (fixed rake, 500 m; both codes' Jacobi tolerance
+tightened to 1e-13): TPV3 over 12 s to 4e-10 in slip and 2e-9 in slip rate,
+TPV101 over 6 s to 6e-9 and 4e-8; both cases are in run_tests.sh.
+
+TPV101 with the C code (fault x in [-19.5, 19.5] km, y in [-4.5, 19.5] km,
+FD3D_SMALL=1; at 300 m the station values equal those on the larger fault):
+
+| dx | arrival at (9, 7.5) km | arrival at (0, 3) km | slip at (0, 7.5) km at 12 s |
+|---|---|---|---|
+| 300 m | 6.32 s | 3.90 s | 6.98 m |
+| 250 m | 5.81 s | 3.68 s | 7.24 m |
+| 200 m | 5.51 s | 3.61 s | 7.25 m |
+| 150 m (single precision) | 5.22 s | 3.40 s | 7.29 m |
+
+Not yet in the asymptotic range (the arrival at 9 km moves by 0.3 s per
+step from 250 to 150 m); 100 m and finer are needed, and the SCEC
+reference files for the comparison. Cost: 200 m 7 min, 150 m 13 min on one
+core in this sandbox.
+
+Remaining for M9: the C port (M9): square elements on one planar fault (grid detection
 like fd_segments), the quadrant kernels (tada_quad.py) in C, 2-D Toeplitz
 tables with 2-D FFTs built from the 1-D FFT, the 3 x 3 first-lag stencil,
 the coarse history; the static gate against interact's 3-D full-space

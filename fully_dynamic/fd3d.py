@@ -123,7 +123,7 @@ class Fault3D:
                         out[b] += k*src
         return out
 
-    def step(self, maxit=60, tol=1e-10):
+    def step(self, maxit=400, tol=1e-13):
         tab = self.t; dt = tab.dt
         H = self.known()
         k11 = self.k1[0, 0, 1, 1]; k22 = self.k1[1, 1, 1, 1]

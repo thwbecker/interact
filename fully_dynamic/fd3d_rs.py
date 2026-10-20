@@ -45,13 +45,13 @@ class FaultRS3D(fd3d.Fault3D):
             un = u - f/np.where(df != 0, df, -1.0)
             bad = ~np.isfinite(un) | (un <= lo) | (un >= hi)
             un = np.where(bad, 0.5*(lo + hi), un)
-            if np.max(np.abs(un - u)) < 1e-12: u = un; break
+            if np.max(np.abs(un - u)) < 1e-13: u = un; break
             u = un
         v = np.exp(u)
         F = self.strength(v, theta)
         return np.stack([v*Hp[0]/(F + A1*v), v*Hp[1]/(F + A2*v)])
 
-    def solve(self, H, theta, Vg, maxit=50, tol=1e-9):
+    def solve(self, H, theta, Vg, maxit=400, tol=1e-13):
         k11 = self.k1[0, 0, 1, 1]; k22 = self.k1[1, 1, 1, 1]
         V = Vg.copy()
         for it in range(maxit):
@@ -60,7 +60,7 @@ class FaultRS3D(fd3d.Fault3D):
             Vn = self.local(Hp, theta, k11, k22)
             ch = np.abs(Vn - V).max()
             V = Vn
-            if ch <= tol*max(np.abs(V).max(), 1e-9): break
+            if ch <= tol*max(np.abs(V).max(), 1.0): break
         return V, it + 1
 
     def step(self):

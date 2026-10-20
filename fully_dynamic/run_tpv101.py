@@ -35,6 +35,9 @@ def load(t):
     out = np.zeros((2, nx, nz)); out[0] = dtau0*Fr*G; return out
 tau0 = np.zeros((2, nx, nz)); tau0[0] = tauini
 f = fd3d_rs.FaultRS3D(tab, tau0, np.full((nx, nz), sig), a, b, Lc, f0, V0, theta0, Vini, load)
+import os
+f.fixed_rake = bool(os.environ.get("FIXED_RAKE"))
+if f.fixed_rake: print("fixed rake: slip along strike only", flush=True)
 stations = {"st000dp030": (0, 3e3), "st000dp075": (0, 7.5e3), "st000dp120": (0, 12e3), "st090dp075": (9e3, 7.5e3),
             "st120dp030": (12e3, 3e3), "st120dp120": (12e3, 12e3)}
 def cells(x, y):
@@ -58,4 +61,4 @@ out = {k: np.array(v) for k, v in rec.items()}
 for k, A in out.items():
     on = A[A[:, 2] > 1e-3, 0]
     print(f"{k}: rupture time {on[0] if len(on) else np.nan:.3f} s, peak slip rate {A[:,2].max():.3f} m/s, final slip {A[-1,1]:.3f} m")
-np.savez(f"tpv101_dx{int(dx)}.npz", rt=rt, xc=xc, yc=yc, delta=f.delta, **out)
+np.savez(f"tpv101_dx{int(dx)}{'_fr' if f.fixed_rake else ''}.npz", rt=rt, xc=xc, yc=yc, delta=f.delta, **out)

@@ -19,5 +19,10 @@ for W in 500 -500; do
   tail -1 tmp_fd_dynamic/hd.out | sed "s/:/ (W $W):/"
   [ $st -eq 0 ] || fail=1
 done
+# 3-D: TPV3 (slip weakening) and TPV101 (rate and state, 6 s) at 500 m against the prototype (about 15 s)
+( cd tmp_fd_dynamic && ../bin/fd3d_test tpv3 500 ../$d/ref/ref_tpv3_dx500.txt > fd3d.out 2>/dev/null ); st=$?
+tail -1 tmp_fd_dynamic/fd3d.out; [ $st -eq 0 ] || fail=1
+( cd tmp_fd_dynamic && ../bin/fd3d_test tpv101 500 ../$d/ref/ref_tpv101_dx500.txt 6 > fd3d.out 2>/dev/null ); st=$?
+tail -1 tmp_fd_dynamic/fd3d.out; [ $st -eq 0 ] || fail=1
 [ $fail -eq 0 ] && echo "rsf_solve fd tests: all PASS" || echo "rsf_solve fd tests: FAIL"
 exit $fail
