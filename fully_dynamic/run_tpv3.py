@@ -15,6 +15,9 @@ X, Z = np.meshgrid(xc, zc, indexing="ij")
 tau0 = np.zeros((2, nx, nz)); tau0[0] = 70e6
 nuc = (np.abs(X) < 1.5e3) & (np.abs(Z) < 1.5e3); tau0[0][nuc] = 81.6e6
 f = fd3d.Fault3D(tab, tau0, np.full((nx, nz), 120e6), 0.677, 0.525, 0.40)
+import os
+f.fixed_rake = bool(os.environ.get("FIXED_RAKE"))
+if f.fixed_rake: print("fixed rake: slip along strike only")
 def stn(x, z):
     i = np.argsort(np.abs(xc - x))[:2] if abs(((x + 15e3)/dx) % 1) < 1e-9 else [np.argmin(np.abs(xc - x))]
     j = np.argsort(np.abs(zc - z))[:2] if abs(((z + 7.5e3)/dx) % 1) < 1e-9 else [np.argmin(np.abs(zc - z))]
@@ -36,4 +39,4 @@ out = {k: np.array(v) for k, v in rec.items()}
 for k, a in out.items():
     on = a[a[:, 2] > 1e-3, 0]
     print(f"{k}: rupture time {on[0] if len(on) else np.nan:.3f} s, peak slip rate {a[:,2].max():.3f} m/s at {a[np.argmax(a[:,2]),0]:.3f} s, final slip {a[-1,1]:.3f} m")
-np.savez(f"tpv3_dx{int(dx)}.npz", rt=rt, xc=xc, zc=zc, delta=f.delta, **out)
+np.savez(f"tpv3_dx{int(dx)}{'_fr' if f.fixed_rake else ''}.npz", rt=rt, xc=xc, zc=zc, delta=f.delta, **out)

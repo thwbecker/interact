@@ -135,6 +135,7 @@ class Fault3D:
         for it in range(maxit):
             Hp = H + self.apply_k1(V)
             Vn = np.zeros_like(V)
+            if getattr(self, "fixed_rake", False): Hp[1] = 0.0      # scalar slip along x1, friction on tau_1 only
             hmag = np.sqrt(Hp[0]**2 + Hp[1]**2)
             str0 = s*mu_now
             act = (hmag > str0) & self.mask

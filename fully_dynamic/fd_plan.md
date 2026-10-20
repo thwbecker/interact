@@ -346,9 +346,41 @@ out 2.8 km wide.) Run times on one core: 10 s at 500 m, 1 min at 250 m,
 about 4 GB of tables in this form; the C port with real-to-complex FFTs
 and the symmetries of the square element will cut that by about 4.
 
-Next: TPV101 (rate and state, aging law, whole space), then the static
-check of the square-element tables against interact's -full_space 1
-operator (conventions), then the C port and BP4.
+SCEC TPV101 (fd3d_rs.py, run_tpv101.py; rate and state, aging law, whole
+space; computational fault x in [-21, 21] km, y in [-6, 21] km, locked
+beyond): vector rate-and-state friction with an exact local solve along the
+traction direction, exact aging-law update, predictor-corrector in the
+state, nucleation load as specified. Rupture times (bilinear in the
+rupture-time field) along strike at y = 7.5 km and along dip at x = 0:
+
+| dx | x = 3, 6, 9, 12, 15 km | y = 4.5, 3, 1.5, 0 km |
+|---|---|---|
+| 300 m | 2.30, 4.22, 6.43, 8.16, 9.55 s | 2.53, 4.07, 5.78, 7.04 s |
+| 250 m | 2.26, 4.02, 5.88, 7.45, 8.79 s | 2.47, 3.81, 5.20, 6.37 s |
+
+The rupture arrests in the transition layer along dip and strike, as it
+should, but is far from converged at these resolutions (9 percent faster at
+9 km from 300 to 250 m): the process zone is about 400 m, so this problem
+needs 100 m or less, which is beyond the Python prototype in memory and
+time. TPV101 is therefore a test for the C version. (A first run had the
+along-dip half-width of the velocity-weakening region wrong, W instead of
+W/2, and ruptured into the velocity-strengthening region; fixed.)
+
+Fixed rake: TPV3 at 250 m with slip and friction restricted to the strike
+component (FIXED_RAKE=1) gives the same station values to the printed
+digits (PI 2.851 s, 3.122 m; PA 2.670 s, 2.070 m) as the vector version.
+rsf_solve's quasi-dynamic state has one slip component per patch (fixed
+rake), so the C port keeps that: one table (strike slip to strike
+traction) instead of four, and vector slip stays a later extension of both
+the QD and the FD parts (BP4 asks for both slip components).
+
+Next: the C port (M9): square elements on one planar fault (grid detection
+like fd_segments), the quadrant kernels (tada_quad.py) in C, 2-D Toeplitz
+tables with 2-D FFTs built from the 1-D FFT, the 3 x 3 first-lag stencil,
+the coarse history; the static gate against interact's 3-D full-space
+operator; a standalone driver for TPV3 and TPV101 against this prototype
+at roundoff, then TPV101 at 100 m against the SCEC reference series, then
+BP4 with rsf_solve.
 
 ### WP7, C implementation in rsf_solve: status (2026-10-18)
 Done, each verified in the sandbox before delivery (details in
