@@ -426,6 +426,47 @@ dynamic variant, compared with the QD run as for BP1. A 2 km smoke test in
 the sandbox ran (events at 199, 219, 353 yr; far too coarse to mean
 anything beyond the setup working).
 
+3-D dynamic phases in rsf_solve and the free surface (2026-10-23):
+- Free surface by a mirror image, as in the spectral boundary-integral
+  codes (Lapusta et al. 2000; Aochi and Fukuyama 2002; Lapusta and Liu
+  2009; reviewed by Ando 2016 and Hok and Fukuyama 2011): for a vertical
+  strike-slip fault the image lies in the fault plane, so the tables cover
+  the fault doubled in depth and the image rows carry the slip of the real
+  rows (fd3d_create2, mirror = 1); the top row also feels its own image in
+  the first-lag self term. Checked against the explicit doubled fault in a
+  whole space: equal to 4e-10 (fd3d_test mirror, in run_tests.sh). The
+  mirror makes the shear tractions on the surface vanish but not the
+  normal traction; statically the fault plus image deviates 1.8 to 2.5
+  percent from interact's exact half-space operator (whole space without
+  image: 10.6 percent), so the static part of the phases uses the exact Is
+  (callback), and only the dynamic correction uses the image.
+- rsf_solve: with 3-D elements, -fd_mode 1 now runs dynamic phases with
+  the fd3d marcher (fixed fine steps, no variable substeps or coarse
+  history in 3-D yet): switch as in 2-D, history seeded from the
+  accepted-step record, backslip loading since the switch, hand-back of
+  psi, tau, slip; half space allowed for vertical strike-slip faults whose
+  top row reaches the surface. A phase also runs at start-up when the
+  initial state already exceeds -fd_vsw (BP5's seeded nucleation patch),
+  since no upward crossing would be detected.
+- BP5-FD, first event, 1 km, rsf_solve with the repository's BP5 inputs
+  (seas_bp_tests/bp5, QD initial stress) against Lambert's BICyclE
+  BP5-FD files (1 km, also a mirror-image spectral code):
+
+| station | V > 0.1 m/s (ours / Lambert) | peak slip rate | slip at 200 s |
+|---|---|---|---|
+| strk+00dp+00 | 17.47 / 16.74 s | 2.26 / 2.49 m/s | 6.64 / 6.77 m |
+| strk+16dp+00 | 20.64 / 20.02 s | 3.42 / 4.07 m/s | 6.25 / 6.41 m |
+| strk-24dp+10 | 1.73 / 1.73 s | 1.07 / 1.15 m/s | 6.61 / 6.57 m |
+
+  Arrivals 0.6 to 0.7 s (4 to 5 steps) late at the surface stations,
+  slip within 2.5 percent, peak slip rates 7 to 16 percent lower. Our
+  station cells sit half a cell off the nominal positions (cell centres at
+  +-0.5 km), and our initial stress includes eta Vi in the nucleation patch
+  (QD convention; BP5-FD specifies without); neither is corrected yet. A
+  phase at 1 km takes about 40 min on one core here because the afterslip
+  tail runs at the fine step; variable substeps and the coarse history in
+  3-D are the obvious next speed-up.
+
 Remaining for M9: the C port (M9): square elements on one planar fault (grid detection
 like fd_segments), the quadrant kernels (tada_quad.py) in C, 2-D Toeplitz
 tables with 2-D FFTs built from the 1-D FFT, the 3 x 3 first-lag stencil,

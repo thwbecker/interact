@@ -103,6 +103,41 @@ static int run_tpv101(int argc, char **argv)
   return i;
 }
 
+/* mirror check: a fault reaching the surface with its image (fd3d_create2, mirror = 1)
+   against the explicit doubled fault (2 nzp rows, symmetric initial stress) in a whole
+   space; both use the same tables, so the solutions must agree to roundoff */
+static int run_mirror(int argc, char **argv)
+{
+  double cL = 6000, cT = 3464, rho = 2670, dx = argc > 2 ? atof(argv[2]) : 500.0, dt = 0.5*dx/cT, tend = argc > 3 ? atof(argv[3]) : 6.0;
+  int nx = (int)floor(20e3/dx + 0.5), nzp = (int)floor(5e3/dx + 0.5), i, j, n, nsteps = (int)floor(tend/dt + 0.5), fail;
+  struct fd3d_tab *t = fd3d_tab_create(nx, 2*nzp, dx, dt, cL, cT, rho, 0);
+  struct fd3d *fm = fd3d_create2(t, nzp, 1), *fd = fd3d_create(t);
+  double emax = 0, vmax = 0, dmax = 0, ed = 0;
+  fd->law = fm->law = 0; fd->mu_s = fm->mu_s = 0.677; fd->mu_d = fm->mu_d = 0.525; fd->d0 = fm->d0 = 0.40;
+  for(i = 0; i < nx; i++) for(j = 0; j < nzp; j++){
+    double x = -10e3 + (i + 0.5)*dx, z = (j + 0.5)*dx, tau = (fabs(x) < 1.5e3 && z < 3e3) ? 81.6e6 : 70e6;
+    fm->tau0[i*nzp + j] = tau; fm->sigma[i*nzp + j] = 120e6;
+    fd->tau0[i*2*nzp + nzp + j] = tau; fd->tau0[i*2*nzp + nzp - 1 - j] = tau;
+    fd->sigma[i*2*nzp + nzp + j] = 120e6; fd->sigma[i*2*nzp + nzp - 1 - j] = 120e6;
+  }
+  for(n = 0; n < nsteps; n++){
+    fd3d_step(fm, NULL); fd3d_step(fd, NULL);
+    for(i = 0; i < nx; i++) for(j = 0; j < nzp; j++){
+      double a = fm->V[i*nzp + j], b = fd->V[i*2*nzp + nzp + j];
+      if(fabs(a - b) > emax) emax = fabs(a - b);
+      if(fabs(b) > vmax) vmax = fabs(b);
+      if(fabs(fm->delta[i*nzp + j] - fd->delta[i*2*nzp + nzp + j]) > ed) ed = fabs(fm->delta[i*nzp + j] - fd->delta[i*2*nzp + nzp + j]);
+      if(fabs(fd->delta[i*2*nzp + nzp + j]) > dmax) dmax = fabs(fd->delta[i*2*nzp + nzp + j]);
+    }
+  }
+  fail = !(emax <= 1e-8*vmax && ed <= 1e-8*dmax && dmax > 0);
+  printf("fd3d_test mirror: %d x %d elements of %g m, %d steps: max |V diff| %.2e (of %.3f m/s), max |slip diff| %.2e (of %.3f m)\n",
+         nx, nzp, dx, nsteps, emax, vmax, ed, dmax);
+  printf("fd3d_test mirror: %s\n", fail ? "FAIL" : "PASS");
+  fd3d_free(fm); fd3d_free(fd); fd3d_tab_free(t);
+  return fail;
+}
+
 int main(int argc, char **argv)
 {
   double cL = 6000, cT = 3464, rho = 2670, dx = argc > 2 ? atof(argv[2]) : 500.0, dt;
@@ -113,6 +148,7 @@ int main(int argc, char **argv)
   double emax[3] = {0, 0, 0}, smax[3] = {0, 0, 0};
   double *rec = NULL; int nrec = 0;
   if(argc >= 3 && !strcmp(argv[1], "tpv101")) return run_tpv101(argc, argv);
+  if(argc >= 2 && !strcmp(argv[1], "mirror")) return run_mirror(argc, argv);
   if(argc < 3 || strcmp(argv[1], "tpv3")){ fprintf(stderr, "usage: %s tpv3|tpv101 dx [ref] [tend]\n", argv[0]); return 2; }
   nx = (int)floor(30e3/dx + 0.5); nz = (int)floor(15e3/dx + 0.5); dt = 0.5*dx/cT;
   t = fd3d_tab_create(nx, nz, dx, dt, cL, cT, rho, 0);

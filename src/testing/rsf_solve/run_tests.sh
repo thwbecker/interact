@@ -24,5 +24,8 @@ done
 tail -1 tmp_fd_dynamic/fd3d.out; [ $st -eq 0 ] || fail=1
 ( cd tmp_fd_dynamic && ../bin/fd3d_test tpv101 500 ../$d/ref/ref_tpv101_dx500.txt 6 > fd3d.out 2>/dev/null ); st=$?
 tail -1 tmp_fd_dynamic/fd3d.out; [ $st -eq 0 ] || fail=1
+# 3-D mirror-image free surface against the explicit doubled fault (a few s)
+( cd tmp_fd_dynamic && ../bin/fd3d_test mirror 500 6 > fd3d.out 2>/dev/null ); st=$?
+tail -1 tmp_fd_dynamic/fd3d.out; [ $st -eq 0 ] || fail=1
 [ $fail -eq 0 ] && echo "rsf_solve fd tests: all PASS" || echo "rsf_solve fd tests: FAIL"
 exit $fail

@@ -784,6 +784,8 @@ PetscErrorCode rsf_solve_run(int argc,char **argv,struct interact_ctx *par,
     PetscCall(VecRestoreArrayRead(x,&xr));
   }
   if(!restart_done){
+    if(rsf->fd && !have_restart)		/* initial state already above the FD switch threshold */
+      PetscCall(rsf_fd_initial(ts,par,x));
     PetscCall(TSSolve(ts, x));
     if(ckpt_every > 0)
       PetscCall(rsf_write_checkpoint(ts,x,uc));

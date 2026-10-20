@@ -150,6 +150,14 @@ step, i.e. fourfold per halving of the element size; resolution of 5 or more ele
 slip and timing, about 40 for supershear transitions or near-threshold
 triggering.
 
+3-D (2026-10-23): with all elements 3-D rectangles forming a complete grid
+of equal squares on one plane, `-fd_mode 1` runs the phases with the 3-D
+marcher (Tada 2006 quadrant kernels). Whole space (`-full_space 1`, slip
+along strike or dip) or half space for a vertical strike-slip fault whose
+top row reaches the surface, where the free surface enters the dynamic part
+through a mirror image and the static part uses interact's exact half-space
+operator. 3-D phases use fixed fine steps so far.
+
 Restrictions in this version, refused with a message at start: one MPI
 rank; `-ve_mode 0`; aging law (`-state_law 1`); 2-D elements only, forming
 straight runs of equal, collinear elements with one common element size,

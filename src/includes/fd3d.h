@@ -51,6 +51,14 @@ void fd3d_fft2(const struct fd3d_tab *t, double _Complex *a, int sign);   /* in 
 struct fd3d {
   struct fd3d_tab *t;
   int N, nhist, hk;
+  /* free surface by a mirror image (vertical fault, slip along strike, element row 0
+     adjacent to the surface): the tables cover 2 nzp rows, image row nzp - 1 - j carries
+     the slip of row j. nzp = t->nz and mirror = 0 without it */
+  int nzp, mirror;
+  /* optional external static operator (e.g. interact's exact half-space Is):
+     out = Ks delta in element order; NULL: the tables' own static operator */
+  void (*static_fn)(void *ctx, const double *delta, double *out);
+  void *static_ctx;
   double time;
   double *delta, *V, *tau, *tau0, *sigma, *H, *work;
   fd3d_cplx *hist;              /* ring of L slices of FFT(V), half spectrum */
@@ -64,7 +72,11 @@ struct fd3d {
   int *locked;                                  /* optional: no slip */
 };
 struct fd3d *fd3d_create(struct fd3d_tab *t);
+/* mirror = 1: the tables were built for 2 nzp rows, see struct fd3d */
+struct fd3d *fd3d_create2(struct fd3d_tab *t, int nzp, int mirror);
 void fd3d_free(struct fd3d *f);
 /* one fine step with an optional extra load (Pa, N values, may be NULL); returns Jacobi iterations */
 int fd3d_step(struct fd3d *f, const double *load);
+void fd3d_push(struct fd3d *f, const double *V);   /* one slice into the history ring */
+void fd3d_reset(struct fd3d *f);                   /* empty history, zero slip and time */
 #endif

@@ -169,8 +169,15 @@ void fd3d_tab_free(struct fd3d_tab *t)
 /* ---------------- marcher ---------------- */
 struct fd3d *fd3d_create(struct fd3d_tab *t)
 {
+  return fd3d_create2(t, t->nz, 0);
+}
+
+struct fd3d *fd3d_create2(struct fd3d_tab *t, int nzp, int mirror)
+{
   struct fd3d *f = (struct fd3d *)calloc(1, sizeof(*f));
-  int N = t->nx*t->nz;
+  int N = t->nx*nzp;
+  if(mirror && t->nz != 2*nzp){ free(f); return NULL; }
+  f->nzp = nzp; f->mirror = mirror;
   size_t M = (size_t)t->Mx*t->Mz;
   f->t = t; f->N = N;
   f->delta = calloc(N, sizeof(double)); f->V = calloc(N, sizeof(double)); f->tau = calloc(N, sizeof(double));
@@ -192,8 +199,15 @@ static void field_hat(const struct fd3d *f, const double *x, double _Complex *ou
 {
   const struct fd3d_tab *t = f->t;
   int i, j;
+  int nzp = f->nzp;
   memset(out, 0, sizeof(double _Complex)*(size_t)t->Mx*t->Mz);
-  for(i = 0; i < t->nx; i++) for(j = 0; j < t->nz; j++) out[(size_t)i*t->Mz + j] = x[i*t->nz + j];
+  for(i = 0; i < t->nx; i++) for(j = 0; j < nzp; j++){
+    if(f->mirror){
+      out[(size_t)i*t->Mz + nzp + j] = x[i*nzp + j];
+      out[(size_t)i*t->Mz + nzp - 1 - j] = x[i*nzp + j];      /* image */
+    }else
+      out[(size_t)i*t->Mz + j] = x[i*nzp + j];
+  }
   fd3d_fft2(t, out, -1);
 }
 
@@ -203,8 +217,13 @@ static void known(struct fd3d *f)
   const struct fd3d_tab *t = f->t;
   size_t M = (size_t)t->Mx*t->Mz, m;
   int l, i, j, lmax = t->L < f->nhist + 1 ? t->L : f->nhist + 1;
-  field_hat(f, f->delta, t->work);
-  for(m = 0; m < M; m++) f->acc[m] = t->Ks_hat[m]*t->work[m];
+  int row0 = f->mirror ? f->nzp : 0, nzp = f->nzp;
+  if(f->static_fn)
+    memset(f->acc, 0, sizeof(double _Complex)*M);
+  else{
+    field_hat(f, f->delta, t->work);
+    for(m = 0; m < M; m++) f->acc[m] = t->Ks_hat[m]*t->work[m];
+  }
   {
     size_t Mhh = (size_t)t->Mx*t->Mh; int ii, jj;
     double _Complex *ah = (double _Complex *)calloc(Mhh, sizeof(double _Complex));
@@ -218,22 +237,37 @@ static void known(struct fd3d *f)
   }
   from_half(t, f->acc);
   fd3d_fft2(t, f->acc, +1);
-  for(i = 0; i < t->nx; i++) for(j = 0; j < t->nz; j++)
-    f->H[i*t->nz + j] = f->tau0[i*t->nz + j] + creal(f->acc[(size_t)i*t->Mz + j])/M;
+  for(i = 0; i < t->nx; i++) for(j = 0; j < nzp; j++)
+    f->H[i*nzp + j] = f->tau0[i*nzp + j] + creal(f->acc[(size_t)i*t->Mz + row0 + j])/M;
+  if(f->static_fn){
+    f->static_fn(f->static_ctx, f->delta, f->work);
+    for(i = 0; i < f->N; i++) f->H[i] += f->work[i];
+  }
+}
+
+/* first-lag self coefficient of row j (with the mirror, the top row also feels its own image) */
+static double kdiag(const struct fd3d *f, int j)
+{
+  return f->t->k1[1][1] + ((f->mirror && j == 0) ? f->t->k1[1][2] : 0.0);
 }
 
 /* first-lag traction from neighbours (excluding self) */
 static void apply_k1(const struct fd3d *f, const double *V, double *out)
 {
   const struct fd3d_tab *t = f->t;
-  int i, j, di, dj, nx = t->nx, nz = t->nz;
+  int i, j, di, dj, nx = t->nx, nz = f->nzp;
   for(i = 0; i < nx; i++)
     for(j = 0; j < nz; j++){
       double s = 0.0;
       for(di = -1; di <= 1; di++)
         for(dj = -1; dj <= 1; dj++){
           int si = i - di, sj = j - dj;               /* receiver - source = (di, dj) */
-          if((di == 0 && dj == 0) || si < 0 || si >= nx || sj < 0 || sj >= nz) continue;
+          if((di == 0 && dj == 0) || si < 0 || si >= nx || sj >= nz) continue;
+          if(sj < 0){
+            if(!f->mirror) continue;
+            if(di == 0) continue;                     /* own image: in kdiag */
+            sj = -1 - sj;                             /* image of row -1 - sj */
+          }
           s += t->k1[di + 1][dj + 1]*V[si*nz + sj];
         }
       out[i*nz + j] = s;
@@ -288,11 +322,30 @@ static double local_rs(const struct fd3d *f, int i, double Hp, double k, double 
   return sgn(Hp)*exp(u);
 }
 
+/* push one fine-step slice of slip rate into the history ring */
+void fd3d_push(struct fd3d *f, const double *V)
+{
+  struct fd3d_tab *t = f->t;
+  field_hat(f, V, t->work);
+  to_half(t, t->work, f->hist + (size_t)(f->hk % t->L)*t->Mx*t->Mh);
+  f->hk = (f->hk + 1) % t->L;
+  if(f->nhist < t->L) f->nhist++;
+}
+
+/* empty history, zero slip and time (start of a dynamic phase) */
+void fd3d_reset(struct fd3d *f)
+{
+  struct fd3d_tab *t = f->t;
+  memset(f->hist, 0, sizeof(fd3d_cplx)*(size_t)t->L*t->Mx*t->Mh);
+  f->hk = 0; f->nhist = 0; f->time = 0.0;
+  memset(f->delta, 0, sizeof(double)*f->N);
+}
+
 int fd3d_step(struct fd3d *f, const double *load)
 {
   struct fd3d_tab *t = f->t;
   int N = f->N, i, it, pass, itot = 0;
-  double dt = t->dt, k = t->k1[1][1], *Vn = (double *)malloc(sizeof(double)*N);
+  double dt = t->dt, *Vn = (double *)malloc(sizeof(double)*N);
   double *th_p = NULL, *Vs = NULL;
   known(f);
   if(load) for(i = 0; i < N; i++) f->H[i] += load[i];
@@ -310,9 +363,9 @@ int fd3d_step(struct fd3d *f, const double *load)
         if(f->law == 0){
           double dm = fabs(f->delta[i]), mu = dm < f->d0 ? f->mu_s - (f->mu_s - f->mu_d)*dm/f->d0 : f->mu_d;
           double slope = dm < f->d0 ? f->sigma[i]*(f->mu_s - f->mu_d)*dt/f->d0 : 0.0;
-          Vn[i] = local_sw(f, i, Hp, k, f->sigma[i]*mu, slope);
+          Vn[i] = local_sw(f, i, Hp, kdiag(f, i % f->nzp), f->sigma[i]*mu, slope);
         }else
-          Vn[i] = local_rs(f, i, Hp, k, th_p[i], V[i]);
+          Vn[i] = local_rs(f, i, Hp, kdiag(f, i % f->nzp), th_p[i], V[i]);
         if(fabs(Vn[i] - V[i]) > ch) ch = fabs(Vn[i] - V[i]);
         if(fabs(Vn[i]) > vm) vm = fabs(Vn[i]);
       }
@@ -328,12 +381,8 @@ int fd3d_step(struct fd3d *f, const double *load)
     free(V);
   }
   apply_k1(f, f->V, f->work);
-  for(i = 0; i < N; i++) f->tau[i] = f->H[i] + f->work[i] + k*f->V[i];
-  /* push V^n into the ring */
-  field_hat(f, f->V, t->work);
-  to_half(t, t->work, f->hist + (size_t)(f->hk % t->L)*t->Mx*t->Mh);
-  f->hk = (f->hk + 1) % t->L;
-  if(f->nhist < t->L) f->nhist++;
+  for(i = 0; i < N; i++) f->tau[i] = f->H[i] + f->work[i] + kdiag(f, i % f->nzp)*f->V[i];
+  fd3d_push(f, f->V);
   for(i = 0; i < N; i++) f->delta[i] += f->V[i]*dt;
   f->time += dt;
   free(Vn); free(th_p); free(Vs);

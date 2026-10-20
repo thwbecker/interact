@@ -35,8 +35,11 @@ struct fd_vars {
   PetscInt  coarse;		/* coarse history for aligned long steps (1: on) */
   PetscReal dt_restart;		/* TS step after a phase [s] */
   /* 3-D (fd3d.c): square elements on one plane */
-  PetscBool dim3;
+  PetscBool dim3, mirror3;
   struct fd3d_tab *tab3;
+  struct fd3d *f3;
+  int nx3, nz3;
+  Vec v3a, v3b;			/* work vectors for the exact static operator */
   /* segments, sources (real plus images), tables, marcher system */
   struct fd_seglist *segs;
   PetscInt nsrc;
