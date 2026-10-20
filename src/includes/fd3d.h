@@ -39,6 +39,7 @@ struct fd3d_tab {
   double _Complex *Ks_hat;      /* static stress per unit slip, Mx Mz */
   double k1[3][3];              /* first-lag kernel on the 3 x 3 stencil, [di + 1][dj + 1] */
   double ks_self;
+  double *ks_off;               /* static stress per unit slip by offset, (2 nx - 1) x (2 nz - 1), [di + nx - 1][dj + nz - 1] */
   fd_fft_plan px, pz, ix, iz;   /* forward and backward 1-D plans */
   double _Complex *work;        /* Mx Mz */
 };

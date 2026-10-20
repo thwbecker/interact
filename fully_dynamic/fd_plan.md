@@ -400,6 +400,15 @@ step from 250 to 150 m); 100 m and finer are needed, and the SCEC
 reference files for the comparison. Cost: 200 m 7 min, 150 m 13 min on one
 core in this sandbox.
 
+rsf_solve 3-D setup and static gate (2026-10-22): with all elements
+3-D rectangles, -fd_mode builds the fd3d tables from the geometry (squares
+of one size on one plane forming a complete grid, -full_space 1, slip along
+strike or dip) and compares their static limit with the assembled Is: a
+16 x 8 vertical strike-slip fault of 500 m squares agrees to 3e-10 outside
+the 3 x 3 self neighbourhood, with the same sign convention as in 2-D
+(Is = +Ks). src/testing/rsf_solve/test_fd3d_gate.sh is the check.
+-fd_mode 1 refuses 3-D until the phases are connected.
+
 Remaining for M9: the C port (M9): square elements on one planar fault (grid detection
 like fd_segments), the quadrant kernels (tada_quad.py) in C, 2-D Toeplitz
 tables with 2-D FFTs built from the 1-D FFT, the 3 x 3 first-lag stencil,

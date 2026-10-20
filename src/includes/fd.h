@@ -10,6 +10,7 @@
 #include "fd_tables.h"
 #include "fd_segments.h"
 #include "fd_march.h"
+#include "fd3d.h"
 
 struct fd_vars {
   /* options */
@@ -33,6 +34,9 @@ struct fd_vars {
   PetscReal back_eps,back_vmax;	/* quasi-steady hand-back criterion (0: off) */
   PetscInt  coarse;		/* coarse history for aligned long steps (1: on) */
   PetscReal dt_restart;		/* TS step after a phase [s] */
+  /* 3-D (fd3d.c): square elements on one plane */
+  PetscBool dim3;
+  struct fd3d_tab *tab3;
   /* segments, sources (real plus images), tables, marcher system */
   struct fd_seglist *segs;
   PetscInt nsrc;

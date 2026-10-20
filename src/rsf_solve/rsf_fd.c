@@ -56,6 +56,7 @@
 #include "rsf.h"
 #include "fd.h"
 #include "fd_march.h"
+#include "fd3d.h"
 
 static PetscErrorCode fd_build_tables(struct interact_ctx *par, struct fd_vars *fd);
 static PetscErrorCode fd_gate_static(struct interact_ctx *par, struct fd_vars *fd);
@@ -66,7 +67,7 @@ PetscErrorCode rsf_fd_setup(struct interact_ctx *par, PetscReal shear_modulus_si
   struct flt *fault = par->fault;
   struct rsf_vars *rsf = medium->rsf;
   struct fd_vars *fd;
-  PetscInt mode = 0, i, n2d = 0, nanti = 0;
+  PetscInt mode = 0, i, n2d = 0, nanti = 0, n3d = 0;
   PetscBool set = PETSC_FALSE;
   PetscMPIInt size;
   PetscFunctionBeginUser;
@@ -83,8 +84,11 @@ PetscErrorCode rsf_fd_setup(struct interact_ctx *par, PetscReal shear_modulus_si
       n2d++;
     else if(fault[i].type == TWO_DIM_ANTIPLANE)
       nanti++;
+    else if(fault[i].type == OKADA_PATCH)
+      n3d++;
   }
-  PetscCheck((n2d + nanti) == medium->nrflt,PETSC_COMM_WORLD,PETSC_ERR_SUP,
+  PetscCheck((n3d == 0) || (n3d == medium->nrflt),PETSC_COMM_WORLD,PETSC_ERR_SUP,"-fd_mode: mixed 2-D and 3-D elements");
+  PetscCheck((n3d > 0) || ((n2d + nanti) == medium->nrflt),PETSC_COMM_WORLD,PETSC_ERR_SUP,
 	     "-fd_mode: all elements must be 2-D segments (plane strain or antiplane) in this version");
   PetscCheck((n2d == 0) || (nanti == 0),PETSC_COMM_WORLD,PETSC_ERR_SUP,"-fd_mode: mixed in-plane and antiplane elements");
   PetscCall(PetscCalloc1(1,&fd));
@@ -117,6 +121,20 @@ PetscErrorCode rsf_fd_setup(struct interact_ctx *par, PetscReal shear_modulus_si
   if(!set) fd->nstat = 0;
   PetscCheck(fd->vback < fd->vsw,PETSC_COMM_WORLD,PETSC_ERR_ARG_OUTOFRANGE,"-fd_vback must be below -fd_vsw");
   PetscCheck(fd->kmax >= 1 && fd->kmax <= 32768 && (fd->kmax & (fd->kmax - 1)) == 0,PETSC_COMM_WORLD,PETSC_ERR_ARG_OUTOFRANGE,"-fd_kmax must be a power of two up to 32768");
+  if(n3d > 0){
+    /* 3-D: square elements on one planar fault in a whole space (fd3d.c); so far
+       setup and static gate only, the dynamic phases are not yet connected */
+    fd->dim3 = PETSC_TRUE;
+    fd->mu = shear_modulus_si; fd->beta = s_wave_speed_si;
+    fd->nu = medium->elastic.poisson;
+    fd->rho = fd->mu/(fd->beta*fd->beta);
+    fd->alpha = fd->beta*sqrt(2.0*(1.0 - fd->nu)/(1.0 - 2.0*fd->nu));
+    rsf->fd = fd;
+    PetscCall(fd3d_setup_from_geometry(par,fd));
+    PetscCheck(fd->mode != 1,PETSC_COMM_WORLD,PETSC_ERR_SUP,
+	       "-fd_mode 1: 3-D dynamic phases are not connected to rsf_solve yet (use -fd_mode -1 to check the 3-D setup)");
+    PetscFunctionReturn(PETSC_SUCCESS);
+  }
   /* medium: shear modulus and S speed from the run settings (SI), Poisson from interact */
   fd->mode2d = (nanti > 0) ? FD_MODE_ANTIPLANE : FD_MODE_INPLANE;
   fd->halfplane = PETSC_FALSE;
@@ -144,6 +162,90 @@ PetscErrorCode rsf_fd_setup(struct interact_ctx *par, PetscReal shear_modulus_si
 		(int)fd->mode,fd->mode2d == FD_MODE_ANTIPLANE ? "antiplane" : "in-plane",fd->halfplane ? " half plane (image sources)" : "",(long)fd->segs->nseg,(double)fd->dt_min,
 		(double)fd->vsw,(double)fd->vback,(double)fd->tol,(double)fd->et,(double)fd->xi,(int)fd->kmax,
 		(double)fd->nbytes/1048576.0,fd_fft_backend()));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+
+/*
+  3-D: square elements of equal size forming a complete rectangular grid on
+  one plane, whole space, slip along strike (-rsf_slip_mode strike) or dip.
+  Builds the fd3d tables (grid axis 1 = slip direction) and checks their
+  static limit against the assembled Is, as for 2-D.
+*/
+PetscErrorCode fd3d_setup_from_geometry(struct interact_ctx *par, struct fd_vars *fd)
+{
+  struct med *medium = par->medium;
+  struct flt *fault = par->fault;
+  struct rsf_vars *rsf = medium->rsf;
+  PetscInt n = medium->nrflt, k, c, ncols, gi;
+  const PetscInt *cols;
+  const PetscScalar *vals;
+  double dx, e1[3], e2[3], nn[3], x0[3], lo1 = 1e300, lo2 = 1e300, hi1 = -1e300, hi2 = -1e300, *pa, *pb, dev = 0.0, nrm = 0.0, ls;
+  int nx, nz, *cnt, *s_of_g, i;
+  PetscFunctionBeginUser;
+  PetscCheck(medium->full_space,PETSC_COMM_WORLD,PETSC_ERR_SUP,"-fd_mode: 3-D needs -full_space 1 in this version (the free surface comes later)");
+  PetscCheck((rsf->slip_mode == STRIKE) || (rsf->slip_mode == DIP),PETSC_COMM_WORLD,PETSC_ERR_SUP,"-fd_mode: 3-D needs a fixed slip direction (-rsf_slip_mode strike or dip)");
+  ls = fd->length_scale;
+  dx = 2.0*fault[0].l*ls;
+  for(k = 0;k < 3;k++){
+    e1[k] = (rsf->slip_mode == STRIKE) ? fault[0].t_strike[k] : fault[0].t_dip[k];
+    e2[k] = (rsf->slip_mode == STRIKE) ? fault[0].t_dip[k] : fault[0].t_strike[k];
+    nn[k] = fault[0].normal[k]; x0[k] = fault[0].x[k]*ls;
+  }
+  PetscCall(PetscMalloc2(n,&pa,n,&pb));
+  for(i = 0;i < n;i++){
+    double d[3], dn;
+    PetscCheck((fabs(2.0*fault[i].l*ls - dx) < 1e-6*dx) && (fabs(2.0*fault[i].w*ls - dx) < 1e-6*dx),PETSC_COMM_WORLD,PETSC_ERR_SUP,
+	       "-fd_mode: 3-D elements must be squares of one size (patch %d: half-lengths %g, %g)",i,fault[i].l,fault[i].w);
+    PetscCheck(fabs(fault[i].normal[0]*nn[0] + fault[i].normal[1]*nn[1] + fault[i].normal[2]*nn[2]) > 1.0 - 1e-9,PETSC_COMM_WORLD,PETSC_ERR_SUP,
+	       "-fd_mode: 3-D elements must lie on one plane (patch %d has a different orientation)",i);
+    for(k = 0;k < 3;k++) d[k] = fault[i].x[k]*ls - x0[k];
+    dn = d[0]*nn[0] + d[1]*nn[1] + d[2]*nn[2];
+    PetscCheck(fabs(dn) < 1e-6*dx,PETSC_COMM_WORLD,PETSC_ERR_SUP,"-fd_mode: 3-D elements must lie on one plane (patch %d is %g m off)",i,dn);
+    pa[i] = d[0]*e1[0] + d[1]*e1[1] + d[2]*e1[2]; pb[i] = d[0]*e2[0] + d[1]*e2[1] + d[2]*e2[2];
+    if(pa[i] < lo1) lo1 = pa[i];
+    if(pa[i] > hi1) hi1 = pa[i];
+    if(pb[i] < lo2) lo2 = pb[i];
+    if(pb[i] > hi2) hi2 = pb[i];
+  }
+  nx = (int)floor((hi1 - lo1)/dx + 0.5) + 1; nz = (int)floor((hi2 - lo2)/dx + 0.5) + 1;
+  PetscCheck(nx*nz == n,PETSC_COMM_WORLD,PETSC_ERR_SUP,"-fd_mode: 3-D elements must form a complete %d x %d grid (have %d)",nx,nz,(int)n);
+  PetscCall(PetscCalloc1(n,&cnt)); PetscCall(PetscMalloc1(n,&fd->g_of_s)); PetscCall(PetscMalloc1(n,&s_of_g));
+  for(i = 0;i < n;i++){
+    double fi = (pa[i] - lo1)/dx, fj = (pb[i] - lo2)/dx;
+    int ii = (int)floor(fi + 0.5), jj = (int)floor(fj + 0.5);
+    PetscCheck((fabs(fi - ii) < 1e-6) && (fabs(fj - jj) < 1e-6),PETSC_COMM_WORLD,PETSC_ERR_SUP,"-fd_mode: patch %d is off the regular 3-D grid",i);
+    cnt[ii*nz + jj]++;
+    fd->g_of_s[ii*nz + jj] = i; s_of_g[i] = ii*nz + jj;
+  }
+  for(i = 0;i < n;i++) PetscCheck(cnt[i] == 1,PETSC_COMM_WORLD,PETSC_ERR_SUP,"-fd_mode: duplicate or missing patch in the 3-D grid");
+  PetscCall(PetscFree(cnt)); PetscCall(PetscFree2(pa,pb));
+  fd->dt_min = fd->cfl*dx/fd->beta;
+  fd->tab3 = fd3d_tab_create(nx,nz,dx,fd->dt_min,fd->alpha,fd->beta,fd->rho,(int)fd->lmax);
+  PetscCheck(fd->tab3,PETSC_COMM_WORLD,PETSC_ERR_MEM,"rsf_fd_setup: 3-D table allocation failed");
+  /* static gate: Is(receiver, source) against the offset table, skipping the
+     3 x 3 self neighbourhood whose regularisation may differ */
+  for(gi = 0;gi < n;gi++){
+    int si = s_of_g[gi]/nz, sj = s_of_g[gi]%nz;
+    PetscCall(MatGetRow(medium->Is,gi,&ncols,&cols,&vals));
+    for(c = 0;c < ncols;c++){
+      int ti = s_of_g[cols[c]]/nz, tj = s_of_g[cols[c]]%nz, di = si - ti, dj = sj - tj;
+      double ours, dv;
+      if((abs(di) <= 1) && (abs(dj) <= 1)) continue;
+      ours = fd->tab3->ks_off[(size_t)(di + nx - 1)*(2*nz - 1) + (dj + nz - 1)];
+      dv = PetscRealPart(vals[c]) - ours;
+      dev += dv*dv; nrm += PetscRealPart(vals[c])*PetscRealPart(vals[c]);
+    }
+    PetscCall(MatRestoreRow(medium->Is,gi,&ncols,&cols,&vals));
+  }
+  PetscCall(PetscFree(s_of_g));
+  dev = sqrt(dev/(nrm + 1e-300));
+  PetscCall(PetscPrintf(PETSC_COMM_WORLD,"rsf_fd_setup: 3-D, %d x %d squares of %g m, dt_min %.3e s, window %d lags, FFT %d x %d, tables %.1f MB\n",
+			nx,nz,dx,(double)fd->dt_min,fd->tab3->L,fd->tab3->Mx,fd->tab3->Mz,
+			(double)fd->tab3->L*fd->tab3->Mx*fd->tab3->Mh*sizeof(fd3d_cplx)/1048576.0));
+  PetscCall(PetscPrintf(PETSC_COMM_WORLD,"rsf_fd_setup: 3-D static gate: rel dev of Ks(tables) from Is %.3e (tol %g)\n",dev,(double)fd->gate_tol));
+  PetscCheck(dev <= 5.0*fd->gate_tol,PETSC_COMM_WORLD,PETSC_ERR_USER,
+	     "rsf_fd_setup: 3-D static limit deviates %.3e from the assembled Is: convention mismatch (a sign flip gives 2)",dev);
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
@@ -483,7 +585,7 @@ PetscErrorCode rsf_fd_monitor(TS ts, PetscInt step, PetscReal time, Vec X, void 
   const PetscScalar *v;
   PetscInt i;
   PetscFunctionBeginUser;
-  if(!fd)
+  if(!fd || fd->dim3)		/* 3-D: no phases yet, nothing to record */
     PetscFunctionReturn(PETSC_SUCCESS);
   PetscCall(VecGetArrayRead(rsf->vel,&v));
   fd->rec_t[fd->irec] = time;
@@ -504,7 +606,7 @@ PetscErrorCode rsf_fd_postevent(TS ts, struct interact_ctx *par, PetscReal t, Ve
   if(!fd)
     PetscFunctionReturn(PETSC_SUCCESS);
   fd->nflag++;
-  if(fd->mode == 1){
+  if((fd->mode == 1) && !fd->dim3){
     PetscCall(fd_run_phase(ts,par,fd,t,X,&t_end));
     fd->nphase++;
     fd->nrec_used = 0; fd->irec = 0;	/* the record is stale after the phase */
@@ -526,6 +628,7 @@ PetscErrorCode rsf_fd_finalize(struct interact_ctx *par)
     PetscFunctionReturn(PETSC_SUCCESS);
   PetscCall(PetscPrintf(PETSC_COMM_WORLD,"rsf_fd_finalize: %ld accepted steps above vsw, %ld dynamic phases\n",
 		(long)fd->nflag,(long)fd->nphase));
+  if(fd->tab3) fd3d_tab_free(fd->tab3);
   if(fd->sys) fd_sys_free(fd->sys);
   if(fd->pairs){
     for(k = 0;k < fd->nsrc*fd->segs->nseg;k++)
@@ -535,7 +638,7 @@ PetscErrorCode rsf_fd_finalize(struct interact_ctx *par)
   if(fd->srcseg) PetscCall(PetscFree3(fd->srcseg,fd->src_of,fd->src_rev));
   if(fd->g_of_s) PetscCall(PetscFree(fd->g_of_s));
   if(fd->rec_t) PetscCall(PetscFree2(fd->rec_t,fd->rec_v));
-  fd_seglist_free(fd->segs);
+  if(fd->segs) fd_seglist_free(fd->segs);
   PetscCall(PetscFree(fd));
   rsf->fd = NULL;
   PetscFunctionReturn(PETSC_SUCCESS);

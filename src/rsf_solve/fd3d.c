@@ -126,6 +126,8 @@ struct fd3d_tab *fd3d_tab_create(int nx, int nz, double dx, double dt, double cL
       A[(size_t)i*oz + j] = (fd3d_square_ramp(x1, x2, 0.0, T2, a, cL, cT, rho) - fd3d_square_ramp(x1, x2, 0.0, T1, a, cL, cT, rho))/(T2 - T1);
     }
   t->ks_self = A[(size_t)(nx - 1)*oz + (nz - 1)];
+  t->ks_off = (double *)malloc(sizeof(double)*(size_t)ox*oz);
+  memcpy(t->ks_off, A, sizeof(double)*(size_t)ox*oz);
   t->Ks_hat = (double _Complex *)malloc(sizeof(double _Complex)*(size_t)t->Mx*t->Mz);
   put_offsets(t, A, t->Ks_hat); fd3d_fft2(t, t->Ks_hat, -1);
   t->Mh = t->Mz/2 + 1;
@@ -159,7 +161,7 @@ struct fd3d_tab *fd3d_tab_create(int nx, int nz, double dx, double dt, double cL
 void fd3d_tab_free(struct fd3d_tab *t)
 {
   if(!t) return;
-  free(t->W_hat); free(t->Ks_hat); free(t->work);
+  free(t->W_hat); free(t->Ks_hat); free(t->work); free(t->ks_off);
   fd_fft_plan_destroy(t->px); fd_fft_plan_destroy(t->ix); fd_fft_plan_destroy(t->pz); fd_fft_plan_destroy(t->iz);
   free(t);
 }
@@ -292,7 +294,6 @@ int fd3d_step(struct fd3d *f, const double *load)
   int N = f->N, i, it, pass, itot = 0;
   double dt = t->dt, k = t->k1[1][1], *Vn = (double *)malloc(sizeof(double)*N);
   double *th_p = NULL, *Vs = NULL;
-  size_t M = (size_t)t->Mx*t->Mz;
   known(f);
   if(load) for(i = 0; i < N; i++) f->H[i] += load[i];
   if(f->law == 1){ th_p = (double *)malloc(sizeof(double)*N); Vs = (double *)malloc(sizeof(double)*N); }
