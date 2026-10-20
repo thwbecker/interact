@@ -295,6 +295,61 @@ memory-bound. Consequences:
 Order if pursued: partitioned convolution first (reduces the work), then
 the GPU switch for the remainder.
 
+### WP8, 3-D (started 2026-10-21)
+Decisions: rectangular (square) elements on planar faults, 2-D Toeplitz
+tables and 2-D FFTs over the fault plane, otherwise the same scheme as in
+2-D; full space first (TPV3, TPV101, BP4-FD), the free surface afterwards.
+
+Kernels (prototype, fully_dynamic/):
+- gen3d_point.py: point moment-tensor displacement (Aki and Richards eq.
+  4.29) for a general moment function; Navier residual 3e-14, static
+  Kelvin double couple 1e-15.
+- tada_quad.py: stress response to a constant slip rate on a quadrantal
+  fault, transcribed from Tada (2006, GJI 164, Appendix A, eqs A12-A23; slip
+  along x2 by the x1 <-> x2 symmetry), and the square element as four
+  quadrants. Checks (check_tada_quad.py and inline): early-time self term
+  equals -mu/(2 cT) exactly; late-time slope equals the static stress from
+  a Gauss quadrature of the Kelvin double couple to 9 digits (in-plane,
+  off-element); response to a cubic slip history, computed by twice
+  integrating the Tada ramp response, equals the quadrature of the
+  point-source solution over the element to 1e-9 (off-plane and in-plane
+  receivers; s31, s32, s11; after both waves and between P and S).
+- The response becomes exactly static once the S wave from the farthest
+  corner of an element has passed (Huygens), so W[l] vanishes beyond a
+  finite, offset-dependent lag.
+
+Marcher (fd3d.py): one planar fault, two slip components, vector slip
+weakening with the exact local solve along the traction direction, the
+first-lag operator on the 3 x 3 stencil (the P wave reaches the eight
+neighbours within dt = 0.5 dx/cS, checked) solved by Jacobi iteration,
+history by 2-D FFTs, end-of-step collocation.
+
+SCEC TPV3 (run_tpv3.py; Day et al. 2005, whole space, 30 x 15 km, slip
+weakening), station values (PI at 7.5 km along strike, PA at 6 km along
+dip):
+
+| dx | PI: V > 0.1 m/s | PI final slip | PA: V > 0.1 m/s | PA final slip |
+|---|---|---|---|---|
+| 500 m | 2.742 s | 3.177 m | 2.237 s | 2.123 m |
+| 250 m | 2.851 s | 3.123 m | 2.670 s | 2.070 m |
+| 150 m | 2.901 s | 3.125 m | 2.750 s | 2.061 m |
+| Day et al. 2005, Fig. 7 (read off) | about 2.97 s | about 3.12 m | about 2.86 s | about 2.06 m |
+
+Final slip agrees within 0.5 percent at 250 and 150 m. The rupture arrival
+converges at first order towards the reference: extrapolating 250 and
+150 m gives 2.976 s at PI and 2.87 s at PA. The stress peak at PI is
+81.24 MPa (the static strength) at 2.97 s with a single-element station
+at 200 m, as in the reference. (The 200 m run is not in the table: the
+nucleation patch of 3 km is not a whole number of 200 m elements and came
+out 2.8 km wide.) Run times on one core: 10 s at 500 m, 1 min at 250 m,
+2 min at 200 m, 7 min at 150 m (single-precision tables). 100 m needs
+about 4 GB of tables in this form; the C port with real-to-complex FFTs
+and the symmetries of the square element will cut that by about 4.
+
+Next: TPV101 (rate and state, aging law, whole space), then the static
+check of the square-element tables against interact's -full_space 1
+operator (conventions), then the C port and BP4.
+
 ### WP7, C implementation in rsf_solve: status (2026-10-18)
 Done, each verified in the sandbox before delivery (details in
 fd_c_design.md sections 6 to 10, usage in rsf_solve_fd.md):
