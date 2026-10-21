@@ -9,7 +9,8 @@ def run(dx=50.0, tend=12.0, tol=1e-2, verbose=True, coupled=True):
     dt = 0.5 * dx / BE
     nsteps = int(round(tend / dt))
     t0 = time.time()
-    sys_ = sh.System([f], dt, AL, BE, RHO, tol=tol, lmax=nsteps + 2, cap_ok=True)
+    import os
+    sys_ = sh.System([f], dt, AL, BE, RHO, tol=tol, lmax=nsteps + 2, cap_ok=True, et=float(os.environ.get('FD_ET', '1.0')))
     if verbose: print(f"dx={dx} n={n} dt={dt*1e3:.2f} ms steps={nsteps} L={sys_.L} tables {time.time()-t0:.1f}s mem {sys_.nbytes/1e6:.0f} MB")
     x = f.centers[:, 0]
     tau0 = np.full(n, 70e6)
@@ -19,6 +20,7 @@ def run(dx=50.0, tend=12.0, tol=1e-2, verbose=True, coupled=True):
     sigma0 = 120e6
     fr = st.SlipWeakening(0.677, 0.525, 0.40)
     S = st.Stepper(sys_, fr, tau0=tau0, sigma0=sigma0, normal_coupling=False)
+    if os.environ.get('FD_NL'): S.enable_nl()
     S.coupled = coupled
     stations = {"st-045": -4.5e3, "st-075": -7.5e3, "st120": 12.0e3}
     idx = {k: int(np.argmin(np.abs(x - v))) for k, v in stations.items()}
@@ -38,4 +40,5 @@ if __name__ == "__main__":
     dx = float(sys.argv[1]) if len(sys.argv) > 1 else 50.0
     coupled = (sys.argv[2] != "pc") if len(sys.argv) > 2 else True
     out = run(dx, coupled=coupled)
-    np.savez(f"tpv205_2d_dx{int(dx)}{'' if coupled else '_pc'}.npz", **out)
+    import os
+    np.savez(f"tpv205_2d_dx{int(dx)}{'' if coupled else '_pc'}_et{os.environ.get('FD_ET', '1.0')}{'_nl' if os.environ.get('FD_NL') else ''}.npz", **out)

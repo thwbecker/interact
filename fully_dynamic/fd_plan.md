@@ -459,6 +459,71 @@ operator; a standalone driver for TPV3 and TPV101 against this prototype
 at roundoff, then TPV101 at 100 m against the SCEC reference series, then
 BP4 with rsf_solve.
 
+### Time accuracy: second-order marching (2026-10-24)
+
+Why: the BP5-FD first event (half the time step moves arrivals by 0.5 s at
+1 km) and TPV101 (arrivals converge at first order) showed that the
+first-order time scheme limits accuracy.
+
+Tried and rejected: collocation inside the step (Stepper with sys.et < 1,
+e.g. 0.5, kept as an option). TPV205-2D against Dunham: arrivals converge,
+but final slip is off by 0.16 to 0.20 m at every resolution and peak slip
+rates grow with refinement (+82 percent at 25 m): the oscillatory
+instability of interior collocation with piecewise-constant rates that
+Tada and Madariaga (2001) mapped.
+
+Adopted: the "NL" scheme of Noda, Sato and Kurihara (2020, Earth Planets
+Space 72:76), their adaptation of Noda and Lapusta (2010) to space-domain
+boundary integrals. The tables stay as they are; the history stores
+midpoint slip rates V^(n-1/2) = (V^(n-1) + V^n)/2, the first lag uses the
+end-of-step kernel without its instantaneous part (K1 + eta I), and the
+radiation damping acts on the slip rate at the collocation time:
+  tau^n = H + (K1 + eta I) (V^(n-1) + V^n)/2 - eta V^n,
+slip advances with the trapezoid rule, the slip-weakening strength uses
+the slip at t_n, the aging-law state the mean rate over the step. We solve
+this implicitly (their corrector iterated to convergence). They report
+second-order convergence (1.5 in some mode II cases) and stability for all
+modes for 0.40 <= cS dt/dx <= 1.14, which includes our 0.5.
+Prototype: Stepper.enable_nl() (fixed steps, k = 1, no normal coupling);
+FD_NL=1 for run_tpv205.py and run_rs_rupture.py.
+
+TPV205-2D (slip weakening) against Dunham, arrival (V > 0.1 m/s) / peak
+slip rate / final slip:
+
+| scheme | dx | st-045 | st-075 |
+|---|---|---|---|
+| current | 100 m | -18.8 ms / -4.3 % / -0.014 m | -35.7 ms / -6.6 % / -0.012 m |
+| current | 50 m | -11.6 ms / -2.8 % / -0.009 m | -14.1 ms / -4.8 % / -0.006 m |
+| NL | 100 m | +39.0 ms / +1.3 % / +0.003 m | +22.0 ms / -4.2 % / -0.003 m |
+| NL | 50 m | +24.5 ms / +2.2 % / +0.003 m | +14.8 ms / -2.4 % / -0.001 m |
+| NL | 25 m | +10.1 ms / +0.6 % / +0.002 m | +4.0 ms / -0.8 % / -0.0001 m |
+
+With slip weakening the arrival error is not reduced at 100 and 50 m
+(cohesive-zone resolution in space dominates), but slip and peak slip
+rate are much better.
+
+Rate-and-state rupture (run_rs_rupture.py: in-plane, 20 km, aging law,
+a = 0.008, b = 0.012, L = 0.01 m, sigma 50 MPa, steady state at 1e-9 m/s
+with an 8 MPa overstressed 2 km patch), against NL at 12.5 m (arrival
+interpolated in log V):
+
+| scheme | dx | x = 4 km | x = 7 km |
+|---|---|---|---|
+| current | 100 m | +18.7 ms / -7.7 % / +0.006 m | +33.7 ms / -16.2 % / +0.017 m |
+| current | 50 m | +6.3 ms / -5.9 % / +0.002 m | +11.7 ms / -11.2 % / +0.007 m |
+| current | 25 m | +1.9 ms / -3.6 % / -0.000 m | +3.8 ms / -6.6 % / +0.002 m |
+| NL | 100 m | +13.1 ms / +3.5 % / +0.019 m | +26.3 ms / +9.2 % / +0.023 m |
+| NL | 50 m | +2.7 ms / +1.0 % / +0.008 m | +7.4 ms / +1.7 % / +0.009 m |
+| NL | 25 m | +0.6 ms / +0.3 % / +0.002 m | +1.6 ms / +0.7 % / +0.003 m |
+
+NL arrivals and peak slip rates converge at about second order (peak
+slip rate error at 25 m 0.3 to 0.7 percent against 3.6 to 6.6 percent);
+the reference is itself NL, so its own error is not in these numbers.
+Next: NL with the variable substeps (slip rate linear across the k
+substeps), a random-perturbation stability check, then the C port (2-D
+and 3-D marchers: midpoint pushes, K1 + eta I with -eta on the diagonal,
+trapezoid slip), then BP5-FD at 1 km again.
+
 ### WP7, C implementation in rsf_solve: status (2026-10-18)
 Done, each verified in the sandbox before delivery (details in
 fd_c_design.md sections 6 to 10, usage in rsf_solve_fd.md):

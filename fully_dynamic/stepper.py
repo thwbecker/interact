@@ -395,7 +395,10 @@ class Stepper:
 
     def known_parts(self):
         dt = self.sys.dt * self.k
-        t1 = self.t + dt
+        # collocation time within the step: t + ec dt (ec = 1 end of step; ec = sys.et < 1,
+        # e.g. 0.5, collocates inside the step, which makes the piecewise-constant slip rate
+        # a midpoint value and the scheme second order in time for ec = 0.5)
+        t1 = self.t + self._ec()*dt
         H = self.tau0 + self.taudot * t1 + self.sys.Ks @ self.delta
         Hn = self.sys.Kn @ self.delta + self.Hn_dot * t1
         if self.mode == "fd":
@@ -408,9 +411,50 @@ class Stepper:
             return lambda V: self.sigma0
         return lambda V: self.sigma0 - (Hn + self.K1n @ V)
 
+    def enable_nl(self):
+        """Second-order time marching after Noda, Sato and Kurihara (2020, EPS 72:76),
+        adapted from Noda and Lapusta (2010): the history stores midpoint slip rates
+        V^(n-1/2) = (V^(n-1) + V^n)/2, the first lag uses the end-of-step kernel without its
+        instantaneous part (K1 + eta I), and the radiation damping -eta V^n acts on the slip
+        rate at the collocation time. Solved implicitly (corrector iterated to convergence):
+          tau^n = H + (K1 + eta I) (V^(n-1) + V^n)/2 - eta V^n.  Fixed steps (k = 1) only."""
+        import scipy.sparse as sps
+        self.nl = True
+        eta = self.sys.eta
+        K1p = self.K1 + eta*np.eye(self.N)
+        self.K1p = K1p
+        self.A_nl = 0.5*K1p - eta*np.eye(self.N)
+        self.A_nl_band = banded_from_dense(self.A_nl)
+        self.A_nl_sp = sps.csr_matrix(self.A_nl)
+
+    def _ec(self):
+        et = getattr(self.sys, "et", 1.0)
+        return et if (et < 1.0 and self.k == 1) else 1.0
+
     def step(self):
-        dt = self.sys.dt * self.k
+        dt_full = self.sys.dt * self.k
+        ec = self._ec()
+        dt = ec*dt_full                    # friction sees the slip and state at the collocation time
+        psi_old, V_old = (self.state.copy() if isinstance(self.state, np.ndarray) else self.state), self.V
         H, Hn, t1 = self.known_parts()
+        if getattr(self, "nl", False):
+            assert self.k == 1 and not self.normal_coupling
+            Hp = H + 0.5*(self.K1p @ V_old)
+            if isinstance(self.fr, SlipWeakening):
+                # slip at the collocation time: delta + dt (V_old + V)/2
+                V, self.state = self.fr.solve(Hp, self.A_nl_sp if self.coupled else self.A_nl, self.sigma_fun_factory(Hn), t1, self.state,
+                                              self.V, 0.5*dt, self.delta + 0.5*dt*V_old, coupled=self.coupled, K1band=self.A_nl_band)
+            else:
+                V, self.state = self.fr.solve(Hp, self.A_nl_sp if self.coupled else self.A_nl, self.sigma_fun_factory(Hn), t1, self.state,
+                                              self.V, dt, coupled=self.coupled, K1band=self.A_nl_band)
+            Vmid = 0.5*(V_old + V)
+            self.tau = Hp + self.A_nl @ V
+            self.sigma = self.sigma0 - Hn
+            self.sys.push(Vmid)
+            self.V = V
+            self.delta = self.delta + Vmid*dt
+            self.t = self.t + dt; self.n += 1
+            return V
         if isinstance(self.fr, PrescribedTip):
             # H here includes tau0; the prescribed model wants tau(t_{n+1}) = tau0 - dsigma
             V, self.state = self.fr.solve(H - self.tau0, self.K1, None, t1, self.state, self.V)
@@ -422,10 +466,13 @@ class Stepper:
                                           coupled=self.coupled, K1band=self.K1band)
         self.tau = H + self.K1sp @ V
         self.sigma = self.sigma0 - (Hn + self.K1n @ V)
+        if ec < 1.0 and hasattr(self.fr, "advance_psi") and isinstance(psi_old, np.ndarray):
+            # state at the end of the step from the step's slip rate
+            self.state = self.fr.advance_psi(psi_old, V, V, dt_full)
         if self.mode == "fd":
             for _ in range(self.k):
                 self.sys.push(V)
         self.V = V
-        self.delta = self.delta + V * dt
-        self.t = t1; self.n += 1
+        self.delta = self.delta + V * dt_full
+        self.t = self.t + dt_full; self.n += 1
         return V
