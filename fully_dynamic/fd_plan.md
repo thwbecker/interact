@@ -396,11 +396,14 @@ FD3D_SMALL=1; at 300 m the station values equal those on the larger fault):
 | 150 m (single precision) | 5.22 s | 3.40 s | 7.29 m |
 | 100 m (Thor) | 5.02 s | 3.31 s | 7.34 m |
 
-From 200 m on the steps shrink (0.30 then 0.20 s at 9 km, 0.21 then 0.09 s
-at 3 km); a power-law fit to the last three resolutions gives an exponent of
-about 2.2 and extrapolated arrivals of about 4.9 s at (9, 7.5) km and 3.25 s
-at (0, 3) km, i.e. errors of about 0.1 s at 100 m. A 75 m run (Thor) is
-pending. The comparison with other codes is open: the SCEC pages for TPV101
+With 75 m (Thor: 4.94 s at (9, 7.5) km, 3.26 s at (0, 3) km, hypocentral
+slip 7.36 m, peak slip rate 4.77 m/s) the arrivals converge at about first
+order (exponents of about 1.3 and 1.0 from 150, 100, 75 m; an earlier fit
+without 75 m suggested 2.2 and was wrong), consistent with the first-order
+time scheme at fixed CFL. Extrapolated arrivals: about 4.74 s at (9, 7.5) km
+and 3.12 s at (0, 3) km, so errors of about 0.19 and 0.14 s (4 percent) at
+75 m; hypocentral slip is converged to about 0.3 percent, the peak slip rate
+at (9, 7.5) km is still rising (3.96, 4.49, 4.77 m/s from 150 to 75 m). The comparison with other codes is open: the SCEC pages for TPV101
 show cross-code summaries but no station time series we could download
 (2026-10-22); to return to, e.g. by asking the benchmark organisers or
 from published comparisons. Cost: 200 m 7 min, 150 m 13 min on one
@@ -427,9 +430,26 @@ uses the 3bs integrator as seas_bp_tests/bp4/run_bp4.sh does (without it a
 at 1 km and 192, 353, 508, ... yr at 500 m: recurrence 123 to 128 and 154
 to 160 yr, as in Jiang et al. Fig. 5, but shifted (their first large events
 near 110 to 125 yr and 155 yr). Dense and H-matrix runs agree to 0.02 yr.
-With the velocity seed at 2 km the event after the seeded one comes at
-206.8 yr, the next at 346.7 yr; whether the seed closes the shift at 1 km
-and 500 m is still to be run.
+With the velocity seed alone the seeded event died within a minute
+(fault-wide mean slip 0.013 m at 1 km, 0.017 m at 500 m) and the next
+event came at 193 or 222 yr. The cause is the initial state: the
+participants (Jiang et al. 2022, eqs 15-16 and Table 3) started from steady
+state at Vinit everywhere (theta = L/Vinit, tau0 the local steady-state
+stress with the local a) and seeded BP4 with Vi = 0.001 m/s (0.03 m/s is
+BP5's value). With the description's uniform tau0 from amax the
+velocity-weakening region starts about 6 MPa below its steady-state stress
+and a full rupture would have a dynamic stress drop of only about 0.4 MPa,
+so the seed cannot spread. make_bp4.py now defaults to the Jiang et al.
+version (init_state = "steady", Vi = 0.001). Results (Thor, 2026-10-23):
+
+| dx | events (yr) | recurrence |
+|---|---|---|
+| 1 km | 0.00, 117.77, 246.64, 372.32, 499.71, 627.49, 755.21, 882.95 | 125.7 to 128.9 yr |
+| 500 m | 0.00, 151.40, 306.03, 460.58, 615.11, 769.65, 924.18 | 154.5 to 154.6 yr |
+
+Jiang et al. (2022), Fig. 5: first spontaneous event at about 110 to
+125 yr (1 km) and about 155 yr (500 m), recurrence about 130 and 155 yr.
+BP4-QD with rsf_solve agrees with the published runs at both resolutions.
 
 Remaining for M9: the C port (M9): square elements on one planar fault (grid detection
 like fd_segments), the quadrant kernels (tada_quad.py) in C, 2-D Toeplitz
