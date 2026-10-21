@@ -418,14 +418,37 @@ class Stepper:
         instantaneous part (K1 + eta I), and the radiation damping -eta V^n acts on the slip
         rate at the collocation time. Solved implicitly (corrector iterated to convergence):
           tau^n = H + (K1 + eta I) (V^(n-1) + V^n)/2 - eta V^n.  Fixed steps (k = 1) only."""
-        import scipy.sparse as sps
         self.nl = True
-        eta = self.sys.eta
-        K1p = self.K1 + eta*np.eye(self.N)
-        self.K1p = K1p
-        self.A_nl = 0.5*K1p - eta*np.eye(self.N)
-        self.A_nl_band = banded_from_dense(self.A_nl)
-        self.A_nl_sp = sps.csr_matrix(self.A_nl)
+        self._nl_ops = {}
+        self._nl_set(self.k)
+
+    def _nl_set(self, k):
+        """NL operators for a step of k substeps: the slip rate varies linearly from
+        V_old to V over the step, so substep j (1..k) carries the midpoint rate
+        (1 - w_j) V_old + w_j V with w_j = (j - 1/2)/k, and
+          tau = H + C_k V_old + B_k V,
+          B_k = sum_l w(l) K[l] + (w(1) - 1) eta I,  C_k = sum_l (1 - w(l)) K[l] + (1 - w(1)) eta I,
+        with lag l = k - j + 1, w(l) = (k - l + 1/2)/k, K[l] = W[l] + Ks dt (all pairs).
+        For k = 1: B = K1/2 - eta/2, C = (K1 + eta)/2."""
+        import scipy.sparse as sps
+        if k not in self._nl_ops:
+            eta = self.sys.eta; N = self.N; sysm = self.sys
+            B = np.zeros((N, N)); C = np.zeros((N, N))
+            for (a_, b_), p in sysm.pairs.items():
+                ks, kn = p.static_blocks()
+                bs = np.zeros_like(ks); cs = np.zeros_like(ks)
+                for l in range(1, k + 1):
+                    w = (k - l + 0.5)/k
+                    Kl = ks*sysm.dt + (p.W_dense(l)[0] if l <= p.L else 0.0)
+                    bs = bs + w*Kl; cs = cs + (1.0 - w)*Kl
+                B[sysm.off[b_]:sysm.off[b_ + 1], sysm.off[a_]:sysm.off[a_ + 1]] = bs
+                C[sysm.off[b_]:sysm.off[b_ + 1], sysm.off[a_]:sysm.off[a_ + 1]] = cs
+            w1 = (k - 0.5)/k
+            B += (w1 - 1.0)*eta*np.eye(N); C += (1.0 - w1)*eta*np.eye(N)
+            thr = 1e-13*np.abs(B).max()
+            B = np.where(np.abs(B) > thr, B, 0.0); C = np.where(np.abs(C) > thr, C, 0.0)
+            self._nl_ops[k] = (B, C, banded_from_dense(B), sps.csr_matrix(B), sps.csr_matrix(C))
+        self.A_nl, self.C_nl, self.A_nl_band, self.A_nl_sp, self.C_nl_sp = self._nl_ops[k]
 
     def _ec(self):
         et = getattr(self.sys, "et", 1.0)
@@ -438,8 +461,10 @@ class Stepper:
         psi_old, V_old = (self.state.copy() if isinstance(self.state, np.ndarray) else self.state), self.V
         H, Hn, t1 = self.known_parts()
         if getattr(self, "nl", False):
-            assert self.k == 1 and not self.normal_coupling
-            Hp = H + 0.5*(self.K1p @ V_old)
+            assert not self.normal_coupling
+            k = self.k
+            self._nl_set(k)
+            Hp = H + self.C_nl_sp @ V_old
             if isinstance(self.fr, SlipWeakening):
                 # slip at the collocation time: delta + dt (V_old + V)/2
                 V, self.state = self.fr.solve(Hp, self.A_nl_sp if self.coupled else self.A_nl, self.sigma_fun_factory(Hn), t1, self.state,
@@ -447,12 +472,13 @@ class Stepper:
             else:
                 V, self.state = self.fr.solve(Hp, self.A_nl_sp if self.coupled else self.A_nl, self.sigma_fun_factory(Hn), t1, self.state,
                                               self.V, dt, coupled=self.coupled, K1band=self.A_nl_band)
-            Vmid = 0.5*(V_old + V)
-            self.tau = Hp + self.A_nl @ V
+            self.tau = Hp + self.A_nl_sp @ V
             self.sigma = self.sigma0 - Hn
-            self.sys.push(Vmid)
+            for j in range(1, k + 1):                  # substep midpoint rates, linear in time
+                w = (j - 0.5)/k
+                self.sys.push((1.0 - w)*V_old + w*V)
             self.V = V
-            self.delta = self.delta + Vmid*dt
+            self.delta = self.delta + 0.5*(V_old + V)*dt
             self.t = self.t + dt; self.n += 1
             return V
         if isinstance(self.fr, PrescribedTip):

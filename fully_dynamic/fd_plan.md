@@ -550,9 +550,38 @@ The second-order scheme at the original step matches Lambert's arrivals
 to 0.1 s or better and peak slip rates to 2 percent, better than the
 first-order scheme at half the step, at the same cost per step.
 
-Next: NL with the variable substeps in 2-D (prototype, then C), a
-random-perturbation stability check at cS dt/dx = 0.5, the full BP5-FD
-first event and sequence with -fd_nl 1, then making it the default.
+Variable substeps (prototype, 2026-10-24): with a step of k substeps the
+slip rate varies linearly from V_old to V across the step, substep j
+carries (1 - w_j) V_old + w_j V with w_j = (j - 1/2)/k, and
+tau = H + C_k V_old + B_k V with B_k = sum_l w(l) K[l] + (w(1) - 1) eta I,
+C_k = sum_l (1 - w(l)) K[l] + (1 - w(1)) eta I, w(l) = (k - l + 1/2)/k.
+Checks: for k = 1 these are the NL operators exactly; B_k + C_k equals the
+first-order cumulative operator K_k to 6e-17 (constant rate). Rate-and-
+state rupture at 50 m with k fixed during the whole rupture (a stress
+test; the step selector uses k = 1 at high slip rate): the first-order
+scheme blows up for k = 2 and 4, NL stays stable (slip error -0.036 m at
+k = 2, -0.24 m at k = 4; peak slip rate within 4 percent).
+
+Stability (stab_random.py, after Noda et al. 2020): traction-free in-plane
+fault of 64 elements with random initial traction, growth rate of ||V||
+for c_p t/dx from 160 to 320 (negative is stable):
+
+| cS dt/dx | 0.3 | 0.4 | 0.5 | 0.7 | 1.0 | 1.5 | 2.0 |
+|---|---|---|---|---|---|---|---|
+| first order | +0.034 | +0.014 | -0.010 | +0.027 | +0.022 | +0.015 | +0.006 |
+| NL | +0.032 | -0.002 | -0.010 | -0.001 | -0.009 | -0.003 | -0.010 |
+
+The first-order scheme with end-of-step collocation is stable only near
+our 0.5, an island in mode II (cf. Tada and Madariaga 2001); NL is stable
+from 0.4 to at least 2.0, consistent with Noda et al. (0.40 to 1.14 in
+their periodic setting). Our first-order runs were stable because they
+sit on that island and because rate-and-state friction adds positive
+instantaneous rate dependence.
+
+Next: NL in the 2-D C marcher, including the variable substeps (the
+history push becomes a linear combination of the spatial FFTs of V_old
+and V, and the coarse history needs a second aggregated kernel for the
+linear part of a block), then making NL the default in 2-D and 3-D.
 
 ### WP7, C implementation in rsf_solve: status (2026-10-18)
 Done, each verified in the sandbox before delivery (details in

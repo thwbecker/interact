@@ -6,7 +6,8 @@ import sys, os, numpy as np
 import shells as sh, stepper as st
 AL, BE, RHO = 6000.0, 3464.0, 2670.0
 dx = float(sys.argv[1]); tend = float(sys.argv[2]) if len(sys.argv) > 2 else 7.0
-L = 20e3; n = int(round(L/dx)); dt = 0.5*dx/BE; nsteps = int(round(tend/dt))
+kk = int(os.environ.get("FD_K", "1"))
+L = 20e3; n = int(round(L/dx)); dt = 0.5*dx/BE; nsteps = int(round(tend/dt/kk))
 f = sh.Fault([-L/2, 0.0], [1.0, 0.0], L, n)
 sys_ = sh.System([f], dt, AL, BE, RHO, tol=1e-2, lmax=nsteps + 2, cap_ok=True)
 x = f.centers[:, 0]
@@ -18,6 +19,8 @@ tau0 = np.full(n, tau_ss); tau0[np.abs(x) < 1e3] += 8e6
 fr = st.RateState(np.full(n, a), np.full(n, b), dc, V0, f0)
 S = st.Stepper(sys_, fr, tau0=tau0, sigma0=sig, normal_coupling=False)
 S.state = np.full(n, psi0); S.V = np.full(n, Vi)
+kfix = int(os.environ.get("FD_K", "1"))
+if kfix > 1: S.set_substeps(kfix)
 if os.environ.get("FD_NL"): S.enable_nl()
 ist = {"x4": np.argmin(np.abs(x - 4e3)), "x7": np.argmin(np.abs(x - 7e3))}
 rec = {k: [] for k in ist}
@@ -25,7 +28,7 @@ for m in range(nsteps):
     S.step()
     for k, i in ist.items(): rec[k].append([S.t, S.delta[i], S.V[i]])
 out = {k: np.array(v) for k, v in rec.items()}
-tag = "nl" if os.environ.get("FD_NL") else "cm"
+tag = ("nl" if os.environ.get("FD_NL") else "cm") + (f"_k{kk}" if kk > 1 else "")
 np.savez(f"rs_rupture_dx{dx:g}_{tag}.npz", **out)
 for k, A in out.items():
     print(f"{tag} dx {dx:g} {k}: V>0.1 at {A[np.argmax(A[:,2]>0.1),0]:.4f} s, peak {A[:,2].max():.4f} m/s, slip {A[-1,1]:.4f} m")
