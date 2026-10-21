@@ -67,6 +67,10 @@ struct fd3d {
   int Kc;
   /* friction: 0 slip weakening, 1 rate and state (aging law) */
   int law;
+  /* 0: piecewise-constant slip rate, end-of-step collocation (first order);
+     1: second-order marching after Noda, Sato and Kurihara (2020): midpoint slip
+     rates in the history, tau = H + (K1 + eta I)(V_old + V)/2 - eta V, trapezoid slip */
+  int nl;
   double mu_s, mu_d, d0;                        /* slip weakening (uniform) */
   double *a, *b, *Lc, *theta, f0, V0;           /* rate and state */
   int *locked;                                  /* optional: no slip */

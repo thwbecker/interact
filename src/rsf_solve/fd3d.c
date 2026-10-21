@@ -346,9 +346,18 @@ int fd3d_step(struct fd3d *f, const double *load)
   struct fd3d_tab *t = f->t;
   int N = f->N, i, it, pass, itot = 0;
   double dt = t->dt, *Vn = (double *)malloc(sizeof(double)*N);
-  double *th_p = NULL, *Vs = NULL;
+  double *th_p = NULL, *Vs = NULL, *Vold = NULL, eta = 0.5*t->rho*t->cT;
+  /* NL: neighbour and self terms are halved (the step's midpoint rate is (V_old + V)/2),
+     the V_old half goes into H, the self term becomes kdiag/2 - eta/2 */
+  double hw = f->nl ? 0.5 : 1.0;
   known(f);
   if(load) for(i = 0; i < N; i++) f->H[i] += load[i];
+  if(f->nl){
+    Vold = (double *)malloc(sizeof(double)*N);
+    memcpy(Vold, f->V, sizeof(double)*N);
+    apply_k1(f, Vold, f->work);
+    for(i = 0; i < N; i++) f->H[i] += 0.5*(f->work[i] + (kdiag(f, i % f->nzp) + eta)*Vold[i]);
+  }
   if(f->law == 1){ th_p = (double *)malloc(sizeof(double)*N); Vs = (double *)malloc(sizeof(double)*N); }
   for(pass = 0; pass < (f->law == 1 ? 2 : 1); pass++){
     double *V = (double *)malloc(sizeof(double)*N);
@@ -359,13 +368,16 @@ int fd3d_step(struct fd3d *f, const double *load)
       double ch = 0.0, vm = 0.0;
       apply_k1(f, V, f->work);
       for(i = 0; i < N; i++){
-        double Hp = f->H[i] + f->work[i];
+        double Hp = f->H[i] + hw*f->work[i];
+        double kd = f->nl ? 0.5*kdiag(f, i % f->nzp) - 0.5*eta : kdiag(f, i % f->nzp);
         if(f->law == 0){
-          double dm = fabs(f->delta[i]), mu = dm < f->d0 ? f->mu_s - (f->mu_s - f->mu_d)*dm/f->d0 : f->mu_d;
-          double slope = dm < f->d0 ? f->sigma[i]*(f->mu_s - f->mu_d)*dt/f->d0 : 0.0;
-          Vn[i] = local_sw(f, i, Hp, kdiag(f, i % f->nzp), f->sigma[i]*mu, slope);
+          /* slip at the collocation time: delta + dt V (first order) or delta + dt (V_old + V)/2 */
+          double d0s = f->delta[i] + (f->nl ? 0.5*dt*Vold[i] : 0.0), dm = fabs(d0s);
+          double mu = dm < f->d0 ? f->mu_s - (f->mu_s - f->mu_d)*dm/f->d0 : f->mu_d;
+          double slope = dm < f->d0 ? f->sigma[i]*(f->mu_s - f->mu_d)*hw*dt/f->d0 : 0.0;
+          Vn[i] = local_sw(f, i, Hp, kd, f->sigma[i]*mu, slope);
         }else
-          Vn[i] = local_rs(f, i, Hp, kdiag(f, i % f->nzp), th_p[i], V[i]);
+          Vn[i] = local_rs(f, i, Hp, kd, th_p[i], V[i]);
         if(fabs(Vn[i] - V[i]) > ch) ch = fabs(Vn[i] - V[i]);
         if(fabs(Vn[i]) > vm) vm = fabs(Vn[i]);
       }
@@ -381,9 +393,19 @@ int fd3d_step(struct fd3d *f, const double *load)
     free(V);
   }
   apply_k1(f, f->V, f->work);
-  for(i = 0; i < N; i++) f->tau[i] = f->H[i] + f->work[i] + kdiag(f, i % f->nzp)*f->V[i];
-  fd3d_push(f, f->V);
-  for(i = 0; i < N; i++) f->delta[i] += f->V[i]*dt;
+  if(f->nl){
+    for(i = 0; i < N; i++){
+      f->tau[i] = f->H[i] + 0.5*f->work[i] + (0.5*kdiag(f, i % f->nzp) - 0.5*eta)*f->V[i];
+      Vold[i] = 0.5*(Vold[i] + f->V[i]);                  /* midpoint rate of the step */
+    }
+    fd3d_push(f, Vold);
+    for(i = 0; i < N; i++) f->delta[i] += Vold[i]*dt;
+    free(Vold);
+  }else{
+    for(i = 0; i < N; i++) f->tau[i] = f->H[i] + f->work[i] + kdiag(f, i % f->nzp)*f->V[i];
+    fd3d_push(f, f->V);
+    for(i = 0; i < N; i++) f->delta[i] += f->V[i]*dt;
+  }
   f->time += dt;
   free(Vn); free(th_p); free(Vs);
   return itot;

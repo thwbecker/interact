@@ -36,6 +36,7 @@ struct fd_vars {
   PetscReal dt_restart;		/* TS step after a phase [s] */
   /* 3-D (fd3d.c): square elements on one plane */
   PetscBool dim3, mirror3;
+  PetscInt nl;			/* 1: second-order time marching (Noda et al. 2020), 3-D only so far */
   struct fd3d_tab *tab3;
   struct fd3d *f3;
   int nx3, nz3;

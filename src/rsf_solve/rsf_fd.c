@@ -116,6 +116,8 @@ PetscErrorCode rsf_fd_setup(struct interact_ctx *par, PetscReal shear_modulus_si
   PetscCall(PetscOptionsGetInt(NULL,NULL,"-fd_coarse",&fd->coarse,NULL));
   PetscCall(PetscOptionsGetReal(NULL,NULL,"-fd_back_vmax",&fd->back_vmax,NULL));
   if(fd->back_vmax <= 0.0) fd->back_vmax = 0.5*fd->vsw;
+  fd->nl = 0;
+  PetscCall(PetscOptionsGetInt(NULL,NULL,"-fd_nl",&fd->nl,NULL));
   fd->nstat = 16;
   PetscCall(PetscOptionsGetIntArray(NULL,NULL,"-fd_stations",fd->stat,&fd->nstat,&set));
   if(!set) fd->nstat = 0;
@@ -131,10 +133,11 @@ PetscErrorCode rsf_fd_setup(struct interact_ctx *par, PetscReal shear_modulus_si
     fd->alpha = fd->beta*sqrt(2.0*(1.0 - fd->nu)/(1.0 - 2.0*fd->nu));
     rsf->fd = fd;
     PetscCall(fd3d_setup_from_geometry(par,fd));
-    PetscCall(PetscPrintf(PETSC_COMM_WORLD,"rsf_fd_setup: 3-D fully dynamic extension, mode %d, %s, vsw %.1e vback %.1e m/s, fixed fine steps\n",
-			  (int)fd->mode,fd->mirror3 ? "half space (mirror-image free surface, exact static Is)" : "whole space",(double)fd->vsw,(double)fd->vback));
+    PetscCall(PetscPrintf(PETSC_COMM_WORLD,"rsf_fd_setup: 3-D fully dynamic extension, mode %d, %s, vsw %.1e vback %.1e m/s, fixed fine steps, %s time marching\n",
+			  (int)fd->mode,fd->mirror3 ? "half space (mirror-image free surface, exact static Is)" : "whole space",(double)fd->vsw,(double)fd->vback,fd->nl ? "second-order (-fd_nl 1)" : "first-order"));
     PetscFunctionReturn(PETSC_SUCCESS);
   }
+  PetscCheck(!fd->nl,PETSC_COMM_WORLD,PETSC_ERR_SUP,"-fd_nl 1: the second-order time marching is 3-D only in this version");
   /* medium: shear modulus and S speed from the run settings (SI), Poisson from interact */
   fd->mode2d = (nanti > 0) ? FD_MODE_ANTIPLANE : FD_MODE_INPLANE;
   fd->halfplane = PETSC_FALSE;
@@ -368,6 +371,7 @@ PetscErrorCode fd3d_setup_from_geometry(struct interact_ctx *par, struct fd_vars
   fd->f3 = fd3d_create2(fd->tab3,nz,fd->mirror3 ? 1 : 0);
   PetscCheck(fd->f3,PETSC_COMM_WORLD,PETSC_ERR_MEM,"rsf_fd_setup: 3-D marcher allocation failed");
   fd->f3->law = 1; fd->f3->f0 = rsf->f0; fd->f3->V0 = rsf->v0;
+  fd->f3->nl = (int)fd->nl;
   PetscCall(PetscMalloc4(n,&fd->f3->a,n,&fd->f3->b,n,&fd->f3->Lc,n,&fd->f3->theta));
   for(i = 0;i < n;i++){
     int g = fd->g_of_s[i];

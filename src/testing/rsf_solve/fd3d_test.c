@@ -55,6 +55,7 @@ static int run_tpv101(int argc, char **argv)
   t = fd3d_tab_create(nx, nz, dx, dt, cL, cT, rho, 0);
   fprintf(stderr, "fd3d_test tpv101: %d x %d elements, dt %.4f s, window %d lags, FFT %d x %d\n", nx, nz, dt, t->L, t->Mx, t->Mz);
   f = fd3d_create(t); f->law = 1; f->f0 = 0.6; f->V0 = 1e-6;
+  f->nl = getenv("FD3D_NL") ? 1 : 0;
   f->a = malloc(sizeof(double)*N); f->b = malloc(sizeof(double)*N); f->Lc = malloc(sizeof(double)*N); f->theta = malloc(sizeof(double)*N);
   load = malloc(sizeof(double)*N); Fr = malloc(sizeof(double)*N);
   for(i = 0; i < nx; i++) for(j = 0; j < nz; j++){
@@ -113,6 +114,7 @@ static int run_mirror(int argc, char **argv)
   struct fd3d_tab *t = fd3d_tab_create(nx, 2*nzp, dx, dt, cL, cT, rho, 0);
   struct fd3d *fm = fd3d_create2(t, nzp, 1), *fd = fd3d_create(t);
   double emax = 0, vmax = 0, dmax = 0, ed = 0;
+  fd->nl = fm->nl = getenv("FD3D_NL") ? 1 : 0;
   fd->law = fm->law = 0; fd->mu_s = fm->mu_s = 0.677; fd->mu_d = fm->mu_d = 0.525; fd->d0 = fm->d0 = 0.40;
   for(i = 0; i < nx; i++) for(j = 0; j < nzp; j++){
     double x = -10e3 + (i + 0.5)*dx, z = (j + 0.5)*dx, tau = (fabs(x) < 1.5e3 && z < 3e3) ? 81.6e6 : 70e6;
@@ -155,6 +157,7 @@ int main(int argc, char **argv)
   fprintf(stderr, "fd3d_test tpv3: %d x %d elements, dt %.4f s, window %d lags, FFT %d x %d, tables %.0f MB, k1 self %.6e, ks self %.6e\n",
           nx, nz, dt, t->L, t->Mx, t->Mz, 16.0*t->L*t->Mx*t->Mz/1e6, t->k1[1][1], t->ks_self);
   f = fd3d_create(t); f->law = 0; f->mu_s = 0.677; f->mu_d = 0.525; f->d0 = 0.40;
+  f->nl = getenv("FD3D_NL") ? 1 : 0;
   for(i = 0; i < nx; i++) for(j = 0; j < nz; j++){
     double x = -15e3 + (i + 0.5)*dx, z = -7.5e3 + (j + 0.5)*dx;
     f->tau0[i*nz + j] = (fabs(x) < 1.5e3 && fabs(z) < 1.5e3) ? 81.6e6 : 70e6;

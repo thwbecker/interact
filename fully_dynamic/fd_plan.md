@@ -519,10 +519,40 @@ interpolated in log V):
 NL arrivals and peak slip rates converge at about second order (peak
 slip rate error at 25 m 0.3 to 0.7 percent against 3.6 to 6.6 percent);
 the reference is itself NL, so its own error is not in these numbers.
-Next: NL with the variable substeps (slip rate linear across the k
-substeps), a random-perturbation stability check, then the C port (2-D
-and 3-D marchers: midpoint pushes, K1 + eta I with -eta on the diagonal,
-trapezoid slip), then BP5-FD at 1 km again.
+C, 3-D (2026-10-24): fd3d.c with nl = 1 (rsf_solve -fd_nl 1; fd3d_test
+with FD3D_NL=1). The 3 x 3 first-lag stencil carries half the neighbour
+terms, the V_old half goes into the known part, the self coefficient
+becomes kdiag/2 - eta/2 (kdiag includes the mirror self-image), the
+history receives the step's midpoint rate and slip advances with it. The
+mirror check against the explicit doubled fault holds in this scheme too
+(4.6e-11, in run_tests.sh). First-order remains the default.
+
+TPV3 (slip weakening, stations PI and PA; reference about 2.97 / 2.86 s,
+3.12 / 2.06 m): at 250 m first order 2.851 / 2.670 s, second order
+3.067 / 2.959 s; final slip 3.111 / 2.062 m (first order 3.122 / 2.070).
+As in 2-D, slip weakening arrivals are limited by the cohesive zone in
+space; at 500 m the second-order run is far off (3.54 / 3.61 s).
+
+BP5-FD first event at 1 km, CFL 0.5, against Lambert (BICyclE, 1 km):
+
+| station | Lambert | first order | first order, dt / 2 | second order |
+|---|---|---|---|---|
+| strk+00dp+00, V > 0.1 m/s | 16.74 s | 17.47 s | 16.96 s | 16.74 s |
+| peak slip rate | 2.492 m/s | 2.262 | 2.407 | 2.492 |
+| slip at 39 s | 6.690 m | 6.550 | 6.612 | 6.646 |
+| strk+16dp+00, V > 0.1 m/s | 20.02 s | 20.64 s | 20.14 s | 19.92 s |
+| peak slip rate | 4.072 m/s | 3.421 | 3.755 | 3.988 |
+| slip at 39 s | 6.380 m | 6.217 | 6.331 | 6.419 |
+| strk-24dp+10, peak slip rate | 1.147 m/s | 1.071 | 1.113 | 1.137 |
+| slip at 39 s | 6.569 m | 6.614 | 6.636 | 6.657 |
+
+The second-order scheme at the original step matches Lambert's arrivals
+to 0.1 s or better and peak slip rates to 2 percent, better than the
+first-order scheme at half the step, at the same cost per step.
+
+Next: NL with the variable substeps in 2-D (prototype, then C), a
+random-perturbation stability check at cS dt/dx = 0.5, the full BP5-FD
+first event and sequence with -fd_nl 1, then making it the default.
 
 ### WP7, C implementation in rsf_solve: status (2026-10-18)
 Done, each verified in the sandbox before delivery (details in
