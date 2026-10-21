@@ -416,56 +416,20 @@ the 3 x 3 self neighbourhood, with the same sign convention as in 2-D
 -fd_mode 1 refuses 3-D until the phases are connected.
 
 BP4: the SEAS BP4 description specifies a quasi-dynamic problem
-(radiation damping); there is no fully dynamic BP4 reference. Plan: BP4-QD
-with rsf_solve first (fully_dynamic/c_port/run_bp4_qd.sh writes the inputs:
-fault |x2| <= 50 km by default, |x3| <= 40 km, a(x2, x3), tau0 from eq. 18
-with 1.1 tau0 in the nucleation square, the 14 SEAS stations; fixed rake;
-the suggested 500 m needs an H-matrix backend), compared with the SEAS
-BP4-QD submissions; then the same setup with -fd_mode 1 as our own fully
-dynamic variant, compared with the QD run as for BP1. A 2 km smoke test in
-the sandbox ran (events at 199, 219, 353 yr; far too coarse to mean
-anything beyond the setup working).
-
-3-D dynamic phases in rsf_solve and the free surface (2026-10-23):
-- Free surface by a mirror image, as in the spectral boundary-integral
-  codes (Lapusta et al. 2000; Aochi and Fukuyama 2002; Lapusta and Liu
-  2009; reviewed by Ando 2016 and Hok and Fukuyama 2011): for a vertical
-  strike-slip fault the image lies in the fault plane, so the tables cover
-  the fault doubled in depth and the image rows carry the slip of the real
-  rows (fd3d_create2, mirror = 1); the top row also feels its own image in
-  the first-lag self term. Checked against the explicit doubled fault in a
-  whole space: equal to 4e-10 (fd3d_test mirror, in run_tests.sh). The
-  mirror makes the shear tractions on the surface vanish but not the
-  normal traction; statically the fault plus image deviates 1.8 to 2.5
-  percent from interact's exact half-space operator (whole space without
-  image: 10.6 percent), so the static part of the phases uses the exact Is
-  (callback), and only the dynamic correction uses the image.
-- rsf_solve: with 3-D elements, -fd_mode 1 now runs dynamic phases with
-  the fd3d marcher (fixed fine steps, no variable substeps or coarse
-  history in 3-D yet): switch as in 2-D, history seeded from the
-  accepted-step record, backslip loading since the switch, hand-back of
-  psi, tau, slip; half space allowed for vertical strike-slip faults whose
-  top row reaches the surface. A phase also runs at start-up when the
-  initial state already exceeds -fd_vsw (BP5's seeded nucleation patch),
-  since no upward crossing would be detected.
-- BP5-FD, first event, 1 km, rsf_solve with the repository's BP5 inputs
-  (seas_bp_tests/bp5, QD initial stress) against Lambert's BICyclE
-  BP5-FD files (1 km, also a mirror-image spectral code):
-
-| station | V > 0.1 m/s (ours / Lambert) | peak slip rate | slip at 200 s |
-|---|---|---|---|
-| strk+00dp+00 | 17.47 / 16.74 s | 2.26 / 2.49 m/s | 6.64 / 6.77 m |
-| strk+16dp+00 | 20.64 / 20.02 s | 3.42 / 4.07 m/s | 6.25 / 6.41 m |
-| strk-24dp+10 | 1.73 / 1.73 s | 1.07 / 1.15 m/s | 6.61 / 6.57 m |
-
-  Arrivals 0.6 to 0.7 s (4 to 5 steps) late at the surface stations,
-  slip within 2.5 percent, peak slip rates 7 to 16 percent lower. Our
-  station cells sit half a cell off the nominal positions (cell centres at
-  +-0.5 km), and our initial stress includes eta Vi in the nucleation patch
-  (QD convention; BP5-FD specifies without); neither is corrected yet. A
-  phase at 1 km takes about 40 min on one core here because the afterslip
-  tail runs at the fine step; variable substeps and the coarse history in
-  3-D are the obvious next speed-up.
+(radiation damping); there is no fully dynamic BP4 reference (Jiang et al.
+2022 compare QD only). fully_dynamic/c_port/run_bp4_qd.sh now wraps the
+repository's seas_bp_tests/bp4/make_bp4.py (velocity seed Vi = 0.03 m/s in
+the nucleation square, state unchanged, as the published runs; the
+description's 1.1 tau0 prestress bump nucleates slowly, near 200 yr) and
+uses the 3bs integrator as seas_bp_tests/bp4/run_bp4.sh does (without it a
+2 km run stopped in a rejection storm at 136 yr). With the prestress bump
+(the first version of this script) the events came at 213, 337, 465, ... yr
+at 1 km and 192, 353, 508, ... yr at 500 m: recurrence 123 to 128 and 154
+to 160 yr, as in Jiang et al. Fig. 5, but shifted (their first large events
+near 110 to 125 yr and 155 yr). Dense and H-matrix runs agree to 0.02 yr.
+With the velocity seed at 2 km the event after the seeded one comes at
+206.8 yr, the next at 346.7 yr; whether the seed closes the shift at 1 km
+and 500 m is still to be run.
 
 Remaining for M9: the C port (M9): square elements on one planar fault (grid detection
 like fd_segments), the quadrant kernels (tada_quad.py) in C, 2-D Toeplitz
