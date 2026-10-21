@@ -72,7 +72,15 @@ hi  = 1.5                   # offset of nucleation square from the VW corner
 # near 200 yr. The recurrence interval is the same either way; only the timing of
 # the first event differs.
 nuc_seed = "velocity"
-Vi       = 0.03            # nucleation slip rate [m/s] (velocity seed)
+Vi       = 0.001           # nucleation slip rate [m/s] (velocity seed; Jiang et al. 2022 Table 3: 0.001 in BP4, 0.03 in BP5)
+# initial stress and state. "steady" (default) follows Jiang et al. 2022 eqs 15-16, the
+# version the BP4-QD participants ran: steady state at Vinit everywhere, theta = L/Vinit,
+# and tau0 the local steady-state stress (with the local a), so the VW region starts at
+# its steady-state stress. "pdf" is the earlier BP4 description: one uniform tau0 from
+# amax (eq 18) with the state adjusted to it (eq 19), which leaves the VW region about
+# 6 MPa below steady state; there the seeded event cannot propagate (a dynamic stress
+# drop of only ~0.4 MPa) and the first spontaneous event comes late.
+init_state = "steady"
 tau_bump = 1.1             # nucleation prestress factor (prestress seed)
 
 # nucleation square, at one VW corner offset hi inward; centered here at
@@ -102,13 +110,18 @@ for i in range(imax):
         r = max(abs(x3) - H, abs(x2) - lVW/2.0)/h
         a = min(a0 + max(0.0, r)*(a_max - a0), a_max)
         if a < 0.5*(a0 + b0): nvw += 1
-        tau = tau0; v = Vinit
+        if init_state == "steady":
+            # Jiang et al. 2022 eq 16 with the local a: steady state at Vinit
+            tau_loc = sig*a*np.arcsinh(0.5*Vinit/V0*np.exp((f0 + b0*np.log(V0/Vinit))/a)) + eta*Vinit
+        else:
+            tau_loc = tau0
+        tau = tau_loc; v = Vinit
         if abs(x2 - nuc_x2) < wi/2.0 and abs(x3 - nuc_x3) < wi/2.0:
             if nuc_seed == "velocity":
                 # higher slip rate Vi with the background state left unchanged; the
                 # consistent prestress follows from the friction law (BP5-style seed)
                 v   = Vi
-                tau = sig*a*np.arcsinh((Vi/Vinit)*np.sinh((tau0 - eta*Vinit)/(sig*a))) + eta*Vi
+                tau = sig*a*np.arcsinh((Vi/Vinit)*np.sinh((tau_loc - eta*Vinit)/(sig*a))) + eta*Vi
             else:
                 tau = tau_bump*tau0
             nnuc += 1
@@ -120,7 +133,7 @@ for i in range(imax):
         fi.write(f"{tau*1e6:.8e} {v:.6e}\n")     # MPa -> Pa
 fg.close(); fr.close(); fi.close()
 print(f"BP4 ds={ds:g} km, Lstrike={Lstrike:g} km : {imax}x{jmax} = {imax*jmax} cells")
-seed_desc = f"velocity seed Vi={Vi:g} m/s (immediate)" if nuc_seed == "velocity" else f"prestress bump {tau_bump:g}x (slow)"
+seed_desc = (f"velocity seed Vi={Vi:g} m/s (immediate)" if nuc_seed == "velocity" else f"prestress bump {tau_bump:g}x (slow)") + f", initial state {init_state}"
 print(f"  VW cells={nvw} nucleation cells={nnuc} ; uniform tau0={tau0:.4f} MPa ; {seed_desc}")
 print(f"  x3 in [-{Wf:g},{Wf:g}] km (symmetric) ; nucleation center ({nuc_x2:g},{nuc_x3:g}) km")
 if z_off == 0.0:
