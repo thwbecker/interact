@@ -697,8 +697,42 @@ near-threshold triggering (Harris-Day W = +500 m), where the first-order
 scheme is robust. Default stays first order; -fd_nl 1 with resolution
 checks for rupture-front details.
 
-Next: BP1-FD with NL at 25 m (run_bp1_fd.sh 25 520 12000 "-fd_nl 1") to
-confirm NL's self-convergence.
+BP1-FD with NL at 25 m (Thor): switch times 196.364, 302.628, 421.568 yr,
+peak slip rates 16.24, 13.58, 14.73 m/s, mean slip 1.566, 1.316, 1.465 m;
+from 50 to 25 m NL changes event times by +0.08 and +0.14 yr and peak slip
+rates by 3.2 to 3.6 percent, against +0.39 and +0.38 yr and 11 to 13
+percent for the first-order scheme. Wall time 300 to 340 s per phase,
+about 25 percent more than first order.
+
+Harris-Day sweep (2026-10-25, tend 10 s instead of 8 s; maximum slip on
+segment 2 and triggering time, first V > 0.1 m/s on segment 2):
+
+| W | dx | first order | NL |
+|---|---|---|---|
+| +200 m | 100 / 50 m | 2.219 m, 5.48 s / 2.231 m, 5.45 s | 2.176 m, 5.60 s / 2.205 m, 5.51 s |
+| +300 m | 100 / 50 m | 2.101 m, 5.51 s / 2.109 m, 5.46 s | 2.059 m, 5.61 s / 2.087 m, 5.52 s |
+| +400 m | 100 / 50 m | 2.006 m, 5.66 s / 2.017 m, 5.70 s | 1.960 m, 5.63 s / 1.987 m, 5.54 s |
+| +500 m | 100 / 50 m | 1.423 m, 7.72 s / 1.407 m, 7.73 s | 1.877 m, 5.99 s / 1.600 m, 7.26 s |
+| +700, +1000 m | 100 / 50 m | no jump | no jump |
+| -500 m | 100 / 50 m | 1.974 m, 5.85 s / 1.980 m, 5.79 s | 1.958 m, 5.93 s / 1.966 m, 5.83 s |
+| -1000 to -2500 m | 100 / 50 m | no jump | no jump |
+
+Correction of the earlier reading: at W = +500 m both schemes jump; the
+8 s runs ended just as the delayed first-order jump started (7.7 s), so
+"0.23 m, aborted" was an artefact of the window. The schemes agree on jump
+or no jump at every width and both resolutions; they differ in the delay
+near the threshold, where NL at 100 m triggers 1.7 s early (6.0 against
+about 7.7 s) and at 50 m 0.5 s early, while the first-order delay is
+already stable at 100 m. Away from the threshold the triggering times
+change by 0.03 to 0.10 s from 100 to 50 m in both schemes.
+
+Default (2026-10-25): -fd_nl 1. NL is more accurate for event times, peak
+slip rates and arrivals in every benchmark; the only measured
+disadvantage is the near-threshold triggering delay at coarse
+resolution, which needs a resolution check with either scheme.
+test_fd_sequence.sh passes -fd_nl 0 to keep its comparison with the
+first-order prototype run; the reference numbers in run_bp1_fd.sh are
+first-order values.
 
 ### WP7, C implementation in rsf_solve: status (2026-10-18)
 Done, each verified in the sandbox before delivery (details in

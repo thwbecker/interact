@@ -1,5 +1,5 @@
 #!/bin/sh
-# rsf_solve with -fd_mode 1 on the prototype's single-fault test (30 km in-plane
+# rsf_solve with -fd_mode 1 -fd_nl 0 (first-order scheme, as the prototype run) on the prototype's single-fault test (30 km in-plane
 # fault, 16 km velocity-weakening patch, 100 m), two events: checks the first
 # dynamic phase against the Python prototype (2013 steps over 1370 s, peak
 # 2.43 m/s, mean slip 0.984 m) and the recurrence (82.1 yr). About 1 minute.
@@ -18,7 +18,7 @@ with open("geom.in","w") as g, open("rsf.dat","w") as r, open("ic.in","w") as ic
 PY
 ../bin/rsf_solve -geom_file geom.in -rsf_file rsf.dat -rsf_ic_file ic.in -dc 0.016 -sigma_init 50e6 \
   -v0 1e-6 -f0 0.6 -vpl 1e-9 -shear_modulus 3.24e10 -s_wave_speed 3464 -full_space 1 -rtol 1e-6 \
-  -stop_time_yr 90 -track_events 1 -vel_event 1e-3 -dt_monitor_yr 50 -fd_mode 1 > run.log 2>&1
+  -stop_time_yr 90 -track_events 1 -vel_event 1e-3 -dt_monitor_yr 50 -fd_mode 1 -fd_nl 0 > run.log 2>&1
 grep "rsf_fd: phase" run.log
 awk '/rsf_fd: phase 1:/ {for(i=1;i<=NF;i++){if($i=="phase") ; if($i=="steps") st=$(i-1); if($i=="slip" && $(i-1)=="mean") ms=$(i+1); if($i=="rate") pk=$(i+1)}; t1=$5}
      /rsf_fd: phase 2:/ {t2=$5}

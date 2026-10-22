@@ -116,7 +116,7 @@ PetscErrorCode rsf_fd_setup(struct interact_ctx *par, PetscReal shear_modulus_si
   PetscCall(PetscOptionsGetInt(NULL,NULL,"-fd_coarse",&fd->coarse,NULL));
   PetscCall(PetscOptionsGetReal(NULL,NULL,"-fd_back_vmax",&fd->back_vmax,NULL));
   if(fd->back_vmax <= 0.0) fd->back_vmax = 0.5*fd->vsw;
-  fd->nl = 0;
+  fd->nl = 1;			/* second-order time marching (Noda et al. 2020) by default */
   PetscCall(PetscOptionsGetInt(NULL,NULL,"-fd_nl",&fd->nl,NULL));
   fd->nstat = 16;
   PetscCall(PetscOptionsGetIntArray(NULL,NULL,"-fd_stations",fd->stat,&fd->nstat,&set));
