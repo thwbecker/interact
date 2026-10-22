@@ -773,6 +773,39 @@ The 3-D phase files fd_phase_<n>_st<i>.dat now have a fifth column, the
 number of substeps of the step, and the phase summary lists how many steps
 used each k and how many were retried.
 
+### Free surface for dipping faults (started 2026-10-26)
+
+Literature: Ando (2016, GJI 207, FDP=H) reviews the options (mirror image
+for vertical strike-slip faults; numerically integrated half-space Green's
+functions, Zhang and Chen 2006; a virtual traction-free fault representing
+the ground surface, Ando and Okuyama 2010). Hok and Fukuyama (2011, GJI
+184) give the method in detail: surface elements carry three displacement
+components, zero traction in all components, the same kernels as the
+fault; validated against Okada (static) and a discrete-wavenumber code
+(waveforms); surface elements finer than the fault elements near the
+fault (0.5 against 1 km in the static test); a surface patch about 2.5
+times the fault length, graded; a growing checkerboard oscillation on the
+surface elements, which they suppressed with an ad hoc spatial filter.
+Plan: static part from interact's exact half-space operator, the virtual
+surface for the dynamic correction only; second-order marching (stable in
+our traction-free test, cS dt/dx 0.4 to 2) in the hope of avoiding the
+filter; first in 2-D in-plane (dipping fault plus surface line), then 3-D.
+
+Step 1 (2026-10-26): opening kernels for 2-D in-plane. gen_inplane_open.py
+generates the point opening source from the same Green's function as the
+shear source (moment density m_xx = lambda t, m_yy = (lambda + 2 mu) t);
+inplane_open.py integrates it over a segment with the complement identity
+on the segment (whole-line integral = plane P wave). test_inplane_open.py:
+early-time self term equals the plane P wave (sxx = -lambda/(2 alpha),
+syy = -rho alpha/2) to 1e-9; static limit against Crouch and Starfield's
+constant displacement discontinuity to 2e-5 at four receivers (their
+D = u(-) - u(+) is the opposite convention; the existing shear kernel
+shows the same overall sign relation to 1e-9).
+Next: dense tables for non-parallel segment pairs with shear and opening
+sources, segments of a "surface" type (zero traction in both components),
+and the static check of the virtual surface line against interact's exact
+half-plane operator as a function of patch length and element size.
+
 ### WP7, C implementation in rsf_solve: status (2026-10-18)
 Done, each verified in the sandbox before delivery (details in
 fd_c_design.md sections 6 to 10, usage in rsf_solve_fd.md):
