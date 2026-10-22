@@ -156,7 +156,12 @@ marcher (Tada 2006 quadrant kernels). Whole space (`-full_space 1`, slip
 along strike or dip) or half space for a vertical strike-slip fault whose
 top row reaches the surface, where the free surface enters the dynamic part
 through a mirror image and the static part uses interact's exact half-space
-operator. 3-D phases use fixed fine steps so far.
+operator. 3-D phases use fixed fine steps by default; `-fd_back_eps 0.05` (quasi-steady
+hand-back, as in 2-D) shortens the afterslip tail, about 4 times faster on
+the BP5-FD first event at 2 km with the later slip unchanged to 1e-4 m.
+`-fd_kmax3 1` enables steps of several substeps in 3-D (experimental, see
+fd_plan.md). The 3-D phase station files have a fifth column, the number
+of substeps of the step.
 
 `-fd_nl 1` (default since 2026-10-25, 2-D and 3-D) is second-order time
 marching after Noda, Sato and Kurihara (2020): midpoint slip rates in the

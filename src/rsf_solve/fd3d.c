@@ -178,6 +178,7 @@ struct fd3d *fd3d_create2(struct fd3d_tab *t, int nzp, int mirror)
   int N = t->nx*nzp;
   if(mirror && t->nz != 2*nzp){ free(f); return NULL; }
   f->nzp = nzp; f->mirror = mirror;
+  f->kdamp = getenv("FD3D_KDAMP") ? atof(getenv("FD3D_KDAMP")) : 0.5;
   size_t M = (size_t)t->Mx*t->Mz;
   f->t = t; f->N = N;
   f->delta = calloc(N, sizeof(double)); f->V = calloc(N, sizeof(double)); f->tau = calloc(N, sizeof(double));
@@ -192,6 +193,7 @@ void fd3d_free(struct fd3d *f)
 {
   if(!f) return;
   free(f->delta); free(f->V); free(f->tau); free(f->tau0); free(f->sigma); free(f->H); free(f->work);
+  { int q; for(q = 0; q < 8; q++){ free(f->kop_B[q]); free(f->kop_C[q]); } }
   free(f->hist); free(f->acc); free(f);
 }
 
@@ -212,11 +214,16 @@ static void field_hat(const struct fd3d *f, const double *x, double _Complex *ou
 }
 
 /* tau0 + Ks delta + history (lags >= 2) */
-static void known(struct fd3d *f)
+static void known_k(struct fd3d *f, int k);
+static void known(struct fd3d *f){ known_k(f, 1); }
+
+/* tau0 + Ks delta + history for a step of k substeps: the most recent stored
+   slice is k + 1 lags old at the end of the step */
+static void known_k(struct fd3d *f, int k)
 {
   const struct fd3d_tab *t = f->t;
   size_t M = (size_t)t->Mx*t->Mz, m;
-  int l, i, j, lmax = t->L < f->nhist + 1 ? t->L : f->nhist + 1;
+  int l, i, j, lmax = t->L < f->nhist + k ? t->L : f->nhist + k;
   int row0 = f->mirror ? f->nzp : 0, nzp = f->nzp;
   if(f->static_fn)
     memset(f->acc, 0, sizeof(double _Complex)*M);
@@ -227,9 +234,9 @@ static void known(struct fd3d *f)
   {
     size_t Mhh = (size_t)t->Mx*t->Mh; int ii, jj;
     double _Complex *ah = (double _Complex *)calloc(Mhh, sizeof(double _Complex));
-    for(l = 2; l <= lmax; l++){
+    for(l = k + 1; l <= lmax; l++){
       const fd3d_cplx *W = t->W_hat + (size_t)(l - 1)*Mhh;
-      const fd3d_cplx *Vh = f->hist + (size_t)((f->hk - (l - 1) + t->L) % t->L)*Mhh;   /* V^(n+1-l) */
+      const fd3d_cplx *Vh = f->hist + (size_t)((f->hk - (l - k) + 2*t->L) % t->L)*Mhh;
       for(m = 0; m < Mhh; m++) ah[m] += (double _Complex)(W[m]*Vh[m]);
     }
     for(ii = 0; ii < t->Mx; ii++) for(jj = 0; jj < t->Mh; jj++) f->acc[(size_t)ii*t->Mz + jj] += ah[(size_t)ii*t->Mh + jj];
@@ -408,5 +415,161 @@ int fd3d_step(struct fd3d *f, const double *load)
   }
   f->time += dt;
   free(Vn); free(th_p); free(Vs);
+  return itot;
+}
+
+
+/* ---------------- variable substeps (k = 2, 4, ..., 64) ----------------
+   A step of k fine substeps: the current step's own contribution is the operator
+   K_k = sum_{l<=k} K[l] (first order, constant rate) or, for second-order marching,
+   B_k V + C_k V_old with the rate linear across the step (weights w(l) = (k-l+1/2)/k,
+   eta on the diagonal as in 2-D). These operators reach well beyond the 3 x 3
+   stencil, so the implicit solve iterates: each sweep applies the full operator by
+   FFT and solves locally with its self coefficient. Meant for slow phases (rate
+   and state), where the rate dependence of friction dominates the self term. */
+
+static int ilog2i(int k){ int i = 0; while((1 << i) < k) i++; return i; }
+
+static void fd3d_kops(struct fd3d *f, int k)
+{
+  struct fd3d_tab *t = f->t;
+  int ik = ilog2i(k), l, ii, jj, mirror = f->mirror;
+  size_t Mhh = (size_t)t->Mx*t->Mh, M = (size_t)t->Mx*t->Mz, m;
+  double eta = 0.5*t->rho*t->cT, w1 = (k - 0.5)/k;
+  if(f->kop_B[ik]) return;
+  f->kop_B[ik] = (double _Complex *)calloc(Mhh, sizeof(double _Complex));
+  f->kop_C[ik] = (double _Complex *)calloc(Mhh, sizeof(double _Complex));
+  for(l = 1; l <= k && l <= t->L; l++){
+    const fd3d_cplx *W = t->W_hat + (size_t)(l - 1)*Mhh;
+    double w = f->nl ? (k - l + 0.5)/k : 1.0;
+    for(m = 0; m < Mhh; m++){ f->kop_B[ik][m] += w*W[m]; f->kop_C[ik][m] += (1.0 - w)*W[m]; }
+  }
+  for(ii = 0; ii < t->Mx; ii++) for(jj = 0; jj < t->Mh; jj++){
+    double _Complex ks = t->Ks_hat[(size_t)ii*t->Mz + jj]*t->dt;
+    size_t q = (size_t)ii*t->Mh + jj;
+    if(f->nl){ f->kop_B[ik][q] += 0.5*k*ks + (w1 - 1.0)*eta; f->kop_C[ik][q] += 0.5*k*ks + (1.0 - w1)*eta; }
+    else f->kop_B[ik][q] += k*ks;
+  }
+  /* self coefficients (offset 0; with the mirror the top row also sees its image at +1 row) */
+  memset(t->work, 0, sizeof(double _Complex)*M);
+  for(ii = 0; ii < t->Mx; ii++) for(jj = 0; jj < t->Mh; jj++) t->work[(size_t)ii*t->Mz + jj] = f->kop_B[ik][(size_t)ii*t->Mh + jj];
+  from_half(t, t->work);
+  fd3d_fft2(t, t->work, +1);
+  f->kop_self[ik] = creal(t->work[0])/M;
+  f->kop_self_top[ik] = f->kop_self[ik] + (mirror ? creal(t->work[1])/M : 0.0);
+}
+
+/* operator (half spectrum) applied to a field: out = op * x (element order) */
+static void kop_apply(struct fd3d *f, const double _Complex *opq, const double *x, double *out)
+{
+  struct fd3d_tab *t = f->t;
+  size_t M = (size_t)t->Mx*t->Mz;
+  int ii, jj, i, j, row0 = f->mirror ? f->nzp : 0;
+  field_hat(f, x, t->work);
+  for(ii = 0; ii < t->Mx; ii++) for(jj = 0; jj < t->Mh; jj++) t->work[(size_t)ii*t->Mz + jj] *= opq[(size_t)ii*t->Mh + jj];
+  from_half(t, t->work);
+  fd3d_fft2(t, t->work, +1);
+  for(i = 0; i < t->nx; i++) for(j = 0; j < f->nzp; j++) out[i*f->nzp + j] = creal(t->work[(size_t)i*t->Mz + row0 + j])/M;
+}
+
+/* push k fine slices: constant V (first order) or linear from Vold to V (second order) */
+static void push_k_lin(struct fd3d *f, const double *Vold, const double *V, int k)
+{
+  struct fd3d_tab *t = f->t;
+  size_t Mhh = (size_t)t->Mx*t->Mh, m;
+  int q;
+  double _Complex *a = (double _Complex *)malloc(sizeof(double _Complex)*(size_t)t->Mx*t->Mz);
+  field_hat(f, Vold, a);
+  field_hat(f, V, t->work);
+  for(q = 1; q <= k; q++){
+    double w = f->nl ? (q - 0.5)/k : 1.0;
+    fd3d_cplx *slot = f->hist + (size_t)(f->hk % t->L)*Mhh;
+    int ii, jj;
+    for(ii = 0; ii < t->Mx; ii++) for(jj = 0; jj < t->Mh; jj++){
+      size_t fq = (size_t)ii*t->Mz + jj;
+      slot[(size_t)ii*t->Mh + jj] = (fd3d_cplx)((1.0 - w)*a[fq] + w*t->work[fq]);
+    }
+    f->hk = (f->hk + 1) % t->L;
+    if(f->nhist < t->L) f->nhist++;
+  }
+  (void)m;
+  free(a);
+}
+
+int fd3d_step_k(struct fd3d *f, const double *load, int k)
+{
+  struct fd3d_tab *t = f->t;
+  int N = f->N, i, it, pass, itot = 0, ik;
+  double dt = t->dt*k, *Vold, *Hc, *Vit, *Vn, *conv, *th_p = NULL, *Vs = NULL;
+  if(k <= 1 && !f->generic) return fd3d_step(f, load);
+  if(k > 64 || (k & (k - 1))) return -1;
+  ik = ilog2i(k);
+  fd3d_kops(f, k);
+  Vold = (double *)malloc(sizeof(double)*N); Hc = (double *)malloc(sizeof(double)*N);
+  Vit = (double *)malloc(sizeof(double)*N); Vn = (double *)malloc(sizeof(double)*N); conv = (double *)malloc(sizeof(double)*N);
+  memcpy(Vold, f->V, sizeof(double)*N);
+  known_k(f, k);
+  if(load) for(i = 0; i < N; i++) f->H[i] += load[i];
+  memcpy(Hc, f->H, sizeof(double)*N);
+  if(f->nl){
+    kop_apply(f, f->kop_C[ik], Vold, conv);
+    for(i = 0; i < N; i++) Hc[i] += conv[i];
+  }
+  if(f->law == 1){ th_p = (double *)malloc(sizeof(double)*N); Vs = (double *)malloc(sizeof(double)*N); }
+  for(pass = 0; pass < (f->law == 1 ? 2 : 1); pass++){
+    memcpy(Vit, pass == 0 ? Vold : Vs, sizeof(double)*N);
+    if(f->law == 1)
+      for(i = 0; i < N; i++) th_p[i] = theta_adv(f, i, f->theta[i], Vold[i], pass == 0 ? Vold[i] : Vs[i], dt);
+    for(it = 0; it < 500; it++){
+      double ch = 0.0, vm = 0.0;
+      kop_apply(f, f->kop_B[ik], Vit, conv);
+      for(i = 0; i < N; i++){
+        int row = i % f->nzp;
+        double kd = (f->mirror && row == 0) ? f->kop_self_top[ik] : f->kop_self[ik];
+        double Hp = Hc[i] + conv[i] - kd*Vit[i];
+        if(f->law == 0){
+          double d0s = f->delta[i] + (f->nl ? 0.5*dt*Vold[i] : 0.0), dm = fabs(d0s);
+          double mu = dm < f->d0 ? f->mu_s - (f->mu_s - f->mu_d)*dm/f->d0 : f->mu_d;
+          double slope = dm < f->d0 ? f->sigma[i]*(f->mu_s - f->mu_d)*(f->nl ? 0.5 : 1.0)*dt/f->d0 : 0.0;
+          Vn[i] = local_sw(f, i, Hp, kd, f->sigma[i]*mu, slope);
+        }else
+          Vn[i] = local_rs(f, i, Hp, kd, th_p[i], Vit[i]);
+        if(fabs(Vn[i] - Vit[i]) > ch) ch = fabs(Vn[i] - Vit[i]);
+        if(fabs(Vn[i]) > vm) vm = fabs(Vn[i]);
+      }
+      /* damped Jacobi: the long-step operator is not diagonally dominant */
+      for(i = 0; i < N; i++) Vit[i] += f->kdamp*(Vn[i] - Vit[i]);
+      if(!isfinite(ch)) break;
+      if(ch <= 1e-12*(vm > 1e-9 ? vm : 1e-9)) break;
+    }
+    itot += it + 1;
+    {
+      /* a long step must not change the peak slip rate much (the step selector aims at
+         10 percent); a jump by more than a factor of two means the step was too long or
+         the iteration settled on a spurious solution */
+      double vo = 0.0, vn = 0.0;
+      for(i = 0; i < N; i++){ if(fabs(Vold[i]) > vo) vo = fabs(Vold[i]); if(fabs(Vit[i]) > vn) vn = fabs(Vit[i]); }
+      if(vn > 2.0*vo + 1e-12) it = 500;
+    }
+    if(getenv("FD3D_DEBUG") && (it >= 500 || !isfinite(Vit[0]))){
+      double vo = 0.0, vn = 0.0; int io = 0, in_ = 0;
+      for(i = 0; i < N; i++){ if(fabs(Vold[i]) > vo){ vo = fabs(Vold[i]); io = i; } if(fabs(Vit[i]) > vn){ vn = fabs(Vit[i]); in_ = i; } }
+      fprintf(stderr, "fd3d_step_k: k %d pass %d rejected after %d its: vmax old %.3e (cell %d) new %.3e (cell %d)\n", k, pass, it, vo, io, vn, in_);
+    }
+    if(it >= 500 || !isfinite(Vit[0])){
+      /* not converged: leave the state untouched, the caller retries with fewer substeps */
+      free(Vold); free(Hc); free(Vit); free(Vn); free(conv); free(th_p); free(Vs);
+      return -2;
+    }
+    if(f->law == 1 && pass == 0) memcpy(Vs, Vit, sizeof(double)*N);
+  }
+  memcpy(f->V, Vit, sizeof(double)*N);
+  if(f->law == 1) memcpy(f->theta, th_p, sizeof(double)*N);
+  kop_apply(f, f->kop_B[ik], f->V, conv);
+  for(i = 0; i < N; i++) f->tau[i] = Hc[i] + conv[i];
+  push_k_lin(f, Vold, f->V, k);
+  for(i = 0; i < N; i++) f->delta[i] += (f->nl ? 0.5*(Vold[i] + f->V[i]) : f->V[i])*dt;
+  f->time += dt;
+  free(Vold); free(Hc); free(Vit); free(Vn); free(conv); free(th_p); free(Vs);
   return itot;
 }

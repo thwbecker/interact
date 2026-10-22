@@ -117,6 +117,8 @@ PetscErrorCode rsf_fd_setup(struct interact_ctx *par, PetscReal shear_modulus_si
   PetscCall(PetscOptionsGetReal(NULL,NULL,"-fd_back_vmax",&fd->back_vmax,NULL));
   if(fd->back_vmax <= 0.0) fd->back_vmax = 0.5*fd->vsw;
   fd->nl = 1;			/* second-order time marching (Noda et al. 2020) by default */
+  fd->kmax3 = 0;
+  PetscCall(PetscOptionsGetInt(NULL,NULL,"-fd_kmax3",&fd->kmax3,NULL));
   PetscCall(PetscOptionsGetInt(NULL,NULL,"-fd_nl",&fd->nl,NULL));
   fd->nstat = 16;
   PetscCall(PetscOptionsGetIntArray(NULL,NULL,"-fd_stations",fd->stat,&fd->nstat,&set));
@@ -237,19 +239,61 @@ static PetscErrorCode fd3d_run_phase(TS ts, struct interact_ctx *par, struct fd_
       for(i = 0;i < N;i++) if(fd->g_of_s[i] == fd->stat[a]) fd->sstat[a] = i;
     }
   }
+  double vprev = 0.0, *vref; int kprev = 0, nretry = 0, khist[7] = {0, 0, 0, 0, 0, 0, 0};
+  PetscCall(PetscMalloc1(N,&vref));
   for(;;){
-    double trel = f->time + dt;
-    int a;
+    double trel, kd, dcmin = 1e300;
+    int a, k = 1;
+    /* variable substeps as in 2-D: powers of two up to kmax and xi dc/(V dt) */
+    vmax = 0.0;
+    for(i = 0;i < N;i++){ if(fabs(f->V[i]) > vmax) vmax = fabs(f->V[i]); if(f->Lc[i] < dcmin) dcmin = f->Lc[i]; }
+    kd = fd->xi*dcmin/((vmax > 1e-30 ? vmax : 1e-30)*dt);
+    /* also limit the step by how fast the peak slip rate changes (relative change of
+       at most 10 percent per step, from the previous step), and grow k by at most a
+       factor of two per step: in 3-D the fine step can be long in absolute time
+       (dt = 0.29 s at 2 km), and the slip-distance criterion alone lets a slowly
+       starting rupture be stepped over */
+    if(kprev > 0 && vprev > 0.0){
+      double rate = fabs(vmax - vprev)/(kprev*dt), ka = (rate > 0.0) ? 0.1*vmax/(rate*dt) : 1e300;
+      if(ka < kd) kd = ka;
+      if(kd > 2*kprev) kd = 2*kprev;
+    }
+    if(!fd->kmax3) kd = 1.0;              /* long steps in 3-D only on request (-fd_kmax3 1) */
+    while((2*k <= fd->kmax) && (2*k <= kd) && (2*k <= 64)) k *= 2;
+    vprev = vmax; kprev = k;
+    trel = f->time + k*dt;
     for(i = 0;i < N;i++) load[i] = fault[fd->g_of_s[i]].sinc[0]*trel;    /* backslip loading since the switch */
-    fd3d_step(f,load);
+    for(;;){
+      int e = fd3d_step_k(f,load,k);
+      if(e >= 0) break;
+      PetscCheck((e == -2) && (k > 1),PETSC_COMM_WORLD,PETSC_ERR_LIB,"rsf_fd: 3-D step of %d substeps failed (%d)",k,e);
+      k /= 2; kprev = k; nretry++;       /* not converged: halve the step and retry */
+      trel = f->time + k*dt;
+      for(i = 0;i < N;i++) load[i] = fault[fd->g_of_s[i]].sinc[0]*trel;
+    }
     nsteps++;
+    { int q = 0; while((1 << q) < k) q++; if(q < 7) khist[q]++; }
     for(a = 0;a < fd->nstat;a++)
       if(fd->sstat[a] >= 0)
-	fprintf(fd->fstat[a],"%.10e %.10e %.10e %.10e\n",f->time,f->delta[fd->sstat[a]],f->V[fd->sstat[a]],f->tau[fd->sstat[a]]);
+	fprintf(fd->fstat[a],"%.10e %.10e %.10e %.10e %d\n",f->time,f->delta[fd->sstat[a]],f->V[fd->sstat[a]],f->tau[fd->sstat[a]],k);
     vmax = 0.0;
     for(i = 0;i < N;i++) if(fabs(f->V[i]) > vmax) vmax = fabs(f->V[i]);
     if(vmax > vpeak) vpeak = vmax;
-    if(vmax < fd->vback) below += dt; else below = 0.0;
+    if(fd->back_eps > 0.0){
+      /* quasi-steady hand-back as in 2-D: every slip rate changed by less than back_eps
+	 (relative, floored at vback) over a full window, peak below back_vmax */
+      int quiet = (vmax < fd->back_vmax);
+      if(quiet && (below > 0.0))
+	for(i = 0;i < N;i++)
+	  if(fabs(f->V[i] - vref[i]) > fd->back_eps*(fabs(vref[i]) + fd->vback)){ quiet = 0; break; }
+      if(!quiet || (below == 0.0)){
+	memcpy(vref,f->V,sizeof(double)*N);
+	below = quiet ? 1e-30 : 0.0;
+      }else
+	below += k*dt;
+    }else{
+      if(vmax < fd->vback) below += k*dt; else below = 0.0;
+    }
     if(below >= L*dt) break;
     PetscCheck(nsteps < fd->max_steps,PETSC_COMM_WORLD,PETSC_ERR_CONV_FAILED,
 	       "rsf_fd: 3-D phase exceeded -fd_max_steps = %ld steps (t - t_switch %g s, max V %g)",(long)fd->max_steps,f->time,vmax);
@@ -265,9 +309,12 @@ static PetscErrorCode fd3d_run_phase(TS ts, struct interact_ctx *par, struct fd_
   PetscCall(VecRestoreArray(X,&x));
   *t_end = t + f->time;
   PetscCall(PetscTime(&t_wall1));
+  PetscCall(PetscPrintf(PETSC_COMM_WORLD,"rsf_fd: 3-D phase steps by substeps k = 1..64: %d %d %d %d %d %d %d, retries %d\n",
+			khist[0],khist[1],khist[2],khist[3],khist[4],khist[5],khist[6],nretry));
   PetscCall(PetscPrintf(PETSC_COMM_WORLD,"rsf_fd: 3-D phase %ld: t %.8f yr, %d steps over %.1f s, peak slip rate %.3f m/s, mean slip %.4f m, wall %.1f s\n",
 			(long)fd->nphase + 1,(double)(t/SEC_PER_YEAR),nsteps,f->time,vpeak,slipsum/N,(double)(t_wall1 - t_wall0)));
   PetscCall(PetscFree2(vtmp,load));
+  PetscCall(PetscFree(vref));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 

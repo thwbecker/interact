@@ -56,6 +56,7 @@ static int run_tpv101(int argc, char **argv)
   fprintf(stderr, "fd3d_test tpv101: %d x %d elements, dt %.4f s, window %d lags, FFT %d x %d\n", nx, nz, dt, t->L, t->Mx, t->Mz);
   f = fd3d_create(t); f->law = 1; f->f0 = 0.6; f->V0 = 1e-6;
   f->nl = getenv("FD3D_NL") ? 1 : 0;
+  f->generic = getenv("FD3D_GENERIC") ? 1 : 0;
   f->a = malloc(sizeof(double)*N); f->b = malloc(sizeof(double)*N); f->Lc = malloc(sizeof(double)*N); f->theta = malloc(sizeof(double)*N);
   load = malloc(sizeof(double)*N); Fr = malloc(sizeof(double)*N);
   for(i = 0; i < nx; i++) for(j = 0; j < nz; j++){
@@ -75,12 +76,13 @@ static int run_tpv101(int argc, char **argv)
     sc[s][0] = i0*nz + j0; sw[s][0] = (1 - wi)*(1 - wj); sc[s][1] = (i0 + 1)*nz + j0; sw[s][1] = wi*(1 - wj);
     sc[s][2] = i0*nz + j0 + 1; sw[s][2] = (1 - wi)*wj; sc[s][3] = (i0 + 1)*nz + j0 + 1; sw[s][3] = wi*wj;
   }
-  nsteps = (int)floor(tend/dt + 0.5); rec = malloc(sizeof(double)*3*4*nsteps);
+  { int K = getenv("FD3D_K") ? atoi(getenv("FD3D_K")) : 1;    /* fixed substeps per step (test) */
+  nsteps = (int)floor(tend/(dt*K) + 0.5); rec = malloc(sizeof(double)*3*4*nsteps);
   rt = malloc(sizeof(double)*N); for(k = 0; k < N; k++) rt[k] = -1.0;
   for(n = 0; n < nsteps; n++){
-    double t1 = f->time + dt, G = (t1 > 0 && t1 < T) ? exp((t1 - T)*(t1 - T)/(t1*(t1 - 2*T))) : (t1 >= T ? 1.0 : 0.0);
+    double t1 = f->time + K*dt, G = (t1 > 0 && t1 < T) ? exp((t1 - T)*(t1 - T)/(t1*(t1 - 2*T))) : (t1 >= T ? 1.0 : 0.0);
     for(k = 0; k < N; k++) load[k] = 25e6*Fr[k]*G;
-    fd3d_step(f, load);
+    if(fd3d_step_k(f, load, K) < 0){ fprintf(stderr, "fd3d_step_k failed\n"); return 1; }
     for(k = 0; k < N; k++) if(rt[k] < 0 && fabs(f->V[k]) > 1e-3) rt[k] = f->time;
     if(n % 50 == 0){ double vm = 0; for(k = 0; k < N; k++) if(fabs(f->V[k]) > vm) vm = fabs(f->V[k]); fprintf(stderr, "  t %6.3f max V %.3e\n", f->time, vm); }
     for(s = 0; s < 3; s++){
@@ -98,7 +100,8 @@ static int run_tpv101(int argc, char **argv)
     for(i = 0; i < nx; i++) for(j = 0; j < nz; j++)
       fprintf(fo, "%.4f %.4f %.5f %.5f\n", (xlo + (i + 0.5)*dx)/1e3, (ylo + (j + 0.5)*dx)/1e3, rt[i*nz + j], f->delta[i*nz + j]);
     fclose(fo); }
-  i = (argc > 3 && strcmp(argv[3], "-")) ? compare(argv[3], 3, nm, rec, nsteps, dt, 1e-8, "tpv101") : 0;
+  i = (argc > 3 && strcmp(argv[3], "-")) ? compare(argv[3], 3, nm, rec, nsteps, dt*K, 1e-8, "tpv101") : 0;
+  }
   free(rt);
   fd3d_free(f); fd3d_tab_free(t); free(rec); free(load); free(Fr);
   return i;

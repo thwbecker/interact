@@ -71,6 +71,11 @@ struct fd3d {
      1: second-order marching after Noda, Sato and Kurihara (2020): midpoint slip
      rates in the history, tau = H + (K1 + eta I)(V_old + V)/2 - eta V, trapezoid slip */
   int nl;
+  /* operators for steps of k = 2^ik substeps (fd3d_step_k), built on first use */
+  double _Complex *kop_B[8], *kop_C[8];
+  double kop_self[8], kop_self_top[8];
+  int generic;
+  double kdamp;                 /* relaxation of the long-step iteration (default 0.5) */                  /* test: k = 1 also through the iterative k-step path */
   double mu_s, mu_d, d0;                        /* slip weakening (uniform) */
   double *a, *b, *Lc, *theta, f0, V0;           /* rate and state */
   int *locked;                                  /* optional: no slip */
@@ -81,6 +86,9 @@ struct fd3d *fd3d_create2(struct fd3d_tab *t, int nzp, int mirror);
 void fd3d_free(struct fd3d *f);
 /* one fine step with an optional extra load (Pa, N values, may be NULL); returns Jacobi iterations */
 int fd3d_step(struct fd3d *f, const double *load);
+/* one step of k = 1, 2, 4, ..., 64 fine substeps (k = 1: fd3d_step); returns iterations,
+   -1 on bad arguments, -2 if the iteration did not converge (state unchanged: retry with smaller k) */
+int fd3d_step_k(struct fd3d *f, const double *load, int k);
 void fd3d_push(struct fd3d *f, const double *V);   /* one slice into the history ring */
 void fd3d_reset(struct fd3d *f);                   /* empty history, zero slip and time */
 #endif

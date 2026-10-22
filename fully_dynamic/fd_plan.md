@@ -734,6 +734,45 @@ test_fd_sequence.sh passes -fd_nl 0 to keep its comparison with the
 first-order prototype run; the reference numbers in run_bp1_fd.sh are
 first-order values.
 
+### 3-D phases: speed (2026-10-26)
+
+Variable substeps in 3-D (fd3d_step_k, -fd_kmax3 1, experimental): steps of
+k = 2..64 fine substeps for both time schemes; known part for a step of k
+substeps, operators B_k, C_k (or K_k) in the half spectrum with their self
+coefficients, the history receives k slices per step (linear in time for
+NL). The long-step operator reaches far beyond the 3 x 3 stencil, so the
+implicit solve iterates (damped Jacobi, each sweep applies the operator by
+FFT and solves locally with the self coefficient); a step that does not
+converge or whose peak slip rate more than doubles is rejected and retried
+with half the substeps. The step selector adds two 3-D limits to the 2-D
+slip-distance criterion: at most 10 percent relative change of the peak
+slip rate per step (from the previous step), and at most a doubling of k
+per step. Check: forcing k = 1 through the iterative path reproduces the
+stencil path on TPV101 (6 s) to the output precision (1e-5 m).
+Result on the BP5-FD first event at 2 km: without the rejection test the
+run took 475 instead of 12,607 steps (30 s instead of 360 s) with
+identical arrivals, peak slip rates within 1.5 percent and slip at 60 s to
+1e-4 m, but one long step in the afterslip produced a spurious solution
+(0.46 m of slip at the hypocentral station, negative shear stress); with
+the rejection test the iteration fails for k >= 2 near the arrested
+rupture edge (cells near x2 = 27-29 km, 5 km depth: the damped iteration
+settles on a spurious fast solution even at peak slip rates of 5e-4 m/s),
+so the run falls back to single steps. Not usable yet; open: a robust
+solver for the long-step system (Newton-Krylov with the FFT operator, or
+an implicit near field with an explicit far field), and the coarse
+history in 3-D.
+
+Quasi-steady hand-back in 3-D (-fd_back_eps, as in 2-D): BP5-FD first
+event at 2 km, -fd_back_eps 0.05 against the full phase (both NL): phase
+806 s instead of 3639 s, wall 91 s instead of 399 s; slip at the stations
+480 and 640 afterwards (from the QD continuation) 6.8625 / 6.8626,
+6.8896 / 6.8898, 6.9173 / 6.9172 m and 6.5957 / 6.5958, 6.6135 / 6.6138,
+6.6331 / 6.6333 m at 5000, 10000 and 20000 s. This is the speed-up to use
+in 3-D for now.
+The 3-D phase files fd_phase_<n>_st<i>.dat now have a fifth column, the
+number of substeps of the step, and the phase summary lists how many steps
+used each k and how many were retried.
+
 ### WP7, C implementation in rsf_solve: status (2026-10-18)
 Done, each verified in the sandbox before delivery (details in
 fd_c_design.md sections 6 to 10, usage in rsf_solve_fd.md):

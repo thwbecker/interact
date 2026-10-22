@@ -266,6 +266,8 @@ void rsf_print_help(const char *prog)
   fprintf(stderr,"  -fd_conv_block <n>      partition length, power of two (default 0 = automatic)\n");
   fprintf(stderr,"  -fd_nl <0|1>            1 (default): second-order time marching (Noda, Sato and Kurihara\n");
   fprintf(stderr,"                          2020); 0: the earlier first-order scheme. See rsf_solve_fd.md\n");
+  fprintf(stderr,"  -fd_kmax3 <0|1>         3-D: 1 allows steps of several substeps (experimental, default 0);\n");
+  fprintf(stderr,"                          for 3-D speed use -fd_back_eps (quasi-steady hand-back)\n");
   fprintf(stderr,"  -fd_coarse <0|1>        long steps (kmax substeps) start at multiples of kmax and,\n");
   fprintf(stderr,"                          once a window holds only such steps, the history is summed\n");
   fprintf(stderr,"                          over aligned blocks (exact, kmax times cheaper; default 1)\n");
