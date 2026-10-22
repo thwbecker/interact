@@ -578,10 +578,28 @@ their periodic setting). Our first-order runs were stable because they
 sit on that island and because rate-and-state friction adds positive
 instantaneous rate dependence.
 
-Next: NL in the 2-D C marcher, including the variable substeps (the
-history push becomes a linear combination of the spatial FFTs of V_old
-and V, and the coarse history needs a second aggregated kernel for the
-linear part of a block), then making NL the default in 2-D and 3-D.
+C, 2-D (2026-10-24): fd_march.c with fd_state.nl = 1 (rsf_solve -fd_nl 1,
+fd_dynamic with FD_NL=1). fd_sys_ops_nl builds B_k and C_k (band storage
+for B_k, dense C_k), fd_sys_push_lin pushes the k substep midpoint rates
+from the spatial FFTs of V_old and V (two FFTs per source and step),
+fd_step_slipweak and fd_step_rsf branch to the NL variants. TPV205 at
+100 m equals the prototype's NL run to 1e-10 in slip and 2e-10 in slip
+rate (ref_tpv205_nl_dx100.txt, in run_tests.sh).
+Not yet: the coarse history (an NL step suspends it, so slow phases cost
+more: the sequence test's phases take 1.8 times the wall time), and
+normal-stress coupling (refused with a message; needed for the stepover
+work).
+Sequence test (test_fd_sequence.sh setup, 100 m, variable substeps):
+first order / NL phase 1 2018 / 2019 steps, peak slip rate 2.473 / 2.828
+m/s, mean slip 0.9836 / 0.9899 m, recurrence 82.23 / 82.58 yr. The higher
+peak slip rate is in line with the TPV205, rate-and-state rupture and
+BP5-FD comparisons, where the first-order scheme underestimates it.
+
+Next: the coarse history for NL (a second aggregated kernel
+A1[j] = sum_l W[l] w_l for the linear part within an aligned block),
+normal-stress coupling in NL (B_k and C_k for the normal component exist
+already), BP1-FD at 50 and 25 m with NL against the SEAS FD submissions,
+then making NL the default in 2-D and 3-D.
 
 ### WP7, C implementation in rsf_solve: status (2026-10-18)
 Done, each verified in the sandbox before delivery (details in

@@ -54,6 +54,7 @@ int main(int argc, char **argv)
     fprintf(stderr, "partitioned convolution: %s, B %d, D %d\n", e ? "failed" : (s->conv ? "on" : "not needed"), s->B, s->D); }
   st = fd_state_create(n);
   st->normal_coupling = 0;
+  st->nl = (getenv("FD_NL") && getenv("FD_NL")[0]) ? 1 : 0;       /* second-order marching */
   fr.N = n; fr.dugdale = 0; fr.d0 = 0.40; fr.force_time = NULL; fr.force_t0 = 0.0; fr.locked = NULL;
   fr.mu_s = malloc(sizeof(double) * n); fr.mu_d = malloc(sizeof(double) * n);
   for(i = 0; i < n; i++){

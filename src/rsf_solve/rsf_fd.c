@@ -137,7 +137,8 @@ PetscErrorCode rsf_fd_setup(struct interact_ctx *par, PetscReal shear_modulus_si
 			  (int)fd->mode,fd->mirror3 ? "half space (mirror-image free surface, exact static Is)" : "whole space",(double)fd->vsw,(double)fd->vback,fd->nl ? "second-order (-fd_nl 1)" : "first-order"));
     PetscFunctionReturn(PETSC_SUCCESS);
   }
-  PetscCheck(!fd->nl,PETSC_COMM_WORLD,PETSC_ERR_SUP,"-fd_nl 1: the second-order time marching is 3-D only in this version");
+  PetscCheck(!fd->nl || !rsf->calc_sigma_dot,PETSC_COMM_WORLD,PETSC_ERR_SUP,
+	     "-fd_nl 1: the second-order time marching does not include normal-stress coupling yet (drop -calc_sigma_dot or use -fd_nl 0)");
   /* medium: shear modulus and S speed from the run settings (SI), Poisson from interact */
   fd->mode2d = (nanti > 0) ? FD_MODE_ANTIPLANE : FD_MODE_INPLANE;
   fd->halfplane = PETSC_FALSE;
@@ -599,6 +600,7 @@ static PetscErrorCode fd_run_phase(TS ts, struct interact_ctx *par, struct fd_va
   PetscCall(PetscMalloc1(N,&vtmp));
   PetscCall(PetscMalloc1(N,&vref));
   st->normal_coupling = (fd->mode2d == FD_MODE_INPLANE) && rsf->calc_sigma_dot;
+  st->nl = (int)fd->nl;
   PetscCall(VecGetArray(X,&x));
   for(i = 0;i < N;i++){
     g = fd->g_of_s[i];

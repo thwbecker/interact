@@ -22,8 +22,12 @@
 
 struct fd_ops {                 /* operators for one substep multiple k */
   int k, bw;
-  double *Ks, *Kn;              /* dense N x N cumulative kernels K_k (shear, normal) */
+  double *Ks, *Kn;              /* dense N x N cumulative kernels K_k (shear, normal); for nl: B_k */
   double *ab;                   /* LAPACK band storage of Ks, ldab = 3 bw + 1, column-major */
+  /* second-order marching (nl = 1, Noda et al. 2020): tau = H + C_k V_old + B_k V with the
+     slip rate linear across the k substeps; Ks/Kn/ab hold B_k, Cs/Cn the C_k operators */
+  int nl;
+  double *Cs, *Cn;
 };
 
 struct fd_sys {
@@ -88,6 +92,10 @@ void fd_sys_push(struct fd_sys *s, const double *V);
 void fd_sys_push_k(struct fd_sys *s, const double *V, int k);     /* same slice k times */                /* one fine-grid slice */
 void fd_sys_history(struct fd_sys *s, int lag0, double *ts, double *tn); /* sum over lags >= lag0 */
 struct fd_ops *fd_sys_ops(struct fd_sys *s, int k);                /* K_k, built on first use */
+struct fd_ops *fd_sys_ops_nl(struct fd_sys *s, int k);             /* B_k, C_k for second-order marching */
+/* push k substep slices with the slip rate linear from Vold to V (second-order marching);
+   suspends the coarse history for this step */
+void fd_sys_push_lin(struct fd_sys *s, const double *Vold, const double *V, int kk);
 void fd_sys_static(struct fd_sys *s, const double *delta, double *ts, double *tn);
 
 /* banded solve (fd_band.c): dense N x N to LAPACK band storage, and
@@ -131,6 +139,7 @@ struct fd_state {
   double *delta, *V, *tau, *sigma, *tau0, *taudot, *sigma0, *Hn_dot, *psi;
   double *H, *Hn, *hs, *hn, *work;
   int normal_coupling;
+  int nl;                       /* 1: second-order marching (fd_sys_ops_nl, fd_sys_push_lin) */
 };
 struct fd_state *fd_state_create(int N);
 void fd_state_free(struct fd_state *st);

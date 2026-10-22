@@ -19,6 +19,9 @@ for W in 500 -500; do
   tail -1 tmp_fd_dynamic/hd.out | sed "s/:/ (W $W):/"
   [ $st -eq 0 ] || fail=1
 done
+# 2-D second-order marching: TPV205 at 100 m against the prototype (Stepper.enable_nl)
+( cd tmp_fd_dynamic && FD_NL=1 ../bin/fd_dynamic tpv205 100 12 ../$d/ref/ref_tpv205_nl_dx100.txt > nl.out 2>&1 ); st=$?
+echo "(second-order marching) $(tail -1 tmp_fd_dynamic/nl.out)"; [ $st -eq 0 ] || fail=1
 # 3-D: TPV3 (slip weakening) and TPV101 (rate and state, 6 s) at 500 m against the prototype (about 15 s)
 ( cd tmp_fd_dynamic && ../bin/fd3d_test tpv3 500 ../$d/ref/ref_tpv3_dx500.txt > fd3d.out 2>/dev/null ); st=$?
 tail -1 tmp_fd_dynamic/fd3d.out; [ $st -eq 0 ] || fail=1

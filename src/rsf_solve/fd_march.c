@@ -128,7 +128,7 @@ void fd_sys_free(struct fd_sys *s)
     free(s->Acs); free(s->Acn); free(s->Jc);
   }
   free(s->hist); free(s->hk); free(s->off); free(s->src_of); free(s->src_rev); free(s->w1); free(s->w2); free(s->w3); free(s->Ks); free(s->Kn);
-  for(k = 0; k < s->nops; k++){ free(s->ops[k].Ks); free(s->ops[k].Kn); free(s->ops[k].ab); }
+  for(k = 0; k < s->nops; k++){ free(s->ops[k].Ks); free(s->ops[k].Kn); free(s->ops[k].ab); free(s->ops[k].Cs); free(s->ops[k].Cn); }
   fd_fft_plan_destroy(s->pf); fd_fft_plan_destroy(s->pb);
   free(s);
 }
@@ -177,6 +177,32 @@ void fd_sys_push_k(struct fd_sys *s, const double *V, int kk)
       s->hk[k]++;
       if((s->conv == 1) && (s->hk[k] % s->B == 0))
         form_window(s, k, s->hk[k] / s->B - 1);      /* complete now; the ring will not keep its inputs */
+    }
+  }
+}
+
+void fd_sys_push_lin(struct fd_sys *s, const double *Vold, const double *V, int kk)
+{
+  int k, i, r, n, q;
+  if(s->Kc) s->coarse_from = -1;                 /* aligned blocks assume a constant rate */
+  for(k = 0; k < s->nsrc; k++){
+    r = s->src_of[k]; n = s->segs->seg[r].n;
+    memset(s->w1, 0, sizeof(double _Complex) * s->M);
+    memset(s->w3, 0, sizeof(double _Complex) * s->M);
+    for(i = 0; i < n; i++){
+      s->w1[i] = Vold[s->off[r] + (s->src_rev[k] ? n - 1 - i : i)];
+      s->w3[i] = V[s->off[r] + (s->src_rev[k] ? n - 1 - i : i)];
+    }
+    fd_fft_exec(s->pf, s->w1, s->w2);            /* w2 = F(Vold) */
+    fd_fft_exec(s->pf, s->w3, s->w1);            /* w1 = F(V) */
+    for(q = 1; q <= kk; q++){
+      double w = (q - 0.5) / kk;
+      double _Complex *slot = s->hist[k] + (size_t)(s->hk[k] % s->Lbuf) * s->M;
+      int m;
+      for(m = 0; m < s->M; m++) slot[m] = (1.0 - w) * s->w2[m] + w * s->w1[m];
+      s->hk[k]++;
+      if((s->conv == 1) && (s->hk[k] % s->B == 0))
+        form_window(s, k, s->hk[k] / s->B - 1);
     }
   }
 }
@@ -425,9 +451,10 @@ struct fd_ops *fd_sys_ops(struct fd_sys *s, int k)
   int q, a, b, l, i, j, ns, nr, bw;
   double *Ws, *Wn, thr, amax = 0.0;
   struct fd_ops *op;
-  for(q = 0; q < s->nops; q++) if(s->ops[q].k == k) return s->ops + q;
+  for(q = 0; q < s->nops; q++) if(s->ops[q].k == k && !s->ops[q].nl) return s->ops + q;
   if(s->nops >= 16) return NULL;
   op = s->ops + s->nops;
+  memset(op, 0, sizeof(*op));
   op->k = k;
   op->Ks = (double *)malloc(sizeof(double) * (size_t)s->N * s->N);
   op->Kn = (double *)malloc(sizeof(double) * (size_t)s->N * s->N);
@@ -453,6 +480,66 @@ struct fd_ops *fd_sys_ops(struct fd_sys *s, int k)
   for(i = 0; i < (size_t)s->N * s->N; i++) if(fabs(op->Ks[i]) > amax) amax = fabs(op->Ks[i]);
   thr = 1e-13 * amax;
   for(i = 0; i < (size_t)s->N * s->N; i++){ if(fabs(op->Ks[i]) <= thr) op->Ks[i] = 0.0; if(fabs(op->Kn[i]) <= thr) op->Kn[i] = 0.0; }
+  bw = fd_band_width(s->N, op->Ks, 0.0);
+  op->bw = bw;
+  op->ab = (double *)malloc(sizeof(double) * (size_t)(3 * bw + 1) * s->N);
+  fd_band_from_dense(s->N, bw, op->Ks, op->ab);
+  s->nops++;
+  return op;
+}
+
+/* B_k and C_k for second-order marching (see fd_ops): with lag l = k - j + 1 and
+   w(l) = (k - l + 1/2)/k, B_k = sum_l w(l) K[l] + (w(1) - 1) eta I and
+   C_k = sum_l (1 - w(l)) K[l] + (1 - w(1)) eta I, K[l] = W[l] + Ks dt; eta on the shear diagonal only */
+struct fd_ops *fd_sys_ops_nl(struct fd_sys *s, int k)
+{
+  int q, a, b, l, i, j, ns, nr, bw;
+  double *Ws, *Wn, thr, amax = 0.0, w1 = (k - 0.5) / k;
+  size_t NN = (size_t)s->N * s->N, ii;
+  struct fd_ops *op;
+  for(q = 0; q < s->nops; q++) if(s->ops[q].k == k && s->ops[q].nl) return s->ops + q;
+  if(s->nops >= 16) return NULL;
+  op = s->ops + s->nops;
+  memset(op, 0, sizeof(*op));
+  op->k = k; op->nl = 1;
+  op->Ks = (double *)malloc(sizeof(double) * NN); op->Kn = (double *)malloc(sizeof(double) * NN);
+  op->Cs = (double *)malloc(sizeof(double) * NN); op->Cn = (double *)malloc(sizeof(double) * NN);
+  for(ii = 0; ii < NN; ii++){                     /* static part: sum_l w(l) = sum_l (1 - w(l)) = k/2 */
+    op->Ks[ii] = op->Cs[ii] = s->Ks[ii] * s->dt * 0.5 * k;
+    op->Kn[ii] = op->Cn[ii] = s->Kn[ii] * s->dt * 0.5 * k;
+  }
+  for(a = 0; a < s->nsrc; a++)
+    for(b = 0; b < s->nseg; b++){
+      struct fd_pair *p = s->pairs[a * s->nseg + b];
+      int r = s->src_of[a], rev = s->src_rev[a], jj;
+      ns = p->src->n; nr = p->rcv->n;
+      Ws = (double *)malloc(sizeof(double) * ns * nr); Wn = (double *)malloc(sizeof(double) * ns * nr);
+      for(l = 1; l <= (k < p->L ? k : p->L); l++){
+        double w = (k - l + 0.5) / k;
+        fd_pair_W_dense(p, l, Ws, Wn);
+        for(i = 0; i < nr; i++)
+          for(j = 0; j < ns; j++){
+            size_t idx;
+            jj = rev ? ns - 1 - j : j;
+            idx = (size_t)(s->off[b] + i) * s->N + s->off[r] + jj;
+            op->Ks[idx] += w * Ws[i * ns + j]; op->Cs[idx] += (1.0 - w) * Ws[i * ns + j];
+            op->Kn[idx] += w * Wn[i * ns + j]; op->Cn[idx] += (1.0 - w) * Wn[i * ns + j];
+          }
+      }
+      free(Ws); free(Wn);
+    }
+  for(i = 0; i < s->N; i++){
+    op->Ks[(size_t)i * s->N + i] += (w1 - 1.0) * s->eta;
+    op->Cs[(size_t)i * s->N + i] += (1.0 - w1) * s->eta;
+  }
+  for(ii = 0; ii < NN; ii++) if(fabs(op->Ks[ii]) > amax) amax = fabs(op->Ks[ii]);
+  thr = 1e-13 * amax;
+  for(ii = 0; ii < NN; ii++){
+    if(fabs(op->Ks[ii]) <= thr) op->Ks[ii] = 0.0;
+    if(fabs(op->Kn[ii]) <= thr) op->Kn[ii] = 0.0;
+    if(fabs(op->Cs[ii]) <= thr) op->Cs[ii] = 0.0;
+    if(fabs(op->Cn[ii]) <= thr) op->Cn[ii] = 0.0;
+  }
   bw = fd_band_width(s->N, op->Ks, 0.0);
   op->bw = bw;
   op->ab = (double *)malloc(sizeof(double) * (size_t)(3 * bw + 1) * s->N);
@@ -568,11 +655,40 @@ void fd_state_free(struct fd_state *st)
   free(st->Hn_dot); free(st->psi); free(st->H); free(st->Hn); free(st->hs); free(st->hn); free(st->work); free(st);
 }
 
+static int fd_step_slipweak_nl(struct fd_sys *s, struct fd_state *st, struct fd_slipweak *f, int k)
+{
+  int i, N = s->N;
+  double dt = s->dt * k, t1 = st->t + dt, *Vold, *d1;
+  struct fd_ops *op = fd_sys_ops_nl(s, k);
+  if(!op || st->normal_coupling) return -1;
+  Vold = (double *)malloc(sizeof(double) * N); d1 = (double *)malloc(sizeof(double) * N);
+  memcpy(Vold, st->V, sizeof(double) * N);
+  fd_sys_static(s, st->delta, st->H, st->Hn);
+  fd_sys_history(s, k + 1, st->hs, st->hn);
+  dense_mult(N, op->Cs, Vold, st->work);
+  for(i = 0; i < N; i++){
+    st->H[i] += st->tau0[i] + st->taudot[i] * t1 + st->hs[i] + st->work[i];
+    st->Hn[i] += st->Hn_dot[i] * t1 + st->hn[i];
+    d1[i] = st->delta[i] + 0.5 * dt * Vold[i];     /* slip at t1 = d1 + (dt/2) V */
+  }
+  fd_slipweak_solve(f, s, op, st->H, st->Hn, st->sigma0, 0, t1, 0.5 * dt, d1, st->V, st->work, st->sigma);
+  memcpy(st->V, st->work, sizeof(double) * N);
+  fd_band_mult(N, op->bw, op->ab, st->V, st->work);
+  for(i = 0; i < N; i++) st->tau[i] = st->H[i] + st->work[i];
+  fd_sys_push_lin(s, Vold, st->V, k);
+  for(i = 0; i < N; i++) st->delta[i] += 0.5 * (Vold[i] + st->V[i]) * dt;
+  st->t = t1; st->n++; st->k = k;
+  free(Vold); free(d1);
+  return 0;
+}
+
 int fd_step_slipweak(struct fd_sys *s, struct fd_state *st, struct fd_slipweak *f, int k)
 {
   int i, N = s->N;
   double dt = s->dt * k, t1 = st->t + dt;
-  struct fd_ops *op = fd_sys_ops(s, k);
+  struct fd_ops *op;
+  if(st->nl) return fd_step_slipweak_nl(s, st, f, k);
+  op = fd_sys_ops(s, k);
   if(!op) return -1;
   /* known parts: static + loading + history beyond the current step */
   fd_sys_static(s, st->delta, st->H, st->Hn);
@@ -691,11 +807,50 @@ int fd_rsf_solve(const struct fd_rsf *f, struct fd_sys *s, struct fd_ops *op, co
 
 /* one step of k dt_min: predictor-corrector in psi (exact aging update at the
    mean slip rate), coupled solve for V twice (stepper.RateState.solve) */
+static int fd_step_rsf_nl(struct fd_sys *s, struct fd_state *st, const struct fd_rsf *f, int k)
+{
+  int i, N = s->N;
+  double dt = s->dt * k, t1 = st->t + dt, *psi_s = st->work, *Vs, *sig, *Vold;
+  struct fd_ops *op = fd_sys_ops_nl(s, k);
+  double tp0 = fd_now(), tp1;
+  if(!op || st->normal_coupling) return -1;
+  Vs = (double *)calloc((size_t)N, sizeof(double)); sig = (double *)calloc((size_t)N, sizeof(double));
+  Vold = (double *)malloc(sizeof(double) * N);
+  memcpy(Vold, st->V, sizeof(double) * N);
+  for(i = 0; i < N; i++) sig[i] = st->sigma0[i];
+  fd_sys_static(s, st->delta, st->H, st->Hn);
+  tp1 = fd_now(); fd_prof[1] += tp1 - tp0; tp0 = tp1;
+  fd_sys_history(s, k + 1, st->hs, st->hn);
+  tp1 = fd_now(); fd_prof[0] += tp1 - tp0; tp0 = tp1;
+  dense_mult(N, op->Cs, Vold, Vs);
+  for(i = 0; i < N; i++){
+    st->H[i] += st->tau0[i] + st->taudot[i] * t1 + st->hs[i] + Vs[i];
+    st->Hn[i] += st->Hn_dot[i] * t1 + st->hn[i];
+  }
+  /* predictor, corrector: state over the step at the mean rate */
+  for(i = 0; i < N; i++) psi_s[i] = fd_rsf_psi_advance(f, i, st->psi[i], Vold[i], Vold[i], dt);
+  fd_rsf_solve(f, s, op, st->H, sig, psi_s, Vold, Vs);
+  for(i = 0; i < N; i++) psi_s[i] = fd_rsf_psi_advance(f, i, st->psi[i], Vold[i], Vs[i], dt);
+  fd_rsf_solve(f, s, op, st->H, sig, psi_s, Vs, st->V);
+  tp1 = fd_now(); fd_prof[2] += tp1 - tp0; tp0 = tp1;
+  memcpy(st->psi, psi_s, sizeof(double) * N);
+  fd_band_mult(N, op->bw, op->ab, st->V, Vs);
+  for(i = 0; i < N; i++){ st->tau[i] = st->H[i] + Vs[i]; st->sigma[i] = st->sigma0[i]; }
+  fd_sys_push_lin(s, Vold, st->V, k);
+  tp1 = fd_now(); fd_prof[3] += tp1 - tp0; tp0 = tp1;
+  for(i = 0; i < N; i++) st->delta[i] += 0.5 * (Vold[i] + st->V[i]) * dt;
+  st->t = t1; st->n++; st->k = k;
+  free(Vs); free(sig); free(Vold);
+  return 0;
+}
+
 int fd_step_rsf(struct fd_sys *s, struct fd_state *st, const struct fd_rsf *f, int k)
 {
   int i, N = s->N;
   double dt = s->dt * k, t1 = st->t + dt, *psi_s = st->work, *Vs, *sig;
-  struct fd_ops *op = fd_sys_ops(s, k);
+  struct fd_ops *op;
+  if(st->nl) return fd_step_rsf_nl(s, st, f, k);
+  op = fd_sys_ops(s, k);
   if(!op) return -1;
   double tp0 = fd_now(), tp1;
   Vs = (double *)calloc((size_t)N, sizeof(double)); sig = (double *)calloc((size_t)N, sizeof(double));
