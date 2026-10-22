@@ -404,10 +404,9 @@ LIBS_DEBUG = $(MY_LIBDIR_SPEC)$(ODIR)/     -linput.dbg -lpatchio.dbg $(TGF_LIB) 
 # list of all programs in groups
 #
 
-all:  libraries main_prog rsf_testing \
-	tools converters geom_converters
+all:  libraries main_prog tools converters geom_converters
 
-really_all: all debug_libraries  relax testing $(BDIR)/$(INTERACT_BINARY_NAME).sgl  \
+really_all: all debug_libraries  rsf_testing relax testing $(BDIR)/$(INTERACT_BINARY_NAME).sgl  \
 	analysis geographic_tools $(BDIR)/$(INTERACT_BINARY_NAME).dbg
 #	pgplot_progs block_tools
 
