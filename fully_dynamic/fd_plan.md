@@ -595,11 +595,42 @@ m/s, mean slip 0.9836 / 0.9899 m, recurrence 82.23 / 82.58 yr. The higher
 peak slip rate is in line with the TPV205, rate-and-state rupture and
 BP5-FD comparisons, where the first-order scheme underestimates it.
 
-Next: the coarse history for NL (a second aggregated kernel
-A1[j] = sum_l W[l] w_l for the linear part within an aligned block),
-normal-stress coupling in NL (B_k and C_k for the normal component exist
-already), BP1-FD at 50 and 25 m with NL against the SEAS FD submissions,
-then making NL the default in 2-D and 3-D.
+Coarse history for NL (2026-10-25): with a rate linear within each
+aligned block of Kc substeps, the block's contribution is
+A[j] s_1 + (B[j] - w_1 A[j]) (s_Kc - s_1) Kc/(Kc - 1), with the first and
+last slices s_1, s_Kc of the block, w_1 = 1/(2 Kc), and the first moments
+B[j] = sum_l W[l] ((j+1) Kc - l + 1/2)/Kc built next to A[j]
+(fd_sys_set_coarse). On the sequence test the NL run with the coarse sum
+equals the run with FD_COARSE_OFF=1 to all printed digits (phase times,
+steps, peak slip rates, slip) and takes the first-order wall time again
+(5.8 s against 11.5 s per phase).
+
+Normal-stress coupling in NL (2026-10-25): sigma = sigma0 + nsign (Hn +
+Cn V_old + Bn V) in both step functions; the refusal in rsf_solve is gone.
+Harris and Day case D, W = +500 m (fd_dynamic hd, FD_NL=1), maximum final
+slip on segment 2:
+
+| dx | first order | NL |
+|---|---|---|
+| 100 m | 0.249 m | 1.244 m |
+| 50 m | 0.234 m | 0.567 m |
+| 25 m | 0.231 m | 0.293 m |
+
+Both converge to an aborted jump (about 0.23 m), but NL at 100 m and 50 m
+produces a sustained rupture on segment 2 that is not there at 25 m; the
+first-order scheme is already within 8 percent at 100 m for this
+quantity. Without normal coupling (FD_NOCOUP=1) both give no jump. The
+traces agree until segment 2 starts slipping; the normal stress shows no
+oscillation. Whether this is a remaining error in the NL normal coupling
+or a genuine resolution sensitivity of near-threshold triggering is open;
+it matters directly for the jump statistics. Until it is understood NL is
+not the default, and stepover runs should use the first-order scheme or
+check both.
+
+Next: settle the NL normal-coupling question (an independent check of
+Bn + Cn against the first-order operator, NL with normal coupling in the
+prototype for a roundoff comparison, and the Harris-Day case at 12.5 m),
+then BP1-FD with NL against the SEAS FD submissions.
 
 ### WP7, C implementation in rsf_solve: status (2026-10-18)
 Done, each verified in the sandbox before delivery (details in

@@ -66,6 +66,9 @@ struct fd_sys {
      (exact, Kc times fewer terms) */
   int Kc, *Jc;                  /* block length (0: off), blocks per pair */
   double _Complex **Acs, **Acn; /* aggregated kernels per pair, [j][m], j = 1..Jc */
+  double _Complex **Bcs, **Bcn; /* first moments for a linear rate within a block (second-order
+                                   marching): sum_l W[l] w(l), w = ((j+1)Kc - l + 1/2)/Kc */
+  int lin;                      /* history slices come from fd_sys_push_lin */
   long coarse_from;             /* fine index where the current run of aligned Kc steps began, -1 none */
   fd_fft_plan tf, tb;           /* time FFTs of length F */
   double _Complex *tw1, *tw2, *tz, *tzn;

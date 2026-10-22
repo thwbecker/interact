@@ -124,8 +124,8 @@ void fd_sys_free(struct fd_sys *s)
     fd_fft_plan_destroy(s->tf); fd_fft_plan_destroy(s->tb);
   }
   if(s->Kc){
-    for(k = 0; k < s->nsrc * s->nseg; k++){ free(s->Acs[k]); free(s->Acn[k]); }
-    free(s->Acs); free(s->Acn); free(s->Jc);
+    for(k = 0; k < s->nsrc * s->nseg; k++){ free(s->Acs[k]); free(s->Acn[k]); free(s->Bcs[k]); free(s->Bcn[k]); }
+    free(s->Acs); free(s->Acn); free(s->Bcs); free(s->Bcn); free(s->Jc);
   }
   free(s->hist); free(s->hk); free(s->off); free(s->src_of); free(s->src_rev); free(s->w1); free(s->w2); free(s->w3); free(s->Ks); free(s->Kn);
   for(k = 0; k < s->nops; k++){ free(s->ops[k].Ks); free(s->ops[k].Kn); free(s->ops[k].ab); free(s->ops[k].Cs); free(s->ops[k].Cn); }
@@ -184,7 +184,11 @@ void fd_sys_push_k(struct fd_sys *s, const double *V, int kk)
 void fd_sys_push_lin(struct fd_sys *s, const double *Vold, const double *V, int kk)
 {
   int k, i, r, n, q;
-  if(s->Kc) s->coarse_from = -1;                 /* aligned blocks assume a constant rate */
+  s->lin = 1;
+  if(s->Kc){                                     /* aligned steps of Kc substeps: a block is one step */
+    if((kk == s->Kc) && (s->hk[0] % s->Kc == 0)){ if(s->coarse_from < 0) s->coarse_from = s->hk[0]; }
+    else s->coarse_from = -1;
+  }
   for(k = 0; k < s->nsrc; k++){
     r = s->src_of[k]; n = s->segs->seg[r].n;
     memset(s->w1, 0, sizeof(double _Complex) * s->M);
@@ -214,16 +218,23 @@ int fd_sys_set_coarse(struct fd_sys *s, int K)
   s->Kc = K; s->coarse_from = -1;
   s->Jc = calloc((size_t)np, sizeof(int));
   s->Acs = calloc((size_t)np, sizeof(double _Complex *)); s->Acn = calloc((size_t)np, sizeof(double _Complex *));
+  s->Bcs = calloc((size_t)np, sizeof(double _Complex *)); s->Bcn = calloc((size_t)np, sizeof(double _Complex *));
   for(k = 0; k < np; k++){
     struct fd_pair *p = s->pairs[k];
     s->Jc[k] = (p->L - 1) / K;                     /* blocks j = 1..Jc with jK + 1 <= L */
     for(comp = 0; comp < (p->has_normal ? 2 : 1); comp++){
       const double _Complex *W = comp ? p->Wn_hat : p->Ws_hat;
       double _Complex *A = calloc((size_t)(s->Jc[k] + 1) * p->M, sizeof(double _Complex));
+      double _Complex *Bm = calloc((size_t)(s->Jc[k] + 1) * p->M, sizeof(double _Complex));
       for(j = 1; j <= s->Jc[k]; j++)
-        for(l = j * K + 1; l <= (j + 1) * K && l <= p->L; l++)
-          for(m = 0; m < p->M; m++) A[(size_t)j * p->M + m] += W[(size_t)(l - 1) * p->M + m];
-      if(comp) s->Acn[k] = A; else s->Acs[k] = A;
+        for(l = j * K + 1; l <= (j + 1) * K && l <= p->L; l++){
+          double w = ((j + 1) * K - l + 0.5) / K;
+          for(m = 0; m < p->M; m++){
+            A[(size_t)j * p->M + m] += W[(size_t)(l - 1) * p->M + m];
+            Bm[(size_t)j * p->M + m] += w * W[(size_t)(l - 1) * p->M + m];
+          }
+        }
+      if(comp){ s->Acn[k] = A; s->Bcn[k] = Bm; } else { s->Acs[k] = A; s->Bcs[k] = Bm; }
     }
   }
   return 0;
@@ -386,6 +397,18 @@ void fd_sys_history(struct fd_sys *s, int lag0, double *ts, double *tn)
           if(p->has_normal){
             const double _Complex *An = s->Acn[kk] + (size_t)j * s->M;
             for(m = 0; m < s->M; m++) s->w2[m] += An[m] * Vh[m];
+          }
+          if(s->lin){
+            /* rate linear within the block: slices s_q = Vo + w_q (Vn - Vo), w_q = (q - 1/2)/Kc;
+               sum = A s_1 + (B - w_1 A)(s_Kc - s_1) Kc/(Kc - 1) */
+            const double _Complex *V1 = Vh, *VK = s->hist[a] + (size_t)((hk - (j - 1) * s->Kc - 1) % s->Lbuf) * s->M;
+            const double _Complex *Bs = s->Bcs[kk] + (size_t)j * s->M;
+            double w1 = 0.5 / s->Kc, fac = (double)s->Kc / (s->Kc - 1);
+            for(m = 0; m < s->M; m++) s->w1[m] += (Bs[m] - w1 * As[m]) * (VK[m] - V1[m]) * fac;
+            if(p->has_normal){
+              const double _Complex *An = s->Acn[kk] + (size_t)j * s->M, *Bn = s->Bcn[kk] + (size_t)j * s->M;
+              for(m = 0; m < s->M; m++) s->w2[m] += (Bn[m] - w1 * An[m]) * (VK[m] - V1[m]) * fac;
+            }
           }
         }
         fd_fft_exec(s->pb, s->w1, s->w3);
@@ -660,7 +683,7 @@ static int fd_step_slipweak_nl(struct fd_sys *s, struct fd_state *st, struct fd_
   int i, N = s->N;
   double dt = s->dt * k, t1 = st->t + dt, *Vold, *d1;
   struct fd_ops *op = fd_sys_ops_nl(s, k);
-  if(!op || st->normal_coupling) return -1;
+  if(!op) return -1;
   Vold = (double *)malloc(sizeof(double) * N); d1 = (double *)malloc(sizeof(double) * N);
   memcpy(Vold, st->V, sizeof(double) * N);
   fd_sys_static(s, st->delta, st->H, st->Hn);
@@ -671,7 +694,11 @@ static int fd_step_slipweak_nl(struct fd_sys *s, struct fd_state *st, struct fd_
     st->Hn[i] += st->Hn_dot[i] * t1 + st->hn[i];
     d1[i] = st->delta[i] + 0.5 * dt * Vold[i];     /* slip at t1 = d1 + (dt/2) V */
   }
-  fd_slipweak_solve(f, s, op, st->H, st->Hn, st->sigma0, 0, t1, 0.5 * dt, d1, st->V, st->work, st->sigma);
+  if(st->normal_coupling){                         /* normal stress: Hn + Cn V_old + Bn V */
+    dense_mult(N, op->Cn, Vold, st->work);
+    for(i = 0; i < N; i++) st->Hn[i] += st->work[i];
+  }
+  fd_slipweak_solve(f, s, op, st->H, st->Hn, st->sigma0, st->normal_coupling, t1, 0.5 * dt, d1, st->V, st->work, st->sigma);
   memcpy(st->V, st->work, sizeof(double) * N);
   fd_band_mult(N, op->bw, op->ab, st->V, st->work);
   for(i = 0; i < N; i++) st->tau[i] = st->H[i] + st->work[i];
@@ -813,7 +840,7 @@ static int fd_step_rsf_nl(struct fd_sys *s, struct fd_state *st, const struct fd
   double dt = s->dt * k, t1 = st->t + dt, *psi_s = st->work, *Vs, *sig, *Vold;
   struct fd_ops *op = fd_sys_ops_nl(s, k);
   double tp0 = fd_now(), tp1;
-  if(!op || st->normal_coupling) return -1;
+  if(!op) return -1;
   Vs = (double *)calloc((size_t)N, sizeof(double)); sig = (double *)calloc((size_t)N, sizeof(double));
   Vold = (double *)malloc(sizeof(double) * N);
   memcpy(Vold, st->V, sizeof(double) * N);
@@ -827,15 +854,24 @@ static int fd_step_rsf_nl(struct fd_sys *s, struct fd_state *st, const struct fd
     st->H[i] += st->tau0[i] + st->taudot[i] * t1 + st->hs[i] + Vs[i];
     st->Hn[i] += st->Hn_dot[i] * t1 + st->hn[i];
   }
+  if(st->normal_coupling){                         /* normal stress: Hn + Cn V_old + Bn V */
+    dense_mult(N, op->Cn, Vold, Vs);
+    for(i = 0; i < N; i++) st->Hn[i] += Vs[i];
+    dense_mult(N, op->Kn, Vold, sig);
+    for(i = 0; i < N; i++) sig[i] = st->sigma0[i] + s->nsign * (st->Hn[i] + sig[i]);
+  }
   /* predictor, corrector: state over the step at the mean rate */
   for(i = 0; i < N; i++) psi_s[i] = fd_rsf_psi_advance(f, i, st->psi[i], Vold[i], Vold[i], dt);
   fd_rsf_solve(f, s, op, st->H, sig, psi_s, Vold, Vs);
+  if(st->normal_coupling){ dense_mult(N, op->Kn, Vs, sig); for(i = 0; i < N; i++) sig[i] = st->sigma0[i] + s->nsign * (st->Hn[i] + sig[i]); }
   for(i = 0; i < N; i++) psi_s[i] = fd_rsf_psi_advance(f, i, st->psi[i], Vold[i], Vs[i], dt);
   fd_rsf_solve(f, s, op, st->H, sig, psi_s, Vs, st->V);
   tp1 = fd_now(); fd_prof[2] += tp1 - tp0; tp0 = tp1;
   memcpy(st->psi, psi_s, sizeof(double) * N);
   fd_band_mult(N, op->bw, op->ab, st->V, Vs);
-  for(i = 0; i < N; i++){ st->tau[i] = st->H[i] + Vs[i]; st->sigma[i] = st->sigma0[i]; }
+  for(i = 0; i < N; i++) st->tau[i] = st->H[i] + Vs[i];
+  if(st->normal_coupling){ dense_mult(N, op->Kn, st->V, sig); for(i = 0; i < N; i++) st->sigma[i] = st->sigma0[i] + s->nsign * (st->Hn[i] + sig[i]); }
+  else for(i = 0; i < N; i++) st->sigma[i] = st->sigma0[i];
   fd_sys_push_lin(s, Vold, st->V, k);
   tp1 = fd_now(); fd_prof[3] += tp1 - tp0; tp0 = tp1;
   for(i = 0; i < N; i++) st->delta[i] += 0.5 * (Vold[i] + st->V[i]) * dt;

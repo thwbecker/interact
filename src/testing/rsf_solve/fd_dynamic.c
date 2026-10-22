@@ -146,7 +146,8 @@ static int run_hd(int argc, char **argv)
   s = fd_sys_create(&segs, pairs, 2, NULL, NULL, FD_MODE_INPLANE, dt, AL, BE, RHO, -1);
   if(getenv("FD_CONV_B") && getenv("FD_CONV_B")[0]){ int e = fd_sys_set_partitioned(s, atoi(getenv("FD_CONV_B")), 1);
     fprintf(stderr, "partitioned convolution: %s, B %d, D %d\n", e ? "failed" : (s->conv ? "on" : "not needed"), s->B, s->D); }
-  st = fd_state_create(N); st->normal_coupling = 1;
+  st = fd_state_create(N); st->normal_coupling = getenv("FD_NOCOUP") ? 0 : 1;
+  st->nl = (getenv("FD_NL") && getenv("FD_NL")[0]) ? 1 : 0;
   fr.N = N; fr.dugdale = 0; fr.d0 = 0.10; fr.force_t0 = 0.2; fr.locked = NULL;
   fr.mu_s = malloc(sizeof(double) * (size_t)N); fr.mu_d = malloc(sizeof(double) * (size_t)N); fr.force_time = malloc(sizeof(double) * (size_t)N);
   for(i = 0; i < N; i++){

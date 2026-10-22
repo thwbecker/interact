@@ -137,8 +137,6 @@ PetscErrorCode rsf_fd_setup(struct interact_ctx *par, PetscReal shear_modulus_si
 			  (int)fd->mode,fd->mirror3 ? "half space (mirror-image free surface, exact static Is)" : "whole space",(double)fd->vsw,(double)fd->vback,fd->nl ? "second-order (-fd_nl 1)" : "first-order"));
     PetscFunctionReturn(PETSC_SUCCESS);
   }
-  PetscCheck(!fd->nl || !rsf->calc_sigma_dot,PETSC_COMM_WORLD,PETSC_ERR_SUP,
-	     "-fd_nl 1: the second-order time marching does not include normal-stress coupling yet (drop -calc_sigma_dot or use -fd_nl 0)");
   /* medium: shear modulus and S speed from the run settings (SI), Poisson from interact */
   fd->mode2d = (nanti > 0) ? FD_MODE_ANTIPLANE : FD_MODE_INPLANE;
   fd->halfplane = PETSC_FALSE;

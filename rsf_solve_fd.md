@@ -158,12 +158,14 @@ top row reaches the surface, where the free surface enters the dynamic part
 through a mirror image and the static part uses interact's exact half-space
 operator. 3-D phases use fixed fine steps so far.
 
-`-fd_nl 1` (3-D, and 2-D without -calc_sigma_dot) selects second-order time marching after Noda,
+`-fd_nl 1` (2-D and 3-D) selects second-order time marching after Noda,
 Sato and Kurihara (2020): midpoint slip rates in the history and the
 radiation damping applied to the slip rate at the collocation time. On the
 BP5-FD first event at 1 km it brings arrivals and peak slip rates close to
 an independent spectral code at the same step size; see fd_plan.md. The
-default remains the first-order scheme for now.
+default remains the first-order scheme for now: with normal-stress coupling
+(stepovers) the second-order scheme over-predicts triggering at 100 and 50 m
+in the Harris-Day test (see fd_plan.md), which is under investigation.
 
 Restrictions in this version, refused with a message at start: one MPI
 rank; `-ve_mode 0`; aging law (`-state_law 1`); 2-D elements only, forming
