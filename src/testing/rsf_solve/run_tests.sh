@@ -19,6 +19,9 @@ for W in 500 -500; do
   tail -1 tmp_fd_dynamic/hd.out | sed "s/:/ (W $W):/"
   [ $st -eq 0 ] || fail=1
 done
+# 2-D second-order marching with normal-stress coupling: Harris-Day W = 500 m at 100 m against the prototype
+( cd tmp_fd_dynamic && FD_NL=1 ../bin/fd_dynamic hd 500 100 8 ../$d/ref/ref_hd_nl_W500_dx100.txt > nlhd.out 2>&1 ); st=$?
+echo "(second-order marching) $(tail -1 tmp_fd_dynamic/nlhd.out | sed 's/:/ (W 500):/')"; [ $st -eq 0 ] || fail=1
 # 2-D second-order marching: TPV205 at 100 m against the prototype (Stepper.enable_nl)
 ( cd tmp_fd_dynamic && FD_NL=1 ../bin/fd_dynamic tpv205 100 12 ../$d/ref/ref_tpv205_nl_dx100.txt > nl.out 2>&1 ); st=$?
 echo "(second-order marching) $(tail -1 tmp_fd_dynamic/nl.out)"; [ $st -eq 0 ] || fail=1

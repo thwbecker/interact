@@ -627,10 +627,29 @@ it matters directly for the jump statistics. Until it is understood NL is
 not the default, and stepover runs should use the first-order scheme or
 check both.
 
-Next: settle the NL normal-coupling question (an independent check of
-Bn + Cn against the first-order operator, NL with normal coupling in the
-prototype for a roundoff comparison, and the Harris-Day case at 12.5 m),
-then BP1-FD with NL against the SEAS FD submissions.
+NL normal coupling, checks (2026-10-25):
+- Operators: Bn + Cn equals the first-order normal operator to 1e-16
+  (k = 1 and 4), as B + C does for shear.
+- Prototype: Stepper.enable_nl() now includes normal coupling
+  (sigma = sigma0 - (Hn + Cn V_old + Bn V)); dump_hd.py takes FD_NL=1. The
+  C run equals the prototype on Harris-Day W = 500 m at 100 m to 5e-11 in
+  slip and 2e-10 in slip rate (ref_hd_nl_W500_dx100.txt, in run_tests.sh),
+  so the over-triggering at 100 and 50 m is a property of the scheme as
+  formulated, not an implementation error in C.
+- W = -500 m (the other sense, a sustained jump in both schemes): maximum
+  slip on segment 2 1.365 / 1.327 m (first order / NL) at 100 m,
+  1.381 / 1.364 m at 50 m; the schemes agree.
+- W = +500 m at 12.5 m does not fit in the sandbox (tables of several GB);
+  to run on a workstation:
+  fd_dynamic hd 500 12.5 and FD_NL=1 fd_dynamic hd 500 12.5.
+Reading: in this near-threshold case (segment 2 nucleates or not) NL
+needs finer elements than the first-order scheme to give the converged
+answer; where a jump clearly happens or clearly does not, the schemes
+agree. For jump statistics, resolution checks are needed with either
+scheme; NL stays opt-in.
+
+Next: Harris-Day W = +500 m at 12.5 m on a workstation, BP1-FD with NL
+against the SEAS FD submissions.
 
 ### WP7, C implementation in rsf_solve: status (2026-10-18)
 Done, each verified in the sandbox before delivery (details in

@@ -9,7 +9,9 @@ sy=sh.System([f1,f2],dt,AL,BE,RHO,tol=1e-2,lmax=nsteps+2,cap_ok=True)
 x=np.concatenate([f1.centers[:,0],f2.centers[:,0]]); ft=np.full(sy.N,np.inf)
 inner=(np.arange(sy.N)<n)&(np.abs(x)<2.5e3); ft[inner]=np.abs(x[inner])/(0.5*BE)
 fr=st.SlipWeakening(0.75,0.51,0.10,force_time=ft,force_t0=0.2)
+import os
 S=st.Stepper(sy,fr,tau0=20e6,sigma0=33.3e6,normal_coupling=True)
+if os.environ.get("FD_NL"): S.enable_nl()
 pts=[n-1, n//2+50, n+int(5.5e3/dx), n+int(1e3/dx)]
 with open(out,"w") as f:
     f.write(f"# hd W {W} dx {dx} n {n} pts {' '.join(map(str,pts))}: t, delta[pts], V[pts], sigma[pts]\n")

@@ -420,6 +420,7 @@ class Stepper:
           tau^n = H + (K1 + eta I) (V^(n-1) + V^n)/2 - eta V^n.  Fixed steps (k = 1) only."""
         self.nl = True
         self._nl_ops = {}
+        self._nl_n = {}
         self._nl_set(self.k)
 
     def _nl_set(self, k):
@@ -433,16 +434,21 @@ class Stepper:
         import scipy.sparse as sps
         if k not in self._nl_ops:
             eta = self.sys.eta; N = self.N; sysm = self.sys
-            B = np.zeros((N, N)); C = np.zeros((N, N))
+            B = np.zeros((N, N)); C = np.zeros((N, N)); Bn = np.zeros((N, N)); Cn = np.zeros((N, N))
             for (a_, b_), p in sysm.pairs.items():
                 ks, kn = p.static_blocks()
-                bs = np.zeros_like(ks); cs = np.zeros_like(ks)
+                bs = np.zeros_like(ks); cs = np.zeros_like(ks); bn = np.zeros_like(kn); cn = np.zeros_like(kn)
                 for l in range(1, k + 1):
                     w = (k - l + 0.5)/k
-                    Kl = ks*sysm.dt + (p.W_dense(l)[0] if l <= p.L else 0.0)
+                    Wl = p.W_dense(l) if l <= p.L else (0.0, 0.0)
+                    Kl = ks*sysm.dt + Wl[0]; Knl = kn*sysm.dt + Wl[1]
                     bs = bs + w*Kl; cs = cs + (1.0 - w)*Kl
+                    bn = bn + w*Knl; cn = cn + (1.0 - w)*Knl
                 B[sysm.off[b_]:sysm.off[b_ + 1], sysm.off[a_]:sysm.off[a_ + 1]] = bs
                 C[sysm.off[b_]:sysm.off[b_ + 1], sysm.off[a_]:sysm.off[a_ + 1]] = cs
+                Bn[sysm.off[b_]:sysm.off[b_ + 1], sysm.off[a_]:sysm.off[a_ + 1]] = bn
+                Cn[sysm.off[b_]:sysm.off[b_ + 1], sysm.off[a_]:sysm.off[a_ + 1]] = cn
+            self._nl_n[k] = (Bn, Cn)
             w1 = (k - 0.5)/k
             B += (w1 - 1.0)*eta*np.eye(N); C += (1.0 - w1)*eta*np.eye(N)
             thr = 1e-13*np.abs(B).max()
@@ -461,19 +467,25 @@ class Stepper:
         psi_old, V_old = (self.state.copy() if isinstance(self.state, np.ndarray) else self.state), self.V
         H, Hn, t1 = self.known_parts()
         if getattr(self, "nl", False):
-            assert not self.normal_coupling
             k = self.k
             self._nl_set(k)
             Hp = H + self.C_nl_sp @ V_old
+            if self.normal_coupling:
+                Bn, Cn = self._nl_n[k]
+                Hnp = Hn + Cn @ V_old
+                sigf = lambda Vx, Hnp=Hnp, Bn=Bn: self.sigma0 - (Hnp + Bn @ Vx)
+            else:
+                Hnp = Hn; Bn = None
+                sigf = lambda Vx: self.sigma0
             if isinstance(self.fr, SlipWeakening):
                 # slip at the collocation time: delta + dt (V_old + V)/2
-                V, self.state = self.fr.solve(Hp, self.A_nl_sp if self.coupled else self.A_nl, self.sigma_fun_factory(Hn), t1, self.state,
+                V, self.state = self.fr.solve(Hp, self.A_nl_sp if self.coupled else self.A_nl, sigf, t1, self.state,
                                               self.V, 0.5*dt, self.delta + 0.5*dt*V_old, coupled=self.coupled, K1band=self.A_nl_band)
             else:
-                V, self.state = self.fr.solve(Hp, self.A_nl_sp if self.coupled else self.A_nl, self.sigma_fun_factory(Hn), t1, self.state,
+                V, self.state = self.fr.solve(Hp, self.A_nl_sp if self.coupled else self.A_nl, sigf, t1, self.state,
                                               self.V, dt, coupled=self.coupled, K1band=self.A_nl_band)
             self.tau = Hp + self.A_nl_sp @ V
-            self.sigma = self.sigma0 - Hn
+            self.sigma = sigf(V)
             for j in range(1, k + 1):                  # substep midpoint rates, linear in time
                 w = (j - 0.5)/k
                 self.sys.push((1.0 - w)*V_old + w*V)
