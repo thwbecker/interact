@@ -9,7 +9,16 @@ import numpy as np
 import inplane as ip
 from inplane_kernel_open import sigma_point_ramp_open
 
-def segment_ramp_stress_open(xr, yr, t, a, alpha, beta, rho, ngauss=12, near=0.5):
+def segment_ramp_stress_open(xr, yr, t, a, alpha, beta, rho, ngauss=12, near=0.5, tshift=0.0):
+    """tshift > 0: return the average of the values at t - tshift and t + tshift (tables use
+    a small shift, 1e-4 dt: when a wave front crosses a segment end exactly at a sample time,
+    two quadrature breakpoints coincide and the point field cancels catastrophically; the
+    stress itself is continuous in time, so the symmetric average changes it by O(tshift^2)
+    away from fronts and O(tshift) at a kink)"""
+    if tshift > 0.0:
+        lo = segment_ramp_stress_open(xr, yr, np.asarray(t, float) - tshift, a, alpha, beta, rho, ngauss, near)
+        hi = segment_ramp_stress_open(xr, yr, np.asarray(t, float) + tshift, a, alpha, beta, rho, ngauss, near)
+        return [0.5*(u + v) for u, v in zip(lo, hi)]
     xr = np.asarray(xr, float); yr = np.asarray(yr, float); t = np.asarray(t, float)
     shp = np.broadcast(xr, yr, t).shape
     xr, yr, t = [np.broadcast_to(z, shp).ravel().copy() for z in (xr, yr, t)]

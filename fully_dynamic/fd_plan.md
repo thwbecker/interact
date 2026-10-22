@@ -834,6 +834,65 @@ sources, a "surface" segment type (zero traction in both components), and
 the dynamic test against the exact half-plane static limit and the mirror
 image (vertical fault) before a dipping fault.
 
+### Free surface, step 3: dynamics in 2-D (2026-10-27)
+
+densesys.py: a dense fault-plus-surface system for the prototype (no
+Toeplitz structure; a few hundred unknowns): fault elements with one slip
+component, surface elements with slip and (in-plane) opening and zero
+shear and normal traction; tables W[l] = K[l] - Ks dt for every pair
+(opening sources by quadrature, cached by relative position), both time
+schemes (instantaneous coefficients mu/(2 cS) for shear, rho cP/2 for
+opening), the surface eliminated at each step (Schur complement), slip
+weakening with normal-stress coupling on the fault, or prescribed fault
+slip rates. test_fs_dyn2d.py runs the checks below (quick version about 2
+min: python3 test_fs_dyn2d.py).
+Fixes found by the tests: the opening kernel cancelled catastrophically
+when a front crossed a segment end exactly at a sample time (spikes of
+1e13 in the tables); tables now use the mean of the values at t -+ 1e-4 dt
+(segment_ramp_stress_open(tshift=...)). The closed-form static opening
+field has a removable 0/0 for receivers on the normal through an element
+end; fs_static2d.stress_global averages over a tiny offset there.
+
+1. Antiplane, vertical fault reaching the surface, prescribed rupture
+   running up from the bottom at 0.8 cS, against the exact image solution:
+   maximum fault traction error over 4 s 3.1e-3, 2.1e-3, 8.9e-4 for
+   surface elements of 250, 125, 62.5 m (surface +-8 km); 9.3e-3 with
+   +-4 km (edge reflections); stable over 8 s.
+2. In-plane, buried 30 degree fault (top 500 m), prescribed slip for 1 s:
+   before the surface reflection arrives the fault traction equals the
+   full-space one to roundoff; at 8 s it is within 3.2e-3 (surface +-6 km)
+   or 1.9e-3 (+-12 km) of the exact half-plane static traction of the
+   final slip (full space: 7.8e-2). The first-order scheme blows up on the
+   surface elements (surface slip rates of 1e4), the instability Hok and
+   Fukuyama suppressed with a filter; NL stays stable without one.
+3. Spontaneous rupture (slip weakening, normal coupling), 6 km fault
+   dipping 30 degrees, top at 400 m:
+   - thrust without / with surface: slip at the top 0.42 / 0.92 m, mid
+     fault 1.32 / 2.18 m, arrival at the top 3.12 / 2.71 s, peak slip rate
+     2.9 / 6.9 m/s; normal sense with surface: 0.42 / 1.57 m, 3.58 s,
+     2.2 m/s (the full space is the same for both senses): the expected
+     thrust-normal asymmetry of free-surface effects (Oglesby et al. 1998);
+   - normal sense, 200 against 100 m elements: final slip within 0.086 m
+     of 1.58 m (fine result averaged onto the coarse elements), arrival at
+     the top 3.58 against 3.75 s.
+4. Thrust reaching the surface (3 km, 200 m fault elements): blew up at
+   first, for two reasons now fixed in the test setup: the time step was
+   set by the finer surface elements, which put the fault elements at
+   cS dt/dx = 0.125 to 0.25, below NL's stability range (0.4 to 2), and a
+   surface collocation point sat on the fault tip. With dt from the fault
+   elements (surface elements then at 0.5 hf/hs, 1 for hs = hf/2 and 2
+   for hf/4, inside the range) and the trace on a surface element
+   boundary: stable; slip at the trace 2.38 / 2.25 m for hs = 100 / 50 m;
+   with 100 m fault elements (hs 50 m) final slip within 0.089 m of
+   2.25 m, arrival at the top 1.27 against 1.33 s, peak slip rate 14 /
+   19 m/s.
+Rules so far: NL (no filter needed); time step from the fault elements;
+surface elements between a quarter and a half of the fault element size
+near the trace; the fault trace on a surface element boundary.
+Next: the design for the C code and 3-D (a refined strip along the trace
+plus a coarser outer surface, cross-plane tables, statics from interact's
+exact half-space operator).
+
 ### WP7, C implementation in rsf_solve: status (2026-10-18)
 Done, each verified in the sandbox before delivery (details in
 fd_c_design.md sections 6 to 10, usage in rsf_solve_fd.md):

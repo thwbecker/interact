@@ -30,7 +30,19 @@ def stress_global(Xs, ss, a, X, comp):
     d = X - Xs; n = np.array([-ss[1], ss[0]])
     xl = d @ ss; yl = d @ n
     if comp == 0: sl = ip.static_segment_stress(xl, yl, a, MU, NU)
-    else: sl = [f(xl, yl, a, MU, NU) for f in _OPEN]
+    else:
+        with np.errstate(all="ignore"):
+            sl = [np.asarray(f(xl, yl, a, MU, NU), float)*np.ones_like(np.asarray(xl, float)) for f in _OPEN]
+            bad = ~np.isfinite(sl[0]) | ~np.isfinite(sl[1]) | ~np.isfinite(sl[2])
+            if np.any(bad):
+                # the closed form has removable 0/0 where the receiver lies on the normal through
+                # an element end (x = +-a, y != 0): average over a tiny offset
+                e = 1e-7*a
+                for k, f in enumerate(_OPEN):
+                    v = np.asarray(sl[k], float)
+                    vp = f(np.asarray(xl, float) + e, yl, a, MU, NU); vm = f(np.asarray(xl, float) - e, yl, a, MU, NU)
+                    v[bad] = (0.5*(np.asarray(vp)*np.ones_like(v) + np.asarray(vm)*np.ones_like(v)))[bad]
+                    sl[k] = v
     sxx, sxy, syy = [np.asarray(v, float) for v in sl]
     c, s = ss[0], ss[1]          # local -> global rotation
     gxx = c*c*sxx - 2*c*s*sxy + s*s*syy
@@ -43,6 +55,8 @@ def traction(g, sr):
     gxx, gxy, gyy = g; n = np.array([-sr[1], sr[0]])
     tx = gxx*n[0] + gxy*n[1]; ty = gxy*n[0] + gyy*n[1]
     return tx*sr[0] + ty*sr[1], tx*n[0] + ty*n[1]
+
+traction_rows = traction
 
 # exact half plane (y <= 0 solid) from tdd_coeff
 _lib = ctypes.CDLL(os.environ.get("TDD_LIB", "/tmp/tdd/libtdd.so"))
