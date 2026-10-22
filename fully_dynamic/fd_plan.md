@@ -801,10 +801,38 @@ syy = -rho alpha/2) to 1e-9; static limit against Crouch and Starfield's
 constant displacement discontinuity to 2e-5 at four receivers (their
 D = u(-) - u(+) is the opposite convention; the existing shear kernel
 shows the same overall sign relation to 1e-9).
+Step 2 (2026-10-26), static test of the virtual surface in 2-D
+(fs_static2d.py): a fault of 10 km (20 elements of 500 m) dipping 30 or 60
+degrees, plus a traction-free surface line of displacement discontinuities
+(shear and opening) in a full plane, against the exact half-plane solution
+(interact's tdd_coeff, Crouch and Starfield, built as a shared library;
+the full-plane conventions agree to 1e-16). Relative error of the fault's
+static traction operator (shear and normal):
+
+| fault top | surface half-length | h_s = 1000 m | 500 m | 250 m | 125 m |
+|---|---|---|---|---|---|
+| 1 km | 10 km | 1.6e-3 | 8.6e-4 | 8.7e-4 | |
+| 1 km | 20 km | 1.4e-3 | 2.6e-4 | 2.6e-4 | |
+| 1 km | 40 km | 1.4e-3 | 6.8e-5 | 6.8e-5 | |
+| 0.25 km | 10-40 km | 4.3e-2 | 2.6e-2 | 0.8e-3 to 1.3e-3 | |
+| 0 (30 deg) | 20 km | | 1.5e-1 | 4.2e-2 | 6.4e-3 |
+| 0 (60 deg) | 20 km | | 3.8e-2 | 5.3e-3 | |
+
+(no surface at all: 1.7e-2, 5.7e-2, 1.3e-1, 9.7e-2 for the four fault
+geometries). Rules: surface elements no larger than the depth of the fault
+top (else no better than no surface); for faults that reach the surface,
+surface elements much finer than the fault elements near the trace (a
+quarter of the fault element for below 1 percent); a surface half-length
+of two fault lengths gives about 1e-4. One degenerate case (60 degrees,
+125 m) evaluates a receiver exactly on an element end and returns NaN: the
+junction of fault trace and surface needs staggered element positions.
+This matches Hok and Fukuyama's need for fine surface elements near the
+fault and suggests a refined strip along the trace with a coarser outer
+surface, as separate segments with their own tables.
 Next: dense tables for non-parallel segment pairs with shear and opening
-sources, segments of a "surface" type (zero traction in both components),
-and the static check of the virtual surface line against interact's exact
-half-plane operator as a function of patch length and element size.
+sources, a "surface" segment type (zero traction in both components), and
+the dynamic test against the exact half-plane static limit and the mirror
+image (vertical fault) before a dipping fault.
 
 ### WP7, C implementation in rsf_solve: status (2026-10-18)
 Done, each verified in the sandbox before delivery (details in
