@@ -648,8 +648,57 @@ answer; where a jump clearly happens or clearly does not, the schemes
 agree. For jump statistics, resolution checks are needed with either
 scheme; NL stays opt-in.
 
-Next: Harris-Day W = +500 m at 12.5 m on a workstation, BP1-FD with NL
-against the SEAS FD submissions.
+Harris-Day W = +500 m, maximum final slip on segment 2 (12.5 m: Thor):
+
+| dx | first order | NL |
+|---|---|---|
+| 100 m | 0.249 m | 1.244 m |
+| 50 m | 0.234 m | 0.567 m |
+| 25 m | 0.231 m | 0.293 m |
+| 12.5 m | 0.226 m | 0.225 m |
+
+The converged answer is an aborted jump (about 0.225 m). The first-order
+scheme is within 11 percent at 100 m; NL gives the wrong qualitative
+answer at 100 and 50 m and converges only at 12.5 m. For near-threshold
+triggering at the resolutions used for sequences, the first-order scheme
+is the safer choice.
+
+BP1-FD at 50 m (2026-10-25), switch times of the dynamic phases, fault-wide
+peak slip rate and mean slip per event; first order at 25 m from Thor's
+earlier run; group 5 is the densest SEAS FD submission in ref/
+(onset at 7.5 km):
+
+| | event 2 | event 3 | peak slip rate, events 1-3 | mean slip, events 1-3 |
+|---|---|---|---|---|
+| first order, 50 m | 301.69 yr | 420.48 yr | 12.54, 10.81, 11.69 m/s | 1.561, 1.303, 1.461 m |
+| first order, 25 m | 302.08 yr | 420.86 yr | 14.17, 12.04, 13.01 m/s | |
+| NL, 50 m | 302.55 yr | 421.42 yr | 15.68, 13.13, 14.28 m/s | 1.565, 1.316, 1.464 m |
+| group 5 | 302.21 yr | 420.93 yr | | |
+
+Extrapolating the first-order runs at first order (50 and 25 m) gives
+about 302.47 and 421.24 yr and peak slip rates of about 15.8, 13.3 and
+14.3 m/s: NL at 50 m sits at that limit. Peak slip rates at the stations
+(2.5, 7.5, 12.5 km), events 1-3:
+
+| | event 1 | event 2 | event 3 |
+|---|---|---|---|
+| first order, 50 m | 4.08, 3.30, 1.43 | 2.89, 2.58, 1.18 | 3.51, 3.38, 1.32 |
+| NL, 50 m | 4.91, 3.88, 2.07 | 3.62, 2.84, 1.75 | 4.28, 3.99, 1.90 |
+| group 5 | 6.08, 4.50, 2.39 | 4.25, 3.41, 2.09 | 4.83, 4.41, 2.24 |
+
+NL is closer to group 5 in all nine values. Wall time per phase in the
+sandbox: 38 to 44 s (NL) against 31 to 35 s (first order).
+
+Summary of the two schemes: NL gives smooth quantities (event times,
+peak slip rates, arrivals) at about the accuracy of the first-order
+scheme at half the element size or better (BP1-FD, BP5-FD, TPV205,
+rate-and-state rupture), but at coarse resolution it can mispredict
+near-threshold triggering (Harris-Day W = +500 m), where the first-order
+scheme is robust. Default stays first order; -fd_nl 1 with resolution
+checks for rupture-front details.
+
+Next: BP1-FD with NL at 25 m (run_bp1_fd.sh 25 520 12000 "-fd_nl 1") to
+confirm NL's self-convergence.
 
 ### WP7, C implementation in rsf_solve: status (2026-10-18)
 Done, each verified in the sandbox before delivery (details in

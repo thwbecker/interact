@@ -1,6 +1,7 @@
 #!/bin/sh
 # SEAS BP1 with rsf_solve, QD and FD, at a given element size.
-# usage: fully_dynamic/c_port/run_bp1_fd.sh [dz_m] [tend_yr] [lmax]
+# usage: fully_dynamic/c_port/run_bp1_fd.sh [dz_m] [tend_yr] [lmax] [extra FD options]
+#   e.g. run_bp1_fd.sh 25 520 12000 "-fd_nl 1" for second-order marching (FD run only)
 #   dz 50 (default) or 25; tend 520; lmax 6000 for 50 m, 12000 for 25 m
 # Writes geom_bp1.in, rsf_bp1.dat, ic_bp1.in in the current directory,
 # runs QD into bp1_qd_dz<dz>/ and FD into bp1_fd_dz<dz>/.
@@ -10,6 +11,7 @@
 dz=${1-50}
 tend=${2-520}
 lmax=${3-6000}
+extra=${4-}
 bin=`pwd`/bin/rsf_solve
 [ -x $bin ] || { echo "run from the repository root (bin/rsf_solve not found)"; exit 1; }
 python3 - $dz << 'PY'
@@ -35,5 +37,5 @@ common="-geom_file ../geom_bp1.in -rsf_file ../rsf_bp1.dat -rsf_ic_file ../ic_bp
 mkdir -p bp1_qd_dz$dz bp1_fd_dz$dz
 ( cd bp1_qd_dz$dz && $bin $common > run.log 2>&1 )
 echo "QD events (yr):"; awk '$3==1 {printf "%.3f ", $2} END {print ""}' bp1_qd_dz$dz/rsf_events.dat
-( cd bp1_fd_dz$dz && $bin $common -fd_mode 1 -fd_lmax $lmax -fd_stations $st > run.log 2>&1 )
+( cd bp1_fd_dz$dz && $bin $common -fd_mode 1 -fd_lmax $lmax -fd_stations $st $extra > run.log 2>&1 )
 echo "FD phases:"; grep "rsf_fd: phase" bp1_fd_dz$dz/run.log
