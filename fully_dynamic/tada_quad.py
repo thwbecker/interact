@@ -67,16 +67,40 @@ def L_1(x1, x2, x3, t, cL, cT):
            - cT*x3/(pi*chi1**2)*((1 - 2*p**2 + 2*p**2*x3**2/chi1**2)*g2L + (1 - 2*x3**2/chi1**2)*g2T))
     return dict(s11=L11, s12=L12, s22=L22, s31=L31, s32=L32, s33=L33)
 
+def L_3(x1, x2, x3, t, cL, cT):
+    """L_ij/3 (opening, eqs A24-A27; L_22/3 and L_32/3 by the x1 <-> x2 symmetry)"""
+    p = cT/cL; pi = np.pi
+    def l11(x1, x2):
+        chi1 = np.sqrt(x1**2 + x3**2); chi2 = np.sqrt(x2**2 + x3**2); R = np.sqrt(x1**2 + x2**2 + x3**2)
+        dg1 = g1(x1, x2, x3, t, cL) - g1(x1, x2, x3, t, cT); dg4 = g4(R, t, cL) - g4(R, t, cT)
+        return ((1 - 2*p**2)/p*_H(x1)*_H(x2)*_H(t - np.abs(x3)/cL)
+                - (1 - 2*p**2)/(2*pi*p)*(g3(x1, x2, x3, t, cL) + g3(x2, x1, x3, t, cL))
+                - 2*cT**3*x1*(3*x3**2 - x1**2)/(3*pi*chi1**6)*dg1 - cT**3*x1*x2*x3**2/(pi*R**5*chi1**2)*dg4
+                - 2*cT*x1*x3**2/(pi*chi1**4)*(p**2*g2(x1, x2, x3, t, cL) - g2(x1, x2, x3, t, cT))
+                + (1 - 2*p**2)*cT*x2/(pi*chi2**2)*g2(x2, x1, x3, t, cL))
+    chi1 = np.sqrt(x1**2 + x3**2); chi2 = np.sqrt(x2**2 + x3**2); R = np.sqrt(x1**2 + x2**2 + x3**2)
+    dg4 = g4(R, t, cL) - g4(R, t, cT)
+    L12 = cT**3/(pi*R**5)*(x3**2 - R**2/3)*dg4 + cT/(pi*R)*((1 - 4*p**2/3)*g5(R, t, cL) - 2.0/3.0*g5(R, t, cT))
+    L33 = (1/p*_H(x1)*_H(x2)*_H(t - np.abs(x3)/cL) - 1/(2*pi*p)*(g3(x1, x2, x3, t, cL) + g3(x2, x1, x3, t, cL))
+           + 2*cT**3*x1*(3*x3**2 - x1**2)/(3*pi*chi1**6)*(g1(x1, x2, x3, t, cL) - g1(x1, x2, x3, t, cT))
+           + 2*cT**3*x2*(3*x3**2 - x2**2)/(3*pi*chi2**6)*(g1(x2, x1, x3, t, cL) - g1(x2, x1, x3, t, cT))
+           + cT**3*x1*x2*x3**2/(pi*R**5)*(1/chi1**2 + 1/chi2**2)*dg4
+           + cT*x1/(pi*chi1**2)*((2*(1 - p**2) + 2*p**2*x3**2/chi1**2)*g2(x1, x2, x3, t, cL) - 2*x3**2/chi1**2*g2(x1, x2, x3, t, cT))
+           + cT*x2/(pi*chi2**2)*((2*(1 - p**2) + 2*p**2*x3**2/chi2**2)*g2(x2, x1, x3, t, cL) - 2*x3**2/chi2**2*g2(x2, x1, x3, t, cT)))
+    L31 = L_1(x1, x2, x3, t, cL, cT)["s33"]
+    L32 = L_1(x2, x1, x3, t, cL, cT)["s33"]
+    return dict(s11=l11(x1, x2), s22=l11(x2, x1), s12=L12, s31=L31, s32=L32, s33=L33)
+
 def L_2(x1, x2, x3, t, cL, cT):
     """L_ij/2 by the x1 <-> x2 symmetry: L_ij/2(x1, x2) = L_i'j'/1(x2, x1), 1' = 2, 2' = 1"""
     L = L_1(x2, x1, x3, t, cL, cT)
     return dict(s11=L["s22"], s12=L["s12"], s22=L["s11"], s31=L["s32"], s32=L["s31"], s33=L["s33"])
 
 def rect_ramp_stress(x1, x2, x3, t, a1, a2, cL, cT, rho, comp=1):
-    """stress at receiver (x1, x2, x3) from slip rate 1 in direction comp (1 or 2)
+    """stress at receiver (x1, x2, x3) from slip rate 1 in direction comp (1 or 2; 3 = opening)
     on the rectangle |xi1| < a1, |xi2| < a2 (xi3 = 0) since t = 0: four quadrants"""
     mu = rho*cT**2
-    Lf = L_1 if comp == 1 else L_2
+    Lf = {1: L_1, 2: L_2, 3: L_3}[comp]
     out = None
     for (s1, c1) in ((+1, -a1), (-1, a1)):
         for (s2, c2) in ((+1, -a2), (-1, a2)):

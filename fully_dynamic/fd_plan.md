@@ -893,6 +893,97 @@ Next: the design for the C code and 3-D (a refined strip along the trace
 plus a coarser outer surface, cross-plane tables, statics from interact's
 exact half-space operator).
 
+### Free surface in 3-D: design (2026-10-27)
+
+Structure. Fault and surface are planes that share the strike direction
+(x1), so every coupling is translation invariant along strike: tables are
+Toeplitz along strike (1-D FFT, half spectrum) for all pairs, and Toeplitz
+in the second direction only within a uniform grid (fault-fault, 2-D FFT as
+now). Across strike the surface needs non-uniform rows (a fine strip along
+the trace, coarser outside: the 2-D rules, h_s a quarter to a half of h_f
+near the trace, a patch of about two fault widths either side), so
+surface-surface and fault-surface couplings are dense in (fault row,
+surface row) and (surface row, surface row) per along-strike wavenumber.
+Surface elements are rectangles (h_f along strike, h_s across), which the
+Tada quadrant kernels allow; the along-strike lattice is that of the fault.
+Kernels: the full stress tensor at off-plane receivers for slip along x1
+and x2 and for opening (Tada 2006, A18-A27; opening, L_ij/3, not yet
+ported). Statics: interact's exact Okada half-space operator for the fault,
+as with the mirror; the surface supplies only the dynamic correction.
+Time step from the fault elements (2-D rule); NL marching (no filter).
+
+Vertical strike-slip faults (BP5): the mirror image already makes both
+shear tractions on the surface vanish; what remains is the normal traction.
+Opening elements on the surface plane, in a full space, change no shear
+traction on that plane and are symmetric under the mirror, so a surface
+layer with opening only, added to the mirror, should give the exact free
+surface at a third of the surface unknowns. To verify statically against
+Okada before any dynamics.
+
+Memory (fs3d_cost.py; single-precision half spectra, the window of the
+farthest pair, which ends exactly in 3-D once the S wave has passed):
+
+| case | fault | surface rows | tables |
+|---|---|---|---|
+| BP5-FD, mirror + opening-only layer | 100 x 40 km, 1 km | 56 (16 at 250 m) | about 8 GB |
+| BP5-FD, full virtual surface | same | same | about 29 GB |
+| dipping thrust 60 x 30 km, 30 deg | 1 km | 63 (24 at 250 m) | about 11 GB |
+| same | 500 m | 127 (48 at 125 m) | about 180 GB |
+| dipping thrust 20 x 10 km, 30 deg | 250 m | 85 (32 at 62.5 m) | about 27 GB |
+
+The dense across-strike surface blocks dominate. 1 km problems fit a
+workstation; finer dipping-fault problems need compression (candidates:
+low-rank or H-matrix blocks per wavenumber and lag, coarser outer rows with
+a taper, or shorter windows for far pairs).
+
+Plan:
+A. BP5 with mirror plus opening-only layer: port Tada's opening kernels
+   (Python first, checked against a late-time slope and the 2-D analogue),
+   static check of fault traction against interact's half-space Is (the
+   mirror alone deviates 1.8 to 2.5 percent), then the dynamic tables in
+   C and BP5-FD against Lambert and against the mirror-only run.
+B. Dipping faults with the full three-component surface, at 1 km first,
+   then compression if the science needs finer resolution.
+
+### Free surface in 3-D, step A1: opening kernels and the static check (2026-10-27)
+
+tada_quad.L_3: Tada's opening source (A24-A27; L_22/3 and L_32/3 by the
+x1 <-> x2 symmetry); rect_ramp_stress(comp=3). Checks: early time at the
+centre of a large rectangle gives the plane P wave (s33 = -rho cP/2,
+s11 = -lambda/(2 cP)) exactly; against the independent point-source
+quadrature (check_tada_quad.py with CHECK_OPENING=1, moment tensor
+lambda delta + 2 mu n n) to 1e-8 to 1e-11 for s31, s32, s11, s33 after both
+waves and between P and S, off-plane and in-plane. (The check script had
+omitted the moment-tensor weights, harmless for the shear source whose
+entries are 1; fixed, and the shear check still agrees to 5e-8.)
+
+Static check (fs3d_static.py; all blocks from interact's Okada routine,
+dc3dmod.F built as a shared library, half space as the reference): a
+vertical strike-slip fault reaching the surface, 4 x 2 km of 1 km
+elements, strike traction operator against the exact half space:
+
+| construction | relative error |
+|---|---|
+| full space | 8.5e-2 |
+| mirror image | 2.2e-2 |
+| mirror + opening layer, surface 1000 x 250 m | 2.0e-2 |
+| mirror + opening layer, surface 500 x 250 m | 4.8e-3 |
+| mirror + opening layer, surface 500 x 125 m | 5.2e-3 |
+| mirror + opening layer, surface 250 x 250 m | 4.5e-4 |
+
+(surface +-4 km across strike, 2 km beyond the fault ends; doubling the
+extent changes nothing at 1000 m along strike.) The mirror plus a layer of
+opening-only surface elements converges to the exact free surface, as the
+symmetry argument says, but the surface elements must be fine in both
+directions near the trace: about a quarter of the fault element, along
+strike as well. For the Toeplitz design this means an along-strike lattice
+of h_f/4 for the surface (fault columns every fourth lattice point), which
+multiplies the surface table memory by about four compared with the
+estimate above, or a separate fine strip along the trace.
+Next: refine the memory estimate for that lattice, then the dynamic
+tables in the prototype (vertical fault, mirror plus opening layer) and a
+comparison with the mirror-only BP5-FD first event at 2 km.
+
 ### WP7, C implementation in rsf_solve: status (2026-10-18)
 Done, each verified in the sandbox before delivery (details in
 fd_c_design.md sections 6 to 10, usage in rsf_solve_fd.md):
