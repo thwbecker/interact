@@ -97,6 +97,22 @@ def L_2(x1, x2, x3, t, cL, cT):
     return dict(s11=L["s22"], s12=L["s12"], s22=L["s11"], s31=L["s32"], s32=L["s31"], s33=L["s33"])
 
 def rect_ramp_stress(x1, x2, x3, t, a1, a2, cL, cT, rho, comp=1):
+    """see _rect_ramp_stress; receivers exactly on the extension of an element edge (x1 = +-a1
+    or x2 = +-a2 with x3 = 0 or not) hit removable 0/0 in the closed forms: average over a
+    tiny symmetric offset there"""
+    x1 = np.asarray(x1, float); x2 = np.asarray(x2, float)
+    e = 1e-9*max(a1, a2)
+    on = (np.abs(np.abs(x1) - a1) < e) | (np.abs(np.abs(x2) - a2) < e)
+    if not np.any(on):
+        return _rect_ramp_stress(x1, x2, x3, t, a1, a2, cL, cT, rho, comp)
+    d = 1e-7*max(a1, a2)
+    lo = _rect_ramp_stress(x1 - d, x2 - d, x3, t, a1, a2, cL, cT, rho, comp)
+    hi = _rect_ramp_stress(x1 + d, x2 + d, x3, t, a1, a2, cL, cT, rho, comp)
+    with np.errstate(all="ignore"):
+        mid = _rect_ramp_stress(x1, x2, x3, t, a1, a2, cL, cT, rho, comp)
+    return {k: np.where(on, 0.5*(lo[k] + hi[k]), mid[k]) for k in mid}
+
+def _rect_ramp_stress(x1, x2, x3, t, a1, a2, cL, cT, rho, comp=1):
     """stress at receiver (x1, x2, x3) from slip rate 1 in direction comp (1 or 2; 3 = opening)
     on the rectangle |xi1| < a1, |xi2| < a2 (xi3 = 0) since t = 0: four quadrants"""
     mu = rho*cT**2

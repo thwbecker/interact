@@ -984,6 +984,94 @@ Next: refine the memory estimate for that lattice, then the dynamic
 tables in the prototype (vertical fault, mirror plus opening layer) and a
 comparison with the mirror-only BP5-FD first event at 2 km.
 
+### Free surface: literature check (2026-10-27)
+
+What exists, so that we do not reinvent it:
+- Virtual traction-free surface elements in a full-space space-time BIEM:
+  Ando and Okuyama (2010, GRL 37), Hok and Fukuyama (2011, GJI 184; three
+  displacement components on the surface, finer surface elements near the
+  fault, a large graded patch, an ad hoc spatial filter against a growing
+  checkerboard instability), Ando et al. (2017), Ando (2016, GJI 207; FDP=H
+  for the cost of the time convolution in such models).
+- Exact half-space Green's functions in the BIEM: Zhang and Chen (2006a,b,
+  GJI), Chen and Zhang (2006); for vertical strike-slip fault systems the
+  kernel splits into the full-space part and a free-surface part (Chen
+  and Zhang 2010, Earthquake Science 23); closed-form Lamb's-problem
+  solutions (Feng and Zhang 2018 and later) make image-type methods
+  practical for simple geometries.
+- Mirror image for vertical strike-slip faults: Tse and Rice (1986), Quin
+  (1990), Lapusta et al. (2000), Aochi and Fukuyama (2002), Lapusta and
+  Liu (2009); exact in antiplane 2-D, approximate in 3-D (normal traction
+  on the surface left over). BICyclE uses it for BP5 (Jiang et al. 2022).
+- Hybrid treatments: spectral BIEM for planar self-interactions plus
+  H-matrix-compressed space-time kernels for interactions between
+  surfaces, with the free surface as an auxiliary planar boundary whose
+  self-interaction is spectral and whose coupling to the faults is
+  compressed (Ciardo and Romanet 2026, arXiv:2603.00383, 2-D antiplane so
+  far; they also use exact causality-based window truncation, which in 3-D
+  is the exact end of the kernel once the S wave has passed, as here);
+  FDPM combined with H-matrices for log-linear cost (Sato and Ando 2021);
+  coupled BIEM-FEM (Ma et al. 2008-2011 style SH/P-SV hybrids) and 3-D
+  hybrid FE-spectral BI (Albertini et al. 2021) put the free surface in a
+  volume region next to the fault.
+What does not seem to be in the literature: completing the mirror for a
+vertical strike-slip fault with an opening-only surface layer (step A1
+above). It is a small specialisation of the virtual-surface idea, exact by
+symmetry, and the static check confirms it; we keep it as stage A.
+Consequences for our design:
+1. Our Toeplitz/FFT tables for fault-fault and surface-surface play the
+   role of the spectral self-interactions in Ciardo and Romanet; the
+   fault-surface coupling is where compression belongs. Per lag and per
+   along-strike wavenumber the (fault row) x (surface row) blocks are
+   small dense matrices of smooth, far-field kernels: low-rank compression
+   (truncated SVD or ACA) per block and lag is the natural first step,
+   before FDPM.
+2. The finding that the surface must be about four times finer than the
+   fault near the trace (both directions) is consistent with Hok and
+   Fukuyama; a fine strip with its own lattice plus a coarser outer
+   surface, coupled through compressed blocks, follows Ciardo and
+   Romanet's divide-and-conquer pattern.
+3. NL time marching removes the instability that forced Hok and Fukuyama
+   to filter; we have not found that combination reported.
+
+### Free surface in 3-D, step A2: dynamic prototype of mirror + opening layer (2026-10-28)
+
+fs3d_dyn.py: vertical strike-slip fault (image tied to the fault slip) plus
+a layer of opening-only rectangles on the surface plane, Tada kernels
+rotated between element frames, tables cached by relative position (3122
+distinct kernels for a 4 x 2 fault of 500 m and a 256-element layer of
+250 m instead of 70,000 pairs), marching with densesys.Marcher.
+tada_quad.rect_ramp_stress now averages over a tiny symmetric offset when
+a receiver lies on the extension of an element edge (removable 0/0 in the
+closed forms).
+test_fs3d_dyn.py (prescribed uniform slip rate on the fault for 0.4 s):
+- static limit of the tables (late-time slopes through the layer) against
+  Okada's half space: 1.2e-4 (mirror alone 2.9e-3; top at 500 m);
+- causality: with the fault top at 500 m the run equals the mirror-only
+  run exactly until 2 top / cP (0.167 s);
+- static traction of the final slip, maximum relative error after the
+  pulse (exact: Okada half space):
+
+| fault top | layer | time | with layer | mirror only |
+|---|---|---|---|---|
+| 500 m | 250 m | 3.5 s | 6.1e-4 (NL), 4.2e-4 (first order) | 9.5e-3 |
+| 500 m | 250 m | 8 s | 5.5e-4 (both) | 9.5e-3 |
+| 0 (reaching the surface) | 250 m | 3.5 s | 1.05e-3 | 2.5e-2 |
+| 0 | 125 m | 3.5 s | 7.3e-4 | 2.5e-2 |
+
+- stable over 8 s in both schemes (surface opening rates decay to 2e-4 with
+  NL, 1e-3 with first order; no filter).
+So the opening layer reduces the free-surface error of the mirror by 15 to
+35 times dynamically as well as statically, and is stable.
+Cost outlook for BP5 at 1 km (Toeplitz along strike on a 250 m lattice,
+fault columns every fourth point; layer rows of 250 m within +-2 km of the
+trace and graded to +-20 km beyond): cross tables about 1025 wavenumbers
+x 40 fault rows x 40 layer rows x 2 directions per lag, about 26 MB, over
+about 400 lags, 10 GB, plus about 5 GB for the layer's self tables, so
+about 15 GB before compression. Next: measure the compressibility of the
+cross blocks, then the C implementation (the 3-D marcher with a second
+plane of unknowns).
+
 ### WP7, C implementation in rsf_solve: status (2026-10-18)
 Done, each verified in the sandbox before delivery (details in
 fd_c_design.md sections 6 to 10, usage in rsf_solve_fd.md):
