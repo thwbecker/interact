@@ -269,6 +269,8 @@ void fd3d_free(struct fd3d *f)
   if(!f) return;
   free(f->delta); free(f->V); free(f->tau); free(f->tau0); free(f->sigma); free(f->H); free(f->work);
   { int q; for(q = 0; q < 8; q++){ free(f->kop_B[q]); free(f->kop_C[q]); } }
+  free(f->Vold);
+  if(f->layer) fd3d_layer_free(f->layer);
   free(f->hist); free(f->acc); free(f);
 }
 
@@ -423,34 +425,49 @@ void fd3d_reset(struct fd3d *f)
   memset(f->delta, 0, sizeof(double)*f->N);
 }
 
-int fd3d_step(struct fd3d *f, const double *load)
+/* one fine step, split in three parts so that the free-surface layer can iterate the
+   fault solve with an extra known traction (step_solve's Hx) before finishing */
+static void step_begin(struct fd3d *f, const double *load)
+{
+  struct fd3d_tab *t = f->t;
+  int N = f->N, i;
+  double eta = 0.5*t->rho*t->cT;
+  known(f);
+  if(load) for(i = 0; i < N; i++) f->H[i] += load[i];
+  if(!f->Vold) f->Vold = (double *)malloc(sizeof(double)*N);
+  memcpy(f->Vold, f->V, sizeof(double)*N);
+  /* NL: neighbour and self terms are halved (the step's midpoint rate is (V_old + V)/2),
+     the V_old half goes into H, the self term becomes kdiag/2 - eta/2 */
+  if(f->nl){
+    apply_k1(f, f->Vold, f->work);
+    for(i = 0; i < N; i++) f->H[i] += 0.5*(f->work[i] + (kdiag(f, i % f->nzp) + eta)*f->Vold[i]);
+  }
+}
+
+static int step_solve(struct fd3d *f, const double *Hx)
 {
   struct fd3d_tab *t = f->t;
   int N = f->N, i, it, pass, itot = 0;
-  double dt = t->dt, *Vn = (double *)malloc(sizeof(double)*N);
-  double *th_p = NULL, *Vs = NULL, *Vold = NULL, eta = 0.5*t->rho*t->cT;
-  /* NL: neighbour and self terms are halved (the step's midpoint rate is (V_old + V)/2),
-     the V_old half goes into H, the self term becomes kdiag/2 - eta/2 */
-  double hw = f->nl ? 0.5 : 1.0;
-  known(f);
-  if(load) for(i = 0; i < N; i++) f->H[i] += load[i];
-  if(f->nl){
-    Vold = (double *)malloc(sizeof(double)*N);
-    memcpy(Vold, f->V, sizeof(double)*N);
-    apply_k1(f, Vold, f->work);
-    for(i = 0; i < N; i++) f->H[i] += 0.5*(f->work[i] + (kdiag(f, i % f->nzp) + eta)*Vold[i]);
+  double dt = t->dt, *Vn = (double *)malloc(sizeof(double)*N), *Vold = f->Vold;
+  double *th_p = NULL, *Vs = NULL, eta = 0.5*t->rho*t->cT, hw = f->nl ? 0.5 : 1.0;
+  double *H = (double *)malloc(sizeof(double)*N);
+  for(i = 0; i < N; i++) H[i] = f->H[i] + (Hx ? Hx[i] : 0.0);
+  if(f->vpres){                                   /* prescribed slip rates (tests) */
+    memcpy(f->V, f->vpres, sizeof(double)*N);
+    free(Vn); free(H);
+    return 0;
   }
   if(f->law == 1){ th_p = (double *)malloc(sizeof(double)*N); Vs = (double *)malloc(sizeof(double)*N); }
   for(pass = 0; pass < (f->law == 1 ? 2 : 1); pass++){
     double *V = (double *)malloc(sizeof(double)*N);
-    memcpy(V, pass == 0 ? f->V : Vs, sizeof(double)*N);
+    memcpy(V, pass == 0 ? Vold : Vs, sizeof(double)*N);
     if(f->law == 1)
-      for(i = 0; i < N; i++) th_p[i] = theta_adv(f, i, f->theta[i], f->V[i], pass == 0 ? f->V[i] : Vs[i], dt);
+      for(i = 0; i < N; i++) th_p[i] = theta_adv(f, i, f->theta[i], Vold[i], pass == 0 ? Vold[i] : Vs[i], dt);
     for(it = 0; it < 400; it++){
       double ch = 0.0, vm = 0.0;
       apply_k1(f, V, f->work);
       for(i = 0; i < N; i++){
-        double Hp = f->H[i] + hw*f->work[i];
+        double Hp = H[i] + hw*f->work[i];
         double kd = f->nl ? 0.5*kdiag(f, i % f->nzp) - 0.5*eta : kdiag(f, i % f->nzp);
         if(f->law == 0){
           /* slip at the collocation time: delta + dt V (first order) or delta + dt (V_old + V)/2 */
@@ -470,29 +487,46 @@ int fd3d_step(struct fd3d *f, const double *load)
     if(f->law == 1 && pass == 0) memcpy(Vs, V, sizeof(double)*N);
     else{
       memcpy(f->V, V, sizeof(double)*N);
-      if(f->law == 1) memcpy(f->theta, th_p, sizeof(double)*N);
+      if(f->law == 1) memcpy(f->thnew ? f->thnew : f->theta, th_p, sizeof(double)*N);
     }
     free(V);
   }
+  free(Vn); free(th_p); free(Vs); free(H);
+  return itot;
+}
+
+static void step_end(struct fd3d *f)
+{
+  struct fd3d_tab *t = f->t;
+  int N = f->N, i;
+  double dt = t->dt, eta = 0.5*t->rho*t->cT, *Vold = f->Vold;
   apply_k1(f, f->V, f->work);
   if(f->nl){
+    double *Vm = (double *)malloc(sizeof(double)*N);
     for(i = 0; i < N; i++){
       f->tau[i] = f->H[i] + 0.5*f->work[i] + (0.5*kdiag(f, i % f->nzp) - 0.5*eta)*f->V[i];
-      Vold[i] = 0.5*(Vold[i] + f->V[i]);                  /* midpoint rate of the step */
+      Vm[i] = 0.5*(Vold[i] + f->V[i]);                    /* midpoint rate of the step */
     }
-    fd3d_push(f, Vold);
-    for(i = 0; i < N; i++) f->delta[i] += Vold[i]*dt;
-    free(Vold);
+    fd3d_push(f, Vm);
+    for(i = 0; i < N; i++) f->delta[i] += Vm[i]*dt;
+    free(Vm);
   }else{
     for(i = 0; i < N; i++) f->tau[i] = f->H[i] + f->work[i] + kdiag(f, i % f->nzp)*f->V[i];
     fd3d_push(f, f->V);
     for(i = 0; i < N; i++) f->delta[i] += f->V[i]*dt;
   }
   f->time += dt;
-  free(Vn); free(th_p); free(Vs);
-  return itot;
 }
 
+int fd3d_step(struct fd3d *f, const double *load)
+{
+  int it;
+  if(f->layer) return fd3d_step_layer(f, load);
+  step_begin(f, load);
+  it = step_solve(f, NULL);
+  step_end(f);
+  return it;
+}
 
 /* ---------------- variable substeps (k = 2, 4, ..., 64) ----------------
    A step of k fine substeps: the current step's own contribution is the operator
@@ -646,5 +680,197 @@ int fd3d_step_k(struct fd3d *f, const double *load, int k)
   for(i = 0; i < N; i++) f->delta[i] += (f->nl ? 0.5*(Vold[i] + f->V[i]) : f->V[i])*dt;
   f->time += dt;
   free(Vold); free(Hc); free(Vit); free(Vn); free(conv); free(th_p); free(Vs);
+  return itot;
+}
+
+
+/* ---------------- free-surface layer (stage A, dense first version) ---------------- */
+
+/* frames: fault e1 = x, e2 = z (up), e3 = -y; layer e1 = x, e2 = y, e3 = z */
+static void lay_resp(const struct fd3d_tab *t, int src_fault, double sx, double sy, double sz, double a1, double a2,
+                     double rx, double ry, double rz, int rcv_fault, int L, double *K, double *ks)
+{
+  double s[6], T1, T2, v, vprev = 0.0, late[2];
+  double x1, x2, x3; int l, q;
+  if(src_fault){ x1 = rx - sx; x2 = rz - sz; x3 = -(ry - sy); }
+  else{ x1 = rx - sx; x2 = ry - sy; x3 = rz - sz; }
+  T1 = 3.0*(sqrt((rx - sx)*(rx - sx) + (ry - sy)*(ry - sy) + (rz - sz)*(rz - sz)) + 4.0*(a1 + a2))/t->cT + 10.0*t->dt;
+  T2 = 2.0*T1;
+  for(q = 0; q < 2; q++){
+    fd3d_rect_ramp_tensor(x1, x2, x3, q ? T2 : T1, a1, a2, t->cL, t->cT, t->rho, src_fault ? 1 : 3, s);
+    /* traction: fault receiver -> strike traction e1F.sigma.e3F; layer receiver -> sigma_zz */
+    if(src_fault) late[q] = rcv_fault ? s[4] : s[1];       /* fault frame: s31 (= e1 . sigma . e3), s22 = sigma_zz */
+    else late[q] = rcv_fault ? -s[3] : s[2];               /* layer frame: -s12 = e1 . sigma . (0,-1,0), s33 */
+  }
+  *ks = (late[1] - late[0])/(T2 - T1);
+  for(l = 1; l <= L; l++){
+    fd3d_rect_ramp_tensor(x1, x2, x3, l*t->dt, a1, a2, t->cL, t->cT, t->rho, src_fault ? 1 : 3, s);
+    if(src_fault) v = rcv_fault ? s[4] : s[1];
+    else v = rcv_fault ? -s[3] : s[2];
+    K[l - 1] = v - vprev; vprev = v;
+  }
+}
+
+/* dense LU without pivoting problems for the small layer operator: partial pivoting */
+static int lu_factor(int n, double *A, int *piv)
+{
+  int i, j, k, p;
+  for(k = 0; k < n; k++){
+    double m = 0.0; p = k;
+    for(i = k; i < n; i++) if(fabs(A[(size_t)i*n + k]) > m){ m = fabs(A[(size_t)i*n + k]); p = i; }
+    if(m == 0.0) return -1;
+    piv[k] = p;
+    if(p != k) for(j = 0; j < n; j++){ double tmp = A[(size_t)k*n + j]; A[(size_t)k*n + j] = A[(size_t)p*n + j]; A[(size_t)p*n + j] = tmp; }
+    for(i = k + 1; i < n; i++){
+      double fct = A[(size_t)i*n + k]/A[(size_t)k*n + k];
+      A[(size_t)i*n + k] = fct;
+      for(j = k + 1; j < n; j++) A[(size_t)i*n + j] -= fct*A[(size_t)k*n + j];
+    }
+  }
+  return 0;
+}
+static void lu_solve(int n, const double *A, const int *piv, double *b)
+{
+  int i, j;
+  for(i = 0; i < n; i++){ if(piv[i] != i){ double tmp = b[i]; b[i] = b[piv[i]]; b[piv[i]] = tmp; } }
+  for(i = 0; i < n; i++) for(j = 0; j < i; j++) b[i] -= A[(size_t)i*n + j]*b[j];
+  for(i = n - 1; i >= 0; i--){ for(j = i + 1; j < n; j++) b[i] -= A[(size_t)i*n + j]*b[j]; b[i] /= A[(size_t)i*n + i]; }
+}
+
+struct fd3d_layer *fd3d_layer_create(struct fd3d *f, double x0f, int nxs, int nys, double hx, double hy,
+                                     double xs0, double ys0, int L)
+{
+  const struct fd3d_tab *t = f->t;
+  struct fd3d_layer *ly;
+  int N = f->N, ns = nxs*nys, a, b, l, nz = f->nzp;
+  double dx = t->dx, *K = (double *)malloc(sizeof(double)*L), ks, *K2 = (double *)malloc(sizeof(double)*L), ks2;
+  if(!f->mirror) return NULL;                       /* the layer completes the mirror image */
+  ly = (struct fd3d_layer *)calloc(1, sizeof(*ly));
+  ly->ns = ns; ly->nxs = nxs; ly->nys = nys; ly->L = L; ly->hx = hx; ly->hy = hy; ly->xs0 = xs0; ly->ys0 = ys0; ly->x0f = x0f;
+  ly->eta_p = 0.5*t->rho*t->cL;
+  ly->Wss = calloc((size_t)L*ns*ns, sizeof(double)); ly->Kss = calloc((size_t)ns*ns, sizeof(double));
+  ly->Wfs = calloc((size_t)L*ns*N, sizeof(double)); ly->Kfs = calloc((size_t)ns*N, sizeof(double));
+  ly->Wsf = calloc((size_t)L*N*ns, sizeof(double)); ly->Ksf = calloc((size_t)N*ns, sizeof(double));
+  for(a = 0; a < ns; a++){                          /* sources: layer elements */
+    double sx = xs0 + (a/nys + 0.5)*hx, sy = ys0 + (a%nys + 0.5)*hy;
+    for(b = 0; b < ns; b++){
+      double rx = xs0 + (b/nys + 0.5)*hx, ry = ys0 + (b%nys + 0.5)*hy;
+      lay_resp(t, 0, sx, sy, 0.0, 0.5*hx, 0.5*hy, rx, ry, 0.0, 0, L, K, &ks);
+      ly->Kss[(size_t)b*ns + a] = ks;
+      for(l = 0; l < L; l++) ly->Wss[((size_t)l*ns + b)*ns + a] = K[l] - ks*t->dt;
+    }
+    for(b = 0; b < N; b++){
+      double rx = x0f + (b/nz + 0.5)*dx, rz = -(b%nz + 0.5)*dx;
+      lay_resp(t, 0, sx, sy, 0.0, 0.5*hx, 0.5*hy, rx, 0.0, rz, 1, L, K, &ks);
+      ly->Ksf[(size_t)b*ns + a] = ks;
+      for(l = 0; l < L; l++) ly->Wsf[((size_t)l*N + b)*ns + a] = K[l] - ks*t->dt;
+    }
+  }
+  for(a = 0; a < N; a++){                           /* sources: fault elements plus their images */
+    double sx = x0f + (a/nz + 0.5)*dx, sz = -(a%nz + 0.5)*dx;
+    for(b = 0; b < ns; b++){
+      double rx = xs0 + (b/nys + 0.5)*hx, ry = ys0 + (b%nys + 0.5)*hy;
+      lay_resp(t, 1, sx, 0.0, sz, 0.5*dx, 0.5*dx, rx, ry, 0.0, 0, L, K, &ks);
+      lay_resp(t, 1, sx, 0.0, -sz, 0.5*dx, 0.5*dx, rx, ry, 0.0, 0, L, K2, &ks2);
+      ly->Kfs[(size_t)b*N + a] = ks + ks2;
+      for(l = 0; l < L; l++) ly->Wfs[((size_t)l*ns + b)*N + a] = K[l] + K2[l] - (ks + ks2)*t->dt;
+    }
+  }
+  free(K); free(K2);
+  ly->K1ss = malloc(sizeof(double)*(size_t)ns*ns); ly->K1fs = malloc(sizeof(double)*(size_t)ns*N); ly->K1sf = malloc(sizeof(double)*(size_t)N*ns);
+  for(a = 0; a < ns*ns; a++) ly->K1ss[a] = ly->Wss[a] + ly->Kss[a]*t->dt;
+  for(a = 0; a < ns*N; a++){ ly->K1fs[a] = ly->Wfs[a] + ly->Kfs[a]*t->dt; ly->K1sf[a] = ly->Wsf[a] + ly->Ksf[a]*t->dt; }
+  /* the layer's self operator for the current step: first order K1ss, NL (K1ss + E)/2 - E */
+  ly->Bss_lu = malloc(sizeof(double)*(size_t)ns*ns); ly->piv = malloc(sizeof(int)*ns);
+  for(a = 0; a < ns*ns; a++) ly->Bss_lu[a] = f->nl ? 0.5*ly->K1ss[a] : ly->K1ss[a];
+  if(f->nl) for(a = 0; a < ns; a++) ly->Bss_lu[(size_t)a*ns + a] -= 0.5*ly->eta_p;
+  if(lu_factor(ns, ly->Bss_lu, ly->piv) != 0){ fd3d_layer_free(ly); return NULL; }
+  ly->V = calloc(ns, sizeof(double)); ly->Vold = calloc(ns, sizeof(double)); ly->delta = calloc(ns, sizeof(double));
+  ly->H = calloc(ns, sizeof(double)); ly->tau = calloc(ns, sizeof(double));
+  ly->hs = calloc((size_t)L*ns, sizeof(double)); ly->hf = calloc((size_t)L*N, sizeof(double));
+  return ly;
+}
+
+void fd3d_layer_free(struct fd3d_layer *ly)
+{
+  if(!ly) return;
+  free(ly->Wss); free(ly->Kss); free(ly->Wfs); free(ly->Kfs); free(ly->Wsf); free(ly->Ksf);
+  free(ly->K1ss); free(ly->K1fs); free(ly->K1sf); free(ly->Bss_lu); free(ly->piv);
+  free(ly->V); free(ly->Vold); free(ly->delta); free(ly->H); free(ly->tau); free(ly->hs); free(ly->hf);
+  free(ly);
+}
+
+static void mv(int nr, int nc, const double *A, const double *x, double w, double *y)   /* y += w A x */
+{
+  int i, j;
+  for(i = 0; i < nr; i++){ double s = 0.0; for(j = 0; j < nc; j++) s += A[(size_t)i*nc + j]*x[j]; y[i] += w*s; }
+}
+
+int fd3d_step_layer(struct fd3d *f, const double *load)
+{
+  struct fd3d_layer *ly = f->layer;
+  const struct fd3d_tab *t = f->t;
+  int N = f->N, ns = ly->ns, i, l, it, itot = 0, lmax = ly->L < ly->nhist + 1 ? ly->L : ly->nhist + 1;
+  double dt = t->dt, hw = f->nl ? 0.5 : 1.0;
+  double *Hx = calloc(N, sizeof(double)), *Hs = malloc(sizeof(double)*ns), *Vs = malloc(sizeof(double)*ns), *Vp = malloc(sizeof(double)*N);
+  double *thbuf = (f->law == 1) ? malloc(sizeof(double)*N) : NULL;
+  step_begin(f, load);
+  memcpy(ly->Vold, ly->V, sizeof(double)*ns);
+  /* known parts: histories (lags >= 2), statics, the V_old half of the current step (NL) */
+  for(i = 0; i < ns; i++) ly->H[i] = 0.0;
+  mv(ns, ns, ly->Kss, ly->delta, 1.0, ly->H);
+  mv(ns, N, ly->Kfs, f->delta, 1.0, ly->H);
+  if(!f->static_fn) mv(N, ns, ly->Ksf, ly->delta, 1.0, Hx);   /* with the exact Is the layer's static part is in Is already */
+  for(l = 2; l <= lmax; l++){
+    int slot = (ly->hk - (l - 1) + 2*ly->L) % ly->L;
+    mv(ns, ns, ly->Wss + (size_t)(l - 1)*ns*ns, ly->hs + (size_t)slot*ns, 1.0, ly->H);
+    mv(ns, N, ly->Wfs + (size_t)(l - 1)*ns*N, ly->hf + (size_t)slot*N, 1.0, ly->H);
+    mv(N, ns, ly->Wsf + (size_t)(l - 1)*N*ns, ly->hs + (size_t)slot*ns, 1.0, Hx);
+  }
+  if(f->nl){
+    mv(ns, ns, ly->K1ss, ly->Vold, 0.5, ly->H);
+    for(i = 0; i < ns; i++) ly->H[i] += 0.5*ly->eta_p*ly->Vold[i];
+    mv(ns, N, ly->K1fs, f->Vold, 0.5, ly->H);
+    mv(N, ns, ly->K1sf, ly->Vold, 0.5, Hx);
+  }
+  /* iterate fault and layer: the fault sees the layer through the first lag, and vice versa */
+  memcpy(Vs, ly->Vold, sizeof(double)*ns);
+  f->thnew = thbuf;
+  for(it = 0; it < 200; it++){
+    double ch = 0.0, vm = 1e-30;
+    double *Hf = malloc(sizeof(double)*N);
+    memcpy(Hf, Hx, sizeof(double)*N);
+    mv(N, ns, ly->K1sf, Vs, hw, Hf);
+    memcpy(Vp, f->V, sizeof(double)*N);
+    itot += step_solve(f, Hf);
+    free(Hf);
+    for(i = 0; i < ns; i++) Hs[i] = -ly->H[i];
+    mv(ns, N, ly->K1fs, f->V, -hw, Hs);
+    lu_solve(ns, ly->Bss_lu, ly->piv, Hs);
+    for(i = 0; i < ns; i++){ if(fabs(Hs[i] - Vs[i]) > ch) ch = fabs(Hs[i] - Vs[i]); if(fabs(Hs[i]) > vm) vm = fabs(Hs[i]); }
+    for(i = 0; i < N; i++){ if(fabs(f->V[i] - Vp[i]) > ch) ch = fabs(f->V[i] - Vp[i]); if(fabs(f->V[i]) > vm) vm = fabs(f->V[i]); }
+    memcpy(Vs, Hs, sizeof(double)*ns);
+    if(it > 0 && ch <= 1e-12*vm) break;
+  }
+  f->thnew = NULL;
+  if(thbuf){ memcpy(f->theta, thbuf, sizeof(double)*N); free(thbuf); }
+  /* finish: the fault with the layer's contribution in its known part, then the layer */
+  memcpy(ly->V, Vs, sizeof(double)*ns);
+  mv(N, ns, ly->K1sf, ly->V, hw, Hx);
+  for(i = 0; i < N; i++) f->H[i] += Hx[i];
+  {
+    int slot = ly->hk % ly->L;
+    for(i = 0; i < ns; i++){
+      double vm_ = f->nl ? 0.5*(ly->Vold[i] + ly->V[i]) : ly->V[i];
+      ly->hs[(size_t)slot*ns + i] = vm_; ly->delta[i] += vm_*dt;
+    }
+    for(i = 0; i < N; i++) ly->hf[(size_t)slot*N + i] = f->nl ? 0.5*(f->Vold[i] + f->V[i]) : f->V[i];
+    ly->hk = (ly->hk + 1) % ly->L;
+    if(ly->nhist < ly->L) ly->nhist++;
+  }
+  step_end(f);
+  /* layer normal traction at the end of the step (should be zero) */
+  for(i = 0; i < ns; i++) ly->tau[i] = 0.0;
+  free(Hx); free(Hs); free(Vs); free(Vp);
   return itot;
 }

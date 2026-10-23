@@ -143,6 +143,38 @@ static int run_mirror(int argc, char **argv)
   return fail;
 }
 
+/* free-surface layer check: vertical fault 2 x 1 km of 500 m reaching the surface, mirror
+   plus a 16 x 16 layer of 250 m opening elements, prescribed slip rate 1 for 0.4 s, NL;
+   fault traction history against fully_dynamic/fs3d_dyn.py */
+static int run_layer(const char *ref)
+{
+  double cL = 6000, cT = 3464, rho = 2670, dx = 500.0, dt = 0.5*dx/cT, *vp, emax = 0.0, smax = 0.0, r;
+  int nx = 4, nzp = 2, N = nx*nzp, n, i, nsteps = (int)floor(3.5/dt + 0.5), cnt = 0, fail;
+  struct fd3d_tab *t = fd3d_tab_create(nx, 2*nzp, dx, dt, cL, cT, rho, 45);
+  struct fd3d *f = fd3d_create2(t, nzp, 1);
+  FILE *fr = fopen(ref, "r");
+  f->nl = 1; f->law = 0; f->mu_s = f->mu_d = 0.0; f->d0 = 1.0;
+  f->layer = fd3d_layer_create(f, -1000.0, 16, 16, 250.0, 250.0, -2000.0, -2000.0, 45);
+  if(!f->layer || !fr){ fprintf(stderr, "layer setup or reference failed\n"); return 1; }
+  vp = malloc(sizeof(double)*N); f->vpres = vp;
+  for(n = 0; n < nsteps; n++){
+    for(i = 0; i < N; i++) vp[i] = (f->time + dt <= 0.4 + 1e-12) ? 1.0 : 0.0;
+    fd3d_step(f, NULL);
+    for(i = 0; i < N; i++){
+      if(fscanf(fr, "%lf", &r) != 1) break;
+      if(fabs(f->tau[i] - r) > emax) emax = fabs(f->tau[i] - r);
+      if(fabs(r) > smax) smax = fabs(r);
+      cnt++;
+    }
+  }
+  fclose(fr);
+  fail = !(cnt == nsteps*N && emax <= 1e-8*smax);
+  printf("fd3d_test layer: %d values, max |tau diff| %.2e of %.3e\n", cnt, emax, smax);
+  printf("fd3d_test layer: %s\n", fail ? "FAIL" : "PASS");
+  fd3d_free(f); fd3d_tab_free(t); free(vp);
+  return fail;
+}
+
 /* kernel check: full stress tensors (slip and opening, rectangles) against tada_quad.py values */
 static int run_kernels(const char *ref)
 {
@@ -178,6 +210,7 @@ int main(int argc, char **argv)
   if(argc >= 3 && !strcmp(argv[1], "tpv101")) return run_tpv101(argc, argv);
   if(argc >= 2 && !strcmp(argv[1], "mirror")) return run_mirror(argc, argv);
   if(argc >= 3 && !strcmp(argv[1], "kernels")) return run_kernels(argv[2]);
+  if(argc >= 3 && !strcmp(argv[1], "layer")) return run_layer(argv[2]);
   if(argc < 3 || strcmp(argv[1], "tpv3")){ fprintf(stderr, "usage: %s tpv3|tpv101 dx [ref] [tend]\n", argv[0]); return 2; }
   nx = (int)floor(30e3/dx + 0.5); nz = (int)floor(15e3/dx + 0.5); dt = 0.5*dx/cT;
   t = fd3d_tab_create(nx, nz, dx, dt, cL, cT, rho, 0);

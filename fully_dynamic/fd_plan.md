@@ -1111,6 +1111,29 @@ rates solved each step together with the fault; fault statics from the
 exact Is, the layer's static coupling to the fault left out to avoid
 counting it twice).
 
+### Free surface in 3-D, step A4: the layer in the C marcher, dense version (2026-10-28)
+
+fd3d.c: the single fine step is split into step_begin / step_solve /
+step_end (same arithmetic as before: the TPV3, TPV101 and mirror checks
+and the BP5-FD 2 km first event are unchanged: 2791 steps over 805.7 s,
+peak 3.814 m/s, mean slip 1.9378 m with -fd_back_eps 0.05). A layer
+(struct fd3d_layer, fd3d_layer_create) attached to a mirrored 3-D fault
+adds opening-only rectangles on the surface plane; each step iterates the
+fault solve (with the layer's first-lag traction as an extra known part)
+and a direct solve of the layer's own first-lag system (LU), both schemes,
+until the rates of both change by less than 1e-12 relative. With the exact
+static operator (static_fn) the layer's static coupling to the fault is
+left out (it is part of Is). Tables are dense in this first version:
+memory L x (layer elements)^2, so only small problems (tests).
+fd3d_test layer: a 2 x 1 km vertical fault of 500 m reaching the surface
+with a 16 x 16 layer of 250 m, prescribed slip rate 1 for 0.4 s, NL,
+against fs3d_dyn.py: fault traction history equal to 8e-5 Pa of 1.6e7
+(5e-12 relative), in run_tests.sh. QD bit-identity harness: PASS.
+Next: the FFT-structured layer for production sizes (layer-layer 2-D
+Toeplitz with an iterative first-lag solve; fault-layer Toeplitz along
+strike with dense rows), checked against this dense version, then the
+rsf_solve option and BP5-FD at 2 km with and without the layer.
+
 ### WP7, C implementation in rsf_solve: status (2026-10-18)
 Done, each verified in the sandbox before delivery (details in
 fd_c_design.md sections 6 to 10, usage in rsf_solve_fd.md):

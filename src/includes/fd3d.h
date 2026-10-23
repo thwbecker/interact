@@ -77,8 +77,12 @@ struct fd3d {
   /* operators for steps of k = 2^ik substeps (fd3d_step_k), built on first use */
   double _Complex *kop_B[8], *kop_C[8];
   double kop_self[8], kop_self_top[8];
-  int generic;
-  double kdamp;                 /* relaxation of the long-step iteration (default 0.5) */                  /* test: k = 1 also through the iterative k-step path */
+  int generic;                  /* test: k = 1 also through the iterative k-step path */
+  double kdamp;                 /* relaxation of the long-step iteration (default 0.5) */
+  double *Vold;                 /* slip rates at the start of the current step */
+  const double *vpres;          /* tests: prescribed fault slip rates for the next step (NULL: friction) */
+  double *thnew;                /* internal: state at the end of a step being iterated (layer) */
+  struct fd3d_layer *layer;     /* free-surface layer of opening elements (NULL: none) */
   double mu_s, mu_d, d0;                        /* slip weakening (uniform) */
   double *a, *b, *Lc, *theta, f0, V0;           /* rate and state */
   int *locked;                                  /* optional: no slip */
@@ -89,6 +93,26 @@ struct fd3d *fd3d_create2(struct fd3d_tab *t, int nzp, int mirror);
 void fd3d_free(struct fd3d *f);
 /* one fine step with an optional extra load (Pa, N values, may be NULL); returns Jacobi iterations */
 int fd3d_step(struct fd3d *f, const double *load);
+/* free-surface layer for a vertical strike-slip fault with its mirror image (fd_plan.md,
+   stage A): opening-only rectangles on the surface plane z = 0, zero normal traction at
+   their centres. Dense real-space tables in this first version (small problems, tests).
+   Geometry: fault plane y = 0, strike along x, fault element (i, j) centred at
+   (x0f + (i + 1/2) dx, 0, -(j + 1/2) dx); layer element (p, q) centred at
+   (xs0 + (p + 1/2) hx, ys0 + (q + 1/2) hy, 0). */
+struct fd3d_layer {
+  int ns, nxs, nys, L, hk, nhist;
+  double hx, hy, xs0, ys0, x0f, eta_p;
+  double *Wss, *Kss, *Wfs, *Kfs, *Wsf, *Ksf;   /* [l][rcv][src]: layer<-layer, layer<-fault (with image), fault<-layer */
+  double *K1ss, *K1fs, *K1sf;                    /* first lags */
+  double *V, *Vold, *delta, *H, *tau;            /* layer opening rates, opening, known part, normal traction */
+  double *hs, *hf;                               /* history rings of midpoint rates: layer (L x ns), fault (L x N) */
+  double *Bss_lu; int *piv;                      /* factorised layer self operator */
+};
+struct fd3d_layer *fd3d_layer_create(struct fd3d *f, double x0f, int nxs, int nys, double hx, double hy,
+                                     double xs0, double ys0, int L);
+void fd3d_layer_free(struct fd3d_layer *ly);
+int fd3d_step_layer(struct fd3d *f, const double *load);
+
 /* one step of k = 1, 2, 4, ..., 64 fine substeps (k = 1: fd3d_step); returns iterations,
    -1 on bad arguments, -2 if the iteration did not converge (state unchanged: retry with smaller k) */
 int fd3d_step_k(struct fd3d *f, const double *load, int k);
