@@ -30,6 +30,9 @@ typedef double _Complex fd3d_cplx;
 /* quadrant Green's function L_31/1 (dimensionless) and the element ramp stress */
 double fd3d_L31(double x1, double x2, double x3, double t, double cL, double cT);
 double fd3d_square_ramp(double x1, double x2, double x3, double t, double a, double cL, double cT, double rho);
+/* full stress tensor (11, 22, 33, 12, 31, 32), comp 1 slip along x1 or 3 opening, rectangle a1 x a2 */
+void fd3d_rect_ramp_tensor(double x1, double x2, double x3, double t, double a1, double a2,
+                           double cL, double cT, double rho, int comp, double s[6]);
 
 struct fd3d_tab {
   int nx, nz, Mx, Mz, L;

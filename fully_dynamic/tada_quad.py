@@ -105,7 +105,10 @@ def rect_ramp_stress(x1, x2, x3, t, a1, a2, cL, cT, rho, comp=1):
     on = (np.abs(np.abs(x1) - a1) < e) | (np.abs(np.abs(x2) - a2) < e)
     if not np.any(on):
         return _rect_ramp_stress(x1, x2, x3, t, a1, a2, cL, cT, rho, comp)
-    d = 1e-7*max(a1, a2)
+    # off the source plane the 0/0 is removable and a tiny offset suffices; in the source plane the
+    # quadrant fields are singular along the shared edge line and cancel only between quadrants, so
+    # a larger offset (1e-3 a, an O(1e-6) smoothing error) avoids the catastrophic cancellation
+    d = np.where(np.abs(np.asarray(x3, float)) < e, 1e-3, 1e-7)*max(a1, a2)
     lo = _rect_ramp_stress(x1 - d, x2 - d, x3, t, a1, a2, cL, cT, rho, comp)
     hi = _rect_ramp_stress(x1 + d, x2 + d, x3, t, a1, a2, cL, cT, rho, comp)
     with np.errstate(all="ignore"):

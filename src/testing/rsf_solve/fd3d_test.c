@@ -143,6 +143,29 @@ static int run_mirror(int argc, char **argv)
   return fail;
 }
 
+/* kernel check: full stress tensors (slip and opening, rectangles) against tada_quad.py values */
+static int run_kernels(const char *ref)
+{
+  FILE *fr = fopen(ref, "r"); double v[13], s[6], emax = 0.0, smax = 0.0; int n = 0, k;
+  if(!fr){ fprintf(stderr, "cannot open %s\n", ref); return 1; }
+  while(fscanf(fr, "%lf %lf %lf %lf %lf %lf %lf %lf %lf %lf %lf %lf %lf", v, v + 1, v + 2, v + 3, v + 4, v + 5, v + 6,
+                v + 7, v + 8, v + 9, v + 10, v + 11, v + 12) == 13){
+    double sc = 1.0;
+    fd3d_rect_ramp_tensor(v[1], v[2], v[3], v[4], v[5], v[6], 6000.0, 3464.0, 2670.0, (int)v[0], s);
+    for(k = 0; k < 6; k++) if(fabs(v[7 + k]) > sc) sc = fabs(v[7 + k]);
+    for(k = 0; k < 6; k++){
+      double e = fabs(s[k] - v[7 + k])/sc;          /* relative to the point's largest component */
+      if(!(e <= emax)) emax = isfinite(e) ? e : 1e300;
+    }
+    if(sc > smax) smax = sc;
+    n++;
+  }
+  fclose(fr);
+  printf("fd3d_test kernels: %d points (slip and opening, rectangles, edge cases), max relative diff %.2e\n", n, emax);
+  printf("fd3d_test kernels: %s\n", (n > 0 && emax <= 1e-8) ? "PASS" : "FAIL");
+  return !(n > 0 && emax <= 1e-8);
+}
+
 int main(int argc, char **argv)
 {
   double cL = 6000, cT = 3464, rho = 2670, dx = argc > 2 ? atof(argv[2]) : 500.0, dt;
@@ -154,6 +177,7 @@ int main(int argc, char **argv)
   double *rec = NULL; int nrec = 0;
   if(argc >= 3 && !strcmp(argv[1], "tpv101")) return run_tpv101(argc, argv);
   if(argc >= 2 && !strcmp(argv[1], "mirror")) return run_mirror(argc, argv);
+  if(argc >= 3 && !strcmp(argv[1], "kernels")) return run_kernels(argv[2]);
   if(argc < 3 || strcmp(argv[1], "tpv3")){ fprintf(stderr, "usage: %s tpv3|tpv101 dx [ref] [tend]\n", argv[0]); return 2; }
   nx = (int)floor(30e3/dx + 0.5); nz = (int)floor(15e3/dx + 0.5); dt = 0.5*dx/cT;
   t = fd3d_tab_create(nx, nz, dx, dt, cL, cT, rho, 0);

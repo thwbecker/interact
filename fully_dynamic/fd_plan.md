@@ -1072,6 +1072,45 @@ about 15 GB before compression. Next: measure the compressibility of the
 cross blocks, then the C implementation (the 3-D marcher with a second
 plane of unknowns).
 
+### Free surface in 3-D, step A3: compressibility, C kernels (2026-10-28)
+
+Compressibility of the fault-to-layer tables (fs3d_compress.py): strike
+slip on a vertical 20 x 10 km fault of 1 km (plus image) to the normal
+traction on a layer with a 250 m along-strike lattice and 52 rows (250 m
+within +-2 km of the trace, 1 km beyond, +-20 km), 94 lags, FFT along
+strike: the (10 fault rows) x (52 layer rows) block of each wavenumber and
+lag has numerical rank 5.8 / 7.8 / 8.8 / 9.0 on average (of at most 10) at
+relative tolerances 1e-3 / 1e-4 / 1e-5 / 1e-6, i.e. storage ratios of
+0.63 / 0.84 / 0.91 / 0.92. Per-block low-rank compression after the FFT
+along strike gains little: the blocks are thin (the fault has few rows).
+Real-space hierarchical compression per lag (Ciardo and Romanet 2026) or
+causal partitioning (Ando 2016; Sato and Ando 2021) would be the
+alternatives; for BP5 at 1 km the uncompressed estimate (about 15 GB)
+fits a large workstation, so stage A proceeds uncompressed.
+
+C kernels: fd3d_rect_ramp_tensor gives the full stress tensor (11, 22,
+33, 12, 31, 32) for slip along x1 or opening on a rectangle a1 x a2 (port
+of tada_quad L_1, L_3). fd3d_test kernels compares it with tada_quad at
+400 random points (both sources, rectangles of 250 and 500 m, receivers
+off and in the source plane, off-plane receivers on edge extensions):
+agreement to 4e-11 relative to each point's largest component (in
+run_tests.sh).
+Conditioning, found while building that test: in the source plane the
+quadrant fields are singular along each element edge line and cancel only
+between quadrants. Receivers on such a line outside the element are
+handled by a symmetric offset of 1e-3 a (1e-7 a off the plane), but
+receivers within about 1e-2 a of a line, or within 1e-1 a of the source
+plane near an edge extension, lose digits (Python and C, with or without
+fused multiply-add, differ by up to 1e-4 there). Grid rule to avoid them:
+coplanar elements on a common lattice, with layer row widths odd
+multiples of the finest width, so receivers (odd multiples of half the
+finest width) never fall on edge lines (multiples of the finest width).
+Next: the layer in the C marcher (tables: layer-layer 2-D Toeplitz,
+fault-layer Toeplitz along strike with dense rows; the layer's opening
+rates solved each step together with the fault; fault statics from the
+exact Is, the layer's static coupling to the fault left out to avoid
+counting it twice).
+
 ### WP7, C implementation in rsf_solve: status (2026-10-18)
 Done, each verified in the sandbox before delivery (details in
 fd_c_design.md sections 6 to 10, usage in rsf_solve_fd.md):

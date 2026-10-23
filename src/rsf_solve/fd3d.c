@@ -44,6 +44,81 @@ double fd3d_L31(double x1, double x2, double x3, double t, double cL, double cT)
   return v;
 }
 
+/* full quadrant Green's functions (Tada 2006, A18-A27): L_ij/1 (slip along x1) and
+   L_ij/3 (opening), returned as s[6] = (11, 22, 33, 12, 31, 32) */
+static double g5(double R, double t, double c){ return (t - R/c)*H(t - R/c); }
+static void L1_all(double x1, double x2, double x3, double t, double cL, double cT, double s[6])
+{
+  double p = cT/cL, chi1 = sqrt(x1*x1 + x3*x3), chi2 = sqrt(x2*x2 + x3*x3), R = sqrt(x1*x1 + x2*x2 + x3*x3);
+  double c3 = cT*cT*cT, chi1_2 = chi1*chi1, R5 = R*R*R*R*R, pi = M_PI;
+  double dg1 = g1(x1, x2, x3, t, cL) - g1(x1, x2, x3, t, cT), dg4 = g4(R, t, cL) - g4(R, t, cT);
+  double g2L = g2(x1, x2, x3, t, cL), g2T = g2(x1, x2, x3, t, cT), g2sT = g2(x2, x1, x3, t, cT);
+  s[0] = -2.0*c3*x3*(3.0*x1*x1 - x3*x3)/(3.0*pi*chi1_2*chi1_2*chi1_2)*dg1 - c3*x1*x1*x2*x3/(pi*R5*chi1_2)*dg4
+         - cT*x3/(pi*chi1_2)*((1.0 - 2.0*p*p + 2.0*p*p*x1*x1/chi1_2)*g2L + (1.0 - 2.0*x1*x1/chi1_2)*g2T);
+  s[3] = c3*x1*x3/(pi*R5)*dg4 - cT*x3/(2.0*pi*chi2*chi2)*g2sT;
+  s[1] = c3*x2*x3/(pi*R5)*dg4 - (1.0 - 2.0*p*p)*cT*x3/(pi*chi1_2)*g2L;
+  s[4] = fd3d_L31(x1, x2, x3, t, cL, cT);
+  s[5] = c3/(pi*R5)*(x3*x3 - R*R/3.0)*dg4 + cT/(pi*R)*(2.0*p*p/3.0*g5(R, t, cL) - g5(R, t, cT)/6.0);
+  s[2] = 2.0*c3*x3*(3.0*x1*x1 - x3*x3)/(3.0*pi*chi1_2*chi1_2*chi1_2)*dg1 - c3*x2*x3*x3*x3/(pi*R5*chi1_2)*dg4
+         - cT*x3/(pi*chi1_2)*((1.0 - 2.0*p*p + 2.0*p*p*x3*x3/chi1_2)*g2L + (1.0 - 2.0*x3*x3/chi1_2)*g2T);
+}
+static double L11_3(double x1, double x2, double x3, double t, double cL, double cT)
+{
+  double p = cT/cL, chi1 = sqrt(x1*x1 + x3*x3), chi2 = sqrt(x2*x2 + x3*x3), R = sqrt(x1*x1 + x2*x2 + x3*x3);
+  double c3 = cT*cT*cT, chi1_2 = chi1*chi1, R5 = R*R*R*R*R, pi = M_PI;
+  double dg1 = g1(x1, x2, x3, t, cL) - g1(x1, x2, x3, t, cT), dg4 = g4(R, t, cL) - g4(R, t, cT);
+  return (1.0 - 2.0*p*p)/p*H(x1)*H(x2)*H(t - fabs(x3)/cL)
+         - (1.0 - 2.0*p*p)/(2.0*pi*p)*(g3(x1, x2, x3, t, cL) + g3(x2, x1, x3, t, cL))
+         - 2.0*c3*x1*(3.0*x3*x3 - x1*x1)/(3.0*pi*chi1_2*chi1_2*chi1_2)*dg1 - c3*x1*x2*x3*x3/(pi*R5*chi1_2)*dg4
+         - 2.0*cT*x1*x3*x3/(pi*chi1_2*chi1_2)*(p*p*g2(x1, x2, x3, t, cL) - g2(x1, x2, x3, t, cT))
+         + (1.0 - 2.0*p*p)*cT*x2/(pi*chi2*chi2)*g2(x2, x1, x3, t, cL);
+}
+static void L3_all(double x1, double x2, double x3, double t, double cL, double cT, double s[6])
+{
+  double p = cT/cL, chi1 = sqrt(x1*x1 + x3*x3), chi2 = sqrt(x2*x2 + x3*x3), R = sqrt(x1*x1 + x2*x2 + x3*x3);
+  double c3 = cT*cT*cT, R5 = R*R*R*R*R, pi = M_PI, dg4 = g4(R, t, cL) - g4(R, t, cT), a[6], b[6];
+  s[0] = L11_3(x1, x2, x3, t, cL, cT);
+  s[1] = L11_3(x2, x1, x3, t, cL, cT);
+  s[3] = c3/(pi*R5)*(x3*x3 - R*R/3.0)*dg4 + cT/(pi*R)*((1.0 - 4.0*p*p/3.0)*g5(R, t, cL) - 2.0/3.0*g5(R, t, cT));
+  L1_all(x1, x2, x3, t, cL, cT, a); s[4] = a[2];          /* L_31/3 = L_33/1 */
+  L1_all(x2, x1, x3, t, cL, cT, b); s[5] = b[2];          /* L_32/3 by symmetry */
+  s[2] = 1.0/p*H(x1)*H(x2)*H(t - fabs(x3)/cL) - 1.0/(2.0*pi*p)*(g3(x1, x2, x3, t, cL) + g3(x2, x1, x3, t, cL))
+         + 2.0*c3*x1*(3.0*x3*x3 - x1*x1)/(3.0*pi*pow(chi1, 6))*(g1(x1, x2, x3, t, cL) - g1(x1, x2, x3, t, cT))
+         + 2.0*c3*x2*(3.0*x3*x3 - x2*x2)/(3.0*pi*pow(chi2, 6))*(g1(x2, x1, x3, t, cL) - g1(x2, x1, x3, t, cT))
+         + c3*x1*x2*x3*x3/(pi*R5)*(1.0/(chi1*chi1) + 1.0/(chi2*chi2))*dg4
+         + cT*x1/(pi*chi1*chi1)*((2.0*(1.0 - p*p) + 2.0*p*p*x3*x3/(chi1*chi1))*g2(x1, x2, x3, t, cL) - 2.0*x3*x3/(chi1*chi1)*g2(x1, x2, x3, t, cT))
+         + cT*x2/(pi*chi2*chi2)*((2.0*(1.0 - p*p) + 2.0*p*p*x3*x3/(chi2*chi2))*g2(x2, x1, x3, t, cL) - 2.0*x3*x3/(chi2*chi2)*g2(x2, x1, x3, t, cT));
+}
+static void rect_tensor0(double x1, double x2, double x3, double t, double a1, double a2, double cL, double cT, double rho, int comp, double s[6])
+{
+  double mu = rho*cT*cT, q[6]; int k, i1, i2;
+  for(k = 0; k < 6; k++) s[k] = 0.0;
+  for(i1 = 0; i1 < 2; i1++) for(i2 = 0; i2 < 2; i2++){
+    double c1 = i1 ? a1 : -a1, c2 = i2 ? a2 : -a2, sg = (i1 == i2) ? 1.0 : -1.0;
+    if(comp == 3) L3_all(x1 - c1, x2 - c2, x3, t, cL, cT, q); else L1_all(x1 - c1, x2 - c2, x3, t, cL, cT, q);
+    for(k = 0; k < 6; k++) s[k] += sg*q[k];
+  }
+  for(k = 0; k < 6; k++) s[k] *= -mu/(2.0*cT);
+}
+/* full stress tensor (11, 22, 33, 12, 31, 32) at (x1, x2, x3) from unit rate since t = 0 on the
+   rectangle |xi1| < a1, |xi2| < a2: comp 1 slip along x1, comp 3 opening. Receivers on the
+   extension of an element edge hit removable 0/0: averaged over a tiny symmetric offset */
+void fd3d_rect_ramp_tensor(double x1, double x2, double x3, double t, double a1, double a2,
+                           double cL, double cT, double rho, int comp, double s[6])
+{
+  double e = 1e-9*(a1 > a2 ? a1 : a2), lo[6], hi[6]; int k;
+  /* in the source plane the quadrant fields are singular along the shared edge line and cancel
+     only between quadrants: a larger offset (1e-3 a) avoids the cancellation, off the plane the
+     0/0 is removable and 1e-7 a suffices (same rule as tada_quad.py) */
+  double d = (fabs(x3) < e ? 1e-3 : 1e-7)*(a1 > a2 ? a1 : a2);
+  if((fabs(fabs(x1) - a1) < e) || (fabs(fabs(x2) - a2) < e)){
+    rect_tensor0(x1 - d, x2 - d, x3, t, a1, a2, cL, cT, rho, comp, lo);
+    rect_tensor0(x1 + d, x2 + d, x3, t, a1, a2, cL, cT, rho, comp, hi);
+    for(k = 0; k < 6; k++) s[k] = 0.5*(lo[k] + hi[k]);
+  }else
+    rect_tensor0(x1, x2, x3, t, a1, a2, cL, cT, rho, comp, s);
+}
+
 /* sigma_31 at (x1, x2, x3) from unit slip rate along x1 on the square |xi| < a since t = 0 */
 double fd3d_square_ramp(double x1, double x2, double x3, double t, double a, double cL, double cT, double rho)
 {
