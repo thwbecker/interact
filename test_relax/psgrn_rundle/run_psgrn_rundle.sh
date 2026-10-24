@@ -57,7 +57,7 @@ for g in $gravs;do
 	cat > psgrn_g$g.inp <<EOF
         0.0       1
   126   0.0    500.0   1.0
-    8   1.0    15.0
+   29   0.5    14.5
  $nt   $tdays
  0.05
  $g.00
