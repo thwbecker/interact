@@ -268,6 +268,16 @@ void rsf_print_help(const char *prog)
   fprintf(stderr,"                          2020); 0: the earlier first-order scheme. See rsf_solve_fd.md\n");
   fprintf(stderr,"  -fd_kmax3 <0|1>         3-D: 1 allows steps of several substeps (experimental, default 0);\n");
   fprintf(stderr,"                          for 3-D speed use -fd_back_eps (quasi-steady hand-back)\n");
+  fprintf(stderr,"  -fd_layer <n>           3-D half space (vertical strike-slip fault reaching the surface):\n");
+  fprintf(stderr,"                          > 0 completes the mirror image with a layer of opening elements on\n");
+  fprintf(stderr,"                          the surface, +-n fault elements across the trace (default 0: off)\n");
+  fprintf(stderr,"  -fd_layer_m <m>         layer elements of dx/m (default 2); -fd_layer_margin <n> beyond the\n");
+  fprintf(stderr,"                          fault ends (default: as -fd_layer)\n");
+  fprintf(stderr,"  -fd_surface <0|1>       3-D half space: a planar fault of any dip (or 1 also for a vertical\n");
+  fprintf(stderr,"                          strike-slip fault) uses a full virtual free surface (three unknowns\n");
+  fprintf(stderr,"                          per surface element); -fd_surface_m (default 4: elements of dx/4),\n");
+  fprintf(stderr,"                          -fd_surface_ext (margin in fault elements, default the fault width);\n");
+  fprintf(stderr,"                          normal-stress changes need -calc_sigma_dot (exact static In)\n");
   fprintf(stderr,"  -fd_coarse <0|1>        long steps (kmax substeps) start at multiples of kmax and,\n");
   fprintf(stderr,"                          once a window holds only such steps, the history is summed\n");
   fprintf(stderr,"                          over aligned blocks (exact, kmax times cheaper; default 1)\n");

@@ -159,6 +159,25 @@ through a mirror image and the static part uses interact's exact half-space
 operator. 3-D phases use fixed fine steps by default; `-fd_back_eps 0.05` (quasi-steady
 hand-back, as in 2-D) shortens the afterslip tail, about 4 times faster on
 the BP5-FD first event at 2 km with the later slip unchanged to 1e-4 m.
+`-fd_layer n` (3-D half space, vertical strike-slip fault reaching the
+surface) completes the mirror image with a strip of opening elements on the
+surface, +-n fault elements across the trace (`-fd_layer_m`, default 2:
+elements of dx/2; `-fd_layer_margin`, default n, beyond the fault ends).
+It removes the normal-traction error of the mirror; for BP5 the effect on
+the first event is below 0.5 percent (fd_plan.md). Off by default.
+In a half space, a planar fault that is not a vertical strike-slip fault (or any
+fault with `-fd_surface 1`) uses a full virtual free surface: surface elements of
+dx/4 (`-fd_surface_m`) over the fault's surface projection plus
+`-fd_surface_ext` fault elements (default the fault width), three unknowns each,
+zero traction. With `-calc_sigma_dot` the fault's normal stress follows the exact
+static In plus the surface's dynamic part. This is new and tested on small
+problems only (see fd_plan.md, steps B2 and B3). The surface's shear modes are
+unstable for cS dt/hs between about 0.85 and 1.05; by default the surface is refined
+to keep cS dt/hs >= 2 (dx/4 at the default CFL). Check with
+src/testing/rsf_solve/test_fd3d_dip.sh. For faults that reach the surface the full
+surface converges slowly at the trace (fd_plan.md, step B5); for vertical strike-slip
+faults the mirror image is exact there and should be used. `-fd_table_statics 1`
+replaces interact's exact Is by the tables' own statics (experiments only).
 `-fd_kmax3 1` enables steps of several substeps in 3-D (experimental, see
 fd_plan.md). The 3-D phase station files have a fifth column, the number
 of substeps of the step.

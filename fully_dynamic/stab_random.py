@@ -10,7 +10,7 @@ hT = float(os.environ.get("FD_HT", "0.5"))
 dx = 100.0; dt = hT*dx/BE
 nsteps = int(round(320*dx/(AL*dt)))
 f = sh.Fault([-N*dx/2, 0.0], [1.0, 0.0], N*dx, N)
-sysm = sh.System([f], dt, AL, BE, RHO, tol=1e-3, lmax=nsteps + 2, cap_ok=True)
+sysm = sh.System([f], dt, AL, BE, RHO, tol=1e-3, lmax=nsteps + 2, cap_ok=True, mode=os.environ.get("FD_MODE", "inplane"))
 rng = np.random.default_rng(1)
 tau0 = rng.normal(0.0, 1e6, N)
 class TractionFree:
@@ -35,4 +35,4 @@ w = max(1, int(len(t[sel])/20)); ts, vs = [], []
 for i in range(0, sel.sum() - w + 1, w):
     j = np.argmax(nv[sel][i:i + w]); ts.append(t[sel][i + j]); vs.append(nv[sel][i + j])
 g = np.polyfit(ts, vs, 1)[0]
-print(f"{'NL' if os.environ.get('FD_NL') else 'first order'} hT {hT}: growth rate {g:+.4f} per cp t/dx (log10 ||V||: start {nv[0]:.2f}, end {nv[-1]:.2f})")
+print(f"{os.environ.get('FD_MODE', 'inplane')} {'NL' if os.environ.get('FD_NL') else 'first order'} hT {hT}: growth rate {g:+.4f} per cp t/dx (log10 ||V||: start {nv[0]:.2f}, end {nv[-1]:.2f})")

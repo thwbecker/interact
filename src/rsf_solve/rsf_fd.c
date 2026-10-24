@@ -57,6 +57,7 @@
 #include "fd.h"
 #include "fd_march.h"
 #include "fd3d.h"
+extern double fd3d_layer_prof[4];
 
 static PetscErrorCode fd_build_tables(struct interact_ctx *par, struct fd_vars *fd);
 static PetscErrorCode fd_gate_static(struct interact_ctx *par, struct fd_vars *fd);
@@ -117,6 +118,18 @@ PetscErrorCode rsf_fd_setup(struct interact_ctx *par, PetscReal shear_modulus_si
   PetscCall(PetscOptionsGetReal(NULL,NULL,"-fd_back_vmax",&fd->back_vmax,NULL));
   if(fd->back_vmax <= 0.0) fd->back_vmax = 0.5*fd->vsw;
   fd->nl = 1;			/* second-order time marching (Noda et al. 2020) by default */
+  fd->layer_w = 0; fd->layer_m = 2; fd->layer_margin = -1; fd->surface_opt = 0; fd->surf_ext = -1;
+  PetscCall(PetscOptionsGetInt(NULL,NULL,"-fd_surface",&fd->surface_opt,NULL));
+  PetscCall(PetscOptionsGetInt(NULL,NULL,"-fd_surface_ext",&fd->surf_ext,NULL));
+  fd->surf_m = 4;
+  {
+    PetscBool set = PETSC_FALSE;
+    PetscCall(PetscOptionsGetInt(NULL,NULL,"-fd_surface_m",&fd->surf_m,&set));
+    fd->surf_m_default = set ? PETSC_FALSE : PETSC_TRUE;
+  }
+  PetscCall(PetscOptionsGetInt(NULL,NULL,"-fd_layer",&fd->layer_w,NULL));
+  PetscCall(PetscOptionsGetInt(NULL,NULL,"-fd_layer_m",&fd->layer_m,NULL));
+  PetscCall(PetscOptionsGetInt(NULL,NULL,"-fd_layer_margin",&fd->layer_margin,NULL));
   fd->kmax3 = 0;
   PetscCall(PetscOptionsGetInt(NULL,NULL,"-fd_kmax3",&fd->kmax3,NULL));
   PetscCall(PetscOptionsGetInt(NULL,NULL,"-fd_nl",&fd->nl,NULL));
@@ -136,7 +149,7 @@ PetscErrorCode rsf_fd_setup(struct interact_ctx *par, PetscReal shear_modulus_si
     rsf->fd = fd;
     PetscCall(fd3d_setup_from_geometry(par,fd));
     PetscCall(PetscPrintf(PETSC_COMM_WORLD,"rsf_fd_setup: 3-D fully dynamic extension, mode %d, %s, vsw %.1e vback %.1e m/s, fixed fine steps, %s time marching\n",
-			  (int)fd->mode,fd->mirror3 ? "half space (mirror-image free surface, exact static Is)" : "whole space",(double)fd->vsw,(double)fd->vback,fd->nl ? "second-order (-fd_nl 1)" : "first-order"));
+			  (int)fd->mode,fd->mirror3 ? "half space (mirror-image free surface, exact static Is)" : (fd->surf3 ? "half space (virtual free surface, exact static Is)" : "whole space"),(double)fd->vsw,(double)fd->vback,fd->nl ? "second-order (-fd_nl 1)" : "first-order"));
     PetscFunctionReturn(PETSC_SUCCESS);
   }
   /* medium: shear modulus and S speed from the run settings (SI), Poisson from interact */
@@ -188,6 +201,23 @@ static void fd3d_static_is(void *ctx, const double *delta, double *out)
   PetscCallAbort(PETSC_COMM_WORLD,VecRestoreArrayRead(fd->v3b,&b));
 }
 
+/* exact static normal traction (tension positive) of the phase slip: -In delta (In: compression positive) */
+static void fd3d_static_in(void *ctx, const double *delta, double *out)
+{
+  struct interact_ctx *par = (struct interact_ctx *)ctx;
+  struct fd_vars *fd = par->medium->rsf->fd;
+  PetscScalar *a;
+  const PetscScalar *b;
+  int i, n = fd->f3->N;
+  PetscCallAbort(PETSC_COMM_WORLD,VecGetArray(fd->v3a,&a));
+  for(i = 0;i < n;i++) a[fd->g_of_s[i]] = delta[i];
+  PetscCallAbort(PETSC_COMM_WORLD,VecRestoreArray(fd->v3a,&a));
+  PetscCallAbort(PETSC_COMM_WORLD,MatMult(par->medium->In,fd->v3a,fd->v3b));
+  PetscCallAbort(PETSC_COMM_WORLD,VecGetArrayRead(fd->v3b,&b));
+  for(i = 0;i < n;i++) out[i] = -PetscRealPart(b[fd->g_of_s[i]]);
+  PetscCallAbort(PETSC_COMM_WORLD,VecRestoreArrayRead(fd->v3b,&b));
+}
+
 /* 3-D dynamic phase (fd3d.c), counterpart of fd_run_phase: fixed fine steps */
 static PetscErrorCode fd3d_run_phase(TS ts, struct interact_ctx *par, struct fd_vars *fd, PetscReal t, Vec X, PetscReal *t_end)
 {
@@ -210,6 +240,7 @@ static PetscErrorCode fd3d_run_phase(TS ts, struct interact_ctx *par, struct fd_
     f->V[i] = 2.0*rsf->v0*exp(-x[4*g]/fault[g].mu_sa)*sinh(x[4*g+1]/(fault[g].mu_sa*x[4*g+2]));
     f->theta[i] = f->Lc[i]/f->V0*exp((x[4*g] - f->f0)/f->b[i]);       /* psi = f0 + b ln(V0 theta/L) */
     f->tau0[i] = x[4*g+1] + eta*f->V[i];                               /* elastic stress at the switch */
+    if(f->layer && f->layer->surf) f->layer->sig0[i] = x[4*g+2];
     if(fabs(f->V[i]) > vmax) vmax = fabs(f->V[i]);
   }
   /* history from the accepted-step record (marcher order) */
@@ -304,11 +335,16 @@ static PetscErrorCode fd3d_run_phase(TS ts, struct interact_ctx *par, struct fd_
     x[4*g] = f->f0 + f->b[i]*log(f->V0*f->theta[i]/f->Lc[i]);
     x[4*g+1] = f->tau[i];
     x[4*g+3] += f->delta[i];
+    if(f->layer && f->layer->surf && rsf->calc_sigma_dot) x[4*g+2] = f->sigma[i];   /* normal stress from the phase */
     slipsum += f->delta[i];
   }
   PetscCall(VecRestoreArray(X,&x));
   *t_end = t + f->time;
   PetscCall(PetscTime(&t_wall1));
+  if(f->layer && f->layer->n_steps > 0)
+    PetscCall(PetscPrintf(PETSC_COMM_WORLD,"rsf_fd: free-surface layer: %.1f outer and %.1f inner iterations per step; time in known part %.1f s, fault solves %.1f s, layer solves %.1f s, finish %.1f s\n",
+			  (double)f->layer->n_outer/f->layer->n_steps,(double)f->layer->n_inner/f->layer->n_steps,
+			  fd3d_layer_prof[0],fd3d_layer_prof[1],fd3d_layer_prof[2],fd3d_layer_prof[3]));
   PetscCall(PetscPrintf(PETSC_COMM_WORLD,"rsf_fd: 3-D phase steps by substeps k = 1..64: %d %d %d %d %d %d %d, retries %d\n",
 			khist[0],khist[1],khist[2],khist[3],khist[4],khist[5],khist[6],nretry));
   PetscCall(PetscPrintf(PETSC_COMM_WORLD,"rsf_fd: 3-D phase %ld: t %.8f yr, %d steps over %.1f s, peak slip rate %.3f m/s, mean slip %.4f m, wall %.1f s\n",
@@ -335,14 +371,23 @@ PetscErrorCode fd3d_setup_from_geometry(struct interact_ctx *par, struct fd_vars
   double dx, e1[3], e2[3], nn[3], x0[3], lo1 = 1e300, lo2 = 1e300, hi1 = -1e300, hi2 = -1e300, *pa, *pb, dev = 0.0, nrm = 0.0, ls;
   int nx, nz, *cnt, *s_of_g, i;
   PetscFunctionBeginUser;
-  PetscCheck(medium->full_space || (rsf->slip_mode == STRIKE),PETSC_COMM_WORLD,PETSC_ERR_SUP,
-	     "-fd_mode: 3-D in a half space needs a vertical fault with strike slip (mirror-image free surface)");
   PetscCheck((rsf->slip_mode == STRIKE) || (rsf->slip_mode == DIP),PETSC_COMM_WORLD,PETSC_ERR_SUP,"-fd_mode: 3-D needs a fixed slip direction (-rsf_slip_mode strike or dip)");
   ls = fd->length_scale;
   dx = 2.0*fault[0].l*ls;
+  /* half space: a vertical strike-slip fault reaching the surface uses the mirror image (plus
+     -fd_layer); any other planar fault (or -fd_surface 1) uses the full virtual surface, with
+     grid axis 1 along strike and slip along axis 1 (strike) or axis 2 (dip) */
+  fd->surf3 = PETSC_FALSE;
+  if(!medium->full_space){
+    int vertical = fabs(fault[0].normal[2]) < 1e-9;
+    if(fd->surface_opt || !vertical || (rsf->slip_mode == DIP)) fd->surf3 = PETSC_TRUE;
+  }
   for(k = 0;k < 3;k++){
-    e1[k] = (rsf->slip_mode == STRIKE) ? fault[0].t_strike[k] : fault[0].t_dip[k];
-    e2[k] = (rsf->slip_mode == STRIKE) ? fault[0].t_dip[k] : fault[0].t_strike[k];
+    if(fd->surf3){ e1[k] = fault[0].t_strike[k]; e2[k] = fault[0].t_dip[k]; }
+    else{
+      e1[k] = (rsf->slip_mode == STRIKE) ? fault[0].t_strike[k] : fault[0].t_dip[k];
+      e2[k] = (rsf->slip_mode == STRIKE) ? fault[0].t_dip[k] : fault[0].t_strike[k];
+    }
     nn[k] = fault[0].normal[k]; x0[k] = fault[0].x[k]*ls;
   }
   PetscCall(PetscMalloc2(n,&pa,n,&pb));
@@ -363,7 +408,14 @@ PetscErrorCode fd3d_setup_from_geometry(struct interact_ctx *par, struct fd_vars
   }
   nx = (int)floor((hi1 - lo1)/dx + 0.5) + 1; nz = (int)floor((hi2 - lo2)/dx + 0.5) + 1;
   fd->mirror3 = PETSC_FALSE;
-  if(!medium->full_space){
+  if(fd->surf3){
+    /* rows ordered by depth (row 0 shallowest): flip the dip axis if it points up */
+    if(e2[2] > 0.0){
+      for(i = 0;i < n;i++) pb[i] = -pb[i];
+      { double tmp = lo2; lo2 = -hi2; hi2 = -tmp; }
+      for(k = 0;k < 3;k++) e2[k] = -e2[k];
+    }
+  }else if(!medium->full_space){
     /* half space: vertical fault reaching the surface z = 0, mirror image in the surface.
        Order the rows by depth (row 0 at the surface) */
     double zmax = -1e300;
@@ -391,7 +443,10 @@ PetscErrorCode fd3d_setup_from_geometry(struct interact_ctx *par, struct fd_vars
   PetscCall(PetscFree(cnt)); PetscCall(PetscFree2(pa,pb));
   fd->dt_min = fd->cfl*dx/fd->beta;
   fd->nx3 = nx; fd->nz3 = nz;
-  fd->tab3 = fd3d_tab_create(nx,fd->mirror3 ? 2*nz : nz,dx,fd->dt_min,fd->alpha,fd->beta,fd->rho,(int)fd->lmax);
+  if(fd->surf3)
+    fd->tab3 = fd3d_tab_create_c(nx,nz,dx,fd->dt_min,fd->alpha,fd->beta,fd->rho,(int)fd->lmax,(rsf->slip_mode == STRIKE) ? 1 : 2);
+  else
+    fd->tab3 = fd3d_tab_create(nx,fd->mirror3 ? 2*nz : nz,dx,fd->dt_min,fd->alpha,fd->beta,fd->rho,(int)fd->lmax);
   PetscCheck(fd->tab3,PETSC_COMM_WORLD,PETSC_ERR_MEM,"rsf_fd_setup: 3-D table allocation failed");
   /* static gate: Is(receiver, source) against the offset table, skipping the
      3 x 3 self neighbourhood whose regularisation may differ */
@@ -424,6 +479,74 @@ PetscErrorCode fd3d_setup_from_geometry(struct interact_ctx *par, struct fd_vars
     fd->f3->a[i] = fault[g].mu_sa; fd->f3->b[i] = fault[g].mu_db; fd->f3->Lc[i] = rsf->dc_vec ? rsf->dc_vec[g]*1.0 : rsf->dc;
   }
   fd->f3->static_fn = fd3d_static_is; fd->f3->static_ctx = (void *)par;
+  {
+    PetscInt ts = 0;                              /* -fd_table_statics 1: the tables' own statics instead of Is (experiments) */
+    PetscCall(PetscOptionsGetInt(NULL,NULL,"-fd_table_statics",&ts,NULL));
+    if(ts){ fd->f3->static_fn = NULL; fd->f3->static_ctx = NULL; PetscCall(PetscPrintf(PETSC_COMM_WORLD,"rsf_fd_setup: 3-D static part from the tables (-fd_table_statics 1), not from Is\n")); }
+  }
+  if(fd->surf3){
+    /* full virtual surface: the marcher's frame has x' along strike (column 0 at x' = 0),
+       y' horizontal towards the up-dip side, z up; element (0, 0) centred at y' = 0 */
+    double sind = -e2[2], cosd = sqrt(1.0 - sind*sind), dipdeg = asin(sind)*180.0/M_PI, zc0, ytop, ztop, ys0, Wd, fsign;
+    /* surface elements of dx/m: m = 4 by default. With the NL scheme the surface's shear
+       components grew in a random-perturbation test at cS dt/hs = 1 (m = 2) and decayed at 0.5
+       (m = 1) and 2 (m = 4); m = 4 also meets the static accuracy rule (a quarter of the fault
+       element near the trace) */
+    int m = (int)fd->surf_m, mg = (int)(fd->surf_ext > 0 ? fd->surf_ext : (nz > 2 ? nz : 2)), nys, nxs, Lsf;
+    /* the unstable band (cS dt/hs about 0.85 to 1.05, fd_plan.md B3): with the default, keep
+       cS dt/hs = m cfl at 2 or more (m = 4 at cfl 0.5, more for smaller steps) */
+    if(fd->surf_m_default) while(m*fd->cfl < 1.999) m++;
+    if(m*fd->cfl > 0.8 && m*fd->cfl < 1.2)
+      PetscCall(PetscPrintf(PETSC_COMM_WORLD,"rsf_fd_setup: WARNING: surface elements of dx/%d give cS dt/hs = %.2f, inside the band where the surface's shear modes grow (0.85 to 1.05)\n",m,(double)(m*fd->cfl)));
+    zc0 = fault[fd->g_of_s[0]].x[INT_Z]*ls;
+    ytop = 0.5*dx*cosd; ztop = zc0 + 0.5*dx*sind;
+    PetscCheck(ztop <= 1e-6*dx,PETSC_COMM_WORLD,PETSC_ERR_SUP,"-fd_mode: the fault must lie below the surface (top edge at z = %g m)",ztop);
+    Wd = nz*dx*cosd;
+    /* rows: the fault's surface projection plus mg fault elements either side; the top edge line
+       (y' = ytop) on a row boundary when the fault reaches the surface */
+    ys0 = ytop - Wd - mg*dx;
+    ys0 = ytop - ceil((ytop - ys0)/(dx/m))*(dx/m);
+    nys = (int)ceil((ytop + mg*dx - ys0)/(dx/m));
+    nxs = (nx + 2*mg)*m;
+    Lsf = (int)ceil(sqrt(pow((nx + 2*mg)*dx, 2) + pow(Wd + 2*mg*dx, 2) + pow(nz*dx*sind - ztop, 2))/(fd->beta*fd->dt_min)) + 2;
+    {
+      /* sign of the QD slip direction in the surface code's frame (x' = strike, e2 = up dip,
+         y' = horizontal part of up dip): dip slip along interact's t_dip, strike slip along
+         t_strike in a frame that may be left-handed */
+      double up[3] = {-e2[0], -e2[1], -e2[2]}, yh[3] = {up[0], up[1], 0.0}, yn = sqrt(up[0]*up[0] + up[1]*up[1]), cr;
+      if(yn > 1e-12){ yh[0] /= yn; yh[1] /= yn; } else { yh[0] = -e1[1]; yh[1] = e1[0]; }
+      cr = e1[0]*yh[1] - e1[1]*yh[0];                                  /* (x' x y') . z */
+      fsign = (rsf->slip_mode == STRIKE) ? (cr > 0 ? 1.0 : -1.0) : (fault[0].t_dip[2] > 0.0 ? 1.0 : -1.0);
+    }
+    fd->f3->layer = fd3d_surf_create(fd->f3,-0.5*dx,ytop,ztop,dipdeg,(rsf->slip_mode == STRIKE) ? 1 : 2,m,nxs,nys,-0.5*dx - mg*dx,ys0,Lsf,fsign);
+    PetscCheck(fd->f3->layer,PETSC_COMM_WORLD,PETSC_ERR_LIB,"rsf_fd_setup: virtual surface setup failed");
+    fd->f3->layer->normal_coupling = rsf->calc_sigma_dot ? 1 : 0;
+    if(rsf->calc_sigma_dot){ fd->f3->layer->static_n_fn = fd3d_static_in; fd->f3->layer->static_n_ctx = (void *)par; }
+    {
+      struct fd3d_layer *ly = fd->f3->layer;
+      double mb = 16.0*((double)5*(ly->L + 2)*ly->Mx2*ly->Mh2 + 9.0*(ly->L + 2)*ly->Mh*ly->nys*ly->nz + 3.0*ly->L*ly->Mx2*ly->Mh2 + (double)ly->L*ly->Mh*(3*ly->nys + ly->nz))/1048576.0;
+      PetscCall(PetscPrintf(PETSC_COMM_WORLD,"rsf_fd_setup: virtual free surface: dip %.1f deg, %s slip, %d x %d surface elements of %g m (3 unknowns each), %d lags, about %.0f MB; normal-stress changes %s\n",
+			    dipdeg,(rsf->slip_mode == STRIKE) ? "strike" : "dip",ly->nxs,ly->nys,ly->hx,ly->L,mb,rsf->calc_sigma_dot ? "on (exact static In)" : "off (no -calc_sigma_dot)"));
+    }
+  }
+  if(fd->mirror3 && (fd->layer_w > 0)){
+    /* free-surface layer completing the mirror (fd_plan.md, stage A): a strip of opening
+       elements of dx/m along the trace, +-layer_w fault elements wide, layer_margin fault
+       elements beyond the fault ends */
+    int m = (int)fd->layer_m, mg = (int)fd->layer_margin, Lly;
+    double x0f = -0.5*dx, rmax;                     /* the marcher's along-strike origin: element 0 centred at 0 */
+    if(mg < 0) mg = (int)fd->layer_w;
+    rmax = sqrt(pow((nx + 2*mg)*dx, 2) + pow((nz + fd->layer_w)*dx, 2));
+    Lly = (int)ceil(rmax/(fd->beta*fd->dt_min)) + 2;
+    fd->f3->layer = fd3d_layer_create_fft(fd->f3,x0f,m,(nx + 2*mg)*m,(int)(2*fd->layer_w*m),x0f - mg*dx,Lly);
+    PetscCheck(fd->f3->layer,PETSC_COMM_WORLD,PETSC_ERR_LIB,"rsf_fd_setup: free-surface layer setup failed");
+    {
+      struct fd3d_layer *ly = fd->f3->layer;
+      double mb = 16.0*((double)ly->L*ly->Mx2*ly->Mh2 + 2.0*ly->L*ly->Mh*ly->nys*ly->nz + (double)ly->L*ly->Mh*(ly->nys + ly->nz) + (double)ly->L*ly->Mx2*ly->Mh2)/1048576.0;
+      PetscCall(PetscPrintf(PETSC_COMM_WORLD,"rsf_fd_setup: free-surface layer: %d x %d opening elements of %g m (+-%d fault elements across the trace, %d beyond the ends), %d lags, about %.0f MB\n",
+			    ly->nxs,ly->nys,ly->hx,(int)fd->layer_w,mg,ly->L,mb));
+    }
+  }
   PetscCall(MatCreateVecs(medium->Is,&fd->v3a,&fd->v3b));
   fd->nrec = 64; fd->irec = 0; fd->nrec_used = 0;
   PetscCall(PetscMalloc2(fd->nrec,&fd->rec_t,(size_t)fd->nrec*n,&fd->rec_v));
@@ -433,9 +556,12 @@ PetscErrorCode fd3d_setup_from_geometry(struct interact_ctx *par, struct fd_vars
   if(fd->mirror3)
     PetscCall(PetscPrintf(PETSC_COMM_WORLD,"rsf_fd_setup: 3-D half space by mirror image: static operator of fault plus image deviates %.3e from the exact half-space Is "
 			  "(expected, a few percent); the dynamic phases use the exact Is for the static part\n",dev));
-  else
+  else if(!fd->surf3)
     PetscCall(PetscPrintf(PETSC_COMM_WORLD,"rsf_fd_setup: 3-D static gate: rel dev of Ks(tables) from Is %.3e (tol %g)\n",dev,(double)fd->gate_tol));
-  PetscCheck(fd->mirror3 || (dev <= 5.0*fd->gate_tol),PETSC_COMM_WORLD,PETSC_ERR_USER,
+  if(fd->surf3)
+    PetscCall(PetscPrintf(PETSC_COMM_WORLD,"rsf_fd_setup: 3-D half space by a virtual surface: the full-space tables deviate %.3e from the exact half-space Is "
+			  "(the free-surface part); the dynamic phases use the exact Is (and In) for the static part\n",dev));
+  PetscCheck(fd->mirror3 || fd->surf3 || (dev <= 5.0*fd->gate_tol),PETSC_COMM_WORLD,PETSC_ERR_USER,
 	     "rsf_fd_setup: 3-D static limit deviates %.3e from the assembled Is: convention mismatch (a sign flip gives 2)",dev);
   PetscFunctionReturn(PETSC_SUCCESS);
 }

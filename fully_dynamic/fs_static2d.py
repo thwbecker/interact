@@ -74,15 +74,24 @@ def segments(x0, y0, ang, L, n):
     X = np.array([[x0, y0]]) + ((np.arange(n) + 0.5)*h)[:, None]*s[None, :]
     return X, s, h/2
 
-def run(dip_deg=30.0, Lf=10e3, nf=20, dtop=1e3, Ls=60e3, hs=500.0, verbose=True):
+def run(dip_deg=30.0, Lf=10e3, nf=20, dtop=1e3, Ls=60e3, hs=500.0, verbose=True, image=False):
+    """image=True: the fault's mirror image across y = 0 (reflected tangent, same slip) is added as a
+    tied source, so the dislocation continues through the surface and the surface elements only
+    cancel a regular traction (test of the junction regularisation for surface-reaching faults)"""
     ang = -np.radians(dip_deg)                 # fault goes down to the right from depth dtop
     Xf, sf, af = segments(0.0, -dtop, ang, Lf, nf)
     ns = int(round(2*Ls/hs)); Xs, ss, as_ = segments(-Ls + 0.0, 0.0, 0.0, 2*Ls, ns)
     Xs[:, 0] += Lf*np.cos(ang)/2               # centre the surface patch over the fault
     # exact half plane (calibrate the convention on the full plane first)
     Tfull = np.zeros((2, nf, nf)); Thalf = np.zeros((2, nf, nf)); Tours = np.zeros((2, nf, nf))
+    Xi = Xf*np.array([1.0, -1.0]); si = sf*np.array([1.0, -1.0])            # image elements
+    def fault_stress(j, X, comp=0):
+        g = stress_global(Xf[j], sf, af, X, comp)
+        if image:
+            gi = stress_global(Xi[j], si, af, X, comp); g = tuple(a + b for a, b in zip(g, gi))
+        return g
     for j in range(nf):
-        g = stress_global(Xf[j], sf, af, Xf, 0)
+        g = fault_stress(j, Xf)
         ts, tn = traction(g, sf); Tours[0, :, j] = ts; Tours[1, :, j] = tn
         for i in range(nf):
             for ih, T in ((0, Tfull), (1, Thalf)):
@@ -99,7 +108,7 @@ def run(dip_deg=30.0, Lf=10e3, nf=20, dtop=1e3, Ls=60e3, hs=500.0, verbose=True)
             ts, tn = traction(stress_global(Xs[j], ss, as_, Xf, c), sf)
             C[0:nf, 2*j + c] = ts; C[nf:, 2*j + c] = tn
     for j in range(nf):
-        ts, tn = traction(stress_global(Xf[j], sf, af, Xs, 0), ss)
+        ts, tn = traction(fault_stress(j, Xs), ss)
         B[0::2, j] = ts; B[1::2, j] = tn
     D = np.linalg.solve(A, -B)                 # surface discontinuities cancelling the surface tractions
     Tvs = np.concatenate([Tours[0], Tours[1]]) + C @ D
@@ -107,7 +116,7 @@ def run(dip_deg=30.0, Lf=10e3, nf=20, dtop=1e3, Ls=60e3, hs=500.0, verbose=True)
     err = np.linalg.norm(Tvs - Tex)/np.linalg.norm(Tex)
     err_full = np.linalg.norm(np.concatenate([Tours[0], Tours[1]]) - Tex)/np.linalg.norm(Tex)
     if verbose:
-        print(f"dip {dip_deg} fault {Lf/1e3:g} km x{nf} top {dtop/1e3:g} km | surface +-{Ls/1e3:g} km, h {hs:g} m ({ns} el.): "
+        print(f"dip {dip_deg} fault {Lf/1e3:g} km x{nf} top {dtop/1e3:g} km{' + image' if image else ''} | surface +-{Ls/1e3:g} km, h {hs:g} m ({ns} el.): "
               f"full-plane convention check {cal:.1e}, rel. error virtual surface {err:.3e} (full plane without surface {err_full:.3e})")
     return err
 

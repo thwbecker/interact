@@ -1134,6 +1134,301 @@ Toeplitz with an iterative first-lag solve; fault-layer Toeplitz along
 strike with dense rows), checked against this dense version, then the
 rsf_solve option and BP5-FD at 2 km with and without the layer.
 
+### Free surface in 3-D, step A5: a narrow FFT-structured layer in rsf_solve (2026-10-28)
+
+Shrinking the layer. Static check (fs3d_static.py, 8 x 4 km fault of 1 km
+reaching the surface, layer elements of 500 m): a strip of only +-1 / +-2 /
++-4 km across the trace gives 1.7e-3 / 1.0e-3 / 8.1e-4 against Okada's half
+space (mirror alone 1.5e-2). The correction lives near the trace, so the
+layer is a narrow strip: a few fault elements either side, elements of
+dx/2 along and across strike.
+FFT structure (fd3d_layer_create_fft): the strip on a lattice of dx/m
+along strike; layer-layer tables 2-D Toeplitz; fault-layer tables
+Toeplitz along strike (the fault's columns every m-th lattice point, an
+offset c0 between the two lattices) with dense (fault row) x (layer row)
+blocks per wavenumber; histories as spectra; the layer's first-lag system
+solved by Jacobi with its self coefficient inside the outer fault-layer
+iteration. Equal to the dense version and to fs3d_dyn.py on the 2 x 1 km
+test to 5e-12 (fd3d_test layer with FD3D_LAYER_FFT=1, in run_tests.sh), 11
+times faster there.
+rsf_solve: -fd_layer n (half-width in fault elements; 0, the default, is
+off), -fd_layer_m (refinement, default 2), -fd_layer_margin (fault elements
+beyond the ends, default n); only for a mirrored 3-D fault (half space,
+vertical strike slip reaching the surface). The layer restarts from rest at
+each phase.
+Memory: BP5 at 2 km with -fd_layer 2: 108 x 8 layer elements of 1 km, 119
+lags, about 90 MB; estimate for BP5 at 1 km: about 0.65 GB (the
+fault-layer blocks dominate), instead of tens of GB for a full surface.
+BP5-FD first event at 2 km, mirror only against mirror plus layer
+(-fd_back_eps 0.05): phase 2791 steps over 805.7 s in both; peak slip rate
+3.814 / 3.836 m/s, mean slip 1.9378 / 1.9386 m; stations 480 (x2 = 0,
+near the surface), 244 (hypocentre), 640 (x2 = 16 km): arrivals
+identical, peak slip rates 2.026 / 2.035, 1.236 / 1.236, 3.693 / 3.686
+m/s, slip at 60 s 6.6883 / 6.6891, 6.5504 / 6.5522, 6.5160 / 6.5162 m.
+So for BP5 (vertical strike slip, constant normal stress) the mirror's
+normal-traction error changes the first event by less than 0.5 percent:
+the mirror used by BICyclE (and by default here) is adequate for BP5; the
+layer matters where the normal traction acts on friction (dipping faults,
+normal-stress coupling) and is the basis for stage B. Wall time with the
+layer 253 s against 76 s per phase (the outer iteration repeats FFTs;
+not optimised yet). QD bit-identity harness: PASS.
+
+### Free surface in 3-D, step A6: layer speed (2026-10-28)
+
+Profile of the BP5-FD first event at 2 km with -fd_layer 2: 3.6 outer
+(fault <-> layer) and 25 inner (layer Jacobi) iterations per step; time in
+the known part 62 s, fault solves 160 s, layer solves 8 s, finish 1 s
+(mirror only: 76 s in total). The repeated full fault solves dominate.
+Changes: the outer iteration stops as soon as the new layer rates would
+change the fault's known part by less than 1e-12 of the normal stress
+(the fault solve just done is then the converged one), and later fault
+solves start from the previous outer iterate. Result: 3.3 outer
+iterations, fault solves 101 s, phase wall time 173 s instead of 236 s
+(2.3 times the mirror-only run), station values unchanged (arrivals
+identical, peak slip rates and slips to the printed digits). The phase
+summary now lists the layer's iteration counts and times. (A restricted
+re-solve of only the cells near the trace was tried and dropped: with rate
+and state the state predictor couples all cells within a step, so it is
+not exact.)
+
+### Free surface for dipping faults in 3-D, step B1: prototype (2026-10-29)
+
+fs3d_dip.py: a planar fault with strike along x and dip delta (frame e1 =
+strike, e2 = up dip, e3 = normal; dipping towards -y), slip along strike or
+dip, and a full virtual surface on z = 0 with three unknowns per element
+(slip along x and y, opening) and zero traction (sxz, syz, szz) at the
+element centres; fault receivers carry the shear traction along the slip
+and the normal traction (normal-stress changes). Tada kernels for all
+three source components (L_2 by the x1 <-> x2 symmetry), rotated between
+the frames, tables cached by relative position (18,157 distinct kernels for
+an 8-element fault and 840 surface elements), marching with
+densesys.Marcher (NL), normal traction on the fault tracked.
+test_fs3d_dip.py (2 x 1 km fault of 500 m, 30 degrees, top at 500 m, dip
+slip, surface elements of 250 m over +-4 km around the fault's projection):
+- consistency: the full-space operators agree with Okada's full space to
+  1.8e-5;
+- static operators through the surface against Okada's half space: shear
+  1.5e-4 (full space 2.8e-2), normal 6.2e-3 (the full space has none:
+  error 1); with +-2 km the errors are 6.3e-4 and 2.1e-2, with 125 m
+  elements at +-2 km 6.3e-4 and 2.0e-2: the surface extent limits the
+  normal operator, not the element size (for this buried fault);
+- prescribed slip pulse, NL: equal to the full-space run before 2 top / cP;
+  at 3.5 s the shear traction of the final slip is within 2.3e-4 and the
+  normal traction within 4.8e-3 of Okada's half space (full space 0.12 for
+  shear); surface rates decay (stable, no filter).
+Next (C, stage B): the surface with three unknowns in the FFT-structured
+layer code (coplanar shear-shear 2 x 2 plus opening-normal tables;
+fault <-> surface tables for one fault component and two fault tractions),
+L_2 in C, normal-stress changes in the 3-D marcher (exact static In plus the
+surface's dynamic part), the rsf_solve half-space branch for dipping
+faults (statics from interact's Is and In, gated), checks against this
+prototype at roundoff, then spontaneous thrust and normal ruptures
+(asymmetry, resolution) and a dipping-fault benchmark (SCEC TPV10 if the
+station data are available).
+
+### Free surface for dipping faults in 3-D, step B2: C and rsf_solve (2026-10-30)
+
+C (fd3d.c): slip along the second grid axis in the kernels (fd3d_rect_ramp_tensor comp 2;
+fd3d_test kernels: 600 points, all three sources, 1.5e-8 relative) and in the
+fault-fault tables (fd3d_tab_create_c, dip slip with axis 1 along strike); the
+full virtual surface (fd3d_surf_create, fd3d_step_surf): three unknowns per surface
+element on a lattice of dx/m, surface-surface tables 2-D Toeplitz (shear-shear 2 x 2
+plus opening-normal), fault <-> surface tables Toeplitz along strike with dense
+(fault row) x (surface row) blocks for the fault's slip and its shear and normal
+traction, the outer fault-surface iteration as for the layer, normal-stress changes
+on the fault (sigma = sigma0 - tn; the exact static part from a callback), a sign
+for the marcher's slip direction. fd3d_test surf: 2 x 1 km thrust of 500 m dipping
+30 degrees, top at 500 m, 840 surface elements, prescribed slip pulse: equal to
+fs3d_dip.py to 6e-12 (shear) and 5e-12 (normal traction) over 48 steps.
+A latent bug found on the way and fixed (layer and surface): the fault->surface and
+surface->fault Toeplitz tables were filled from one loop over the union of both
+offset ranges, which can exceed the FFT length and alias; each direction is now
+filled over its own range. The earlier layer results are unaffected (their union
+fitted: 215 offsets in 256 for BP5 at 2 km; 31 in 32 for the layer test).
+Stability (fd3d_test surfstab): the surface alone, fault at rest, random initial
+rates, NL, 12 x 6 fault of 1 km dipping 30 degrees: with surface elements of dx/2
+(cS dt/hs = 1) the two shear components grow (max rate 0.5 -> 1.2e-2 after 300 steps
+here, divergent in a larger patch: a factor 10 per 100 steps); dx/1 (0.5) and dx/4
+(2) decay (dx/4: 0.5 -> 1.1e-7), dx/3 (1.5) decays slowly; the first-order scheme
+also grows at dx/2. This differs from 2-D, where NL was stable at 1 in the
+traction-free test; not understood yet. The surface default is dx/4, which also
+meets the static accuracy rule.
+rsf_solve: a planar fault in a half space that is not vertical strike slip (or any
+fault with -fd_surface 1) uses the full surface: grid axis 1 along strike, rows by
+depth, slip along strike or dip, the surface frame from the fault geometry (strike,
+up dip, sign of the slip direction relative to interact's t_strike and t_dip), the
+surface over the fault's projection plus -fd_surface_ext fault elements (default the
+fault width), the fault trace on a surface row boundary; statics from the exact Is,
+and with -calc_sigma_dot the exact static normal traction -In delta plus the
+surface's dynamic part, the normal stress handed back to QD at the phase end.
+Test: 12 x 6 km thrust of 1 km, dipping 30 degrees, top at 500 m, rate and state
+(velocity weakening interior, seeded patch), -calc_sigma_dot: with surface elements
+of dx/2 the run diverged after about 100 s (slip of kilometres, the instability
+above, amplified by the normal-stress coupling); with dx/4 (72 x 45 surface elements,
+about 214 MB) the phase runs 731 steps over 105.5 s, peak slip rate 1.5 m/s, mean
+slip 0.053 m, minimum normal stress 48.9 MPa, surface rates decaying to 4e-6 m/s.
+Without the surface (full space) the same seed gives 1.23 m/s and 0.040 m.
+QD bit-identity harness PASS; BP5-FD 2 km (mirror) unchanged.
+Next: thrust against normal faulting and a resolution check in rsf_solve, a fault
+reaching the surface, the stability question at cS dt/hs = 1, and a dipping-fault
+benchmark (TPV10-type).
+
+### Dipping faults in 3-D, step B3: surface stability band, first physics checks (2026-10-30)
+
+Stability band of the surface (fd3d_test-style random test, surface alone, NL, 12 x 6
+fault of 1 km, surface elements dx/2, varying the step): cS dt/hs = 0.8 decays (4e-5
+after 300 steps), 0.94 grows strongly (rates of order 7 after 300 steps), 1.0 grows,
+1.06 decays slowly (4e-4); 0.5 and 2.0 decay strongly, 1.5 slowly. So there is an
+unstable band for the surface's shear components at roughly 0.85 to 1.05, a genuine
+property of the scheme, not an artefact of wave fronts meeting sample times exactly.
+rsf_solve now refines the surface automatically to keep cS dt/hs >= 2 (dx/4 at the
+default CFL 0.5, dx/8 at 0.25) unless -fd_surface_m is given, and warns if a chosen
+refinement falls in 0.8 to 1.2.
+Physics checks with rsf_solve (12 x 6 km fault of 1 km dipping 30 degrees, rate and
+state with a seeded patch, -calc_sigma_dot, first dynamic phase):
+
+| case | peak slip rate | mean slip | phase length |
+|---|---|---|---|
+| full space (either sense) | 1.232 m/s | 0.040 m | 7.1 s |
+| half space, thrust, top at 500 m | 1.499 m/s | 0.053 m | 105.5 s |
+| half space, normal sense, top at 500 m | 1.254 m/s | 0.040 m | 7.9 s |
+| half space, thrust reaching the surface | 1.573 m/s | 0.056 m | 31.5 s |
+
+The free surface promotes thrust slip and hardly changes the normal sense, the
+asymmetry of the 2-D prototype and of Oglesby et al. (1998); the thrust reaching the
+surface runs stably (trace on a surface row boundary). test_fd3d_dip.sh (8 x 4 km,
+about 15 s) checks the branch is chosen, the phase is stable and thrust slip exceeds
+the full space (1.612 against 1.232 m/s, 0.1025 against 0.0901 m).
+Still to do: matching published numbers (TPV10-type, when the SCEC site is back),
+resolution studies, and understanding the band (3-D shear on a plane combines in-plane
+and antiplane behaviour; a 2-D antiplane traction-free test would be the next check).
+
+### Dipping faults in 3-D, step B4: why the surface is unstable near cS dt/hs = 1 (2026-10-30)
+
+Literature. Space-time BIEMs are known for "intermittent instabilities" that appear
+and disappear as the time step to element size ratio changes (Peirce and Siebrits
+1997, IJNME 40, with a z-transform stability analysis of time-stepping schemes for
+displacement-discontinuity boundary elements and the epsilon and half-step schemes
+designed from it; Siebrits and Peirce 1997; Birgisson, Siebrits and Peirce 1999).
+Tada and Madariaga (2001) map the 2-D stability of collocation schemes; Noda, Sato
+and Kurihara (2020) give the 2-D ranges of the NL scheme (modes II and III
+separately); Hok and Fukuyama (2011) report a growing checkerboard on their 3-D
+free-surface elements with the conventional scheme and filter it.
+Tests (all with the second-order NL scheme unless stated):
+1. 2-D traction-free random tests (stab_random.py, FD_MODE=inplane or antiplane):
+   stable at cS dt/dx = 0.5, 0.94, 1.0, 1.06 in both modes.
+2. 3-D planar fault alone, one slip component, fd3d tables (3 x 3 first-lag stencil):
+   stable at 0.5, 0.94, 1.0, 1.06, 2.0.
+3. 3-D surface alone: with the shear cross coupling (x-slip <-> y-slip) switched off,
+   a single shear component on the surface still grows at 0.94 (0.5 -> 7.6 in 400
+   steps), so the coupling between the two shear components is not the cause.
+4. The growing field is a pure checkerboard: sign changes between every neighbour
+   along strike and across (dominant wavenumber (pi, pi); fd3d_test surfstab fields).
+5. Per-mode analysis (fd3d_test surfsym writes the Fourier symbols Ks dt and W(l) of the
+   x-slip -> xz-traction tables on a grid of wavenumbers; fs3d_surf_stability.py
+   iterates the traction-free recursion of each mode and reports the growth per step):
+
+| cS dt/hs | worst NL mode, growth per step | checkerboard NL | first-order scheme |
+|---|---|---|---|
+| 0.5 | (3/8, 0) 1.009 | 0.982 | 1.019 at the checkerboard |
+| 0.8 | (3/8, 0) 1.014 | 0.991 | divergent |
+| 0.94 | checkerboard 1.049 | 1.049 | divergent |
+| 1.0 | checkerboard 1.040 | 1.040 | divergent |
+| 1.06 | (1, 3/4) 1.015 | 1.012 | divergent |
+| 1.5 | (7/8, 0) 1.031 | 0.926 | 1.050 |
+| 2.0 | 0.997 (all decay) | 0.898 | 1.049 |
+
+(periodic-lattice analysis with a 60-lag window: growth factors within about 1 percent
+of 1 are not resolved, and a finite patch radiates energy, which is why the mild values
+at 0.5 and 0.8 are not seen in the runs.)
+Reading: in 2-D each grid-scale mode is purely in-plane (mode II, along the slip) or
+purely antiplane (mode III, across it), and NL is stable for both near a ratio of 1.
+In 3-D the surface carries the checkerboard mode (pi, pi), which has no 2-D
+counterpart: its stress combines the mode II response of the neighbours along the
+slip, the mode III response of those across, and the P-wave coupling of the diagonal
+neighbours, which enters the first lag once cP dt exceeds about 1.4 hs (ratio about
+0.8). In the band 0.85 to 1.05 that combination gives the second-order recursion a
+root outside the unit circle; near 1.5 the along-slip sawtooth is marginal, and at 2
+every mode decays. The first-order scheme is unstable over most of the range, which
+is the instability Hok and Fukuyama filtered. Consequences: the default ratio of 2
+(dx/4 at CFL 0.5), the warning near 1, and the two tools for checking other
+settings. Possible later improvements, from Peirce and Siebrits: a half-step or
+epsilon-type collocation for the surface elements, which they designed to remove such
+intermittent instabilities.
+
+### Dipping faults in 3-D, step B5: cross-check of the two free-surface treatments (2026-10-31)
+
+BP5-FD first event, vertical strike-slip fault reaching the surface, the same fault
+resolution, three treatments: mirror image, mirror plus opening layer (-fd_layer 2),
+full virtual surface (-fd_surface 1, surface elements dx/4, -fd_surface_ext 2):
+
+| | 4 km: hypocentre arrival / peak / slip at 100 s | shallow station slip at 100 s | 2 km: x2 = 0 arrival / peak / slip at 60 s | x2 = 16 km |
+|---|---|---|---|---|
+| mirror | 2.31 s / 1.511 m/s / 5.42 m | 0.234 m | 15.88 s / 2.03 m/s / 6.69 m | 19.34 s / 3.69 m/s / 6.52 m |
+| mirror + layer | 2.31 / 1.510 / 5.43 | 0.225 | 15.88 / 2.04 / 6.69 | 19.34 / 3.69 / 6.52 |
+| full surface | 1.73 / 1.503 / 5.51 | 0.407 | 15.30 / 2.23 / 6.52 | 18.48 / 4.13 / 6.39 |
+
+Mirror and mirror plus layer agree (the layer completes the mirror exactly, so the
+mirror's normal-traction error is small for BP5). The full surface ruptures faster
+near the surface (0.6 to 0.9 s earlier at 2 km), with about 10 percent higher peak
+slip rates and about twice the shallow slip at 4 km, and the gap is the same at 4 and
+2 km. Tests of the causes (4 km, early part of the phase):
+- surface margin 5 instead of 2 fault elements: no change (1.73 s, 1.504 m/s, 5.50 m);
+- surface elements dx/8 instead of dx/4: hypocentre unchanged, shallow slip larger
+  still (0.43 and 0.82 m against 0.41 and 0.65): not converging towards the mirror;
+- the tables' own statics instead of Is (-fd_table_statics 1, a consistent but
+  truncated system): the mirror's arrival and peak (2.31 s, 1.513 m/s) but slip badly
+  off (5.94 m), so the exact statics are needed and are not the cause;
+- cost: 915 s of wall time per 2 km phase against 76 s for the mirror.
+Diagnosis: a fault element edge lying in the surface. In the full space that edge
+carries the dislocation's singular field, which the piecewise-constant surface elements
+must cancel; they converge slowly. Static check (fs3d_dip.py, vertical strike-slip
+2 x 1 km fault of 500 m against Okada): reaching the surface, the shear operator error
+is 6.4e-3 with 250 m surface elements and 4.0e-3 with 125 m; buried 500 m it is 1.7e-3
+with 250 m. The mirror has no such edge (fault plus image is one dislocation through
+the surface), and mirror plus layer converged to 4.5e-4 at dx/4. A tied mirror image
+of a dipping fault does not help (fs_static2d.py, image=True: 30 degree fault reaching
+the surface, 1.3e-2 at 125 m against 6.4e-3 without the image): the image makes a kink
+at the surface, which is singular again.
+Consequences: for vertical strike-slip faults use the mirror (plus layer if normal
+traction matters). The full surface is accurate for buried faults (steps B1, B2: 1e-3
+to 1e-4) and converges slowly for faults that reach the surface; its results there
+need a resolution study of the surface rows next to the trace, which needs graded
+rows (fine next to the trace only; the Toeplitz-along-strike structure allows dense
+rows of unequal width). TPV10-type benchmarks (surface-breaking normal faults) will
+test exactly this, so that is the next development before matching numbers.
+
+### Dipping faults in 3-D, step B6: independent dynamic check against the 2-D prototype (2026-10-31)
+
+Quasi-2-D comparison: a long thrust dipping 30 degrees (24 km along strike, 6 km down
+dip, 1 km squares, top at 500 m), slip weakening (0.677 / 0.525 / 0.40 m), tau0 70 MPa
+with 81.6 MPa on the bottom 2 km along the whole strike, sigma 120 MPa, full virtual
+surface (elements of 250 m, margin 2 km), NL, 6 s; the central column of the 3-D run
+against the 2-D plane-strain prototype (densesys, surface elements 250 m, same
+friction and loading), element by element, top to bottom:
+
+| | 3-D central column: slip (m) | 2-D: slip (m) | rupture times (s), identical in both |
+|---|---|---|---|
+| full space | 1.151 1.519 1.735 1.827 2.064 1.628 | 1.151 1.515 1.724 1.818 2.054 1.621 | 2.454 2.021 1.588 0.866 0.144 0.144 |
+| surface, no normal coupling | 2.168 2.481 2.651 2.622 2.667 1.987 | 2.169 2.480 2.642 2.613 2.662 1.983 | 2.454 1.876 1.588 0.866 0.144 0.144 |
+| surface, normal coupling, thrust | 2.907 3.104 3.112 2.956 2.891 2.125 | 2.907 3.104 3.108 2.955 2.884 2.122 | 2.165 1.876 1.443 0.866 0.144 0.144 |
+
+Agreement to 0.3 to 0.6 percent in slip (the remainder is the 3-D along-strike edge
+effect at 24 km) with identical rupture times, in all three cases: the free surface
+doubles the shallow slip, and the normal-stress coupling adds another third for the
+thrust. The 2-D prototype was itself checked against exact statics (tdd_coeff), the
+image solution (antiplane) and causality, so this is an independent check of the 3-D
+dipping-fault machinery (fault tables for dip slip, surface tables for three
+components, normal-stress changes) with the free surface active. A first attempt with
+the opposite slip sense in 3-D gave less slip with coupling (the normal-faulting
+sense is clamped), which is the expected asymmetry, not an error.
+fd3d_test q2d (16 km strike, 24 s) is in run_tests.sh: 1.3 percent in slip against the
+2-D reference (ref_fd3d_q2d.txt, from test_fs_dyn2d.inplane_rupture), rupture times
+equal.
+So the 3-D dipping fault with the full surface works for buried faults; the open issue
+is the convergence at the trace for faults that reach the surface (step B5), and the
+TPV10-type comparison when the data are available.
+
 ### WP7, C implementation in rsf_solve: status (2026-10-18)
 Done, each verified in the sandbox before delivery (details in
 fd_c_design.md sections 6 to 10, usage in rsf_solve_fd.md):

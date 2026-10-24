@@ -91,7 +91,7 @@ def inplane_kinematic(dip=30.0, Lf=3e3, hf=250.0, top=500.0, Ls=6e3, hs=125.0, T
         print(f"   surface slip-rate max over the last 20 % of the run {vs[int(0.8*len(vs)):].max():.2e} (peak {vs.max():.2e})")
     return early/scale, stat
 
-def inplane_rupture(dip=30.0, Lf=6e3, hf=200.0, top=400.0, Ls=8e3, hs=200.0, T=5.0, nl=True, surface_on=True, verbose=True, tag="", sense=-1.0, stagger=True):
+def inplane_rupture(dip=30.0, Lf=6e3, hf=200.0, top=400.0, Ls=8e3, hs=200.0, T=5.0, nl=True, surface_on=True, verbose=True, tag="", sense=-1.0, stagger=True, nucl=1.2e3, normal_coupling=True):
     """Spontaneous rupture (slip weakening, normal-stress coupling) on a dipping
     thrust whose top is 'top' below the surface; nucleation by overstress at the
     bottom 1.2 km. Returns final slip along the fault and diagnostics."""
@@ -118,9 +118,9 @@ def inplane_rupture(dip=30.0, Lf=6e3, hf=200.0, top=400.0, Ls=8e3, hs=200.0, T=5
     tb = time.time() - t0
     tau0 = np.zeros(d.Nc); s_along = (np.arange(nf) + 0.5)*hf
     # sense -1: thrust (the tangent points down dip, so negative slip moves the hanging wall up)
-    tau0[:nf] = sense*np.where(s_along > Lf - 1.2e3, 81.6e6, 70e6)          # nucleation at the bottom
+    tau0[:nf] = sense*np.where(s_along > Lf - nucl, 81.6e6, 70e6)            # nucleation at the bottom
     sigma0 = np.full(nf, 120e6)
-    m = ds.Marcher(d, nl=nl, tau0=tau0, sigma0=sigma0, sw=(0.677, 0.525, 0.40))
+    m = ds.Marcher(d, nl=nl, tau0=tau0, sigma0=sigma0, sw=(0.677, 0.525, 0.40), normal_coupling=normal_coupling)
     vmax_s = []; vf_hist = []
     for n in range(nsteps):
         m.step()

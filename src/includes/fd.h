@@ -38,6 +38,10 @@ struct fd_vars {
   PetscBool dim3, mirror3;
   PetscInt nl;			/* 1: second-order time marching (Noda et al. 2020) */
   PetscInt kmax3;		/* 3-D: 1 allows steps of several substeps (experimental) */
+  PetscInt layer_w, layer_m, layer_margin;	/* 3-D half space: free-surface layer (half-width and margin in fault elements, refinement) */
+  PetscInt surface_opt, surf_ext, surf_m;	/* 3-D half space: 1 forces the full virtual surface; its margin in fault elements; refinement */
+  PetscBool surf3;			/* the 3-D marcher uses the full virtual surface */
+  PetscBool surf_m_default;		/* -fd_surface_m not given: refine to keep cS dt/hs >= 2 */
   struct fd3d_tab *tab3;
   struct fd3d *f3;
   int nx3, nz3;

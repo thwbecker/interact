@@ -481,7 +481,7 @@ struct fd_ops *fd_sys_ops(struct fd_sys *s, int k)
   op->k = k;
   op->Ks = (double *)malloc(sizeof(double) * (size_t)s->N * s->N);
   op->Kn = (double *)malloc(sizeof(double) * (size_t)s->N * s->N);
-  for(i = 0; i < (size_t)s->N * s->N; i++){ op->Ks[i] = s->Ks[i] * s->dt * k; op->Kn[i] = s->Kn[i] * s->dt * k; }
+  for(i = 0; i < s->N * s->N; i++){ op->Ks[i] = s->Ks[i] * s->dt * k; op->Kn[i] = s->Kn[i] * s->dt * k; }
   for(a = 0; a < s->nsrc; a++)
     for(b = 0; b < s->nseg; b++){
       struct fd_pair *p = s->pairs[a * s->nseg + b];
@@ -500,9 +500,9 @@ struct fd_ops *fd_sys_ops(struct fd_sys *s, int k)
       free(Ws); free(Wn);
     }
   /* prune FFT round-trip noise so that the band is the physical one */
-  for(i = 0; i < (size_t)s->N * s->N; i++) if(fabs(op->Ks[i]) > amax) amax = fabs(op->Ks[i]);
+  for(i = 0; i < s->N * s->N; i++) if(fabs(op->Ks[i]) > amax) amax = fabs(op->Ks[i]);
   thr = 1e-13 * amax;
-  for(i = 0; i < (size_t)s->N * s->N; i++){ if(fabs(op->Ks[i]) <= thr) op->Ks[i] = 0.0; if(fabs(op->Kn[i]) <= thr) op->Kn[i] = 0.0; }
+  for(i = 0; i < s->N * s->N; i++){ if(fabs(op->Ks[i]) <= thr) op->Ks[i] = 0.0; if(fabs(op->Kn[i]) <= thr) op->Kn[i] = 0.0; }
   bw = fd_band_width(s->N, op->Ks, 0.0);
   op->bw = bw;
   op->ab = (double *)malloc(sizeof(double) * (size_t)(3 * bw + 1) * s->N);
@@ -684,7 +684,7 @@ static int fd_step_slipweak_nl(struct fd_sys *s, struct fd_state *st, struct fd_
   double dt = s->dt * k, t1 = st->t + dt, *Vold, *d1;
   struct fd_ops *op = fd_sys_ops_nl(s, k);
   if(!op) return -1;
-  Vold = (double *)malloc(sizeof(double) * N); d1 = (double *)malloc(sizeof(double) * N);
+  Vold = (double *)malloc(sizeof(double) * N); d1 = (double *)calloc((size_t)N, sizeof(double));      /* calloc: silences -Wmaybe-uninitialized */
   memcpy(Vold, st->V, sizeof(double) * N);
   fd_sys_static(s, st->delta, st->H, st->Hn);
   fd_sys_history(s, k + 1, st->hs, st->hn);

@@ -42,11 +42,14 @@ struct fd3d_tab {
   double _Complex *Ks_hat;      /* static stress per unit slip, Mx Mz */
   double k1[3][3];              /* first-lag kernel on the 3 x 3 stencil, [di + 1][dj + 1] */
   double ks_self;
+  int slipcomp;                 /* 1: slip along grid axis 1 (default), 2: along axis 2 */
   double *ks_off;               /* static stress per unit slip by offset, (2 nx - 1) x (2 nz - 1), [di + nx - 1][dj + nz - 1] */
   fd_fft_plan px, pz, ix, iz;   /* forward and backward 1-D plans */
   double _Complex *work;        /* Mx Mz */
 };
 struct fd3d_tab *fd3d_tab_create(int nx, int nz, double dx, double dt, double cL, double cT, double rho, int lmax);
+/* comp 2: slip along grid axis 2 (e.g. dip slip with axis 1 along strike), traction s32 */
+struct fd3d_tab *fd3d_tab_create_c(int nx, int nz, double dx, double dt, double cL, double cT, double rho, int lmax, int comp);
 void fd3d_tab_free(struct fd3d_tab *t);
 void fd3d_fft2(const struct fd3d_tab *t, double _Complex *a, int sign);   /* in place, unnormalised */
 
@@ -107,10 +110,46 @@ struct fd3d_layer {
   double *V, *Vold, *delta, *H, *tau;            /* layer opening rates, opening, known part, normal traction */
   double *hs, *hf;                               /* history rings of midpoint rates: layer (L x ns), fault (L x N) */
   double *Bss_lu; int *piv;                      /* factorised layer self operator */
+  /* FFT-structured version (fft = 1): the layer is a narrow strip on a lattice of hx = dx/m
+     along strike; layer-layer tables 2-D Toeplitz (Mx2 x My2), fault<->layer tables Toeplitz
+     along strike (Mx) with dense (fault row) x (layer row) blocks per wavenumber */
+  int fft, m, Mx, Mh, Mx2, My2, Mh2, nx, nz;
+  double c0;
+  fd_fft_plan pf, pb, pf2x, pb2x, pf2y, pb2y;
+  double _Complex *Wss2, *Kss2, *K1ss2;          /* [l][Mx2*Mh2], half spectra in y */
+  double _Complex *Wfs_h, *Kfs_h, *K1fs_h;       /* [l][k][q][j], k < Mh */
+  double _Complex *Wsf_h, *Ksf_h, *K1sf_h;       /* [l][k][j][q] */
+  double _Complex *hs2, *hsx, *hfx;              /* rings: layer 2-D, layer rows, fault rows (spectral) */
+  double self_ss;                                /* self coefficient of the first-lag layer operator */
+  long n_steps, n_outer, n_inner;                /* iteration statistics */
+  /* full surface (surf = 1, dipping faults, no mirror): three unknowns per surface element
+     (slip along x, along y, opening), zero traction (sxz, syz, szz); fault receivers carry
+     the shear traction along the slip and the normal traction (tension positive) */
+  int surf, fcomp;                               /* fcomp: 1 strike slip, 2 dip slip */
+  double dip, ytop, ztop;                        /* fault: dip, top edge line (y, z) */
+  double _Complex *T2[5][3];                     /* surface-surface: (0,0) (0,1) (1,0) (1,1) (2,2); [W lags | Ks | K1] */
+  double _Complex *Tfs[3][3];                    /* fault -> surface traction c: [k][q][j] */
+  double _Complex *Tsf[2][3][3];                 /* surface comp c -> fault traction r (0 shear, 1 normal): [k][j][q] */
+  double self_sh, self_op;                       /* first-lag self coefficients: surface shear, opening */
+  double *V3, *Vold3, *delta3, *H3;              /* surface unknowns, 3 x ns (component major) */
+  double _Complex *h2_3, *hsx3;                  /* rings: 3 components */
+  double *sig0, *tn;                             /* fault: normal stress at the phase start, normal traction change */
+  void (*static_n_fn)(void *ctx, const double *delta, double *out);   /* exact static normal traction (e.g. -In delta) */
+  int normal_coupling;                           /* 1: the fault's normal stress follows tn (default 1 in tests) */
+  void *static_n_ctx;
 };
 struct fd3d_layer *fd3d_layer_create(struct fd3d *f, double x0f, int nxs, int nys, double hx, double hy,
                                      double xs0, double ys0, int L);
 void fd3d_layer_free(struct fd3d_layer *ly);
+/* FFT version: strip of nys rows of width hx = dx/m centred on the trace (y from -nys hx/2),
+   nxs columns starting at xs0 (on the lattice relative to the fault's x0f), window L */
+struct fd3d_layer *fd3d_layer_create_fft(struct fd3d *f, double x0f, int m, int nxs, int nys, double xs0, int L);
+/* full virtual surface for a planar fault of any dip (no mirror): fault element (i, j) centred at
+   (x0f + (i + 1/2) dx, ytop - (j + 1/2) dx cos(dip), ztop - (j + 1/2) dx sin(dip)), slip fcomp
+   (1 strike, 2 dip, in the fault frame e1 = x, e2 = up dip; fsign -1 reverses the marcher's slip
+   direction); surface lattice dx/m starting at (xs0, ys0) with nxs x nys elements */
+struct fd3d_layer *fd3d_surf_create(struct fd3d *f, double x0f, double ytop, double ztop, double dip_deg, int fcomp,
+                                    int m, int nxs, int nys, double xs0, double ys0, int L, double fsign);
 int fd3d_step_layer(struct fd3d *f, const double *load);
 
 /* one step of k = 1, 2, 4, ..., 64 fine substeps (k = 1: fd3d_step); returns iterations,

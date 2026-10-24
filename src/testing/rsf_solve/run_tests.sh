@@ -37,6 +37,14 @@ tail -1 tmp_fd_dynamic/fd3d.out; [ $st -eq 0 ] || fail=1
 tail -1 tmp_fd_dynamic/fd3d.out; [ $st -eq 0 ] || fail=1
 ( cd tmp_fd_dynamic && ../bin/fd3d_test layer ../$d/ref/ref_fd3d_layer.txt > fd3d.out 2>/dev/null ); st=$?
 tail -1 tmp_fd_dynamic/fd3d.out; [ $st -eq 0 ] || fail=1
+( cd tmp_fd_dynamic && FD3D_LAYER_FFT=1 ../bin/fd3d_test layer ../$d/ref/ref_fd3d_layer.txt > fd3d.out 2>/dev/null ); st=$?
+echo "(FFT layer) $(tail -1 tmp_fd_dynamic/fd3d.out)"; [ $st -eq 0 ] || fail=1
+( cd tmp_fd_dynamic && ../bin/fd3d_test surf ../$d/ref/ref_fd3d_surf.txt > fd3d.out 2>/dev/null ); st=$?
+tail -1 tmp_fd_dynamic/fd3d.out; [ $st -eq 0 ] || fail=1
+( cd tmp_fd_dynamic && ../bin/fd3d_test surfstab 4 > fd3d.out 2>/dev/null ); st=$?
+tail -1 tmp_fd_dynamic/fd3d.out; [ $st -eq 0 ] || fail=1
+( cd tmp_fd_dynamic && ../bin/fd3d_test q2d ../$d/ref/ref_fd3d_q2d.txt > fd3d.out 2>/dev/null ); st=$?
+tail -1 tmp_fd_dynamic/fd3d.out; [ $st -eq 0 ] || fail=1
 ( cd tmp_fd_dynamic && FD3D_NL=1 ../bin/fd3d_test mirror 500 6 > fd3d.out 2>/dev/null ); st=$?
 echo "(second-order marching) $(tail -1 tmp_fd_dynamic/fd3d.out)"; [ $st -eq 0 ] || fail=1
 [ $fail -eq 0 ] && echo "rsf_solve fd tests: all PASS" || echo "rsf_solve fd tests: FAIL"

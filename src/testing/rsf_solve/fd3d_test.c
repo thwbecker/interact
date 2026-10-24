@@ -10,6 +10,7 @@
    or the two cells sharing an edge at x */
 static int near2(double x, double lo, double dx, int n, int *c)
 {
+  (void)n;
   double f = (x - lo)/dx; int k = (int)floor(f + 0.5);
   if(fabs(f - k) < 1e-9){ c[0] = k - 1; c[1] = k; return 2; }
   c[0] = (int)floor(f); return 1;
@@ -154,7 +155,8 @@ static int run_layer(const char *ref)
   struct fd3d *f = fd3d_create2(t, nzp, 1);
   FILE *fr = fopen(ref, "r");
   f->nl = 1; f->law = 0; f->mu_s = f->mu_d = 0.0; f->d0 = 1.0;
-  f->layer = fd3d_layer_create(f, -1000.0, 16, 16, 250.0, 250.0, -2000.0, -2000.0, 45);
+  if(getenv("FD3D_LAYER_FFT")) f->layer = fd3d_layer_create_fft(f, -1000.0, 2, 16, 16, -2000.0, 45);
+  else f->layer = fd3d_layer_create(f, -1000.0, 16, 16, 250.0, 250.0, -2000.0, -2000.0, 45);
   if(!f->layer || !fr){ fprintf(stderr, "layer setup or reference failed\n"); return 1; }
   vp = malloc(sizeof(double)*N); f->vpres = vp;
   for(n = 0; n < nsteps; n++){
@@ -168,10 +170,133 @@ static int run_layer(const char *ref)
     }
   }
   fclose(fr);
+  { extern double fd3d_layer_prof[4]; if(getenv("FD3D_PROF")) fprintf(stderr, "layer profile: known %.3f s, fault solves %.3f s, layer solves %.3f s, finish %.3f s\n",
+       fd3d_layer_prof[0], fd3d_layer_prof[1], fd3d_layer_prof[2], fd3d_layer_prof[3]); }
   fail = !(cnt == nsteps*N && emax <= 1e-8*smax);
   printf("fd3d_test layer: %d values, max |tau diff| %.2e of %.3e\n", cnt, emax, smax);
   printf("fd3d_test layer: %s\n", fail ? "FAIL" : "PASS");
   fd3d_free(f); fd3d_tab_free(t); free(vp);
+  return fail;
+}
+
+/* full-surface check: 2 x 1 km fault of 500 m dipping 30 degrees, top at 500 m, dip slip, a
+   24 x 35 surface of 250 m with three unknowns per element, prescribed slip rate 1 for 0.4 s,
+   NL; shear and normal traction histories against fully_dynamic/fs3d_dip.py */
+static int run_surf(const char *ref)
+{
+  double cL = 6000, cT = 3464, rho = 2670, dx = 500.0, dt = 0.5*dx/cT, *vp, es = 0.0, ss = 0.0, en = 0.0, sn = 0.0, r;
+  double dip = 30.0, ny = 35, ymid = -0.5*1000.0*cos(dip*M_PI/180.0);
+  int nx = 4, nz = 2, N = nx*nz, n, i, nsteps = (int)floor(3.5/dt + 0.5), cnt = 0, fail;
+  struct fd3d_tab *t = fd3d_tab_create_c(nx, nz, dx, dt, cL, cT, rho, 45, 2);     /* dip slip along grid axis 2 */
+  struct fd3d *f = fd3d_create(t);
+  FILE *fr = fopen(ref, "r");
+  f->nl = 1; f->law = 0; f->mu_s = f->mu_d = 0.0; f->d0 = 1.0;
+  f->layer = fd3d_surf_create(f, -1000.0, 0.0, -500.0, dip, 2, 2, 24, (int)ny, -3000.0, ymid - ny*125.0, 45, 1.0);
+  if(!f->layer || !fr){ fprintf(stderr, "surface setup or reference failed\n"); return 1; }
+  vp = malloc(sizeof(double)*N); f->vpres = vp;
+  for(n = 0; n < nsteps; n++){
+    for(i = 0; i < N; i++) vp[i] = (f->time + dt <= 0.4 + 1e-12) ? 1.0 : 0.0;
+    fd3d_step(f, NULL);
+    for(i = 0; i < N; i++){ if(fscanf(fr, "%lf", &r) != 1) break; if(fabs(f->tau[i] - r) > es) es = fabs(f->tau[i] - r); if(fabs(r) > ss) ss = fabs(r); cnt++; }
+    for(i = 0; i < N; i++){ if(fscanf(fr, "%lf", &r) != 1) break; if(fabs(f->layer->tn[i] - r) > en) en = fabs(f->layer->tn[i] - r); if(fabs(r) > sn) sn = fabs(r); cnt++; }
+  }
+  fclose(fr);
+  fail = !(cnt == 2*nsteps*N && es <= 1e-8*ss && en <= 1e-8*sn);
+  printf("fd3d_test surf: %d values, max |shear diff| %.2e of %.3e, max |normal diff| %.2e of %.3e\n", cnt, es, ss, en, sn);
+  printf("fd3d_test surf: %s\n", fail ? "FAIL" : "PASS");
+  fd3d_free(f); fd3d_tab_free(t); free(vp);
+  return fail;
+}
+
+/* stability of the virtual surface alone (fault at rest, random initial surface rates, NL):
+   the largest surface rate must decay by a factor 1e3 over 300 steps with surface elements
+   of dx/m; m = 4 (the rsf_solve default) passes, m = 2 grows (fd_plan.md) */
+static int run_surfstab(int m)
+{
+  double dx = 1000.0, dt = 0.5*dx/3464.0, dip = 30.0, c = cos(dip*M_PI/180.0), s = sin(dip*M_PI/180.0), v0 = 0.0, v1 = 0.0;
+  int nx = 12, nz = 6, mg = 4, i, n, fail;
+  double hs = dx/m, ytop = 0.5*dx*c, ztop = -750.0 + 0.5*dx*s, Wd = nz*dx*c, ys0 = ytop - Wd - mg*dx;
+  int nys, nxs = (nx + 2*mg)*m;
+  struct fd3d_tab *t = fd3d_tab_create_c(nx, nz, dx, dt, 6000.0, 3464.0, 2670.0, 50, 2);
+  struct fd3d *f = fd3d_create(t);
+  double *vp = calloc(nx*nz, sizeof(double));
+  ys0 = ytop - ceil((ytop - ys0)/hs)*hs; nys = (int)ceil((ytop + mg*dx - ys0)/hs);
+  f->nl = 1; f->law = 0; f->mu_s = f->mu_d = 0.0; f->d0 = 1.0; f->vpres = vp;
+  f->layer = fd3d_surf_create(f, -0.5*dx, ytop, ztop, dip, 2, m, nxs, nys, -0.5*dx - mg*dx, ys0, 50, 1.0);
+  srand(1);
+  for(i = 0; i < 3*f->layer->ns; i++){ f->layer->V3[i] = rand()/(double)RAND_MAX - 0.5; if(fabs(f->layer->V3[i]) > v0) v0 = fabs(f->layer->V3[i]); }
+  for(n = 0; n < 300; n++) fd3d_step(f, NULL);
+  for(i = 0; i < 3*f->layer->ns; i++) if(fabs(f->layer->V3[i]) > v1 || !isfinite(f->layer->V3[i])) v1 = isfinite(f->layer->V3[i]) ? fabs(f->layer->V3[i]) : 1e300;
+  fail = !(v1 <= 1e-3*v0);
+  printf("fd3d_test surfstab: surface elements dx/%d, max rate %.2e -> %.2e after 300 steps\n", m, v0, v1);
+  printf("fd3d_test surfstab: %s\n", fail ? "FAIL" : "PASS");
+  fd3d_free(f); fd3d_tab_free(t); free(vp);
+  return fail;
+}
+
+/* surface stability analysis data: for a surface with elements dx/m at the given CFL, write the
+   symbols of the x-slip -> xz-traction tables (Ks dt and W(l), l = 1..L) at wavenumbers
+   (i/8, j/8) of Nyquist, i = 0..8, j = 0..4, for fully_dynamic/fs3d_surf_stability.py */
+static int run_surfsym(double cfl, int m, const char *out)
+{
+  double dx = 1000.0, dt = cfl*dx/3464.0, dip = 30.0, c = cos(dip*M_PI/180.0), s = sin(dip*M_PI/180.0);
+  int nx = 12, nz = 6, mg = 4, i, j, l;
+  double hs = dx/m, ytop = 0.5*dx*c, ztop = -750.0 + 0.5*dx*s, Wd = nz*dx*c, ys0 = ytop - Wd - mg*dx;
+  int nys, nxs = (nx + 2*mg)*m, L = 60;
+  struct fd3d_tab *t = fd3d_tab_create_c(nx, nz, dx, dt, 6000.0, 3464.0, 2670.0, L, 2);
+  struct fd3d *f = fd3d_create(t);
+  struct fd3d_layer *ly;
+  FILE *fo = fopen(out, "w");
+  ys0 = ytop - ceil((ytop - ys0)/hs)*hs; nys = (int)ceil((ytop + mg*dx - ys0)/hs);
+  f->nl = 1; f->law = 0; f->mu_s = f->mu_d = 0.0; f->d0 = 1.0;
+  ly = fd3d_surf_create(f, -0.5*dx, ytop, ztop, dip, 2, m, nxs, nys, -0.5*dx - mg*dx, ys0, L, 1.0);
+  if(!ly || !fo){ fprintf(stderr, "surfsym: setup failed\n"); return 1; }
+  fprintf(fo, "# cS dt/hs %.4f, dt %.6e, eta %.6e, L %d; columns: i j Ks*dt W(1..L)  (wavenumber i/8, j/8 of Nyquist)\n", m*cfl, dt, 0.5*2670.0*3464.0, L);
+  for(i = 0; i <= 8; i++) for(j = 0; j <= 4; j++){
+    size_t pq = (size_t)((i*ly->Mx2/16) % ly->Mx2)*ly->Mh2 + (j*ly->My2/8) % ly->Mh2;
+    fprintf(fo, "%d %d %.10e", i, j, creal(ly->T2[0][1][pq])*dt);
+    for(l = 0; l < L; l++) fprintf(fo, " %.10e", creal(ly->T2[0][0][(size_t)l*ly->Mx2*ly->Mh2 + pq]));
+    fprintf(fo, "\n");
+  }
+  fclose(fo); f->layer = ly; fd3d_free(f); fd3d_tab_free(t);
+  printf("fd3d_test surfsym: wrote %s\n", out);
+  return 0;
+}
+
+/* quasi-2-D check of the dipping fault with the full surface and normal-stress coupling: a 16 km
+   long thrust dipping 30 degrees (6 km down dip, 1 km squares, top at 500 m), slip weakening,
+   nucleation on the bottom 2 km along the whole strike; the central column's final slip and
+   rupture times against the 2-D plane-strain prototype (ref_fd3d_q2d.txt), 2 percent in slip
+   (the remaining along-strike edge effect at 16 km) and one step in time */
+static int run_q2d(const char *ref)
+{
+  double dx = 1000.0, dt = 0.5*dx/3464.0, dip = 30.0, c = cos(dip*M_PI/180.0), top = 500.0, T = 6.0;
+  int nx = 16, nz = 6, N = nx*nz, i, j, n, m = 4, mg = 2, nsteps = (int)(T/dt), fail = 0, cnt = 0;
+  double hs = dx/m, ytop = 0.5*dx*c, ztop = -top, Wd = nz*dx*c, ys0 = ytop - Wd - mg*dx, emax = 0.0, tmax = 0.0;
+  int nys, nxs = (nx + 2*mg)*m, L;
+  struct fd3d_tab *t; struct fd3d *f; double *rt = malloc(sizeof(double)*N); FILE *fr = fopen(ref, "r"); char line[512];
+  ys0 = ytop - ceil((ytop - ys0)/hs)*hs; nys = (int)ceil((ytop + mg*dx - ys0)/hs);
+  L = (int)(sqrt(pow((nx + 2*mg)*dx, 2) + pow(Wd + 2*mg*dx, 2))/(3464.0*dt)) + 4;
+  t = fd3d_tab_create_c(nx, nz, dx, dt, 6000.0, 3464.0, 2670.0, L, 2); f = fd3d_create(t);
+  f->nl = 1; f->law = 0; f->mu_s = 0.677; f->mu_d = 0.525; f->d0 = 0.40;
+  for(i = 0; i < N; i++){ f->sigma[i] = 120e6; f->tau0[i] = ((i % nz) >= nz - 2) ? 81.6e6 : 70e6; rt[i] = -1.0; }   /* thrust: + slip up dip */
+  f->layer = fd3d_surf_create(f, -0.5*dx, ytop, ztop, dip, 2, m, nxs, nys, -0.5*dx - mg*dx, ys0, L, 1.0);
+  if(!f->layer || !fr){ fprintf(stderr, "q2d: setup or reference failed\n"); return 1; }
+  for(i = 0; i < N; i++) f->layer->sig0[i] = 120e6;
+  for(n = 0; n < nsteps; n++){ fd3d_step(f, NULL); for(i = 0; i < N; i++) if(rt[i] < 0 && fabs(f->V[i]) > 0.1) rt[i] = f->time; }
+  while(fgets(line, sizeof(line), fr)){
+    double sl, tr; int jj;
+    if(line[0] == '#' || sscanf(line, "%d %lf %lf", &jj, &sl, &tr) != 3) continue;
+    i = (nx/2)*nz + jj;
+    if(fabs(fabs(f->delta[i]) - sl)/sl > emax) emax = fabs(fabs(f->delta[i]) - sl)/sl;
+    if(fabs(rt[i] - tr) > tmax) tmax = fabs(rt[i] - tr);
+    cnt++;
+  }
+  fclose(fr);
+  fail = !(cnt == nz && emax <= 0.02 && tmax <= 1.01*dt);
+  printf("fd3d_test q2d: central column against the 2-D prototype: max relative slip difference %.2e, max rupture-time difference %.3f s (step %.3f s)\n", emax, tmax, dt);
+  printf("fd3d_test q2d: %s\n", fail ? "FAIL" : "PASS");
+  fd3d_free(f); fd3d_tab_free(t); free(rt);
   return fail;
 }
 
@@ -193,9 +318,11 @@ static int run_kernels(const char *ref)
     n++;
   }
   fclose(fr);
-  printf("fd3d_test kernels: %d points (slip and opening, rectangles, edge cases), max relative diff %.2e\n", n, emax);
-  printf("fd3d_test kernels: %s\n", (n > 0 && emax <= 1e-8) ? "PASS" : "FAIL");
-  return !(n > 0 && emax <= 1e-8);
+  printf("fd3d_test kernels: %d points (slip along x1 and x2, opening; rectangles, edge cases), max relative diff %.2e\n", n, emax);
+  /* 1e-7: the closed forms cancel large terms at some points; Python and C (with fused
+     multiply-add) differ at the 1e-8 level there */
+  printf("fd3d_test kernels: %s\n", (n > 0 && emax <= 1e-7) ? "PASS" : "FAIL");
+  return !(n > 0 && emax <= 1e-7);
 }
 
 int main(int argc, char **argv)
@@ -211,6 +338,10 @@ int main(int argc, char **argv)
   if(argc >= 2 && !strcmp(argv[1], "mirror")) return run_mirror(argc, argv);
   if(argc >= 3 && !strcmp(argv[1], "kernels")) return run_kernels(argv[2]);
   if(argc >= 3 && !strcmp(argv[1], "layer")) return run_layer(argv[2]);
+  if(argc >= 3 && !strcmp(argv[1], "surf")) return run_surf(argv[2]);
+  if(argc >= 2 && !strcmp(argv[1], "surfstab")) return run_surfstab(argc >= 3 ? atoi(argv[2]) : 4);
+  if(argc >= 5 && !strcmp(argv[1], "surfsym")) return run_surfsym(atof(argv[2]), atoi(argv[3]), argv[4]);
+  if(argc >= 3 && !strcmp(argv[1], "q2d")) return run_q2d(argv[2]);
   if(argc < 3 || strcmp(argv[1], "tpv3")){ fprintf(stderr, "usage: %s tpv3|tpv101 dx [ref] [tend]\n", argv[0]); return 2; }
   nx = (int)floor(30e3/dx + 0.5); nz = (int)floor(15e3/dx + 0.5); dt = 0.5*dx/cT;
   t = fd3d_tab_create(nx, nz, dx, dt, cL, cT, rho, 0);
