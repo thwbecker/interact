@@ -202,3 +202,18 @@ README_ve_thrust_relax.md.
   on a dipping plane matches the 2-D codes only with the mirrored
   moment tensor (open item, in that README); it is not a reference
   for dipping faults until resolved.
+
+## UPDATE, 2026-10-24 (appended): BP3 viscoelastic cycle sweep complete
+
+The 25 m, 15000 yr sweep of test_twod/ve_cycle_demos (dip 60 and 30,
+thrust and normal, three coupling cases, twelve Maxwell times) is
+complete and read; results and their interpretation are in
+test_twod/ve_cycle_demos/README_ve_cycle_demos.md section 2.  In one
+line: simple cycles (dip 30) change recurrence by at most a few
+percent with a smooth t_M dependence and only through the
+normal-stress channel; the near-bifurcation dip-60 cycle switches
+attractor (-5 percent thrust, -8 percent normal) for every t_M up to
+12 T with a switching time that grows linearly with t_M.  Verification
+of the machinery used: restart (bitwise), resolution (50 vs 25 m
+within a cycle), tolerance (rtol 1e-6 and dt_max unchanged),
+kernel physics vs PSGRN (0.5 percent, no gravity).
