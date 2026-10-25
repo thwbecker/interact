@@ -384,12 +384,12 @@ static int run_tpv10(double dx, double Ls, int q2d, int mg, const char *out)
    for which the discrete convolution of a piecewise-constant rate is exact), plane 1 is at
    rest; the shear and normal traction on plane 1 must equal the direct sum of the exact ramp
    responses (fd3d_rect_ramp_tensor at the normal offset W) over the sources of plane 0 */
-static int run_pair(void)
+static int run_pair(int mirror)
 {
   double cL = 6000, cT = 3464, rho = 2670, dx = 500.0, dt = 0.5*dx/cT, W = 1000.0, es = 0, ss = 0, en = 0, sn = 0, s6[6];
   int nx = 8, nz = 4, N = nx*nz, K = 4, nsteps = 40, n, i, r, q, fail;
-  struct fd3d_tab *t = fd3d_tab_create(nx, nz, dx, dt, cL, cT, rho, 0);
-  struct fd3d *f0 = fd3d_create(t), *f1 = fd3d_create(t);
+  struct fd3d_tab *t = fd3d_tab_create(nx, mirror ? 2*nz : nz, dx, dt, cL, cT, rho, 0);
+  struct fd3d *f0 = fd3d_create2(t, nz, mirror), *f1 = fd3d_create2(t, nz, mirror);
   struct fd3d_pair *pp;
   double *v0 = malloc(sizeof(double)*N), *v1 = calloc(N, sizeof(double));
   f0->nl = f1->nl = 0; f0->law = f1->law = 0; f0->mu_s = f0->mu_d = f1->mu_s = f1->mu_d = 0.0; f0->d0 = f1->d0 = 1.0;
@@ -402,13 +402,16 @@ static int run_pair(void)
     for(r = 0; r < N; r++){
       double ex_s = 0.0, ex_n = 0.0;
       for(q = 0; q < N; q++){
-        double x1 = (r/nz - q/nz)*dx, x2 = (r%nz - q%nz)*dx, sa[2] = {0, 0};
-        int k;
-        for(k = 0; k < 2; k++){                     /* ramp from 0 minus ramp from K dt */
-          double tt = n*dt - (k ? K*dt : 0.0);
-          if(tt <= 0.0) continue;
-          fd3d_rect_ramp_tensor(x1, x2, W, tt, 0.5*dx, 0.5*dx, cL, cT, rho, 1, s6);
-          sa[0] += (k ? -1.0 : 1.0)*s6[4]; sa[1] += (k ? -1.0 : 1.0)*s6[2];
+        double x1 = (r/nz - q/nz)*dx, sa[2] = {0, 0};
+        int k, im;
+        for(im = 0; im <= mirror; im++){            /* the source and (mirror) its image above the surface */
+          double x2 = im ? (r%nz + q%nz + 1)*dx : (r%nz - q%nz)*dx;
+          for(k = 0; k < 2; k++){                   /* ramp from 0 minus ramp from K dt */
+            double tt = n*dt - (k ? K*dt : 0.0);
+            if(tt <= 0.0) continue;
+            fd3d_rect_ramp_tensor(x1, x2, W, tt, 0.5*dx, 0.5*dx, cL, cT, rho, 1, s6);
+            sa[0] += (k ? -1.0 : 1.0)*s6[4]; sa[1] += (k ? -1.0 : 1.0)*s6[2];
+          }
         }
         ex_s += sa[0]; ex_n += sa[1];
       }
@@ -419,8 +422,8 @@ static int run_pair(void)
     }
   }
   fail = !(es <= 1e-8*ss && en <= 1e-8*sn && ss > 0 && sn > 0);
-  printf("fd3d_test pair: plane 1 at %g m, %d steps: max |shear diff| %.2e of %.3e, max |normal diff| %.2e of %.3e (k1 cross %.1e)\n", W, nsteps, es, ss, en, sn, pp->k1c);
-  printf("fd3d_test pair: %s\n", fail ? "FAIL" : "PASS");
+  printf("fd3d_test pair%s: plane 1 at %g m, %d steps: max |shear diff| %.2e of %.3e, max |normal diff| %.2e of %.3e (k1 cross %.1e)\n", mirror ? " (mirror)" : "", W, nsteps, es, ss, en, sn, pp->k1c);
+  printf("fd3d_test pair%s: %s\n", mirror ? " (mirror)" : "", fail ? "FAIL" : "PASS");
   fd3d_pair_free(pp); fd3d_free(f0); fd3d_free(f1); fd3d_tab_free(t); free(v0); free(v1);
   return fail;
 }
@@ -538,7 +541,7 @@ static int main0(int argc, char **argv)
   if(argc >= 2 && !strcmp(argv[1], "surfstab")) return run_surfstab(argc >= 3 ? atoi(argv[2]) : 4);
   if(argc >= 5 && !strcmp(argv[1], "surfsym")) return run_surfsym(atof(argv[2]), atoi(argv[3]), argv[4]);
   if(argc >= 3 && !strcmp(argv[1], "q2d")) return run_q2d(argv[2]);
-  if(argc >= 2 && !strcmp(argv[1], "pair")) return run_pair();
+  if(argc >= 2 && !strcmp(argv[1], "pair")) return run_pair(argc > 2 ? atoi(argv[2]) : 0);
   if(argc >= 6 && !strcmp(argv[1], "stepover")) return run_stepover(atof(argv[2]), atof(argv[3]), atof(argv[4]), atof(argv[5]), argc > 6 ? atof(argv[6]) : 0.75);
   if(argc >= 7 && !strcmp(argv[1], "tpv10")) return run_tpv10(atof(argv[2]), atof(argv[3]), atoi(argv[4]), atoi(argv[5]), argv[6]);
   if(argc < 3 || strcmp(argv[1], "tpv3")){ fprintf(stderr, "usage: %s tpv3|tpv101 dx [ref] [tend]\n", argv[0]); return 2; }

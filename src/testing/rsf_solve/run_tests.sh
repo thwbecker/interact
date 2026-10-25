@@ -47,6 +47,8 @@ tail -1 tmp_fd_dynamic/fd3d.out; [ $st -eq 0 ] || fail=1
 tail -1 tmp_fd_dynamic/fd3d.out; [ $st -eq 0 ] || fail=1
 ( cd tmp_fd_dynamic && ../bin/fd3d_test pair > fd3d.out 2>/dev/null ); st=$?
 tail -1 tmp_fd_dynamic/fd3d.out; [ $st -eq 0 ] || fail=1
+( cd tmp_fd_dynamic && ../bin/fd3d_test pair 1 > fd3d.out 2>/dev/null ); st=$?
+tail -1 tmp_fd_dynamic/fd3d.out; [ $st -eq 0 ] || fail=1
 # 3-D stepover smoke test: case-B strength, 500 m step, 500 m elements: segment 1 must rupture
 ( cd tmp_fd_dynamic && ../bin/fd3d_test stepover -500 500 12 0.25 0.645 > fd3d.out 2>/dev/null )
 if grep -q "segment 1 triggered" tmp_fd_dynamic/fd3d.out && grep -q "ruptured 2[0-9].[0-9] km (max slip 1.1" tmp_fd_dynamic/fd3d.out; then echo "fd3d_test stepover: PASS"

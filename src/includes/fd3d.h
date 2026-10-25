@@ -191,8 +191,14 @@ struct fd3d_pair {
   double W, k1c;
   fd3d_cplx *Wsh[2], *Wno[2];                    /* index q: source plane q to receiver 1 - q */
   double _Complex *Ksh[2], *Kno[2];
+  double *ks_off[2][2];                          /* static [shear, normal] per unit slip by offset (as the table's ks_off), source plane q */
   int normal_coupling;
   double *sig0[2], *tn[2];
+  /* optional exact statics: shear traction on both planes from both planes' slips (e.g. interact's
+     Is); the marchers' own static_fn are then set to return these parts */
+  void (*static_fn)(void *ctx, const double *delta0, const double *delta1, double *out0, double *out1);
+  void *static_ctx;
+  double *sbuf[2];
   /* optional exact static normal traction of plane p from both planes' slips (tension positive) */
   void (*static_n_fn)(void *ctx, int p, const double *delta_other, const double *delta_own, double *out);
   void *static_n_ctx;

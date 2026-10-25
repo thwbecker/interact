@@ -1788,6 +1788,68 @@ Checks:
 Next: two-plane faults in rsf_solve (setup from the geometry, exact Is and In for both
 planes, the hand-over), then QD against FD stepover sequences in 3-D.
 
+### 3-D stepovers, step P2: two planes in rsf_solve; the side convention (2026-10-27)
+
+rsf_fd.c, fd3d_setup_pair: a geometry whose 3-D squares lie on two parallel planes (strike
+slip) is put on one lattice along strike and by depth; cells of a plane without a patch are
+locked. Whole space, or half space by the mirror image on both planes (vertical planes
+reaching the surface; fd3d_pair now accepts mirrored marchers, receivers at the mirrored row
+offset; fd3d_test pair 1 checks it exactly, 4e-13). Exact statics for both planes:
+fd3d_pair->static_fn (interact's Is over both planes' slips, once per step; each marcher's
+static part is taken from it and the cross tables' static part is skipped) and, with
+-calc_sigma_dot, static_n_fn (-In, tension positive). fd3d_run_phase_pair steps both
+marchers (fixed fine steps, quasi-steady hand-back over both planes), combined element
+index p N + i for the record, stations and hand-back; the one-plane phase is unchanged.
+Static gates (whole space, 16 x 8 squares of 1 km per plane, 2 km apart, 4 km overlap):
+tables against Is within planes 3.4e-10, across 1.1e-11; cross normal traction against -In
+4.7e-12; with the mirror 3.8, 3.0 and 5.2 percent (the mirror's static error).
+The side convention, found by the normal gate: the kernels take slip as the motion of the
++x3 side, interact as that of the side its normal points to. Shear checks cannot see a
+mismatch (the slip and the traction both change sign), the normal traction can: the first
+gate came out at exactly 2. An Okada-against-Tada check (fs3d_static.okada_stress) confirmed
+the kernels; x3 is now measured along interact's normal. The virtual surface for dipping
+faults (step B2) uses the same rule: fsign now includes the side sign, computed in the
+surface code's own frame (a message is printed when it is -1); the dipping test geometry
+already had +1, its results are unchanged.
+test_fd3d_pair.sh (about 30 s): the whole-space gates at 1e-8 and a half-space phase on 1
+and 3 MPI ranks with identical station series.
+First sequences (two segments of 30 x 15 km, 1 km squares, 2 km apart, 5 km overlap, half
+space, a = 0.006 / b = 0.016 velocity weakening between 2 and 12 km depth, dc 0.06 m, sigma
+50 MPa, Vpl 1e-9 m/s):
+- FD with -calc_sigma_dot: 21.64 yr segment 1 alone (mean slip 1.34 m), segment 2 23 days
+  later (1.36 m); 131.56 yr segment 2 alone (1.35 m), segment 1 6 days later (1.40 m): no
+  dynamic jump at 2 km, delayed triggering instead. 5 to 8 minutes per event (2000 to 15000
+  fine steps per phase, mostly the slow tail).
+- QD with -calc_sigma_dot stops at 118 yr in the QD integrator (rsf_domain_check:
+  rejection storm), with or without -limit_sigma: a QD-side issue, not touched here.
+- QD without normal-stress evolution: pairs of events 21.75 / 21.98 yr, 118.54 / 118.82 yr,
+  215.16 / 215.39 yr (each about 0.5 m of system-mean slip, one segment at a time, 85 to 100
+  days apart).
+A like-for-like FD run without normal-stress evolution follows (step P3).
+
+### 3-D stepovers, step P3: QD against FD on the same stepover (2026-10-27)
+
+The P2 model without normal-stress evolution in both runs (-calc_sigma_dot off), stations
+at the centre of each segment (patches 231 and 681, 7.5 km down, mid strike); event times
+and coseismic slip at the stations:
+
+| | segment 1 | segment 2 | delay | recurrence |
+|---|---|---|---|---|
+| QD, cycle 1 | 21.748 yr, 2.49 m | 21.983 yr, 2.77 m | 86 days | |
+| QD, cycle 2 | 118.541 yr, 2.74 m | 118.817 yr, 3.02 m | 100 days | 96.8 yr |
+| FD, cycle 1 | 21.748 yr, 2.92 m | 21.900 yr, 3.23 m | 56 days | |
+| FD, cycle 2 | 132.581 yr, 3.19 m | 132.664 yr, 3.47 m | 29 days | 110.8 yr |
+
+(QD cycle 3: 215.155 / 215.386 yr.) In both, a 2 km stepover stops every rupture and the
+second segment fails weeks to months later by delayed triggering. Fully dynamic ruptures
+have 15 to 17 percent more slip, which lengthens the recurrence by 14 percent and shortens
+the delay before the second segment fails (56 and 29 days against 86 and 100). The FD run
+costs 70 to 220 s of wall time per dynamic phase; most of each phase is the slow tail, as
+the hand-back waits for the peak rate to fall below -fd_back_vmax (0.5 vsw) and quasi-steady
+behaviour (-fd_back_eps): the long-step solver (item 2) is the next speed item.
+Next: narrower steps (1 km and below, with 500 m elements) and the jump statistics over
+longer sequences; Newton-Krylov long steps in 3-D.
+
 ### WP7, C implementation in rsf_solve: status (2026-10-18)
 Done, each verified in the sandbox before delivery (details in
 fd_c_design.md sections 6 to 10, usage in rsf_solve_fd.md):

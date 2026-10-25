@@ -47,6 +47,9 @@ struct fd_vars {
   struct fd3d_tab *tab3;
   struct fd3d *f3;
   int nx3, nz3;
+  struct fd3d *f3b;			/* two parallel planes (stepovers): the second plane's marcher */
+  struct fd3d_pair *pair3;		/* and their coupling; NULL for one plane */
+  int n3tot;				/* marcher elements over both planes (2 nx nz) */
   Vec v3a, v3b;			/* work vectors for the exact static operator */
   VecScatter sc3, scX, scV;		/* MPI: full copies on every rank of v3b, the state, the slip rates */
   Vec v3all, Xall, Vall;

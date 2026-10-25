@@ -1817,7 +1817,7 @@ void fd3d_surf_kernel(const struct fd3d_tab *t, double dip_deg, int fcomp, int s
    source plane): shear traction along the slip and normal traction (tension positive), split
    by kx rows and built over lags in blocks as the self tables */
 static void cross_build(struct fd3d_tab *t, double x3, int comp, fd3d_cplx **Wsh, fd3d_cplx **Wno,
-                        double _Complex **Ksh, double _Complex **Kno, double *k1max)
+                        double _Complex **Ksh, double _Complex **Kno, double *k1max, double **ks_off_out)
 {
   int nx = t->nx, nz = t->nz, ox = 2*nx - 1, oz = 2*nz - 1, i, j, l, r, P = t->mpi_size, which;
   double a = 0.5*t->dx, dt = t->dt, T1, T2, rmax, s[6];
@@ -1836,6 +1836,8 @@ static void cross_build(struct fd3d_tab *t, double x3, int comp, fd3d_cplx **Wsh
     for(which = 0; which < 2; which++) A[which][(size_t)i*oz + j] = (v2[which] - v1[which])/(T2 - T1);
   }
   *Ksh = malloc(sizeof(double _Complex)*(size_t)t->Mx*t->Mz); *Kno = malloc(sizeof(double _Complex)*(size_t)t->Mx*t->Mz);
+  if(ks_off_out){ ks_off_out[0] = malloc(sizeof(double)*M2); memcpy(ks_off_out[0], A[0], sizeof(double)*M2);
+                  ks_off_out[1] = malloc(sizeof(double)*M2); memcpy(ks_off_out[1], A[1], sizeof(double)*M2); }
   put_offsets(t, A[0], *Ksh); fd3d_fft2(t, *Ksh, -1);
   put_offsets(t, A[1], *Kno); fd3d_fft2(t, *Kno, -1);
   *Wsh = malloc(sizeof(fd3d_cplx)*(size_t)t->L*t->nxr*Mh); *Wno = malloc(sizeof(fd3d_cplx)*(size_t)t->L*t->nxr*Mh);
@@ -1902,12 +1904,14 @@ struct fd3d_pair *fd3d_pair_create(struct fd3d *f0, struct fd3d *f1, double W, i
   struct fd3d_pair *pp;
   struct fd3d_tab *t = f0->t;
   double k1c[2], kself = fabs(t->k1[1][1]);
-  if(f1->t != t || f0->mirror || f1->mirror || f0->layer || f1->layer) return NULL;
+  /* both planes on the same table; with a mirror image (vertical planes reaching the free
+     surface) both carry it, the table then covering the doubled rows */
+  if(f1->t != t || f0->mirror != f1->mirror || f0->nzp != f1->nzp || f0->layer || f1->layer) return NULL;
   pp = calloc(1, sizeof(*pp));
   pp->f[0] = f0; pp->f[1] = f1; pp->W = W;
   /* receiver plane 1 at +W from source plane 0, and plane 0 at -W from plane 1 */
-  cross_build(t, W, comp, &pp->Wsh[0], &pp->Wno[0], &pp->Ksh[0], &pp->Kno[0], &k1c[0]);   /* 0 -> 1 */
-  cross_build(t, -W, comp, &pp->Wsh[1], &pp->Wno[1], &pp->Ksh[1], &pp->Kno[1], &k1c[1]);  /* 1 -> 0 */
+  cross_build(t, W, comp, &pp->Wsh[0], &pp->Wno[0], &pp->Ksh[0], &pp->Kno[0], &k1c[0], pp->ks_off[0]);   /* 0 -> 1 */
+  cross_build(t, -W, comp, &pp->Wsh[1], &pp->Wno[1], &pp->Ksh[1], &pp->Kno[1], &k1c[1], pp->ks_off[1]);  /* 1 -> 0 */
   pp->k1c = k1c[0] > k1c[1] ? k1c[0] : k1c[1];
   if(pp->k1c > 1e-6*kself){ fd3d_pair_free(pp); return NULL; }   /* the planes interact within one step: not supported */
   pp->normal_coupling = 0;
@@ -1920,7 +1924,7 @@ void fd3d_pair_free(struct fd3d_pair *pp)
 {
   int k;
   if(!pp) return;
-  for(k = 0; k < 2; k++){ free(pp->Wsh[k]); free(pp->Wno[k]); free(pp->Ksh[k]); free(pp->Kno[k]); free(pp->sig0[k]); free(pp->tn[k]); }
+  for(k = 0; k < 2; k++){ free(pp->Wsh[k]); free(pp->Wno[k]); free(pp->Ksh[k]); free(pp->Kno[k]); free(pp->sig0[k]); free(pp->tn[k]); free(pp->sbuf[k]); free(pp->ks_off[k][0]); free(pp->ks_off[k][1]); }
   free(pp);
 }
 
@@ -1930,7 +1934,7 @@ static void cross_known(struct fd3d_pair *pp, int p, double *sh, double *no)
 {
   struct fd3d *fq = pp->f[1 - p], *fp = pp->f[p];
   const struct fd3d_tab *t = fp->t;
-  int q = 1 - p, which, l, i, j, lmax = t->L < fq->nhist + 1 ? t->L : fq->nhist + 1, row0 = 0, nzp = fp->nzp;
+  int q = 1 - p, which, l, i, j, lmax = t->L < fq->nhist + 1 ? t->L : fq->nhist + 1, row0 = fp->mirror ? fp->nzp : fp->next, nzp = fp->nzp;
   size_t Mhh = (size_t)t->Mx*t->Mh, Mho = (size_t)t->nxr*t->Mh, M = (size_t)t->Mx*t->Mz, m;
   double _Complex *acc = malloc(sizeof(double _Complex)*M), *dh = NULL;
   if(!fp->static_fn){ dh = malloc(sizeof(double _Complex)*M); field_hat(fq, fq->delta, dh); }
@@ -1956,10 +1960,20 @@ static void cross_known(struct fd3d_pair *pp, int p, double *sh, double *no)
   free(acc); free(dh);
 }
 
+/* exact statics of both planes: pp->static_fn fills both outputs once per step, each marcher's
+   static_fn then returns its part (and the cross tables' static part is skipped) */
+static void pair_static_out0(void *ctx, const double *delta, double *out){ struct fd3d_pair *pp = (struct fd3d_pair *)ctx; (void)delta; memcpy(out, pp->sbuf[0], sizeof(double)*pp->f[0]->N); }
+static void pair_static_out1(void *ctx, const double *delta, double *out){ struct fd3d_pair *pp = (struct fd3d_pair *)ctx; (void)delta; memcpy(out, pp->sbuf[1], sizeof(double)*pp->f[1]->N); }
 int fd3d_pair_step(struct fd3d_pair *pp, const double *load0, const double *load1)
 {
   int p, i, it = 0;
   double *sh[2], *no[2];
+  if(pp->static_fn){
+    if(!pp->sbuf[0]){ pp->sbuf[0] = malloc(sizeof(double)*pp->f[0]->N); pp->sbuf[1] = malloc(sizeof(double)*pp->f[1]->N); }
+    pp->static_fn(pp->static_ctx, pp->f[0]->delta, pp->f[1]->delta, pp->sbuf[0], pp->sbuf[1]);
+    pp->f[0]->static_fn = pair_static_out0; pp->f[0]->static_ctx = pp;
+    pp->f[1]->static_fn = pair_static_out1; pp->f[1]->static_ctx = pp;
+  }
   step_begin(pp->f[0], load0); step_begin(pp->f[1], load1);
   for(p = 0; p < 2; p++){
     sh[p] = malloc(sizeof(double)*pp->f[p]->N); no[p] = malloc(sizeof(double)*pp->f[p]->N);

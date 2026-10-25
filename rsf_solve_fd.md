@@ -20,6 +20,11 @@ Capabilities at a glance (2026-10-25):
   second-order time marching (default) with variable substeps and an exact
   coarse history; mirror free surface for antiplane. Benchmarked against
   exact solutions, TPV205-2D, Harris-Day and SEAS BP1.
+- 3-D, two parallel planes (stepovers, strike slip): one lattice for both, whole
+  space or half space by the mirror image, exact statics (Is, and In with
+  -calc_sigma_dot) for both planes; check with
+  src/testing/rsf_solve/test_fd3d_pair.sh. The planes must be farther apart than
+  the P-wave reach of one step (about 0.9 element at the default CFL).
 - 3-D (one planar fault of squares, strike or dip slip): full space; half
   space with a mirror image for vertical strike-slip faults (BP5-FD first
   event within 0.1 s and 2 percent of BICyclE), an optional opening layer
