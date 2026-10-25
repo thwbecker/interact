@@ -41,6 +41,8 @@ struct fd_vars {
   PetscInt layer_w, layer_m, layer_margin;	/* 3-D half space: free-surface layer (half-width and margin in fault elements, refinement) */
   PetscInt surface_opt, surf_ext, surf_m;	/* 3-D half space: 1 forces the full virtual surface; its margin in fault elements; refinement */
   PetscBool surf3;			/* the 3-D marcher uses the full virtual surface */
+  PetscInt surf_grade;		/* 1 (default): surface rows fine next to the trace, widening outwards */
+  PetscInt surf_extend, next3;	/* extension rows above the surface (-1: 1 if the fault reaches the surface, else 0) */
   PetscBool surf_m_default;		/* -fd_surface_m not given: refine to keep cS dt/hs >= 2 */
   struct fd3d_tab *tab3;
   struct fd3d *f3;

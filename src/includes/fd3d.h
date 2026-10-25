@@ -76,6 +76,7 @@ struct fd3d {
   /* 0: piecewise-constant slip rate, end-of-step collocation (first order);
      1: second-order marching after Noda, Sato and Kurihara (2020): midpoint slip
      rates in the history, tau = H + (K1 + eta I)(V_old + V)/2 - eta V, trapezoid slip */
+  int next;                     /* extension rows above the top row (surface-breaking faults), 0: none */
   int nl;
   /* operators for steps of k = 2^ik substeps (fd3d_step_k), built on first use */
   double _Complex *kop_B[8], *kop_C[8];
@@ -93,6 +94,8 @@ struct fd3d {
 struct fd3d *fd3d_create(struct fd3d_tab *t);
 /* mirror = 1: the tables were built for 2 nzp rows, see struct fd3d */
 struct fd3d *fd3d_create2(struct fd3d_tab *t, int nzp, int mirror);
+/* next > 0: the fault plane continues above the top row by next rows tied to row 0 (table nzp + next rows) */
+struct fd3d *fd3d_create3(struct fd3d_tab *t, int nzp, int mirror, int next);
 void fd3d_free(struct fd3d *f);
 /* one fine step with an optional extra load (Pa, N values, may be NULL); returns Jacobi iterations */
 int fd3d_step(struct fd3d *f, const double *load);
@@ -127,7 +130,8 @@ struct fd3d_layer {
      the shear traction along the slip and the normal traction (tension positive) */
   int surf, fcomp;                               /* fcomp: 1 strike slip, 2 dip slip */
   double dip, ytop, ztop;                        /* fault: dip, top edge line (y, z) */
-  double _Complex *T2[5][3];                     /* surface-surface: (0,0) (0,1) (1,0) (1,1) (2,2); [W lags | Ks | K1] */
+  double _Complex *T2[5][3];                     /* surface-surface: (0,0) (0,1) (1,0) (1,1) (2,2); [W lags | Ks | K1]; [k][q'][q] */
+  double *yc, *wy, *self_c;                      /* row centres and widths; first-lag self coefficients [comp][row] */
   double _Complex *Tfs[3][3];                    /* fault -> surface traction c: [k][q][j] */
   double _Complex *Tsf[2][3][3];                 /* surface comp c -> fault traction r (0 shear, 1 normal): [k][j][q] */
   double self_sh, self_op;                       /* first-lag self coefficients: surface shear, opening */
@@ -150,6 +154,9 @@ struct fd3d_layer *fd3d_layer_create_fft(struct fd3d *f, double x0f, int m, int 
    direction); surface lattice dx/m starting at (xs0, ys0) with nxs x nys elements */
 struct fd3d_layer *fd3d_surf_create(struct fd3d *f, double x0f, double ytop, double ztop, double dip_deg, int fcomp,
                                     int m, int nxs, int nys, double xs0, double ys0, int L, double fsign);
+/* the same with rows of given centres yc[q] and widths wy[q] (graded rows, e.g. fine next to the trace) */
+struct fd3d_layer *fd3d_surf_create_rows(struct fd3d *f, double x0f, double ytop, double ztop, double dip_deg, int fcomp,
+                                         int m, int nxs, int nys, double xs0, const double *yc, const double *wy, int L, double fsign);
 int fd3d_step_layer(struct fd3d *f, const double *load);
 
 /* one step of k = 1, 2, 4, ..., 64 fine substeps (k = 1: fd3d_step); returns iterations,

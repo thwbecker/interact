@@ -173,7 +173,10 @@ zero traction. With `-calc_sigma_dot` the fault's normal stress follows the exac
 static In plus the surface's dynamic part. This is new and tested on small
 problems only (see fd_plan.md, steps B2 and B3). The surface's shear modes are
 unstable for cS dt/hs between about 0.85 and 1.05; by default the surface is refined
-to keep cS dt/hs >= 2 (dx/4 at the default CFL). Check with
+to keep cS dt/hs >= 2 (dx/4 at the default CFL). Rows are graded by default
+(`-fd_surface_grade 1`): widths of at most half the distance to the fault, from
+dx/m near the trace up to dx far away. A fault whose top edge lies in the surface
+continues one row above it (`-fd_surface_extend`, tied to the top row). Check with
 src/testing/rsf_solve/test_fd3d_dip.sh. For faults that reach the surface the full
 surface converges slowly at the trace (fd_plan.md, step B5); for vertical strike-slip
 faults the mirror image is exact there and should be used. `-fd_table_statics 1`

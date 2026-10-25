@@ -271,7 +271,7 @@ static int run_surfsym(double cfl, int m, const char *out)
 static int run_q2d(const char *ref)
 {
   double dx = 1000.0, dt = 0.5*dx/3464.0, dip = 30.0, c = cos(dip*M_PI/180.0), top = 500.0, T = 6.0;
-  int nx = 16, nz = 6, N = nx*nz, i, j, n, m = 4, mg = 2, nsteps = (int)(T/dt), fail = 0, cnt = 0;
+  int nx = 16, nz = 6, N = nx*nz, i, n, m = 4, mg = 2, nsteps = (int)(T/dt), fail = 0, cnt = 0;
   double hs = dx/m, ytop = 0.5*dx*c, ztop = -top, Wd = nz*dx*c, ys0 = ytop - Wd - mg*dx, emax = 0.0, tmax = 0.0;
   int nys, nxs = (nx + 2*mg)*m, L;
   struct fd3d_tab *t; struct fd3d *f; double *rt = malloc(sizeof(double)*N); FILE *fr = fopen(ref, "r"); char line[512];

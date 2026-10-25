@@ -1429,6 +1429,42 @@ So the 3-D dipping fault with the full surface works for buried faults; the open
 is the convergence at the trace for faults that reach the surface (step B5), and the
 TPV10-type comparison when the data are available.
 
+### Dipping faults in 3-D, step B7: graded surface rows, fault-plane extension (2026-10-25)
+
+Graded rows (fd3d_surf_create_rows): the surface-surface tables are Toeplitz along
+strike with dense (row, row) blocks, so rows can have any widths; uniform rows are
+detected and their blocks computed once per row offset. rsf_solve builds the rows
+(-fd_surface_grade 1, default) with widths of at most half the distance from the surface
+point to the nearest part of the fault's cross-section (vertical depth over the
+projection, distance to the top or bottom edge line outside it), powers of two times
+dx/m between dx/m and dx, at most doubling from row to row. A first version graded by
+distance from the trace alone was wrong for dipping faults: on the quasi-2-D buried
+thrust it put 1 km rows over a fault 0.5 to 3 km below the surface and the top element's
+slip came out 5 percent low (2.763 against 2.906 m) with a shifted rupture time; with
+the distance rule the regression thrust (test_fd3d_dip.sh) gives 1.609 m/s and
+0.1024 m with 17 graded rows against 1.612 m/s and 0.1025 m with 30 uniform rows.
+Extension rows (fd3d_create3, -fd_surface_extend, default 1 when the fault's top edge
+lies in the surface): the fault plane continues above the surface by rows whose slip
+rate copies the top row, with the mirror image's mechanism (table rows nz + next, the
+extension in the first-lag stencil and self coefficient, and as a tied source in the
+fault-to-surface tables), so the dislocation crosses the surface without an edge. 2-D
+static test (fs_static2d.py, 30 degree fault reaching the surface): error 7.8e-2 /
+2.4e-2 / 2.6e-3 for surface elements of 500 / 250 / 125 m against 1.5e-1 / 4.2e-2 /
+6.4e-3 without it.
+BP5 at 4 km (early phase, hypocentre slip at 100 s / shallow station slip at 100 s):
+mirror 5.42 / 0.23 m; uniform surface rows dx/4 5.51 / 0.41; distance-graded rows with
+the extension 5.51 / 0.43 (rows of 1 and 2 km, 139 MB instead of 187 MB). The trace
+error of a surface-breaking fault is therefore not removed by the extension or by
+finer surface rows at the fault's resolution of 4 km; it shrank between 4 and 2 km
+(step B5), so it is governed by the fault element size at the trace.
+State after this step: buried dipping faults validated; surface-breaking dipping
+faults need a fault-resolution study at the trace (and the TPV10 data) before numbers
+can be matched. QD harness, run_tests.sh (12 checks), test_fd_sequence.sh,
+test_fd3d_gate.sh, test_fd3d_dip.sh: PASS.
+Sandbox note: the sandbox was reset on 2026-10-24 and rebuilt from SANDBOX.md (PETSc
+3.25.5 from the pip sdist, the sandbox makefile configuration); the graded-row code
+written just before the reset was re-implemented.
+
 ### WP7, C implementation in rsf_solve: status (2026-10-18)
 Done, each verified in the sandbox before delivery (details in
 fd_c_design.md sections 6 to 10, usage in rsf_solve_fd.md):

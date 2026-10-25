@@ -277,7 +277,9 @@ void rsf_print_help(const char *prog)
   fprintf(stderr,"                          strike-slip fault) uses a full virtual free surface (three unknowns\n");
   fprintf(stderr,"                          per surface element); -fd_surface_m (default 4: elements of dx/4),\n");
   fprintf(stderr,"                          -fd_surface_ext (margin in fault elements, default the fault width);\n");
-  fprintf(stderr,"                          normal-stress changes need -calc_sigma_dot (exact static In)\n");
+  fprintf(stderr,"                          normal-stress changes need -calc_sigma_dot (exact static In);\n");
+  fprintf(stderr,"                          -fd_surface_grade <0|1> rows graded by distance to the fault (default 1);\n");
+  fprintf(stderr,"                          -fd_surface_extend <n> rows continuing the plane above the surface\n");
   fprintf(stderr,"  -fd_coarse <0|1>        long steps (kmax substeps) start at multiples of kmax and,\n");
   fprintf(stderr,"                          once a window holds only such steps, the history is summed\n");
   fprintf(stderr,"                          over aligned blocks (exact, kmax times cheaper; default 1)\n");

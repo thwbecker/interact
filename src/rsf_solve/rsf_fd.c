@@ -121,7 +121,9 @@ PetscErrorCode rsf_fd_setup(struct interact_ctx *par, PetscReal shear_modulus_si
   fd->layer_w = 0; fd->layer_m = 2; fd->layer_margin = -1; fd->surface_opt = 0; fd->surf_ext = -1;
   PetscCall(PetscOptionsGetInt(NULL,NULL,"-fd_surface",&fd->surface_opt,NULL));
   PetscCall(PetscOptionsGetInt(NULL,NULL,"-fd_surface_ext",&fd->surf_ext,NULL));
-  fd->surf_m = 4;
+  fd->surf_m = 4; fd->surf_grade = 1; fd->surf_extend = -1;
+  PetscCall(PetscOptionsGetInt(NULL,NULL,"-fd_surface_extend",&fd->surf_extend,NULL));
+  PetscCall(PetscOptionsGetInt(NULL,NULL,"-fd_surface_grade",&fd->surf_grade,NULL));
   {
     PetscBool set = PETSC_FALSE;
     PetscCall(PetscOptionsGetInt(NULL,NULL,"-fd_surface_m",&fd->surf_m,&set));
@@ -443,9 +445,13 @@ PetscErrorCode fd3d_setup_from_geometry(struct interact_ctx *par, struct fd_vars
   PetscCall(PetscFree(cnt)); PetscCall(PetscFree2(pa,pb));
   fd->dt_min = fd->cfl*dx/fd->beta;
   fd->nx3 = nx; fd->nz3 = nz;
-  if(fd->surf3)
-    fd->tab3 = fd3d_tab_create_c(nx,nz,dx,fd->dt_min,fd->alpha,fd->beta,fd->rho,(int)fd->lmax,(rsf->slip_mode == STRIKE) ? 1 : 2);
-  else
+  if(fd->surf3){
+    /* a fault whose top edge lies in the surface continues above it by next rows tied to the
+       top row (fd_plan.md B7): the table has nz + next rows */
+    double sind0 = fabs(e2[2]), zc0 = fault[fd->g_of_s[0]].x[INT_Z]*ls, ztop0 = zc0 + 0.5*dx*sind0;
+    fd->next3 = (fd->surf_extend >= 0) ? (int)fd->surf_extend : ((fabs(ztop0) < 1e-6*dx) ? 1 : 0);
+    fd->tab3 = fd3d_tab_create_c(nx,nz + fd->next3,dx,fd->dt_min,fd->alpha,fd->beta,fd->rho,(int)fd->lmax,(rsf->slip_mode == STRIKE) ? 1 : 2);
+  }else
     fd->tab3 = fd3d_tab_create(nx,fd->mirror3 ? 2*nz : nz,dx,fd->dt_min,fd->alpha,fd->beta,fd->rho,(int)fd->lmax);
   PetscCheck(fd->tab3,PETSC_COMM_WORLD,PETSC_ERR_MEM,"rsf_fd_setup: 3-D table allocation failed");
   /* static gate: Is(receiver, source) against the offset table, skipping the
@@ -469,7 +475,7 @@ PetscErrorCode fd3d_setup_from_geometry(struct interact_ctx *par, struct fd_vars
   }
   PetscCall(PetscFree(s_of_g));
   dev = sqrt(dev/(nrm + 1e-300));
-  fd->f3 = fd3d_create2(fd->tab3,nz,fd->mirror3 ? 1 : 0);
+  fd->f3 = fd->surf3 ? fd3d_create3(fd->tab3,nz,0,fd->next3) : fd3d_create2(fd->tab3,nz,fd->mirror3 ? 1 : 0);
   PetscCheck(fd->f3,PETSC_COMM_WORLD,PETSC_ERR_MEM,"rsf_fd_setup: 3-D marcher allocation failed");
   fd->f3->law = 1; fd->f3->f0 = rsf->f0; fd->f3->V0 = rsf->v0;
   fd->f3->nl = (int)fd->nl;
@@ -518,15 +524,51 @@ PetscErrorCode fd3d_setup_from_geometry(struct interact_ctx *par, struct fd_vars
       cr = e1[0]*yh[1] - e1[1]*yh[0];                                  /* (x' x y') . z */
       fsign = (rsf->slip_mode == STRIKE) ? (cr > 0 ? 1.0 : -1.0) : (fault[0].t_dip[2] > 0.0 ? 1.0 : -1.0);
     }
-    fd->f3->layer = fd3d_surf_create(fd->f3,-0.5*dx,ytop,ztop,dipdeg,(rsf->slip_mode == STRIKE) ? 1 : 2,m,nxs,nys,-0.5*dx - mg*dx,ys0,Lsf,fsign);
+    if(fd->surf_grade){
+      /* graded rows: elements of dx/m within one fault element of the trace (y' = ytop), then
+         rows doubling in width (up to dx) out to the margins; all boundaries on the dx/m lattice
+         through the trace */
+      /* row width at y': no more than half the depth of the fault below that point (within the
+         fault's surface projection d = top depth + (ytop - y') tan(dip); beyond the bottom edge
+         the bottom depth; above the trace the distance from it), a power of two times dx/m
+         between dx/m and dx, growing at most by two from row to row */
+      double hx = dx/m, *yc, *wy, y, w, ylo = ytop - Wd - mg*dx, yhi = ytop + mg*dx;
+      int nr = 0, cap = 4096;
+      yc = malloc(sizeof(double)*cap); wy = malloc(sizeof(double)*cap);
+#define ROW_W(dep, wprev) do{ double wa = 0.5*(dep); if(wa > dx) wa = dx; if(wa > 2*(wprev)) wa = 2*(wprev); w = hx; while(2*w <= wa + 1e-9) w *= 2.0; }while(0)
+      /* dep: distance from the surface point to the nearest part of the fault (vertical depth over
+         the projection, distance to the top or bottom edge line outside it) */
+      /* dep: distance from the surface point (y, 0) to the fault's cross-section, the segment from
+         the top edge (ytop, ztop) to the bottom edge (ytop - Wd, ztop - nz dx sin(dip)) */
+#define SEG_DIST(yy) ({ double ay = ytop, az = ztop, by = ytop - Wd, bz = ztop - nz*dx*sind, vy = by - ay, vz = bz - az, \
+        tt = ((yy - ay)*vy + (0.0 - az)*vz)/(vy*vy + vz*vz + 1e-30); if(tt < 0) tt = 0; if(tt > 1) tt = 1; \
+        sqrt(pow(yy - (ay + tt*vy), 2) + pow(0.0 - (az + tt*vz), 2)); })
+      for(y = ytop, w = hx; y < yhi - 1e-9; ){
+        double dep = SEG_DIST(y);
+        ROW_W(dep, w); if(y + w > yhi + 1e-9) break; yc[nr] = y + 0.5*w; wy[nr++] = w; y += w;
+      }
+      for(y = ytop, w = hx; y > ylo + 1e-9; ){
+        double dep = SEG_DIST(y);
+        ROW_W(dep, w); if(y - w < ylo - 1e-9) break; yc[nr] = y - 0.5*w; wy[nr++] = w; y -= w;
+      }
+#undef SEG_DIST
+#undef ROW_W
+      { int a,b; for(a = 0; a < nr; a++) for(b = a + 1; b < nr; b++) if(yc[b] < yc[a]){ double t1 = yc[a], t2 = wy[a]; yc[a] = yc[b]; wy[a] = wy[b]; yc[b] = t1; wy[b] = t2; } }
+      nys = nr;
+      fd->f3->layer = fd3d_surf_create_rows(fd->f3,-0.5*dx,ytop,ztop,dipdeg,(rsf->slip_mode == STRIKE) ? 1 : 2,m,nxs,nys,-0.5*dx - mg*dx,yc,wy,Lsf,fsign);
+      free(yc); free(wy);
+    }else
+      fd->f3->layer = fd3d_surf_create(fd->f3,-0.5*dx,ytop,ztop,dipdeg,(rsf->slip_mode == STRIKE) ? 1 : 2,m,nxs,nys,-0.5*dx - mg*dx,ys0,Lsf,fsign);
     PetscCheck(fd->f3->layer,PETSC_COMM_WORLD,PETSC_ERR_LIB,"rsf_fd_setup: virtual surface setup failed");
     fd->f3->layer->normal_coupling = rsf->calc_sigma_dot ? 1 : 0;
     if(rsf->calc_sigma_dot){ fd->f3->layer->static_n_fn = fd3d_static_in; fd->f3->layer->static_n_ctx = (void *)par; }
     {
       struct fd3d_layer *ly = fd->f3->layer;
-      double mb = 16.0*((double)5*(ly->L + 2)*ly->Mx2*ly->Mh2 + 9.0*(ly->L + 2)*ly->Mh*ly->nys*ly->nz + 3.0*ly->L*ly->Mx2*ly->Mh2 + (double)ly->L*ly->Mh*(3*ly->nys + ly->nz))/1048576.0;
-      PetscCall(PetscPrintf(PETSC_COMM_WORLD,"rsf_fd_setup: virtual free surface: dip %.1f deg, %s slip, %d x %d surface elements of %g m (3 unknowns each), %d lags, about %.0f MB; normal-stress changes %s\n",
-			    dipdeg,(rsf->slip_mode == STRIKE) ? "strike" : "dip",ly->nxs,ly->nys,ly->hx,ly->L,mb,rsf->calc_sigma_dot ? "on (exact static In)" : "off (no -calc_sigma_dot)"));
+      double mb = 16.0*((double)5*(ly->L + 2)*ly->Mh*ly->nys*ly->nys + 9.0*(ly->L + 2)*ly->Mh*ly->nys*ly->nz + (double)ly->L*ly->Mh*(3*ly->nys + ly->nz))/1048576.0;
+      double wmin = 1e300, wmax = 0.0; int q; for(q = 0; q < ly->nys; q++){ if(ly->wy[q] < wmin) wmin = ly->wy[q]; if(ly->wy[q] > wmax) wmax = ly->wy[q]; }
+      PetscCall(PetscPrintf(PETSC_COMM_WORLD,"rsf_fd_setup: virtual free surface: dip %.1f deg, %s slip, %d columns of %g m x %d rows of %g to %g m (3 unknowns each), %d lags, about %.0f MB; normal-stress changes %s\n",
+			    dipdeg,(rsf->slip_mode == STRIKE) ? "strike" : "dip",ly->nxs,ly->hx,ly->nys,wmin,wmax,ly->L,mb,rsf->calc_sigma_dot ? "on (exact static In)" : "off (no -calc_sigma_dot)"));
+      if(fd->next3) PetscCall(PetscPrintf(PETSC_COMM_WORLD,"rsf_fd_setup: the fault reaches the surface: its plane continues %d row(s) above it, tied to the top row\n",(int)fd->next3));
     }
   }
   if(fd->mirror3 && (fd->layer_w > 0)){
