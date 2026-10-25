@@ -1,9 +1,99 @@
 # Fully dynamic extension of `rsf_solve`: plan and status
 
-Updated 2026-10-12. Replaces the earlier dated log; history is kept only
-where it explains a current choice. Science target: rupture jump
-probabilities across stepovers, comparing quasi-dynamic (QD) and fully
-dynamic (FD) sequences on identical fault systems.
+Updated 2026-10-25. Section 0 is the current summary; sections 2 and 3
+are the state of 2026-10-12 and are kept for the record; section 4 holds
+the dated work notes (newest topics first within the 3-D block). Science
+target: rupture jump probabilities across stepovers, comparing
+quasi-dynamic (QD) and fully dynamic (FD) sequences on identical fault
+systems. For how to resume the work see HANDOFF.md.
+
+## 0. Status summary (2026-10-25)
+
+### 0.1 What the code does
+
+rsf_solve runs seismic-cycle simulations as QD between events and fully
+dynamic (space-time boundary integral, inertia and waves) above a slip-rate
+threshold (-fd_mode 1), handing stress, state, slip (and normal stress
+where coupled) over in both directions. The QD path is untouched when
+-fd_mode is not set (bit identity against the master is checked by the
+harness, fully_dynamic/c_port/regress_rsf.sh, after every change).
+
+| | 2-D (in-plane and antiplane) | 3-D (planar fault, squares) |
+|---|---|---|
+| geometry | one fault or parallel segments (stepovers), one plane strain or antiplane problem | one planar fault, strike or dip slip |
+| friction | rate and state (aging law, regularized), slip weakening (tests) | the same |
+| time scheme | second-order (Noda, Sato and Kurihara 2020) default, first order optional | the same |
+| steps | variable substeps (powers of two to 64) with an exact coarse history | fixed fine steps; quasi-steady hand-back (-fd_back_eps) for speed; long steps experimental |
+| normal-stress coupling | parallel segments | from the free surface (In plus the surface's dynamic part), with -calc_sigma_dot |
+| free surface | antiplane: mirror (exact); in-plane: prototype only | vertical strike slip: mirror (exact for shear) plus optional opening layer (exact); any dip: full virtual surface |
+| statics | interact's exact operators (Is, In) | the same, gated against the tables |
+
+### 0.2 What it has been checked against
+
+- 2-D: Kostrov and self-similar cracks (exact), TPV205-2D against Dunham,
+  Harris-Day stepover cases, BP1-QD and BP1-FD against the SEAS
+  submissions, bit identity of the C code with the Python prototype.
+- Time scheme: on BP1-FD the second-order scheme converges 3 to 5 times
+  faster than the first-order one; on BP5-FD at 1 km it matches Lambert's
+  BICyclE arrivals to 0.1 s and peak slip rates to 2 percent at the same
+  step; random-perturbation stability maps for both schemes in 2-D.
+- 3-D kernels: Tada's quadrant formulas (slip along x1 and x2, opening)
+  against an independent point-source quadrature (1e-8 to 1e-11), Kelvin
+  statics, the plane-wave limits; C against Python at 600 points.
+- 3-D free surface: mirror plus opening layer converges to Okada's half
+  space (4.5e-4 at dx/4); the full virtual surface for buried dipping
+  faults against Okada statically (1e-3 to 1e-4) and against the
+  independent 2-D plane-strain prototype dynamically (0.3 to 0.6 percent
+  in slip, identical rupture times, with and without normal-stress
+  coupling, thrust and normal sense).
+- BP4-QD and BP5 setups reproduce the published first-event timing once
+  the participants' initial conditions are used (BP4) and the second-order
+  scheme is on (BP5).
+
+### 0.3 Findings worth remembering
+
+1. The first-order scheme with end-of-step collocation is stable only
+   near cS dt/dx = 0.5 in mode II; the second-order scheme is stable from
+   0.4 to at least 2 (2-D). It is the default; the only measured drawback is
+   a too-early triggering right at a stepover's jump threshold at coarse
+   resolution (Harris-Day, 100 m), where the first-order scheme happened
+   to be closer.
+2. BP4-QD was 80 yr late against the published runs because the benchmark
+   description's uniform pre-stress is not what the participants used
+   (steady state at V_init, seed 0.001 m/s); with their setup it matches.
+3. For BP5 (vertical strike slip, constant normal stress) the mirror's
+   normal-traction error changes the first event by less than 0.5 percent:
+   the mirror is adequate and 2 to 12 times cheaper than a surface.
+4. The 3-D virtual surface has an unstable checkerboard mode for
+   cS dt/hs between about 0.85 and 1.05 (a mixed-mode grid-scale mode that
+   does not exist in 2-D; per-mode analysis reproduces the band; Peirce and
+   Siebrits' "intermittent instabilities"); the code keeps the ratio at 2.
+5. For a fault whose top edge lies in the surface, the full surface
+   converges slowly at the trace: the top element's edge carries a
+   singular field that only fault refinement removes (surface refinement,
+   graded rows and a tied extension row above the surface do not); the
+   mirror has no such edge. Buried dipping faults are fine.
+6. Low-rank compression of the fault-surface tables after the along-strike
+   FFT gains little (thin blocks); the surface is kept small instead
+   (narrow strips, graded rows), 0.1 to 1.5 GB at 1 to 2 km.
+7. The 3-D long-step (variable substep) solve settles on spurious fast
+   solutions near arrested rupture edges with a damped Jacobi iteration;
+   it needs a proper nonlinear solver before 3-D sequences become cheap.
+
+### 0.4 Open items, in the order I would take them
+
+1. Surface-breaking dipping faults: a fault-resolution study at the trace
+   (quasi-2-D thrust with the top at the surface at 1 km, 500 m, 250 m
+   against the 2-D prototype), then TPV10 when the SCEC data return.
+2. A robust long-step solver in 3-D (Newton-Krylov with the FFT operator),
+   then the coarse history, so sequences on dipping faults and BP5-FD
+   sequences become affordable.
+3. Stepover ensembles in 2-D and 3-D with the second-order scheme (the
+   original goal; the WP6 work below predates the scheme change).
+4. 2-D: non-parallel segments in the C code (bends, branches), slip law
+   and flash heating; TPV101 station comparison when the data return.
+5. Speed: the surface's outer iteration (2 to 12 times a mirror run),
+   OpenMP over wavenumbers and lags.
 
 ## 1. Approach (settled)
 
@@ -34,7 +124,7 @@ phase, neither of which exists in antiplane. Known bias: infinitely deep
 faults; 2-D results are read as QD-versus-FD differences, not absolute
 probabilities.
 
-## 2. What exists and what it has been checked against
+## 2. What exists and what it has been checked against (state of 2026-10-12, kept for the record)
 
 Python prototype `fdkern` (its README has module-level detail). All items
 below are covered by tests unless marked otherwise.
@@ -68,7 +158,7 @@ grid is coarser than L_c (about 200 m) and they used artificial damping.
 Andrews (1976b) or Dunham (2007) transition lengths would settle the speed
 question; Hu et al. (2016) or Lozos et al. (2012) the stepover one.
 
-## 3. Numerical choices in force
+## 3. Numerical choices in force (2026-10-12; superseded where section 0 says so)
 
 - beta dt_min = dx / 2, end-of-step collocation (e_t = 1). This lies on
   the stability island of Tada and Madariaga (2001) for mode II and has

@@ -9,7 +9,24 @@ without the option are unchanged, bit for bit.
 
 This document gives the formulation, what it was checked against, the
 options, and the current limits. Development notes and the Python prototype
-that the C code was verified against are in `fully_dynamic/`.
+that the C code was verified against are in `fully_dynamic/` (status summary
+in `fully_dynamic/fd_plan.md`, section 0; how to resume the work in
+`fully_dynamic/HANDOFF.md`).
+
+Capabilities at a glance (2026-10-25):
+
+- 2-D (in-plane, antiplane): one fault or parallel segments with
+  normal-stress coupling; rate-and-state and slip-weakening friction;
+  second-order time marching (default) with variable substeps and an exact
+  coarse history; mirror free surface for antiplane. Benchmarked against
+  exact solutions, TPV205-2D, Harris-Day and SEAS BP1.
+- 3-D (one planar fault of squares, strike or dip slip): full space; half
+  space with a mirror image for vertical strike-slip faults (BP5-FD first
+  event within 0.1 s and 2 percent of BICyclE), an optional opening layer
+  that makes the mirror exact, and a full virtual free surface for faults of
+  any dip with normal-stress coupling (validated for buried faults; a
+  resolution-dependent error at the trace for faults that reach the
+  surface). Fixed fine steps; quasi-steady hand-back for speed.
 
 ## 1. Formulation
 
@@ -90,6 +107,22 @@ and the prototype was checked against:
 and with group 4's reference to 0.01 yr, and the FD tables' static limit
 agrees with the assembled `Is`/`In` to 1e-16 (checked at every start,
 `static gate` lines).
+
+Added since (details and numbers in `fully_dynamic/fd_plan.md`):
+
+- second-order time marching (Noda, Sato and Kurihara 2020): equal to the
+  prototype's version to 1e-10; BP1-FD converges 3 to 5 times faster than
+  with the first-order scheme; BP5-FD at 1 km matches Lambert's BICyclE
+  arrivals to 0.1 s and peak slip rates to 2 percent;
+- 3-D kernels (Tada 2006) against an independent point-source quadrature
+  to 1e-8 or better, C against Python at 600 points; TPV3 and TPV101 runs
+  (TPV101 converging at first order, no station data available yet);
+- free surface: mirror plus opening layer against Okada's half space to
+  4.5e-4; the full virtual surface for buried dipping faults against Okada
+  (1e-3 to 1e-4) and against the independent 2-D plane-strain prototype
+  (slip to 0.3 to 0.6 percent, identical rupture times, with normal-stress
+  coupling; `fd3d_test q2d`); BP4-QD and BP5 first events against the
+  published runs.
 
 ## 3. Usage
 
