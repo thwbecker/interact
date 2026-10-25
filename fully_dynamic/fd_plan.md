@@ -46,6 +46,13 @@ harness, fully_dynamic/c_port/regress_rsf.sh, after every change).
   independent 2-D plane-strain prototype dynamically (0.3 to 0.6 percent
   in slip, identical rupture times, with and without normal-stress
   coupling, thrust and normal sense).
+- SCEC TPV101 (whole space, aging law) at 100 m with the second-order
+  scheme: arrivals within 0.08 to 0.13 s, final slip within 1 percent and
+  peak slip rates within 2 percent of Dunham's MDSBI and 8 percent of
+  Kaneko's SPECFEM3D; second-order convergence from 250 to 100 m. SCEC
+  TPV10 (60 degree normal fault reaching the surface, full virtual surface)
+  converging towards SPECFEM3D at 1 km and 500 m (final surface slip within
+  2 percent at 500 m; arrivals and peaks need finer elements).
 - BP4-QD and BP5 setups reproduce the published first-event timing once
   the participants' initial conditions are used (BP4) and the second-order
   scheme is on (BP5).
@@ -1637,9 +1644,41 @@ arrival at (9, 7.5) km 6.32, 5.81, 5.51, 5.22, 5.02, 4.94 s from 300 to 75 m,
 converging at first order to about 4.74 s) extrapolates to Kaneko's 4.73 s, which
 confirms that converged solution independently. At 500 m the rupture does not
 propagate properly (the aging-law cohesive zone, a few hundred metres, is not resolved).
-Next: second-order runs at 150 and 100 m on a workstation (FD3D_NL=1 FD3D_SMALL=1
-FD3D_STFILES=1 bin/fd3d_test tpv101 100 - 15); the driver's default is still the first-order
-scheme so that the prototype reference test is unchanged.
+Dunham's MDSBI (spectral boundary integral, 100 m) series at the same three stations
+agree with SPECFEM3D: rupture 0.570 / 4.715 / 6.275 s against 0.570 / 4.730 / 6.280 s,
+final slip 7.400 / 4.939 / 3.733 m against 7.419 / 4.937 / 3.736 m, peak slip rates
+4.30 / 5.48 / 7.68 against 4.35 / 5.71 / 8.27 m/s. So the two references agree to 15 ms
+in arrival and 0.3 percent in final slip, while peak slip rates still differ by 1 to
+7 percent between them at 100 m; our comparison should judge peak rates with that in
+mind. MDSBI is the method closest to ours (a boundary integral code), so it is the
+natural reference once our resolution approaches 100 m.
+Second-order run at 100 m (Thor, 2026-10-25: FD3D_NL=1 FD3D_SMALL=1 FD3D_STFILES=1
+bin/fd3d_test tpv101 100 - 15; 390 x 240 elements, 1039 steps):
+
+| station | Kaneko / Dunham (100 m) | ours 100 m | ours 250 m |
+|---|---|---|---|
+| (0, 7.5): rupture, peak, slip at 15 s | 0.570 / 0.570 s, 4.35 / 4.30 m/s, 7.419 / 7.400 m | 0.577 s, 4.25 m/s, 7.351 m | 0.577, 4.33, 7.286 |
+| (9, 7.5) | 4.730 / 4.715 s, 5.71 / 5.48 m/s, 4.937 / 4.939 m | 4.807 s, 5.37 m/s, 4.884 m | 5.268, 3.72, 4.747 |
+| (12, 3) | 6.280 / 6.275 s, 8.27 / 7.68 m/s, 3.736 / 3.733 m | 6.409 s, 7.61 m/s, 3.706 m | 7.181, 5.02, 3.605 |
+
+At 100 m: arrivals 0.08 to 0.09 s and 0.13 s late (against 0.55 and 0.90 s at 250 m:
+the errors fall by 6 and 7 for a factor 2.5 in element size, i.e. second-order
+convergence, which would leave about 0.02 and 0.03 s at 50 m); final slip within 0.3
+to 1.1 percent of both references; peak slip rates within 1 to 2 percent of Dunham's
+MDSBI and 6 to 8 percent of SPECFEM3D (the references differ by 1 to 7 percent among
+themselves). Time series, RMS difference over 0 to 15 s relative to the reference: slip
+1.1 / 2.8 / 4.9 percent at the three stations (Dunham against Kaneko: 0.2 percent);
+slip rate 3.5 percent at the hypocentre, 57 and 83 percent at the outer stations, where
+the sharp rupture-front pulse arrives 0.10 and 0.17 s late (the best-fitting shift), so
+that misfit is mostly the arrival delay. The first-order scheme at 100 m (section WP8)
+had the (9, 7.5) arrival at 5.02 s; the second-order run's 4.81 s confirms the gain.
+The rupture-time grid (tpv101_rt.dat) shows a 43 ms asymmetry between (-9, 7.5) and
+(9, 7.5) km, from the half-element offset of the sampling points relative to the
+nucleation centre.
+Status: TPV101 is reproduced at 100 m to within about 0.1 s in arrival, 1 percent in
+slip and a few percent in peak slip rate, converging at second order; a 50 m run would
+close the remaining arrival gap. The driver's default is still the first-order scheme so
+that the prototype reference test is unchanged; use FD3D_NL=1.
 
 ### WP7, C implementation in rsf_solve: status (2026-10-18)
 Done, each verified in the sandbox before delivery (details in

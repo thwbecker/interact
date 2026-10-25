@@ -30,11 +30,17 @@ if __name__ == "__main__":
         hdr, a = read_scec(path)
         if a is None: print(f"{path}: no data (a login page?)"); continue
         loc = hdr.get("location", ""); m = re.search(r"st(-?\d+)dp(\d+)", loc)
-        st = f"st{abs(int(m.group(1))):03d}dp{m.group(2)}"
+        if m:
+            st = f"st{abs(int(m.group(1))):03d}dp{m.group(2)}"
+        else:   # "on fault -9.00 km along strike,  7.50 km down-dip" (Dunham's files)
+            m = re.search(r"(-?[\d.]+)\s*km along strike,\s*(-?[\d.]+)\s*km down-dip", loc)
+            xs, zs = round(float(m.group(1))*10), round(float(m.group(2))*10)
+            st = f"st{abs(xs):03d}dp{zs:03d}"; loc = f"faultst{xs:03d}dp{zs:03d}"
         tr, pk, sl = metrics(a[:, 0], np.abs(a[:, 1]), a[:, 2])
-        print(f"{loc:22s} {hdr.get('code','?')[:14]:14s}: rupture {tr:6.3f} s, peak {pk:6.3f} m/s, slip at 3/6/9/15 s " + " ".join(f"{x:.3f}" for x in sl))
+        who = (hdr.get('author', '?').split(',')[0].split()[-1] + ' ' + hdr.get('code', '?'))[:22]
+        print(f"{loc:20s} {who:22s}: rupture {tr:6.3f} s, peak {pk:6.3f} m/s, slip at 3/6/9/15 s " + " ".join(f"{x:.3f}" for x in sl))
         for d in args[k + 1:]:
             f = os.path.join(d, f"tpv101_{st}.dat")
             if not os.path.exists(f): continue
             b = np.loadtxt(f); tr, pk, sl = metrics(b[:, 0], np.abs(b[:, 1]), b[:, 2])
-            print(f"   {d:34s}: rupture {tr:6.3f} s, peak {pk:6.3f} m/s, slip at 3/6/9/15 s " + " ".join(f"{x:.3f}" for x in sl))
+            print(f"   {d:40s}: rupture {tr:6.3f} s, peak {pk:6.3f} m/s, slip at 3/6/9/15 s " + " ".join(f"{x:.3f}" for x in sl))
