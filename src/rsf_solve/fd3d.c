@@ -298,7 +298,7 @@ void fd3d_free(struct fd3d *f)
   if(!f) return;
   free(f->delta); free(f->V); free(f->tau); free(f->tau0); free(f->sigma); free(f->H); free(f->work);
   { int q; for(q = 0; q < 8; q++){ free(f->kop_B[q]); free(f->kop_C[q]); } }
-  free(f->Vold);
+  free(f->Vold); free(f->dpath); free(f->coh);
   if(f->layer) fd3d_layer_free(f->layer);
   free(f->hist); free(f->acc); free(f);
 }
@@ -529,10 +529,26 @@ static int step_solve_g(struct fd3d *f, const double *Hx, const double *guess, c
         double kd = f->nl ? 0.5*kdiag(f, i % f->nzp) - 0.5*eta : kdiag(f, i % f->nzp);
         if(f->law == 0){
           /* slip at the collocation time: delta + dt V (first order) or delta + dt (V_old + V)/2 */
-          double d0s = f->delta[i] + (f->nl ? 0.5*dt*Vold[i] : 0.0), dm = fabs(d0s);
+          /* slip distance: net slip, or (path = 1) the accumulated slip path (TPV10: backward motion
+             adds to it); strength c + mu max(sigma, 0) (TPV10: tension acts as zero normal stress) */
+          double dm = f->path ? f->dpath[i] + (f->nl ? 0.5*dt*fabs(Vold[i]) : 0.0) : fabs(f->delta[i] + (f->nl ? 0.5*dt*Vold[i] : 0.0));
+          double sg = f->sigma[i] > 0.0 ? f->sigma[i] : 0.0, coh = f->coh ? f->coh[i] : 0.0;
           double mu = dm < f->d0 ? f->mu_s - (f->mu_s - f->mu_d)*dm/f->d0 : f->mu_d;
-          double slope = dm < f->d0 ? f->sigma[i]*(f->mu_s - f->mu_d)*hw*dt/f->d0 : 0.0;
-          Vn[i] = local_sw(f, i, Hp, kd, f->sigma[i]*mu, slope);
+          double slope = dm < f->d0 ? sg*(f->mu_s - f->mu_d)*hw*dt/f->d0 : 0.0;
+          Vn[i] = local_sw(f, i, Hp, kd, coh + sg*mu, slope);
+          if(slope > 0.0){
+            /* the strength falls linearly with |V| only until the slip distance reaches d0 (at
+               |V| = vc); beyond, it stays at the dynamic level. If the step weakens faster than
+               the radiation term can balance (-kd <= slope; the linearised solve is then ill posed),
+               or (sw_saturate = 1) the solution passes vc, take the saturated branch (exact for the
+               piecewise-linear strength; the prototype and the earlier tests use the linearised
+               solve, so the second case is optional) */
+            double vc = (f->d0 - dm)/(hw*dt), sd = coh + sg*f->mu_d;
+            if(-kd - slope <= 0.0 || (f->sw_saturate && fabs(Vn[i]) > vc)){
+              double vs = (fabs(Hp) > sd) ? (fabs(Hp) - sd)/(-kd) : 0.0;
+              if(fabs(Hp) > coh + sg*mu) Vn[i] = sgn(Hp)*(vs > vc ? vs : vc);
+            }
+          }
         }else
           Vn[i] = local_rs(f, i, Hp, kd, th_p[i], V[i]);
         if(fabs(Vn[i] - V[i]) > ch) ch = fabs(Vn[i] - V[i]);
@@ -567,11 +583,13 @@ static void step_end(struct fd3d *f)
     }
     fd3d_push(f, Vm);
     for(i = 0; i < N; i++) f->delta[i] += Vm[i]*dt;
+    if(f->path) for(i = 0; i < N; i++) f->dpath[i] += 0.5*(fabs(Vold[i]) + fabs(f->V[i]))*dt;
     free(Vm);
   }else{
     for(i = 0; i < N; i++) f->tau[i] = f->H[i] + f->work[i] + kdiag(f, i % f->nzp)*f->V[i];
     fd3d_push(f, f->V);
     for(i = 0; i < N; i++) f->delta[i] += f->V[i]*dt;
+    if(f->path) for(i = 0; i < N; i++) f->dpath[i] += fabs(f->V[i])*dt;
   }
   f->time += dt;
 }

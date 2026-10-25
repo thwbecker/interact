@@ -1555,6 +1555,92 @@ Sandbox note: the sandbox was reset on 2026-10-24 and rebuilt from SANDBOX.md (P
 3.25.5 from the pip sdist, the sandbox makefile configuration); the graded-row code
 written just before the reset was re-implemented.
 
+### Dipping faults in 3-D, step B8: SCEC TPV10, first comparison (2026-10-25)
+
+Reference data (provided by Thor, SCEC site): Kaneko, Lapusta and Ampuero, SPECFEM3D,
+100 m elements, on-fault stations st000dp000 (surface, along-strike centre) and
+st000dp120 (12 km down dip) plus two off-fault stations; Dunham, WENORUP-2D (a 2-D,
+plane-strain version), 18.75 m, on-fault at the surface and 4.5 km down dip, off-fault
+at +-0.5 km. fully_dynamic/tpv10_compare.py reads the SCEC HTML files directly.
+Code additions (fd3d.c): slip weakening with cohesion (f->coh) and tension treated as
+zero normal stress (strength coh + mu max(sigma, 0)); weakening by the accumulated slip
+path (f->path, f->dpath; TPV10: backward motion adds to it); a saturated branch of the
+local solve for steps that weaken faster than radiation damping can balance (always on,
+it only acts where the linearised solve is ill posed) and optionally (f->sw_saturate)
+whenever the solution passes d0 within a step (exact for the piecewise-linear
+strength; off by default because the prototype references use the linearised solve).
+Driver: fd3d_test tpv10 <dx> <strike length> <q2d> <surface margin> <prefix>: the TPV10
+geometry and stresses, the full virtual surface (uniform rows, elements of dx: cS dt/hs
+= 0.5, stable), the extension row above the trace, normal-stress coupling, window from
+the geometry.
+Results (centre column; rupture time = slip rate first above 1 mm/s; slip in m):
+
+| station | reference | rupture | peak rate | slip at 5 / 8 / 12 / 15 s |
+|---|---|---|---|---|
+| surface | Kaneko 3-D, 100 m | 2.320 s | 1.760 m/s | 1.103 / 2.397 / 3.001 / 3.072 |
+| | ours 3-D, 1 km | 2.576 | 0.480 | 0.132 / 0.476 / 0.529 / 0.740 |
+| | ours 3-D, 500 m | 2.576 | 1.114 | 0.092 / 1.779 / 2.809 / 3.140 |
+| 12 km | Kaneko 3-D, 100 m | 0.005 | 6.379 | 3.756 / 4.451 / 4.857 / 4.863 |
+| | ours 3-D, 1 km | 0.152 | 6.129 | 3.728 / 3.728 / 3.980 / 4.082 |
+| | ours 3-D, 500 m | 0.076 | 5.967 | 3.296 / 3.801 / 4.370 / 4.484 |
+| surface | Dunham 2-D, 18.75 m | 2.265 | 6.390 | 3.821 / 5.367 / ... |
+| | ours quasi-2-D (nucleation along strike, 30 km), 1 km | 2.273 | 2.918 | 2.767 / 2.999 / ... |
+| 4.5 km | Dunham 2-D | 1.901 | 5.184 | 4.666 / 5.955 |
+| | ours quasi-2-D, 1 km | 1.818 | 2.712 | 4.993 / 5.160 |
+
+Reading: the machinery runs the full TPV10 problem (60 degree normal fault reaching the
+surface, tension at shallow depth, normal-stress changes from the surface) and
+converges strongly from 1 km to 500 m: final surface slip 0.74 -> 3.14 m against 3.07,
+slip at 12 km 4.08 -> 4.48 against 4.86. At 500 m the surface slip arrives later than
+in SPECFEM3D (1.8 m against 2.4 m at 8 s) and the peak slip rate is 37 percent low; the
+cohesive zone (about 1 km at mid depth, less near the hypocentre) is resolved by about
+two elements at 500 m, against ten at Kaneko's 100 m, so this is the expected
+under-resolution, not a sign error. The quasi-2-D runs reproduce Dunham's 2-D rupture
+times (2.27 against 2.27 s at the surface, 1.82 against 1.90 s at 4.5 km), but with a
+30 km strike the along-strike edges limit the slip after about 5 s, so 2-D final slip
+is not comparable; a 16 km strike (q2d16) is worse, as expected.
+Cost and limits: 500 m with the full surface is about 2.2 GB of tables and 9 minutes in
+the sandbox (7.8 outer and 72 inner iterations per step); 250 m needs a workstation
+(about 4 times the elements and twice the steps; tables of order 15 to 20 GB with the
+current dense row blocks; single-precision tables or a narrower surface would halve or
+quarter that). Next: 250 m (and 100 m if feasible) on a workstation, the off-fault
+stations, and the rupture-time contours.
+
+### 3-D, step B9: SCEC TPV101 against Kaneko et al. (2026-10-25)
+
+Reference (provided by Thor, SCEC site): Kaneko, Lapusta and Ampuero, SPECFEM3D, 100 m,
+stations st000dp075 (hypocentre), st-090dp075 and st120dp030. (Three further uploads,
+meant as Dunham's TPV101 series, were the SCEC login page; no data.)
+fully_dynamic/tpv101_compare.py reads the SCEC files; fd3d_test tpv101 now also records
+st120dp030 (the first three stations, and the prototype reference test, are unchanged)
+and with FD3D_STFILES=1 writes tpv101_<station>.dat. Whole space, FD3D_SMALL geometry,
+15 s; strike slip; rupture time at 1 mm/s; slip in m:
+
+| station | run | rupture | peak rate | slip at 3 / 6 / 9 / 15 s |
+|---|---|---|---|---|
+| st000dp075 | Kaneko 100 m | 0.570 s | 4.347 m/s | 3.674 / 5.504 / 7.312 / 7.419 |
+| | ours 250 m, first order | 0.577 | 4.110 | 3.425 / 4.599 / 6.242 / 7.250 |
+| | ours 250 m, second order | 0.577 | 4.333 | 3.511 / 4.961 / 6.890 / 7.286 |
+| | ours 500 m, second order | 0.650 | 4.558 | 3.227 / 3.774 / 3.989 / 5.248 |
+| st090dp075 (vs -090) | Kaneko 100 m | 4.730 | 5.711 | 0 / 2.360 / 4.914 / 4.937 |
+| | ours 250 m, first order | 5.810 | 2.720 | 0 / 0.186 / 3.387 / 4.651 |
+| | ours 250 m, second order | 5.268 | 3.724 | 0 / 1.427 / 4.106 / 4.747 |
+| st120dp030 | Kaneko 100 m | 6.280 | 8.274 | 0 / 0 / 3.712 / 3.736 |
+| | ours 250 m, first order | 7.975 | 4.143 | 0 / 0 / 2.076 / 3.534 |
+| | ours 250 m, second order | 7.181 | 5.024 | 0 / 0 / 3.017 / 3.605 |
+
+Reading: at 250 m the second-order scheme gives final slip within 1.8 to 4 percent of
+SPECFEM3D at all three stations, and arrivals 0.5 s (st090) and 0.9 s (st120) late
+against 1.1 and 1.7 s with the first-order scheme; peak slip rates are 35 to 40 percent
+low away from the hypocentre. The earlier first-order resolution series (section WP8:
+arrival at (9, 7.5) km 6.32, 5.81, 5.51, 5.22, 5.02, 4.94 s from 300 to 75 m,
+converging at first order to about 4.74 s) extrapolates to Kaneko's 4.73 s, which
+confirms that converged solution independently. At 500 m the rupture does not
+propagate properly (the aging-law cohesive zone, a few hundred metres, is not resolved).
+Next: second-order runs at 150 and 100 m on a workstation (FD3D_NL=1 FD3D_SMALL=1
+FD3D_STFILES=1 bin/fd3d_test tpv101 100 - 15); the driver's default is still the first-order
+scheme so that the prototype reference test is unchanged.
+
 ### WP7, C implementation in rsf_solve: status (2026-10-18)
 Done, each verified in the sandbox before delivery (details in
 fd_c_design.md sections 6 to 10, usage in rsf_solve_fd.md):

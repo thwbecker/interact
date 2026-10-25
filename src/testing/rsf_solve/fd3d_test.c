@@ -47,9 +47,11 @@ static int run_tpv101(int argc, char **argv)
   double cL = 6000, cT = 3464, rho = 2670, dx = atof(argv[2]), tend = argc > 4 ? atof(argv[4]) : 12.0, dt;
   double xlo = -21e3, ylo = -6e3, xlen = 42e3, ylen = 27e3, W = 15e3, w = 3e3, *load, *Fr, R = 3e3, T = 1.0, *rt;
   int nx, nz, i, j, n, nsteps, s, k, N;
-  const char *nm[3] = {"st000dp075", "st090dp075", "st000dp030"};
-  double sx[3] = {0, 9e3, 0}, sy[3] = {7.5e3, 7.5e3, 3e3}, *rec;
-  int sc[3][4]; double sw[3][4];
+  /* the first three stations are those of the prototype reference; st120dp030 is a SCEC station
+     (Kaneko et al.'s SPECFEM3D series) added for the external comparison */
+  const char *nm[4] = {"st000dp075", "st090dp075", "st000dp030", "st120dp030"};
+  double sx[4] = {0, 9e3, 0, 12e3}, sy[4] = {7.5e3, 7.5e3, 3e3, 3e3}, *rec;
+  int sc[4][4]; double sw[4][4];
   struct fd3d_tab *t; struct fd3d *f;
   if(getenv("FD3D_SMALL")){ xlo = -19.5e3; ylo = -4.5e3; xlen = 39e3; ylen = 24e3; }   /* 1.5 km of strengthening fault beyond the transition */
   nx = (int)floor(xlen/dx + 0.5); nz = (int)floor(ylen/dx + 0.5); dt = 0.5*dx/cT; N = nx*nz;
@@ -72,13 +74,13 @@ static int run_tpv101(int argc, char **argv)
     r2 = x*x + (y - 7.5e3)*(y - 7.5e3);
     Fr[k] = r2 < R*R ? exp(r2/(r2 - R*R)) : 0.0;
   }
-  for(s = 0; s < 3; s++){
+  for(s = 0; s < 4; s++){
     double fi = (sx[s] - xlo)/dx - 0.5, fj = (sy[s] - ylo)/dx - 0.5; int i0 = (int)floor(fi), j0 = (int)floor(fj); double wi = fi - i0, wj = fj - j0;
     sc[s][0] = i0*nz + j0; sw[s][0] = (1 - wi)*(1 - wj); sc[s][1] = (i0 + 1)*nz + j0; sw[s][1] = wi*(1 - wj);
     sc[s][2] = i0*nz + j0 + 1; sw[s][2] = (1 - wi)*wj; sc[s][3] = (i0 + 1)*nz + j0 + 1; sw[s][3] = wi*wj;
   }
   { int K = getenv("FD3D_K") ? atoi(getenv("FD3D_K")) : 1;    /* fixed substeps per step (test) */
-  nsteps = (int)floor(tend/(dt*K) + 0.5); rec = malloc(sizeof(double)*3*4*nsteps);
+  nsteps = (int)floor(tend/(dt*K) + 0.5); rec = malloc(sizeof(double)*4*4*nsteps);
   rt = malloc(sizeof(double)*N); for(k = 0; k < N; k++) rt[k] = -1.0;
   for(n = 0; n < nsteps; n++){
     double t1 = f->time + K*dt, G = (t1 > 0 && t1 < T) ? exp((t1 - T)*(t1 - T)/(t1*(t1 - 2*T))) : (t1 >= T ? 1.0 : 0.0);
@@ -86,16 +88,21 @@ static int run_tpv101(int argc, char **argv)
     if(fd3d_step_k(f, load, K) < 0){ fprintf(stderr, "fd3d_step_k failed\n"); return 1; }
     for(k = 0; k < N; k++) if(rt[k] < 0 && fabs(f->V[k]) > 1e-3) rt[k] = f->time;
     if(n % 50 == 0){ double vm = 0; for(k = 0; k < N; k++) if(fabs(f->V[k]) > vm) vm = fabs(f->V[k]); fprintf(stderr, "  t %6.3f max V %.3e\n", f->time, vm); }
-    for(s = 0; s < 3; s++){
+    for(s = 0; s < 4; s++){
       double d = 0, v = 0, ta = 0;
       for(k = 0; k < 4; k++){ d += sw[s][k]*f->delta[sc[s][k]]; v += sw[s][k]*f->V[sc[s][k]]; ta += sw[s][k]*f->tau[sc[s][k]]; }
       rec[(s*nsteps + n)*4] = f->time; rec[(s*nsteps + n)*4 + 1] = d; rec[(s*nsteps + n)*4 + 2] = v; rec[(s*nsteps + n)*4 + 3] = ta;
     }
   }
-  for(s = 0; s < 3; s++){
+  for(s = 0; s < 4; s++){
     double on = -1, pk = 0;
     for(n = 0; n < nsteps; n++){ double v = rec[(s*nsteps + n)*4 + 2]; if(on < 0 && v > 1e-3) on = rec[(s*nsteps + n)*4]; if(v > pk) pk = v; }
     printf("%s: rupture time %.3f s, peak slip rate %.3f m/s, slip %.3f m\n", nm[s], on, pk, rec[(s*nsteps + nsteps - 1)*4 + 1]);
+    if(getenv("FD3D_STFILES")){                       /* time, slip, slip rate, shear stress (MPa) */
+      char fn[64]; FILE *fs; sprintf(fn, "tpv101_%s.dat", nm[s]); fs = fopen(fn, "w");
+      for(n = 0; n < nsteps; n++) fprintf(fs, "%.6e %.6e %.6e %.6e\n", rec[(s*nsteps + n)*4], rec[(s*nsteps + n)*4 + 1], rec[(s*nsteps + n)*4 + 2], rec[(s*nsteps + n)*4 + 3]/1e6);
+      fclose(fs);
+    }
   }
   { FILE *fo = fopen("tpv101_rt.dat", "w");       /* x y rupture_time final_slip (km, s, m) */
     for(i = 0; i < nx; i++) for(j = 0; j < nz; j++)
@@ -300,6 +307,75 @@ static int run_q2d(const char *ref)
   return fail;
 }
 
+/* SCEC TPV10 (60 degree normal fault reaching the surface, slip weakening with cohesion, tension
+   as zero normal stress, slip path) with the full virtual surface, the extension row above the
+   trace and normal-stress coupling; q2d = 1 nucleates along the whole strike (a plane-strain
+   analogue for comparison with Dunham's 2-D runs). Writes <out>_st<down-dip m>.dat for the centre
+   column (time, up-dip slip, up-dip slip rate, up-dip shear stress, normal stress; SCEC signs:
+   normal stress negative in compression, slip positive up dip) at the requested down-dip
+   distances, interpolated between element centres. */
+static int run_tpv10(double dx, double Ls, int q2d, int mg, const char *out)
+{
+  double cL = 5716.0, cT = 3300.0, rho = 2700.0, dt = 0.5*dx/cT, dip = 60.0, T = 15.0;
+  double c = cos(dip*M_PI/180.0), s = sin(dip*M_PI/180.0), W = 15000.0, mus = 0.760, mud = 0.448, d0 = 0.5, coh = 0.2e6;
+  int nx = (int)(Ls/dx + 0.5), nz = (int)(W/dx + 0.5), N = nx*nz, i, j, n, m = 1, nsteps = (int)(T/dt + 0.5), q, nst = 4;
+  double ytop = 0.0, ztop = 0.0, Wd = nz*dx*c, hs = dx/m, ys0, *yc, *wy;
+  double st_dd[4] = {0.0, 4500.0, 7500.0, 12000.0};
+  int nys, nxs = (nx + 2*mg)*m, L;
+  struct fd3d_tab *t; struct fd3d *f; FILE *fo[4]; char fn[256];
+  /* surface rows: uniform hs over the projection plus mg fault elements either side, the trace on
+     a row boundary */
+  ys0 = ytop - Wd - mg*dx; nys = (int)((ytop + mg*dx - ys0)/hs + 0.5);
+  /* window: the tables vanish once the S wave has crossed the farthest pair */
+  L = (int)ceil(sqrt(pow((nx + 2*mg)*dx, 2) + pow(Wd + 2*mg*dx, 2) + pow(W*s, 2))/(cT*dt)) + 4;
+  if(L > nsteps + 2) L = nsteps + 2;
+  yc = malloc(sizeof(double)*nys); wy = malloc(sizeof(double)*nys);
+  for(q = 0; q < nys; q++){ yc[q] = ys0 + (q + 0.5)*hs; wy[q] = hs; }
+  if(getenv("TPV10_NOSURF")){ t = fd3d_tab_create_c(nx, nz, dx, dt, cL, cT, rho, L, 2); f = fd3d_create(t); }
+  else{ t = fd3d_tab_create_c(nx, nz + 1, dx, dt, cL, cT, rho, L, 2); f = fd3d_create3(t, nz, 0, 1); }
+  f->nl = 1; f->law = 0; f->mu_s = mus; f->mu_d = mud; f->d0 = d0;
+  f->coh = malloc(sizeof(double)*N); f->path = 1; f->dpath = calloc(N, sizeof(double)); f->sw_saturate = 1;
+  if(!getenv("TPV10_NOSURF")){
+    f->layer = fd3d_surf_create_rows(f, -0.5*dx, ytop, ztop, dip, 2, m, nxs, nys, -0.5*dx - mg*dx, yc, wy, L, 1.0);
+    if(!f->layer){ fprintf(stderr, "tpv10: surface setup failed\n"); return 1; }
+    if(getenv("TPV10_NONC")) f->layer->normal_coupling = 0;
+  }
+  fprintf(stderr, "tpv10: %d x %d elements of %g m, %d steps of %.4f s, surface %d x %d of %g m, %d lags\n", nx, nz, dx, nsteps, dt, nxs, nys, hs, L);
+  for(i = 0; i < nx; i++) for(j = 0; j < nz; j++){
+    int e = i*nz + j;
+    double sdd = (j + 0.5)*dx, xs = (i + 0.5)*dx - 0.5*nx*dx, sig = 7378.0*sdd, tau;
+    int nucl = (fabs(sdd - 12000.0) <= 1500.0 + 1e-6) && (q2d || fabs(xs) <= 1500.0 + 1e-6);
+    tau = nucl ? coh + (mus + 0.0057)*sig : 0.55*sig;
+    f->tau0[e] = -tau;                 /* normal faulting: the hanging wall moves down dip (negative up-dip slip here) */
+    f->sigma[e] = sig; if(f->layer) f->layer->sig0[e] = sig; f->coh[e] = coh;
+  }
+  for(q = 0; q < nst; q++){ sprintf(fn, "%s_st%05.0f.dat", out, st_dd[q]); fo[q] = fopen(fn, "w"); }
+  for(n = 0; n < nsteps; n++){
+    fd3d_step(f, NULL);
+    for(q = 0; q < nst; q++){
+      /* centre column (average of the two middle columns when nx is even), interpolated along dip */
+      double sdd = st_dd[q], jj = sdd/dx - 0.5, w1; int j0, j1, ic[2], k, ncol;
+      double v[4] = {0, 0, 0, 0};
+      if(jj < 0) jj = 0;
+      if(jj > nz - 1) jj = nz - 1;
+      j0 = (int)floor(jj); j1 = j0 + 1 < nz ? j0 + 1 : j0; w1 = jj - j0;
+      if(nx % 2 == 0){ ic[0] = nx/2 - 1; ic[1] = nx/2; ncol = 2; } else { ic[0] = nx/2; ncol = 1; }
+      for(k = 0; k < ncol; k++){
+        int e0 = ic[k]*nz + j0, e1 = ic[k]*nz + j1;
+        v[0] += ((1 - w1)*f->delta[e0] + w1*f->delta[e1])/ncol;
+        v[1] += ((1 - w1)*f->V[e0] + w1*f->V[e1])/ncol;
+        v[2] += ((1 - w1)*f->tau[e0] + w1*f->tau[e1])/ncol;
+        v[3] += ((1 - w1)*f->sigma[e0] + w1*f->sigma[e1])/ncol;
+      }
+      fprintf(fo[q], "%.6e %.6e %.6e %.6e %.6e\n", f->time, -v[0], -v[1], -v[2]/1e6, -v[3]/1e6);
+    }
+  }
+  for(q = 0; q < nst; q++) fclose(fo[q]);
+  if(f->layer) fprintf(stderr, "tpv10: done; outer/inner iterations per step %.1f / %.1f\n", (double)f->layer->n_outer/f->layer->n_steps, (double)f->layer->n_inner/f->layer->n_steps);
+  fd3d_free(f); fd3d_tab_free(t); free(yc); free(wy);
+  return 0;
+}
+
 /* kernel check: full stress tensors (slip and opening, rectangles) against tada_quad.py values */
 static int run_kernels(const char *ref)
 {
@@ -342,6 +418,7 @@ int main(int argc, char **argv)
   if(argc >= 2 && !strcmp(argv[1], "surfstab")) return run_surfstab(argc >= 3 ? atoi(argv[2]) : 4);
   if(argc >= 5 && !strcmp(argv[1], "surfsym")) return run_surfsym(atof(argv[2]), atoi(argv[3]), argv[4]);
   if(argc >= 3 && !strcmp(argv[1], "q2d")) return run_q2d(argv[2]);
+  if(argc >= 7 && !strcmp(argv[1], "tpv10")) return run_tpv10(atof(argv[2]), atof(argv[3]), atoi(argv[4]), atoi(argv[5]), argv[6]);
   if(argc < 3 || strcmp(argv[1], "tpv3")){ fprintf(stderr, "usage: %s tpv3|tpv101 dx [ref] [tend]\n", argv[0]); return 2; }
   nx = (int)floor(30e3/dx + 0.5); nz = (int)floor(15e3/dx + 0.5); dt = 0.5*dx/cT;
   t = fd3d_tab_create(nx, nz, dx, dt, cL, cT, rho, 0);
