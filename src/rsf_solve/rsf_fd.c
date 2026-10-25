@@ -118,6 +118,9 @@ PetscErrorCode rsf_fd_setup(struct interact_ctx *par, PetscReal shear_modulus_si
   PetscCall(PetscOptionsGetReal(NULL,NULL,"-fd_back_eps",&fd->back_eps,NULL));
   PetscCall(PetscOptionsGetInt(NULL,NULL,"-fd_coarse",&fd->coarse,NULL));
   PetscCall(PetscOptionsGetReal(NULL,NULL,"-fd_back_vmax",&fd->back_vmax,NULL));
+  fd->back_dyn = 0.0; fd->back_nwin = 10;
+  PetscCall(PetscOptionsGetReal(NULL,NULL,"-fd_back_dyn",&fd->back_dyn,NULL));
+  PetscCall(PetscOptionsGetInt(NULL,NULL,"-fd_back_nwin",&fd->back_nwin,NULL));
   if(fd->back_vmax <= 0.0) fd->back_vmax = 0.5*fd->vsw;
   fd->nl = 1;			/* second-order time marching (Noda et al. 2020) by default */
   fd->layer_w = 0; fd->layer_m = 2; fd->layer_margin = -1; fd->surface_opt = 0; fd->surf_ext = -1;
@@ -290,7 +293,7 @@ static PetscErrorCode fd3d_run_phase_pair(TS ts, struct interact_ctx *par, struc
   struct fd3d *fm[2] = {fd->f3, fd->f3b};
   struct fd3d_pair *pp = fd->pair3;
   PetscScalar *x;
-  int N = fd->f3->N, NT = 2*N, i, p, g, l, a, nsteps = 0, L = fd->tab3->L;
+  int N = fd->f3->N, NT = 2*N, i, p, g, l, a, nsteps = 0, L = fd->tab3->L, ndyn_quiet = 0;
   double dt = fd->tab3->dt, eta = 0.5*fd->mu/fd->beta, vmax, vpeak = 0.0, below = 0.0, slipsum = 0.0, *vtmp, *load[2], *vref, t_wall0, t_wall1;
   PetscFunctionBeginUser;
   (void)ts;
@@ -348,6 +351,19 @@ static PetscErrorCode fd3d_run_phase_pair(TS ts, struct interact_ctx *par, struc
     vmax = 0.0;
     for(p = 0;p < 2;p++) for(i = 0;i < N;i++) if(fabs(fm[p]->V[i]) > vmax) vmax = fabs(fm[p]->V[i]);
     if(vmax > vpeak) vpeak = vmax;
+    if(fd->back_dyn > 0.0 && vmax < fd->vsw && pp->static_fn){
+      /* as in fd3d_run_phase: FD traction against the QD traction of both planes */
+      double dmax = 0.0, *s0 = vtmp, *s1 = vtmp + N;
+      pp->static_fn(pp->static_ctx, fm[0]->delta, fm[1]->delta, s0, s1);
+      for(p = 0;p < 2;p++) for(i = 0;i < N;i++){
+	double qd, dd;
+	if(fm[p]->locked[i]) continue;
+	qd = fm[p]->tau0[i] + (p ? s1[i] : s0[i]) + load[p][i] - eta*fm[p]->V[i]; dd = fabs(fm[p]->tau[i] - qd);
+	if(dd > dmax) dmax = dd;
+      }
+      if(dmax < fd->back_dyn) ndyn_quiet++; else ndyn_quiet = 0;
+      if(ndyn_quiet >= fd->back_nwin) break;
+    }
     if(fd->back_eps > 0.0){
       int quiet = (vmax < fd->back_vmax);
       if(quiet && (below > 0.0))
@@ -441,7 +457,7 @@ static PetscErrorCode fd3d_run_phase(TS ts, struct interact_ctx *par, struct fd_
       for(i = 0;i < N;i++) if(fd->g_of_s[i] == fd->stat[a]) fd->sstat[a] = i;
     }
   }
-  double vprev = 0.0, *vref; int kprev = 0, nretry = 0, khist[7] = {0, 0, 0, 0, 0, 0, 0};
+  double vprev = 0.0, *vref; int kprev = 0, nretry = 0, khist[7] = {0, 0, 0, 0, 0, 0, 0}, ndyn_quiet = 0;
   PetscCall(PetscMalloc1(N,&vref));
   for(;;){
     double trel, kd, dcmin = 1e300;
@@ -481,6 +497,19 @@ static PetscErrorCode fd3d_run_phase(TS ts, struct interact_ctx *par, struct fd_
     vmax = 0.0;
     for(i = 0;i < N;i++) if(fabs(f->V[i]) > vmax) vmax = fabs(f->V[i]);
     if(vmax > vpeak) vpeak = vmax;
+    if(fd->back_dyn > 0.0 && vmax < fd->vsw && f->static_fn){
+      /* hand back once the fully dynamic traction equals the quasi-dynamic one (elastostatic
+	 interaction plus radiation damping) to within back_dyn everywhere, for back_nwin steps
+	 in a row (fd_plan.md L2): from then on the QD integrator reproduces the phase */
+      double dmax = 0.0;
+      f->static_fn(f->static_ctx, f->delta, vtmp);
+      for(i = 0;i < N;i++){
+	double qd = f->tau0[i] + vtmp[i] + load[i] - eta*f->V[i], dd = fabs(f->tau[i] - qd);
+	if(dd > dmax) dmax = dd;
+      }
+      if(dmax < fd->back_dyn) ndyn_quiet++; else ndyn_quiet = 0;
+      if(ndyn_quiet >= fd->back_nwin) break;
+    }
     if(fd->back_eps > 0.0){
       /* quasi-steady hand-back as in 2-D: every slip rate changed by less than back_eps
 	 (relative, floored at vback) over a full window, peak below back_vmax */
@@ -868,6 +897,11 @@ PetscErrorCode fd3d_setup_from_geometry(struct interact_ctx *par, struct fd_vars
     fd->f3->a[i] = fault[g].mu_sa; fd->f3->b[i] = fault[g].mu_db; fd->f3->Lc[i] = rsf->dc_vec ? rsf->dc_vec[g]*1.0 : rsf->dc;
   }
   fd->f3->static_fn = fd3d_static_is; fd->f3->static_ctx = (void *)par;
+  {
+    PetscInt nk = 0;                              /* -fd_nk 1: Newton-Krylov for long steps (fd_plan.md L1) */
+    PetscCall(PetscOptionsGetInt(NULL,NULL,"-fd_nk",&nk,NULL));
+    if(nk) fd->f3->nk = (int)nk;
+  }
   {
     PetscInt ts = 0;                              /* -fd_table_statics 1: the tables' own statics instead of Is (experiments) */
     PetscCall(PetscOptionsGetInt(NULL,NULL,"-fd_table_statics",&ts,NULL));

@@ -273,6 +273,9 @@ void rsf_print_help(const char *prog)
   fprintf(stderr,"                          the surface, +-n fault elements across the trace (default 0: off)\n");
   fprintf(stderr,"  -fd_layer_m <m>         layer elements of dx/m (default 2); -fd_layer_margin <n> beyond the\n");
   fprintf(stderr,"                          fault ends (default: as -fd_layer)\n");
+  fprintf(stderr,"  -fd_back_dyn <Pa>       3-D: hand back to QD once the fully dynamic traction equals the\n");
+  fprintf(stderr,"                          quasi-dynamic one to within this everywhere (and max V < vsw)\n");
+  fprintf(stderr,"                          for -fd_back_nwin steps (default 10); default 0: off\n");
   fprintf(stderr,"  -fd_surface <0|1>       3-D half space: a planar fault of any dip (or 1 also for a vertical\n");
   fprintf(stderr,"                          strike-slip fault) uses a full virtual free surface (three unknowns\n");
   fprintf(stderr,"                          per surface element); -fd_surface_m (default 4: elements of dx/4),\n");

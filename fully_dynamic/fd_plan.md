@@ -1850,6 +1850,39 @@ behaviour (-fd_back_eps): the long-step solver (item 2) is the next speed item.
 Next: narrower steps (1 km and below, with 500 m elements) and the jump statistics over
 longer sequences; Newton-Krylov long steps in 3-D.
 
+### Speed, steps L1 and L2: long steps by Newton-Krylov; hand-back by traction difference (2026-10-27)
+
+L1. fd3d_step_k (k = 2 .. 64 fine steps per step, rate and state) can now solve each long
+step by Newton-Krylov instead of the damped Jacobi iteration (f->nk, -fd_nk 1, FD3D_NK=1 in
+tests): F(V) = Hc + B_k V - S(V) = 0, Newton with backtracking on |F|_2, GMRES(40) with up to
+4 restarts, right-preconditioned by the local Jacobian diag(kd - S'). It converges, but on
+the BP5-FD tail at 2 km it lands, like the Jacobi iteration, on solutions whose peak rate
+jumps by more than a factor of two from a two-step start (e.g. 0.03 to 0.13 m/s at an
+arrest edge), which the step check rejects: 2661 retries in 2790 steps, the same station
+results as fixed steps (peak rates within 1 percent, slip within 1e-4 m) but 110 s instead
+of 28 s. So the obstacle to long steps in 3-D is not the linear solver: at arrest edges the
+long-step equations themselves have only the fast root (the step is longer than the local
+time scale of the velocity-weakening cells). Long steps stay off by default; -fd_nk is kept
+for experiments.
+L2. A hand-back that measures what matters (-fd_back_dyn <Pa>, -fd_back_nwin, default off):
+once the peak rate is below vsw, the fully dynamic traction is compared with the
+quasi-dynamic one, tau0 + Is delta + load - eta V (exact statics, the radiation-damping
+term of the QD formulation), and the phase ends after back_nwin steps (default 10) with
+the largest difference below back_dyn everywhere. From then on the QD integrator
+reproduces the phase. BP5-FD at 2 km, first event: with 10 kPa the phase ends at 336 s
+instead of 805 s (wall 11 s instead of 29 s), and the afterslip that follows in QD matches
+the reference at three stations to 1e-4 m (6.9335 against 6.9336 m at 3e4 s; 6.6442
+against 6.6453 m). With 1 kPa the criterion is not met before the quasi-steady test ends
+the phase (same as before). Two planes (stepover sequence of P2): with 10 kPa the dynamic
+phases take 27 to 60 s of wall time instead of 70 to 220 s; the afterslip then exceeds
+vsw again and opens short slow phases, so the total gain is about 3; the second segment
+again fails at 21.901 yr (as with the default), the second cycle starts at 132.31 instead
+of 132.58 yr (the sequence is sensitive at that level). Requiring the peak rate below
+back_vmax (0.5 vsw) as well removes the gain (504 s instead of 539 s for the first
+phase), so the criterion uses vsw.
+Recommendation for 3-D sequences: -fd_back_eps 0.05 -fd_back_dyn 1e4 (about 1 percent of
+the stress drop in these models).
+
 ### WP7, C implementation in rsf_solve: status (2026-10-18)
 Done, each verified in the sandbox before delivery (details in
 fd_c_design.md sections 6 to 10, usage in rsf_solve_fd.md):

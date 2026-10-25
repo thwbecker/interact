@@ -350,6 +350,7 @@ struct fd3d *fd3d_create3(struct fd3d_tab *t, int nzp, int mirror, int next)
   if(mirror && t->nz != 2*nzp){ free(f); return NULL; }
   if(next && (mirror || t->nz != nzp + next)){ free(f); return NULL; }
   f->nzp = nzp; f->mirror = mirror; f->next = next;
+  f->nk = getenv("FD3D_NK") ? atoi(getenv("FD3D_NK")) : 0;   /* tests; rsf_solve sets it from -fd_nk */
   {                                                /* column blocks for the local solves (MPI) */
     int r, size = t->mpi_size;
     f->ccounts = (int *)malloc(sizeof(int)*size); f->cdispls = (int *)malloc(sizeof(int)*size);
@@ -797,6 +798,117 @@ static void push_k_lin(struct fd3d *f, const double *Vold, const double *V, int 
   free(a);
 }
 
+
+/* ---------------- Newton-Krylov solve of a long step (rate and state), fd_plan.md L1 ----------------
+   F(V) = Hc + B_k V - S(V; theta_p) = 0 for all cells, S the rate-and-state strength (odd in V),
+   B_k the long-step operator (FFT convolution, self term included). Newton with backtracking on
+   |F|_2; each Newton system J d = -F, J = B_k - diag(S'), by restarted GMRES, right-preconditioned
+   with P = diag(kd - S') (the local Jacobian). Locked cells stay at zero. Returns the number of
+   Newton iterations, or -1 if not converged. */
+static void nk_resid(struct fd3d *f, int ik, const double *Hc, const double *th, const double *V, double *F, double *conv)
+{
+  int i, N = f->N;
+  kop_apply(f, f->kop_B[ik], V, conv);
+  for(i = 0; i < N; i++){
+    if(f->locked && f->locked[i]){ F[i] = 0.0; continue; }
+    F[i] = Hc[i] + conv[i] - sgn(V[i])*rs_strength(f, i, fabs(V[i]), th[i]);
+  }
+}
+static double nk_norm2(int n, const double *x){ double s = 0.0; int i; for(i = 0; i < n; i++) s += x[i]*x[i]; return sqrt(s); }
+static int nk_solve(struct fd3d *f, int ik, const double *Hc, const double *th, double *V)
+{
+  int N = f->N, i, j, it, newton, m = 40, restarts = 4;
+  double *F = malloc(sizeof(double)*N), *conv = malloc(sizeof(double)*N), *Dp = malloc(sizeof(double)*N), *Pinv = malloc(sizeof(double)*N);
+  double *d = malloc(sizeof(double)*N), *Vt = malloc(sizeof(double)*N), *Ft = malloc(sizeof(double)*N), *w = malloc(sizeof(double)*N);
+  double *Vk = malloc(sizeof(double)*(size_t)(m + 1)*N), *Hh = calloc((size_t)(m + 1)*m, sizeof(double)), *cs = malloc(sizeof(double)*m), *sn = malloc(sizeof(double)*m), *g = malloc(sizeof(double)*(m + 1)), *y = malloc(sizeof(double)*m);
+  double hmax = 0.0, fn, vm;
+  int ok = -1;
+  for(i = 0; i < N; i++) if(fabs(Hc[i]) > hmax) hmax = fabs(Hc[i]);
+  nk_resid(f, ik, Hc, th, V, F, conv);
+  fn = nk_norm2(N, F);
+  for(newton = 0; newton < 40; newton++){
+    double finf = 0.0, lam, fn_new, dinf = 0.0;
+    for(i = 0; i < N; i++) if(fabs(F[i]) > finf) finf = fabs(F[i]);
+    vm = 1e-9; for(i = 0; i < N; i++) if(fabs(V[i]) > vm) vm = fabs(V[i]);
+    if(finf <= 1e-11*(hmax > 1.0 ? hmax : 1.0)){ ok = newton; break; }
+    /* Jacobian diagonal parts */
+    for(i = 0; i < N; i++){
+      int row = i % f->nzp;
+      double kd = (f->mirror && row == 0) ? f->kop_self_top[ik] : f->kop_self[ik];
+      if(f->locked && f->locked[i]){ Dp[i] = 0.0; Pinv[i] = 0.0; continue; }
+      Dp[i] = rs_dstrength(f, i, fabs(V[i]), th[i]);
+      Pinv[i] = 1.0/(kd - Dp[i]);
+    }
+    /* GMRES for J d = -F, right preconditioned, x = P^{-1} z */
+    memset(d, 0, sizeof(double)*N);
+    {
+      int r;
+      double b0 = fn, tol = 1e-6*b0;
+      for(r = 0; r < restarts; r++){
+        double beta;
+        /* residual r0 = -F - J d */
+        kop_apply(f, f->kop_B[ik], d, conv);
+        for(i = 0; i < N; i++) w[i] = (f->locked && f->locked[i]) ? 0.0 : -F[i] - (conv[i] - Dp[i]*d[i]);
+        beta = nk_norm2(N, w);
+        if(beta <= tol) break;
+        for(i = 0; i < N; i++) Vk[i] = w[i]/beta;
+        memset(g, 0, sizeof(double)*(m + 1)); g[0] = beta;
+        for(j = 0; j < m; j++){
+          double *vj = Vk + (size_t)j*N, *vn = Vk + (size_t)(j + 1)*N, hn;
+          int k2;
+          for(i = 0; i < N; i++) Ft[i] = Pinv[i]*vj[i];
+          kop_apply(f, f->kop_B[ik], Ft, conv);
+          for(i = 0; i < N; i++) vn[i] = (f->locked && f->locked[i]) ? 0.0 : conv[i] - Dp[i]*Ft[i];
+          for(k2 = 0; k2 <= j; k2++){                 /* modified Gram-Schmidt */
+            double h = 0.0, *vk2 = Vk + (size_t)k2*N;
+            for(i = 0; i < N; i++) h += vn[i]*vk2[i];
+            Hh[(size_t)k2*m + j] = h;
+            for(i = 0; i < N; i++) vn[i] -= h*vk2[i];
+          }
+          hn = nk_norm2(N, vn); Hh[(size_t)(j + 1)*m + j] = hn;
+          if(hn > 0.0) for(i = 0; i < N; i++) vn[i] /= hn;
+          for(k2 = 0; k2 < j; k2++){                  /* apply the previous rotations */
+            double a1 = Hh[(size_t)k2*m + j], a2 = Hh[(size_t)(k2 + 1)*m + j];
+            Hh[(size_t)k2*m + j] = cs[k2]*a1 + sn[k2]*a2; Hh[(size_t)(k2 + 1)*m + j] = -sn[k2]*a1 + cs[k2]*a2;
+          }
+          {
+            double a1 = Hh[(size_t)j*m + j], a2 = Hh[(size_t)(j + 1)*m + j], rr = sqrt(a1*a1 + a2*a2);
+            cs[j] = rr > 0 ? a1/rr : 1.0; sn[j] = rr > 0 ? a2/rr : 0.0;
+            Hh[(size_t)j*m + j] = rr; Hh[(size_t)(j + 1)*m + j] = 0.0;
+            g[j + 1] = -sn[j]*g[j]; g[j] = cs[j]*g[j];
+          }
+          if(fabs(g[j + 1]) <= tol){ j++; break; }
+        }
+        if(j > m) j = m;
+        {                                              /* back substitution, d += P^{-1} V y */
+          int jj, k2, nj = j;
+          for(jj = nj - 1; jj >= 0; jj--){
+            double s = g[jj];
+            for(k2 = jj + 1; k2 < nj; k2++) s -= Hh[(size_t)jj*m + k2]*y[k2];
+            y[jj] = s/Hh[(size_t)jj*m + jj];
+          }
+          for(i = 0; i < N; i++){ double s = 0.0; for(k2 = 0; k2 < nj; k2++) s += Vk[(size_t)k2*N + i]*y[k2]; d[i] += Pinv[i]*s; }
+        }
+      }
+    }
+    /* backtracking line search on |F|_2 */
+    lam = 1.0;
+    for(it = 0; it < 12; it++){
+      for(i = 0; i < N; i++) Vt[i] = V[i] + lam*d[i];
+      nk_resid(f, ik, Hc, th, Vt, Ft, conv);
+      fn_new = nk_norm2(N, Ft);
+      if(isfinite(fn_new) && fn_new <= (1.0 - 1e-4*lam)*fn) break;
+      lam *= 0.5;
+    }
+    if(it >= 12) break;                                /* no decrease: give up */
+    for(i = 0; i < N; i++){ if(fabs(lam*d[i]) > dinf) dinf = fabs(lam*d[i]); V[i] = Vt[i]; }
+    memcpy(F, Ft, sizeof(double)*N); fn = fn_new;
+    if(dinf <= 1e-12*vm){ ok = newton + 1; break; }
+  }
+  free(F); free(conv); free(Dp); free(Pinv); free(d); free(Vt); free(Ft); free(w); free(Vk); free(Hh); free(cs); free(sn); free(g); free(y);
+  return ok;
+}
+
 int fd3d_step_k(struct fd3d *f, const double *load, int k)
 {
   struct fd3d_tab *t = f->t;
@@ -822,6 +934,11 @@ int fd3d_step_k(struct fd3d *f, const double *load, int k)
     memcpy(Vit, pass == 0 ? Vold : Vs, sizeof(double)*N);
     if(f->law == 1)
       for(i = 0; i < N; i++) th_p[i] = theta_adv(f, i, f->theta[i], Vold[i], pass == 0 ? Vold[i] : Vs[i], dt);
+    if(f->law == 1 && f->nk){
+      /* Newton-Krylov instead of the damped Jacobi iteration (fd_plan.md L1) */
+      int nit = nk_solve(f, ik, Hc, th_p, Vit);
+      it = (nit >= 0) ? nit : 500;
+    }else
     for(it = 0; it < 500; it++){
       double ch = 0.0, vm = 0.0;
       kop_apply(f, f->kop_B[ik], Vit, conv);

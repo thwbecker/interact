@@ -107,7 +107,8 @@ struct fd3d {
   double mu_s, mu_d, d0;                        /* slip weakening (uniform) */
   double *coh;                                   /* cohesion per element (NULL: none); strength coh + mu max(sigma, 0) */
   int path; double *dpath;                       /* path = 1: weakening by the accumulated slip path dpath (allocate it) */
-  int sw_saturate;                               /* 1: piecewise-linear strength solved exactly past d0 within a step */
+  int sw_saturate;
+  int nk;                                        /* long steps (rate and state): 1 Newton-Krylov, 0 damped Jacobi */                               /* 1: piecewise-linear strength solved exactly past d0 within a step */
   double *a, *b, *Lc, *theta, f0, V0;           /* rate and state */
   int *locked;                                  /* optional: no slip */
 };

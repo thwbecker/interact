@@ -219,6 +219,11 @@ src/testing/rsf_solve/test_fd3d_dip.sh. For faults that reach the surface the fu
 surface converges slowly at the trace (fd_plan.md, step B5); for vertical strike-slip
 faults the mirror image is exact there and should be used. `-fd_table_statics 1`
 replaces interact's exact Is by the tables' own statics (experiments only).
+For 3-D sequences, `-fd_back_dyn 1e4` ends a dynamic phase once the fully dynamic
+traction differs from the quasi-dynamic one by less than 10 kPa everywhere (for
+`-fd_back_nwin` steps, default 10) and the peak rate is below the switching
+threshold; on BP5-FD this halves the phase with afterslip unchanged to 1e-4 m
+(fd_plan.md, L2). Off by default.
 `-fd_kmax3 1` enables steps of several substeps in 3-D (experimental, see
 fd_plan.md). The 3-D phase station files have a fifth column, the number
 of substeps of the step.
