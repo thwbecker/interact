@@ -34,8 +34,20 @@ double fd3d_square_ramp(double x1, double x2, double x3, double t, double a, dou
 void fd3d_rect_ramp_tensor(double x1, double x2, double x3, double t, double a1, double a2,
                            double cL, double cT, double rho, int comp, double s[6]);
 
+#ifdef USE_PETSC
+#include <mpi.h>
+#define FD3D_MPI 1
+#endif
 struct fd3d_tab {
   int nx, nz, Mx, Mz, L;
+  /* MPI (fd_plan.md S2): the stored half spectra (tables W_hat, the marcher's history) are
+     split by blocks of kx rows, rank r keeping rows xr0 .. xr0 + nxr - 1; everything else is
+     replicated. Without MPI (or one rank) xr0 = 0, nxr = Mx. */
+  int mpi_rank, mpi_size, xr0, nxr;
+  int *rcounts, *rdispls;       /* per rank: number and offset of its rows times Mh (complex values) */
+#ifdef FD3D_MPI
+  MPI_Comm comm;
+#endif
   double dx, dt, cL, cT, rho;
   int Mh;                       /* stored spectrum: kz = 0..Mz/2 (Hermitian half), Mx (Mz/2 + 1) values */
   fd3d_cplx *W_hat;             /* L x (Mx Mh), lag l at index l - 1 */
@@ -52,6 +64,10 @@ struct fd3d_tab *fd3d_tab_create(int nx, int nz, double dx, double dt, double cL
 struct fd3d_tab *fd3d_tab_create_c(int nx, int nz, double dx, double dt, double cL, double cT, double rho, int lmax, int comp);
 void fd3d_tab_free(struct fd3d_tab *t);
 void fd3d_fft2(const struct fd3d_tab *t, double _Complex *a, int sign);   /* in place, unnormalised */
+#ifdef FD3D_MPI
+/* communicator for the tables created next (default: one rank, no MPI calls) */
+void fd3d_set_comm(MPI_Comm comm);
+#endif
 
 /* marcher state (scalar slip) */
 struct fd3d {
@@ -61,6 +77,7 @@ struct fd3d {
      adjacent to the surface): the tables cover 2 nzp rows, image row nzp - 1 - j carries
      the slip of row j. nzp = t->nz and mirror = 0 without it */
   int nzp, mirror;
+  int c0, nc, *ccounts, *cdispls;   /* MPI: own columns c0 .. c0 + nc - 1 for the local solves; per-rank counts/offsets (elements) */
   /* optional external static operator (e.g. interact's exact half-space Is):
      out = Ks delta in element order; NULL: the tables' own static operator */
   void (*static_fn)(void *ctx, const double *delta, double *out);
@@ -161,6 +178,28 @@ struct fd3d_layer *fd3d_surf_create(struct fd3d *f, double x0f, double ytop, dou
 struct fd3d_layer *fd3d_surf_create_rows(struct fd3d *f, double x0f, double ytop, double ztop, double dip_deg, int fcomp,
                                          int m, int nxs, int nys, double xs0, const double *yc, const double *wy, int L, double fsign);
 int fd3d_step_layer(struct fd3d *f, const double *load);
+
+/* two parallel planes (stepovers, fd_plan.md P1): marchers f[0] and f[1] on the same table
+   (same lattice; elements outside a segment locked), plane 1 at normal offset W (along the
+   source frame's e3) from plane 0. The cross interaction enters explicitly (the planes must be
+   farther apart than one P-wave step: checked at creation). Shear and normal traction from the
+   other plane; with normal_coupling the friction sees sigma = sig0 - tn. With exact statics
+   (f->static_fn) the static cross part must be in static_fn (both planes' slips); otherwise it
+   comes from the cross tables. */
+struct fd3d_pair {
+  struct fd3d *f[2];
+  double W, k1c;
+  fd3d_cplx *Wsh[2], *Wno[2];                    /* index q: source plane q to receiver 1 - q */
+  double _Complex *Ksh[2], *Kno[2];
+  int normal_coupling;
+  double *sig0[2], *tn[2];
+  /* optional exact static normal traction of plane p from both planes' slips (tension positive) */
+  void (*static_n_fn)(void *ctx, int p, const double *delta_other, const double *delta_own, double *out);
+  void *static_n_ctx;
+};
+struct fd3d_pair *fd3d_pair_create(struct fd3d *f0, struct fd3d *f1, double W, int comp);
+void fd3d_pair_free(struct fd3d_pair *pp);
+int fd3d_pair_step(struct fd3d_pair *pp, const double *load0, const double *load1);
 
 /* one step of k = 1, 2, 4, ..., 64 fine substeps (k = 1: fd3d_step); returns iterations,
    -1 on bad arguments, -2 if the iteration did not converge (state unchanged: retry with smaller k) */

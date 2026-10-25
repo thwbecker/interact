@@ -48,6 +48,8 @@ struct fd_vars {
   struct fd3d *f3;
   int nx3, nz3;
   Vec v3a, v3b;			/* work vectors for the exact static operator */
+  VecScatter sc3, scX, scV;		/* MPI: full copies on every rank of v3b, the state, the slip rates */
+  Vec v3all, Xall, Vall;
   /* segments, sources (real plus images), tables, marcher system */
   struct fd_seglist *segs;
   PetscInt nsrc;

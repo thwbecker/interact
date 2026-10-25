@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
+#include <unistd.h>
 #include "fd3d.h"
 /* cells for a station at x on a grid starting at edge lo: the cell containing x,
    or the two cells sharing an edge at x */
@@ -379,6 +380,97 @@ static int run_tpv10(double dx, double Ls, int q2d, int mg, const char *out)
   return 0;
 }
 
+/* two parallel planes: plane 0 slips at a prescribed rate 1 for K steps (first-order scheme,
+   for which the discrete convolution of a piecewise-constant rate is exact), plane 1 is at
+   rest; the shear and normal traction on plane 1 must equal the direct sum of the exact ramp
+   responses (fd3d_rect_ramp_tensor at the normal offset W) over the sources of plane 0 */
+static int run_pair(void)
+{
+  double cL = 6000, cT = 3464, rho = 2670, dx = 500.0, dt = 0.5*dx/cT, W = 1000.0, es = 0, ss = 0, en = 0, sn = 0, s6[6];
+  int nx = 8, nz = 4, N = nx*nz, K = 4, nsteps = 40, n, i, r, q, fail;
+  struct fd3d_tab *t = fd3d_tab_create(nx, nz, dx, dt, cL, cT, rho, 0);
+  struct fd3d *f0 = fd3d_create(t), *f1 = fd3d_create(t);
+  struct fd3d_pair *pp;
+  double *v0 = malloc(sizeof(double)*N), *v1 = calloc(N, sizeof(double));
+  f0->nl = f1->nl = 0; f0->law = f1->law = 0; f0->mu_s = f0->mu_d = f1->mu_s = f1->mu_d = 0.0; f0->d0 = f1->d0 = 1.0;
+  f0->vpres = v0; f1->vpres = v1;
+  pp = fd3d_pair_create(f0, f1, W, 1);
+  if(!pp){ fprintf(stderr, "pair setup failed\n"); return 1; }
+  for(n = 1; n <= nsteps; n++){
+    for(i = 0; i < N; i++) v0[i] = (n <= K) ? 1.0 : 0.0;
+    fd3d_pair_step(pp, NULL, NULL);
+    for(r = 0; r < N; r++){
+      double ex_s = 0.0, ex_n = 0.0;
+      for(q = 0; q < N; q++){
+        double x1 = (r/nz - q/nz)*dx, x2 = (r%nz - q%nz)*dx, sa[2] = {0, 0};
+        int k;
+        for(k = 0; k < 2; k++){                     /* ramp from 0 minus ramp from K dt */
+          double tt = n*dt - (k ? K*dt : 0.0);
+          if(tt <= 0.0) continue;
+          fd3d_rect_ramp_tensor(x1, x2, W, tt, 0.5*dx, 0.5*dx, cL, cT, rho, 1, s6);
+          sa[0] += (k ? -1.0 : 1.0)*s6[4]; sa[1] += (k ? -1.0 : 1.0)*s6[2];
+        }
+        ex_s += sa[0]; ex_n += sa[1];
+      }
+      if(fabs(f1->tau[r] - ex_s) > es) es = fabs(f1->tau[r] - ex_s);
+      if(fabs(ex_s) > ss) ss = fabs(ex_s);
+      if(fabs(pp->tn[1][r] - ex_n) > en) en = fabs(pp->tn[1][r] - ex_n);
+      if(fabs(ex_n) > sn) sn = fabs(ex_n);
+    }
+  }
+  fail = !(es <= 1e-8*ss && en <= 1e-8*sn && ss > 0 && sn > 0);
+  printf("fd3d_test pair: plane 1 at %g m, %d steps: max |shear diff| %.2e of %.3e, max |normal diff| %.2e of %.3e (k1 cross %.1e)\n", W, nsteps, es, ss, en, sn, pp->k1c);
+  printf("fd3d_test pair: %s\n", fail ? "FAIL" : "PASS");
+  fd3d_pair_free(pp); fd3d_free(f0); fd3d_free(f1); fd3d_tab_free(t); free(v0); free(v1);
+  return fail;
+}
+
+/* 3-D stepover (fd_plan.md P1): two vertical strike-slip segments of length Lseg and depth D
+   in a whole space, overlapping by `ov` along strike, plane 1 at normal offset W (sign: see
+   the printed normal-stress change), slip weakening (mu_s 0.75, mu_d 0.51, d0, sigma 33.3
+   MPa, tau0 20 MPa: Harris and Day's case D strength parameter S = 1.65) with normal-stress
+   coupling, nucleation by an overstressed 6 x 6 km patch at the centre of segment 0; reports
+   whether and when segment 1 ruptures */
+static int run_stepover(double W, double dx, double tend, double d0, double mus)
+{
+  double cL = 6000, cT = 3464, rho = 2700, dt = 0.5*dx/cT, Lseg = 28e3, D = 12e3, ov = 5e3, mud = 0.51, sig = 33.3e6, tau0 = 20e6;
+  int n1 = (int)(Lseg/dx + 0.5), nov = (int)(ov/dx + 0.5), nx = 2*n1 - nov, nz = (int)(D/dx + 0.5), N = nx*nz, i, j, n, p, nsteps = (int)(tend/dt + 0.5);
+  struct fd3d_tab *t = fd3d_tab_create(nx, nz, dx, dt, cL, cT, rho, 0);
+  struct fd3d *f[2]; struct fd3d_pair *pp;
+  double trig[2] = {-1, -1}, xtrig = 0, smin = 1e300, smax = -1e300;
+  for(p = 0; p < 2; p++){
+    f[p] = fd3d_create(t); f[p]->nl = 1; f[p]->law = 0; f[p]->mu_s = mus; f[p]->mu_d = mud; f[p]->d0 = d0;
+    f[p]->locked = calloc(N, sizeof(int)); f[p]->path = 1; f[p]->dpath = calloc(N, sizeof(double)); f[p]->sw_saturate = 1;
+    for(i = 0; i < nx; i++) for(j = 0; j < nz; j++){
+      int e = i*nz + j, on = p == 0 ? (i < n1) : (i >= n1 - nov);
+      double xc = (i - 0.5*n1 + 0.5)*dx, zc = (j + 0.5)*dx - 0.5*D;    /* relative to segment 0's centre */
+      f[p]->locked[e] = !on; f[p]->sigma[e] = sig;
+      f[p]->tau0[e] = (p == 0 && fabs(xc) <= 3000.0 && fabs(zc) <= 3000.0) ? (mus + 0.005)*sig : tau0;   /* 6 x 6 km patch */
+    }
+  }
+  pp = fd3d_pair_create(f[0], f[1], W, 1);
+  if(!pp){ fprintf(stderr, "stepover: pair setup failed (W too small for dx?)\n"); return 1; }
+  pp->normal_coupling = 1;
+  for(p = 0; p < 2; p++) for(i = 0; i < N; i++) pp->sig0[p][i] = sig;
+  fprintf(stderr, "stepover: W %+g m, dx %g m, %d x %d lattice (segments %d columns, overlap %d), %d steps, window %d lags\n", W, dx, nx, nz, n1, nov, nsteps, t->L);
+  for(n = 0; n < nsteps; n++){
+    fd3d_pair_step(pp, NULL, NULL);
+    for(p = 0; p < 2; p++) if(trig[p] < 0) for(i = 0; i < N; i++) if(!f[p]->locked[i] && fabs(f[p]->V[i]) > 1e-3){ trig[p] = f[p]->time; if(p == 1) xtrig = (i/nz - 0.5*n1 + 0.5)*dx; break; }
+    for(i = 0; i < N; i++) if(!f[1]->locked[i]){ if(f[1]->sigma[i] < smin) smin = f[1]->sigma[i]; if(f[1]->sigma[i] > smax) smax = f[1]->sigma[i]; }
+  }
+  {
+    int len[2] = {0, 0}; double smx[2] = {0, 0};
+    for(p = 0; p < 2; p++) for(i = 0; i < nx; i++){
+      int any = 0; for(j = 0; j < nz; j++){ int e = i*nz + j; if(!f[p]->locked[e] && fabs(f[p]->delta[e]) > 0.05) any = 1; if(fabs(f[p]->delta[e]) > smx[p]) smx[p] = fabs(f[p]->delta[e]); }
+      len[p] += any;
+    }
+    printf("stepover mu_s %.3f (S %.2f) W %+6.0f m: segment 0 ruptured %.1f km (max slip %.2f m); segment 1 %s at %.2f s, x = %.1f km, ruptured %.1f km (max slip %.2f m); sigma on segment 1 %.1f .. %.1f MPa\n",
+           mus, (mus*sig - tau0)/(tau0 - mud*sig), W, len[0]*dx/1e3, smx[0], trig[1] >= 0 ? "triggered" : "not triggered", trig[1], xtrig/1e3, len[1]*dx/1e3, smx[1], smin/1e6, smax/1e6);
+  }
+  fd3d_pair_free(pp); fd3d_free(f[0]); fd3d_free(f[1]); fd3d_tab_free(t);
+  return 0;
+}
+
 /* kernel check: full stress tensors (slip and opening, rectangles) against tada_quad.py values */
 static int run_kernels(const char *ref)
 {
@@ -404,7 +496,32 @@ static int run_kernels(const char *ref)
   return !(n > 0 && emax <= 1e-7);
 }
 
+static int main0(int argc, char **argv);
 int main(int argc, char **argv)
+{
+  int r;
+#ifdef FD3D_MPI
+  /* under mpirun: the tables and histories are split over the ranks (fd_plan.md S2); rank 0
+     prints and writes, the other ranks work in a scratch directory with stdout discarded */
+  int rank = 0, size = 1;
+  MPI_Init(&argc, &argv);
+  MPI_Comm_rank(MPI_COMM_WORLD, &rank); MPI_Comm_size(MPI_COMM_WORLD, &size);
+  if(size > 1){
+    fd3d_set_comm(MPI_COMM_WORLD);
+    if(rank > 0){
+      char d[64]; sprintf(d, "/tmp/fd3d_test_rank%d_XXXXXX", rank);
+      if(mkdtemp(d) && chdir(d) == 0){}
+      if(!freopen("/dev/null", "w", stdout)){}
+    }
+  }
+#endif
+  r = main0(argc, argv);
+#ifdef FD3D_MPI
+  MPI_Finalize();
+#endif
+  return r;
+}
+static int main0(int argc, char **argv)
 {
   double cL = 6000, cT = 3464, rho = 2670, dx = argc > 2 ? atof(argv[2]) : 500.0, dt;
   int nx, nz, i, j, n, nsteps, s, ci[2], cj[2], ni, nj, cnt = 0, fail = 0;
@@ -421,6 +538,8 @@ int main(int argc, char **argv)
   if(argc >= 2 && !strcmp(argv[1], "surfstab")) return run_surfstab(argc >= 3 ? atoi(argv[2]) : 4);
   if(argc >= 5 && !strcmp(argv[1], "surfsym")) return run_surfsym(atof(argv[2]), atoi(argv[3]), argv[4]);
   if(argc >= 3 && !strcmp(argv[1], "q2d")) return run_q2d(argv[2]);
+  if(argc >= 2 && !strcmp(argv[1], "pair")) return run_pair();
+  if(argc >= 6 && !strcmp(argv[1], "stepover")) return run_stepover(atof(argv[2]), atof(argv[3]), atof(argv[4]), atof(argv[5]), argc > 6 ? atof(argv[6]) : 0.75);
   if(argc >= 7 && !strcmp(argv[1], "tpv10")) return run_tpv10(atof(argv[2]), atof(argv[3]), atoi(argv[4]), atoi(argv[5]), argv[6]);
   if(argc < 3 || strcmp(argv[1], "tpv3")){ fprintf(stderr, "usage: %s tpv3|tpv101 dx [ref] [tend]\n", argv[0]); return 2; }
   nx = (int)floor(30e3/dx + 0.5); nz = (int)floor(15e3/dx + 0.5); dt = 0.5*dx/cT;

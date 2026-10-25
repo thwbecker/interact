@@ -1708,6 +1708,86 @@ tables are already per along-strike wavenumber and follow the same slab split. R
 must be bit-identical for any number of ranks (sums over lags per wavenumber in the same
 order, local solves identical), which is the test.
 
+### Speed, step S2: MPI in the 3-D marcher and in rsf_solve (2026-10-26)
+
+MPI only (no OpenMP), as rsf_solve. fd3d.c:
+- tables and history: the stored half spectra (W_hat, the history ring) are split by
+  blocks of kx rows (fd3d_tab: xr0, nxr; rank r keeps its rows), so memory divides by
+  the number of ranks; each step sums the history over its rows and one
+  MPI_Allgatherv assembles the full half spectrum, after which the inverse FFT is done
+  on every rank (cheap against the history sum);
+- table construction: lags in blocks over the ranks (W[l] = S(l) - S(l - 1) - Ks dt,
+  so each rank also evaluates S(la - 1)), one MPI_Alltoallv delivers every rank its
+  rows; the first-lag stencil is broadcast from rank 0;
+- local solves: blocks of fault columns (fd3d: c0, nc), the rates gathered after every
+  Jacobi sweep (MPI_Allgatherv) and the convergence test reduced (MPI_Allreduce MAX);
+  Jacobi updates depend only on the previous sweep, so the result does not depend on the
+  partition;
+- the opening layer and the full surface run replicated on every rank on top of this
+  (correct, no memory saving yet); long steps (-fd_kmax3) are refused with several ranks.
+fd3d_set_comm(comm) selects the communicator for the tables created next; without it, or
+on one rank, no MPI calls are made.
+rsf_fd.c: the one-rank restriction is lifted for 3-D faults (2-D stays on one rank); the
+state and the slip-rate record are copied to every rank for a 3-D phase (VecScatter to
+all) and written back afterwards; the exact-statics callbacks (Is, In) fill their own
+rows and gather the result; the static gate sums over the own rows of Is; station files
+are written by rank 0. On one rank read-only access is used where the QD vectors are
+only read, so the QD integrator sees exactly what it saw before.
+Checks: fd3d_test tpv101 (500 m) on 1, 2, 3 and 4 ranks gives bit-identical rupture-time
+grids; tpv3, mirror, layer, surf and q2d pass on 3 ranks; BP5-FD at 2 km in rsf_solve on
+3 ranks gives station files bit-identical to 1 rank. run_tests.sh now includes the
+1-against-3-rank bit-identity check (skipped without mpirun). QD bit-identity harness,
+run_tests.sh, test_fd_sequence.sh, test_fd3d_gate.sh, test_fd3d_dip.sh: PASS.
+On one rank the results equal those of the previous code to roundoff: fd3d_test tpv101
+and mirror are bit-identical, while BP5-FD at 2 km first differs at step 59 by 7e-11
+relative, which the nearly arrested tail amplifies to 2789 instead of 2791 steps and a
+mean slip of 1.9376 instead of 1.9380 m (peak and arrivals unchanged). A hunk-by-hunk
+bisection places it in the history-sum block, and it persists with the old loop text
+restored, so it comes from code generation (fused multiply-add contraction in the
+complex products), not from a change in the arithmetic.
+Speed-up measurements need a multi-core machine (the sandbox has one core).
+
+### 3-D stepovers, step P1: two parallel planes in the marcher (2026-10-26)
+
+fd3d.c, struct fd3d_pair: two marchers on the same table (one lattice; elements outside a
+segment locked), plane 1 at normal offset W from plane 0. Cross tables (shear along the
+slip and normal traction, both directions, built like the self tables: split by kx rows
+and by lags over the MPI ranks) from fd3d_rect_ramp_tensor at x3 = +-W. The cross
+interaction enters the known part (lags >= 2 of the other plane's history plus the
+static part of its slip); within one step the planes do not interact, which holds when W
+exceeds the P-wave reach of a step (the cross first lag is checked at creation and must
+vanish). Normal-stress coupling as for the surface: sigma = sig0 - tn. Without exact
+statics the cross statics come from the tables (a version with interact's Is and In for
+both planes is needed for rsf_solve).
+Checks:
+- fd3d_test pair: plane 0 slips at a prescribed rate for 4 steps, plane 1 at rest,
+  first-order scheme (exact for a piecewise-constant rate): shear and normal traction on
+  plane 1 equal the direct sum of exact ramp responses to 7e-14 relative over 40 steps
+  (W = 1000 m, 500 m elements); the same on 3 MPI ranks.
+- fd3d_test stepover <W> <dx> <tend> <d0> [mu_s]: two vertical strike-slip segments of 28
+  x 12 km, overlap 5 km, whole space, slip weakening (mu_d 0.51, sigma 33.3 MPa, tau0 20
+  MPa, slip path), normal-stress coupling, nucleation by an overstressed 6 x 6 km patch.
+  Case-D strength (S = 1.65, d0 = 0.25 m, 500 m): no jump for W = +-500 to +-4000 m.
+  Case-B strength (mu_s 0.645, S = 0.49):
+
+| W | 500 m elements | 250 m |
+|---|---|---|
+| +500 | jump at 4.40 s, 26.0 km of segment 1 ruptured | |
+| -500 | jump at 4.84 s, 26.5 km | |
+| +1000 | triggered at 5.63 s, no propagation | |
+| -1000 | triggered at 4.98 s, 0.5 km | triggered at 4.84 s, no propagation |
+| +2000 | not triggered | |
+| -2000 | triggered at 6.06 s, no propagation | |
+| +-3000 | not triggered | |
+
+  Negative W unclamps segment 1 in the overlap (sigma down to 29.6 to 30.7 MPa against
+  up to 37 MPa for positive W), i.e. it is the dilational step, and it triggers earlier
+  and at larger widths, as in Harris and Day. Jump widths are smaller than in their 2-D
+  results: finite depth (12 km), whole space, and 2 to 3 elements per cohesive zone at 500
+  m; a resolution and depth study is next. The 3-rank run is identical.
+Next: two-plane faults in rsf_solve (setup from the geometry, exact Is and In for both
+planes, the hand-over), then QD against FD stepover sequences in 3-D.
+
 ### WP7, C implementation in rsf_solve: status (2026-10-18)
 Done, each verified in the sandbox before delivery (details in
 fd_c_design.md sections 6 to 10, usage in rsf_solve_fd.md):

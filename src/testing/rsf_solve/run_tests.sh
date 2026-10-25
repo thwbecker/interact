@@ -45,6 +45,23 @@ tail -1 tmp_fd_dynamic/fd3d.out; [ $st -eq 0 ] || fail=1
 tail -1 tmp_fd_dynamic/fd3d.out; [ $st -eq 0 ] || fail=1
 ( cd tmp_fd_dynamic && ../bin/fd3d_test q2d ../$d/ref/ref_fd3d_q2d.txt > fd3d.out 2>/dev/null ); st=$?
 tail -1 tmp_fd_dynamic/fd3d.out; [ $st -eq 0 ] || fail=1
+( cd tmp_fd_dynamic && ../bin/fd3d_test pair > fd3d.out 2>/dev/null ); st=$?
+tail -1 tmp_fd_dynamic/fd3d.out; [ $st -eq 0 ] || fail=1
+# 3-D stepover smoke test: case-B strength, 500 m step, 500 m elements: segment 1 must rupture
+( cd tmp_fd_dynamic && ../bin/fd3d_test stepover -500 500 12 0.25 0.645 > fd3d.out 2>/dev/null )
+if grep -q "segment 1 triggered" tmp_fd_dynamic/fd3d.out && grep -q "ruptured 2[0-9].[0-9] km (max slip 1.1" tmp_fd_dynamic/fd3d.out; then echo "fd3d_test stepover: PASS"
+else echo "fd3d_test stepover: FAIL"; cat tmp_fd_dynamic/fd3d.out; fail=1; fi
+# MPI (fd_plan.md S2): the 3-D marcher must give bit-identical results on 1 and 3 ranks
+if command -v mpirun > /dev/null 2>&1; then
+  mkdir -p tmp_fd_dynamic/mpi1 tmp_fd_dynamic/mpi3
+  ( cd tmp_fd_dynamic/mpi1 && FD3D_NL=1 ../../bin/fd3d_test tpv101 500 - 4 > out 2>/dev/null )
+  ( cd tmp_fd_dynamic/mpi3 && FD3D_NL=1 mpirun --oversubscribe -np 3 ../../bin/fd3d_test tpv101 500 - 4 > out 2>/dev/null \
+      || FD3D_NL=1 mpirun --allow-run-as-root --oversubscribe -np 3 ../../bin/fd3d_test tpv101 500 - 4 > out 2>/dev/null )
+  if cmp -s tmp_fd_dynamic/mpi1/tpv101_rt.dat tmp_fd_dynamic/mpi3/tpv101_rt.dat; then echo "fd3d_test MPI (1 and 3 ranks bit-identical): PASS"
+  else echo "fd3d_test MPI (1 and 3 ranks bit-identical): FAIL"; fail=1; fi
+else
+  echo "fd3d_test MPI: skipped (no mpirun)"
+fi
 ( cd tmp_fd_dynamic && FD3D_NL=1 ../bin/fd3d_test mirror 500 6 > fd3d.out 2>/dev/null ); st=$?
 echo "(second-order marching) $(tail -1 tmp_fd_dynamic/fd3d.out)"; [ $st -eq 0 ] || fail=1
 [ $fail -eq 0 ] && echo "rsf_solve fd tests: all PASS" || echo "rsf_solve fd tests: FAIL"

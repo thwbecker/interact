@@ -154,12 +154,6 @@ void fd3d_fft2(const struct fd3d_tab *t, double _Complex *a, int sign)
   free(col); free(out);
 }
 
-/* store the Hermitian half (kz = 0..Mz/2) of a full spectrum */
-static void to_half(const struct fd3d_tab *t, const double _Complex *full, fd3d_cplx *half)
-{
-  int i, j, Mz = t->Mz, Mh = t->Mh;
-  for(i = 0; i < t->Mx; i++) for(j = 0; j < Mh; j++) half[(size_t)i*Mh + j] = (fd3d_cplx)full[(size_t)i*Mz + j];
-}
 /* rebuild the full spectrum of a real field from its half (double accumulator) */
 static void from_half(const struct fd3d_tab *t, double _Complex *full)
 {
@@ -196,6 +190,38 @@ struct fd3d_tab *fd3d_tab_create_c(int nx, int nz, double dx, double dt, double 
   if(t) t->slipcomp = comp;
   return t;
 }
+#ifdef FD3D_MPI
+static int g_fd3d_use_mpi = 0;
+static MPI_Comm g_fd3d_comm;
+void fd3d_set_comm(MPI_Comm comm){ g_fd3d_comm = comm; g_fd3d_use_mpi = 1; }
+#endif
+/* row partition of the half spectra over the ranks (block rows of kx) */
+static void tab_partition(struct fd3d_tab *t)
+{
+  int r, size = 1, rank = 0;
+#ifdef FD3D_MPI
+  if(g_fd3d_use_mpi){ t->comm = g_fd3d_comm; MPI_Comm_size(t->comm, &size); MPI_Comm_rank(t->comm, &rank); }
+  else t->comm = MPI_COMM_SELF;
+#endif
+  t->mpi_rank = rank; t->mpi_size = size;
+  t->rcounts = (int *)malloc(sizeof(int)*size); t->rdispls = (int *)malloc(sizeof(int)*size);
+  for(r = 0; r < size; r++){
+    int a = (int)(((long)t->Mx*r)/size), b = (int)(((long)t->Mx*(r + 1))/size);
+    t->rcounts[r] = (b - a)*t->Mh; t->rdispls[r] = a*t->Mh;
+    if(r == rank){ t->xr0 = a; t->nxr = b - a; }
+  }
+}
+/* gather the row blocks of a half spectrum held in place (own rows filled) on all ranks */
+static void tab_allgather(const struct fd3d_tab *t, double _Complex *half)
+{
+#ifdef FD3D_MPI
+  if(t->mpi_size > 1)
+    MPI_Allgatherv(MPI_IN_PLACE, 0, MPI_DATATYPE_NULL, half, t->rcounts, t->rdispls, MPI_C_DOUBLE_COMPLEX, t->comm);
+#else
+  (void)t; (void)half;
+#endif
+}
+
 struct fd3d_tab *fd3d_tab_create(int nx, int nz, double dx, double dt, double cL, double cT, double rho, int lmax)
 {
   struct fd3d_tab *t = (struct fd3d_tab *)calloc(1, sizeof(*t));
@@ -230,28 +256,70 @@ struct fd3d_tab *fd3d_tab_create(int nx, int nz, double dx, double dt, double cL
   t->Ks_hat = (double _Complex *)malloc(sizeof(double _Complex)*(size_t)t->Mx*t->Mz);
   put_offsets(t, A, t->Ks_hat); fd3d_fft2(t, t->Ks_hat, -1);
   t->Mh = t->Mz/2 + 1;
-  t->W_hat = (fd3d_cplx *)malloc(sizeof(fd3d_cplx)*(size_t)t->L*t->Mx*t->Mh);
-  for(l = 1; l <= t->L; l++){
-    double *Ks = (double *)malloc(sizeof(double)*(size_t)ox*oz);
-    /* recompute the static rows cheaply from the stored slope array: keep A as Ks */
-    memcpy(Ks, A, sizeof(double)*(size_t)ox*oz);
-    for(i = 0; i < ox; i++)
-      for(j = 0; j < oz; j++){
-        double x1 = (i - (nx - 1))*dx, x2 = (j - (nz - 1))*dx;
-        S1[(size_t)i*oz + j] = tab_kernel(tab_comp, x1, x2, l*dt, a, cL, cT, rho);
+  tab_partition(t);
+  t->W_hat = (fd3d_cplx *)malloc(sizeof(fd3d_cplx)*(size_t)t->L*t->nxr*t->Mh);
+  {
+    /* lags in blocks over the ranks: rank r computes lags la .. lb - 1 (W[l] = S(l) - S(l - 1) -
+       Ks dt, so it also evaluates S(la - 1)), transforms them and sends every rank its kx rows;
+       with one rank this is the serial loop */
+    int P = t->mpi_size, r, la, lb, nl, q;
+    size_t Mh = (size_t)t->Mh;
+    double _Complex *mine;                          /* own lags, full half spectra: nl x Mx x Mh */
+    la = 1 + (int)(((long)t->L*t->mpi_rank)/P); lb = 1 + (int)(((long)t->L*(t->mpi_rank + 1))/P); nl = lb - la;
+    mine = (double _Complex *)malloc(sizeof(double _Complex)*((size_t)(nl > 0 ? nl : 1))*t->Mx*Mh);
+    if(la > 1)
+      for(i = 0; i < ox; i++) for(j = 0; j < oz; j++)
+        S0[(size_t)i*oz + j] = tab_kernel(tab_comp, (i - (nx - 1))*dx, (j - (nz - 1))*dx, (la - 1)*dt, a, cL, cT, rho);
+    for(l = la; l < lb; l++){
+      double *Ks = (double *)malloc(sizeof(double)*(size_t)ox*oz);
+      memcpy(Ks, A, sizeof(double)*(size_t)ox*oz);
+      for(i = 0; i < ox; i++)
+        for(j = 0; j < oz; j++){
+          double x1 = (i - (nx - 1))*dx, x2 = (j - (nz - 1))*dx;
+          S1[(size_t)i*oz + j] = tab_kernel(tab_comp, x1, x2, l*dt, a, cL, cT, rho);
+        }
+      if(l == 1){
+        int di, dj;
+        for(di = -1; di <= 1; di++) for(dj = -1; dj <= 1; dj++)
+          t->k1[di + 1][dj + 1] = (nx > 1 || di == 0) && (nz > 1 || dj == 0) ?
+            S1[(size_t)(di + nx - 1)*oz + (dj + nz - 1)] : 0.0;
       }
-    if(l == 1){
-      int di, dj;
-      for(di = -1; di <= 1; di++) for(dj = -1; dj <= 1; dj++)
-        t->k1[di + 1][dj + 1] = (nx > 1 || di == 0) && (nz > 1 || dj == 0) ?
-          S1[(size_t)(di + nx - 1)*oz + (dj + nz - 1)] : 0.0;
+      for(i = 0; i < ox*oz; i++) Ks[i] = S1[i] - S0[i] - Ks[i]*dt;      /* W[l] */
+      put_offsets(t, Ks, t->work);
+      fd3d_fft2(t, t->work, -1);
+      { int ii, jj; double _Complex *dst = mine + (size_t)(l - la)*t->Mx*Mh;
+        for(ii = 0; ii < t->Mx; ii++) for(jj = 0; jj < t->Mh; jj++) dst[(size_t)ii*Mh + jj] = t->work[(size_t)ii*t->Mz + jj]; }
+      memcpy(S0, S1, sizeof(double)*(size_t)ox*oz);
+      free(Ks);
     }
-    for(i = 0; i < ox*oz; i++) Ks[i] = S1[i] - S0[i] - Ks[i]*dt;      /* W[l] */
-    put_offsets(t, Ks, t->work);
-    fd3d_fft2(t, t->work, -1);
-    to_half(t, t->work, t->W_hat + (size_t)(l - 1)*t->Mx*t->Mh);
-    memcpy(S0, S1, sizeof(double)*(size_t)ox*oz);
-    free(Ks);
+    if(P == 1){
+      for(l = 0; l < t->L; l++) for(size_t m = 0; m < (size_t)t->Mx*Mh; m++) t->W_hat[(size_t)l*t->Mx*Mh + m] = (fd3d_cplx)mine[(size_t)l*t->Mx*Mh + m];
+    }
+#ifdef FD3D_MPI
+    else{
+      /* all-to-all: to rank q, for each own lag, q's rows; from rank s, for each of s's lags, own rows */
+      int *sc = calloc(P, sizeof(int)), *sd = calloc(P, sizeof(int)), *rc = calloc(P, sizeof(int)), *rd = calloc(P, sizeof(int));
+      double _Complex *sbuf = malloc(sizeof(double _Complex)*((size_t)(nl > 0 ? nl : 1))*t->Mx*Mh), *rbuf = malloc(sizeof(double _Complex)*(size_t)t->L*t->nxr*Mh);
+      size_t o = 0;
+      for(q = 0; q < P; q++){
+        int qa = t->rdispls[q]/t->Mh, qn = t->rcounts[q]/t->Mh, ll;
+        sd[q] = (int)o;
+        for(ll = 0; ll < nl; ll++){ memcpy(sbuf + o, mine + ((size_t)ll*t->Mx + qa)*Mh, sizeof(double _Complex)*qn*Mh); o += (size_t)qn*Mh; }
+        sc[q] = (int)o - sd[q];
+      }
+      o = 0;
+      for(r = 0; r < P; r++){
+        int ra = 1 + (int)(((long)t->L*r)/P), rb = 1 + (int)(((long)t->L*(r + 1))/P);
+        rd[r] = (int)o; rc[r] = (rb - ra)*t->nxr*t->Mh; o += (size_t)rc[r];
+      }
+      MPI_Alltoallv(sbuf, sc, sd, MPI_C_DOUBLE_COMPLEX, rbuf, rc, rd, MPI_C_DOUBLE_COMPLEX, t->comm);
+      for(size_t m = 0; m < (size_t)t->L*t->nxr*Mh; m++) t->W_hat[m] = (fd3d_cplx)rbuf[m];   /* lags in order, own rows */
+      /* the first-lag stencil comes from the rank that owns lag 1 */
+      MPI_Bcast(&t->k1[0][0], 9, MPI_DOUBLE, 0, t->comm);
+      free(sc); free(sd); free(rc); free(rd); free(sbuf); free(rbuf);
+    }
+#endif
+    free(mine);
   }
   free(S0); free(S1); free(A);
   return t;
@@ -260,7 +328,7 @@ struct fd3d_tab *fd3d_tab_create(int nx, int nz, double dx, double dt, double cL
 void fd3d_tab_free(struct fd3d_tab *t)
 {
   if(!t) return;
-  free(t->W_hat); free(t->Ks_hat); free(t->work); free(t->ks_off);
+  free(t->W_hat); free(t->Ks_hat); free(t->work); free(t->ks_off); free(t->rcounts); free(t->rdispls);
   fd_fft_plan_destroy(t->px); fd_fft_plan_destroy(t->ix); fd_fft_plan_destroy(t->pz); fd_fft_plan_destroy(t->iz);
   free(t);
 }
@@ -282,13 +350,22 @@ struct fd3d *fd3d_create3(struct fd3d_tab *t, int nzp, int mirror, int next)
   if(mirror && t->nz != 2*nzp){ free(f); return NULL; }
   if(next && (mirror || t->nz != nzp + next)){ free(f); return NULL; }
   f->nzp = nzp; f->mirror = mirror; f->next = next;
+  {                                                /* column blocks for the local solves (MPI) */
+    int r, size = t->mpi_size;
+    f->ccounts = (int *)malloc(sizeof(int)*size); f->cdispls = (int *)malloc(sizeof(int)*size);
+    for(r = 0; r < size; r++){
+      int a = (int)(((long)t->nx*r)/size), b = (int)(((long)t->nx*(r + 1))/size);
+      f->ccounts[r] = (b - a)*nzp; f->cdispls[r] = a*nzp;
+      if(r == t->mpi_rank){ f->c0 = a; f->nc = b - a; }
+    }
+  }
   f->kdamp = getenv("FD3D_KDAMP") ? atof(getenv("FD3D_KDAMP")) : 0.5;
   size_t M = (size_t)t->Mx*t->Mz;
   f->t = t; f->N = N;
   f->delta = calloc(N, sizeof(double)); f->V = calloc(N, sizeof(double)); f->tau = calloc(N, sizeof(double));
   f->tau0 = calloc(N, sizeof(double)); f->sigma = calloc(N, sizeof(double)); f->H = calloc(N, sizeof(double));
   f->work = calloc(N, sizeof(double));
-  f->hist = (fd3d_cplx *)calloc((size_t)t->L*t->Mx*t->Mh, sizeof(fd3d_cplx));
+  f->hist = (fd3d_cplx *)calloc((size_t)t->L*t->nxr*t->Mh, sizeof(fd3d_cplx));
   f->acc = (double _Complex *)malloc(sizeof(double _Complex)*M);
   return f;
 }
@@ -298,7 +375,7 @@ void fd3d_free(struct fd3d *f)
   if(!f) return;
   free(f->delta); free(f->V); free(f->tau); free(f->tau0); free(f->sigma); free(f->H); free(f->work);
   { int q; for(q = 0; q < 8; q++){ free(f->kop_B[q]); free(f->kop_C[q]); } }
-  free(f->Vold); free(f->dpath); free(f->coh);
+  free(f->Vold); free(f->dpath); free(f->coh); free(f->ccounts); free(f->cdispls);
   if(f->layer) fd3d_layer_free(f->layer);
   free(f->hist); free(f->acc); free(f);
 }
@@ -341,13 +418,15 @@ static void known_k(struct fd3d *f, int k)
     for(m = 0; m < M; m++) f->acc[m] = t->Ks_hat[m]*t->work[m];
   }
   {
-    size_t Mhh = (size_t)t->Mx*t->Mh; int ii, jj;
-    double _Complex *ah = (double _Complex *)calloc(Mhh, sizeof(double _Complex));
+    /* own kx rows: history sum over the lags; then the row blocks of all ranks */
+    size_t Mhh = (size_t)t->Mx*t->Mh, Mho = (size_t)t->nxr*t->Mh; int ii, jj;
+    double _Complex *ah = (double _Complex *)calloc(Mhh, sizeof(double _Complex)), *ao = ah + (size_t)t->xr0*t->Mh;
     for(l = k + 1; l <= lmax; l++){
-      const fd3d_cplx *W = t->W_hat + (size_t)(l - 1)*Mhh;
-      const fd3d_cplx *Vh = f->hist + (size_t)((f->hk - (l - k) + 2*t->L) % t->L)*Mhh;
-      for(m = 0; m < Mhh; m++) ah[m] += (double _Complex)(W[m]*Vh[m]);
+      const fd3d_cplx *W = t->W_hat + (size_t)(l - 1)*Mho;
+      const fd3d_cplx *Vh = f->hist + (size_t)((f->hk - (l - k) + 2*t->L) % t->L)*Mho;
+      for(m = 0; m < Mho; m++) ao[m] += (double _Complex)(W[m]*Vh[m]);
     }
+    tab_allgather(t, ah);
     for(ii = 0; ii < t->Mx; ii++) for(jj = 0; jj < t->Mh; jj++) f->acc[(size_t)ii*t->Mz + jj] += ah[(size_t)ii*t->Mh + jj];
     free(ah);
   }
@@ -446,7 +525,10 @@ void fd3d_push(struct fd3d *f, const double *V)
 {
   struct fd3d_tab *t = f->t;
   field_hat(f, V, t->work);
-  to_half(t, t->work, f->hist + (size_t)(f->hk % t->L)*t->Mx*t->Mh);
+  {                                                /* own kx rows */
+    int ii, jj; fd3d_cplx *dst = f->hist + (size_t)(f->hk % t->L)*t->nxr*t->Mh;
+    for(ii = 0; ii < t->nxr; ii++) for(jj = 0; jj < t->Mh; jj++) dst[(size_t)ii*t->Mh + jj] = (fd3d_cplx)t->work[(size_t)(t->xr0 + ii)*t->Mz + jj];
+  }
   f->hk = (f->hk + 1) % t->L;
   if(f->nhist < t->L) f->nhist++;
 }
@@ -473,7 +555,7 @@ void fd3d_reset(struct fd3d *f)
     }
     ly->hk = 0; ly->nhist = 0;
   }
-  memset(f->hist, 0, sizeof(fd3d_cplx)*(size_t)t->L*t->Mx*t->Mh);
+  memset(f->hist, 0, sizeof(fd3d_cplx)*(size_t)t->L*t->nxr*t->Mh);
   f->hk = 0; f->nhist = 0; f->time = 0.0;
   memset(f->delta, 0, sizeof(double)*f->N);
 }
@@ -529,6 +611,7 @@ static int step_solve_g(struct fd3d *f, const double *Hx, const double *guess, c
        its solution); this removes most of the cost of the later sweeps */
     char *chg = (char *)malloc(N), *act = (char *)malloc(N);
     int use_act = !getenv("FD3D_NO_ACTIVE"), nzp = f->nzp, nxx = t->nx;
+    int i_lo = f->c0*nzp, i_hi = (f->c0 + f->nc)*nzp;      /* own columns (all without MPI) */
     memset(chg, 1, N);
     for(it = 0; it < 400; it++){
       double ch = 0.0, vm = 0.0;
@@ -545,7 +628,7 @@ static int step_solve_g(struct fd3d *f, const double *Hx, const double *guess, c
       }else memset(act, 1, N);
       for(i = 0; i < N; i++){
         double Hp;
-        if((mask && !mask[i]) || !act[i]){ Vn[i] = V[i]; continue; }
+        if((mask && !mask[i]) || !act[i] || i < i_lo || i >= i_hi){ Vn[i] = V[i]; continue; }
         Hp = H[i] + hw*f->work[i];
         double kd = f->nl ? 0.5*kdiag(f, i % f->nzp) - 0.5*eta : kdiag(f, i % f->nzp);
         if(f->law == 0){
@@ -574,6 +657,12 @@ static int step_solve_g(struct fd3d *f, const double *Hx, const double *guess, c
           Vn[i] = local_rs(f, i, Hp, kd, th_p[i], V[i]);
         if(fabs(Vn[i] - V[i]) > ch) ch = fabs(Vn[i] - V[i]);
       }
+#ifdef FD3D_MPI
+      if(t->mpi_size > 1){                         /* every rank needs all rates for the next sweep */
+        MPI_Allgatherv(MPI_IN_PLACE, 0, MPI_DATATYPE_NULL, Vn, f->ccounts, f->cdispls, MPI_DOUBLE, t->comm);
+        MPI_Allreduce(MPI_IN_PLACE, &ch, 1, MPI_DOUBLE, MPI_MAX, t->comm);
+      }
+#endif
       /* changed: by more than 1e-3 of the convergence tolerance (Newton from a nearby guess changes
          the last bits even for unchanged input, which must not keep a cell active) */
       for(i = 0; i < N; i++){ chg[i] = fabs(Vn[i] - V[i]) > 1e-16*(fabs(V[i]) > 1.0 ? fabs(V[i]) : 1.0); if(fabs(Vn[i]) > vm) vm = fabs(Vn[i]); }
@@ -715,6 +804,7 @@ int fd3d_step_k(struct fd3d *f, const double *load, int k)
   double dt = t->dt*k, *Vold, *Hc, *Vit, *Vn, *conv, *th_p = NULL, *Vs = NULL;
   if(k <= 1 && !f->generic) return fd3d_step(f, load);
   if(k > 64 || (k & (k - 1))) return -1;
+  if(t->mpi_size > 1) return -1;                  /* long steps: one rank only (to be rewritten, fd_plan.md) */
   ik = ilog2i(k);
   fd3d_kops(f, k);
   Vold = (double *)malloc(sizeof(double)*N); Hc = (double *)malloc(sizeof(double)*N);
@@ -1719,4 +1809,171 @@ void fd3d_surf_kernel(const struct fd3d_tab *t, double dip_deg, int fcomp, int s
   frame_fault(dip_deg, F);
   for(i = 0; i < 3; i++) sdir[i] = F[fcomp - 1][i];
   surf_resp(t, F, src_fault, comp, c, a1, a2, X, rcv_fault, sdir, L, K, ks);
+}
+
+/* ---------------- two parallel planes (stepovers), fd_plan.md P1 ---------------- */
+
+/* cross tables from plane q to plane p (normal offset x3 of the receiver plane from the
+   source plane): shear traction along the slip and normal traction (tension positive), split
+   by kx rows and built over lags in blocks as the self tables */
+static void cross_build(struct fd3d_tab *t, double x3, int comp, fd3d_cplx **Wsh, fd3d_cplx **Wno,
+                        double _Complex **Ksh, double _Complex **Kno, double *k1max)
+{
+  int nx = t->nx, nz = t->nz, ox = 2*nx - 1, oz = 2*nz - 1, i, j, l, r, P = t->mpi_size, which;
+  double a = 0.5*t->dx, dt = t->dt, T1, T2, rmax, s[6];
+  size_t Mh = (size_t)t->Mh, M2 = (size_t)ox*oz;
+  double *A[2], *S0[2], *S1[2];
+  int la = 1 + (int)(((long)t->L*t->mpi_rank)/P), lb = 1 + (int)(((long)t->L*(t->mpi_rank + 1))/P), nl = lb - la;
+#define CROSS_K(x1, x2, tt, out2) do{ fd3d_rect_ramp_tensor((x1), (x2), x3, (tt), a, a, t->cL, t->cT, t->rho, comp, s); \
+    (out2)[0] = (comp == 1) ? s[4] : s[5]; (out2)[1] = s[2]; }while(0)
+  for(which = 0; which < 2; which++){ A[which] = malloc(sizeof(double)*M2); S0[which] = calloc(M2, sizeof(double)); S1[which] = malloc(sizeof(double)*M2); }
+  rmax = sqrt(2.0)*(nx > nz ? nx : nz)*t->dx + t->dx + fabs(x3);
+  T1 = 1.5*rmax/t->cT + 10.0*dt; T2 = 2.0*T1;
+  for(i = 0; i < ox; i++) for(j = 0; j < oz; j++){
+    double v1[2], v2[2];
+    CROSS_K((i - (nx - 1))*t->dx, (j - (nz - 1))*t->dx, T1, v1);
+    CROSS_K((i - (nx - 1))*t->dx, (j - (nz - 1))*t->dx, T2, v2);
+    for(which = 0; which < 2; which++) A[which][(size_t)i*oz + j] = (v2[which] - v1[which])/(T2 - T1);
+  }
+  *Ksh = malloc(sizeof(double _Complex)*(size_t)t->Mx*t->Mz); *Kno = malloc(sizeof(double _Complex)*(size_t)t->Mx*t->Mz);
+  put_offsets(t, A[0], *Ksh); fd3d_fft2(t, *Ksh, -1);
+  put_offsets(t, A[1], *Kno); fd3d_fft2(t, *Kno, -1);
+  *Wsh = malloc(sizeof(fd3d_cplx)*(size_t)t->L*t->nxr*Mh); *Wno = malloc(sizeof(fd3d_cplx)*(size_t)t->L*t->nxr*Mh);
+  *k1max = 0.0;
+  {
+    double _Complex *mine[2];
+    for(which = 0; which < 2; which++) mine[which] = malloc(sizeof(double _Complex)*((size_t)(nl > 0 ? nl : 1))*t->Mx*Mh);
+    if(la > 1) for(i = 0; i < ox; i++) for(j = 0; j < oz; j++){
+      double v[2]; CROSS_K((i - (nx - 1))*t->dx, (j - (nz - 1))*t->dx, (la - 1)*dt, v);
+      S0[0][(size_t)i*oz + j] = v[0]; S0[1][(size_t)i*oz + j] = v[1];
+    }
+    for(l = la; l < lb; l++){
+      for(i = 0; i < ox; i++) for(j = 0; j < oz; j++){
+        double v[2]; CROSS_K((i - (nx - 1))*t->dx, (j - (nz - 1))*t->dx, l*dt, v);
+        S1[0][(size_t)i*oz + j] = v[0]; S1[1][(size_t)i*oz + j] = v[1];
+        if(l == 1 && fabs(v[0]) > *k1max) *k1max = fabs(v[0]);
+      }
+      for(which = 0; which < 2; which++){
+        double *Wl = malloc(sizeof(double)*M2); int ii, jj; double _Complex *dst = mine[which] + (size_t)(l - la)*t->Mx*Mh;
+        for(i = 0; i < (int)M2; i++) Wl[i] = S1[which][i] - S0[which][i] - A[which][i]*dt;
+        put_offsets(t, Wl, t->work); fd3d_fft2(t, t->work, -1);
+        for(ii = 0; ii < t->Mx; ii++) for(jj = 0; jj < t->Mh; jj++) dst[(size_t)ii*Mh + jj] = t->work[(size_t)ii*t->Mz + jj];
+        memcpy(S0[which], S1[which], sizeof(double)*M2); free(Wl);
+      }
+    }
+    for(which = 0; which < 2; which++){
+      fd3d_cplx *Wout = which ? *Wno : *Wsh;
+      if(P == 1){
+        for(size_t m = 0; m < (size_t)t->L*t->Mx*Mh; m++) Wout[m] = (fd3d_cplx)mine[which][m];
+      }
+#ifdef FD3D_MPI
+      else{
+        int *sc = calloc(P, sizeof(int)), *sd = calloc(P, sizeof(int)), *rc = calloc(P, sizeof(int)), *rd = calloc(P, sizeof(int)), q;
+        double _Complex *sbuf = malloc(sizeof(double _Complex)*((size_t)(nl > 0 ? nl : 1))*t->Mx*Mh), *rbuf = malloc(sizeof(double _Complex)*(size_t)t->L*t->nxr*Mh);
+        size_t o = 0;
+        for(q = 0; q < P; q++){
+          int qa = t->rdispls[q]/t->Mh, qn = t->rcounts[q]/t->Mh, ll;
+          sd[q] = (int)o;
+          for(ll = 0; ll < nl; ll++){ memcpy(sbuf + o, mine[which] + ((size_t)ll*t->Mx + qa)*Mh, sizeof(double _Complex)*qn*Mh); o += (size_t)qn*Mh; }
+          sc[q] = (int)o - sd[q];
+        }
+        o = 0;
+        for(r = 0; r < P; r++){
+          int ra = 1 + (int)(((long)t->L*r)/P), rb = 1 + (int)(((long)t->L*(r + 1))/P);
+          rd[r] = (int)o; rc[r] = (rb - ra)*t->nxr*t->Mh; o += (size_t)rc[r];
+        }
+        MPI_Alltoallv(sbuf, sc, sd, MPI_C_DOUBLE_COMPLEX, rbuf, rc, rd, MPI_C_DOUBLE_COMPLEX, t->comm);
+        for(size_t m = 0; m < (size_t)t->L*t->nxr*Mh; m++) Wout[m] = (fd3d_cplx)rbuf[m];
+        free(sc); free(sd); free(rc); free(rd); free(sbuf); free(rbuf);
+      }
+#endif
+      free(mine[which]);
+    }
+#ifdef FD3D_MPI
+    if(P > 1) MPI_Allreduce(MPI_IN_PLACE, k1max, 1, MPI_DOUBLE, MPI_MAX, t->comm);
+#endif
+  }
+  for(which = 0; which < 2; which++){ free(A[which]); free(S0[which]); free(S1[which]); }
+#undef CROSS_K
+}
+
+struct fd3d_pair *fd3d_pair_create(struct fd3d *f0, struct fd3d *f1, double W, int comp)
+{
+  struct fd3d_pair *pp;
+  struct fd3d_tab *t = f0->t;
+  double k1c[2], kself = fabs(t->k1[1][1]);
+  if(f1->t != t || f0->mirror || f1->mirror || f0->layer || f1->layer) return NULL;
+  pp = calloc(1, sizeof(*pp));
+  pp->f[0] = f0; pp->f[1] = f1; pp->W = W;
+  /* receiver plane 1 at +W from source plane 0, and plane 0 at -W from plane 1 */
+  cross_build(t, W, comp, &pp->Wsh[0], &pp->Wno[0], &pp->Ksh[0], &pp->Kno[0], &k1c[0]);   /* 0 -> 1 */
+  cross_build(t, -W, comp, &pp->Wsh[1], &pp->Wno[1], &pp->Ksh[1], &pp->Kno[1], &k1c[1]);  /* 1 -> 0 */
+  pp->k1c = k1c[0] > k1c[1] ? k1c[0] : k1c[1];
+  if(pp->k1c > 1e-6*kself){ fd3d_pair_free(pp); return NULL; }   /* the planes interact within one step: not supported */
+  pp->normal_coupling = 0;
+  pp->sig0[0] = calloc(f0->N, sizeof(double)); pp->sig0[1] = calloc(f1->N, sizeof(double));
+  pp->tn[0] = calloc(f0->N, sizeof(double)); pp->tn[1] = calloc(f1->N, sizeof(double));
+  return pp;
+}
+
+void fd3d_pair_free(struct fd3d_pair *pp)
+{
+  int k;
+  if(!pp) return;
+  for(k = 0; k < 2; k++){ free(pp->Wsh[k]); free(pp->Wno[k]); free(pp->Ksh[k]); free(pp->Kno[k]); free(pp->sig0[k]); free(pp->tn[k]); }
+  free(pp);
+}
+
+/* cross contribution to plane p from plane q = 1 - p: lags >= 2 of q's history plus (without
+   exact statics) the static part of q's slip; shear and normal traction in element order */
+static void cross_known(struct fd3d_pair *pp, int p, double *sh, double *no)
+{
+  struct fd3d *fq = pp->f[1 - p], *fp = pp->f[p];
+  const struct fd3d_tab *t = fp->t;
+  int q = 1 - p, which, l, i, j, lmax = t->L < fq->nhist + 1 ? t->L : fq->nhist + 1, row0 = 0, nzp = fp->nzp;
+  size_t Mhh = (size_t)t->Mx*t->Mh, Mho = (size_t)t->nxr*t->Mh, M = (size_t)t->Mx*t->Mz, m;
+  double _Complex *acc = malloc(sizeof(double _Complex)*M), *dh = NULL;
+  if(!fp->static_fn){ dh = malloc(sizeof(double _Complex)*M); field_hat(fq, fq->delta, dh); }
+  for(which = 0; which < 2; which++){
+    const fd3d_cplx *Wt = which ? pp->Wno[q] : pp->Wsh[q];
+    const double _Complex *Ks = which ? pp->Kno[q] : pp->Ksh[q];
+    double _Complex *ah = calloc(Mhh, sizeof(double _Complex)), *ao = ah + (size_t)t->xr0*t->Mh;
+    double *out = which ? no : sh;
+    int ii, jj;
+    for(l = 2; l <= lmax; l++){
+      const fd3d_cplx *Wl = Wt + (size_t)(l - 1)*Mho;
+      const fd3d_cplx *Vh = fq->hist + (size_t)((fq->hk - (l - 1) + 2*t->L) % t->L)*Mho;
+      for(m = 0; m < Mho; m++) ao[m] += (double _Complex)(Wl[m]*Vh[m]);
+    }
+    tab_allgather(t, ah);
+    if(dh) for(m = 0; m < M; m++) acc[m] = Ks[m]*dh[m]; else memset(acc, 0, sizeof(double _Complex)*M);
+    for(ii = 0; ii < t->Mx; ii++) for(jj = 0; jj < t->Mh; jj++) acc[(size_t)ii*t->Mz + jj] += ah[(size_t)ii*t->Mh + jj];
+    free(ah);
+    from_half(t, acc);
+    fd3d_fft2(t, acc, +1);
+    for(i = 0; i < t->nx; i++) for(j = 0; j < nzp; j++) out[i*nzp + j] = creal(acc[(size_t)i*t->Mz + row0 + j])/M;
+  }
+  free(acc); free(dh);
+}
+
+int fd3d_pair_step(struct fd3d_pair *pp, const double *load0, const double *load1)
+{
+  int p, i, it = 0;
+  double *sh[2], *no[2];
+  step_begin(pp->f[0], load0); step_begin(pp->f[1], load1);
+  for(p = 0; p < 2; p++){
+    sh[p] = malloc(sizeof(double)*pp->f[p]->N); no[p] = malloc(sizeof(double)*pp->f[p]->N);
+    cross_known(pp, p, sh[p], no[p]);
+  }
+  for(p = 0; p < 2; p++){
+    struct fd3d *f = pp->f[p];
+    if(pp->static_n_fn) pp->static_n_fn(pp->static_n_ctx, p, pp->f[1 - p]->delta, f->delta, pp->tn[p]);
+    else memcpy(pp->tn[p], no[p], sizeof(double)*f->N);
+    if(pp->static_n_fn) for(i = 0; i < f->N; i++) pp->tn[p][i] += no[p][i];
+    if(pp->normal_coupling) for(i = 0; i < f->N; i++){ f->sigma[i] = pp->sig0[p][i] - pp->tn[p][i]; if(f->sigma[i] < 0.0) f->sigma[i] = 0.0; }
+    it += step_solve(f, sh[p]);
+    for(i = 0; i < f->N; i++) f->H[i] += sh[p][i];
+  }
+  for(p = 0; p < 2; p++){ step_end(pp->f[p]); free(sh[p]); free(no[p]); }
+  return it;
 }
