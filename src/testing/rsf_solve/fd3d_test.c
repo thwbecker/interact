@@ -104,6 +104,9 @@ static int run_tpv101(int argc, char **argv)
       fclose(fs);
     }
   }
+  { extern double fd3d_prof3[4]; extern long fd3d_cnt[3]; if(getenv("FD3D_PROF")) fprintf(stderr, "profile: %d steps; per step known part %.3f ms, solve %.3f ms, finish %.3f ms; per step %.1f Jacobi sweeps, %.0f local solves, %.2f Newton iterations each\n",
+      (int)fd3d_prof3[3], 1e3*fd3d_prof3[0]/fd3d_prof3[3], 1e3*fd3d_prof3[1]/fd3d_prof3[3], 1e3*fd3d_prof3[2]/fd3d_prof3[3],
+      fd3d_cnt[0]/fd3d_prof3[3], fd3d_cnt[1]/fd3d_prof3[3], (double)fd3d_cnt[2]/(fd3d_cnt[1] > 0 ? fd3d_cnt[1] : 1)); }
   { FILE *fo = fopen("tpv101_rt.dat", "w");       /* x y rupture_time final_slip (km, s, m) */
     for(i = 0; i < nx; i++) for(j = 0; j < nz; j++)
       fprintf(fo, "%.4f %.4f %.5f %.5f\n", (xlo + (i + 0.5)*dx)/1e3, (ylo + (j + 0.5)*dx)/1e3, rt[i*nz + j], f->delta[i*nz + j]);

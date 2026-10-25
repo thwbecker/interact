@@ -408,6 +408,7 @@ static double theta_adv(const struct fd3d *f, int i, double th, double va, doubl
 }
 
 /* local solve at element i: Hp + k V = strength(V) sign(V), scalar */
+long fd3d_cnt[3];                                  /* profiling: Jacobi sweeps, local RS solves, Newton iterations */
 static double local_sw(const struct fd3d *f, int i, double Hp, double k, double str0, double slope)
 {
   double A = -k - slope;
@@ -436,6 +437,7 @@ static double local_rs(const struct fd3d *f, int i, double Hp, double k, double 
     if(fabs(un - u) < 1e-13){ u = un; break; }
     u = un;
   }
+  fd3d_cnt[1]++; fd3d_cnt[2] += it + 1;
   return sgn(Hp)*exp(u);
 }
 
@@ -478,6 +480,9 @@ void fd3d_reset(struct fd3d *f)
 
 /* one fine step, split in three parts so that the free-surface layer can iterate the
    fault solve with an extra known traction (step_solve's Hx) before finishing */
+#include <time.h>
+static double fd3d_now(void){ struct timespec ts; clock_gettime(CLOCK_MONOTONIC, &ts); return ts.tv_sec + 1e-9*ts.tv_nsec; }
+double fd3d_prof3[4];                              /* known part (history), solve, finish (incl. push), steps */
 static void step_begin(struct fd3d *f, const double *load)
 {
   struct fd3d_tab *t = f->t;
@@ -519,12 +524,28 @@ static int step_solve_g(struct fd3d *f, const double *Hx, const double *guess, c
     memcpy(V, pass == 0 ? (guess ? guess : Vold) : Vs, sizeof(double)*N);
     if(f->law == 1)
       for(i = 0; i < N; i++) th_p[i] = theta_adv(f, i, f->theta[i], Vold[i], pass == 0 ? Vold[i] : Vs[i], dt);
+    /* active set: after the first sweep, a cell is recomputed only if its own rate or a stencil
+       neighbour's changed in the previous sweep (otherwise its known part is unchanged and so is
+       its solution); this removes most of the cost of the later sweeps */
+    char *chg = (char *)malloc(N), *act = (char *)malloc(N);
+    int use_act = !getenv("FD3D_NO_ACTIVE"), nzp = f->nzp, nxx = t->nx;
+    memset(chg, 1, N);
     for(it = 0; it < 400; it++){
       double ch = 0.0, vm = 0.0;
+      fd3d_cnt[0]++;
       apply_k1(f, V, f->work);
+      if(use_act && it > 0){
+        int ii, jj, di, dj;
+        memset(act, 0, N);
+        for(i = 0; i < N; i++) if(chg[i]){
+          ii = i/nzp; jj = i%nzp;
+          for(di = -1; di <= 1; di++) for(dj = -1; dj <= 1; dj++)
+            if(ii + di >= 0 && ii + di < nxx && jj + dj >= 0 && jj + dj < nzp) act[(ii + di)*nzp + jj + dj] = 1;
+        }
+      }else memset(act, 1, N);
       for(i = 0; i < N; i++){
         double Hp;
-        if(mask && !mask[i]){ Vn[i] = V[i]; continue; }
+        if((mask && !mask[i]) || !act[i]){ Vn[i] = V[i]; continue; }
         Hp = H[i] + hw*f->work[i];
         double kd = f->nl ? 0.5*kdiag(f, i % f->nzp) - 0.5*eta : kdiag(f, i % f->nzp);
         if(f->law == 0){
@@ -552,8 +573,10 @@ static int step_solve_g(struct fd3d *f, const double *Hx, const double *guess, c
         }else
           Vn[i] = local_rs(f, i, Hp, kd, th_p[i], V[i]);
         if(fabs(Vn[i] - V[i]) > ch) ch = fabs(Vn[i] - V[i]);
-        if(fabs(Vn[i]) > vm) vm = fabs(Vn[i]);
       }
+      /* changed: by more than 1e-3 of the convergence tolerance (Newton from a nearby guess changes
+         the last bits even for unchanged input, which must not keep a cell active) */
+      for(i = 0; i < N; i++){ chg[i] = fabs(Vn[i] - V[i]) > 1e-16*(fabs(V[i]) > 1.0 ? fabs(V[i]) : 1.0); if(fabs(Vn[i]) > vm) vm = fabs(Vn[i]); }
       memcpy(V, Vn, sizeof(double)*N);
       if(ch <= 1e-13*(vm > 1.0 ? vm : 1.0)) break;     /* Jacobi converged (same rule as the prototype) */
     }
@@ -563,7 +586,7 @@ static int step_solve_g(struct fd3d *f, const double *Hx, const double *guess, c
       memcpy(f->V, V, sizeof(double)*N);
       if(f->law == 1) memcpy(f->thnew ? f->thnew : f->theta, th_p, sizeof(double)*N);
     }
-    free(V);
+    free(V); free(chg); free(act);
   }
   free(Vn); free(th_p); free(Vs); free(H);
   return itot;
@@ -598,13 +621,13 @@ static int fd3d_step_layer_fft(struct fd3d *f, const double *load);
 static int fd3d_step_surf(struct fd3d *f, const double *load);
 int fd3d_step(struct fd3d *f, const double *load)
 {
-  int it;
+  int it; double t0, t1;
   if(f->layer && f->layer->surf) return fd3d_step_surf(f, load);
   if(f->layer && f->layer->fft) return fd3d_step_layer_fft(f, load);
   if(f->layer) return fd3d_step_layer(f, load);
-  step_begin(f, load);
-  it = step_solve(f, NULL);
-  step_end(f);
+  t0 = fd3d_now(); step_begin(f, load); t1 = fd3d_now(); fd3d_prof3[0] += t1 - t0; t0 = t1;
+  it = step_solve(f, NULL); t1 = fd3d_now(); fd3d_prof3[1] += t1 - t0; t0 = t1;
+  step_end(f); t1 = fd3d_now(); fd3d_prof3[2] += t1 - t0; fd3d_prof3[3] += 1.0;
   return it;
 }
 

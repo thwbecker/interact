@@ -1680,6 +1680,34 @@ slip and a few percent in peak slip rate, converging at second order; a 50 m run
 close the remaining arrival gap. The driver's default is still the first-order scheme so
 that the prototype reference test is unchanged; use FD3D_NL=1.
 
+### Speed, step S1: profile of the 3-D step, active-set Jacobi (2026-10-26)
+
+Profile (fd3d_test tpv101 with FD3D_PROF=1, second order, one core): at 500 m over 6 s,
+per step 3.1 ms in the known part (history convolution), 56 ms in the local solves,
+0.7 ms in finishing; 27.5 Jacobi sweeps per step, each solving every one of the 3744
+cells (103,000 local rate-and-state solves of 7.7 Newton iterations per step). So the
+local solve, not the convolution, dominated.
+Active set: after the first sweep, a cell is recomputed only if its own rate or one of its
+3 x 3 stencil neighbours changed by more than 1e-16 relative in the previous sweep (an
+unchanged known part gives an unchanged solution; Newton restarted from a nearby guess
+changes the last bits even for unchanged input, which must not keep a cell active).
+FD3D_NO_ACTIVE=1 switches it off. Results: local solves per step 103,000 -> 16,300 at
+500 m (solve 56 -> 7.0 ms per step), 6 times faster per step; at 250 m over 8 s per step
+28.7 ms known part, 43 ms solve (28 percent of the cells active on average), 3.9 ms
+finishing. The reference tests are unchanged to the printed digits (tpv3, tpv101, mirror
+differences identical to before). BP5-FD at 2 km, first event: 21.2 s instead of 70 s of
+wall time, 2791 steps and peak 3.814 m/s as before, mean slip 1.9380 against 1.9378 m
+(the quasi-steady hand-back test is sensitive at the 1e-4 level).
+MPI plan (decided 2026-10-26: MPI only, no OpenMP, to match rsf_solve's
+parallelism): the history convolution is distributed by wavenumber slabs (each rank
+owns a block of kx rows of the half spectrum: its part of the tables and history rings,
+so memory also divides by the number of ranks); the local solves by blocks of fault
+columns along strike with a one-column halo exchanged per Jacobi sweep; between the two,
+a slab-decomposed 2-D FFT with one all-to-all transpose each way per step. The surface
+tables are already per along-strike wavenumber and follow the same slab split. Results
+must be bit-identical for any number of ranks (sums over lags per wavenumber in the same
+order, local solves identical), which is the test.
+
 ### WP7, C implementation in rsf_solve: status (2026-10-18)
 Done, each verified in the sandbox before delivery (details in
 fd_c_design.md sections 6 to 10, usage in rsf_solve_fd.md):
