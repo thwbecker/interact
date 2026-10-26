@@ -53,6 +53,15 @@ tail -1 tmp_fd_dynamic/fd3d.out; [ $st -eq 0 ] || fail=1
 ( cd tmp_fd_dynamic && ../bin/fd3d_test stepover -500 500 12 0.25 0.645 > fd3d.out 2>/dev/null )
 if grep -q "segment 1 triggered" tmp_fd_dynamic/fd3d.out && grep -q "ruptured 2[0-9].[0-9] km (max slip 1.1" tmp_fd_dynamic/fd3d.out; then echo "fd3d_test stepover: PASS"
 else echo "fd3d_test stepover: FAIL"; cat tmp_fd_dynamic/fd3d.out; fail=1; fi
+# several 3-D planes of any orientation (fd_plan.md G1): a fault split into two planes must
+# reproduce the single plane (upright, and rigidly rotated: dipping and turned), strike and
+# dip slip; the dense coupling must equal the Toeplitz pair for parallel planes
+for c in "0 90 2 1" "35 -30 2 1" "0 90 2 2" "35 -30 2 2"; do
+  ( cd tmp_fd_dynamic && ../bin/fd3d_test multi $c > fd3d.out 2>/dev/null ); st=$?
+  tail -1 tmp_fd_dynamic/fd3d.out; [ $st -eq 0 ] || fail=1
+done
+( cd tmp_fd_dynamic && ../bin/fd3d_test multipair > fd3d.out 2>/dev/null ); st=$?
+tail -1 tmp_fd_dynamic/fd3d.out; [ $st -eq 0 ] || fail=1
 # non-parallel 2-D pairs (fd_plan.md N1): dense tables against the prototype for a kinked pair
 if command -v python3 > /dev/null 2>&1; then
   for a in 30 -45; do for m in 0 1; do

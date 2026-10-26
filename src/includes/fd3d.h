@@ -217,4 +217,43 @@ int fd3d_pair_step(struct fd3d_pair *pp, const double *load0, const double *load
 int fd3d_step_k(struct fd3d *f, const double *load, int k);
 void fd3d_push(struct fd3d *f, const double *V);   /* one slice into the history ring */
 void fd3d_reset(struct fd3d *f);                   /* empty history, zero slip and time */
+
+/* several planar faults of any orientation, whole space (fd_plan.md G1) */
+#define FD3D_MULTI_MAX 8
+struct fd3d_mplane {
+  double O[3];          /* corner of cell (0, 0) at the top (strike origin, up-dip edge) */
+  double E[3][3];       /* rows: e1 (strike), e2 (up dip), e3 = e1 x e2 */
+  double dx;            /* cell size */
+  int comp;             /* slip along e1 (1) or e2 (2) */
+};
+struct fd3d_mpair {     /* source q to receiver p, dense, receiver x source */
+  int L, nr, ns, has_k1;
+  double *Ws, *Wn, *Ks, *Kn, *K1s, *K1n;
+};
+struct fd3d_multi;
+struct fd3d_multi_slot { struct fd3d_multi *m; int p; };
+struct fd3d_multi {
+  int np, implicit, maxit, last_iters, Lb;
+  long hk;
+  double tol;
+  struct fd3d *f[FD3D_MULTI_MAX];
+  struct fd3d_mplane g[FD3D_MULTI_MAX];
+  struct fd3d_mpair c[FD3D_MULTI_MAX][FD3D_MULTI_MAX];
+  double *ring[FD3D_MULTI_MAX];          /* real-space history slices per plane */
+  int normal_coupling;
+  double *sig0[FD3D_MULTI_MAX], *tn[FD3D_MULTI_MAX];
+  /* optional exact statics: shear on every plane from all planes' slips (fills out[p]) */
+  void (*static_fn)(void *ctx, double **delta, double **out);
+  void *static_ctx;
+  double *sbuf[FD3D_MULTI_MAX];
+  struct fd3d_multi_slot slot[FD3D_MULTI_MAX];
+  /* optional exact static normal traction (tension positive) of plane p from all slips */
+  void (*static_n_fn)(void *ctx, int p, double **delta, double *out);
+  void *static_n_ctx;
+};
+struct fd3d_multi *fd3d_multi_create(int np, struct fd3d **f, const struct fd3d_mplane *geom);
+void fd3d_multi_free(struct fd3d_multi *m);
+void fd3d_multi_reset(struct fd3d_multi *m);
+void fd3d_multi_push(struct fd3d_multi *m, double **V);
+int fd3d_multi_step(struct fd3d_multi *m, double **load);
 #endif

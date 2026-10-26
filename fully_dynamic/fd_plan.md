@@ -2060,6 +2060,39 @@ up to about a hundred elements per segment at the default tolerance, slow with -
 result (1.46 against 1.59 m final slip) and was not kept. Segment detection split a
 1e-4 degree kinked half into 71 + 3 elements (harmless, one more pair).
 
+### 3-D faults of any orientation, step G1: several planes in the marcher (2026-10-28)
+
+fd3d.c, struct fd3d_multi (up to 8 planes, whole space): each plane p is an fd3d marcher
+on its own table, cells (i, j) with centre O_p + (i + 1/2) dx e1 - (j + 1/2) dx e2 (frame
+rows e1, e2, e3 = e1 x e2 of any orientation; slip of the +e3 side along e1 or e2, shear
+traction d . sigma . e3, normal traction e3 . sigma . e3, tension positive). Cross
+interactions are dense tables (receiver cell x source cell x lag) from
+fd3d_rect_ramp_tensor in the source cell's frame, rotated to global and projected on the
+receiver; window past the S arrival from the farthest cell (W vanishes in 3-D). Unlike
+the stepover pair, the current-step cross term K1 = S(dt) is kept (it is not small where
+planes meet: bends, branches): it is solved by a fixed point between the planes around
+the planes' own local solves (7 iterations at a seam, 1 to 2 when the planes are apart).
+History of each plane in a real-space ring (the pushed slices: the step's midpoint rate
+with the second-order scheme). Optional exact statics over all planes (static_fn,
+static_n_fn) as for the pair. Receivers within 1e-9 dx of a source plane are put in it
+(rotation round-off).
+Checks (fd3d_test multi, multipair; in run_tests.sh):
+- a slip-weakening fault of 24 x 12 cells split into two planes of 12 x 12 reproduces the
+  single plane: strike slip 2.7e-11 relative in V over 55 steps (cross first lag kept,
+  7 iterations), dip slip 5.4e-12; rigidly rotated (strike turned 35 degrees, dip 30 or 60
+  degrees): 1.5e-8 (strike slip; round-off of the rotations amplified by the rupture) and
+  3.9e-11 (dip slip);
+- parallel planes 1 km apart, prescribed slip: tractions equal to the Toeplitz pair (P1,
+  checked against interact) to 5e-14 (shear) and 1e-13 (normal; the pair's frame has the
+  opposite e3, hence the opposite normal sign, as expected);
+- bends: turning the second half by 10 and 30 degrees about the vertical lowers the mean
+  slip from 1.0345 m to 1.0266 and 0.9511 m; a dipping second half that meets the first
+  only at the surface point is not ruptured (geometrically disconnected), as expected.
+Cost: a dense pair costs L nr ns per step and to build (fine for faults of up to about a
+thousand cells each). One MPI rank for now; no free surface yet (whole space). Next:
+rsf_solve integration (planes from the geometry, exact Is and In, the phase), then the
+free surface for non-vertical planes (the virtual surface with several faults).
+
 ### WP7, C implementation in rsf_solve: status (2026-10-18)
 Done, each verified in the sandbox before delivery (details in
 fd_c_design.md sections 6 to 10, usage in rsf_solve_fd.md):

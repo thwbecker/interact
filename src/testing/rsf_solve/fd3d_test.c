@@ -474,6 +474,119 @@ static int run_stepover(double W, double dx, double tend, double d0, double mus)
   return 0;
 }
 
+/* several planes (fd_plan.md G1): a vertical strike-slip fault of nx x nz cells of 500 m with
+   slip weakening and an overstressed patch, run (a) as one plane and (b) split into two
+   planes at column nx/2 whose second half is turned by `ang` degrees about the vertical
+   through the seam (0: coplanar, the split must reproduce (a) to the solver tolerance), or
+   tilted (`dip` < 90: the second half dips). Prints the largest differences or the result. */
+static void run_sw_setup(struct fd3d *f, int nzp, double i0, double dx, int nxall, int off)
+{
+  int i, N = f->N; (void)nxall;
+  f->law = 0; f->mu_s = 0.677; f->mu_d = 0.525; f->d0 = 0.40; f->nl = 1;
+  for(i = 0; i < N; i++){
+    int ii = i/nzp + off, jj = i%nzp;
+    double xc = (ii + 0.5)*dx - i0, zc = (jj + 0.5)*dx - 0.5*nzp*dx;
+    f->sigma[i] = 120e6;
+    f->tau0[i] = (fabs(xc) <= 1500.0 && fabs(zc) <= 1500.0) ? 81.6e6 : 70e6;
+  }
+}
+static int run_multi(double ang, double dip, double tend, int comp)
+{
+  double cL = 6000, cT = 3464, rho = 2670, dx = 500.0, dt = 0.5*dx/cT, i0 = 6.5*dx, emax = 0, smax = 0;
+  int nx = 24, nz = 12, h = nx/2, n, i, ns = (int)(tend/dt + 0.5), p;
+  struct fd3d_tab *t1 = fd3d_tab_create_c(nx, nz, dx, dt, cL, cT, rho, 0, comp), *th = fd3d_tab_create_c(h, nz, dx, dt, cL, cT, rho, 0, comp);
+  struct fd3d *f1 = fd3d_create(t1), *fa[2];
+  struct fd3d_mplane g[2];
+  struct fd3d_multi *m;
+  double a = ang*M_PI/180.0, dp = dip*M_PI/180.0;
+  run_sw_setup(f1, nz, i0, dx, nx, 0);
+  for(p = 0; p < 2; p++){ fa[p] = fd3d_create(th); run_sw_setup(fa[p], nz, i0, dx, nx, p ? h : 0); }
+  memset(g, 0, sizeof(g));
+  g[0].dx = g[1].dx = dx; g[0].comp = g[1].comp = comp;
+  g[0].E[0][0] = 1.0; g[0].E[1][2] = 1.0; g[0].E[2][1] = -1.0;              /* e1 = x, e2 = z up, e3 = -y */
+  g[1].O[0] = h*dx;
+  g[1].E[0][0] = cos(a); g[1].E[0][1] = sin(a);                               /* strike turned about z */
+  {                                                                          /* up dip: sin(dip) z + cos(dip) (horizontal, normal to e1) */
+    double hz[3] = {sin(a), -cos(a), 0.0};
+    for(i = 0; i < 3; i++) g[1].E[1][i] = cos(dp)*hz[i] + sin(dp)*(i == 2);
+  }
+  g[1].E[2][0] = g[1].E[0][1]*g[1].E[1][2] - g[1].E[0][2]*g[1].E[1][1];
+  g[1].E[2][1] = g[1].E[0][2]*g[1].E[1][0] - g[1].E[0][0]*g[1].E[1][2];
+  g[1].E[2][2] = g[1].E[0][0]*g[1].E[1][1] - g[1].E[0][1]*g[1].E[1][0];
+  if(dip < 0.0){
+    /* rigid rotation of the whole split fault (coplanar halves, strike turned by ang, dip |dip|):
+       in a whole space it must reproduce the single plane exactly */
+    double dd = -dip*M_PI/180.0, e1[3] = {cos(a), sin(a), 0.0}, hz[3] = {sin(a), -cos(a), 0.0}, e2[3];
+    for(i = 0; i < 3; i++) e2[i] = cos(dd)*hz[i] + sin(dd)*(i == 2);
+    for(p = 0; p < 2; p++){
+      int k;
+      for(k = 0; k < 3; k++){ g[p].E[0][k] = e1[k]; g[p].E[1][k] = e2[k]; }
+      g[p].E[2][0] = e1[1]*e2[2] - e1[2]*e2[1]; g[p].E[2][1] = e1[2]*e2[0] - e1[0]*e2[2]; g[p].E[2][2] = e1[0]*e2[1] - e1[1]*e2[0];
+      for(k = 0; k < 3; k++) g[p].O[k] = (p ? h*dx : 0.0)*e1[k];
+    }
+  }
+  m = fd3d_multi_create(2, fa, g);
+  if(!m){ fprintf(stderr, "multi setup failed\n"); return 1; }
+  fprintf(stderr, "multi: turn %g deg, dip %g deg, cross first lag %s, cross windows %d / %d lags\n", ang, dip, m->implicit ? "kept (implicit)" : "zero", m->c[0][1].L, m->c[1][0].L);
+  for(n = 0; n < ns; n++){
+    fd3d_step(f1, NULL);
+    fd3d_multi_step(m, NULL);
+    for(p = 0; p < 2; p++) for(i = 0; i < fa[p]->N; i++){
+      int ii = i/nz + (p ? h : 0), jj = i%nz, k = ii*nz + jj;
+      double d = fabs(fa[p]->V[i] - f1->V[k]);
+      if(d > emax) emax = d;
+      if(fabs(f1->V[k]) > smax) smax = fabs(f1->V[k]);
+    }
+  }
+  {
+    double s1 = 0, s2 = 0;
+    for(i = 0; i < f1->N; i++) s1 += f1->delta[i];
+    for(p = 0; p < 2; p++) for(i = 0; i < fa[p]->N; i++) s2 += fa[p]->delta[i];
+    printf("fd3d_test multi: comp %d, turn %g deg, dip %g deg, %d steps: max |V(two planes) - V(one plane)| %.3e of %.3f m/s; mean slip %.5f (one plane) %.5f (two planes) m; fixed-point iterations last step %d\n",
+           comp, ang, dip, ns, emax, smax, s1/f1->N, s2/(2*fa[0]->N), m->last_iters);
+    if((ang == 0.0 && dip >= 90.0) || dip < 0.0){ int ok = emax <= (dip < 0.0 ? 1e-7 : 1e-8)*smax;   /* rotated: round-off of the rotations, amplified by the rupture */ printf("fd3d_test multi: %s\n", ok ? "PASS" : "FAIL"); return !ok; }
+  }
+  return 0;
+}
+
+/* dense several-plane coupling against the Toeplitz pair for two parallel planes 1 km apart:
+   plane 0 slips at a prescribed rate (first order), traction on plane 1 from both objects.
+   The pair's frame has e3 = e1 x (down) = -e3 of the multi frame, so the same receivers sit at
+   pair offset -W, and its slip and normal-traction signs are opposite: expected tau equal,
+   normal traction opposite. */
+static int run_multi_pair(void)
+{
+  double cL = 6000, cT = 3464, rho = 2670, dx = 500.0, dt = 0.5*dx/cT, W = 1000.0, es = 0, ss = 0, en = 0, sn = 0;
+  int nx = 8, nz = 4, N = nx*nz, n, i, ok;
+  struct fd3d_tab *t = fd3d_tab_create(nx, nz, dx, dt, cL, cT, rho, 0);
+  struct fd3d *a0 = fd3d_create(t), *a1 = fd3d_create(t), *b[2];
+  struct fd3d_pair *pp; struct fd3d_multi *m; struct fd3d_mplane g[2];
+  double *v0 = malloc(sizeof(double)*N), *vz = calloc(N, sizeof(double));
+  b[0] = fd3d_create(t); b[1] = fd3d_create(t);
+  a0->nl = a1->nl = b[0]->nl = b[1]->nl = 0;
+  a0->vpres = v0; a1->vpres = vz; b[0]->vpres = v0; b[1]->vpres = vz;
+  pp = fd3d_pair_create(a0, a1, -W, 1);
+  memset(g, 0, sizeof(g));
+  for(i = 0; i < 2; i++){ g[i].dx = dx; g[i].comp = 1; g[i].E[0][0] = 1.0; g[i].E[1][2] = 1.0; g[i].E[2][1] = -1.0; }
+  g[1].O[1] = -W;                                                           /* +W along e3 = -y */
+  m = fd3d_multi_create(2, b, g);
+  if(!pp || !m){ fprintf(stderr, "setup failed\n"); return 1; }
+  for(n = 1; n <= 40; n++){
+    for(i = 0; i < N; i++) v0[i] = (n <= 4) ? 1.0 : 0.0;
+    fd3d_pair_step(pp, NULL, NULL); fd3d_multi_step(m, NULL);
+    for(i = 0; i < N; i++){
+      if(fabs(b[1]->tau[i] - a1->tau[i]) > es) es = fabs(b[1]->tau[i] - a1->tau[i]);
+      if(fabs(a1->tau[i]) > ss) ss = fabs(a1->tau[i]);
+      if(fabs(m->tn[1][i] + pp->tn[1][i]) > en) en = fabs(m->tn[1][i] + pp->tn[1][i]);
+      if(fabs(pp->tn[1][i]) > sn) sn = fabs(pp->tn[1][i]);
+    }
+  }
+  ok = es <= 1e-8*ss && en <= 1e-8*sn;
+  printf("fd3d_test multipair: 40 steps: max |tau(multi) - tau(pair)| %.3e of %.3e, max |tn(multi) + tn(pair)| %.3e of %.3e\n", es, ss, en, sn);
+  printf("fd3d_test multipair: %s\n", ok ? "PASS" : "FAIL");
+  return !ok;
+}
+
 /* kernel check: full stress tensors (slip and opening, rectangles) against tada_quad.py values */
 static int run_kernels(const char *ref)
 {
@@ -542,6 +655,8 @@ static int main0(int argc, char **argv)
   if(argc >= 5 && !strcmp(argv[1], "surfsym")) return run_surfsym(atof(argv[2]), atoi(argv[3]), argv[4]);
   if(argc >= 3 && !strcmp(argv[1], "q2d")) return run_q2d(argv[2]);
   if(argc >= 2 && !strcmp(argv[1], "pair")) return run_pair(argc > 2 ? atoi(argv[2]) : 0);
+  if(argc >= 2 && !strcmp(argv[1], "multipair")) return run_multi_pair();
+  if(argc >= 2 && !strcmp(argv[1], "multi")) return run_multi(argc > 2 ? atof(argv[2]) : 0.0, argc > 3 ? atof(argv[3]) : 90.0, argc > 4 ? atof(argv[4]) : 4.0, argc > 5 ? atoi(argv[5]) : 1);
   if(argc >= 6 && !strcmp(argv[1], "stepover")) return run_stepover(atof(argv[2]), atof(argv[3]), atof(argv[4]), atof(argv[5]), argc > 6 ? atof(argv[6]) : 0.75);
   if(argc >= 7 && !strcmp(argv[1], "tpv10")) return run_tpv10(atof(argv[2]), atof(argv[3]), atoi(argv[4]), atoi(argv[5]), argv[6]);
   if(argc < 3 || strcmp(argv[1], "tpv3")){ fprintf(stderr, "usage: %s tpv3|tpv101 dx [ref] [tend]\n", argv[0]); return 2; }

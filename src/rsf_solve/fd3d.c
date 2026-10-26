@@ -2135,3 +2135,239 @@ int fd3d_pair_step(struct fd3d_pair *pp, const double *load0, const double *load
   for(p = 0; p < 2; p++){ step_end(pp->f[p]); free(sh[p]); free(no[p]); }
   return it;
 }
+
+/* ---------------- several planar faults of any orientation (fd_plan.md G1) ----------------
+   Each plane p is an fd3d marcher on its own table (whole space), cells (i, j), i along e1
+   (strike), j down the dip; centre O_p + (i + 1/2) dx e1 - (j + 1/2) dx e2, e2 up dip,
+   e3 = e1 x e2. Slip of plane p: motion of its +e3 side relative to the -e3 side along
+   d_p = e1 (comp 1) or e2 (comp 2); shear traction d_p . sigma . e3, normal traction (tension
+   positive) e3 . sigma . e3. Cross interactions are dense tables W[l][i][j], built from
+   fd3d_rect_ramp_tensor in the source cell's frame and rotated. The current step's cross term
+   K1 = S(dt) is kept (intersecting faults): solved by a fixed point between the planes around
+   the planes' own local solves. */
+static void mat_rot(const double E[3][3], const double s6[6], double S[3][3])
+{
+  /* s6 in the frame with rows E (s11 s22 s33 s12 s13 s23) to global S = E^T s E */
+  double s[3][3] = {{s6[0], s6[3], s6[4]}, {s6[3], s6[1], s6[5]}, {s6[4], s6[5], s6[2]}};
+  int a, b, c, d;
+  for(a = 0; a < 3; a++) for(b = 0; b < 3; b++){
+    double v = 0.0;
+    for(c = 0; c < 3; c++) for(d = 0; d < 3; d++) v += E[c][a]*s[c][d]*E[d][b];
+    S[a][b] = v;
+  }
+}
+static void plane_centre(const struct fd3d_mplane *g, int i, int j, double X[3])
+{
+  int k;
+  for(k = 0; k < 3; k++) X[k] = g->O[k] + (i + 0.5)*g->dx*g->E[0][k] - (j + 0.5)*g->dx*g->E[1][k];
+}
+/* traction (shear along the receiver's slip, normal) on receiver plane gp at X from a unit-rate
+   ramp of the source cell (iq, jq) of plane gq, at time t */
+static void cross_resp(const struct fd3d_mplane *gq, int iq, int jq, const struct fd3d_mplane *gp, const double X[3],
+                       double t, double cL, double cT, double rho, double *ts, double *tn)
+{
+  double Y[3], r[3], x[3], s6[6], S[3][3], d[3], n[3], Sn[3];
+  int k, a;
+  plane_centre(gq, iq, jq, Y);
+  for(k = 0; k < 3; k++) r[k] = X[k] - Y[k];
+  for(a = 0; a < 3; a++) x[a] = r[0]*gq->E[a][0] + r[1]*gq->E[a][1] + r[2]*gq->E[a][2];
+  for(a = 0; a < 3; a++) if(fabs(x[a]) < 1e-9*gq->dx) x[a] = 0.0;   /* rotation round-off: in-plane receivers stay in-plane */
+  if(t <= 0.0){ *ts = *tn = 0.0; return; }
+  fd3d_rect_ramp_tensor(x[0], x[1], x[2], t, 0.5*gq->dx, 0.5*gq->dx, cL, cT, rho, gq->comp, s6);
+  mat_rot(gq->E, s6, S);
+  for(k = 0; k < 3; k++){ d[k] = gp->E[gp->comp - 1][k]; n[k] = gp->E[2][k]; }
+  for(a = 0; a < 3; a++) Sn[a] = S[a][0]*n[0] + S[a][1]*n[1] + S[a][2]*n[2];
+  *ts = d[0]*Sn[0] + d[1]*Sn[1] + d[2]*Sn[2];
+  *tn = n[0]*Sn[0] + n[1]*Sn[1] + n[2]*Sn[2];
+}
+
+struct fd3d_multi *fd3d_multi_create(int np, struct fd3d **f, const struct fd3d_mplane *geom)
+{
+  struct fd3d_multi *m = calloc(1, sizeof(*m));
+  int p, q, Lmax = 0;
+  double cL = f[0]->t->cL, cT = f[0]->t->cT, rho = f[0]->t->rho, dt = f[0]->t->dt;
+  m->np = np;
+  for(p = 0; p < np; p++){
+    m->f[p] = f[p]; m->g[p] = geom[p];
+    if(f[p]->mirror || f[p]->layer || f[p]->next || fabs(f[p]->t->dt - dt) > 1e-12*dt || f[p]->t->mpi_size > 1){ free(m); return NULL; }
+  }
+  for(p = 0; p < np; p++) for(q = 0; q < np; q++){
+    struct fd3d_mpair *c = &m->c[q][p];               /* source q, receiver p */
+    int nr = f[p]->N, ns = f[q]->N, i, j, l, L;
+    double rmax = 0.0, T1, T2;
+    if(p == q) continue;
+    for(i = 0; i < nr; i++){
+      double X[3], Y[3], rr;
+      plane_centre(&m->g[p], i/f[p]->nzp, i%f[p]->nzp, X);
+      for(j = 0; j < ns; j += (ns > 64 ? ns/64 : 1)){
+        plane_centre(&m->g[q], j/f[q]->nzp, j%f[q]->nzp, Y);
+        rr = sqrt((X[0]-Y[0])*(X[0]-Y[0]) + (X[1]-Y[1])*(X[1]-Y[1]) + (X[2]-Y[2])*(X[2]-Y[2]));
+        if(rr > rmax) rmax = rr;
+      }
+    }
+    rmax += 2.0*m->g[q].dx;
+    L = (int)ceil(rmax/cT/dt) + 12;                  /* past the S arrival from the farthest cell: W vanishes in 3-D */
+    T1 = 1.5*rmax/cT + 10.0*dt; T2 = 2.0*T1;
+    c->L = L; c->nr = nr; c->ns = ns;
+    c->Ws = calloc((size_t)L*nr*ns, sizeof(double)); c->Wn = calloc((size_t)L*nr*ns, sizeof(double));
+    c->Ks = malloc(sizeof(double)*nr*ns); c->Kn = malloc(sizeof(double)*nr*ns);
+    c->K1s = malloc(sizeof(double)*nr*ns); c->K1n = malloc(sizeof(double)*nr*ns);
+    for(i = 0; i < nr; i++){
+      double X[3];
+      plane_centre(&m->g[p], i/f[p]->nzp, i%f[p]->nzp, X);
+      for(j = 0; j < ns; j++){
+        size_t e = (size_t)i*ns + j;
+        double s0, n0, s1, n1, a1, b1, a2, b2, As, An;
+        int iq = j/f[q]->nzp, jq = j%f[q]->nzp;
+        cross_resp(&m->g[q], iq, jq, &m->g[p], X, T1, cL, cT, rho, &a1, &b1);
+        cross_resp(&m->g[q], iq, jq, &m->g[p], X, T2, cL, cT, rho, &a2, &b2);
+        As = (a2 - a1)/(T2 - T1); An = (b2 - b1)/(T2 - T1);
+        c->Ks[e] = As; c->Kn[e] = An;
+        s0 = n0 = 0.0;
+        for(l = 1; l <= L; l++){
+          cross_resp(&m->g[q], iq, jq, &m->g[p], X, l*dt, cL, cT, rho, &s1, &n1);
+          if(l == 1){ c->K1s[e] = s1; c->K1n[e] = n1; }
+          c->Ws[(size_t)(l - 1)*nr*ns + e] = s1 - s0 - As*dt;
+          c->Wn[(size_t)(l - 1)*nr*ns + e] = n1 - n0 - An*dt;
+          s0 = s1; n0 = n1;
+        }
+      }
+    }
+    {                                                 /* the cross first lag, kept only where it matters */
+      double kself = fabs(f[p]->t->k1[1][1]), km = 0.0; size_t e;
+      for(e = 0; e < (size_t)nr*ns; e++) if(fabs(c->K1s[e]) > km) km = fabs(c->K1s[e]);
+      c->has_k1 = km > 1e-12*kself;
+      if(c->has_k1) m->implicit = 1;
+    }
+    if(L > Lmax) Lmax = L;
+  }
+  m->Lb = Lmax + 1;
+  for(p = 0; p < np; p++){
+    m->ring[p] = calloc((size_t)m->Lb*f[p]->N, sizeof(double));
+    m->sig0[p] = calloc(f[p]->N, sizeof(double)); m->tn[p] = calloc(f[p]->N, sizeof(double));
+  }
+  m->tol = 1e-12; m->maxit = 200;
+  return m;
+}
+
+void fd3d_multi_free(struct fd3d_multi *m)
+{
+  int p, q;
+  if(!m) return;
+  for(p = 0; p < m->np; p++){
+    free(m->ring[p]); free(m->sig0[p]); free(m->tn[p]); free(m->sbuf[p]);
+    for(q = 0; q < m->np; q++){ struct fd3d_mpair *c = &m->c[q][p]; free(c->Ws); free(c->Wn); free(c->Ks); free(c->Kn); free(c->K1s); free(c->K1n); }
+  }
+  free(m);
+}
+
+void fd3d_multi_reset(struct fd3d_multi *m)
+{
+  int p;
+  for(p = 0; p < m->np; p++){ fd3d_reset(m->f[p]); memset(m->ring[p], 0, sizeof(double)*(size_t)m->Lb*m->f[p]->N); }
+  m->hk = 0;
+}
+
+/* push a slice of all planes (history seeding from QD, and after each step) */
+void fd3d_multi_push(struct fd3d_multi *m, double **V)
+{
+  int p;
+  for(p = 0; p < m->np; p++){
+    memcpy(m->ring[p] + (size_t)(m->hk % m->Lb)*m->f[p]->N, V[p], sizeof(double)*m->f[p]->N);
+    fd3d_push(m->f[p], V[p]);
+  }
+  m->hk++;
+}
+
+static void multi_sbuf_out(void *ctx, const double *delta, double *out)
+{
+  struct fd3d_multi_slot *s = (struct fd3d_multi_slot *)ctx; (void)delta;
+  memcpy(out, s->m->sbuf[s->p], sizeof(double)*s->m->f[s->p]->N);
+}
+
+int fd3d_multi_step(struct fd3d_multi *m, double **load)
+{
+  int np = m->np, p, q, i, j, l, it, itot = 0;
+  double *Kx[FD3D_MULTI_MAX], *Kn[FD3D_MULTI_MAX], *Hs[FD3D_MULTI_MAX], *Vprev[FD3D_MULTI_MAX];
+  if(m->static_fn){                                   /* exact statics of all planes from all slips */
+    double *dl[FD3D_MULTI_MAX];
+    for(p = 0; p < np; p++){ if(!m->sbuf[p]) m->sbuf[p] = malloc(sizeof(double)*m->f[p]->N); dl[p] = m->f[p]->delta; }
+    m->static_fn(m->static_ctx, dl, m->sbuf);
+    for(p = 0; p < np; p++){ m->slot[p].m = m; m->slot[p].p = p; m->f[p]->static_fn = multi_sbuf_out; m->f[p]->static_ctx = &m->slot[p]; }
+  }
+  for(p = 0; p < np; p++) step_begin(m->f[p], load ? load[p] : NULL);
+  /* known cross part: statics (tables unless exact) and lags >= 2 */
+  for(p = 0; p < np; p++){
+    int nr = m->f[p]->N;
+    Kx[p] = calloc(nr, sizeof(double)); Kn[p] = calloc(nr, sizeof(double)); Hs[p] = malloc(sizeof(double)*nr); Vprev[p] = malloc(sizeof(double)*nr);
+    for(q = 0; q < np; q++){
+      struct fd3d_mpair *c = &m->c[q][p];
+      int ns;
+      if(p == q) continue;
+      ns = c->ns;
+      if(!m->static_fn) for(i = 0; i < nr; i++){
+        double a = 0.0, b = 0.0; const double *rs = c->Ks + (size_t)i*ns, *rn = c->Kn + (size_t)i*ns;
+        for(j = 0; j < ns; j++){ a += rs[j]*m->f[q]->delta[j]; b += rn[j]*m->f[q]->delta[j]; }
+        Kx[p][i] += a; Kn[p][i] += b;
+      }
+      for(l = 2; l <= c->L && l - 1 <= m->hk; l++){
+        const double *v = m->ring[q] + (size_t)((m->hk - (l - 1) + (long)m->Lb*1000) % m->Lb)*ns;
+        const double *Ws = c->Ws + (size_t)(l - 1)*nr*ns, *Wn = c->Wn + (size_t)(l - 1)*nr*ns;
+        for(i = 0; i < nr; i++){
+          double a = 0.0, b = 0.0;
+          for(j = 0; j < ns; j++){ a += Ws[(size_t)i*ns + j]*v[j]; b += Wn[(size_t)i*ns + j]*v[j]; }
+          Kx[p][i] += a; Kn[p][i] += b;
+        }
+      }
+      if(m->f[p]->nl && c->has_k1) for(i = 0; i < nr; i++){   /* NL: half of the current-step term from V_old */
+        double a = 0.0, b = 0.0;
+        for(j = 0; j < ns; j++){ a += c->K1s[(size_t)i*ns + j]*m->f[q]->Vold[j]; b += c->K1n[(size_t)i*ns + j]*m->f[q]->Vold[j]; }
+        Kx[p][i] += 0.5*a; Kn[p][i] += 0.5*b;
+      }
+    }
+  }
+  if(m->static_n_fn) for(p = 0; p < np; p++){       /* exact static normal traction (all planes' slips) */
+    double *dl[FD3D_MULTI_MAX], *o = malloc(sizeof(double)*m->f[p]->N);
+    for(q = 0; q < np; q++) dl[q] = m->f[q]->delta;
+    m->static_n_fn(m->static_n_ctx, p, dl, o);
+    for(i = 0; i < m->f[p]->N; i++) Kn[p][i] += o[i];
+    free(o);
+  }
+  /* solve: fixed point between the planes for the current-step cross terms */
+  for(p = 0; p < np; p++) memcpy(Vprev[p], m->f[p]->Vold, sizeof(double)*m->f[p]->N);
+  for(it = 0; it < (m->implicit ? m->maxit : 1); it++){
+    double ch = 0.0, vm = 1e-9;
+    for(p = 0; p < np; p++){
+      struct fd3d *f = m->f[p];
+      int nr = f->N;
+      double hw = f->nl ? 0.5 : 1.0, *tnc = calloc(nr, sizeof(double));
+      for(i = 0; i < nr; i++) Hs[p][i] = Kx[p][i];
+      for(q = 0; q < np; q++){
+        struct fd3d_mpair *c = &m->c[q][p];
+        if(p == q || !c->has_k1) continue;
+        for(i = 0; i < nr; i++){
+          double a = 0.0, b = 0.0;
+          for(j = 0; j < c->ns; j++){ a += c->K1s[(size_t)i*c->ns + j]*m->f[q]->V[j]; b += c->K1n[(size_t)i*c->ns + j]*m->f[q]->V[j]; }
+          Hs[p][i] += hw*a; tnc[i] += hw*b;
+        }
+      }
+      for(i = 0; i < nr; i++) m->tn[p][i] = Kn[p][i] + tnc[i];
+      if(m->normal_coupling) for(i = 0; i < nr; i++){ f->sigma[i] = m->sig0[p][i] - m->tn[p][i]; if(f->sigma[i] < 0.0) f->sigma[i] = 0.0; }
+      free(tnc);
+      if(it > 0) memcpy(Vprev[p], f->V, sizeof(double)*nr);
+      itot += step_solve_g(f, Hs[p], it > 0 ? f->V : NULL, NULL);
+      for(i = 0; i < nr; i++){ if(fabs(f->V[i] - Vprev[p][i]) > ch) ch = fabs(f->V[i] - Vprev[p][i]); if(fabs(f->V[i]) > vm) vm = fabs(f->V[i]); }
+    }
+    if(m->implicit && it > 0 && ch <= m->tol*vm) break;
+  }
+  m->last_iters = it + 1;
+  for(p = 0; p < np; p++){
+    struct fd3d *f = m->f[p];
+    double *sl = m->ring[p] + (size_t)(m->hk % m->Lb)*f->N;
+    for(i = 0; i < f->N; i++){ f->H[i] += Hs[p][i]; sl[i] = f->nl ? 0.5*(f->Vold[i] + f->V[i]) : f->V[i]; }
+    step_end(f);
+    free(Kx[p]); free(Kn[p]); free(Hs[p]); free(Vprev[p]);
+  }
+  m->hk++;
+  return itot;
+}
