@@ -39,6 +39,8 @@ struct fd_sys {
   int *off;
   /* history: per source segment a ring of Lbuf FFT'd slices */
   double _Complex **hist;
+  double **histr;               /* real-space ring per source, only with dense pairs (ndense > 0) */
+  int ndense;
   int *hk;
   fd_fft_plan pf, pb;
   double _Complex *w1, *w2, *w3;

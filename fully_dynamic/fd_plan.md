@@ -2028,6 +2028,38 @@ stepover model through the first events (onsets 20.7792 and 20.8384 yr, as with 
 QD bit-identity harness: PASS (the option is off by default). Suggestion for Thor: a
 default of a few hundred m/s would be physically safe.
 
+### 2-D non-parallel segments, step N1 (2026-10-28)
+
+fd_tables.c: pairs that are not parallel with equal elements (bends, branches, the mirror
+image of a dipping segment) get dense tables (fd_pair_build_dense, also selectable with
+FD_FORCE_DENSE=1 for tests): for every (receiver, source) element pair the same columns
+as the Toeplitz tables (closed form, then the large-time series), receiver centre in the
+source element's frame, traction projected on the receiver; the window rule is the same.
+fd_pair_W_dense and fd_pair_static_dense return them directly, so the cumulative kernels
+and the static operators need no change. fd_march.c: with dense pairs a real-space ring of
+the source slices is kept (fd_sys: histr, ndense) and fd_sys_history sums dense pairs
+directly over the lags; coarse history skips dense pairs (they use the fine ring), the
+partitioned convolution is switched off when any pair is dense. rsf_fd.c: the
+non-parallel check is gone; antiplane half-plane images are built generally (mirrored
+segment in reversed order, tangent (-s_x, s_y), as before for vertical segments), so
+dipping segments in a half plane are allowed; the setup prints which pairs are dense.
+Checks:
+- test_fd_dense (C) against test_fd_dense.py (prototype inplane.W_table and
+  antiplane.W_table_ap), kinks of 30 and -45 degrees, in-plane and antiplane, static
+  blocks and lags 1, 2, 5, 20, 60: 2e-10 relative (in run_tests.sh).
+- Harris-Day stepover (fd_dynamic hd 500 200 10) with all pairs dense against the Toeplitz
+  pairs: traces equal to 2.6e-11 relative, final slip 1.593414 m in both; 18 times slower.
+- rsf_solve, 2-D in-plane single fault (200 m, rate and state), bent at its centre:
+  no bend: first event 24.861 yr, 900 steps, peak 1.028 m/s, mean slip 0.8465 m;
+  1e-4 degree bend (dense cross pairs): 24.861 yr, 897 steps, 1.027 m/s, 0.8441 m (the
+  0.3 percent difference is the window tolerance 1e-2 truncating the pairs differently);
+  10 degree bend: 23.802 yr, 855 steps, 1.000 m/s, 0.7880 m.
+Costs: a dense pair costs L nr ns per step and to build; fine for bends and branches of
+up to about a hundred elements per segment at the default tolerance, slow with -fd_tol
+1e-4. Truncating each pair's tail separately to save build time changed the Harris-Day
+result (1.46 against 1.59 m final slip) and was not kept. Segment detection split a
+1e-4 degree kinked half into 71 + 3 elements (harmless, one more pair).
+
 ### WP7, C implementation in rsf_solve: status (2026-10-18)
 Done, each verified in the sandbox before delivery (details in
 fd_c_design.md sections 6 to 10, usage in rsf_solve_fd.md):

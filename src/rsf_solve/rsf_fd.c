@@ -1076,9 +1076,7 @@ static PetscErrorCode fd_build_tables(struct interact_ctx *par, struct fd_vars *
     PetscCheck(fabs(fd->segs->seg[k].dx - dx0) < 1e-9*dx0,PETSC_COMM_WORLD,PETSC_ERR_SUP,
 	       "rsf_fd_setup: segments with different element sizes (%g vs %g): one common size required in this version",
 	       fd->segs->seg[k].dx,dx0);
-    for(l = 0;l < fd->segs->nseg;l++)
-      PetscCheck(fd_segments_parallel(fd->segs->seg + k,fd->segs->seg + l),PETSC_COMM_WORLD,PETSC_ERR_SUP,
-		 "rsf_fd_setup: segments %ld and %ld are not parallel: non-parallel pairs are M7 work",(long)k,(long)l);
+    /* non-parallel segments (bends, branches) use dense pair tables (fd_plan.md N1) */
   }
   fd->dt_min = fd->cfl*dx0/fd->beta;
   /* sources: the real segments, plus for the antiplane half plane the image of
@@ -1090,10 +1088,12 @@ static PetscErrorCode fd_build_tables(struct interact_ctx *par, struct fd_vars *
     fd->srcseg[k] = fd->segs->seg[k]; fd->src_of[k] = (int)k; fd->src_rev[k] = 0;
     if(fd->halfplane){
       struct fd_segment *im = fd->srcseg + fd->segs->nseg + k, *re = fd->segs->seg + k;
-      PetscCheck(fabs(re->s[0]) < 1e-9,PETSC_COMM_WORLD,PETSC_ERR_SUP,
-		 "rsf_fd_setup: antiplane half plane needs vertical segments (image of a dipping segment is not parallel, M7)");
+      /* image: the mirrored segment in reversed element order, tangent (-s_x, s_y), so that a
+         vertical segment keeps its tangent (as before); a dipping segment's image is not
+         parallel to it and gets a dense table (fd_plan.md N1) */
       *im = *re;
-      im->X0[0] = re->X0[0];
+      im->s[0] = -re->s[0]; im->s[1] = re->s[1];
+      im->X0[0] = re->X0[0] + (re->n - 1)*re->dx*re->s[0];
       im->X0[1] = -(re->X0[1] + (re->n - 1)*re->dx*re->s[1]);
       fd->src_of[fd->segs->nseg + k] = (int)k; fd->src_rev[fd->segs->nseg + k] = 1;
     }
@@ -1113,8 +1113,9 @@ static PetscErrorCode fd_build_tables(struct interact_ctx *par, struct fd_vars *
       fd->pairs[k*fd->segs->nseg + l] = p;
       fd->nbytes += (double)p->L*p->M*16.0*(p->has_normal ? 2 : 1);
       if(p->L > fd->L) fd->L = p->L;
-      PetscCall(PetscPrintf(PETSC_COMM_WORLD,"rsf_fd_setup: pair (%s%ld -> %ld): %d x %d elements, window %d lags (%.2f s)\n",
-			    k >= fd->segs->nseg ? "image " : "",(long)fd->src_of[k],(long)l,p->src->n,p->rcv->n,p->L,(double)(p->L*fd->dt_min)));
+      PetscCall(PetscPrintf(PETSC_COMM_WORLD,"rsf_fd_setup: pair (%s%ld -> %ld): %d x %d elements, window %d lags (%.2f s)%s\n",
+			    k >= fd->segs->nseg ? "image " : "",(long)fd->src_of[k],(long)l,p->src->n,p->rcv->n,p->L,(double)(p->L*fd->dt_min),
+			    p->dense ? ", dense (not parallel)" : ""));
     }
   fd->sys = fd_sys_create(fd->segs,fd->pairs,(int)fd->nsrc,fd->src_of,fd->src_rev,fd->mode2d,fd->dt_min,fd->alpha,fd->beta,fd->rho,+1);
   PetscCheck(fd->sys,PETSC_COMM_WORLD,PETSC_ERR_MEM,"rsf_fd_setup: marcher system allocation failed");

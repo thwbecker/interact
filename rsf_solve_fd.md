@@ -20,6 +20,10 @@ Capabilities at a glance (2026-10-25):
   second-order time marching (default) with variable substeps and an exact
   coarse history; mirror free surface for antiplane. Benchmarked against
   exact solutions, TPV205-2D, Harris-Day and SEAS BP1.
+- 2-D, any segment geometry: pairs of parallel segments use Toeplitz tables, other pairs
+  (bends, branches, images of dipping segments) dense tables, which cost L nr ns per step
+  (fd_plan.md N1); coarse history applies to the parallel pairs only and the partitioned
+  convolution (-fd_conv) is off when any pair is dense.
 - 3-D, two parallel planes (stepovers, strike slip): one lattice for both, whole
   space or half space by the mirror image, exact statics (Is, and In with
   -calc_sigma_dot) for both planes; check with

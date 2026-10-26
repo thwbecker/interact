@@ -32,6 +32,11 @@ struct fd_pair {
   double *ks_row, *kn_row;	/* static traction per offset (stress-from-slip) */
   double _Complex *Ws_hat, *Wn_hat;	/* L x M */
   fd_fft_plan pf, pb;
+  /* non-parallel segments (or unequal elements, fd_plan.md N1): no Toeplitz structure; dense
+     tables W[l][i][j] (receiver i, source j), l = 0 .. L-1 as the columns above, and the
+     static blocks; Ws_hat/Wn_hat, m, ks_row, kn_row are then unused */
+  int dense;
+  double *Wd_s, *Wd_n, *Kd_s, *Kd_n;
 };
 
 /* build the table; lmax caps the window (cap_ok: accept the cap silently),
@@ -46,4 +51,8 @@ void fd_pair_free(struct fd_pair *p);
 void fd_pair_W_dense(const struct fd_pair *p, int l1, double *Ws, double *Wn);
 void fd_pair_static_dense(const struct fd_pair *p, double *Ks, double *Kn);
 int  fd_segments_parallel(const struct fd_segment *a, const struct fd_segment *b);
+/* the dense variant, built for any pair (also used by fd_pair_build when the segments are not parallel) */
+struct fd_pair *fd_pair_build_dense(const struct fd_segment *src, const struct fd_segment *rcv, int mode,
+                                    double dt, double et, double alpha, double beta, double rho,
+                                    double tol, int lmax, int cap_ok, int M, char *errmsg);
 #endif

@@ -77,9 +77,21 @@ struct fd_sys *fd_sys_create(struct fd_seglist *segs, struct fd_pair **pairs, in
   s->off[0] = 0;
   for(k = 0; k < s->nseg; k++) s->off[k + 1] = s->off[k] + segs->seg[k].n;
   s->N = s->off[s->nseg];
-  s->M = pairs[0]->M; s->L = 0;
-  for(k = 0; k < s->nsrc * s->nseg; k++) if(pairs[k]->L > s->L) s->L = pairs[k]->L;
+  s->M = 0; s->L = 0; s->ndense = 0;
+  for(k = 0; k < s->nsrc * s->nseg; k++){
+    if(pairs[k]->L > s->L) s->L = pairs[k]->L;
+    if(pairs[k]->dense) s->ndense++;
+    else if(pairs[k]->M > s->M) s->M = pairs[k]->M;      /* Toeplitz pairs share one M */
+  }
+  if(s->M == 0){                                         /* only dense pairs: the spectral ring is still kept */
+    int nmax = 0;
+    for(k = 0; k < s->nseg; k++) if(segs->seg[k].n > nmax) nmax = segs->seg[k].n;
+    s->M = fd_fft_size_for(nmax);
+  }
   s->Lbuf = s->L + 1;
+  /* real-space ring of the source slices for dense (non-parallel) pairs (fd_plan.md N1) */
+  s->histr = (double **)calloc((size_t)s->nsrc, sizeof(double *));
+  if(s->ndense) for(k = 0; k < s->nsrc; k++) s->histr[k] = (double *)calloc((size_t)s->Lbuf * segs->seg[s->src_of[k]].n, sizeof(double));
   s->hist = (double _Complex **)malloc(sizeof(double _Complex *) * (size_t)s->nsrc);
   s->hk = (int *)calloc((size_t)s->nsrc, sizeof(int));
   for(k = 0; k < s->nsrc; k++) s->hist[k] = (double _Complex *)calloc((size_t)s->Lbuf * s->M, sizeof(double _Complex));
@@ -113,7 +125,8 @@ void fd_sys_free(struct fd_sys *s)
 {
   int k;
   if(!s) return;
-  for(k = 0; k < s->nsrc; k++) free(s->hist[k]);
+  for(k = 0; k < s->nsrc; k++){ free(s->hist[k]); free(s->histr[k]); }
+  free(s->histr);
   if(s->conv){
     int np = s->nsrc * s->nseg;
     for(k = 0; k < np; k++){ free(s->Hs[k]); if(s->Hn) free(s->Hn[k]); free(s->Ys[k]); if(s->Yn) free(s->Yn[k]); }
@@ -137,7 +150,10 @@ void fd_sys_reset_history(struct fd_sys *s)
 {
   int k;
   s->coarse_from = -1;
-  for(k = 0; k < s->nsrc; k++){ memset(s->hist[k], 0, sizeof(double _Complex) * (size_t)s->Lbuf * s->M); s->hk[k] = 0; }
+  for(k = 0; k < s->nsrc; k++){
+    memset(s->hist[k], 0, sizeof(double _Complex) * (size_t)s->Lbuf * s->M); s->hk[k] = 0;
+    if(s->histr[k]) memset(s->histr[k], 0, sizeof(double) * (size_t)s->Lbuf * s->segs->seg[s->src_of[k]].n);
+  }
   if(s->conv){
     for(k = 0; k < s->nsrc; k++){
       int q;
@@ -167,6 +183,10 @@ void fd_sys_push_k(struct fd_sys *s, const double *V, int kk)
     r = s->src_of[k]; n = s->segs->seg[r].n;
     for(q = 0; q < kk; q++){
       double _Complex *slot = s->hist[k] + (size_t)(s->hk[k] % s->Lbuf) * s->M;
+      if(s->histr[k]){
+        double *rs = s->histr[k] + (size_t)(s->hk[k] % s->Lbuf) * n;
+        for(i = 0; i < n; i++) rs[i] = V[s->off[r] + (s->src_rev[k] ? n - 1 - i : i)];
+      }
       if(!first){
         memset(s->w1, 0, sizeof(double _Complex) * s->M);
         for(i = 0; i < n; i++) s->w1[i] = V[s->off[r] + (s->src_rev[k] ? n - 1 - i : i)];
@@ -204,6 +224,10 @@ void fd_sys_push_lin(struct fd_sys *s, const double *Vold, const double *V, int 
       double _Complex *slot = s->hist[k] + (size_t)(s->hk[k] % s->Lbuf) * s->M;
       int m;
       for(m = 0; m < s->M; m++) slot[m] = (1.0 - w) * s->w2[m] + w * s->w1[m];
+      if(s->histr[k]){
+        double *rs = s->histr[k] + (size_t)(s->hk[k] % s->Lbuf) * n;
+        for(i = 0; i < n; i++){ int ii = s->off[r] + (s->src_rev[k] ? n - 1 - i : i); rs[i] = (1.0 - w) * Vold[ii] + w * V[ii]; }
+      }
       s->hk[k]++;
       if((s->conv == 1) && (s->hk[k] % s->B == 0))
         form_window(s, k, s->hk[k] / s->B - 1);
@@ -221,6 +245,7 @@ int fd_sys_set_coarse(struct fd_sys *s, int K)
   s->Bcs = calloc((size_t)np, sizeof(double _Complex *)); s->Bcn = calloc((size_t)np, sizeof(double _Complex *));
   for(k = 0; k < np; k++){
     struct fd_pair *p = s->pairs[k];
+    if(p->dense) continue;                         /* dense pairs: direct sum (fd_sys_history) */
     s->Jc[k] = (p->L - 1) / K;                     /* blocks j = 1..Jc with jK + 1 <= L */
     for(comp = 0; comp < (p->has_normal ? 2 : 1); comp++){
       const double _Complex *W = comp ? p->Wn_hat : p->Ws_hat;
@@ -247,6 +272,7 @@ double fd_sys_bytes(const struct fd_sys *s)
   for(k = 0; k < s->nsrc * s->nseg; k++){
     const struct fd_pair *p = s->pairs[k];
     int lt = (s->conv == 1) ? (p->L < s->D ? p->L : s->D) : p->L;
+    if(p->dense){ b += 8.0 * lt * (double)p->src->n * p->rcv->n * (p->has_normal ? 2 : 1); continue; }
     b += 16.0 * lt * p->M * (p->has_normal ? 2 : 1);
     if(s->conv) b += 16.0 * (double)s->P[k] * s->M * s->F * (p->has_normal ? 2 : 1) + 16.0 * s->M * s->B * (p->has_normal ? 2 : 1);
   }
@@ -266,6 +292,7 @@ int fd_sys_set_partitioned(struct fd_sys *s, int B, int kmax)
    two outputs */
 int fd_sys_set_conv(struct fd_sys *s, int mode, int B, int kmax)
 {
+  if(s->ndense) return 0;                          /* partitioned convolution needs Toeplitz pairs: off */
   int np = s->nsrc * s->nseg, k, p, q, a, b, Lmax, best = 0;
   double cost, cbest = 1e300;
   if(s->conv) return 0;
@@ -384,6 +411,23 @@ void fd_sys_history(struct fd_sys *s, int lag0, double *ts, double *tn)
     hk = s->hk[a];
     for(b = 0; b < s->nseg; b++){        /* receiver */
       struct fd_pair *p = s->pairs[a * s->nseg + b];
+      if(p->dense){
+        /* non-parallel pair: direct sum over the real-space ring, W[l] dense (receiver x source) */
+        int nr = p->rcv->n, nsr = p->src->n, j;
+        size_t np2 = (size_t)nr * nsr;
+        lmax = p->L < hk + sh ? p->L : hk + sh;
+        for(l = lag0; l <= lmax; l++){
+          const double *v = s->histr[a] + (size_t)((hk + sh - l) % s->Lbuf) * nsr;
+          const double *Ws = p->Wd_s + (size_t)(l - 1) * np2, *Wn = p->Wd_n ? p->Wd_n + (size_t)(l - 1) * np2 : NULL;
+          for(i = 0; i < nr; i++){
+            double acs = 0.0, acn = 0.0;
+            for(j = 0; j < nsr; j++){ acs += Ws[(size_t)i * nsr + j] * v[j]; if(Wn) acn += Wn[(size_t)i * nsr + j] * v[j]; }
+            ts[s->off[b] + i] += acs;
+            if(Wn && tn) tn[s->off[b] + i] += acn;
+          }
+        }
+        continue;
+      }
       if(s->Kc && (sh == s->Kc) && (s->coarse_from >= 0) && (hk % s->Kc == 0) &&
          ((long)hk - s->coarse_from >= (long)p->L - s->Kc) && !getenv("FD_COARSE_OFF")){
         /* coarse path: block j of Kc slices ends Kc*j slices before the end of the step */

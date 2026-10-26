@@ -53,6 +53,14 @@ tail -1 tmp_fd_dynamic/fd3d.out; [ $st -eq 0 ] || fail=1
 ( cd tmp_fd_dynamic && ../bin/fd3d_test stepover -500 500 12 0.25 0.645 > fd3d.out 2>/dev/null )
 if grep -q "segment 1 triggered" tmp_fd_dynamic/fd3d.out && grep -q "ruptured 2[0-9].[0-9] km (max slip 1.1" tmp_fd_dynamic/fd3d.out; then echo "fd3d_test stepover: PASS"
 else echo "fd3d_test stepover: FAIL"; cat tmp_fd_dynamic/fd3d.out; fail=1; fi
+# non-parallel 2-D pairs (fd_plan.md N1): dense tables against the prototype for a kinked pair
+if command -v python3 > /dev/null 2>&1; then
+  for a in 30 -45; do for m in 0 1; do
+    ( cd tmp_fd_dynamic && ../bin/test_fd_dense $a $m dense_${a}_${m}.txt > /dev/null 2>&1 && \
+      python3 ../fully_dynamic/test_fd_dense.py $a $m dense_${a}_${m}.txt > fd3d.out 2>&1 ); st=$?
+    tail -1 tmp_fd_dynamic/fd3d.out; grep -q PASS tmp_fd_dynamic/fd3d.out || fail=1
+  done; done
+fi
 # MPI (fd_plan.md S2): the 3-D marcher must give bit-identical results on 1 and 3 ranks
 if command -v mpirun > /dev/null 2>&1; then
   mkdir -p tmp_fd_dynamic/mpi1 tmp_fd_dynamic/mpi3
