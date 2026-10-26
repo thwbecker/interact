@@ -490,19 +490,19 @@ static void run_sw_setup(struct fd3d *f, int nzp, double i0, double dx, int nxal
     f->tau0[i] = (fabs(xc) <= 1500.0 && fabs(zc) <= 1500.0) ? 81.6e6 : 70e6;
   }
 }
-static int run_multi(double ang, double dip, double tend, int comp)
+static int run_multi(double ang, double dip, double tend, int comp, int mir)
 {
   double cL = 6000, cT = 3464, rho = 2670, dx = 500.0, dt = 0.5*dx/cT, i0 = 6.5*dx, emax = 0, smax = 0;
   int nx = 24, nz = 12, h = nx/2, n, i, ns = (int)(tend/dt + 0.5), p;
-  struct fd3d_tab *t1 = fd3d_tab_create_c(nx, nz, dx, dt, cL, cT, rho, 0, comp), *th = fd3d_tab_create_c(h, nz, dx, dt, cL, cT, rho, 0, comp);
-  struct fd3d *f1 = fd3d_create(t1), *fa[2];
+  struct fd3d_tab *t1 = fd3d_tab_create_c(nx, mir ? 2*nz : nz, dx, dt, cL, cT, rho, 0, comp), *th = fd3d_tab_create_c(h, mir ? 2*nz : nz, dx, dt, cL, cT, rho, 0, comp);
+  struct fd3d *f1 = fd3d_create2(t1, nz, mir), *fa[2];
   struct fd3d_mplane g[2];
   struct fd3d_multi *m;
   double a = ang*M_PI/180.0, dp = dip*M_PI/180.0;
   run_sw_setup(f1, nz, i0, dx, nx, 0);
-  for(p = 0; p < 2; p++){ fa[p] = fd3d_create(th); run_sw_setup(fa[p], nz, i0, dx, nx, p ? h : 0); }
+  for(p = 0; p < 2; p++){ fa[p] = fd3d_create2(th, nz, mir); run_sw_setup(fa[p], nz, i0, dx, nx, p ? h : 0); }
   memset(g, 0, sizeof(g));
-  g[0].dx = g[1].dx = dx; g[0].comp = g[1].comp = comp;
+  g[0].dx = g[1].dx = dx; g[0].comp = g[1].comp = comp; g[0].mirror = g[1].mirror = mir;
   g[0].E[0][0] = 1.0; g[0].E[1][2] = 1.0; g[0].E[2][1] = -1.0;              /* e1 = x, e2 = z up, e3 = -y */
   g[1].O[0] = h*dx;
   g[1].E[0][0] = cos(a); g[1].E[0][1] = sin(a);                               /* strike turned about z */
@@ -542,8 +542,8 @@ static int run_multi(double ang, double dip, double tend, int comp)
     double s1 = 0, s2 = 0;
     for(i = 0; i < f1->N; i++) s1 += f1->delta[i];
     for(p = 0; p < 2; p++) for(i = 0; i < fa[p]->N; i++) s2 += fa[p]->delta[i];
-    printf("fd3d_test multi: comp %d, turn %g deg, dip %g deg, %d steps: max |V(two planes) - V(one plane)| %.3e of %.3f m/s; mean slip %.5f (one plane) %.5f (two planes) m; fixed-point iterations last step %d\n",
-           comp, ang, dip, ns, emax, smax, s1/f1->N, s2/(2*fa[0]->N), m->last_iters);
+    printf("fd3d_test multi%s: comp %d, turn %g deg, dip %g deg, %d steps: max |V(two planes) - V(one plane)| %.3e of %.3f m/s; mean slip %.5f (one plane) %.5f (two planes) m; fixed-point iterations last step %d\n",
+           mir ? " (half space, images)" : "", comp, ang, dip, ns, emax, smax, s1/f1->N, s2/(2*fa[0]->N), m->last_iters);
     if((ang == 0.0 && dip >= 90.0) || dip < 0.0){ int ok = emax <= (dip < 0.0 ? 1e-7 : 1e-8)*smax;   /* rotated: round-off of the rotations, amplified by the rupture */ printf("fd3d_test multi: %s\n", ok ? "PASS" : "FAIL"); return !ok; }
   }
   return 0;
@@ -656,7 +656,7 @@ static int main0(int argc, char **argv)
   if(argc >= 3 && !strcmp(argv[1], "q2d")) return run_q2d(argv[2]);
   if(argc >= 2 && !strcmp(argv[1], "pair")) return run_pair(argc > 2 ? atoi(argv[2]) : 0);
   if(argc >= 2 && !strcmp(argv[1], "multipair")) return run_multi_pair();
-  if(argc >= 2 && !strcmp(argv[1], "multi")) return run_multi(argc > 2 ? atof(argv[2]) : 0.0, argc > 3 ? atof(argv[3]) : 90.0, argc > 4 ? atof(argv[4]) : 4.0, argc > 5 ? atoi(argv[5]) : 1);
+  if(argc >= 2 && !strcmp(argv[1], "multi")) return run_multi(argc > 2 ? atof(argv[2]) : 0.0, argc > 3 ? atof(argv[3]) : 90.0, argc > 4 ? atof(argv[4]) : 4.0, argc > 5 ? atoi(argv[5]) : 1, argc > 6 ? atoi(argv[6]) : 0);
   if(argc >= 6 && !strcmp(argv[1], "stepover")) return run_stepover(atof(argv[2]), atof(argv[3]), atof(argv[4]), atof(argv[5]), argc > 6 ? atof(argv[6]) : 0.75);
   if(argc >= 7 && !strcmp(argv[1], "tpv10")) return run_tpv10(atof(argv[2]), atof(argv[3]), atoi(argv[4]), atoi(argv[5]), argv[6]);
   if(argc < 3 || strcmp(argv[1], "tpv3")){ fprintf(stderr, "usage: %s tpv3|tpv101 dx [ref] [tend]\n", argv[0]); return 2; }

@@ -2163,12 +2163,13 @@ static void plane_centre(const struct fd3d_mplane *g, int i, int j, double X[3])
 }
 /* traction (shear along the receiver's slip, normal) on receiver plane gp at X from a unit-rate
    ramp of the source cell (iq, jq) of plane gq, at time t */
-static void cross_resp(const struct fd3d_mplane *gq, int iq, int jq, const struct fd3d_mplane *gp, const double X[3],
-                       double t, double cL, double cT, double rho, double *ts, double *tn)
+static void cross_resp1(const struct fd3d_mplane *gq, int iq, int jq, const struct fd3d_mplane *gp, const double X[3],
+                        double t, double cL, double cT, double rho, int image, double *ts, double *tn)
 {
   double Y[3], r[3], x[3], s6[6], S[3][3], d[3], n[3], Sn[3];
   int k, a;
   plane_centre(gq, iq, jq, Y);
+  if(image) Y[2] = -Y[2];          /* free-surface image (vertical strike-slip planes): mirrored centre, same frame and slip, as fd3d's mirror */
   for(k = 0; k < 3; k++) r[k] = X[k] - Y[k];
   for(a = 0; a < 3; a++) x[a] = r[0]*gq->E[a][0] + r[1]*gq->E[a][1] + r[2]*gq->E[a][2];
   for(a = 0; a < 3; a++) if(fabs(x[a]) < 1e-9*gq->dx) x[a] = 0.0;   /* rotation round-off: in-plane receivers stay in-plane */
@@ -2180,6 +2181,16 @@ static void cross_resp(const struct fd3d_mplane *gq, int iq, int jq, const struc
   *ts = d[0]*Sn[0] + d[1]*Sn[1] + d[2]*Sn[2];
   *tn = n[0]*Sn[0] + n[1]*Sn[1] + n[2]*Sn[2];
 }
+static void cross_resp(const struct fd3d_mplane *gq, int iq, int jq, const struct fd3d_mplane *gp, const double X[3],
+                       double t, double cL, double cT, double rho, double *ts, double *tn)
+{
+  cross_resp1(gq, iq, jq, gp, X, t, cL, cT, rho, 0, ts, tn);
+  if(gq->mirror){
+    double ts2, tn2;
+    cross_resp1(gq, iq, jq, gp, X, t, cL, cT, rho, 1, &ts2, &tn2);
+    *ts += ts2; *tn += tn2;
+  }
+}
 
 struct fd3d_multi *fd3d_multi_create(int np, struct fd3d **f, const struct fd3d_mplane *geom)
 {
@@ -2189,7 +2200,9 @@ struct fd3d_multi *fd3d_multi_create(int np, struct fd3d **f, const struct fd3d_
   m->np = np;
   for(p = 0; p < np; p++){
     m->f[p] = f[p]; m->g[p] = geom[p];
-    if(f[p]->mirror || f[p]->layer || f[p]->next || fabs(f[p]->t->dt - dt) > 1e-12*dt || f[p]->t->mpi_size > 1){ free(m); return NULL; }
+    /* a mirrored plane (half space) must be vertical with strike slip and its top row at the surface */
+    if(f[p]->mirror && (!geom[p].mirror || geom[p].comp != 1 || fabs(geom[p].E[2][2]) > 1e-9 || fabs(geom[p].O[2]) > 1e-6*geom[p].dx)){ free(m); return NULL; }
+    if(f[p]->layer || f[p]->next || fabs(f[p]->t->dt - dt) > 1e-12*dt || f[p]->t->mpi_size > 1){ free(m); return NULL; }
   }
   for(p = 0; p < np; p++) for(q = 0; q < np; q++){
     struct fd3d_mpair *c = &m->c[q][p];               /* source q, receiver p */
@@ -2206,6 +2219,11 @@ struct fd3d_multi *fd3d_multi_create(int np, struct fd3d **f, const struct fd3d_
       }
     }
     rmax += 2.0*m->g[q].dx;
+    if(m->g[q].mirror){                              /* images lie up to twice the depth further */
+      double zmin = 0.0, Y[3]; int jj;
+      for(jj = 0; jj < f[q]->nzp; jj++){ plane_centre(&m->g[q], 0, jj, Y); if(Y[2] < zmin) zmin = Y[2]; }
+      rmax += 2.0*fabs(zmin);
+    }
     L = (int)ceil(rmax/cT/dt) + 12;                  /* past the S arrival from the farthest cell: W vanishes in 3-D */
     T1 = 1.5*rmax/cT + 10.0*dt; T2 = 2.0*T1;
     c->L = L; c->nr = nr; c->ns = ns;
@@ -2333,8 +2351,15 @@ int fd3d_multi_step(struct fd3d_multi *m, double **load)
     for(i = 0; i < m->f[p]->N; i++) Kn[p][i] += o[i];
     free(o);
   }
-  /* solve: fixed point between the planes for the current-step cross terms */
-  for(p = 0; p < np; p++) memcpy(Vprev[p], m->f[p]->Vold, sizeof(double)*m->f[p]->N);
+  /* solve: fixed point between the planes for the current-step cross terms. The local solve
+     advances the state variable (rate and state) to the end of the step, so every repeat
+     starts again from the state at the beginning of the step. */
+  double *th0[FD3D_MULTI_MAX];
+  for(p = 0; p < np; p++){
+    memcpy(Vprev[p], m->f[p]->Vold, sizeof(double)*m->f[p]->N);
+    th0[p] = NULL;
+    if(m->f[p]->law == 1 && m->implicit){ th0[p] = malloc(sizeof(double)*m->f[p]->N); memcpy(th0[p], m->f[p]->theta, sizeof(double)*m->f[p]->N); }
+  }
   for(it = 0; it < (m->implicit ? m->maxit : 1); it++){
     double ch = 0.0, vm = 1e-9;
     for(p = 0; p < np; p++){
@@ -2354,7 +2379,7 @@ int fd3d_multi_step(struct fd3d_multi *m, double **load)
       for(i = 0; i < nr; i++) m->tn[p][i] = Kn[p][i] + tnc[i];
       if(m->normal_coupling) for(i = 0; i < nr; i++){ f->sigma[i] = m->sig0[p][i] - m->tn[p][i]; if(f->sigma[i] < 0.0) f->sigma[i] = 0.0; }
       free(tnc);
-      if(it > 0) memcpy(Vprev[p], f->V, sizeof(double)*nr);
+      if(it > 0){ memcpy(Vprev[p], f->V, sizeof(double)*nr); if(th0[p]) memcpy(f->theta, th0[p], sizeof(double)*nr); }
       itot += step_solve_g(f, Hs[p], it > 0 ? f->V : NULL, NULL);
       for(i = 0; i < nr; i++){ if(fabs(f->V[i] - Vprev[p][i]) > ch) ch = fabs(f->V[i] - Vprev[p][i]); if(fabs(f->V[i]) > vm) vm = fabs(f->V[i]); }
     }
@@ -2366,7 +2391,7 @@ int fd3d_multi_step(struct fd3d_multi *m, double **load)
     double *sl = m->ring[p] + (size_t)(m->hk % m->Lb)*f->N;
     for(i = 0; i < f->N; i++){ f->H[i] += Hs[p][i]; sl[i] = f->nl ? 0.5*(f->Vold[i] + f->V[i]) : f->V[i]; }
     step_end(f);
-    free(Kx[p]); free(Kn[p]); free(Hs[p]); free(Vprev[p]);
+    free(Kx[p]); free(Kn[p]); free(Hs[p]); free(Vprev[p]); free(th0[p]);
   }
   m->hk++;
   return itot;

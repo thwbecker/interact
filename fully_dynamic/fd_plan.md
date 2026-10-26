@@ -2093,6 +2093,42 @@ thousand cells each). One MPI rank for now; no free surface yet (whole space). N
 rsf_solve integration (planes from the geometry, exact Is and In, the phase), then the
 free surface for non-vertical planes (the virtual surface with several faults).
 
+### 3-D faults of any orientation, steps G2 and G3a: rsf_solve, half space (2026-10-28)
+
+G2, rsf_fd.c (fd3d_setup_multi, fd3d_run_phase_multi): a geometry whose squares lie on
+several planes is split into planes (parallel normal and zero offset); two parallel planes
+with strike slip still go to the Toeplitz pair (P2: half space, MPI), everything else to
+fd3d_multi. Frame per plane: e1 = interact's strike vector, e3 = interact's normal,
+e2 = e3 x e1, so the kernels' +e3 side is interact's positive side (the P2 lesson); slip
+along e1 (strike slip) or e2 (dip slip, sign sgn3 = sign(e2 . t_dip)); the marcher's slip,
+rate and shear traction are sgn3 times interact's. Each plane gets its own lattice (rows
+along -e2) and table, cells without a patch are locked. Exact statics from Is (all planes'
+slips) and, with -calc_sigma_dot, -In. Static gate: self tables against Is, the dense
+cross statics against Is and the cross normal statics against -In. One MPI rank for this
+path.
+A bug found on the way: the planes' fixed point repeats each plane's local solve, which
+advances the rate-and-state variable to the end of the step; repeats must start from the
+state at the beginning of the step (fixed in fd3d_multi_step; slip-weakening tests could
+not see it).
+G3a, half space for vertical strike-slip planes reaching the surface: each plane carries
+the free-surface image (fd3d mirror, table of 2 nz rows), and the dense cross tables add
+each source cell's image (mirrored centre, same frame and slip), the same approximation as
+the one-plane mirror (static deviations of a few percent from Okada's half space; the
+static part itself is exact through Is). Dipping planes in a half space need the virtual
+surface for several faults (G3b, not done).
+Checks:
+- fd3d_test multi with images (fd3d_create2 mirror): split fault against one plane
+  1.4e-11 relative in V, rigidly turned 35 degrees 9.5e-9;
+- test_fd3d_multi.sh: a vertical strike-slip fault of two 12 x 8 segments of 1 km, the
+  second turned by 30 degrees: gates 3.4e-9 (within planes), 6.1e-10 (across), 3.0e-9
+  (normal across, -In); turned by 0.001 degree (two planes, junction coupling kept) the
+  stations equal the straight one-plane run to 1e-10 m/s (printed precision) in a whole
+  and a half space; the 30 degree bend runs (half-space gates 3.8, 2.0 and 4.3 percent,
+  the images' static error).
+Not yet: MPI for several planes; dipping planes in a half space (G3b); a more efficient
+cross coupling for planes with a common strike (Toeplitz along strike, dense down dip,
+as the surface tables).
+
 ### WP7, C implementation in rsf_solve: status (2026-10-18)
 Done, each verified in the sandbox before delivery (details in
 fd_c_design.md sections 6 to 10, usage in rsf_solve_fd.md):

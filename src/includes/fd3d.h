@@ -225,6 +225,8 @@ struct fd3d_mplane {
   double E[3][3];       /* rows: e1 (strike), e2 (up dip), e3 = e1 x e2 */
   double dx;            /* cell size */
   int comp;             /* slip along e1 (1) or e2 (2) */
+  int mirror;           /* half space by the free-surface image (vertical strike-slip plane, top row at z = 0;
+                           its marcher created with fd3d_create2(t, nz, 1) on a table of 2 nz rows) */
 };
 struct fd3d_mpair {     /* source q to receiver p, dense, receiver x source */
   int L, nr, ns, has_k1;
