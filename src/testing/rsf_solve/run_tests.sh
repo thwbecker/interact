@@ -59,6 +59,12 @@ if command -v mpirun > /dev/null 2>&1; then
   ( cd tmp_fd_dynamic/mpi1 && FD3D_NL=1 ../../bin/fd3d_test tpv101 500 - 4 > out 2>/dev/null )
   ( cd tmp_fd_dynamic/mpi3 && FD3D_NL=1 mpirun --oversubscribe -np 3 ../../bin/fd3d_test tpv101 500 - 4 > out 2>/dev/null \
       || FD3D_NL=1 mpirun --allow-run-as-root --oversubscribe -np 3 ../../bin/fd3d_test tpv101 500 - 4 > out 2>/dev/null )
+  # the virtual surface (tables split by wavenumber, S3): TPV10 at 1 km for 3 s
+  ( cd tmp_fd_dynamic/mpi1 && ../../bin/fd3d_test tpv10 1000 30000 0 2 tv > /dev/null 2>&1 )
+  ( cd tmp_fd_dynamic/mpi3 && ( mpirun --oversubscribe -np 3 ../../bin/fd3d_test tpv10 1000 30000 0 2 tv > /dev/null 2>&1 || \
+      mpirun --allow-run-as-root --oversubscribe -np 3 ../../bin/fd3d_test tpv10 1000 30000 0 2 tv > /dev/null 2>&1 ) )
+  if cmp -s tmp_fd_dynamic/mpi1/tv_st12000.dat tmp_fd_dynamic/mpi3/tv_st12000.dat && cmp -s tmp_fd_dynamic/mpi1/tv_st00000.dat tmp_fd_dynamic/mpi3/tv_st00000.dat; then echo "fd3d_test MPI surface (1 and 3 ranks bit-identical): PASS"
+  else echo "fd3d_test MPI surface (1 and 3 ranks bit-identical): FAIL"; fail=1; fi
   if cmp -s tmp_fd_dynamic/mpi1/tpv101_rt.dat tmp_fd_dynamic/mpi3/tpv101_rt.dat; then echo "fd3d_test MPI (1 and 3 ranks bit-identical): PASS"
   else echo "fd3d_test MPI (1 and 3 ranks bit-identical): FAIL"; fail=1; fi
 else

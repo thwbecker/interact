@@ -333,6 +333,11 @@ PetscErrorCode rsf_domain_check(TS ts,PetscReal time,Vec X,PetscBool *accept)
        both of which exponentiate (psi-f0)/b; the slip law has no such term */
     if((rsf->state_law != RSF_SLIP_LAW) && ( fault[i].mu_db != 0.0) &&
        (fabs((rsf->f0 - x[j])/ fault[i].mu_db) > arg_max)){lok = 0;break;} /* aging/PRZ exp */
+    if(rsf->domain_check_vmax > 0.0){
+      /* slip rate 2 v0 exp(-psi/a) sinh(|tau|/(sigma a)), in logs (no overflow) */
+      PetscReal xa = fabs(x[j+1]/(x[j+2]*fault[i].mu_sa)), lsh = (xa > 20.0) ? (xa - log(2.0)) : log(sinh(xa) + 1e-300);
+      if(log(2.0*rsf->v0) - x[j]/fault[i].mu_sa + lsh > log(rsf->domain_check_vmax)){lok = 0;break;}
+    }
   }
   PetscCall(VecRestoreArrayRead(X,&x));
   PetscCallMPI(MPI_Allreduce(&lok,&gok,1,MPIU_INT,MPI_MIN,PETSC_COMM_WORLD));
@@ -351,6 +356,20 @@ PetscErrorCode rsf_domain_check(TS ts,PetscReal time,Vec X,PetscBool *accept)
     rsf->domain_check_nreject = 0;
   }else{
     rsf->domain_check_nreject++;
+    if(getenv("RSF_DEBUG_DOMAIN") && (rsf->domain_check_nreject == 1 || rsf->domain_check_nreject == 100)){   /* diagnosis only */
+      PetscCall(VecGetArrayRead(X,&x));
+      for (i = medium->rs, j=0; i < medium->re; i++, j+=rsf->dim){
+        int why = 0;
+        if((!PetscIsNormalReal(x[j+2])) || (x[j+2] <= 0.0)) why = 1;
+        else if(PetscIsInfOrNanReal(x[j]) || PetscIsInfOrNanReal(x[j+1]) || PetscIsInfOrNanReal(x[j+3])) why = 2;
+        else if(fabs(x[j+1]/(x[j+2]*fault[i].mu_sa)) > arg_max) why = 3;
+        else if(fabs(x[j]/fault[i].mu_sa) > arg_max) why = 4;
+        else if((rsf->state_law != RSF_SLIP_LAW) && (fault[i].mu_db != 0.0) && (fabs((rsf->f0 - x[j])/fault[i].mu_db) > arg_max)) why = 5;
+        if(why) PetscCall(PetscPrintf(PETSC_COMM_SELF,"rsf_domain_check (reject %d): patch %d reason %d: psi %g tau %g sigma %g slip %g a %g b %g\n",
+                                       (int)rsf->domain_check_nreject,(int)i,why,(double)x[j],(double)x[j+1],(double)x[j+2],(double)x[j+3],(double)fault[i].mu_sa,(double)fault[i].mu_db));
+      }
+      PetscCall(VecRestoreArrayRead(X,&x));
+    }
     if((rsf->domain_check_max_reject > 0) &&
        (rsf->domain_check_nreject >= rsf->domain_check_max_reject)){
       SETERRQ(PETSC_COMM_WORLD,PETSC_ERR_CONV_FAILED,

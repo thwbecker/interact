@@ -50,6 +50,7 @@ void init_medium_rsf(struct med *medium)
      options for now; edit here if they need to change */
   rsf->sato_beta = 1e-2;
   rsf->domain_check_max_reject = 5000;
+  rsf->domain_check_vmax = 0.0;
   rsf->domain_check_nreject = 0;
   rsf->kt_vc     = -1.0;		/* set from v0 below, after -v0 has been read */
   rsf->min_sigma = 1e6;
@@ -173,6 +174,9 @@ void rsf_print_help(const char *prog)
   fprintf(stderr,"                          including those from petsc_settings.yaml, do not\n");
   fprintf(stderr,"                          affect them.\n");
   fprintf(stderr,"  -stop_time_yr <yr>      integration stop time (default 3000)\n");
+  fprintf(stderr,"  -domain_check_vmax <m/s> > 0: also reject trial states whose slip rate exceeds this\n");
+  fprintf(stderr,"                          (e.g. 100; default 0, off). Without it an explicit step can accept\n");
+  fprintf(stderr,"                          a state with an absurd slip rate whose derivative overflows\n");
   fprintf(stderr,"  -domain_check_max_reject <n>  abort after n CONSECUTIVE out-of-domain trial\n");
   fprintf(stderr,"                          steps (default 5000; <= 0 disables). Such rejection\n");
   fprintf(stderr,"                          storms bypass the PETSc rejection limits and can\n");
@@ -566,6 +570,7 @@ PetscErrorCode rsf_get_settings(int argc,char **argv,struct interact_ctx *par,
   PetscCall(PetscOptionsGetReal(NULL,NULL,"-vmin_state",&rsf->vmin_state,NULL)); /* [m/s] */
   /* rejection-storm guard, see rsf_domain_check in rsf_engine.c */
   PetscCall(PetscOptionsGetInt(NULL,NULL,"-domain_check_max_reject",&rsf->domain_check_max_reject,NULL));
+  PetscCall(PetscOptionsGetReal(NULL,NULL,"-domain_check_vmax",&rsf->domain_check_vmax,NULL));
   if((rsf->state_law < RSF_AGING_LAW) || (rsf->state_law > RSF_KT_LAW)){
     if(medium->comm_rank == 0)
       fprintf(stderr,"rsf_get_settings: -state_law has to be %i (aging), %i (slip), %i (PRZ), %i (Sato) or %i (Kato-Tullis), not %i\n",

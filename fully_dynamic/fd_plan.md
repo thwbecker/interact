@@ -1991,6 +1991,43 @@ event; the onsets are 15.1 h apart.) Full FD sequences for both senses (about an
 core at 500 m) are workstation runs; with -calc_sigma_dot the QD part is also about 1.5
 times slower than without.
 
+### Speed, step S3: the virtual surface under MPI (2026-10-28)
+
+The full virtual surface (dipping faults, B2 to B8) ran replicated on every rank. Now:
+- its tables (surface-surface T2, fault-surface Tfs and Tsf: W lags, statics, first lag) are
+  kept for each rank's block of along-strike wavenumbers only (ly->k0, ly->nk), so their
+  memory divides by the number of ranks (they dominate: 2.2 GB for TPV10 at 500 m);
+- the products with them (lxp_apply, surf_apply_rows) run over the own wavenumbers, and the
+  partial spectra are summed over the ranks (MPI_Allreduce) before each inverse FFT along
+  strike (known parts, the fault's view of the surface in each outer iteration, the
+  surface's right-hand side, each inner Jacobi sweep of the surface, the finish);
+- the tables are built one row pair at a time, so the temporary memory is O(L Mx) instead
+  of a real-valued copy of all tables (which had been as large as the tables).
+The kernel evaluations of the build are still done on every rank (each needs all offsets
+of its pairs for the FFT along strike); splitting them needs an all-to-all of the tables
+and is left for when build time matters. The history rings stay full (small).
+Checks: fd3d_test surf and q2d unchanged; TPV10 at 1 km bit-identical to the previous
+code and between 1 and 3 ranks (now in run_tests.sh, with mpirun); all regressions and
+the QD bit-identity harness pass.
+
+### QD side: the rejection storm (2026-10-28)
+
+The storm with the default Runge-Kutta scheme (P4) is not a step-size problem: the
+step-size controller halves dt down to 1e-323 s and every trial stage still fails, because
+the right-hand side at the accepted state is already NaN. The previous step had accepted a
+state whose slip rate, 2 v0 exp(-psi/a) sinh(tau/(a sigma)), was absurd but whose arguments
+were inside the domain check's overflow bounds (|tau/(a sigma)| and |psi/a| below 600); the
+elastic interaction of that rate then overflows (patch 2261 of the 1 km step model, tau
+NaN in every stage). The domain check is applied to the stages, not to the accepted
+combination, so nothing caught it.
+New option -domain_check_vmax <m/s> (rsf_engine.c, rsf_domain_check; default 0, off, so
+the QD path is unchanged): trial states whose slip rate (computed in logs) exceeds the
+bound are out of domain. With -domain_check_vmax 100 the default scheme runs the 1 km
+stepover model through the first events (onsets 20.7792 and 20.8384 yr, as with 3bs:
+20.7799 and 20.8384). RSF_DEBUG_DOMAIN=1 prints why a state is rejected (diagnosis only).
+QD bit-identity harness: PASS (the option is off by default). Suggestion for Thor: a
+default of a few hundred m/s would be physically safe.
+
 ### WP7, C implementation in rsf_solve: status (2026-10-18)
 Done, each verified in the sandbox before delivery (details in
 fd_c_design.md sections 6 to 10, usage in rsf_solve_fd.md):

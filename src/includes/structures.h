@@ -203,6 +203,8 @@ struct rsf_vars{
 					domain-check rejections (storm guard,
 					-domain_check_max_reject, <= 0 off) */
   PetscInt domain_check_nreject;     /* running count, reset on accept */
+  PetscReal domain_check_vmax;       /* > 0: a state whose slip rate exceeds this [m/s] is out of
+					domain (-domain_check_vmax; default 0, off) */
   /*
      visco-elastic hereditary stressing (Prony representation of the
      step-response interaction kernel, see src/rsf_ve.c and
