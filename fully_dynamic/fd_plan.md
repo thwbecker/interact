@@ -1930,8 +1930,11 @@ QD, 320 yr (slip at the stations; segment 1 always first):
 
 | step | cycle 1 | cycle 2 | cycle 3 | cycle 4 |
 |---|---|---|---|---|
-| 1 km: delay of segment 2 | 22 days | 12 days | 12 days | 12 days |
-| 500 m: delay of segment 2 | 2 days | same event | 2 days | 2 days |
+| 1 km: delay of segment 2 | 21.4 days | 11.0 days | 11.3 days | 11.3 days |
+| 500 m: delay of segment 2 | 1.12 days | 0.57 days | 0.60 days | 0.60 days |
+
+(onsets from stepover_events.py; an earlier reading with a 0.01 yr slip window reported
+the 500 m step's cycle 2 as one event: the onsets are 13.7 h apart)
 
 (segment 1 2.3 to 2.6 m, segment 2 2.8 to 3.0 m; recurrence about 94.5 yr for both).
 FD, first cycle (dynamic phases with the end times of the hand-back):
@@ -1954,6 +1957,39 @@ carries the phase, and the next dynamic phase opens above 1e-2 m/s. The runs the
 (880 to 1211 steps, 100 to 160 s of wall time at 500 m on one core, instead of 3185 steps and
 415 s for the first rupture before). BP5-FD at 2 km with this: phase 150 s (13 s of wall
 time), afterslip over the next 3e4 s within 0.8 mm of the original defaults.
+
+### 3-D stepovers, step P5: compressional against dilational (2026-10-28)
+
+Same model as P4, step 500 m on either side (segment 2 at x = +500 m or -500 m).
+- Without normal-stress evolution the two senses are identical to all printed digits (the
+  shear interaction of parallel planes is even in the offset).
+- Which sense is which, measured: a station in the overlap on segment 2 (patch 1960, 2.5 km
+  into the overlap, 5.25 km deep) in QD with -calc_sigma_dot: for x = -500 m the normal
+  stress drops from 50.04 to 49.60 MPa with segment 1's event (unclamping): -500 m is the
+  dilational (releasing) step, +500 m the compressional one, as inferred from the kernel
+  frame (P1).
+- With normal-stress evolution (-calc_sigma_dot 1; QD needs -ts_rk_type 3bs here):
+
+| 500 m step: delay of segment 2 | QD cycle 1 | QD cycle 2 | QD cycle 3 | FD cycle 1 |
+|---|---|---|---|---|
+| compressional (+500 m) | 11.1 h | 5.8 h | (stopped at 210 yr) | 1.0 h |
+| dilational (-500 m) | 26.0 h | 15.1 h | 15.7 h | 3.1 h |
+| no normal-stress evolution | 26.8 h | 13.7 h | 14.5 h | 3.6 h |
+
+  (onsets from stepover_events.py: QD from the station series, FD from the phases; FD
+  segment 1 at 21.55277 and 21.42881 yr, mean slip 1.24 and 1.23 m, peak 2.4 m/s; segment 2
+  1.38 and 1.39 m, peak 3.7 m/s.)
+Reading: no rupture jumps the 500 m step, in QD or FD, in either sense. The second segment
+fails sooner after a compressional step than after a dilational one, in QD (6 to 11 h
+against 15 to 26 h) and in FD (1.0 against 3.1 h), and the dilational case is close to the
+case without normal-stress evolution. So in these rate-and-state sequences the clamped
+side fails sooner, opposite to the usual intuition for dynamic jumps: unclamping lowers the
+frictional strength, but it also lowers the strength rate and lengthens the nucleation,
+which governs delayed triggering. FD shortens all delays by a factor of 4 to 11. (An
+earlier reading with a 0.01 yr slip window had reported the dilational QD cycle 2 as one
+event; the onsets are 15.1 h apart.) Full FD sequences for both senses (about an hour each on one
+core at 500 m) are workstation runs; with -calc_sigma_dot the QD part is also about 1.5
+times slower than without.
 
 ### WP7, C implementation in rsf_solve: status (2026-10-18)
 Done, each verified in the sandbox before delivery (details in
