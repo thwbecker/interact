@@ -1883,6 +1883,78 @@ phase), so the criterion uses vsw.
 Recommendation for 3-D sequences: -fd_back_eps 0.05 -fd_back_dyn 1e4 (about 1 percent of
 the stress drop in these models).
 
+### Speed, step L3: re-entry hysteresis and new 3-D defaults (2026-10-27)
+
+After a hand-back the afterslip can exceed vsw again and open slow dynamic phases (peak
+rates near 1e-3 m/s), which QD reproduces equally well. Now, after a phase the QD-to-FD
+switching threshold is raised to -fd_reentry times vsw (fd->vsw_eff, used by the event
+indicator in rsf_solve.c) until the peak rate has fallen below vback, then it returns to
+vsw. A first version reset at back_vmax (0.5 vsw) too early: the rate had dipped below it
+at the hand-back and the next phase opened anyway.
+New defaults for 3-D (2-D unchanged; each can be overridden): -fd_back_eps 0.05,
+-fd_back_dyn 1e4, -fd_reentry 10.
+Stepover sequence of P2 (no normal-stress evolution), with the new defaults against the
+previous ones (fixed quasi-steady hand-back only):
+
+| | old defaults | new defaults |
+|---|---|---|
+| phases per two-segment cycle | 3 to 4 (re-entries) | 2 |
+| wall time per dynamic phase | 70 to 220 s | 34 to 40 s |
+| cycle 1: segment 1 / segment 2 | 21.748 yr 2.92 m / 21.900 yr 3.23 m | 21.748 yr 2.92 m / 21.900 yr 3.22 m |
+| cycle 2: segment 1 / segment 2 | 132.581 yr 3.19 m / 132.664 yr 3.47 m | 132.268 yr 3.14 m / 132.268 yr 3.46 m (station window; the dynamic phases at 132.272 and 132.363 yr) |
+
+(slip at the segment-centre stations). The first cycle is the same to the printed digits;
+the second starts 0.3 yr (0.3 percent of the recurrence) earlier, within the sensitivity
+seen between equivalent runs (e.g. 132.31 yr with the traction criterion alone), and the
+event slips agree to 2 percent. Overall about 5 times less wall time per cycle.
+On BP5-FD at 2 km the first event with the new defaults (no flags) gives the run of L2:
+phase 336 s instead of 805 s, afterslip at the stations within 1.1 mm of the old defaults
+over the following 3e4 s.
+A stall found by test_fd3d_pair.sh: two planes in a half space with -calc_sigma_dot; after
+a phase ended early by the traction criterion, the QD integrator resumed with the event
+handler's own step (15 s, the pre-event step) instead of -fd_dt_restart, the trial state
+overflowed, the error estimate became NaN and the integration never advanced. The FD
+post-event hook now also sets TSSetPostEventStep(dt_restart) (3-D only, so 2-D runs are
+untouched); with -fd_back_dyn 0 the stall did not occur, and the 2-D sequence test is
+unchanged either way. All regressions and the QD bit-identity harness pass.
+
+### 3-D stepovers, step P4: 500 m elements, steps of 1 km and 500 m; slow phases (2026-10-28)
+
+Model: two segments of 30 x 15 km in 500 m squares (1800 each, one lattice of 110 x 30),
+5 km overlap, half space, a = 0.006 / b = 0.016 between 2 and 12 km depth and 2 km from the
+ends (a = 0.025 elsewhere), dc 0.06 m, sigma 50 MPa, Vpl 1e-9 m/s, steady state at the plate
+rate with mild noise; stations at the segment centres; -ts_rk_type 3bs (the default RK
+scheme stopped in the first coseismic QD phase with a rejection storm at this resolution;
+the QD side, untouched here).
+QD, 320 yr (slip at the stations; segment 1 always first):
+
+| step | cycle 1 | cycle 2 | cycle 3 | cycle 4 |
+|---|---|---|---|---|
+| 1 km: delay of segment 2 | 22 days | 12 days | 12 days | 12 days |
+| 500 m: delay of segment 2 | 2 days | same event | 2 days | 2 days |
+
+(segment 1 2.3 to 2.6 m, segment 2 2.8 to 3.0 m; recurrence about 94.5 yr for both).
+FD, first cycle (dynamic phases with the end times of the hand-back):
+
+| step | segment 1 | segment 2 | delay | QD delay |
+|---|---|---|---|---|
+| 1 km | 20.77988 yr, 1.23 m mean slip, 2.3 m/s | 20.80232 yr, 1.30 m, 3.4 m/s | 8.2 days | 22 days |
+| 500 m | 21.45260 yr, 1.23 m, 2.4 m/s | 21.45301 yr, 1.38 m, 3.7 m/s | 3.6 hours | 2 days |
+
+No dynamic jump in either: each FD rupture stops at the step and the other segment
+fails later, but much sooner than in QD (8 days against 22 at 1 km, hours against days at
+500 m); at the 1 km step the coseismic slip at the stations is 2.83 and 3.21 m in FD against
+2.34 and 2.83 m in QD.
+Slow phases. At 500 m the first FD runs stalled: after segment 1 the run re-entered the
+dynamic mode for segment 2's slow nucleation, with rates just above vsw for days, and the
+traction criterion (L2) applied only below vsw. It now applies below the re-entry threshold
+(reentry vsw, 1e-2 m/s by default): whenever the FD and QD tractions agree to back_dyn, QD
+carries the phase, and the next dynamic phase opens above 1e-2 m/s. The runs then show a
+10-step probe phase at each nucleation (handed back at once), then the dynamic rupture
+(880 to 1211 steps, 100 to 160 s of wall time at 500 m on one core, instead of 3185 steps and
+415 s for the first rupture before). BP5-FD at 2 km with this: phase 150 s (13 s of wall
+time), afterslip over the next 3e4 s within 0.8 mm of the original defaults.
+
 ### WP7, C implementation in rsf_solve: status (2026-10-18)
 Done, each verified in the sandbox before delivery (details in
 fd_c_design.md sections 6 to 10, usage in rsf_solve_fd.md):

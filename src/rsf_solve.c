@@ -849,7 +849,7 @@ PetscErrorCode rsf_event_function(TS ts,PetscReal t,Vec X,PetscScalar *fvalue,vo
     fvalue[uc->vel_event_index] = log10((gvmax > 1e-300)?(gvmax):(1e-300)) -
       log10(uc->vel_event * ((uc->slipping)?(uc->vel_event_hyst):(1.0)));
   if(uc->fd_event_index >= 0)	/* fully dynamic switch, rsf_fd.c */
-    fvalue[uc->fd_event_index] = log10((gvmax > 1e-300)?(gvmax):(1e-300)) - log10(rsf->fd->vsw);
+    fvalue[uc->fd_event_index] = log10((gvmax > 1e-300)?(gvmax):(1e-300)) - log10(rsf->fd->vsw_eff);
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 

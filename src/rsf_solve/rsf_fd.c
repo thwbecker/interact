@@ -118,10 +118,12 @@ PetscErrorCode rsf_fd_setup(struct interact_ctx *par, PetscReal shear_modulus_si
   PetscCall(PetscOptionsGetReal(NULL,NULL,"-fd_back_eps",&fd->back_eps,NULL));
   PetscCall(PetscOptionsGetInt(NULL,NULL,"-fd_coarse",&fd->coarse,NULL));
   PetscCall(PetscOptionsGetReal(NULL,NULL,"-fd_back_vmax",&fd->back_vmax,NULL));
-  fd->back_dyn = 0.0; fd->back_nwin = 10;
+  fd->back_dyn = 0.0; fd->back_nwin = 10; fd->reentry = 1.0;
   PetscCall(PetscOptionsGetReal(NULL,NULL,"-fd_back_dyn",&fd->back_dyn,NULL));
   PetscCall(PetscOptionsGetInt(NULL,NULL,"-fd_back_nwin",&fd->back_nwin,NULL));
+  PetscCall(PetscOptionsGetReal(NULL,NULL,"-fd_reentry",&fd->reentry,NULL));
   if(fd->back_vmax <= 0.0) fd->back_vmax = 0.5*fd->vsw;
+  fd->vsw_eff = fd->vsw;
   fd->nl = 1;			/* second-order time marching (Noda et al. 2020) by default */
   fd->layer_w = 0; fd->layer_m = 2; fd->layer_margin = -1; fd->surface_opt = 0; fd->surf_ext = -1;
   PetscCall(PetscOptionsGetInt(NULL,NULL,"-fd_surface",&fd->surface_opt,NULL));
@@ -149,6 +151,18 @@ PetscErrorCode rsf_fd_setup(struct interact_ctx *par, PetscReal shear_modulus_si
     /* 3-D: square elements on one planar fault in a whole space (fd3d.c); so far
        setup and static gate only, the dynamic phases are not yet connected */
     fd->dim3 = PETSC_TRUE;
+    {
+      /* 3-D defaults for speed (fd_plan.md L2, L3), unless given: quasi-steady hand-back,
+	 hand-back by traction difference (10 kPa), re-entry only above 10 vsw until the
+	 peak rate has dropped below the hand-back limit */
+      PetscBool set;
+      PetscCall(PetscOptionsHasName(NULL,NULL,"-fd_back_eps",&set));
+      if(!set) fd->back_eps = 0.05;
+      PetscCall(PetscOptionsHasName(NULL,NULL,"-fd_back_dyn",&set));
+      if(!set) fd->back_dyn = 1e4;
+      PetscCall(PetscOptionsHasName(NULL,NULL,"-fd_reentry",&set));
+      if(!set) fd->reentry = 10.0;
+    }
     fd->mu = shear_modulus_si; fd->beta = s_wave_speed_si;
     fd->nu = medium->elastic.poisson;
     fd->rho = fd->mu/(fd->beta*fd->beta);
@@ -351,7 +365,7 @@ static PetscErrorCode fd3d_run_phase_pair(TS ts, struct interact_ctx *par, struc
     vmax = 0.0;
     for(p = 0;p < 2;p++) for(i = 0;i < N;i++) if(fabs(fm[p]->V[i]) > vmax) vmax = fabs(fm[p]->V[i]);
     if(vmax > vpeak) vpeak = vmax;
-    if(fd->back_dyn > 0.0 && vmax < fd->vsw && pp->static_fn){
+    if(fd->back_dyn > 0.0 && vmax < fd->vsw*(fd->reentry > 1.0 ? fd->reentry : 1.0) && pp->static_fn){
       /* as in fd3d_run_phase: FD traction against the QD traction of both planes */
       double dmax = 0.0, *s0 = vtmp, *s1 = vtmp + N;
       pp->static_fn(pp->static_ctx, fm[0]->delta, fm[1]->delta, s0, s1);
@@ -392,6 +406,8 @@ static PetscErrorCode fd3d_run_phase_pair(TS ts, struct interact_ctx *par, struc
       x[4*g+1] = f->tau[i];
       x[4*g+3] += f->delta[i];
       if(pp->normal_coupling) x[4*g+2] = f->sigma[i];
+      if(getenv("FD_DEBUG_REENTRY") && (!isfinite(x[4*g]) || !isfinite(x[4*g+1]) || !(x[4*g+2] > 0.0)))
+        PetscCall(PetscPrintf(PETSC_COMM_WORLD,"hand-back: patch %d plane %d cell %d: psi %g tau %g sigma %g theta %g V %g\n",g,p,i,(double)x[4*g],(double)x[4*g+1],(double)x[4*g+2],f->theta[i],f->V[i]));
       slip[p] += f->delta[i]; cnt[p]++; slipsum += f->delta[i];
     }
     PetscCall(fd_full_put(X,&fd->scX,&fd->Xall,&x,1));
@@ -497,7 +513,7 @@ static PetscErrorCode fd3d_run_phase(TS ts, struct interact_ctx *par, struct fd_
     vmax = 0.0;
     for(i = 0;i < N;i++) if(fabs(f->V[i]) > vmax) vmax = fabs(f->V[i]);
     if(vmax > vpeak) vpeak = vmax;
-    if(fd->back_dyn > 0.0 && vmax < fd->vsw && f->static_fn){
+    if(fd->back_dyn > 0.0 && vmax < fd->vsw*(fd->reentry > 1.0 ? fd->reentry : 1.0) && f->static_fn){
       /* hand back once the fully dynamic traction equals the quasi-dynamic one (elastostatic
 	 interaction plus radiation damping) to within back_dyn everywhere, for back_nwin steps
 	 in a row (fd_plan.md L2): from then on the QD integrator reproduces the phase */
@@ -1379,7 +1395,12 @@ PetscErrorCode rsf_fd_monitor(TS ts, PetscInt step, PetscReal time, Vec X, void 
   fd->rec_t[fd->irec] = time;
   {
     int N = fd->dim3 ? (fd->pair3 ? fd->n3tot : fd->f3->N) : fd->sys->N;
-    for(i = 0;i < N;i++) fd->rec_v[(size_t)fd->irec*N + i] = (fd->g_of_s[i] >= 0) ? PetscRealPart(v[fd->g_of_s[i]]) : 0.0;
+    double vm = 0.0;
+    for(i = 0;i < N;i++){
+      fd->rec_v[(size_t)fd->irec*N + i] = (fd->g_of_s[i] >= 0) ? PetscRealPart(v[fd->g_of_s[i]]) : 0.0;
+      if(fabs(fd->rec_v[(size_t)fd->irec*N + i]) > vm) vm = fabs(fd->rec_v[(size_t)fd->irec*N + i]);
+    }
+    if((fd->vsw_eff > fd->vsw) && (vm < fd->vback)) fd->vsw_eff = fd->vsw;   /* end of the re-entry hysteresis: afterslip below vback */
   }
   PetscCall(fd_full_put_read(rsf->vel,&fd->scV,&fd->Vall,&v));
   fd->irec = (fd->irec + 1) % fd->nrec; if(fd->nrec_used < fd->nrec) fd->nrec_used++;
@@ -1397,13 +1418,22 @@ PetscErrorCode rsf_fd_postevent(TS ts, struct interact_ctx *par, PetscReal t, Ve
   if(!fd)
     PetscFunctionReturn(PETSC_SUCCESS);
   fd->nflag++;
+  if(getenv("FD_DEBUG_REENTRY")) PetscCall(PetscPrintf(PETSC_COMM_WORLD,"rsf_fd_postevent: t %.9f yr, switching threshold %g\n",(double)(t/SEC_PER_YEAR),(double)fd->vsw_eff));
   if(fd->mode == 1){
     if(fd->dim3) PetscCall(fd3d_run_phase(ts,par,fd,t,X,&t_end));
     else PetscCall(fd_run_phase(ts,par,fd,t,X,&t_end));
     fd->nphase++;
     fd->nrec_used = 0; fd->irec = 0;	/* the record is stale after the phase */
+    /* re-entry hysteresis (fd_plan.md L3): right after a phase, the afterslip may exceed vsw
+       again; QD reproduces it (the hand-back tested that), so a new phase opens only above
+       reentry vsw until the peak rate has fallen below vback (reset in rsf_fd_monitor) */
+    if(fd->reentry > 1.0) fd->vsw_eff = fd->reentry*fd->vsw;
     PetscCall(TSSetTime(ts,t_end));
     PetscCall(TSSetTimeStep(ts,fd->dt_restart));
+    /* the event handler otherwise resumes with its own step (the pre-event one), which after an
+       early hand-back (-fd_back_dyn) can be far too long for the still-fast afterslip (the
+       error estimate turned NaN and the integration stalled, fd_plan.md L3) */
+    if(fd->dim3) PetscCall(TSSetPostEventStep(ts,fd->dt_restart));   /* 3-D only: 2-D runs unchanged */
   }else
     PetscCall(PetscPrintf(PETSC_COMM_WORLD,"rsf_fd_postevent: t %.6f yr: switch threshold crossed (mode %d: no phase)\n",
 			  (double)(t/SEC_PER_YEAR),(int)fd->mode));

@@ -223,7 +223,13 @@ For 3-D sequences, `-fd_back_dyn 1e4` ends a dynamic phase once the fully dynami
 traction differs from the quasi-dynamic one by less than 10 kPa everywhere (for
 `-fd_back_nwin` steps, default 10) and the peak rate is below the switching
 threshold; on BP5-FD this halves the phase with afterslip unchanged to 1e-4 m
-(fd_plan.md, L2). Off by default.
+(fd_plan.md, L2). In 3-D the defaults are now `-fd_back_eps 0.05 -fd_back_dyn 1e4
+-fd_reentry 10` (after a phase, the next one opens only above 10 vsw until the peak
+rate has fallen below vback; fd_plan.md, L3); 2-D defaults are unchanged. The
+traction criterion applies up to the re-entry threshold, so slow nucleation above vsw
+is carried by QD until the rate exceeds 10 vsw (fd_plan.md, P4). For 3-D models at
+500 m or finer, `-ts_rk_type 3bs` was needed for the QD part (the default scheme can
+stop in a rejection storm during QD coseismic phases).
 `-fd_kmax3 1` enables steps of several substeps in 3-D (experimental, see
 fd_plan.md). The 3-D phase station files have a fifth column, the number
 of substeps of the step.

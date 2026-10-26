@@ -41,6 +41,7 @@ struct fd_vars {
   PetscInt layer_w, layer_m, layer_margin;	/* 3-D half space: free-surface layer (half-width and margin in fault elements, refinement) */
   PetscInt surface_opt, surf_ext, surf_m;	/* 3-D half space: 1 forces the full virtual surface; its margin in fault elements; refinement */
   PetscBool surf3;			/* the 3-D marcher uses the full virtual surface */
+  PetscReal reentry, vsw_eff;		/* re-entry hysteresis factor (3-D default 10), current switching threshold */
   PetscReal back_dyn;			/* > 0: hand back when |tau_FD - tau_QD| < back_dyn [Pa] everywhere (3-D) */
   PetscInt back_nwin;			/* for this many steps in a row (default 10) */
   PetscInt surf_grade;		/* 1 (default): surface rows fine next to the trace, widening outwards */

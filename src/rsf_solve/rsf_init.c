@@ -252,7 +252,7 @@ void rsf_print_help(const char *prog)
   fprintf(stderr,"  -fd_vsw <m/s>           switch QD to FD at this max slip rate (default 1e-3)\n");
   fprintf(stderr,"  -fd_vback <m/s>         back to QD after max slip rate below this for one\n");
   fprintf(stderr,"                          window (default 1e-4)\n");
-  fprintf(stderr,"  -fd_back_eps <f>        > 0: instead, back to QD once all slip rates change by less\n");
+  fprintf(stderr,"  -fd_back_eps <f>        > 0 (3-D default 0.05): instead, back to QD once all slip rates change by less\n");
   fprintf(stderr,"                          than this fraction over one window (default 0 = off)\n");
   fprintf(stderr,"  -fd_back_vmax <m/s>     max slip rate allowed at that hand-back (default vsw/2)\n");
   fprintf(stderr,"  -fd_tol <f>             history window tolerance (default 1e-2)\n");
@@ -275,7 +275,9 @@ void rsf_print_help(const char *prog)
   fprintf(stderr,"                          fault ends (default: as -fd_layer)\n");
   fprintf(stderr,"  -fd_back_dyn <Pa>       3-D: hand back to QD once the fully dynamic traction equals the\n");
   fprintf(stderr,"                          quasi-dynamic one to within this everywhere (and max V < vsw)\n");
-  fprintf(stderr,"                          for -fd_back_nwin steps (default 10); default 0: off\n");
+  fprintf(stderr,"                          for -fd_back_nwin steps (default 10); 3-D default 1e4, 2-D off\n");
+  fprintf(stderr,"  -fd_reentry <f>         after a phase, open the next one only above f vsw until the peak\n");
+  fprintf(stderr,"                          rate has fallen below -fd_vback (3-D default 10, 2-D 1)\n");
   fprintf(stderr,"  -fd_surface <0|1>       3-D half space: a planar fault of any dip (or 1 also for a vertical\n");
   fprintf(stderr,"                          strike-slip fault) uses a full virtual free surface (three unknowns\n");
   fprintf(stderr,"                          per surface element); -fd_surface_m (default 4: elements of dx/4),\n");
