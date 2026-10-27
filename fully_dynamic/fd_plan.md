@@ -2245,6 +2245,42 @@ elsewhere; per-fault strips keep the large fault-to-own-surface couplings struct
 along strike), the dense remainder is fault-to-other-faults' strips and the background.
 Next: gate 2 (domain partitioning for our rectangular kernels) and gate 3 (compression).
 
+### General surface-breaking fault systems, gates 2 and 3: domain partitioning and compression (2026-10-29)
+
+Scripts in fully_dynamic/h_gates (Python, tada_quad.rect_ramp_stress, 500 m squares, the
+time step of the code at CFL 0.5).
+Gate 2 (gate2_domain_I.py, gate2_strips.py): for our square sources Ando's partition holds
+exactly. With strips bounded by the nearest and farthest point of the source square, the
+P strip takes 3 to 4 steps and the S strip 3 to 5 steps; between the strips the ramp
+response is a cubic polynomial in t to 1e-13 (relative; degree 2 leaves 2e-4 to 4e-4);
+after the S strip it is linear in t (static) to 1e-12. So per source-receiver pair and
+component about 15 numbers (two strips of at most 5, four cubic coefficients, the static
+slope) replace the present dense window (all lags up to the S passage from the farthest
+cell, 46 to 93 lags in the gate-3 blocks, 240 for 60 km): 3 to 6 times less storage in
+these blocks and growing linearly with the span. The history sum between the strips can
+use running moment sums of each source cell's slip-rate history (O(1) per pair and step),
+as Ando's factorised Domain I.
+Gate 3 (gate3_ranks.py): fault (16 x 8 squares of 500 m, thrust 30 degrees) to surface
+(32 x 32 cells of 250 m) blocks, above the fault's top and 10 km away. Singular-value
+ranks at 1e-3 and 1e-5 (relative Frobenius): the wavefront strips (values per step after
+the strip start) are full rank (120 to 128 of 128) near and far; the static slope is rank
+92 / 120 near and 8 / 14 far; the even cubic coefficients are low rank far (6 to 15), the
+odd ones full rank (probably round-off in the monomial basis; not pursued). So low-rank
+compression helps the static and between-front parts of well separated blocks, as for the
+quasi-dynamic H-matrices, but not the wavefront strips, which set the floor.
+Gate 3c (gate3_coarse.py): replacing a 1 km group of 250 m squares by one square with the
+mean slip rate is exact for uniform slip (linearity) but, with slip varying by +-50 percent
+within the group, the traction history differs by 13 to 31 percent of its maximum at 2 to
+20 km (the wavefront shape carries the slip variation); coarse-graining distant sources
+in time-domain kernels is not accurate in this simple form.
+Consequence for 4 to 5 faults (about 20 000 fault cells of 500 m, graded surface strips of
+about 8 000 cells per trace, cells of 125 m at the trace): the couplings of each fault with
+its own strip stay Toeplitz along that strike (FFT, as now); the dense cross couplings
+(faults with the other faults' strips, strips with strips, faults with faults) at about 15
+numbers per pair and component give of the order of 1 to 5 TB, the range of Ando's runs,
+3 to 6 times less than dense windows. Without an accurate coarse-graining or a compressible
+wavefront representation this stays a distributed-memory (cluster) problem.
+
 ### WP7, C implementation in rsf_solve: status (2026-10-18)
 Done, each verified in the sandbox before delivery (details in
 fd_c_design.md sections 6 to 10, usage in rsf_solve_fd.md):
