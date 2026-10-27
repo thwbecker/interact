@@ -1462,6 +1462,11 @@ PetscErrorCode fd3d_setup_from_geometry(struct interact_ctx *par, struct fd_vars
          the bottom depth; above the trace the distance from it), a power of two times dx/m
          between dx/m and dx, growing at most by two from row to row */
       double hx = dx/m, *yc, *wy, y, w, ylo = ytop - Wd - mg*dx, yhi = ytop + mg*dx;
+      if(getenv("FD_SURF_BAND")){                     /* experiment (fd_plan.md H1): surface only within a band of +-band m of the trace */
+        double band = atof(getenv("FD_SURF_BAND"));
+        if(ytop - band > ylo) ylo = ytop - band;
+        if(ytop + band < yhi) yhi = ytop + band;
+      }
       int nr = 0, cap = 4096;
       yc = malloc(sizeof(double)*cap); wy = malloc(sizeof(double)*cap);
 #define ROW_W(dep, wprev) do{ double wa = 0.5*(dep); if(wa > dx) wa = dx; if(wa > 2*(wprev)) wa = 2*(wprev); w = hx; while(2*w <= wa + 1e-9) w *= 2.0; }while(0)

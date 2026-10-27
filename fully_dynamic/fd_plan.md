@@ -2207,6 +2207,44 @@ window) counted only the cross tables, not the planes' own; with one plane it wa
 and the phase ended after one step. It now takes the largest of all windows (G2 runs
 seeded from a QD history were affected; the checks started from rest).
 
+### General surface-breaking fault systems, gate 1: how much virtual surface is needed (2026-10-29)
+
+Strategy (A + B, see the discussion of Ando 2016, GJI 207, 833-847): keep the structured
+parts (Toeplitz/FFT self tables of planar segments, a structured surface), use Ando's
+domain partitioning (F: wavefront strips; I: between the fronts, factorised in space and
+time; S: static) only for the dense couplings, possibly with low-rank compression. Gates:
+(1) surface extent and resolution, (2) FDPM factors for our kernels, (3) compressibility.
+Gate 1, with the existing one-fault virtual surface (B2/B7), the large surface-breaking
+thrust of G4 (30 degrees, 16 x 8 squares of 1 km, depth extent 4 km, mean slip 3.9 m):
+slip at the end of the phase and peak slip rate at three trace stations, relative to the
+default surface (graded rows of 250 m to 1 km, footprint plus 8 km, 1.4 GB):
+
+| surface | stations: slip, peak rate | mean slip, peak | tables |
+|---|---|---|---|
+| footprint + 4 km | within 0.1 % | 3.911 m, 13.42 m/s | 651 MB |
+| footprint + 2 km | +0.1 to +0.9 %, +0.0 to +0.1 % | 3.923, 13.49 | 409 MB |
+| footprint + 1 km | +2.3 to +2.8 %, +0.8 to +1.7 % | 4.016, 13.87 | 287 MB |
+| 500 m cells at the trace (dx/2), + 8 km | +5.6 to +20 %, +11 to +15 % | 4.173, 14.95 | 502 MB |
+| 125 m cells (dx/8), + 2 km | -0.7 to -2.5 %, -2.8 to +0.9 % (against + 2 km at 250 m) | 3.879, 13.42 | 1.2 GB |
+| band of +-4 km around the trace only | -1.1 to -3.9 %, -0.1 to -1.0 % | 3.764, 13.11 | 299 MB |
+| band of +-2 km | -1.3 to +2.7 %, -9 to -13 % | 3.691, 11.88 | |
+| band of +-1 km | -4 to +2 %, -17 to -23 % | 3.698, 10.49 | |
+
+(the reference default is 6.08 / 6.27 / 5.86 m and 10.2 / 10.8 / 11.6 m/s at the stations,
+3.901 m and 13.41 m/s overall). So: cells of dx/4 at the trace are needed and enough
+(dx/2: errors of 6 to 20 percent; dx/8: within 3 percent); the surface may stop half a
+fault depth beyond the footprint (within 1 percent); a band around the trace about one
+fault depth wide on each side gives 1 to 4 percent, narrower bands lose the peak slip
+rates quickly. FD_SURF_BAND=<m> (environment, experiment only) restricts the surface to
+such a band. Not yet tested: deeper faults (the band may scale with depth or with the
+rupture's wavelengths), 2-D grading along strike (the columns are uniform at dx/4 here,
+which makes the surface cells 14 times the fault cells).
+Consequence for 4 to 5 faults (about 20 000 fault cells of 500 m): fine surface cells only
+in strips along each trace (Toeplitz along that trace, as now), graded coarser cells
+elsewhere; per-fault strips keep the large fault-to-own-surface couplings structured (FFT
+along strike), the dense remainder is fault-to-other-faults' strips and the background.
+Next: gate 2 (domain partitioning for our rectangular kernels) and gate 3 (compression).
+
 ### WP7, C implementation in rsf_solve: status (2026-10-18)
 Done, each verified in the sandbox before delivery (details in
 fd_c_design.md sections 6 to 10, usage in rsf_solve_fd.md):
