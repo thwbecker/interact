@@ -461,6 +461,136 @@ static void fd3d_multi_static_in(void *ctx, int p, double **delta, double *out)
   fd3d_multi_apply(par,par->medium->In,delta,o,1);
 }
 
+
+/* several dipping (or vertical) faults sharing the strike direction in a half space, with one
+   virtual surface (fd_plan.md G3b). Local frame x' = strike of patch 0, y' = z x x', z up;
+   plane p: up-dip direction u_p in (y', z), dip angle d_p = atan2(u_z, u_y) in (0, 180]; one
+   lattice along x' for all planes; rows down dip from each plane's top; marcher slip =
+   interact's slip (fsign_p = sign of the normal times sign of the slip direction in the
+   kernel frame, see P2), so sgn3 = 1. */
+static PetscErrorCode fd3d_setup_msurf(struct interact_ctx *par, struct fd_vars *fd)
+{
+  struct med *medium = par->medium;
+  struct flt *fault = par->fault;
+  struct rsf_vars *rsf = medium->rsf;
+  PetscInt n = medium->nrflt, mgo = 4, mo = 2;
+  double ls = fd->length_scale, dx = 2.0*fault[0].l*ls, ex[3], ey[3], O[3], *xp, *rowc, xmin = 1e300, xmax = -1e300;
+  double u[FD3D_MULTI_MAX][2], dipd[FD3D_MULTI_MAX], ytop[FD3D_MULTI_MAX], ztop[FD3D_MULTI_MAX], fsg[FD3D_MULTI_MAX], rmin[FD3D_MULTI_MAX], rmax[FD3D_MULTI_MAX];
+  double ylo = 1e300, yhi = -1e300;
+  int *plane, np = 0, rep[FD3D_MULTI_MAX], i, k, p, nx, nz[FD3D_MULTI_MAX], comp = (rsf->slip_mode == STRIKE) ? 1 : 2, m, mg, nxs, nys, Lsf;
+  struct fd3d *fp[FD3D_MULTI_MAX];
+  PetscFunctionBeginUser;
+  (void)mo; (void)mgo;
+  m = (int)fd->surf_m;                                 /* as the one-fault surface: -fd_surface_m (stability band), -fd_surface_ext */
+  for(k = 0;k < 3;k++){ ex[k] = fault[0].t_strike[k]; O[k] = fault[0].x[k]*ls; }
+  { double nrm = sqrt(ex[0]*ex[0] + ex[1]*ex[1]); PetscCheck(nrm > 1e-9,PETSC_COMM_WORLD,PETSC_ERR_SUP,"-fd_mode: horizontal strike needed"); ex[0] /= nrm; ex[1] /= nrm; ex[2] = 0.0; }
+  ey[0] = -ex[1]; ey[1] = ex[0]; ey[2] = 0.0;               /* z x x' */
+  PetscCall(PetscMalloc3(n,&xp,n,&rowc,n,&plane));
+  for(i = 0;i < n;i++){
+    double d[3], yl, zl;
+    PetscCheck(fabs(fabs(fault[i].t_strike[0]*ex[0] + fault[i].t_strike[1]*ex[1] + fault[i].t_strike[2]*ex[2]) - 1.0) < 1e-9,PETSC_COMM_WORLD,PETSC_ERR_SUP,
+	       "-fd_mode: dipping faults in a half space must share the strike direction (patch %d; fd_plan.md G3b)",i);
+    plane[i] = -1;
+    for(p = 0;p < np;p++){
+      double c = fabs(fault[i].normal[0]*fault[rep[p]].normal[0] + fault[i].normal[1]*fault[rep[p]].normal[1] + fault[i].normal[2]*fault[rep[p]].normal[2]), dn = 0.0;
+      for(k = 0;k < 3;k++) dn += (fault[i].x[k] - fault[rep[p]].x[k])*ls*fault[rep[p]].normal[k];
+      if((c > 1.0 - 1e-9) && (fabs(dn) < 1e-6*dx)){ plane[i] = p; break; }
+    }
+    if(plane[i] < 0){
+      double nl[2] = {fault[i].normal[0]*ey[0] + fault[i].normal[1]*ey[1], fault[i].normal[2]}, uy = -nl[1], uz = nl[0];   /* u perpendicular to n in (y', z) */
+      PetscCheck(np < FD3D_MULTI_MAX,PETSC_COMM_WORLD,PETSC_ERR_SUP,"-fd_mode: at most %d 3-D planes",FD3D_MULTI_MAX);
+      if((uz < -1e-12) || ((fabs(uz) <= 1e-12) && (uy < 0.0))){ uy = -uy; uz = -uz; }
+      { double un = sqrt(uy*uy + uz*uz); uy /= un; uz /= un; }
+      u[np][0] = uy; u[np][1] = uz; dipd[np] = atan2(uz, uy)*180.0/M_PI;
+      {
+        /* sign: kernel frame F = (x', u, x' x u); interact's normal and slip direction there */
+        double e3l[2] = {-uz, uy}, sn = (nl[0]*e3l[0] + nl[1]*e3l[1]) > 0.0 ? 1.0 : -1.0, st;
+        if(comp == 1) st = (fault[i].t_strike[0]*ex[0] + fault[i].t_strike[1]*ex[1] + fault[i].t_strike[2]*ex[2]) > 0.0 ? 1.0 : -1.0;
+        else st = ((fault[i].t_dip[0]*ey[0] + fault[i].t_dip[1]*ey[1])*uy + fault[i].t_dip[2]*uz) > 0.0 ? 1.0 : -1.0;
+        fsg[np] = sn*st;
+      }
+      rmin[np] = 1e300; rmax[np] = -1e300; rep[np] = i; plane[i] = np; np++;
+    }
+    p = plane[i];
+    for(k = 0;k < 3;k++) d[k] = fault[i].x[k]*ls - O[k];
+    xp[i] = d[0]*ex[0] + d[1]*ex[1] + d[2]*ex[2];
+    yl = d[0]*ey[0] + d[1]*ey[1]; zl = fault[i].x[2]*ls;
+    rowc[i] = -(yl*u[p][0] + zl*u[p][1]);                    /* down-dip coordinate */
+    if(xp[i] < xmin) xmin = xp[i];
+    if(xp[i] > xmax) xmax = xp[i];
+    if(rowc[i] < rmin[p]) rmin[p] = rowc[i];
+    if(rowc[i] > rmax[p]) rmax[p] = rowc[i];
+  }
+  PetscCheck(np >= 2,PETSC_COMM_WORLD,PETSC_ERR_SUP,"-fd_mode: fd3d_setup_msurf needs two or more planes");
+  { int nzm = 2; for(p = 0;p < np;p++){ int nzp = (int)floor((rmax[p] - rmin[p])/dx + 0.5) + 1; if(nzp > nzm) nzm = nzp; }
+    mg = (int)(fd->surf_ext > 0 ? fd->surf_ext : nzm); }
+  nx = (int)floor((xmax - xmin)/dx + 0.5) + 1;
+  fd->n3tot = 0;
+  for(p = 0;p < np;p++){
+    double yl, zl, rr, perp;
+    nz[p] = (int)floor((rmax[p] - rmin[p])/dx + 0.5) + 1;
+    fd->off3[p] = fd->n3tot; fd->n3tot += nx*nz[p];
+    /* the plane's offset along its normal in (y', z): any of its patches */
+    { double d[3]; for(k = 0;k < 3;k++) d[k] = fault[rep[p]].x[k]*ls - O[k]; yl = d[0]*ey[0] + d[1]*ey[1]; zl = fault[rep[p]].x[2]*ls; }
+    perp = yl*(-u[p][1]) + zl*u[p][0];                       /* component along e3l = (-uz, uy) */
+    rr = rmin[p] - 0.5*dx;                                   /* top edge, down-dip coordinate */
+    ytop[p] = -rr*u[p][0] + perp*(-u[p][1]); ztop[p] = -rr*u[p][1] + perp*u[p][0];
+    PetscCheck(ztop[p] <= 1e-6*dx,PETSC_COMM_WORLD,PETSC_ERR_SUP,"-fd_mode: plane %d above the surface",p);
+    { double yb = ytop[p] - nz[p]*dx*u[p][0]; if(fmin(ytop[p],yb) < ylo) ylo = fmin(ytop[p],yb); if(fmax(ytop[p],yb) > yhi) yhi = fmax(ytop[p],yb); }
+  }
+  PetscCall(PetscMalloc1(fd->n3tot,&fd->g_of_s));
+  for(i = 0;i < fd->n3tot;i++) fd->g_of_s[i] = -1;
+  for(i = 0;i < n;i++){
+    int ii = (int)floor((xp[i] - xmin)/dx + 0.5), jj = (int)floor((rowc[i] - rmin[plane[i]])/dx + 0.5), s = fd->off3[plane[i]] + ii*nz[plane[i]] + jj;
+    PetscCheck((fabs((xp[i] - xmin)/dx - ii) < 1e-6) && (fabs((rowc[i] - rmin[plane[i]])/dx - jj) < 1e-6),PETSC_COMM_WORLD,PETSC_ERR_SUP,"-fd_mode: patch %d is off the common lattice (x %g, down dip %g in units of dx; strike (%g %g %g))",i,(xp[i] - xmin)/dx,(rowc[i] - rmin[plane[i]])/dx,ex[0],ex[1],ex[2]);
+    PetscCheck(fd->g_of_s[s] < 0,PETSC_COMM_WORLD,PETSC_ERR_SUP,"-fd_mode: duplicate patch (patch %d)",i);
+    fd->g_of_s[s] = i;
+  }
+  PetscCall(PetscFree3(xp,rowc,plane));
+  fd->nm3 = np; fd->dt_min = fd->cfl*dx/fd->beta; fd->mirror3 = PETSC_FALSE; fd->surf3 = PETSC_TRUE;
+  for(p = 0;p < np;p++){
+    struct fd3d *f; int N = nx*nz[p];
+    fd->sgn3[p] = 1.0;
+    fd->tabm3[p] = fd3d_tab_create_c(nx,nz[p],dx,fd->dt_min,fd->alpha,fd->beta,fd->rho,(int)fd->lmax,comp);
+    PetscCheck(fd->tabm3[p],PETSC_COMM_WORLD,PETSC_ERR_MEM,"rsf_fd_setup: 3-D table allocation failed");
+    fp[p] = f = fd3d_create(fd->tabm3[p]);
+    f->law = 1; f->f0 = rsf->f0; f->V0 = rsf->v0; f->nl = (int)fd->nl;
+    PetscCall(PetscMalloc4(N,&f->a,N,&f->b,N,&f->Lc,N,&f->theta));
+    f->locked = (int *)calloc(N,sizeof(int));
+    for(i = 0;i < N;i++){
+      int g = fd->g_of_s[fd->off3[p] + i];
+      if(g >= 0){ f->a[i] = fault[g].mu_sa; f->b[i] = fault[g].mu_db; f->Lc[i] = rsf->dc_vec ? rsf->dc_vec[g] : rsf->dc; }
+      else{ f->a[i] = 0.01; f->b[i] = 0.01; f->Lc[i] = 1.0; f->locked[i] = 1; f->theta[i] = 1.0; }
+    }
+  }
+  /* surface: uniform rows of dx/m on the lattice through plane 0's top line, margins mg dx */
+  {
+    double hx = dx/m, y0 = ytop[0], ys = y0 - ceil((y0 - (ylo - mg*dx))/hx)*hx, *yc, *wy, zmax = 0.0;
+    nys = (int)ceil((yhi + mg*dx - ys)/hx); nxs = (nx + 2*mg)*m;
+    yc = malloc(sizeof(double)*nys); wy = malloc(sizeof(double)*nys);
+    for(i = 0;i < nys;i++){ yc[i] = ys + (i + 0.5)*hx; wy[i] = hx; }
+    for(p = 0;p < np;p++) zmax = fmax(zmax, -(ztop[p] - nz[p]*dx*u[p][1]));
+    Lsf = (int)ceil(sqrt(pow((nx + 2*mg)*dx, 2) + pow(yhi - ylo + 2*mg*dx, 2) + zmax*zmax)/(fd->beta*fd->dt_min)) + 2;
+    fd->msurf3 = fd3d_msurf_create(np,fp,ytop,ztop,dipd,fsg,comp,xmin - 0.5*dx,m,nxs,nys,xmin - 0.5*dx - mg*dx,yc,wy,Lsf);
+    free(yc); free(wy);
+    PetscCheck(fd->msurf3,PETSC_COMM_WORLD,PETSC_ERR_LIB,"rsf_fd_setup: several faults with a virtual surface: setup failed (one MPI rank; same along-strike lattice)");
+    PetscCall(PetscPrintf(PETSC_COMM_WORLD,"rsf_fd_setup: virtual surface for %d faults: %d x %d surface elements of %g m, %d lags\n",np,nxs,nys,hx,Lsf));
+  }
+  fd->multi3 = fd->msurf3->mx;
+  fd->f3 = fp[0];
+  fd->multi3->static_fn = fd3d_multi_static_is; fd->multi3->static_ctx = (void *)par;
+  for(p = 0;p < np;p++){
+    struct fd3d_layer *ly = fd->msurf3->ly[p];
+    ly->normal_coupling = rsf->calc_sigma_dot ? 1 : 0;
+    PetscCall(PetscPrintf(PETSC_COMM_WORLD,"rsf_fd_setup: fault %d: %d x %d squares of %g m, dip %.2f deg, top (y', z) = (%.1f, %.1f) m, slip sign %+.0f\n",p,nx,nz[p],dx,dipd[p],ytop[p],ztop[p],fsg[p]));
+  }
+  if(rsf->calc_sigma_dot){ fd->msurf3->static_n_fn = fd3d_multi_static_in; fd->msurf3->static_n_ctx = (void *)par; }
+  PetscCall(MatCreateVecs(medium->Is,&fd->v3a,&fd->v3b));
+  fd->nrec = 64; fd->irec = 0; fd->nrec_used = 0;
+  PetscCall(PetscMalloc2(fd->nrec,&fd->rec_t,(size_t)fd->nrec*fd->n3tot,&fd->rec_v));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 static PetscErrorCode fd3d_setup_multi(struct interact_ctx *par, struct fd_vars *fd)
 {
   struct med *medium = par->medium;
@@ -477,10 +607,10 @@ static PetscErrorCode fd3d_setup_multi(struct interact_ctx *par, struct fd_vars 
   /* half space (G3a): vertical strike-slip planes reaching the surface, by free-surface images;
      dipping planes in a half space need the virtual surface for several faults (G3b) */
   if(mir){
-    PetscCheck(rsf->slip_mode == STRIKE,PETSC_COMM_WORLD,PETSC_ERR_SUP,"-fd_mode: several 3-D planes in a half space: strike slip only in this version (fd_plan.md G3b)");
-    for(i = 0;i < n;i++)
-      PetscCheck(fabs(fault[i].normal[2]) < 1e-9,PETSC_COMM_WORLD,PETSC_ERR_SUP,
-		 "-fd_mode: several 3-D planes in a half space must be vertical in this version (patch %d; dipping planes: fd_plan.md G3b)",i);
+    /* dipping planes or dip slip in a half space: one virtual surface for all (G3b) */
+    int need = (rsf->slip_mode != STRIKE);
+    for(i = 0;i < n;i++) if(fabs(fault[i].normal[2]) > 1e-9) need = 1;
+    if(need || getenv("FD_FORCE_MSURF")) return fd3d_setup_msurf(par,fd);
   }
   PetscCheck((rsf->slip_mode == STRIKE) || (rsf->slip_mode == DIP),PETSC_COMM_WORLD,PETSC_ERR_SUP,"-fd_mode: 3-D planes need pure strike or dip slip");
   PetscCall(PetscMalloc3(n,&pa,n,&pb,n,&plane));
@@ -644,6 +774,7 @@ static PetscErrorCode fd3d_run_phase_multi(TS ts, struct interact_ctx *par, stru
     g = fd->g_of_s[fd->off3[p] + i];
     if(g < 0){ f->sigma[i] = 0.0; f->V[i] = 0.0; f->tau0[i] = 0.0; m->sig0[p][i] = 0.0; continue; }
     f->sigma[i] = x[4*g+2]; m->sig0[p][i] = x[4*g+2];
+    if(fd->msurf3) fd->msurf3->ly[p]->sig0[i] = x[4*g+2];
     vI = 2.0*rsf->v0*exp(-x[4*g]/fault[g].mu_sa)*sinh(x[4*g+1]/(fault[g].mu_sa*x[4*g+2]));
     f->V[i] = s*vI;
     f->theta[i] = f->Lc[i]/f->V0*exp((x[4*g] - f->f0)/f->b[i]);
@@ -678,7 +809,7 @@ static PetscErrorCode fd3d_run_phase_multi(TS ts, struct interact_ctx *par, stru
   for(;;){
     double trel = m->f[0]->time + dt;
     for(p = 0;p < np;p++) for(i = 0;i < m->f[p]->N;i++){ g = fd->g_of_s[fd->off3[p] + i]; load[p][i] = (g >= 0) ? fd->sgn3[p]*fault[g].sinc[0]*trel : 0.0; }
-    fd3d_multi_step(m,load);
+    if(fd->msurf3) fd3d_msurf_step(fd->msurf3,load); else fd3d_multi_step(m,load);
     nsteps++;
     for(a = 0;a < fd->nstat;a++)
       if(fd->sstat[a] >= 0 && fd->fstat[a]){
@@ -731,7 +862,7 @@ static PetscErrorCode fd3d_run_phase_multi(TS ts, struct interact_ctx *par, stru
         x[4*g] = f->f0 + f->b[i]*log(f->V0*f->theta[i]/f->Lc[i]);
         x[4*g+1] = s*f->tau[i];
         x[4*g+3] += s*f->delta[i];
-        if(m->normal_coupling) x[4*g+2] = f->sigma[i];
+        if(m->normal_coupling || (fd->msurf3 && fd->msurf3->ly[p]->normal_coupling)) x[4*g+2] = f->sigma[i];
         slip[p] += f->delta[i]; cnt[p]++;
       }
       sprintf(one,"%s%.4f",p ? " / " : "",slip[p]/(cnt[p] > 0 ? cnt[p] : 1)); strcat(buf,one);

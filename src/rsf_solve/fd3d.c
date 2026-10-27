@@ -1589,6 +1589,9 @@ static void fft_x_inplace(const struct fd3d_layer *ly, const double *in, double 
 
 struct fd3d_layer *fd3d_surf_create_rows(struct fd3d *f, double x0f, double ytop, double ztop, double dip_deg, int fcomp,
                                          int m, int nxs, int nys, double xs0, const double *yc, const double *wy, int L, double fsign);
+/* several faults sharing one virtual surface (fd_plan.md G3b): the second and further faults
+   need only their fault <-> surface tables; the surface-surface tables are built once */
+static int g_surf_skip_T2 = 0;
 struct fd3d_layer *fd3d_surf_create(struct fd3d *f, double x0f, double ytop, double ztop, double dip_deg, int fcomp,
                                     int m, int nxs, int nys, double xs0, double ys0, int L, double fsign)
 {
@@ -1637,6 +1640,7 @@ struct fd3d_layer *fd3d_surf_create_rows(struct fd3d *f, double x0f, double ytop
   /* surface-surface: pairs (rcv, src) (0,0) (0,1) (1,0) (1,1) (2,2), Toeplitz along strike (offset
      d = p' - p), dense in (receiver row, source row); row widths may differ. Built one row pair
      at a time (temporary memory O(L Mx)); each rank keeps its wavenumbers (fd_plan.md S3) */
+  if(!g_surf_skip_T2)
   {
     static const int pr[5] = {0, 0, 1, 1, 2}, ps[5] = {0, 1, 0, 1, 2};
     size_t nss = (size_t)nys*nys, nkk = (size_t)ly->nk, Lx = (size_t)(L + 2)*ly->Mx;
@@ -2202,7 +2206,8 @@ struct fd3d_multi *fd3d_multi_create(int np, struct fd3d **f, const struct fd3d_
     m->f[p] = f[p]; m->g[p] = geom[p];
     /* a mirrored plane (half space) must be vertical with strike slip and its top row at the surface */
     if(f[p]->mirror && (!geom[p].mirror || geom[p].comp != 1 || fabs(geom[p].E[2][2]) > 1e-9 || fabs(geom[p].O[2]) > 1e-6*geom[p].dx)){ free(m); return NULL; }
-    if(f[p]->layer || f[p]->next || fabs(f[p]->t->dt - dt) > 1e-12*dt || f[p]->t->mpi_size > 1){ free(m); return NULL; }
+    if(f[p]->layer || fabs(f[p]->t->dt - dt) > 1e-12*dt || f[p]->t->mpi_size > 1){ free(m); return NULL; }
+    /* extension rows above the surface (f->next) are not in the cross tables (fd_plan.md G3b) */
   }
   for(p = 0; p < np; p++) for(q = 0; q < np; q++){
     struct fd3d_mpair *c = &m->c[q][p];               /* source q, receiver p */
@@ -2394,5 +2399,277 @@ int fd3d_multi_step(struct fd3d_multi *m, double **load)
     free(Kx[p]); free(Kn[p]); free(Hs[p]); free(Vprev[p]); free(th0[p]);
   }
   m->hk++;
+  return itot;
+}
+
+/* ---------------- several faults with one virtual surface (fd_plan.md G3b) ----------------
+   Faults sharing the strike direction x and one along-strike lattice (same nx, x0f), each with
+   its own dip, top line and slip sign; one surface of graded rows. The surface tables and
+   state live in the first fault's layer, each further fault has its own fault <-> surface
+   tables (surface-surface tables skipped). Fault <-> fault coupling: the dense whole-space
+   tables of fd3d_multi (the virtual surface supplies the free surface for them too). */
+struct fd3d_msurf *fd3d_msurf_create(int nf, struct fd3d **f, const double *ytop, const double *ztop, const double *dip_deg,
+                                     const double *fsign, int fcomp, double x0f, int m, int nxs, int nys, double xs0,
+                                     const double *yc, const double *wy, int L)
+{
+  struct fd3d_msurf *s = calloc(1, sizeof(*s));
+  struct fd3d_mplane g[FD3D_MULTI_MAX];
+  int k, q;
+  if(nf < 1 || nf > FD3D_MULTI_MAX){ free(s); return NULL; }
+  s->nf = nf;
+  for(k = 0; k < nf; k++){
+    double F[3][3];
+    s->f[k] = f[k]; s->fsg[k] = fsign[k];
+    if(f[k]->t->nx != f[0]->t->nx){ free(s); return NULL; }        /* one along-strike lattice */
+    frame_fault(dip_deg[k], F);
+    memset(&g[k], 0, sizeof(g[k]));
+    g[k].dx = f[k]->t->dx; g[k].comp = fcomp;
+    for(q = 0; q < 3; q++){ g[k].E[0][q] = F[0][q]; g[k].E[1][q] = F[1][q]; g[k].E[2][q] = F[2][q]; }
+    g[k].O[0] = x0f; g[k].O[1] = ytop[k]; g[k].O[2] = ztop[k];       /* cell (0, 0): top row, first column */
+  }
+  if(nf > 1){
+    s->mx = fd3d_multi_create(nf, f, g);
+    if(!s->mx){ free(s); return NULL; }
+  }
+  for(k = 0; k < nf; k++){
+    g_surf_skip_T2 = (k > 0);
+    s->ly[k] = fd3d_surf_create_rows(f[k], x0f, ytop[k], ztop[k], dip_deg[k], fcomp, m, nxs, nys, xs0, yc, wy, L, fsign[k]);
+    g_surf_skip_T2 = 0;
+    if(!s->ly[k] || s->ly[k]->Mx != s->ly[0]->Mx){ fd3d_msurf_free(s); return NULL; }
+    f[k]->layer = s->ly[k];
+  }
+  return s;
+}
+
+void fd3d_msurf_free(struct fd3d_msurf *s)
+{
+  if(!s) return;
+  if(s->mx) fd3d_multi_free(s->mx);
+  free(s);
+}
+
+int fd3d_msurf_step(struct fd3d_msurf *s, double **load)
+{
+  struct fd3d_layer *L0 = s->ly[0];
+  const struct fd3d_tab *t = s->f[0]->t;
+  int nf = s->nf, ns = L0->ns, nys = L0->nys, i, l, it, inner, c, r, k, q, j, itot = 0, lmax = L0->L < L0->nhist + 1 ? L0->L : L0->nhist + 1, nl = s->f[0]->nl;
+  size_t Mh = L0->Mh, m, Q = Mh*nys;
+  double dt = t->dt, hw = nl ? 0.5 : 1.0, Es[3];
+  double *V3 = malloc(sizeof(double)*3*ns), *rhs = malloc(sizeof(double)*3*ns), *tmps = malloc(sizeof(double)*3*ns);
+  double _Complex *Xs = malloc(sizeof(double _Complex)*Mh*nys), *Ys = malloc(sizeof(double _Complex)*3*Mh*nys);
+  double _Complex *S3 = malloc(sizeof(double _Complex)*3*Q), *P3 = malloc(sizeof(double _Complex)*3*Q);
+  double *Hx[FD3D_MULTI_MAX], *Hn[FD3D_MULTI_MAX], *Kx[FD3D_MULTI_MAX], *Kn[FD3D_MULTI_MAX], *Vp[FD3D_MULTI_MAX], *thb[FD3D_MULTI_MAX];
+  double _Complex *Xf[FD3D_MULTI_MAX], *Yf[FD3D_MULTI_MAX];
+  Es[0] = Es[1] = 0.5*t->rho*t->cT; Es[2] = 0.5*t->rho*t->cL;
+  /* exact statics over all faults (shear), as fd3d_multi_step */
+  if(s->mx && s->mx->static_fn){
+    double *dl[FD3D_MULTI_MAX];
+    for(k = 0; k < nf; k++){ if(!s->mx->sbuf[k]) s->mx->sbuf[k] = malloc(sizeof(double)*s->f[k]->N); dl[k] = s->f[k]->delta; }
+    s->mx->static_fn(s->mx->static_ctx, dl, s->mx->sbuf);
+    for(k = 0; k < nf; k++){ s->mx->slot[k].m = s->mx; s->mx->slot[k].p = k; s->f[k]->static_fn = multi_sbuf_out; s->f[k]->static_ctx = &s->mx->slot[k]; }
+  }
+  for(k = 0; k < nf; k++){
+    int N = s->f[k]->N, nz = s->ly[k]->nz;
+    step_begin(s->f[k], load ? load[k] : NULL);
+    Hx[k] = calloc(N, sizeof(double)); Hn[k] = calloc(N, sizeof(double)); Kx[k] = calloc(N, sizeof(double)); Kn[k] = calloc(N, sizeof(double));
+    Vp[k] = malloc(sizeof(double)*N); thb[k] = (s->f[k]->law == 1) ? malloc(sizeof(double)*N) : NULL;
+    Xf[k] = malloc(sizeof(double _Complex)*Mh*nz); Yf[k] = calloc(2*Mh*nz, sizeof(double _Complex));
+  }
+  memcpy(L0->Vold3, L0->V3, sizeof(double)*3*ns);
+  /* ---- known parts: surface <- surface and all faults; fault k <- surface ---- */
+  memset(Ys, 0, sizeof(double _Complex)*3*Mh*nys);
+  for(c = 0; c < 3; c++) layer_rows_hat(L0, L0->delta3 + (size_t)c*ns, S3 + (size_t)c*Q);
+  surf_apply_rows(L0, 1, 0, S3, 1.0, Ys);
+  for(k = 0; k < nf; k++){
+    struct fd3d_layer *ly = s->ly[k]; int nz = ly->nz; size_t nfs = (size_t)nys*nz;
+    fault_rows_hat(ly, s->f[k]->delta, Xf[k]);
+    for(r = 0; r < 3; r++) lxp_apply(ly, nys, nz, ly->Tfs[r][1], Xf[k], Ys + (size_t)r*Mh*nys);
+    for(c = 0; c < 3; c++){
+      layer_rows_hat(L0, L0->delta3 + (size_t)c*ns, Xs);
+      if(!s->f[k]->static_fn) lxp_apply(ly, nz, nys, ly->Tsf[0][c][1], Xs, Yf[k]);
+      if(!ly->static_n_fn) lxp_apply(ly, nz, nys, ly->Tsf[1][c][1], Xs, Yf[k] + Mh*nz);
+    }
+    for(l = 2; l <= lmax; l++){
+      int slot = (L0->hk - (l - 1) + 2*L0->L) % L0->L;
+      if(k == 0) surf_apply_rows(L0, 0, l - 1, L0->hsx3 + (size_t)slot*3*Q, 1.0, Ys);
+      for(r = 0; r < 3; r++) lxp_apply(ly, nys, nz, ly->Tfs[r][0] + (size_t)(l - 1)*ly->nk*nfs, ly->hfx + (size_t)slot*Mh*nz, Ys + (size_t)r*Mh*nys);
+      for(c = 0; c < 3; c++) for(r = 0; r < 2; r++)
+        lxp_apply(ly, nz, nys, ly->Tsf[r][c][0] + (size_t)(l - 1)*ly->nk*nfs, L0->hsx3 + ((size_t)slot*3 + c)*Mh*nys, Yf[k] + (size_t)r*Mh*nz);
+    }
+    if(nl){
+      double _Complex *Yt = calloc(3*Mh*nys, sizeof(double _Complex)), *Yt2 = calloc(2*Mh*nz, sizeof(double _Complex));
+      fault_rows_hat(ly, s->f[k]->Vold, Xf[k]);
+      for(r = 0; r < 3; r++) lxp_apply(ly, nys, nz, ly->Tfs[r][2], Xf[k], Yt + (size_t)r*Mh*nys);
+      for(m = 0; m < 3*Mh*nys; m++) Ys[m] += 0.5*Yt[m];
+      for(c = 0; c < 3; c++){ layer_rows_hat(L0, L0->Vold3 + (size_t)c*ns, Xs); for(r = 0; r < 2; r++) lxp_apply(ly, nz, nys, ly->Tsf[r][c][2], Xs, Yt2 + (size_t)r*Mh*nz); }
+      for(m = 0; m < 2*Mh*nz; m++) Yf[k][m] += 0.5*Yt2[m];
+      free(Yt); free(Yt2);
+    }
+    surf_reduce(ly, Yf[k], 2*Mh*nz);
+    lx_inv(ly, nz, Yf[k], ly->nx, ly->m, 1.0, Hx[k]);
+    lx_inv(ly, nz, Yf[k] + Mh*nz, ly->nx, ly->m, 1.0, Hn[k]);
+  }
+  if(nl){
+    for(c = 0; c < 3; c++) layer_rows_hat(L0, L0->Vold3 + (size_t)c*ns, S3 + (size_t)c*Q);
+    surf_apply_rows(L0, 2, 0, S3, 0.5, Ys);
+  }
+  surf_reduce(L0, Ys, 3*Mh*nys);
+  memset(L0->H3, 0, sizeof(double)*3*ns);
+  for(c = 0; c < 3; c++){
+    lx_inv(L0, nys, Ys + (size_t)c*Mh*nys, L0->nxs, 1, 1.0, L0->H3 + (size_t)c*ns);
+    if(nl) for(i = 0; i < ns; i++) L0->H3[(size_t)c*ns + i] += 0.5*Es[c]*L0->Vold3[(size_t)c*ns + i];
+  }
+  /* fault <- fault (dense whole-space tables, slip signs fsg): statics (unless exact), lags >= 2, NL half */
+  if(s->mx) for(k = 0; k < nf; k++) for(q = 0; q < nf; q++){
+    struct fd3d_mpair *cp = &s->mx->c[q][k];
+    double sg = s->fsg[k]*s->fsg[q], sn = s->fsg[q];
+    int nr = s->f[k]->N, nsr = cp->ns;
+    if(k == q) continue;
+    if(!s->mx->static_fn) for(i = 0; i < nr; i++){
+      double a = 0.0, b = 0.0;
+      for(j = 0; j < nsr; j++){ a += cp->Ks[(size_t)i*nsr + j]*s->f[q]->delta[j]; b += cp->Kn[(size_t)i*nsr + j]*s->f[q]->delta[j]; }
+      Kx[k][i] += sg*a; Kn[k][i] += sn*b;
+    }
+    for(l = 2; l <= cp->L && l - 1 <= s->mx->hk; l++){
+      const double *v = s->mx->ring[q] + (size_t)((s->mx->hk - (l - 1) + (long)s->mx->Lb*1000) % s->mx->Lb)*nsr;
+      const double *Ws = cp->Ws + (size_t)(l - 1)*nr*nsr, *Wn = cp->Wn + (size_t)(l - 1)*nr*nsr;
+      for(i = 0; i < nr; i++){
+        double a = 0.0, b = 0.0;
+        for(j = 0; j < nsr; j++){ a += Ws[(size_t)i*nsr + j]*v[j]; b += Wn[(size_t)i*nsr + j]*v[j]; }
+        Kx[k][i] += sg*a; Kn[k][i] += sn*b;
+      }
+    }
+    if(nl && cp->has_k1) for(i = 0; i < nr; i++){
+      double a = 0.0, b = 0.0;
+      for(j = 0; j < nsr; j++){ a += cp->K1s[(size_t)i*nsr + j]*s->f[q]->Vold[j]; b += cp->K1n[(size_t)i*nsr + j]*s->f[q]->Vold[j]; }
+      Kx[k][i] += 0.5*sg*a; Kn[k][i] += 0.5*sn*b;
+    }
+  }
+  /* ---- iterate faults and surface ---- */
+  memcpy(V3, L0->Vold3, sizeof(double)*3*ns);
+  for(k = 0; k < nf; k++) s->f[k]->thnew = thb[k];
+  for(it = 0; it < 200; it++){
+    double ch = 0.0, vm = 1e-30;
+    for(k = 0; k < nf; k++){
+      struct fd3d *f = s->f[k]; struct fd3d_layer *ly = s->ly[k];
+      int N = f->N, nz = ly->nz;
+      double *Hf = malloc(sizeof(double)*N), *tnc = calloc(N, sizeof(double));
+      memset(Yf[k], 0, sizeof(double _Complex)*2*Mh*nz);
+      for(c = 0; c < 3; c++){ layer_rows_hat(L0, V3 + (size_t)c*ns, Xs); for(r = 0; r < 2; r++) lxp_apply(ly, nz, nys, ly->Tsf[r][c][2], Xs, Yf[k] + (size_t)r*Mh*nz); }
+      surf_reduce(ly, Yf[k], 2*Mh*nz);
+      for(i = 0; i < N; i++) Hf[i] = Hx[k][i] + Kx[k][i];
+      lx_inv(ly, nz, Yf[k], ly->nx, ly->m, hw, Hf);
+      memcpy(ly->tn, Hn[k], sizeof(double)*N);
+      lx_inv(ly, nz, Yf[k] + Mh*nz, ly->nx, ly->m, hw, ly->tn);
+      for(i = 0; i < N; i++) ly->tn[i] += Kn[k][i];
+      if(s->mx) for(q = 0; q < nf; q++){                 /* the current step's fault <- fault term */
+        struct fd3d_mpair *cp = &s->mx->c[q][k];
+        if(q == k || !cp->has_k1) continue;
+        for(i = 0; i < N; i++){
+          double a = 0.0, b = 0.0;
+          for(j = 0; j < cp->ns; j++){ a += cp->K1s[(size_t)i*cp->ns + j]*s->f[q]->V[j]; b += cp->K1n[(size_t)i*cp->ns + j]*s->f[q]->V[j]; }
+          Hf[i] += hw*s->fsg[k]*s->fsg[q]*a; tnc[i] += hw*s->fsg[q]*b;
+        }
+      }
+      for(i = 0; i < N; i++) ly->tn[i] += tnc[i];
+      if(s->static_n_fn){                                /* exact static normal traction at the end of the step (all faults) */
+        double *dend[FD3D_MULTI_MAX], *o = malloc(sizeof(double)*N);
+        for(q = 0; q < nf; q++){
+          int nq = s->f[q]->N; dend[q] = malloc(sizeof(double)*nq);
+          for(i = 0; i < nq; i++) dend[q][i] = s->f[q]->delta[i] + (nl ? 0.5*dt*(s->f[q]->Vold[i] + s->f[q]->V[i]) : dt*s->f[q]->V[i]);
+        }
+        s->static_n_fn(s->static_n_ctx, k, dend, o);
+        for(i = 0; i < N; i++) ly->tn[i] += o[i];
+        for(q = 0; q < nf; q++) free(dend[q]);
+        free(o);
+      }
+      if(ly->normal_coupling) for(i = 0; i < N; i++){ f->sigma[i] = ly->sig0[i] - ly->tn[i]; if(f->sigma[i] < 0.0) f->sigma[i] = 0.0; }
+      memcpy(Vp[k], f->V, sizeof(double)*N);
+      itot += step_solve_g(f, Hf, it > 0 ? Vp[k] : NULL, NULL);
+      free(Hf); free(tnc);
+    }
+    /* surface: zero traction, Jacobi with the self coefficients */
+    memset(Ys, 0, sizeof(double _Complex)*3*Mh*nys);
+    for(k = 0; k < nf; k++){
+      struct fd3d_layer *ly = s->ly[k];
+      fault_rows_hat(ly, s->f[k]->V, Xf[k]);
+      for(r = 0; r < 3; r++) lxp_apply(ly, nys, ly->nz, ly->Tfs[r][2], Xf[k], Ys + (size_t)r*Mh*nys);
+    }
+    surf_reduce(L0, Ys, 3*Mh*nys);
+    for(i = 0; i < 3*ns; i++) rhs[i] = -L0->H3[i];
+    for(c = 0; c < 3; c++) lx_inv(L0, nys, Ys + (size_t)c*Mh*nys, L0->nxs, 1, -hw, rhs + (size_t)c*ns);
+    for(inner = 0; inner < 500; inner++){
+      double chi = 0.0, vmi = 1e-30;
+      for(c = 0; c < 3; c++) layer_rows_hat(L0, V3 + (size_t)c*ns, S3 + (size_t)c*Q);
+      memset(P3, 0, sizeof(double _Complex)*3*Q);
+      surf_apply_rows(L0, 2, 0, S3, 1.0, P3);
+      surf_reduce(L0, P3, 3*Q);
+      memset(tmps, 0, sizeof(double)*3*ns);
+      for(c = 0; c < 3; c++){
+        lx_inv(L0, nys, P3 + (size_t)c*Q, L0->nxs, 1, hw, tmps + (size_t)c*ns);
+        if(nl) for(i = 0; i < ns; i++) tmps[(size_t)c*ns + i] -= 0.5*Es[c]*V3[(size_t)c*ns + i];
+      }
+      for(c = 0; c < 3; c++) for(i = 0; i < ns; i++){
+        size_t ii = (size_t)c*ns + i; double diag = hw*L0->self_c[(size_t)c*nys + i % nys] - (nl ? 0.5*Es[c] : 0.0);
+        double dv = (rhs[ii] - tmps[ii])/diag;
+        V3[ii] += dv; if(fabs(dv) > chi) chi = fabs(dv); if(fabs(V3[ii]) > vmi) vmi = fabs(V3[ii]);
+      }
+      if(chi <= 1e-13*vmi) break;
+    }
+    L0->n_inner += inner + 1;
+    for(i = 0; i < 3*ns; i++){ if(fabs(V3[i] - L0->V3[i]) > ch) ch = fabs(V3[i] - L0->V3[i]); if(fabs(V3[i]) > vm) vm = fabs(V3[i]); }
+    memcpy(L0->V3, V3, sizeof(double)*3*ns);
+    for(k = 0; k < nf; k++) for(i = 0; i < s->f[k]->N; i++){
+      if(fabs(s->f[k]->V[i] - Vp[k][i]) > ch) ch = fabs(s->f[k]->V[i] - Vp[k][i]);
+      if(fabs(s->f[k]->V[i]) > vm) vm = fabs(s->f[k]->V[i]);
+    }
+    if(it > 0 && ch <= 1e-12*vm) break;
+  }
+  L0->n_outer += it + 1; L0->n_steps++;
+  s->last_iters = it + 1;
+  for(k = 0; k < nf; k++){ s->f[k]->thnew = NULL; if(thb[k]){ memcpy(s->f[k]->theta, thb[k], sizeof(double)*s->f[k]->N); free(thb[k]); } }
+  /* ---- finish: faults' known parts, rings, step_end ---- */
+  {
+    int slot = L0->hk % L0->L;
+    double *vms = malloc(sizeof(double)*3*ns);
+    for(i = 0; i < 3*ns; i++){ vms[i] = nl ? 0.5*(L0->Vold3[i] + L0->V3[i]) : L0->V3[i]; L0->delta3[i] += vms[i]*dt; }
+    for(c = 0; c < 3; c++) layer_rows_hat(L0, vms + (size_t)c*ns, L0->hsx3 + ((size_t)slot*3 + c)*Mh*nys);
+    free(vms);
+    for(k = 0; k < nf; k++){
+      struct fd3d *f = s->f[k]; struct fd3d_layer *ly = s->ly[k];
+      int N = f->N, nz = ly->nz;
+      double *tmpf = calloc(N, sizeof(double)), *vmf = malloc(sizeof(double)*N);
+      memset(Yf[k], 0, sizeof(double _Complex)*2*Mh*nz);
+      for(c = 0; c < 3; c++){ layer_rows_hat(L0, L0->V3 + (size_t)c*ns, Xs); for(r = 0; r < 2; r++) lxp_apply(ly, nz, nys, ly->Tsf[r][c][2], Xs, Yf[k] + (size_t)r*Mh*nz); }
+      surf_reduce(ly, Yf[k], 2*Mh*nz);
+      lx_inv(ly, nz, Yf[k], ly->nx, ly->m, hw, tmpf);
+      for(i = 0; i < N; i++) f->H[i] += Hx[k][i] + Kx[k][i] + tmpf[i];
+      if(s->mx) for(q = 0; q < nf; q++){                 /* the current step's fault <- fault term, final rates */
+        struct fd3d_mpair *cp = &s->mx->c[q][k];
+        if(q == k || !cp->has_k1) continue;
+        for(i = 0; i < N; i++){
+          double a = 0.0;
+          for(j = 0; j < cp->ns; j++) a += cp->K1s[(size_t)i*cp->ns + j]*s->f[q]->V[j];
+          f->H[i] += hw*s->fsg[k]*s->fsg[q]*a;
+        }
+      }
+      for(i = 0; i < N; i++) vmf[i] = nl ? 0.5*(f->Vold[i] + f->V[i]) : f->V[i];
+      fault_rows_hat(ly, vmf, ly->hfx + (size_t)slot*Mh*nz);
+      if(s->mx) memcpy(s->mx->ring[k] + (size_t)(s->mx->hk % s->mx->Lb)*N, vmf, sizeof(double)*N);
+      free(tmpf); free(vmf);
+    }
+    for(k = 0; k < nf; k++){ s->ly[k]->hk = (L0->hk + 1) % L0->L; if(s->ly[k]->nhist < L0->L) s->ly[k]->nhist = L0->nhist + (L0->nhist < L0->L ? 1 : 0); }
+    if(s->mx) s->mx->hk++;
+  }
+  for(k = 0; k < nf; k++){
+    struct fd3d *f = s->f[k]; struct fd3d_layer *ly = s->ly[k];
+    step_end(f);
+    if(ly->normal_coupling){
+      /* normal traction at the end of the step: tn as last computed in the iteration */
+      for(i = 0; i < f->N; i++){ f->sigma[i] = ly->sig0[i] - ly->tn[i]; if(f->sigma[i] < 0.0) f->sigma[i] = 0.0; }
+    }
+    free(Hx[k]); free(Hn[k]); free(Kx[k]); free(Kn[k]); free(Vp[k]); free(Xf[k]); free(Yf[k]);
+  }
+  free(V3); free(rhs); free(tmps); free(Xs); free(Ys); free(S3); free(P3);
   return itot;
 }

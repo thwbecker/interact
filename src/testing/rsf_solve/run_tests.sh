@@ -62,6 +62,11 @@ for c in "0 90 2 1" "35 -30 2 1" "0 90 2 2" "35 -30 2 2"; do
 done
 ( cd tmp_fd_dynamic && ../bin/fd3d_test multipair > fd3d.out 2>/dev/null ); st=$?
 tail -1 tmp_fd_dynamic/fd3d.out; [ $st -eq 0 ] || fail=1
+# several faults with one virtual surface (G3b): a dipping fault split along dip must reproduce it
+for c in 1 2; do
+  ( cd tmp_fd_dynamic && ../bin/fd3d_test msurf $c 2 > fd3d.out 2>/dev/null ); st=$?
+  tail -1 tmp_fd_dynamic/fd3d.out; [ $st -eq 0 ] || fail=1
+done
 # non-parallel 2-D pairs (fd_plan.md N1): dense tables against the prototype for a kinked pair
 if command -v python3 > /dev/null 2>&1; then
   for a in 30 -45; do for m in 0 1; do

@@ -2129,6 +2129,43 @@ Not yet: MPI for several planes; dipping planes in a half space (G3b); a more ef
 cross coupling for planes with a common strike (Toeplitz along strike, dense down dip,
 as the surface tables).
 
+### 3-D faults of any orientation, step G3b: dipping faults in a half space (2026-10-28)
+
+fd3d.c, struct fd3d_msurf: several faults sharing the strike direction x and one
+along-strike lattice (same nx and origin; each with its own dip, top line, rows and slip
+sign) with one virtual surface. The surface (graded-row machinery of B2 to B7: tables,
+state, rings) lives in the first fault's layer; each further fault gets only its
+fault <-> surface tables (fd3d_surf_create_rows with the surface-surface block skipped).
+Fault <-> fault: the dense whole-space tables of fd3d_multi (the virtual surface provides
+the free surface for them as well), including the current-step term at a junction.
+fd3d_msurf_step generalises fd3d_step_surf: known parts from the surface, all faults and
+the fault-fault tables; then the outer iteration over all faults' local solves (state
+variables kept at the start of the step through thnew) and the surface's zero-traction
+Jacobi solve with all faults as sources; then the rings.
+rsf_fd.c, fd3d_setup_msurf: in a half space, several planes with dip slip or any dipping
+plane go this way: local frame x' = strike of patch 0, y' = z x x'; each plane's up-dip
+direction u in (y', z), dip angle atan2(u_z, u_y) (0 to 180 degrees), down-dip rows from its
+top line; slip sign = sign of interact's normal times sign of its slip direction in the
+kernel frame, so that the marcher's slip is interact's (sgn3 = 1); surface rows of dx/m
+(-fd_surface_m, stability band of B5) on the lattice through plane 0's top line, margins
+-fd_surface_ext (default the largest nz). Exact shear statics from Is over all faults,
+normal statics from -In (-calc_sigma_dot).
+Checks:
+- fd3d_test msurf (run_tests.sh): a buried fault dipping 60 degrees (16 x 8 cells of 500 m,
+  slip weakening) split along dip into two faults on one surface reproduces the one-fault
+  surface code: 1.5e-12 (dip slip), 1.2e-12 (strike slip) relative in V; the same single
+  fault through fd3d_msurf: 3.7e-15; lower half dipping 45 or 30 degrees runs (listric).
+- test_fd3d_msurf.sh: rsf_solve, a buried thrust (dip 30, 8 x 8 cells of 1 km, rate and
+  state), straight (one-fault surface path) against a 0.001 degree kink at mid depth (two
+  faults, several-fault path): stations agree to 4.7e-7 of 0.034 m/s (1.4e-5, the kink's
+  own effect; tau to 2e-6); lower half dipping 50 degrees with -calc_sigma_dot runs.
+Limits: faults must share the strike direction and the along-strike lattice; uniform
+surface rows (no grading yet); no extension rows above the surface in the cross tables
+(surface-breaking faults: -fd_surface_extend 0, the edge error of B7 applies); one MPI
+rank. Two bugs on the way: the test's reference fault had no surface attached
+(fd3d_surf_create_rows does not attach the layer; rsf_fd.c and the other tests do), and a
+missing plane index in the grouping of fd3d_setup_msurf.
+
 ### WP7, C implementation in rsf_solve: status (2026-10-18)
 Done, each verified in the sandbox before delivery (details in
 fd_c_design.md sections 6 to 10, usage in rsf_solve_fd.md):

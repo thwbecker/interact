@@ -587,6 +587,69 @@ static int run_multi_pair(void)
   return !ok;
 }
 
+/* several faults with one virtual surface (fd_plan.md G3b): a buried dipping fault (dip 60
+   degrees, 16 x 8 cells of 500 m, top 1 km deep, slip weakening, overstressed patch) with a
+   graded-free uniform surface, run (a) as one fault with fd3d_surf_create and (b) split along
+   dip into an upper and a lower fault sharing the surface (fd3d_msurf); (b) must reproduce (a). */
+static void msurf_sw(struct fd3d *f, int nzp, int j0, double dx)
+{
+  int i;
+  f->law = 0; f->mu_s = 0.677; f->mu_d = 0.525; f->d0 = 0.40; f->nl = 1;
+  for(i = 0; i < f->N; i++){
+    int ii = i/nzp, jj = i%nzp + j0;
+    double xc = (ii + 0.5)*dx - 4000.0, zc = (jj + 0.5)*dx - 2000.0;
+    f->sigma[i] = 120e6; f->tau0[i] = (fabs(xc) <= 1500.0 && fabs(zc) <= 1500.0) ? 81.6e6 : 70e6;
+  }
+}
+static int run_msurf(int comp, double tend)
+{
+  double cL = 6000, cT = 3464, rho = 2670, dx = 500.0, dt = 0.5*dx/cT, dip = 60.0, d = dip*M_PI/180.0, emax = 0, smax = 0;
+  double ytop[2], ztop[2], dips[2] = {dip, dip}, fs[2] = {1.0, 1.0};
+  int nx = 16, nz = 8, h = 4, m = 2, nxs = 48, nys = 24, n, i, k, ns = (int)(tend/dt + 0.5), L;
+  struct fd3d_tab *t1 = fd3d_tab_create_c(nx, nz, dx, dt, cL, cT, rho, 0, comp), *th = fd3d_tab_create_c(nx, h, dx, dt, cL, cT, rho, 0, comp);
+  struct fd3d *f1 = fd3d_create(t1), *fa[2];
+  struct fd3d_msurf *ms;
+  double *yc = malloc(sizeof(double)*nys), *wy = malloc(sizeof(double)*nys);
+  L = t1->L;
+  for(i = 0; i < nys; i++){ yc[i] = -4000.0 + (i + 0.5)*dx/m; wy[i] = dx/m; }
+  msurf_sw(f1, nz, 0, dx);
+  f1->layer = fd3d_surf_create_rows(f1, 0.0, 0.0, -1000.0, dip, comp, m, nxs, nys, -2000.0, yc, wy, L, 1.0);
+  if(!f1->layer){ fprintf(stderr, "surf failed\n"); return 1; }
+  f1->layer->normal_coupling = 1;
+  if(getenv("MSURF_ONE")){                         /* debugging: the same single fault through fd3d_msurf */
+    h = nz; th = fd3d_tab_create_c(nx, h, dx, dt, cL, cT, rho, 0, comp);
+    fa[0] = fd3d_create(th); msurf_sw(fa[0], h, 0, dx); ytop[0] = 0.0; ztop[0] = -1000.0;
+    ms = fd3d_msurf_create(1, fa, ytop, ztop, dips, fs, comp, 0.0, m, nxs, nys, -2000.0, yc, wy, L);
+  }else{
+  for(k = 0; k < 2; k++){ fa[k] = fd3d_create(th); msurf_sw(fa[k], h, k*h, dx); }
+  ytop[0] = 0.0; ztop[0] = -1000.0;
+  ytop[1] = -h*dx*cos(d); ztop[1] = -1000.0 - h*dx*sin(d);
+  if(getenv("MSURF_DIP2")) dips[1] = atof(getenv("MSURF_DIP2"));     /* a kink in dip at the joint (no reference: runs) */
+  ms = fd3d_msurf_create(2, fa, ytop, ztop, dips, fs, comp, 0.0, m, nxs, nys, -2000.0, yc, wy, L);
+  }
+  if(!ms){ fprintf(stderr, "msurf failed\n"); return 1; }
+  fprintf(stderr, "msurf: comp %d, cross first lag %s\n", comp, ms->mx ? (ms->mx->implicit ? "kept" : "zero") : "none");
+  for(n = 0; n < ns; n++){
+    fd3d_step(f1, NULL);
+    fd3d_msurf_step(ms, NULL);
+    for(k = 0; k < ms->nf; k++) for(i = 0; i < fa[k]->N; i++){
+      int ii = i/h, jj = i%h + k*h, q = ii*nz + jj;
+      double dd = fabs(fa[k]->V[i] - f1->V[q]);
+      if(dd > emax) emax = dd;
+      if(fabs(f1->V[q]) > smax) smax = fabs(f1->V[q]);
+    }
+  }
+  {
+    double s1 = 0, s2 = 0; int ok = emax <= 1e-7*smax;
+    for(i = 0; i < f1->N; i++) s1 += f1->delta[i];
+    for(k = 0; k < ms->nf; k++) for(i = 0; i < fa[k]->N; i++) s2 += fa[k]->delta[i];
+    printf("fd3d_test msurf: comp %d, dip %g, %d steps: max |V(two faults) - V(one fault)| %.3e of %.3f m/s; mean slip %.5f / %.5f m; outer iterations last step %d\n",
+           comp, dip, ns, emax, smax, s1/f1->N, s2/f1->N, ms->last_iters);
+    printf("fd3d_test msurf: %s\n", ok ? "PASS" : "FAIL");
+    return !ok;
+  }
+}
+
 /* kernel check: full stress tensors (slip and opening, rectangles) against tada_quad.py values */
 static int run_kernels(const char *ref)
 {
@@ -656,6 +719,7 @@ static int main0(int argc, char **argv)
   if(argc >= 3 && !strcmp(argv[1], "q2d")) return run_q2d(argv[2]);
   if(argc >= 2 && !strcmp(argv[1], "pair")) return run_pair(argc > 2 ? atoi(argv[2]) : 0);
   if(argc >= 2 && !strcmp(argv[1], "multipair")) return run_multi_pair();
+  if(argc >= 2 && !strcmp(argv[1], "msurf")) return run_msurf(argc > 2 ? atoi(argv[2]) : 2, argc > 3 ? atof(argv[3]) : 3.0);
   if(argc >= 2 && !strcmp(argv[1], "multi")) return run_multi(argc > 2 ? atof(argv[2]) : 0.0, argc > 3 ? atof(argv[3]) : 90.0, argc > 4 ? atof(argv[4]) : 4.0, argc > 5 ? atoi(argv[5]) : 1, argc > 6 ? atoi(argv[6]) : 0);
   if(argc >= 6 && !strcmp(argv[1], "stepover")) return run_stepover(atof(argv[2]), atof(argv[3]), atof(argv[4]), atof(argv[5]), argc > 6 ? atof(argv[6]) : 0.75);
   if(argc >= 7 && !strcmp(argv[1], "tpv10")) return run_tpv10(atof(argv[2]), atof(argv[3]), atoi(argv[4]), atoi(argv[5]), argv[6]);

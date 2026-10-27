@@ -258,4 +258,20 @@ void fd3d_multi_free(struct fd3d_multi *m);
 void fd3d_multi_reset(struct fd3d_multi *m);
 void fd3d_multi_push(struct fd3d_multi *m, double **V);
 int fd3d_multi_step(struct fd3d_multi *m, double **load);
+
+/* several faults sharing the strike direction with one virtual surface (fd_plan.md G3b) */
+struct fd3d_msurf {
+  int nf, last_iters;
+  struct fd3d *f[FD3D_MULTI_MAX];
+  struct fd3d_layer *ly[FD3D_MULTI_MAX];   /* ly[0]: the surface (tables, state, rings); ly[k]: fault k <-> surface */
+  double fsg[FD3D_MULTI_MAX];              /* marcher slip sign per fault (as fsign of fd3d_surf_create) */
+  struct fd3d_multi *mx;                    /* fault <-> fault dense tables (nf > 1); its static_fn: exact shear statics */
+  void (*static_n_fn)(void *ctx, int k, double **delta, double *out);   /* exact static normal traction of fault k */
+  void *static_n_ctx;
+};
+struct fd3d_msurf *fd3d_msurf_create(int nf, struct fd3d **f, const double *ytop, const double *ztop, const double *dip_deg,
+                                     const double *fsign, int fcomp, double x0f, int m, int nxs, int nys, double xs0,
+                                     const double *yc, const double *wy, int L);
+void fd3d_msurf_free(struct fd3d_msurf *s);
+int fd3d_msurf_step(struct fd3d_msurf *s, double **load);
 #endif
