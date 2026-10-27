@@ -2224,12 +2224,14 @@ default surface (graded rows of 250 m to 1 km, footprint plus 8 km, 1.4 GB):
 | footprint + 4 km | within 0.1 % | 3.911 m, 13.42 m/s | 651 MB |
 | footprint + 2 km | +0.1 to +0.9 %, +0.0 to +0.1 % | 3.923, 13.49 | 409 MB |
 | footprint + 1 km | +2.3 to +2.8 %, +0.8 to +1.7 % | 4.016, 13.87 | 287 MB |
-| 500 m cells at the trace (dx/2), + 8 km | +5.6 to +20 %, +11 to +15 % | 4.173, 14.95 | 502 MB |
+| 500 m cells at the trace (dx/2), + 8 km (unstable: see H2) | +5.6 to +20 %, +11 to +15 % | 4.173, 14.95 | 502 MB |
 | 125 m cells (dx/8), + 2 km | -0.7 to -2.5 %, -2.8 to +0.9 % (against + 2 km at 250 m) | 3.879, 13.42 | 1.2 GB |
 | band of +-4 km around the trace only | -1.1 to -3.9 %, -0.1 to -1.0 % | 3.764, 13.11 | 299 MB |
 | band of +-2 km | -1.3 to +2.7 %, -9 to -13 % | 3.691, 11.88 | |
 | band of +-1 km | -4 to +2 %, -17 to -23 % | 3.698, 10.49 | |
 
+(correction, H2: cells of dx/2 put the surface step ratio cS dt/hs at 1.0, inside the
+unstable band 0.85 to 1.05 of B6; that row's errors may be instability, not resolution)
 (the reference default is 6.08 / 6.27 / 5.86 m and 10.2 / 10.8 / 11.6 m/s at the stations,
 3.901 m and 13.41 m/s overall). So: cells of dx/4 at the trace are needed and enough
 (dx/2: errors of 6 to 20 percent; dx/8: within 3 percent); the surface may stop half a
@@ -2280,6 +2282,47 @@ its own strip stay Toeplitz along that strike (FFT, as now); the dense cross cou
 numbers per pair and component give of the order of 1 to 5 TB, the range of Ando's runs,
 3 to 6 times less than dense windows. Without an accurate coarse-graining or a compressible
 wavefront representation this stays a distributed-memory (cluster) problem.
+
+### General surface-breaking fault systems, H2: local exact surface, far approximate (2026-10-29)
+
+Question: is it enough that each fault interacts dynamically with the virtual surface near
+its own trace, the statics staying exact through Is? Experiment switches in
+fd3d_msurf_create (environment, off by default): FD_MSURF_CUT=<m> keeps, for each fault,
+only the surface rows within that horizontal distance of its trace (fault-to-surface tables
+in all parts, surface-to-fault tables in their dynamic parts), FD_MSURF_TAPER=<m> a cosine
+taper beyond the cutoff instead of a hard cut; FD_DEBUG_ITERS prints the outer and inner
+iteration counts of fd3d_msurf_step.
+Case: two surface-breaking thrusts sharing a strike (G3b), 8 x 4 squares of 1 km, dips 30
+and 60 degrees (depth extents 2.0 and 3.5 km), both dipping the same way, the 60-degree
+fault's trace 4 or 8 km behind the 30-degree fault's, rate and state (a = 0.008, b = 0.016),
+a seed on the 30-degree fault, -calc_sigma_dot; surface cells of 250 m (dx/4).
+A first attempt with 500 m surface cells was discarded: cS dt/hs = 1.0 is in the unstable
+band; the exact run for 8 km blew up (slip -15 m, 150 m/s).
+Traces 4 km apart, slip at four stations (two per fault) at the end of the event, against
+the exact several-fault surface (4.018 / 4.441 m on the 30-degree fault, 3.823 / 4.057 m on
+the 60-degree fault, peak 8.79 m/s, both faults rupture):
+
+| variant | rows seen (of 46) | 30-degree fault | 60-degree fault | peak | jump |
+|---|---|---|---|---|---|
+| hard cut 4 km | 32 / 24 | +0.3, +1.2 % | +6.6, +6.4 % | +0.2 % | yes |
+| cut 2 km + taper 2 km | | +2.2, +3.2 % | +6.1, +7.8 % | +1.6 % | yes |
+| cut 1 km + taper 2 km | 24 / 20 | +3.5, +4.1 % | +3.9, +8.3 % | +1.3 % | yes |
+| hard cut 2 km, 1 km | 16 / 16 | not finished in 280 s | | | |
+| whole-space dynamics (-fd_hs_static) | none | -42, -44 % | 0 (no slip) | -61 % | no |
+
+Traces 8 km apart: exact 1.719 m mean slip on the 30-degree fault, no jump; hard cut 4 km
+1.735 m (+0.9 %), no jump; whole-space dynamics 1.109 m (-35 %), no jump.
+Iterations per step (outer, inner Jacobi sweeps; inner capped at 500): exact 6.5 / 150,
+hard cut 4 km 12 / 360 to 410, hard cut 2 km 17 to 21 / 430 to 550, cut 1 km + taper 2 km
+10 / 250: hard cuts make the surface-fault fixed point converge slowly (the truncated
+coupling is no longer consistent), a taper helps.
+Reading: without a dynamic free surface the jump outcome changes (at 4 km the second
+fault ruptures in the exact run and stays locked with whole-space dynamics), so the free
+surface is required for jump questions near the surface; a surface restricted to about one
+fault depth around each trace keeps slips within 1 to 8 percent, peak rates within 2
+percent and the jump outcome, in this geometry. One geometry, small faults; the tapered,
+local surface is the candidate for an efficient method (H3), to be checked on more
+geometries (different strikes need the 2-D surface grid).
 
 ### WP7, C implementation in rsf_solve: status (2026-10-18)
 Done, each verified in the sandbox before delivery (details in

@@ -2438,6 +2438,35 @@ struct fd3d_msurf *fd3d_msurf_create(int nf, struct fd3d **f, const double *ytop
     g_surf_skip_T2 = 0;
     if(!s->ly[k] || s->ly[k]->Mx != s->ly[0]->Mx){ fd3d_msurf_free(s); return NULL; }
     f[k]->layer = s->ly[k];
+    if(getenv("FD_MSURF_CUT")){
+      /* experiment (fd_plan.md H2, "local exact, far approximate"): fault k does not interact
+         with surface rows farther than the cutoff from its trace (horizontal distance): their
+         fault-to-surface tables (all parts) and surface-to-fault tables (dynamic parts) are
+         zeroed; the statics stay exact through Is */
+      struct fd3d_layer *ly = s->ly[k];
+      double cut = atof(getenv("FD_MSURF_CUT"));
+      int nys = ly->nys, nz = ly->nz, nkk = ly->nk, Lk = ly->L, q2, j, kk, l, r, cc, ncut = 0;
+      size_t nfs = (size_t)nys*nz;
+      double taper = getenv("FD_MSURF_TAPER") ? atof(getenv("FD_MSURF_TAPER")) : 0.0;
+      for(q2 = 0; q2 < nys; q2++){
+        /* weight 1 within the cutoff, a cosine taper over the next `taper` metres, 0 beyond */
+        double dd = fabs(ly->yc[q2] - ytop[k]), w = (dd <= cut) ? 1.0 : ((taper > 0.0 && dd < cut + taper) ? 0.5*(1.0 + cos(M_PI*(dd - cut)/taper)) : 0.0);
+        if(w >= 1.0) continue;
+        if(w == 0.0) ncut++;
+        for(j = 0; j < nz; j++) for(kk = 0; kk < nkk; kk++){
+          size_t efs = (size_t)kk*nfs + (size_t)q2*nz + j, esf = (size_t)kk*nfs + (size_t)j*nys + q2;
+          for(r = 0; r < 3; r++){
+            for(l = 0; l < Lk; l++) ly->Tfs[r][0][(size_t)l*nkk*nfs + efs] *= w;
+            ly->Tfs[r][1][efs] *= w; ly->Tfs[r][2][efs] *= w;
+          }
+          for(r = 0; r < 2; r++) for(cc = 0; cc < 3; cc++){
+            for(l = 0; l < Lk; l++) ly->Tsf[r][cc][0][(size_t)l*nkk*nfs + esf] *= w;
+            ly->Tsf[r][cc][2][esf] *= w;
+          }
+        }
+      }
+      fprintf(stderr, "fd3d_msurf: fault %d sees %d of %d surface rows (cutoff %g m from its trace)\n", k, nys - ncut, nys, cut);
+    }
   }
   return s;
 }
@@ -2627,6 +2656,7 @@ int fd3d_msurf_step(struct fd3d_msurf *s, double **load)
     if(it > 0 && ch <= 1e-12*vm) break;
   }
   L0->n_outer += it + 1; L0->n_steps++;
+  if(getenv("FD_DEBUG_ITERS") && (L0->n_steps % 20 == 0)) fprintf(stderr, "fd3d_msurf_step %d: outer iterations %d (mean %.1f), inner mean %.1f\n", L0->n_steps, it + 1, (double)L0->n_outer/L0->n_steps, (double)L0->n_inner/L0->n_steps);
   s->last_iters = it + 1;
   for(k = 0; k < nf; k++){ s->f[k]->thnew = NULL; if(thb[k]){ memcpy(s->f[k]->theta, thb[k], sizeof(double)*s->f[k]->N); free(thb[k]); } }
   /* ---- finish: faults' known parts, rings, step_end ---- */
