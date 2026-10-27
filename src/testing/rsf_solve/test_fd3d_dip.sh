@@ -25,8 +25,13 @@ PYEOF
 O="-geom_file ../geom.in -rsf_file ../rsf.dat -rsf_ic_file ../ic.in -sigma_init 50e6 -dc 0.02 -rsf_slip_mode 1 -stop_time_yr 0.00002 -track_events 1 -vel_event 1e-3 -fd_mode 1 -fd_back_eps 0.05 -calc_sigma_dot 1 -fd_surface_ext 2"
 ( cd $d/hs && ../../bin/rsf_solve $O > run.log 2>&1 )
 ( cd $d/fs && ../../bin/rsf_solve $O -full_space 1 > run.log 2>&1 )
+mkdir -p $d/ap
+( cd $d/ap && ../../bin/rsf_solve $O -fd_hs_static 1 > run.log 2>&1 )
 grep -q "virtual free surface" $d/hs/run.log || { echo "test_fd3d_dip: FAIL (virtual surface not selected)"; exit 1; }
 hs=`grep "3-D phase 1:" $d/hs/run.log | sed 's/.*peak slip rate \([0-9.e+-]*\) m\/s, mean slip \([0-9.e+-]*\) m.*/\1 \2/'`
 fs=`grep "3-D phase 1:" $d/fs/run.log | sed 's/.*peak slip rate \([0-9.e+-]*\) m\/s, mean slip \([0-9.e+-]*\) m.*/\1 \2/'`
-echo "$hs $fs" | awk '{ ok = ($1 == $1+0) && ($1 < 10.0) && ($1 > $3) && ($2 > $4);
-  printf("test_fd3d_dip: %s (half space: peak %.3f m/s, mean slip %.4f m; full space: %.3f m/s, %.4f m)\n", ok ? "PASS" : "FAIL", $1, $2, $3, $4); exit !ok }'
+ap=`grep "3-D phase 1 (1 planes):" $d/ap/run.log | sed 's/.*peak slip rate \([0-9.e+-]*\) m\/s, mean slip \([0-9.e+-]*\) m.*/\1 \2/'`
+# -fd_hs_static (whole-space dynamics, exact half-space statics, fd_plan.md G4) must be within
+# 5 percent of the virtual surface for this buried thrust
+echo "$hs $fs $ap" | awk '{ ok = ($1 == $1+0) && ($1 < 10.0) && ($1 > $3) && ($2 > $4) && ($5 == $5+0) && ($5 > 0) && (($1 - $5)/$1 < 0.05) && (($5 - $1)/$1 < 0.05) && (($2 - $6)/$2 < 0.05) && (($6 - $2)/$2 < 0.05);
+  printf("test_fd3d_dip: %s (half space: peak %.3f m/s, mean slip %.4f m; full space: %.3f m/s, %.4f m; -fd_hs_static: %.3f m/s, %.4f m)\n", ok ? "PASS" : "FAIL", $1, $2, $3, $4, $5, $6); exit !ok }'

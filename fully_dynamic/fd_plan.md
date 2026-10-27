@@ -2166,6 +2166,47 @@ rank. Two bugs on the way: the test's reference fault had no surface attached
 (fd3d_surf_create_rows does not attach the layer; rsf_fd.c and the other tests do), and a
 missing plane index in the grouping of fd3d_setup_msurf.
 
+### 3-D faults in a half space, step G4: whole-space dynamics with exact statics (2026-10-28)
+
+The exact free-surface methods cover vertical strike-slip planes (images, G3a) and faults
+sharing a strike direction (one virtual surface, G3b). For any other fault system in a
+half space, -fd_hs_static 1 runs the several-plane path (G2) without images or virtual
+surface: the elastodynamic transients are those of a whole space (no free-surface
+reflections), the static part is exact through interact's half-space Is (and In with
+-calc_sigma_dot), so the long-term stress transfer that controls nucleation and triggering
+is the half space's. It can also be forced for geometries the exact methods cover, which
+gives its error (first dynamic phase, seeded rate-and-state rupture, 8 x 4 squares of
+1 km; the virtual surface as reference):
+
+| fault | virtual surface: peak, mean slip | -fd_hs_static | whole space |
+|---|---|---|---|
+| thrust 30 degrees, top 500 m | 1.608 m/s, 0.1024 m | 1.583 (-1.6 %), 0.0988 (-3.5 %) | 1.232, 0.0901 |
+| thrust 30 degrees, top 2 km | 1.390, 0.0919 | 1.356 (-2.4 %), 0.0917 (-0.2 %) | 1.232, 0.0901 |
+| thrust 30 degrees, reaching the surface | 1.928, 0.1211 | 1.709 (-11 %), 0.1089 (-10 %) | 1.232, 0.0901 |
+| vertical strike slip, reaching the surface | 1.318, 0.0913 | 1.313 (-0.4 %), 0.0913 | 1.232, 0.0902 |
+| vertical strike slip, top 2 km | 1.227, 0.0903 | 1.227, 0.0903 | 1.232, 0.0902 |
+
+So the exact statics recover most of the half-space effect: within a few percent for
+buried faults and vertical strike slip, about 10 percent low for a thrust that reaches
+the surface (missing the dynamic reflections near the trace; the reference itself carries
+the trace edge error of B7). These are small ruptures (mean slip 0.1 m). A large
+surface-breaking rupture (thrust 30 degrees, 16 x 8 squares of 1 km reaching the surface,
+a = 0.008 / b = 0.016, seeded over 6 x 4 cells): the virtual surface gives peak 13.4 m/s
+and mean slip 3.90 m (218 steps, 138 s of wall time, tables 1.4 GB), -fd_hs_static 4.89 m/s
+and 3.30 m (-15 percent), the whole space 4.36 m/s and 1.49 m. At three stations on the top
+row: final slip 6.08 / 6.27 / 5.86 m (virtual surface), 5.29 / 6.05 / 4.85 m (-3 to -17
+percent, -fd_hs_static), 1.24 / 1.37 / 1.21 m (whole space); peak slip rates 10.2 to
+11.6 m/s against 4.5 to 4.7 m/s. So for large ruptures that break the surface the exact
+statics still give most of the slip, but the slip rate near the trace, which the free
+surface amplifies dynamically, is low by a factor of 2 to 2.5: -fd_hs_static is suitable
+for buried faults and for sequences and slip budgets, not for near-trace rupture dynamics
+(peak rates, possibly jumps of ruptures that reach the surface). test_fd3d_dip.sh now
+also requires -fd_hs_static within 5 percent of the virtual surface for its buried thrust.
+A bug found on the way: the several-plane window (history seeding, the quiet hand-back
+window) counted only the cross tables, not the planes' own; with one plane it was zero
+and the phase ended after one step. It now takes the largest of all windows (G2 runs
+seeded from a QD history were affected; the checks started from rest).
+
 ### WP7, C implementation in rsf_solve: status (2026-10-18)
 Done, each verified in the sandbox before delivery (details in
 fd_c_design.md sections 6 to 10, usage in rsf_solve_fd.md):

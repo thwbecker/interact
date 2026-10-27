@@ -24,6 +24,10 @@ Capabilities at a glance (2026-10-25):
   strike or dip slip; fd_plan.md G2): whole space, or half space for vertical strike-slip
   planes reaching the surface (free-surface images, G3a); one MPI rank; dense cross tables
   cost L nr ns per step. Check: src/testing/rsf_solve/test_fd3d_multi.sh.
+  Any other fault system in a half space: -fd_hs_static 1 (whole-space dynamics, exact
+  half-space statics; within a few percent for buried faults; for ruptures reaching the
+  surface 10 to 15 percent low in slip and a factor of 2 low in slip rate near the trace;
+  fd_plan.md G4).
   Dipping faults (and dip slip) in a half space: several faults sharing the strike
   direction with one virtual surface (fd_plan.md G3b); check
   src/testing/rsf_solve/test_fd3d_msurf.sh.

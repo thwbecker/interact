@@ -122,6 +122,8 @@ PetscErrorCode rsf_fd_setup(struct interact_ctx *par, PetscReal shear_modulus_si
   PetscCall(PetscOptionsGetReal(NULL,NULL,"-fd_back_dyn",&fd->back_dyn,NULL));
   PetscCall(PetscOptionsGetInt(NULL,NULL,"-fd_back_nwin",&fd->back_nwin,NULL));
   PetscCall(PetscOptionsGetReal(NULL,NULL,"-fd_reentry",&fd->reentry,NULL));
+  fd->hs_static = 0;
+  PetscCall(PetscOptionsGetInt(NULL,NULL,"-fd_hs_static",&fd->hs_static,NULL));
   if(fd->back_vmax <= 0.0) fd->back_vmax = 0.5*fd->vsw;
   fd->vsw_eff = fd->vsw;
   fd->nl = 1;			/* second-order time marching (Noda et al. 2020) by default */
@@ -603,9 +605,10 @@ static PetscErrorCode fd3d_setup_multi(struct interact_ctx *par, struct fd_vars 
   struct fd3d_mplane geom[FD3D_MULTI_MAX];
   struct fd3d *fp[FD3D_MULTI_MAX];
   PetscFunctionBeginUser;
-  int mir = !medium->full_space;
+  int mir = !medium->full_space && !fd->hs_static;
   /* half space (G3a): vertical strike-slip planes reaching the surface, by free-surface images;
-     dipping planes in a half space need the virtual surface for several faults (G3b) */
+     dipping planes in a half space need the virtual surface for several faults (G3b);
+     -fd_hs_static (G4): any geometry, whole-space dynamics with the exact half-space statics */
   if(mir){
     /* dipping planes or dip slip in a half space: one virtual surface for all (G3b) */
     int need = (rsf->slip_mode != STRIKE);
@@ -745,8 +748,8 @@ static PetscErrorCode fd3d_setup_multi(struct interact_ctx *par, struct fd_vars 
     PetscCall(PetscPrintf(PETSC_COMM_WORLD,"rsf_fd_setup: 3-D plane %d: %d x %d squares of %g m, normal (%.3f, %.3f, %.3f), window %d lags%s\n",p,nx[p],nz[p],dx,
 			  E[p][2][0],E[p][2][1],E[p][2][2],fd->tabm3[p]->L,fd->multi3->implicit ? "" : ""));
   PetscCall(PetscPrintf(PETSC_COMM_WORLD,"rsf_fd_setup: 3-D, %d planes, %s, dt_min %.3e s, cross first lag %s; static gate: rel dev from Is %.3e within planes, %.3e across, normal across from -In %.3e%s\n",
-			np,mir ? "half space (images)" : "whole space",(double)fd->dt_min,fd->multi3->implicit ? "kept (planes meet)" : "zero",dev[0],dev[1],devn,mir ? " (images: a few percent expected)" : ""));
-  PetscCheck(mir || ((dev[0] <= 5.0*fd->gate_tol) && (dev[1] <= 5.0*fd->gate_tol) && ((devn < 0.0) || (devn <= 5.0*fd->gate_tol))),PETSC_COMM_WORLD,PETSC_ERR_USER,
+			np,mir ? "half space (images)" : ((fd->hs_static && !medium->full_space) ? "half space: whole-space dynamics, exact half-space statics (-fd_hs_static)" : "whole space"),(double)fd->dt_min,fd->multi3->implicit ? "kept (planes meet)" : "zero",dev[0],dev[1],devn,mir ? " (images: a few percent expected)" : ""));
+  PetscCheck(mir || (fd->hs_static && !medium->full_space) || ((dev[0] <= 5.0*fd->gate_tol) && (dev[1] <= 5.0*fd->gate_tol) && ((devn < 0.0) || (devn <= 5.0*fd->gate_tol))),PETSC_COMM_WORLD,PETSC_ERR_USER,
 	     "rsf_fd_setup: 3-D static gate failed for the planes (%g, %g, %g)",dev[0],dev[1],devn);
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -1245,6 +1248,13 @@ PetscErrorCode fd3d_setup_from_geometry(struct interact_ctx *par, struct fd_vars
   PetscCheck((rsf->slip_mode == STRIKE) || (rsf->slip_mode == DIP),PETSC_COMM_WORLD,PETSC_ERR_SUP,"-fd_mode: 3-D needs a fixed slip direction (-rsf_slip_mode strike or dip)");
   ls = fd->length_scale;
   dx = 2.0*fault[0].l*ls;
+  if(fd->hs_static && !medium->full_space){
+    /* -fd_hs_static (fd_plan.md G4): any fault geometry in a half space through the several-plane
+       path without images or virtual surface: dynamics of the whole space, statics exact from
+       interact's half-space Is (and In) */
+    PetscCall(PetscPrintf(PETSC_COMM_WORLD,"rsf_fd_setup: -fd_hs_static: whole-space elastodynamics with exact half-space statics (no free-surface reflections)\n"));
+    return fd3d_setup_multi(par,fd);
+  }
   {
     /* two parallel planes (stepovers, fd_plan.md P2): elements off the plane of patch 0 */
     int off = 0;

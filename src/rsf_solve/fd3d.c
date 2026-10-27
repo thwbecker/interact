@@ -2264,6 +2264,7 @@ struct fd3d_multi *fd3d_multi_create(int np, struct fd3d **f, const struct fd3d_
     }
     if(L > Lmax) Lmax = L;
   }
+  for(p = 0; p < np; p++) if(f[p]->t->L > Lmax) Lmax = f[p]->t->L;   /* the planes' own windows count too (history seeding, quiet window) */
   m->Lb = Lmax + 1;
   for(p = 0; p < np; p++){
     m->ring[p] = calloc((size_t)m->Lb*f[p]->N, sizeof(double));
