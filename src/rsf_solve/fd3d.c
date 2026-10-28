@@ -2805,7 +2805,9 @@ int fd3d_msurf_step(struct fd3d_msurf *s, double **load)
   free(aa_f); free(aa_g);
 #undef AA_M
   L0->n_outer += it + 1; L0->n_steps++;
-  if(getenv("FD_DEBUG_ITERS") && (L0->n_steps % 20 == 0)) fprintf(stderr, "fd3d_msurf_step %d: outer iterations %d (mean %.1f), inner mean %.1f\n", L0->n_steps, it + 1, (double)L0->n_outer/L0->n_steps, (double)L0->n_inner/L0->n_steps);
+  if(getenv("FD_DEBUG_ITERS") && (L0->n_steps % 20 == 0))
+    fprintf(stderr, "fd3d_msurf_step %i: outer iterations %d (mean %.1f), inner mean %.1f\n",
+	    (int)L0->n_steps, it + 1, (double)L0->n_outer/L0->n_steps, (double)L0->n_inner/L0->n_steps);
   s->last_iters = it + 1;
   for(k = 0; k < nf; k++){ s->f[k]->thnew = NULL; if(thb[k]){ memcpy(s->f[k]->theta, thb[k], sizeof(double)*s->f[k]->N); free(thb[k]); } }
   /* ---- finish: faults' known parts, rings, step_end ---- */

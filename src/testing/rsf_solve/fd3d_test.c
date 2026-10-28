@@ -743,7 +743,14 @@ static int main0(int argc, char **argv)
       else{ if(d > es) es = d; }
     }
     { int n, k; double *t0 = malloc(sizeof(double)*2*N); (void)t0;
-      for(n = 0; n < ns; n++) for(k = 0; k < 2; k++) for(i = 0; i < N; i++){ double d = fabs(t2[((size_t)n*2 + k)*2*N + i] - t2[((size_t)0*2 + k)*2*N + i]); if(d > ss) ss = d; } free(t0); }
+      for(n = 0; n < ns; n++)
+	for(k = 0; k < 2; k++)
+	  for(i = 0; i < N; i++){
+	    double d = fabs(t2[((size_t)n*2 + k)*2*N + i] - t2[((size_t)0*2 + k)*2*N + i]);
+	    if(d > ss) ss = d;
+	  }
+      free(t0);
+    }
     printf("fd3d_test h6strike: turn %g deg: cells dx/%d against dx/%d: shear %.3e of %.3e (largest change of shear), normal %.3e of %.3e\n", ang, m1, m2, es, ss, en, sn);
     free(t1); free(t2);
     return 0;
