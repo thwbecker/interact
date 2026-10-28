@@ -728,6 +728,26 @@ static int main0(int argc, char **argv)
     printf("fd3d_test h6step: %s\n", fl ? "FAIL" : "PASS");
     return fl;
   }
+  if(argc >= 4 && !strcmp(argv[1], "h6strike")){
+    /* H6 step 4: tractions on both faults with strips of dx/3 and dx/4 (and dx/m2 if given) for a strike difference */
+    /* usage: fd3d_test h6strike <angle> <steps> [m2 (4)] [m1 (3)]: cells dx/m1 against dx/m2 (m = 2 is
+       in the surface's unstable band; dx/6 needs several GB for the dense strip tables) */
+    double ang = atof(argv[2]); int ns = atoi(argv[3]), m1 = argc > 5 ? atoi(argv[5]) : 3, m2 = argc > 4 ? atoi(argv[4]) : 4, N = 8, i;
+    size_t nv = (size_t)ns*2*2*N;
+    double *t1 = malloc(sizeof(double)*nv), *t2 = malloc(sizeof(double)*nv), es = 0, en = 0, ss = 0, sn = 0;
+    if(fd3d_h6_strike_run(ang, m1, ns, t1, 1) || fd3d_h6_strike_run(ang, m2, ns, t2, 1)) return 1;
+    for(i = 0; i < (int)nv; i++){
+      int isn = (i % (2*N)) >= N;
+      double d = fabs(t1[i] - t2[i]);
+      if(isn){ if(d > en) en = d; if(fabs(t2[i]) > sn) sn = fabs(t2[i]); }
+      else{ if(d > es) es = d; }
+    }
+    { int n, k; double *t0 = malloc(sizeof(double)*2*N); (void)t0;
+      for(n = 0; n < ns; n++) for(k = 0; k < 2; k++) for(i = 0; i < N; i++){ double d = fabs(t2[((size_t)n*2 + k)*2*N + i] - t2[((size_t)0*2 + k)*2*N + i]); if(d > ss) ss = d; } free(t0); }
+    printf("fd3d_test h6strike: turn %g deg: cells dx/%d against dx/%d: shear %.3e of %.3e (largest change of shear), normal %.3e of %.3e\n", ang, m1, m2, es, ss, en, sn);
+    free(t1); free(t2);
+    return 0;
+  }
   if(argc >= 2 && !strcmp(argv[1], "h6strips")){
     int fl = fd3d_h6_strips_check(1);
     printf("fd3d_test h6strips: %s\n", fl ? "FAIL" : "PASS");

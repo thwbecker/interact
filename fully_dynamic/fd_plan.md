@@ -2468,8 +2468,39 @@ frames, G3b unrotated): the same agreement. Iterations per step: 2 outer, 18 GMR
 (prescribed); 21 outer, 163 GMRES (slip weakening). The dense strip tables scale as
 (3 ns)^2 L, so this check uses small strips (an earlier version with 28 rows and 30 lags
 did not finish in 250 s).
-Next: step 4, two faults of different strikes: resolution study (strips of 500 and 333 m) for
-the error where strips meet, then jump outcomes and rsf_solve integration.
+Step 4 (in progress): two faults of different strikes, fd3d_test h6strike <angle> <steps>
+(fd3d_h6_strike_run): faults of 4 x 2 squares of 1 km, dips 60 and 75 degrees, the second
+starting 3 km away and turned by the angle; strips of +-2.5 km around each trace, margins
+multiples of the cell size so that the traces and fault ends lie on cell boundaries at any
+resolution (a first version did not, and differed by 175 percent between resolutions for
+that reason alone); both faults slip at 1 m/s for 5 steps; fault tractions compared between
+strip cells of dx/3 and dx/4 over 15 steps.
+Two findings on the way. (i) With turned strips the per-strip GMRES preconditioner degraded
+(355 iterations per step at 30 degrees against 15 with a shared strike); the joint strip
+system's first-lag operator over the active cells is now assembled once and LU-factorised
+(strips_direct, dgetrf), an exact solve per step (FD_STRIPS_GMRES=1 keeps GMRES); dense, so
+for test sizes only. (ii) With the exact solve the turned cases blew up (tractions of 1e10 Pa
+at 30 degrees and 1e31 Pa at 60 degrees): cells of the two strips overlapped along the oblique
+partition boundary (partition by cell centre), counting part of the surface twice, as the
+overlapping layout of H5. Now, where two turned cells of different strips overlap (separating
+axes, squares shrunk by 1e-6), the one whose centre lies closer to the partition boundary is
+masked (FD_STRIPS_NOTRIM=1 turns this off); this leaves gaps smaller than a cell. A rule that
+masked every cell crossing the boundary also removed cells at a shared strike and was
+dropped. With a shared strike nothing is trimmed and checks (a) to (c) and (1) are unchanged.
+Results (dx/3 against dx/4; largest difference as a fraction of the largest change of the
+traction over the run):
+
+| strike difference | shear | normal |
+|---|---|---|
+| 0 degrees | 6.5 % | 15 % |
+| 30 degrees | 11.6 % | 27 % |
+| 60 degrees | 27 % | 23 % |
+
+So the turned strips are stable and their resolution sensitivity grows with the angle, from
+6.5 to 27 percent in shear between 333 and 250 m cells; whether this converges needs a third
+resolution (dx/6), whose dense strip tables (about 2.3 GB per pair here) exceed the sandbox.
+Next: dx/6 on a larger machine, or dense coupling restricted to cells near the partition
+boundary; then jump outcomes and rsf_solve integration.
 
 ### WP7, C implementation in rsf_solve: status (2026-10-18)
 Done, each verified in the sandbox before delivery (details in

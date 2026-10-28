@@ -3042,6 +3042,59 @@ struct fd3d_strips *fd3d_strips_create(int nf, struct fd3d **f, const double *th
       }
     }
   }
+  /* trim (fd_plan.md H6 step 4): where turned cells of different strips overlap (their centres
+     on either side of the partition boundary), the one whose centre lies closer to the boundary
+     is masked, so that no part of the surface is represented twice (overlaps made the turned
+     cases unstable); the gaps this leaves along an oblique boundary are smaller than a cell.
+     Overlap of two squares by separating axes, shrunk by 1e-6 to ignore touching edges. */
+  if(!getenv("FD_STRIPS_NOTRIM")){
+    int changed = 1;
+    double *marg[FD3D_MULTI_MAX];
+    for(k = 0; k < nf; k++){                     /* margin: distance to the nearest other trace minus to its own */
+      struct fd3d_layer *ly = s->ly[k];
+      marg[k] = malloc(sizeof(double)*ly->ns);
+      for(i = 0; i < ly->ns; i++){
+        double *X = s->xg[k] + 3*(size_t)i, dk = 0.0, dmin = 1e300;
+        for(q = 0; q < nf; q++){
+          double a[3], b[3], la[3] = {x0f[q], ytop[q], 0.0}, lb[3] = {x0f[q] + f[q]->t->nx*f[q]->t->dx, ytop[q], 0.0}, dq;
+          strip_l2g(s, q, la, a); strip_l2g(s, q, lb, b);
+          dq = seg2_dist(X, a, b);
+          if(q == k) dk = dq; else if(dq < dmin) dmin = dq;
+        }
+        marg[k][i] = dmin - dk;
+      }
+    }
+    while(changed){
+      changed = 0;
+      for(k = 0; k < nf; k++) for(q = k + 1; q < nf; q++){
+        struct fd3d_layer *lk = s->ly[k], *lq = s->ly[q];
+        double ck = cos(s->th[k]), sk = sin(s->th[k]), cq = cos(s->th[q]), sq = sin(s->th[q]);
+        double ax[4][2] = {{ck, sk}, {-sk, ck}, {cq, sq}, {-sq, cq}};
+        for(i = 0; i < lk->ns; i++){
+          double *Xi = s->xg[k] + 3*(size_t)i, hxi = 0.5*lk->hx*(1.0 - 1e-6), hyi = 0.5*lk->wy[i % lk->nys]*(1.0 - 1e-6);
+          if(!s->active[k][i]) continue;
+          for(j = 0; j < lq->ns && s->active[k][i]; j++){
+            double *Xj = s->xg[q] + 3*(size_t)j, hxj = 0.5*lq->hx*(1.0 - 1e-6), hyj = 0.5*lq->wy[j % lq->nys]*(1.0 - 1e-6), d[2];
+            int u, sep = 0;
+            if(!s->active[q][j]) continue;
+            d[0] = Xj[0] - Xi[0]; d[1] = Xj[1] - Xi[1];
+            if(hypot(d[0], d[1]) > (hxi + hyi + hxj + hyj)) continue;
+            for(u = 0; u < 4 && !sep; u++){
+              double pd = fabs(d[0]*ax[u][0] + d[1]*ax[u][1]);
+              double ri = hxi*fabs(ax[0][0]*ax[u][0] + ax[0][1]*ax[u][1]) + hyi*fabs(ax[1][0]*ax[u][0] + ax[1][1]*ax[u][1]);
+              double rj = hxj*fabs(ax[2][0]*ax[u][0] + ax[2][1]*ax[u][1]) + hyj*fabs(ax[3][0]*ax[u][0] + ax[3][1]*ax[u][1]);
+              if(pd > ri + rj) sep = 1;
+            }
+            if(!sep){
+              if(marg[k][i] < marg[q][j]) s->active[k][i] = 0; else s->active[q][j] = 0;
+              changed = 1;
+            }
+          }
+        }
+      }
+    }
+    for(k = 0; k < nf; k++) free(marg[k]);
+  }
   /* dense tables between different faults and strips */
   for(q = 0; q < nf; q++) for(k = 0; k < nf; k++){
     struct fd3d_layer *lk = s->ly[k], *lq = s->ly[q];
@@ -3097,6 +3150,7 @@ void fd3d_strips_free(struct fd3d_strips *s)
   for(k = 0; k < s->nf; k++){
     if(s->ly[k]){ if(s->f[k]) s->f[k]->layer = NULL; fd3d_layer_free(s->ly[k]); }
     free(s->active[k]); free(s->xg[k]); free(s->fg[k]); free(s->sring[k]); free(s->fring[k]);
+    if(k == 0){ free(s->lu); free(s->lpiv); free(s->aidx); }
     for(q = 0; q < s->nf; q++){
       struct fd3d_dtab *d[3] = {&s->fs[k][q], &s->sf[k][q], &s->ss[k][q]}; int u;
       for(u = 0; u < 3; u++){ free(d[u]->W); free(d[u]->Ks); free(d[u]->K1); }
@@ -3223,10 +3277,50 @@ static void strips_P(struct strips_ctx *x, const double *r, double *z)
   for(k = 0; k < s->nf; k++){ surf_precond_setup(s->ly[k], x->nl, x->hw, x->Es); surf_precond(s->ly[k], r + x->off[k], z + x->off[k], x->S3[k]); }
   strips_mask(x, z);
 }
+/* direct solve of the joint strip system (fd_plan.md H6 step 4): the first-lag operator over
+   the active cells does not change in time, so it is assembled once (columns from strips_A on
+   unit vectors) and LU-factorised (dgetrf); each solve is then exact. The GMRES path below,
+   preconditioned per strip, converged slowly where the partition cuts strips obliquely (355
+   iterations per step at 30 degrees against 15 with a shared strike). FD_STRIPS_GMRES=1 keeps
+   GMRES. Dense: (3 active cells)^2 doubles; fine for test sizes, not for production strips. */
+extern void dgetrf_(int *m, int *n, double *a, int *lda, int *ipiv, int *info);
+extern void dgetrs_(char *tr, int *n, int *nrhs, double *a, int *lda, int *ipiv, double *b, int *ldb, int *info);
+static int strips_direct(struct strips_ctx *x, const double *rhs, double *V)
+{
+  struct fd3d_strips *s = x->s;
+  int n = x->off[s->nf], i, j, k, c, info, one = 1; char tr = 'N';
+  if(!s->lu){
+    double *e = calloc(n, sizeof(double)), *col = malloc(sizeof(double)*n);
+    int na = 0;
+    s->aidx = malloc(sizeof(int)*n);
+    for(k = 0; k < s->nf; k++){ int ns = s->ly[k]->ns; for(c = 0; c < 3; c++) for(i = 0; i < ns; i++) if(s->active[k][i]) s->aidx[na++] = x->off[k] + c*ns + i; }
+    s->na = na;
+    s->lu = malloc(sizeof(double)*(size_t)na*na); s->lpiv = malloc(sizeof(int)*na);
+    for(j = 0; j < na; j++){
+      e[s->aidx[j]] = 1.0;
+      strips_A(x, e, col);
+      for(i = 0; i < na; i++) s->lu[(size_t)j*na + i] = col[s->aidx[i]];          /* column major */
+      e[s->aidx[j]] = 0.0;
+    }
+    dgetrf_(&na, &na, s->lu, &na, s->lpiv, &info);
+    free(e); free(col);
+    if(info != 0){ fprintf(stderr, "fd3d_strips: the strip operator is singular (dgetrf %d)\n", info); }
+  }
+  {
+    int na = s->na; double *b = malloc(sizeof(double)*na);
+    for(i = 0; i < na; i++) b[i] = rhs[s->aidx[i]];
+    dgetrs_(&tr, &na, &one, s->lu, &na, s->lpiv, b, &na, &info);
+    memset(V, 0, sizeof(double)*n);
+    for(i = 0; i < na; i++) V[s->aidx[i]] = b[i];
+    free(b);
+  }
+  return 1;
+}
 /* GMRES(40), right preconditioned, for the joint strip system; returns iterations */
 static int strips_solve(struct strips_ctx *x, const double *rhs, double *V)
 {
   int n = x->off[x->s->nf], i, it = 0, m = 40, j, k2, restart;
+  if(!getenv("FD_STRIPS_GMRES")) return strips_direct(x, rhs, V);
   double *r = malloc(sizeof(double)*n), *w = malloc(sizeof(double)*n), *z = malloc(sizeof(double)*n);
   double *Vk = malloc(sizeof(double)*(size_t)(m + 1)*n), *H = calloc((size_t)(m + 1)*m, sizeof(double));
   double cs[64], sn[64], g[65], y[64], bnorm = 0.0, beta;
@@ -3577,4 +3671,53 @@ double fd3d_h6_step_check(int nsteps, int sw, double th_deg, int verbose)
   for(k = 0; k < 2; k++){ fa[k]->layer = NULL; fb[k]->layer = NULL; fd3d_free(fa[k]); fd3d_free(fb[k]); free(vp[k]); }
   fd3d_tab_free(tb); free(yc); free(wy);
   return scale > 0.0 ? worst/scale : -1.0;
+}
+
+/* H6 step 4 (fd3d_test h6strike): two faults whose strikes differ by `ang` degrees, each with
+   a strip of cells dx/m aligned with its own trace (rows +-2.5 km, columns 1.5 km beyond the
+   trace ends), partitioned by the nearest trace. Fault 0 along x from the origin, dipping 60
+   degrees (dip slip); fault 1 starting 3 km away at (0, -3 km), turned by ang, dipping 75
+   degrees. Both slip at 1 m/s for 5 steps, then stop; the fault shear and normal tractions of
+   nsteps steps are written to tau (2 x 2 N per step). Returns 0 on success. */
+int fd3d_h6_strike_run(double ang, int m, int nsteps, double *tau, int verbose)
+{
+  double cL = 6000, cT = 3464, rho = 2670, dx = 1000.0, dt = 0.5*dx/cT, hs = dx/m;
+  int nx = 4, nz = 2, L = 20, k, i, n, nxs[2], nys[2];
+  double th[2] = {0.0, ang}, O[2][3] = {{0, 0, 0}, {0, -3000.0, 0}}, x0f[2] = {0.0, 0.0}, ytop[2] = {0.0, 0.0}, ztop[2] = {0.0, 0.0};
+  double dip[2] = {60.0, 75.0}, fs[2] = {1.0, 1.0}, xs0[2] = {-1500.0, -1500.0}, *yc[2], *wy[2];
+  struct fd3d_tab *tb = fd3d_tab_create_c(nx, nz, dx, dt, cL, cT, rho, 0, 2);
+  struct fd3d *f[2]; struct fd3d_strips *s;
+  double *vp = malloc(sizeof(double)*nx*nz);
+  {
+    /* cell boundaries on the trace and on the fault ends: margins that are multiples of hs */
+    int nb = (int)ceil(2500.0/hs - 1e-9), nc = (int)ceil(1500.0/hs - 1e-9);
+    for(k = 0; k < 2; k++){
+      xs0[k] = -nc*hs; nxs[k] = (int)floor(nx*dx/hs + 0.5) + 2*nc; nys[k] = 2*nb;
+      yc[k] = malloc(sizeof(double)*nys[k]); wy[k] = malloc(sizeof(double)*nys[k]);
+      for(i = 0; i < nys[k]; i++){ yc[k][i] = -nb*hs + (i + 0.5)*hs; wy[k][i] = hs; }
+      f[k] = fd3d_create(tb);
+    }
+  }
+  s = fd3d_strips_create(2, f, th, (const double (*)[3])O, x0f, ytop, ztop, dip, fs, 2, m, nxs, nys, xs0, (const double **)yc, (const double **)wy, L);
+  if(!s){ fprintf(stderr, "h6strike: setup failed\n"); return 1; }
+  if(verbose){
+    int a0 = 0, a1 = 0;
+    for(i = 0; i < s->ly[0]->ns; i++) a0 += s->active[0][i];
+    for(i = 0; i < s->ly[1]->ns; i++) a1 += s->active[1][i];
+    fprintf(stderr, "h6strike: turn %g deg, cells %g m: strips %d x %d, active %d and %d\n", ang, hs, nxs[0], nys[0], a0, a1);
+  }
+  for(n = 0; n < nsteps; n++){
+    for(i = 0; i < nx*nz; i++) vp[i] = (n < 5) ? 1.0 : 0.0;
+    for(k = 0; k < 2; k++) f[k]->vpres = vp;
+    fd3d_strips_step(s, NULL);
+    for(k = 0; k < 2; k++) for(i = 0; i < f[k]->N; i++){
+      tau[((size_t)n*2 + k)*2*f[k]->N + i] = f[k]->tau[i];
+      tau[((size_t)n*2 + k)*2*f[k]->N + f[k]->N + i] = s->ly[k]->tn[i];
+    }
+  }
+  if(verbose) fprintf(stderr, "h6strike: outer %.1f, GMRES %.1f per step\n", (double)s->n_outer/s->n_steps, (double)s->n_inner/s->n_steps);
+  fd3d_strips_free(s);
+  for(k = 0; k < 2; k++){ f[k]->layer = NULL; f[k]->vpres = NULL; fd3d_free(f[k]); free(yc[k]); free(wy[k]); }
+  fd3d_tab_free(tb); free(vp);
+  return 0;
 }
