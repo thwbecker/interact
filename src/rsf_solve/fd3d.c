@@ -2936,3 +2936,237 @@ double fd3d_h6_frame_check(const struct fd3d_tab *t, double dip_deg, int fcomp, 
   free(K1); free(K2);
   return scale > 0.0 ? worst/scale : -1.0;
 }
+
+static void strip_l2g(const struct fd3d_strips *s, int k, const double xl[3], double X[3])
+{
+  double ct = cos(s->th[k]), st = sin(s->th[k]);
+  X[0] = s->O[k][0] + xl[0]*ct - xl[1]*st;
+  X[1] = s->O[k][1] + xl[0]*st + xl[1]*ct;
+  X[2] = s->O[k][2] + xl[2];
+}
+static void strip_v2g(const struct fd3d_strips *s, int k, const double vl[3], double v[3])
+{
+  double ct = cos(s->th[k]), st = sin(s->th[k]);
+  v[0] = vl[0]*ct - vl[1]*st; v[1] = vl[0]*st + vl[1]*ct; v[2] = vl[2];
+}
+static double seg2_dist(const double p[2], const double a[2], const double b[2])
+{
+  double ab[2] = {b[0] - a[0], b[1] - a[1]}, ap[2] = {p[0] - a[0], p[1] - a[1]}, l2 = ab[0]*ab[0] + ab[1]*ab[1], u;
+  u = l2 > 0.0 ? (ap[0]*ab[0] + ap[1]*ab[1])/l2 : 0.0;
+  if(u < 0.0) u = 0.0;
+  if(u > 1.0) u = 1.0;
+  return hypot(p[0] - a[0] - u*ab[0], p[1] - a[1] - u*ab[1]);
+}
+static void dtab_alloc(struct fd3d_dtab *d, int nr, int nc, int L)
+{
+  d->nr = nr; d->nc = nc; d->L = L;
+  d->W = calloc((size_t)L*nr*nc, sizeof(double)); d->Ks = calloc((size_t)nr*nc, sizeof(double)); d->K1 = calloc((size_t)nr*nc, sizeof(double));
+}
+/* one column of a dense table from fd3d_elem_resp: entries for receiver rows r0 .. r0 + nrr - 1 */
+static void dtab_fill(struct fd3d_dtab *d, const struct fd3d_tab *t, int col, int r0, int nrr, const double *K, const double *ks, double sgn)
+{
+  int r, l, L = d->L;
+  for(r = 0; r < nrr; r++){
+    size_t e = (size_t)(r0 + r)*d->nc + col;
+    d->Ks[e] = sgn*ks[r]; d->K1[e] = sgn*K[(size_t)r*L];
+    for(l = 0; l < L; l++) d->W[(size_t)l*d->nr*d->nc + e] = sgn*(K[(size_t)r*L + l] - ks[r]*t->dt);
+  }
+}
+
+struct fd3d_strips *fd3d_strips_create(int nf, struct fd3d **f, const double *th_deg, const double (*O)[3],
+                                       const double *x0f, const double *ytop, const double *ztop, const double *dip_deg,
+                                       const double *fsign, int fcomp, int m, const int *nxs, const int *nys,
+                                       const double *xs0, const double **yc, const double **wy, int L)
+{
+  struct fd3d_strips *s = calloc(1, sizeof(*s));
+  int k, q, p, i, j, c, r;
+  const struct fd3d_tab *t = f[0]->t;
+  double *K = malloc(sizeof(double)*3*L), ks[3];
+  s->nf = nf; s->L = L;
+  for(k = 0; k < nf; k++){
+    s->f[k] = f[k]; s->th[k] = th_deg[k]*M_PI/180.0; s->fsg[k] = fsign[k];
+    for(i = 0; i < 3; i++) s->O[k][i] = O[k][i];
+    if(f[k]->t->dt != t->dt || f[k]->mirror || f[k]->next){ fd3d_strips_free(s); free(K); return NULL; }
+    s->ly[k] = fd3d_surf_create_rows(f[k], x0f[k], ytop[k], ztop[k], dip_deg[k], fcomp, m, nxs[k], nys[k], xs0[k], yc[k], wy[k], L, fsign[k]);
+    if(!s->ly[k]){ fd3d_strips_free(s); free(K); return NULL; }
+    f[k]->layer = s->ly[k];
+  }
+  /* global centres: strip cells (p, q) at (xs0 + (p + 1/2) hx, yc[q], 0); fault cells (i, j) at
+     (x0f + (i + 1/2) dx, ytop - (j + 1/2) dx cos(dip), ztop - (j + 1/2) dx sin(dip)) */
+  for(k = 0; k < nf; k++){
+    struct fd3d_layer *ly = s->ly[k];
+    double F[3][3]; frame_fault(dip_deg[k], F);
+    s->xg[k] = malloc(sizeof(double)*3*ly->ns); s->fg[k] = malloc(sizeof(double)*3*f[k]->N);
+    for(p = 0; p < ly->nxs; p++) for(q = 0; q < ly->nys; q++){
+      double xl[3] = {xs0[k] + (p + 0.5)*ly->hx, ly->yc[q], 0.0};
+      strip_l2g(s, k, xl, s->xg[k] + 3*((size_t)p*ly->nys + q));
+    }
+    for(i = 0; i < t->nx; i++) for(j = 0; j < f[k]->nzp; j++){
+      double xl[3] = {x0f[k] + (i + 0.5)*t->dx, ytop[k] - (j + 0.5)*t->dx*F[1][1], ztop[k] - (j + 0.5)*t->dx*F[1][2]};
+      strip_l2g(s, k, xl, s->fg[k] + 3*((size_t)i*f[k]->nzp + j));
+    }
+  }
+  /* masks: nearest trace (the fault's top line in the surface plane) */
+  for(k = 0; k < nf; k++){
+    struct fd3d_layer *ly = s->ly[k];
+    s->active[k] = malloc(ly->ns);
+    for(i = 0; i < ly->ns; i++){
+      double *X = s->xg[k] + 3*(size_t)i, dk = 0.0, dq;
+      for(q = 0; q < nf; q++){
+        double a[3], b[3], la[3] = {x0f[q], ytop[q], 0.0}, lb[3] = {x0f[q] + f[q]->t->nx*f[q]->t->dx, ytop[q], 0.0};
+        strip_l2g(s, q, la, a); strip_l2g(s, q, lb, b);
+        dq = seg2_dist(X, a, b);
+        if(q == k) dk = dq;
+      }
+      s->active[k][i] = 1;
+      for(q = 0; q < nf; q++){
+        double a[3], b[3], la[3] = {x0f[q], ytop[q], 0.0}, lb[3] = {x0f[q] + f[q]->t->nx*f[q]->t->dx, ytop[q], 0.0};
+        if(q == k) continue;
+        strip_l2g(s, q, la, a); strip_l2g(s, q, lb, b);
+        dq = seg2_dist(X, a, b);
+        if(dq < dk || (dq == dk && q < k)) s->active[k][i] = 0;
+      }
+    }
+  }
+  /* dense tables between different faults and strips */
+  for(q = 0; q < nf; q++) for(k = 0; k < nf; k++){
+    struct fd3d_layer *lk = s->ly[k], *lq = s->ly[q];
+    double Fq[3][3], Rq[3][3], Rk[3][3], Iq[3][3], ez[3] = {0, 0, 1}, dirs_s[3][3];
+    int Nq = f[q]->N, nsk = lk->ns, nsq = lq->ns;
+    if(q == k) continue;
+    frame_fault(dip_deg[q], Fq);
+    for(r = 0; r < 3; r++){ strip_v2g(s, q, Fq[r], Rq[r]); double e[3] = {r == 0, r == 1, r == 2}; strip_v2g(s, q, e, Iq[r]); strip_v2g(s, k, e, Rk[r]); }
+    for(r = 0; r < 3; r++) for(i = 0; i < 3; i++) dirs_s[r][i] = Rk[r][i];
+    /* fault q -> strip k (source slip: the marcher's variable, fsign along Fq[fcomp-1]) */
+    dtab_alloc(&s->fs[q][k], 3*nsk, Nq, L);
+    for(j = 0; j < Nq; j++) for(i = 0; i < nsk; i++){
+      fd3d_elem_resp(t, s->fg[q] + 3*(size_t)j, Rq, fcomp, 0.5*t->dx, 0.5*t->dx, s->xg[k] + 3*(size_t)i, ez, 3, dirs_s, L, K, ks);
+      { int rr; for(rr = 0; rr < 3; rr++){ size_t e0 = (size_t)(rr*nsk + i); double kk[1] = {ks[rr]}; dtab_fill(&s->fs[q][k], t, j, (int)e0, 1, K + (size_t)rr*L, kk, fsign[q]); } }
+    }
+    /* strip q -> fault k (receiver: shear along fault k's slip direction, normal) */
+    {
+      double Fk[3][3], sdk[3], nk[3], dk2[2][3], RSq[3][3];
+      frame_fault(dip_deg[k], Fk);
+      { double sl[3]; for(i = 0; i < 3; i++) sl[i] = fsign[k]*Fk[fcomp - 1][i]; strip_v2g(s, k, sl, sdk); strip_v2g(s, k, Fk[2], nk); }
+      for(i = 0; i < 3; i++){ dk2[0][i] = sdk[i]; dk2[1][i] = nk[i]; }
+      for(r = 0; r < 3; r++) for(i = 0; i < 3; i++) RSq[r][i] = Iq[r][i];
+      dtab_alloc(&s->sf[q][k], 2*f[k]->N, 3*nsq, L);
+      for(c = 1; c <= 3; c++) for(j = 0; j < nsq; j++) for(i = 0; i < f[k]->N; i++){
+        int rr;
+        fd3d_elem_resp(t, s->xg[q] + 3*(size_t)j, RSq, c, 0.5*lq->hx, 0.5*lq->wy[j % lq->nys], s->fg[k] + 3*(size_t)i, nk, 2, dk2, L, K, ks);
+        for(rr = 0; rr < 2; rr++){ double kk[1] = {ks[rr]}; dtab_fill(&s->sf[q][k], t, (c - 1)*nsq + j, rr*f[k]->N + i, 1, K + (size_t)rr*L, kk, 1.0); }
+      }
+      /* strip q -> strip k */
+      dtab_alloc(&s->ss[q][k], 3*nsk, 3*nsq, L);
+      for(c = 1; c <= 3; c++) for(j = 0; j < nsq; j++) for(i = 0; i < nsk; i++){
+        int rr;
+        fd3d_elem_resp(t, s->xg[q] + 3*(size_t)j, RSq, c, 0.5*lq->hx, 0.5*lq->wy[j % lq->nys], s->xg[k] + 3*(size_t)i, ez, 3, dirs_s, L, K, ks);
+        for(rr = 0; rr < 3; rr++){ double kk[1] = {ks[rr]}; dtab_fill(&s->ss[q][k], t, (c - 1)*nsq + j, rr*nsk + i, 1, K + (size_t)rr*L, kk, 1.0); }
+      }
+    }
+    (void)Iq;
+  }
+  free(K);
+  return s;
+}
+
+void fd3d_strips_free(struct fd3d_strips *s)
+{
+  int k, q;
+  if(!s) return;
+  for(k = 0; k < s->nf; k++){
+    if(s->ly[k]){ if(s->f[k]) s->f[k]->layer = NULL; fd3d_layer_free(s->ly[k]); }
+    free(s->active[k]); free(s->xg[k]); free(s->fg[k]);
+    for(q = 0; q < s->nf; q++){
+      struct fd3d_dtab *d[3] = {&s->fs[k][q], &s->sf[k][q], &s->ss[k][q]}; int u;
+      for(u = 0; u < 3; u++){ free(d[u]->W); free(d[u]->Ks); free(d[u]->K1); }
+    }
+  }
+  free(s);
+}
+
+/* step-2 check (fd3d_test h6strips): two faults; (a) the active cells of all strips cover each
+   global cell position once; (b) shared strike: the dense strip-to-strip and fault-to-strip
+   entries equal surf_resp evaluated in the common local frame; (c) a rigid rotation of the
+   whole configuration leaves every dense table unchanged. Returns 0 if all pass. */
+int fd3d_h6_strips_check(int verbose)
+{
+  double cL = 6000, cT = 3464, rho = 2670, dx = 1000.0, dt = 0.5*dx/cT;
+  int nx = 4, nz = 2, m = 4, L = 12, k, i, fail = 0, nxs[2] = {24, 24}, nys[2] = {16, 16};
+  double th[2] = {0.0, 0.0}, O[2][3] = {{0, 0, 0}, {0, 0, 0}}, x0f[2] = {0.0, 0.0}, ytop[2] = {0.0, -3000.0}, ztop[2] = {0.0, 0.0}, dip[2] = {60.0, 75.0}, fs[2] = {1.0, -1.0};
+  double xs0[2] = {-2000.0, -2000.0}, *yc[2], *wy[2], hs = dx/m;
+  struct fd3d_tab *tb = fd3d_tab_create_c(nx, nz, dx, dt, cL, cT, rho, 0, 2);
+  struct fd3d *f[2], *g[2];
+  struct fd3d_strips *s1, *s2;
+  double worst_b = 0.0, scale_b = 0.0, worst_c = 0.0, scale_c = 0.0;
+  for(k = 0; k < 2; k++){
+    yc[k] = malloc(sizeof(double)*nys[k]); wy[k] = malloc(sizeof(double)*nys[k]);
+    for(i = 0; i < nys[k]; i++){ yc[k][i] = -5000.0 + (i + 0.5)*hs + 1000.0*0; wy[k][i] = hs; }
+    f[k] = fd3d_create(tb); g[k] = fd3d_create(tb);
+  }
+  /* both strips on the same lattice y in [-5000, -1000] in the shared frame */
+  s1 = fd3d_strips_create(2, f, th, (const double (*)[3])O, x0f, ytop, ztop, dip, fs, 2, m, nxs, nys, xs0, (const double **)yc, (const double **)wy, L);
+  if(!s1) return 1;
+  /* (a) partition: every lattice position active in exactly one strip */
+  {
+    int ns = s1->ly[0]->ns, cnt = 0, dup = 0;
+    for(i = 0; i < ns; i++){
+      int a0 = s1->active[0][i], a1 = s1->active[1][i];
+      double d = fabs(s1->xg[0][3*i] - s1->xg[1][3*i]) + fabs(s1->xg[0][3*i + 1] - s1->xg[1][3*i + 1]);
+      if(d > 1e-6) dup++;
+      if(a0 + a1 == 1) cnt++;
+    }
+    if(cnt != ns || dup) fail = 1;
+    if(verbose) printf("h6strips (a): %d of %d lattice cells active in exactly one strip, %d position mismatches\n", cnt, ns, dup);
+  }
+  /* (b) shared strike: entries against surf_resp in the local frame */
+  {
+    double F1[3][3], F0[3][3], sd0[3], *K = malloc(sizeof(double)*3*L), ks[3];
+    int j, r, l, cc, ns = s1->ly[0]->ns;
+    frame_fault(dip[1], F1); frame_fault(dip[0], F0);
+    for(i = 0; i < 3; i++) sd0[i] = fs[0]*F0[1][i];
+    for(j = 0; j < ns; j += 37) for(i = 3; i < ns; i += 41){
+      for(cc = 1; cc <= 3; cc++){
+        surf_resp(tb, F1, 0, cc, s1->xg[1] + 3*j, 0.5*hs, 0.5*hs, s1->xg[0] + 3*i, 0, sd0, L, K, ks);
+        for(r = 0; r < 3; r++) for(l = 0; l < L; l++){
+          double ours = s1->ss[1][0].W[(size_t)l*s1->ss[1][0].nr*s1->ss[1][0].nc + (size_t)(r*ns + i)*s1->ss[1][0].nc + (cc - 1)*ns + j] + s1->ss[1][0].Ks[(size_t)(r*ns + i)*s1->ss[1][0].nc + (cc - 1)*ns + j]*dt;
+          worst_b = fmax(worst_b, fabs(ours - K[(size_t)r*L + l])); scale_b = fmax(scale_b, fabs(K[(size_t)r*L + l]));
+        }
+      }
+    }
+    for(j = 0; j < f[1]->N; j++) for(i = 1; i < ns; i += 53){
+      surf_resp(tb, F1, 1, 2, s1->fg[1] + 3*j, 0.5*dx, 0.5*dx, s1->xg[0] + 3*i, 0, sd0, L, K, ks);
+      for(r = 0; r < 3; r++) for(l = 0; l < L; l++){
+        double ours = s1->fs[1][0].W[(size_t)l*s1->fs[1][0].nr*s1->fs[1][0].nc + (size_t)(r*ns + i)*s1->fs[1][0].nc + j] + s1->fs[1][0].Ks[(size_t)(r*ns + i)*s1->fs[1][0].nc + j]*dt;
+        worst_b = fmax(worst_b, fabs(ours - fs[1]*K[(size_t)r*L + l])); scale_b = fmax(scale_b, fabs(K[(size_t)r*L + l]));
+      }
+    }
+    free(K);
+    if(!(worst_b <= 1e-10*scale_b)) fail = 1;
+    if(verbose) printf("h6strips (b): dense entries against surf_resp in the shared frame: %.2e of %.2e\n", worst_b, scale_b);
+  }
+  /* (c) rigid rotation by 37 degrees about z (and a shift) of everything */
+  {
+    double th2[2] = {37.0, 37.0}, O2[2][3] = {{1500.0, -700.0, 0.0}, {1500.0, -700.0, 0.0}};
+    s2 = fd3d_strips_create(2, g, th2, (const double (*)[3])O2, x0f, ytop, ztop, dip, fs, 2, m, nxs, nys, xs0, (const double **)yc, (const double **)wy, L);
+    if(!s2) return 1;
+    {
+      struct fd3d_dtab *a[3] = {&s1->fs[1][0], &s1->sf[1][0], &s1->ss[0][1]}, *b[3] = {&s2->fs[1][0], &s2->sf[1][0], &s2->ss[0][1]};
+      int u; size_t e, n;
+      for(u = 0; u < 3; u++){
+        n = (size_t)a[u]->L*a[u]->nr*a[u]->nc;
+        for(e = 0; e < n; e++){ worst_c = fmax(worst_c, fabs(a[u]->W[e] - b[u]->W[e])); scale_c = fmax(scale_c, fabs(a[u]->W[e])); }
+        n = (size_t)a[u]->nr*a[u]->nc;
+        for(e = 0; e < n; e++){ worst_c = fmax(worst_c, fabs(a[u]->Ks[e] - b[u]->Ks[e])*dt); worst_c = fmax(worst_c, fabs(a[u]->K1[e] - b[u]->K1[e])); }
+      }
+      for(k = 0; k < 2; k++) for(i = 0; i < s1->ly[k]->ns; i++) if(s1->active[k][i] != s2->active[k][i]) worst_c = 1e300;
+    }
+    if(!(worst_c <= 1e-8*scale_c)) fail = 1;     /* rotation round-off near the trace: 1.3e-9 measured */
+    if(verbose) printf("h6strips (c): rigid rotation by 37 degrees: dense tables and masks change by %.2e of %.2e\n", worst_c, scale_c);
+    fd3d_strips_free(s2);
+  }
+  fd3d_strips_free(s1);
+  for(k = 0; k < 2; k++){ fd3d_free(f[k]); fd3d_free(g[k]); free(yc[k]); free(wy[k]); }
+  fd3d_tab_free(tb);
+  return fail;
+}

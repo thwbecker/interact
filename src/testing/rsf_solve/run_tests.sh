@@ -70,6 +70,8 @@ done
 # H6: the generic global-frame element response against the one-fault surface code, rotated
 ( cd tmp_fd_dynamic && ../bin/fd3d_test h6frames > fd3d.out 2>/dev/null ); st=$?
 tail -1 tmp_fd_dynamic/fd3d.out; [ $st -eq 0 ] || fail=1
+( cd tmp_fd_dynamic && ../bin/fd3d_test h6strips > fd3d.out 2>/dev/null ); st=$?
+tail -1 tmp_fd_dynamic/fd3d.out; [ $st -eq 0 ] || fail=1
 # non-parallel 2-D pairs (fd_plan.md N1): dense tables against the prototype for a kinked pair
 if command -v python3 > /dev/null 2>&1; then
   for a in 30 -45; do for m in 0 1; do

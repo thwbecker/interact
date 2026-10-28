@@ -279,4 +279,31 @@ int fd3d_msurf_step(struct fd3d_msurf *s, double **load);
 void fd3d_elem_resp(const struct fd3d_tab *t, const double c[3], double R[3][3], int comp, double a1, double a2,
                     const double X[3], const double n[3], int nr, double dirs[][3], int L, double *K, double *ks);
 double fd3d_h6_frame_check(const struct fd3d_tab *t, double dip_deg, int fcomp, double fsign, double strike_deg, double hs);
+/* H6 step 2: per-fault strips. Fault k lives in its local frame (x along strike, y horizontal
+   towards the up-dip side, z up), mapped to global by X = O[k] + x u + y v + z ez with
+   u = (cos th, sin th, 0), v = (-sin th, cos th, 0); its strip is the one-fault surface layer
+   ly[k] (fd3d_surf_create_rows) in that frame. A strip cell is active where fault k's trace is
+   the nearest (horizontal distance to the trace segments; ties to the lower index). Dense
+   tables between different faults and strips (L lags of step increments minus the static
+   slope times dt, as the layer tables; the static slope; and the first lag S(dt)):
+   fs[q][k]: fault q -> strip k (3 ns_k x N_q), sf[k][q]: strip k -> fault q (2 N_q x 3 ns_k:
+   shear along the marcher's slip direction, normal), ss[j][k]: strip j -> strip k
+   (3 ns_k x 3 ns_j); components of a strip in its own frame (x, y, opening). */
+struct fd3d_dtab { int nr, nc, L; double *W, *Ks, *K1; };
+struct fd3d_strips {
+  int nf, L;
+  struct fd3d *f[FD3D_MULTI_MAX];
+  struct fd3d_layer *ly[FD3D_MULTI_MAX];
+  double O[FD3D_MULTI_MAX][3], th[FD3D_MULTI_MAX], fsg[FD3D_MULTI_MAX];
+  char *active[FD3D_MULTI_MAX];                 /* per strip cell (p nys + q): 1 active, 0 masked */
+  double *xg[FD3D_MULTI_MAX];                   /* global centres of the strip cells (3 per cell) */
+  double *fg[FD3D_MULTI_MAX];                   /* global centres of the fault cells (3 per cell) */
+  struct fd3d_dtab fs[FD3D_MULTI_MAX][FD3D_MULTI_MAX], sf[FD3D_MULTI_MAX][FD3D_MULTI_MAX], ss[FD3D_MULTI_MAX][FD3D_MULTI_MAX];
+};
+struct fd3d_strips *fd3d_strips_create(int nf, struct fd3d **f, const double *th_deg, const double (*O)[3],
+                                       const double *x0f, const double *ytop, const double *ztop, const double *dip_deg,
+                                       const double *fsign, int fcomp, int m, const int *nxs, const int *nys,
+                                       const double *xs0, const double **yc, const double **wy, int L);
+void fd3d_strips_free(struct fd3d_strips *s);
+int fd3d_h6_strips_check(int verbose);
 #endif

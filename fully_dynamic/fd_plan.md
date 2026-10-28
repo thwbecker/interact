@@ -2434,8 +2434,26 @@ and shifted, for fault-to-surface, surface-to-fault and surface-to-surface pairs
 to 90 degrees, strike and dip slip, both slip signs, rotations of -71 to 200 degrees:
 largest relative difference 5.6e-11. (A first version of the test multiplied the fault
 source by the slip sign; surf_resp applies none to sources, the tables do it afterwards.)
-Next: step 2, the strip object (one-fault layers per fault in their own frames, masks from
-the nearest-trace partition, global positions) and check (1).
+Step 2 (done): struct fd3d_strips (fd3d_strips_create): fault k in its local frame (x along
+strike, y horizontal towards the up-dip side, z up), mapped to global by a rotation th[k]
+about z and a shift O[k]; its strip is the one-fault surface layer (fd3d_surf_create_rows)
+in that frame, which supplies the Toeplitz tables fault k <-> strip k and strip k <-> strip
+k; global centres of all strip and fault cells; masks from the nearest trace (horizontal
+distance to the trace segments, ties to the lower index); dense tables (fd3d_dtab: lags of
+increments minus the static slope times dt, static slope, first lag S(dt)) fault q -> strip
+k, strip q -> fault k, strip q -> strip k for q != k, from fd3d_elem_resp, strip components
+in their own frame (x, y, opening), the fault source with its slip sign.
+fd3d_test h6strips (in run_tests.sh): two faults (4 x 2 squares of 1 km, dips 60 and 75
+degrees, slip signs +1 and -1, traces 3 km apart) with strips of 250 m on a common lattice:
+(a) every lattice position is active in exactly one strip (384 of 384); (b) shared strike:
+dense strip-to-strip and fault-to-strip entries equal surf_resp in the common frame to
+5.8e-11 relative; (c) a rigid rotation of everything by 37 degrees and a shift changes the
+dense tables and masks by 1.3e-9 relative (rotation round-off near the trace; tolerance
+1e-8).
+Next: step 3, the coupled step (known parts from the Toeplitz and dense tables, the faults'
+local solves and a joint GMRES solve of all strips' zero traction over the active cells,
+Anderson-accelerated) and check (1): with a shared strike it must reproduce the
+several-fault surface of G3b.
 
 ### WP7, C implementation in rsf_solve: status (2026-10-18)
 Done, each verified in the sandbox before delivery (details in

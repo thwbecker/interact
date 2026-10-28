@@ -719,6 +719,11 @@ static int main0(int argc, char **argv)
   if(argc >= 3 && !strcmp(argv[1], "q2d")) return run_q2d(argv[2]);
   if(argc >= 2 && !strcmp(argv[1], "pair")) return run_pair(argc > 2 ? atoi(argv[2]) : 0);
   if(argc >= 2 && !strcmp(argv[1], "multipair")) return run_multi_pair();
+  if(argc >= 2 && !strcmp(argv[1], "h6strips")){
+    int fl = fd3d_h6_strips_check(1);
+    printf("fd3d_test h6strips: %s\n", fl ? "FAIL" : "PASS");
+    return fl;
+  }
   if(argc >= 2 && !strcmp(argv[1], "h6frames")){
     /* H6: the generic global-frame response against the one-fault surface code, rotated */
     struct fd3d_tab *t = fd3d_tab_create(4, 2, 1000.0, 0.5*1000.0/3464.0, 6000.0, 3464.0, 2670.0, 0);
