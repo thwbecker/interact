@@ -2411,6 +2411,32 @@ prototype (3 to 5 minutes per layout at 500 m), planned in C (H6: per-fault stri
 their own strike in the several-fault surface, partitioned by the nearest trace, with dense
 coupling across the partition boundary).
 
+### General surface-breaking fault systems, H6: per-fault strips of their own strike (plan and step 1, 2026-10-30)
+
+Design (from H2 to H5): each fault k gets a surface strip aligned with its own strike, about
+one fault depth wide around its trace (uniform cells of dx/m, the trace on a cell
+boundary), built as the one-fault surface layer in the fault's local frame (Toeplitz along
+strike, dense across rows). A strip cell is active only where its own trace is the nearest
+(masked cells: zero slip, no equation). Couplings: fault k with its own strip (existing
+Toeplitz tables), fault with fault (dense, G1), fault q with strip k (q != k) and strip j with
+strip k (j != k) dense; one coupled step: known parts from all, then the faults' local
+solves and one joint GMRES solve of all strips' zero-traction conditions (block
+preconditioner from H4), in the Anderson-accelerated outer loop. Checks planned: (1) shared
+strike: equal to the several-fault surface (G3b); (2) one fault turned by any angle: equal
+to the aligned result; (3) two faults at 30 and 60 degrees: resolution study (500 against
+333 m cells) for the error where strips meet; (4) jump outcomes.
+Step 1 (done): fd3d_elem_resp, the response of a receiver (any normal, any projection
+directions) to a source rectangle with any frame, in global coordinates (step increments
+and static slope, as surf_resp), the building block of the dense couplings between
+differently oriented strips and faults. fd3d_test h6frames (in run_tests.sh) checks it
+against the one-fault surface code's surf_resp with everything rotated about the vertical
+and shifted, for fault-to-surface, surface-to-fault and surface-to-surface pairs, dips 30
+to 90 degrees, strike and dip slip, both slip signs, rotations of -71 to 200 degrees:
+largest relative difference 5.6e-11. (A first version of the test multiplied the fault
+source by the slip sign; surf_resp applies none to sources, the tables do it afterwards.)
+Next: step 2, the strip object (one-fault layers per fault in their own frames, masks from
+the nearest-trace partition, global positions) and check (1).
+
 ### WP7, C implementation in rsf_solve: status (2026-10-18)
 Done, each verified in the sandbox before delivery (details in
 fd_c_design.md sections 6 to 10, usage in rsf_solve_fd.md):

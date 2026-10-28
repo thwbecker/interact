@@ -719,6 +719,21 @@ static int main0(int argc, char **argv)
   if(argc >= 3 && !strcmp(argv[1], "q2d")) return run_q2d(argv[2]);
   if(argc >= 2 && !strcmp(argv[1], "pair")) return run_pair(argc > 2 ? atoi(argv[2]) : 0);
   if(argc >= 2 && !strcmp(argv[1], "multipair")) return run_multi_pair();
+  if(argc >= 2 && !strcmp(argv[1], "h6frames")){
+    /* H6: the generic global-frame response against the one-fault surface code, rotated */
+    struct fd3d_tab *t = fd3d_tab_create(4, 2, 1000.0, 0.5*1000.0/3464.0, 6000.0, 3464.0, 2670.0, 0);
+    double w = 0.0; int fail = 0, k;
+    double cases[6][4] = {{60, 2, 1, 37}, {30, 2, -1, -71}, {90, 1, 1, 15}, {45, 1, -1, 123}, {60, 2, 1, 0}, {75, 1, 1, 200}};
+    for(k = 0; k < 6; k++){
+      double e = fd3d_h6_frame_check(t, cases[k][0], (int)cases[k][1], cases[k][2], cases[k][3], 250.0);
+      printf("fd3d_test h6frames: dip %g, comp %g, sign %g, strike %g: largest relative difference %.2e\n", cases[k][0], cases[k][1], cases[k][2], cases[k][3], e);
+      if(!(e >= 0.0 && e < 1e-10)) fail = 1;
+      if(e > w) w = e;
+    }
+    printf("fd3d_test h6frames: %s\n", fail ? "FAIL" : "PASS");
+    fd3d_tab_free(t);
+    return fail;
+  }
   if(argc >= 2 && !strcmp(argv[1], "msurf")) return run_msurf(argc > 2 ? atoi(argv[2]) : 2, argc > 3 ? atof(argv[3]) : 3.0);
   if(argc >= 2 && !strcmp(argv[1], "multi")) return run_multi(argc > 2 ? atof(argv[2]) : 0.0, argc > 3 ? atof(argv[3]) : 90.0, argc > 4 ? atof(argv[4]) : 4.0, argc > 5 ? atoi(argv[5]) : 1, argc > 6 ? atoi(argv[6]) : 0);
   if(argc >= 6 && !strcmp(argv[1], "stepover")) return run_stepover(atof(argv[2]), atof(argv[3]), atof(argv[4]), atof(argv[5]), argc > 6 ? atof(argv[6]) : 0.75);

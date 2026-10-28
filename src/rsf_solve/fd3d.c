@@ -2853,3 +2853,86 @@ int fd3d_msurf_step(struct fd3d_msurf *s, double **load)
   free(V3); free(rhs); free(tmps); free(Xs); free(Ys); free(S3); free(P3);
   return itot;
 }
+
+/* ---------------- H6: per-fault surface strips of their own strike (fd_plan.md H6) ----------------
+   Generic response of a receiver to a source rectangle, both in global coordinates:
+   source: centre c, frame R (rows: the rectangle's axes, R[2] its normal; slip comp 1, 2 along
+   R[0], R[1], 3 opening), half sizes a1 (along R[0]) and a2 (along R[1]); receiver at X with
+   normal n and nr projection directions dirs[r]: K[r L + l - 1] the step increments
+   (traction at l dt minus at (l - 1) dt, unit slip rate from t = 0), ks[r] the static slope. */
+void fd3d_elem_resp(const struct fd3d_tab *t, const double c[3], double R[3][3], int comp, double a1, double a2,
+                    const double X[3], const double n[3], int nr, double dirs[][3], int L, double *K, double *ks)
+{
+  double d[3], x[3], s[6], G[3][3], tv[3], late[2][3], T1, T2, prev[3] = {0, 0, 0}, tr[3];
+  int i, l, q, r;
+  for(i = 0; i < 3; i++) d[i] = X[i] - c[i];
+  for(i = 0; i < 3; i++){ x[i] = R[i][0]*d[0] + R[i][1]*d[1] + R[i][2]*d[2]; if(fabs(x[i]) < 1e-9*(a1 + a2)) x[i] = 0.0; }
+  T1 = 3.0*(sqrt(d[0]*d[0] + d[1]*d[1] + d[2]*d[2]) + 4.0*(a1 + a2))/t->cT + 10.0*t->dt; T2 = 2.0*T1;
+#define ELEM_TR(G, out) do{ int u, v; for(u = 0; u < 3; u++){ tv[u] = 0.0; for(v = 0; v < 3; v++) tv[u] += G[u][v]*n[v]; } \
+    for(r = 0; r < nr; r++) out[r] = dirs[r][0]*tv[0] + dirs[r][1]*tv[1] + dirs[r][2]*tv[2]; }while(0)
+  for(q = 0; q < 2; q++){
+    fd3d_rect_ramp_tensor(x[0], x[1], x[2], q ? T2 : T1, a1, a2, t->cL, t->cT, t->rho, comp, s);
+    to_global(R, s, G); ELEM_TR(G, late[q]);
+  }
+  for(r = 0; r < nr; r++) ks[r] = (late[1][r] - late[0][r])/(T2 - T1);
+  for(l = 1; l <= L; l++){
+    fd3d_rect_ramp_tensor(x[0], x[1], x[2], l*t->dt, a1, a2, t->cL, t->cT, t->rho, comp, s);
+    to_global(R, s, G); ELEM_TR(G, tr);
+    for(r = 0; r < nr; r++){ K[(size_t)r*L + l - 1] = tr[r] - prev[r]; prev[r] = tr[r]; }
+  }
+#undef ELEM_TR
+}
+
+/* frame check (fd3d_test h6frames): the responses of the one-fault surface code (surf_resp, in
+   the fault's local frame x along strike, y horizontal towards the up-dip side, z up) against
+   fd3d_elem_resp with everything rotated about z by `strike` degrees and shifted, for fault ->
+   surface, surface -> fault and surface -> surface pairs; returns the largest relative
+   difference */
+double fd3d_h6_frame_check(const struct fd3d_tab *t, double dip_deg, int fcomp, double fsign, double strike_deg, double hs)
+{
+  double F[3][3], sdir[3], Ide[3][3] = {{1, 0, 0}, {0, 1, 0}, {0, 0, 1}}, Rz[3][3], RF[3][3], RS[3][3], sh[3] = {1234.5, -987.6, 0.0};
+  double worst = 0.0, scale = 0.0, a = 0.5*t->dx;
+  int L = 30, ip, l, r, c, u, v;
+  double *K1 = malloc(sizeof(double)*3*L), *K2 = malloc(sizeof(double)*3*L), ks1[3], ks2[3];
+  double th = strike_deg*M_PI/180.0;
+  /* local -> global: rotation about z by th, then the shift; frames: rows rotated */
+  Rz[0][0] = cos(th); Rz[0][1] = -sin(th); Rz[0][2] = 0; Rz[1][0] = sin(th); Rz[1][1] = cos(th); Rz[1][2] = 0; Rz[2][0] = 0; Rz[2][1] = 0; Rz[2][2] = 1;
+  frame_fault(dip_deg, F);
+  for(c = 0; c < 3; c++) sdir[c] = fsign*F[fcomp - 1][c];
+#define ROTV(in, out) do{ for(u = 0; u < 3; u++){ out[u] = 0.0; for(v = 0; v < 3; v++) out[u] += Rz[u][v]*in[v]; } }while(0)
+  for(r = 0; r < 3; r++){ ROTV(F[r], RF[r]); ROTV(Ide[r], RS[r]); }
+  for(ip = 0; ip < 3; ip++){
+    /* a few source / receiver pairs in the local frame */
+    double fc[3] = {300.0*ip, -400.0 - 200.0*ip, -700.0 - 100.0*ip}, sc[3] = {-250.0 + 500.0*ip, 600.0 - 300.0*ip, 0.0};
+    double gfc[3], gsc[3], gs_rc[3], sc2[3] = {sc[0] + 1500.0, sc[1] - 750.0, 0.0}, gsc2[3];
+    for(u = 0; u < 3; u++){ gfc[u] = sh[u]; gsc[u] = sh[u]; gsc2[u] = sh[u]; for(v = 0; v < 3; v++){ gfc[u] += Rz[u][v]*fc[v]; gsc[u] += Rz[u][v]*sc[v]; gsc2[u] += Rz[u][v]*sc2[v]; } }
+    (void)gs_rc;
+    /* fault -> surface (traction sxz, syz, szz in the local frame = projections on the rotated axes) */
+    {
+      double dirs[3][3], nz[3] = {0, 0, 1};
+      for(r = 0; r < 3; r++) for(u = 0; u < 3; u++) dirs[r][u] = RS[r][u];
+      surf_resp(t, F, 1, fcomp, fc, a, a, sc, 0, sdir, L, K1, ks1);
+      fd3d_elem_resp(t, gfc, RF, fcomp, a, a, gsc, nz, 3, dirs, L, K2, ks2);
+      for(r = 0; r < 3; r++){ for(l = 0; l < L; l++){ worst = fmax(worst, fabs(K2[(size_t)r*L + l] - K1[(size_t)r*L + l]));   /* surf_resp applies no slip sign to a fault source */ scale = fmax(scale, fabs(K1[(size_t)r*L + l])); } }
+    }
+    /* surface -> fault (shear along sdir, normal on F[2]) for each surface component */
+    for(c = 1; c <= 3; c++){
+      double dirs[2][3], nrm[3];
+      ROTV(sdir, dirs[0]); ROTV(F[2], dirs[1]); ROTV(F[2], nrm);
+      surf_resp(t, F, 0, c, sc, 0.5*hs, 0.5*hs, fc, 1, sdir, L, K1, ks1);
+      fd3d_elem_resp(t, gsc, RS, c, 0.5*hs, 0.5*hs, gfc, nrm, 2, dirs, L, K2, ks2);
+      for(r = 0; r < 2; r++) for(l = 0; l < L; l++){ worst = fmax(worst, fabs(K2[(size_t)r*L + l] - K1[(size_t)r*L + l])); scale = fmax(scale, fabs(K1[(size_t)r*L + l])); }
+    }
+    /* surface -> surface */
+    for(c = 1; c <= 3; c++){
+      double dirs[3][3], nz[3] = {0, 0, 1};
+      for(r = 0; r < 3; r++) for(u = 0; u < 3; u++) dirs[r][u] = RS[r][u];
+      surf_resp(t, F, 0, c, sc, 0.5*hs, 0.5*hs, sc2, 0, sdir, L, K1, ks1);
+      fd3d_elem_resp(t, gsc, RS, c, 0.5*hs, 0.5*hs, gsc2, nz, 3, dirs, L, K2, ks2);
+      for(r = 0; r < 3; r++) for(l = 0; l < L; l++){ worst = fmax(worst, fabs(K2[(size_t)r*L + l] - K1[(size_t)r*L + l])); scale = fmax(scale, fabs(K1[(size_t)r*L + l])); }
+    }
+  }
+#undef ROTV
+  free(K1); free(K2);
+  return scale > 0.0 ? worst/scale : -1.0;
+}

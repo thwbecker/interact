@@ -275,4 +275,8 @@ struct fd3d_msurf *fd3d_msurf_create(int nf, struct fd3d **f, const double *ytop
                                      const double *yc, const double *wy, int L);
 void fd3d_msurf_free(struct fd3d_msurf *s);
 int fd3d_msurf_step(struct fd3d_msurf *s, double **load);
+/* H6 (fd_plan.md): generic response of a receiver to a source rectangle in global frames, and its frame check */
+void fd3d_elem_resp(const struct fd3d_tab *t, const double c[3], double R[3][3], int comp, double a1, double a2,
+                    const double X[3], const double n[3], int nr, double dirs[][3], int L, double *K, double *ks);
+double fd3d_h6_frame_check(const struct fd3d_tab *t, double dip_deg, int fcomp, double fsign, double strike_deg, double hs);
 #endif
