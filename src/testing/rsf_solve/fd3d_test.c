@@ -719,6 +719,15 @@ static int main0(int argc, char **argv)
   if(argc >= 3 && !strcmp(argv[1], "q2d")) return run_q2d(argv[2]);
   if(argc >= 2 && !strcmp(argv[1], "pair")) return run_pair(argc > 2 ? atoi(argv[2]) : 0);
   if(argc >= 2 && !strcmp(argv[1], "multipair")) return run_multi_pair();
+  if(argc >= 2 && !strcmp(argv[1], "h6step")){
+    int ns = argc > 2 ? atoi(argv[2]) : 12, which = argc > 3 ? atoi(argv[3]) : -1;
+    double e1 = (which < 0 || which == 0) ? fd3d_h6_step_check(ns, 0, 0.0, 1) : 0.0;
+    double e2 = (which < 0 || which == 1) ? fd3d_h6_step_check(ns, 1, 0.0, 1) : 0.0;
+    double e3 = (which < 0 || which == 2) ? fd3d_h6_step_check(ns, 1, 37.0, 1) : 0.0;
+    int fl = !(e1 >= 0.0 && e1 < 1e-8) || !(e2 >= 0.0 && e2 < 1e-8) || !(e3 >= 0.0 && e3 < 1e-6);
+    printf("fd3d_test h6step: %s\n", fl ? "FAIL" : "PASS");
+    return fl;
+  }
   if(argc >= 2 && !strcmp(argv[1], "h6strips")){
     int fl = fd3d_h6_strips_check(1);
     printf("fd3d_test h6strips: %s\n", fl ? "FAIL" : "PASS");

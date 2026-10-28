@@ -2450,10 +2450,26 @@ dense strip-to-strip and fault-to-strip entries equal surf_resp in the common fr
 5.8e-11 relative; (c) a rigid rotation of everything by 37 degrees and a shift changes the
 dense tables and masks by 1.3e-9 relative (rotation round-off near the trace; tolerance
 1e-8).
-Next: step 3, the coupled step (known parts from the Toeplitz and dense tables, the faults'
-local solves and a joint GMRES solve of all strips' zero traction over the active cells,
-Anderson-accelerated) and check (1): with a shared strike it must reproduce the
-several-fault surface of G3b.
+Step 3 (done): fd3d_strips_step. Known parts: each strip from its own Toeplitz tables (its
+history and its fault's), the other faults and strips through the dense tables (real-space
+rings of the pushed slices per fault and strip); each fault from its own strip (Toeplitz),
+the other strips (dense) and the other faults (the G1 tables, created in global frames in
+fd3d_strips_create); then the faults' local solves and one joint GMRES solve of all strips'
+zero traction (masked cells held at zero), preconditioned per strip with the H4 circulant
+blocks, in an Anderson-accelerated outer loop; exact statics as in G3b when given.
+Check (1) (fd3d_test h6step [steps] [case]; a short version in run_tests.sh): two faults
+sharing a strike (4 x 2 squares of 1 km, dips 60 and 75 degrees, slip signs +1 and -1, traces
+3 km apart), partitioned strips of 250 m on the common lattice (24 x 16 cells each) against
+the several-fault surface of G3b on the same cells, 12 steps: prescribed slip 6.3e-8 Pa of
+1.7e7 Pa (3.6e-15 relative) in the fault tractions, rates identical; prescribed for 5 steps
+then slip weakening (the rupture runs at up to 20 m/s): 2.9e-5 Pa of 1.0e8 Pa (2.8e-13), rates
+to 1.2e-11 m/s; the same configuration rigidly rotated by 37 degrees (strips in rotated
+frames, G3b unrotated): the same agreement. Iterations per step: 2 outer, 18 GMRES
+(prescribed); 21 outer, 163 GMRES (slip weakening). The dense strip tables scale as
+(3 ns)^2 L, so this check uses small strips (an earlier version with 28 rows and 30 lags
+did not finish in 250 s).
+Next: step 4, two faults of different strikes: resolution study (strips of 500 and 333 m) for
+the error where strips meet, then jump outcomes and rsf_solve integration.
 
 ### WP7, C implementation in rsf_solve: status (2026-10-18)
 Done, each verified in the sandbox before delivery (details in

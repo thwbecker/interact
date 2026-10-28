@@ -299,11 +299,19 @@ struct fd3d_strips {
   double *xg[FD3D_MULTI_MAX];                   /* global centres of the strip cells (3 per cell) */
   double *fg[FD3D_MULTI_MAX];                   /* global centres of the fault cells (3 per cell) */
   struct fd3d_dtab fs[FD3D_MULTI_MAX][FD3D_MULTI_MAX], sf[FD3D_MULTI_MAX][FD3D_MULTI_MAX], ss[FD3D_MULTI_MAX][FD3D_MULTI_MAX];
+  struct fd3d_multi *mx;                        /* fault <-> fault (dense, whole space; G1), nf > 1 */
+  int Lb; long hk;                              /* real-space rings of the pushed slices (the dense couplings' history) */
+  double *sring[FD3D_MULTI_MAX], *fring[FD3D_MULTI_MAX];
+  int last_iters, n_steps, n_outer, n_inner;
+  void (*static_n_fn)(void *ctx, int k, double **delta, double *out);   /* exact static normal traction of fault k (optional) */
+  void *static_n_ctx;
 };
+int fd3d_strips_step(struct fd3d_strips *s, double **load);
 struct fd3d_strips *fd3d_strips_create(int nf, struct fd3d **f, const double *th_deg, const double (*O)[3],
                                        const double *x0f, const double *ytop, const double *ztop, const double *dip_deg,
                                        const double *fsign, int fcomp, int m, const int *nxs, const int *nys,
                                        const double *xs0, const double **yc, const double **wy, int L);
 void fd3d_strips_free(struct fd3d_strips *s);
 int fd3d_h6_strips_check(int verbose);
+double fd3d_h6_step_check(int nsteps, int sw, double th_deg, int verbose);
 #endif
