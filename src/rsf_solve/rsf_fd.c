@@ -571,6 +571,20 @@ static PetscErrorCode fd3d_setup_msurf(struct interact_ctx *par, struct fd_vars 
     nys = (int)ceil((yhi + mg*dx - ys)/hx); nxs = (nx + 2*mg)*m;
     yc = malloc(sizeof(double)*nys); wy = malloc(sizeof(double)*nys);
     for(i = 0;i < nys;i++){ yc[i] = ys + (i + 0.5)*hx; wy[i] = hx; }
+    if(getenv("FD_SURF_BAND")){
+      /* experiment (fd_plan.md H3): the surface only within a band around any fault's trace;
+         all couplings of the remaining rows are kept (a smaller but consistent system) */
+      double band = atof(getenv("FD_SURF_BAND"));
+      int k2 = 0, kept;
+      for(i = 0;i < nys;i++){
+        int near = 0;
+        for(p = 0;p < np;p++) if(fabs(yc[i] - ytop[p]) <= band) near = 1;
+        if(near){ yc[k2] = yc[i]; wy[k2] = wy[i]; k2++; }
+      }
+      kept = k2;
+      PetscCall(PetscPrintf(PETSC_COMM_WORLD,"rsf_fd_setup: FD_SURF_BAND %g m: %d of %d surface rows kept\n",band,kept,nys));
+      nys = kept;
+    }
     for(p = 0;p < np;p++) zmax = fmax(zmax, -(ztop[p] - nz[p]*dx*u[p][1]));
     Lsf = (int)ceil(sqrt(pow((nx + 2*mg)*dx, 2) + pow(yhi - ylo + 2*mg*dx, 2) + zmax*zmax)/(fd->beta*fd->dt_min)) + 2;
     fd->msurf3 = fd3d_msurf_create(np,fp,ytop,ztop,dipd,fsg,comp,xmin - 0.5*dx,m,nxs,nys,xmin - 0.5*dx - mg*dx,yc,wy,Lsf);

@@ -154,6 +154,7 @@ struct fd3d_layer {
   double _Complex *T2[5][3];                     /* surface-surface: (0,0) (0,1) (1,0) (1,1) (2,2); [W lags | Ks | K1]; [k][q'][q] */
   double *yc, *wy, *self_c;                      /* row centres and widths; first-lag self coefficients [comp][row] */
   int k0, nk, mpi_size;                          /* MPI: this rank's along-strike wavenumbers of the surface tables */
+  double _Complex *pre_lu; int *pre_piv;        /* the surface solve's preconditioner: LU of the first-lag blocks per own wavenumber */
 #ifdef FD3D_MPI
   MPI_Comm comm;
 #endif

@@ -1774,7 +1774,7 @@ static void surf_free(struct fd3d_layer *ly)
   for(r = 0; r < 3; r++) for(s = 0; s < 3; s++) free(ly->Tfs[r][s]);
   for(r = 0; r < 2; r++) for(c = 0; c < 3; c++) for(s = 0; s < 3; s++) free(ly->Tsf[r][c][s]);
   free(ly->V3); free(ly->Vold3); free(ly->delta3); free(ly->H3); free(ly->hsx3);
-  free(ly->yc); free(ly->wy); free(ly->self_c); free(ly->hfx); free(ly->sig0); free(ly->tn);
+  free(ly->yc); free(ly->wy); free(ly->self_c); free(ly->pre_lu); free(ly->pre_piv); free(ly->hfx); free(ly->sig0); free(ly->tn);
   fd_fft_plan_destroy(ly->pf); fd_fft_plan_destroy(ly->pb);
   fd_fft_plan_destroy(ly->pf2x); fd_fft_plan_destroy(ly->pb2x); fd_fft_plan_destroy(ly->pf2y); fd_fft_plan_destroy(ly->pb2y);
   free(ly);
@@ -1814,6 +1814,145 @@ static void surf_apply_rows(const struct fd3d_layer *ly, int slot_kind, int lag,
   }
 }
 
+
+/* ---- the surface's zero-traction solve (fd_plan.md H4) ----
+   A v = hw IFFT_x( T2(first lag) FFT_x(v) ) - (nl) Es/2 v = rhs over the surface cells (3
+   components). Damped Jacobi needed hundreds of sweeps where the surface edge is near the
+   faults (H3). Instead: GMRES, right-preconditioned by the circulant approximation of A (the
+   along-strike convolution taken periodic on the FFT length), whose blocks per wavenumber
+   (3 nys x 3 nys) are factorised once; FD_SURF_JACOBI=1 restores the old iteration. */
+extern void zgetrf_(int *m, int *n, double _Complex *a, int *lda, int *ipiv, int *info);
+extern void zgetrs_(char *tr, int *n, int *nrhs, double _Complex *a, int *lda, int *ipiv, double _Complex *b, int *ldb, int *info);
+static void surf_A(struct fd3d_layer *ly, int nl, double hw, const double Es[3], const double *v, double *out, double _Complex *S3, double _Complex *P3)
+{
+  int ns = ly->ns, nys = ly->nys, c, i; size_t Q = (size_t)ly->Mh*nys;
+  for(c = 0; c < 3; c++) layer_rows_hat(ly, v + (size_t)c*ns, S3 + (size_t)c*Q);
+  memset(P3, 0, sizeof(double _Complex)*3*Q);
+  surf_apply_rows(ly, 2, 0, S3, 1.0, P3);
+  surf_reduce(ly, P3, 3*Q);
+  memset(out, 0, sizeof(double)*3*ns);
+  for(c = 0; c < 3; c++){
+    lx_inv(ly, nys, P3 + (size_t)c*Q, ly->nxs, 1, hw, out + (size_t)c*ns);
+    if(nl) for(i = 0; i < ns; i++) out[(size_t)c*ns + i] -= 0.5*Es[c]*v[(size_t)c*ns + i];
+  }
+}
+static void surf_precond_setup(struct fd3d_layer *ly, int nl, double hw, const double Es[3])
+{
+  static const int pr[5] = {0, 0, 1, 1, 2}, ps[5] = {0, 1, 0, 1, 2};
+  int nys = ly->nys, n = 3*nys, k, p, qr, qs, info, c;
+  size_t nss = (size_t)nys*nys;
+  if(ly->pre_lu) return;
+  ly->pre_lu = malloc(sizeof(double _Complex)*(size_t)(ly->nk > 0 ? ly->nk : 1)*n*n);
+  ly->pre_piv = malloc(sizeof(int)*(size_t)(ly->nk > 0 ? ly->nk : 1)*n);
+  for(k = 0; k < ly->nk; k++){
+    double _Complex *M = ly->pre_lu + (size_t)k*n*n;
+    memset(M, 0, sizeof(double _Complex)*n*n);
+    for(p = 0; p < 5; p++){
+      const double _Complex *T = ly->T2[p][2] + (size_t)k*nss;
+      for(qr = 0; qr < nys; qr++) for(qs = 0; qs < nys; qs++)
+        M[(size_t)(ps[p]*nys + qs)*n + (pr[p]*nys + qr)] += hw*T[(size_t)qr*nys + qs];    /* column major: row pr*nys+qr, column ps*nys+qs */
+    }
+    if(nl) for(c = 0; c < 3; c++) for(qr = 0; qr < nys; qr++) M[(size_t)(c*nys + qr)*n + (c*nys + qr)] -= 0.5*Es[c];
+    zgetrf_(&n, &n, M, &n, ly->pre_piv + (size_t)k*n, &info);
+  }
+}
+static void surf_precond(struct fd3d_layer *ly, const double *r, double *z, double _Complex *S3)
+{
+  int ns = ly->ns, nys = ly->nys, n = 3*nys, c, k, qr, one = 1, info; size_t Q = (size_t)ly->Mh*nys;
+  char tr = 'N';
+  double _Complex *b = malloc(sizeof(double _Complex)*n);
+  for(c = 0; c < 3; c++) layer_rows_hat(ly, r + (size_t)c*ns, S3 + (size_t)c*Q);
+  for(k = 0; k < ly->Mh; k++){
+    int own = (k >= ly->k0) && (k < ly->k0 + ly->nk);
+    if(!own){ for(c = 0; c < 3; c++) for(qr = 0; qr < nys; qr++) S3[(size_t)c*Q + (size_t)k*nys + qr] = 0.0; continue; }
+    for(c = 0; c < 3; c++) for(qr = 0; qr < nys; qr++) b[c*nys + qr] = S3[(size_t)c*Q + (size_t)k*nys + qr];
+    zgetrs_(&tr, &n, &one, ly->pre_lu + (size_t)(k - ly->k0)*n*n, &n, ly->pre_piv + (size_t)(k - ly->k0)*n, b, &n, &info);
+    for(c = 0; c < 3; c++) for(qr = 0; qr < nys; qr++) S3[(size_t)c*Q + (size_t)k*nys + qr] = b[c*nys + qr];
+  }
+  surf_reduce(ly, S3, 3*Q);
+  memset(z, 0, sizeof(double)*3*ns);
+  for(c = 0; c < 3; c++) lx_inv(ly, nys, S3 + (size_t)c*Q, ly->nxs, 1, 1.0, z + (size_t)c*ns);
+  free(b);
+}
+/* solves A V3 = rhs (V3: initial guess in, solution out); returns the number of iterations */
+static int surf_solve(struct fd3d_layer *ly, int nl, double hw, const double Es[3], const double *rhs, double *V3,
+                      double _Complex *S3, double _Complex *P3, double *tmps)
+{
+  int n = 3*ly->ns, nys = ly->nys, i, it = 0, m = 40, j, k2, restart;
+  if(getenv("FD_SURF_JACOBI")){
+    int inner, c, ns = ly->ns;
+    for(inner = 0; inner < 500; inner++){
+      double chi = 0.0, vmi = 1e-30;
+      surf_A(ly, nl, hw, Es, V3, tmps, S3, P3);
+      for(c = 0; c < 3; c++) for(i = 0; i < ns; i++){
+        size_t ii = (size_t)c*ns + i; double diag = hw*ly->self_c[(size_t)c*nys + i % nys] - (nl ? 0.5*Es[c] : 0.0);
+        double dv = (rhs[ii] - tmps[ii])/diag;
+        V3[ii] += dv; if(fabs(dv) > chi) chi = fabs(dv); if(fabs(V3[ii]) > vmi) vmi = fabs(V3[ii]);
+      }
+      if(chi <= 1e-13*vmi) break;
+    }
+    return inner + 1;
+  }
+  surf_precond_setup(ly, nl, hw, Es);
+  {
+    double *r = malloc(sizeof(double)*n), *w = malloc(sizeof(double)*n), *z = malloc(sizeof(double)*n);
+    double *Vk = malloc(sizeof(double)*(size_t)(m + 1)*n), *H = calloc((size_t)(m + 1)*m, sizeof(double));
+    double cs[64], sn[64], g[65], y[64], bnorm = 0.0, beta;
+    for(i = 0; i < n; i++) bnorm += rhs[i]*rhs[i];
+    bnorm = sqrt(bnorm);
+    if(bnorm == 0.0){ memset(V3, 0, sizeof(double)*n); free(r); free(w); free(z); free(Vk); free(H); return 0; }
+    for(restart = 0; restart < 10; restart++){
+      surf_A(ly, nl, hw, Es, V3, w, S3, P3);
+      for(i = 0; i < n; i++) r[i] = rhs[i] - w[i];
+      beta = 0.0; for(i = 0; i < n; i++) beta += r[i]*r[i];
+      beta = sqrt(beta);
+      if(beta <= 1e-13*bnorm) break;
+      for(i = 0; i < n; i++) Vk[i] = r[i]/beta;
+      memset(g, 0, sizeof(g)); g[0] = beta;
+      for(j = 0; j < m; j++){
+        double *vj = Vk + (size_t)j*n, *vn = Vk + (size_t)(j + 1)*n, hn;
+        surf_precond(ly, vj, z, S3);
+        surf_A(ly, nl, hw, Es, z, vn, S3, P3);
+        it++;
+        for(k2 = 0; k2 <= j; k2++){
+          double h = 0.0, *vk = Vk + (size_t)k2*n;
+          for(i = 0; i < n; i++) h += vn[i]*vk[i];
+          H[(size_t)k2*m + j] = h;
+          for(i = 0; i < n; i++) vn[i] -= h*vk[i];
+        }
+        hn = 0.0; for(i = 0; i < n; i++) hn += vn[i]*vn[i];
+        hn = sqrt(hn); H[(size_t)(j + 1)*m + j] = hn;
+        if(hn > 0.0) for(i = 0; i < n; i++) vn[i] /= hn;
+        for(k2 = 0; k2 < j; k2++){
+          double a1 = H[(size_t)k2*m + j], a2 = H[(size_t)(k2 + 1)*m + j];
+          H[(size_t)k2*m + j] = cs[k2]*a1 + sn[k2]*a2; H[(size_t)(k2 + 1)*m + j] = -sn[k2]*a1 + cs[k2]*a2;
+        }
+        {
+          double a1 = H[(size_t)j*m + j], a2 = H[(size_t)(j + 1)*m + j], rr = sqrt(a1*a1 + a2*a2);
+          cs[j] = rr > 0 ? a1/rr : 1.0; sn[j] = rr > 0 ? a2/rr : 0.0;
+          H[(size_t)j*m + j] = rr; H[(size_t)(j + 1)*m + j] = 0.0;
+          g[j + 1] = -sn[j]*g[j]; g[j] = cs[j]*g[j];
+        }
+        if(fabs(g[j + 1]) <= 1e-13*bnorm){ j++; break; }
+      }
+      if(j > m) j = m;
+      {
+        int jj, nj = j;
+        for(jj = nj - 1; jj >= 0; jj--){
+          double s = g[jj];
+          for(k2 = jj + 1; k2 < nj; k2++) s -= H[(size_t)jj*m + k2]*y[k2];
+          y[jj] = s/H[(size_t)jj*m + jj];
+        }
+        memset(w, 0, sizeof(double)*n);
+        for(k2 = 0; k2 < nj; k2++) for(i = 0; i < n; i++) w[i] += Vk[(size_t)k2*n + i]*y[k2];
+        surf_precond(ly, w, z, S3);
+        for(i = 0; i < n; i++) V3[i] += z[i];
+      }
+    }
+    free(r); free(w); free(z); free(Vk); free(H);
+  }
+  return it;
+}
 static int fd3d_step_surf(struct fd3d *f, const double *load)
 {
   struct fd3d_layer *ly = f->layer;
@@ -1897,25 +2036,8 @@ static int fd3d_step_surf(struct fd3d *f, const double *load)
     surf_reduce(ly, Ys, 3*Mh*nys);
     for(i = 0; i < 3*ns; i++) rhs[i] = -ly->H3[i];
     for(c = 0; c < 3; c++) lx_inv(ly, nys, Ys + (size_t)c*Mh*nys, ly->nxs, 1, -hw, rhs + (size_t)c*ns);
-    for(inner = 0; inner < 500; inner++){
-      double chi = 0.0, vmi = 1e-30;
-      for(c = 0; c < 3; c++) layer_rows_hat(ly, V3 + (size_t)c*ns, S3 + (size_t)c*Q);
-      memset(P3, 0, sizeof(double _Complex)*3*Q);
-      surf_apply_rows(ly, 2, 0, S3, 1.0, P3);
-      surf_reduce(ly, P3, 3*Q);
-      memset(tmps, 0, sizeof(double)*3*ns);
-      for(c = 0; c < 3; c++){
-        lx_inv(ly, nys, P3 + (size_t)c*Q, ly->nxs, 1, hw, tmps + (size_t)c*ns);
-        if(f->nl) for(i = 0; i < ns; i++) tmps[(size_t)c*ns + i] -= 0.5*Es[c]*V3[(size_t)c*ns + i];
-      }
-      for(c = 0; c < 3; c++) for(i = 0; i < ns; i++){
-        size_t ii = (size_t)c*ns + i; double diag = hw*ly->self_c[(size_t)c*nys + i % nys] - (f->nl ? 0.5*Es[c] : 0.0);
-        double dv = (rhs[ii] - tmps[ii])/diag;
-        V3[ii] += dv; if(fabs(dv) > chi) chi = fabs(dv); if(fabs(V3[ii]) > vmi) vmi = fabs(V3[ii]);
-      }
-      if(chi <= 1e-13*vmi) break;
-    }
-    ly->n_inner += inner + 1;
+    inner = surf_solve(ly, f->nl, hw, Es, rhs, V3, S3, P3, tmps);
+    ly->n_inner += inner;
     for(i = 0; i < 3*ns; i++){ if(fabs(V3[i] - ly->V3[i]) > ch) ch = fabs(V3[i] - ly->V3[i]); if(fabs(V3[i]) > vm) vm = fabs(V3[i]); }
     memcpy(ly->V3, V3, sizeof(double)*3*ns);
     for(i = 0; i < N; i++){ if(fabs(f->V[i] - Vp[i]) > ch) ch = fabs(f->V[i] - Vp[i]); if(fabs(f->V[i]) > vm) vm = fabs(f->V[i]); }
@@ -2578,6 +2700,10 @@ int fd3d_msurf_step(struct fd3d_msurf *s, double **load)
   /* ---- iterate faults and surface ---- */
   memcpy(V3, L0->Vold3, sizeof(double)*3*ns);
   for(k = 0; k < nf; k++) s->f[k]->thnew = thb[k];
+#define AA_M 5
+  int aa_n = 0, aa_i;
+  double *aa_dF[AA_M], *aa_dG[AA_M], *aa_f = malloc(sizeof(double)*3*L0->ns), *aa_g = malloc(sizeof(double)*3*L0->ns);
+  for(aa_i = 0; aa_i < AA_M; aa_i++){ aa_dF[aa_i] = calloc(3*L0->ns, sizeof(double)); aa_dG[aa_i] = calloc(3*L0->ns, sizeof(double)); }
   for(it = 0; it < 200; it++){
     double ch = 0.0, vm = 1e-30;
     for(k = 0; k < nf; k++){
@@ -2628,25 +2754,45 @@ int fd3d_msurf_step(struct fd3d_msurf *s, double **load)
     surf_reduce(L0, Ys, 3*Mh*nys);
     for(i = 0; i < 3*ns; i++) rhs[i] = -L0->H3[i];
     for(c = 0; c < 3; c++) lx_inv(L0, nys, Ys + (size_t)c*Mh*nys, L0->nxs, 1, -hw, rhs + (size_t)c*ns);
-    for(inner = 0; inner < 500; inner++){
-      double chi = 0.0, vmi = 1e-30;
-      for(c = 0; c < 3; c++) layer_rows_hat(L0, V3 + (size_t)c*ns, S3 + (size_t)c*Q);
-      memset(P3, 0, sizeof(double _Complex)*3*Q);
-      surf_apply_rows(L0, 2, 0, S3, 1.0, P3);
-      surf_reduce(L0, P3, 3*Q);
-      memset(tmps, 0, sizeof(double)*3*ns);
-      for(c = 0; c < 3; c++){
-        lx_inv(L0, nys, P3 + (size_t)c*Q, L0->nxs, 1, hw, tmps + (size_t)c*ns);
-        if(nl) for(i = 0; i < ns; i++) tmps[(size_t)c*ns + i] -= 0.5*Es[c]*V3[(size_t)c*ns + i];
+    inner = surf_solve(L0, nl, hw, Es, rhs, V3, S3, P3, tmps);
+    L0->n_inner += inner;
+    if(!getenv("FD_SURF_NOAA")){
+      /* Anderson acceleration of the fault-surface fixed point (fd_plan.md H4): x = the surface
+         rates fed into the fault solves, g = the surface rates that come back; with the
+         differences of the last aa_m residuals f = g - x, the next x is g - dG gamma where gamma
+         minimises |f - dF gamma| (the fixed point is unchanged; FD_SURF_NOAA=1 turns it off) */
+      int n3 = 3*ns, mm = aa_n < AA_M ? aa_n : AA_M, a, b2;
+      double *fk = malloc(sizeof(double)*n3);
+      for(i = 0; i < n3; i++) fk[i] = V3[i] - L0->V3[i];
+      if(aa_n > 0){
+        int slot = (aa_n - 1) % AA_M;                      /* differences against the previous iterate */
+        for(i = 0; i < n3; i++){ aa_dF[slot][i] = fk[i] - aa_f[i]; aa_dG[slot][i] = V3[i] - aa_g[i]; }
       }
-      for(c = 0; c < 3; c++) for(i = 0; i < ns; i++){
-        size_t ii = (size_t)c*ns + i; double diag = hw*L0->self_c[(size_t)c*nys + i % nys] - (nl ? 0.5*Es[c] : 0.0);
-        double dv = (rhs[ii] - tmps[ii])/diag;
-        V3[ii] += dv; if(fabs(dv) > chi) chi = fabs(dv); if(fabs(V3[ii]) > vmi) vmi = fabs(V3[ii]);
+      memcpy(aa_f, fk, sizeof(double)*n3); memcpy(aa_g, V3, sizeof(double)*n3);
+      if(mm > 0){
+        double A[AA_M][AA_M], rhsg[AA_M], gam[AA_M];
+        for(a = 0; a < mm; a++){
+          for(b2 = 0; b2 < mm; b2++){ double sdot = 0.0; for(i = 0; i < n3; i++) sdot += aa_dF[a][i]*aa_dF[b2][i]; A[a][b2] = sdot; }
+          { double sdot = 0.0; for(i = 0; i < n3; i++) sdot += aa_dF[a][i]*fk[i]; rhsg[a] = sdot; }
+          A[a][a] *= 1.0 + 1e-10;
+        }
+        /* small symmetric system by Gaussian elimination */
+        for(a = 0; a < mm; a++){
+          for(b2 = a + 1; b2 < mm; b2++){
+            double fct = A[a][a] != 0.0 ? A[b2][a]/A[a][a] : 0.0; int e;
+            for(e = a; e < mm; e++) A[b2][e] -= fct*A[a][e];
+            rhsg[b2] -= fct*rhsg[a];
+          }
+        }
+        for(a = mm - 1; a >= 0; a--){
+          double sdot = rhsg[a]; for(b2 = a + 1; b2 < mm; b2++) sdot -= A[a][b2]*gam[b2];
+          gam[a] = A[a][a] != 0.0 ? sdot/A[a][a] : 0.0;
+        }
+        for(a = 0; a < mm; a++) if(isfinite(gam[a])) for(i = 0; i < n3; i++) V3[i] -= gam[a]*aa_dG[a][i];
       }
-      if(chi <= 1e-13*vmi) break;
+      aa_n++;
+      free(fk);
     }
-    L0->n_inner += inner + 1;
     for(i = 0; i < 3*ns; i++){ if(fabs(V3[i] - L0->V3[i]) > ch) ch = fabs(V3[i] - L0->V3[i]); if(fabs(V3[i]) > vm) vm = fabs(V3[i]); }
     memcpy(L0->V3, V3, sizeof(double)*3*ns);
     for(k = 0; k < nf; k++) for(i = 0; i < s->f[k]->N; i++){
@@ -2655,6 +2801,9 @@ int fd3d_msurf_step(struct fd3d_msurf *s, double **load)
     }
     if(it > 0 && ch <= 1e-12*vm) break;
   }
+  for(aa_i = 0; aa_i < AA_M; aa_i++){ free(aa_dF[aa_i]); free(aa_dG[aa_i]); }
+  free(aa_f); free(aa_g);
+#undef AA_M
   L0->n_outer += it + 1; L0->n_steps++;
   if(getenv("FD_DEBUG_ITERS") && (L0->n_steps % 20 == 0)) fprintf(stderr, "fd3d_msurf_step %d: outer iterations %d (mean %.1f), inner mean %.1f\n", L0->n_steps, it + 1, (double)L0->n_outer/L0->n_steps, (double)L0->n_inner/L0->n_steps);
   s->last_iters = it + 1;

@@ -452,7 +452,7 @@ rsf_testing: $(BDIR)/test_fd_fft $(BDIR)/test_fd_dense $(BDIR)/test_fd_tables $(
 
 # 3-D extension (standalone so far): kernels, tables, marcher and its test driver
 $(BDIR)/fd3d_test: $(ODIR)/fd3d_test.o $(ODIR)/fd3d.o $(ODIR)/fd_fft.o $(GEN_P_INC)
-	$(CC) $(ODIR)/fd3d_test.o $(ODIR)/fd3d.o $(ODIR)/fd_fft.o -o $(BDIR)/fd3d_test $(FFTW_LIBS) -lm $(LDFLAGS)
+	$(CC) $(ODIR)/fd3d_test.o $(ODIR)/fd3d.o $(ODIR)/fd_fft.o -o $(BDIR)/fd3d_test $(FFTW_LIBS) $(MATHLIBS) -lm $(LDFLAGS)
 
 # explicit header dependencies of the fully dynamic sources (the generic
 # pattern rules only depend on the .c file and GEN_P_INC), so that a change

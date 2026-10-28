@@ -2324,6 +2324,62 @@ percent and the jump outcome, in this geometry. One geometry, small faults; the 
 local surface is the candidate for an efficient method (H3), to be checked on more
 geometries (different strikes need the 2-D surface grid).
 
+### General surface-breaking fault systems, H3: validating the local surface (2026-10-29)
+
+The table truncation of H2 (FD_MSURF_CUT) leaves an inconsistent system and slowed the
+surface-fault iteration by large factors (a 45/75-degree pair with cut 2 km + taper 2 km did
+not finish in 290 s against 82 s exact), so it is not a way to save time. A consistent local
+surface instead removes surface rows: FD_SURF_BAND=<m> in fd3d_setup_msurf (environment,
+experiment) keeps only the rows within that horizontal distance of any fault's trace; all
+couplings among the remaining rows are kept.
+Cases (two surface-breaking thrusts sharing a strike, 8 x 4 squares of 1 km, the second
+fault's trace 4 km behind the first's, dips as listed, seed on fault 1 unless marked, surface
+cells 250 m; band 3 km keeps 36 to 37 of 45 to 47 rows; mean slip at the end of the first
+dynamic phase, fault 1 / fault 2):
+
+| dips, seed | exact | band 3 km | jump |
+|---|---|---|---|
+| 30 / 60 | 1.704 / 2.022 m, 8.79 m/s | 1.848 / 2.174 m (+8.4, +7.5 %), 8.94 m/s | yes / yes |
+| 30 / 60, seed on fault 2 | 0.000 / 2.026, 7.47 | 0.000 / 2.028 (+0.1 %), 7.47 | no / no |
+| 60 / 30 | 2.030 / 0.000, 7.47 | 2.029 / 0.000 (-0.05 %), 7.46 | no / no |
+| 30 / 30 | 1.720 / 0.000, 8.80 | 1.887 / 0.000 (+9.7 %), 8.94 | no / no |
+| 45 / 75 | 1.957 / 2.429, 8.38 | not finished in 290 s | |
+
+So the local surface reproduced the jump outcome in all completed cases (and in H2), with
+slips within 0 to 10 percent. Its cost is not reliably lower: wall times 55 to 149 s against
+70 to 190 s exact; the phase can last longer (the traction-difference hand-back sees the
+missing far surface), and for the 45 / 75-degree pair the surface iteration converged badly:
+15 to 21 outer iterations per step and 330 to 760 inner Jacobi sweeps on average (inner cap
+500 per outer iteration), against about 6.5 / 150 for the exact runs measured in H2. The
+damped Jacobi solve of the surface's zero-traction condition is the weak point whenever the
+surface edge is close to the faults; a better surface solver (a preconditioned Krylov method
+or a direct factorisation of the surface's first-lag operator, which is fixed in time) is a
+prerequisite for any production method built on a local or general surface, and would help
+the exact surface as well.
+
+### General surface-breaking fault systems, H4: solvers for the surface (2026-10-29)
+
+1. The surface's zero-traction solve (fd3d.c, surf_solve, used by the one-fault and the
+   several-fault surface steps) is now GMRES(40), right-preconditioned by the circulant
+   approximation of the surface's first-lag operator (the along-strike convolution taken
+   periodic on the FFT length): its 3 nys x 3 nys blocks, one per along-strike wavenumber,
+   are LU-factorised once (zgetrf; each rank its own wavenumbers) and applied with one FFT
+   pair. Tolerance 1e-13 of the right-hand side. FD_SURF_JACOBI=1 restores the damped
+   Jacobi sweeps. fd3d_test now links LAPACK ($(MATHLIBS)).
+2. The several-fault surface step's outer fixed point (faults' local solves, then the
+   surface) is Anderson-accelerated (depth 5) on the surface rates; FD_SURF_NOAA=1 turns it
+   off. The fixed point itself is unchanged.
+Checks: fd3d_test surf against the prototype unchanged (9.6e-5 of 1.6e7 Pa); the large
+surface-breaking thrust (G4, footprint + 2 km): station rates equal to the Jacobi run to
+1e-12 m/s, inner iterations per step 17 instead of 187, wall 21.6 s instead of 30.2 s; the
+45 / 75-degree pair of H3: exact run identical (1.9566 / 2.4288 m, 8.379 m/s) in 62 s
+instead of 82 s (5 outer, 11 inner iterations per step); with the 3 km band, which had not
+finished in 290 s, now 100 s: 2.015 / 2.513 m (+3.0, +3.5 % against exact), 8.44 m/s
+(+0.7 %), both faults rupture as in the exact run. With GMRES alone that case still hit the
+cap of 200 outer iterations; the acceleration brought it to 17 on average.
+So in H3's validation set the local surface now reproduces the jump outcome in all five
+dip combinations, with slips within 0 to 10 percent.
+
 ### WP7, C implementation in rsf_solve: status (2026-10-18)
 Done, each verified in the sandbox before delivery (details in
 fd_c_design.md sections 6 to 10, usage in rsf_solve_fd.md):
