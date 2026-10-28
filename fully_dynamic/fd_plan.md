@@ -2380,6 +2380,37 @@ cap of 200 outer iterations; the acceleration brought it to 17 on average.
 So in H3's validation set the local surface now reproduces the jump outcome in all five
 dip combinations, with slips within 0 to 10 percent.
 
+### General surface-breaking fault systems, H5: surface layouts for different strikes (2026-10-30)
+
+fully_dynamic/h_gates/strips.py: a small dense time-domain integral solver in Python (first
+order, piecewise-constant rates, squares, tada_quad.rect_ramp_stress) with two thrusts
+dipping 60 degrees (4 x 2 squares of 2 km, prescribed slip rate 1 m/s for 5 steps, the second
+fault's strike turned by an angle, its trace 3 km from the first at one end) and a virtual
+surface of 500 m cells (three slip components, zero traction solved at every step; cT dt/hs
+= 2) within 2.5 km of the traces. Layouts, compared by the traction histories on the faults
+(largest difference as a fraction of the reference's largest traction):
+
+| layout | 0 degrees | 30 degrees | 60 degrees |
+|---|---|---|---|
+| per-fault strips aligned with each trace, each cell kept for the nearest trace | 0.000 | 0.44 | 0.45 |
+| the same strips overlapping (surface counted twice) | unstable (nan) | 3.7 | unstable (1e15) |
+| no surface | 0.55 | 0.65 | 0.48 |
+
+(reference: one uniform x-y grid over the union of the bands). For one fault alone, turned
+30 degrees (SINGLE=1), the trace-aligned strip and the x-y grid differ by 0.47: since a rigid
+rotation does not change the physics, the aligned strip is the configuration validated
+before (trace on a cell boundary), so the error is the x-y grid's, whose cells straddle the
+oblique trace. The 0.44 to 0.45 of the two-fault cases are therefore mostly the reference's
+own error, not the partition's. Conclusions: (i) the surface must follow each trace (a
+uniform 2-D surface grid, option B, is poor for surface-breaking faults of varying strike
+unless refined far beyond the strips); (ii) overlapping strips are wrong or unstable; (iii)
+the partitioned strips are exact when the strikes agree (identical cells); their error
+where strips of different strikes meet (rotated cells, small gaps and overlaps along the
+boundary) is not yet measured: it needs a convergence study, too slow in the dense Python
+prototype (3 to 5 minutes per layout at 500 m), planned in C (H6: per-fault strips with
+their own strike in the several-fault surface, partitioned by the nearest trace, with dense
+coupling across the partition boundary).
+
 ### WP7, C implementation in rsf_solve: status (2026-10-18)
 Done, each verified in the sandbox before delivery (details in
 fd_c_design.md sections 6 to 10, usage in rsf_solve_fd.md):
