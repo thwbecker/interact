@@ -909,6 +909,154 @@ static void run_sw_setup(struct fd3d *f, int nzp, double i0, double dx, int nxal
     f->tau0[i] = (fabs(xc) <= 1500.0 && fabs(zc) <= 1500.0) ? 81.6e6 : 70e6;
   }
 }
+/* TPV14 / TPV15 (SCEC branched-fault benchmarks, Barall 2011): vertical strike-slip main fault
+   from x = -16 to +12 km, 15 km deep; vertical branch from the junction at x = 0, 12 km long,
+   turned 30 degrees towards -y (the "near side"); half space by free-surface images (G3a);
+   linear slip weakening (mu_s 0.677, mu_d 0.525, d0 0.4 m), normal stress 120 MPa with normal
+   stress changes from the other fault; 3 x 3 km nucleation at x = -8 km, 7.5 km depth.
+   TPV14: right-lateral, 70 MPa on both faults; TPV15: left-lateral, 70 MPa on the main fault and
+   78 MPa on the branch. Frames: main e1 = x, e2 = z, e3 = -y; branch e1 = (cos 30, -sin 30, 0),
+   e2 = z, e3 = e1 x e2; slip along e1 of the +e3 side, so right-lateral is negative here.
+   gap = 1: the branch starts one cell from the junction (the benchmark's split-node rule).
+   Writes tpv14_rt_main.dat and tpv14_rt_branch.dat (x along strike, depth, rupture time,
+   final slip) and prints the ruptured fractions. */
+static void tpv14_frame(double az_deg, double E[3][3])
+{
+  double a;
+  a = az_deg*M_PI/180.0;
+  E[0][0] = cos(a);
+  E[0][1] = sin(a);
+  E[0][2] = 0.0;
+  E[1][0] = 0.0;
+  E[1][1] = 0.0;
+  E[1][2] = 1.0;
+  E[2][0] = E[0][1]*E[1][2] - E[0][2]*E[1][1];
+  E[2][1] = E[0][2]*E[1][0] - E[0][0]*E[1][2];
+  E[2][2] = E[0][0]*E[1][1] - E[0][1]*E[1][0];
+}
+static void tpv14_friction(struct fd3d *f, int nx, int nz, double dx, double tau, double tnuc, double x0)
+{
+  int i, j;
+  double xc, zc;
+  f->law = 0;
+  f->mu_s = 0.677;
+  f->mu_d = 0.525;
+  f->d0 = 0.40;
+  f->nl = 1;
+  for(i = 0; i < nx; i++)
+    for(j = 0; j < nz; j++){
+      xc = x0 + (i + 0.5)*dx;
+      zc = (j + 0.5)*dx;
+      f->sigma[i*nz + j] = 120e6;
+      f->tau0[i*nz + j] = tau;
+      if(tnuc != 0.0 && fabs(xc + 8000.0) <= 1500.0 && fabs(zc - 7500.0) <= 1500.0)
+        f->tau0[i*nz + j] = tnuc;
+    }
+}
+static int run_tpv14(double dx, int which, double tend, int gap)
+{
+  double cL, cT, rho, dt, sgn, tau_b, x0b, tnmax, vthr;
+  double *rt[2], *slip[2];
+  int nxm, nxb, nz, ns, n, p, i, j, nx[2], nrup[2], nrup_beyond;
+  struct fd3d_tab *tm, *tb;
+  struct fd3d *fa[2];
+  struct fd3d_mplane g[2];
+  struct fd3d_multi *m;
+  FILE *out;
+  char fn[64];
+
+  cL = 6000.0;
+  cT = 3464.0;
+  rho = 2670.0;
+  dt = 0.5*dx/cT;
+  ns = (int)(tend/dt + 0.5);
+  nz = (int)(15000.0/dx + 0.5);
+  nxm = (int)(28000.0/dx + 0.5);
+  x0b = gap ? dx : 0.0;
+  nxb = (int)((12000.0 - x0b)/dx + 0.5);
+  nx[0] = nxm;
+  nx[1] = nxb;
+  sgn = (which == 15) ? 1.0 : -1.0;              /* right-lateral (TPV14) is negative slip here */
+  tau_b = (which == 15) ? 78e6 : 70e6;
+  vthr = 1e-3;
+  tm = fd3d_tab_create_c(nxm, 2*nz, dx, dt, cL, cT, rho, 0, 1);
+  tb = fd3d_tab_create_c(nxb, 2*nz, dx, dt, cL, cT, rho, 0, 1);
+  fa[0] = fd3d_create2(tm, nz, 1);
+  fa[1] = fd3d_create2(tb, nz, 1);
+  tpv14_friction(fa[0], nxm, nz, dx, sgn*70e6, sgn*81.6e6, -16000.0);
+  tpv14_friction(fa[1], nxb, nz, dx, sgn*tau_b, 0.0, 0.0);
+  memset(g, 0, sizeof(g));
+  for(p = 0; p < 2; p++){
+    g[p].dx = dx;
+    g[p].comp = 1;
+    g[p].mirror = 1;
+  }
+  tpv14_frame(0.0, g[0].E);
+  g[0].O[0] = -16000.0;
+  tpv14_frame(-30.0, g[1].E);
+  for(i = 0; i < 3; i++)
+    g[1].O[i] = x0b*g[1].E[0][i];
+  m = fd3d_multi_create(2, fa, g);
+  if(!m){
+    fprintf(stderr, "tpv14: setup failed\n");
+    return 1;
+  }
+  m->normal_coupling = 1;
+  for(p = 0; p < 2; p++){
+    rt[p] = malloc(sizeof(double)*fa[p]->N);
+    slip[p] = calloc(fa[p]->N, sizeof(double));
+    for(i = 0; i < fa[p]->N; i++){
+      m->sig0[p][i] = 120e6;
+      rt[p][i] = -1.0;
+    }
+  }
+  fprintf(stderr, "tpv%d: dx %g m, main %d x %d, branch %d x %d cells, %d steps of %.4f s, cross windows %d / %d lags\n",
+          which, dx, nxm, nz, nxb, nz, ns, dt, m->c[0][1].L, m->c[1][0].L);
+  tnmax = 0.0;
+  for(n = 0; n < ns; n++){
+    fd3d_multi_step(m, NULL);
+    for(p = 0; p < 2; p++)
+      for(i = 0; i < fa[p]->N; i++){
+        slip[p][i] += fa[p]->V[i]*dt;
+        if(rt[p][i] < 0.0 && fabs(fa[p]->V[i]) > vthr)
+          rt[p][i] = (n + 1)*dt;
+      }
+    /* normal traction change on the branch's first column before it slips (unclamping > 0) */
+    for(j = 0; j < nz; j++)
+      if(rt[1][j] < 0.0 && m->tn[1][j] > tnmax)
+        tnmax = m->tn[1][j];
+  }
+  for(p = 0; p < 2; p++){
+    nrup[p] = 0;
+    for(i = 0; i < fa[p]->N; i++)
+      if(rt[p][i] >= 0.0)
+        nrup[p]++;
+  }
+  nrup_beyond = 0;
+  for(i = 0; i < fa[0]->N; i++)
+    if(rt[0][i] >= 0.0 && (-16000.0 + (i/nz + 0.5)*dx) > 0.0)
+      nrup_beyond++;
+  printf("tpv%d: dx %g m, %g s: main fault ruptured %.0f %% (beyond the junction %.0f %%), branch %.0f %%; largest unclamping of the branch's first column before it slips %.2f MPa\n",
+         which, dx, tend, 100.0*nrup[0]/fa[0]->N, 100.0*nrup_beyond/(double)((nxm - (int)(16000.0/dx + 0.5))*nz),
+         100.0*nrup[1]/fa[1]->N, tnmax/1e6);
+  for(p = 0; p < 2; p++){
+    sprintf(fn, "tpv%d_rt_%s.dat", which, p ? "branch" : "main");
+    out = fopen(fn, "w");
+    for(i = 0; i < nx[p]; i++)
+      for(j = 0; j < nz; j++)
+        fprintf(out, "%g %g %g %g\n", (p ? x0b : -16000.0) + (i + 0.5)*dx, (j + 0.5)*dx, rt[p][i*nz + j], slip[p][i*nz + j]);
+    fclose(out);
+    free(rt[p]);
+    free(slip[p]);
+  }
+  fd3d_multi_free(m);
+  for(p = 0; p < 2; p++)
+    fd3d_free(fa[p]);
+  fd3d_tab_free(tm);
+  fd3d_tab_free(tb);
+  return 0;
+}
+
 static int run_multi(double ang, double dip, double tend, int comp, int mir)
 {
   double cL = 6000, cT = 3464, rho = 2670, dx = 500.0, dt = 0.5*dx/cT, i0 = 6.5*dx, emax = 0, smax = 0;
@@ -1393,6 +1541,8 @@ static int main0(int argc, char **argv)
     free(t2);
     return 0;
   }
+  if(argc >= 3 && !strcmp(argv[1], "tpv14"))
+    return run_tpv14(atof(argv[2]), argc > 3 ? atoi(argv[3]) : 14, argc > 4 ? atof(argv[4]) : 12.0, argc > 5 ? atoi(argv[5]) : 0);
   if(argc >= 2 && !strcmp(argv[1], "h6strips")){
     fl_2 = fd3d_h6_strips_check(1);
     printf("fd3d_test h6strips: %s\n", fl_2 ? "FAIL" : "PASS");

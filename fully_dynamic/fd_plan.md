@@ -2502,6 +2502,41 @@ resolution (dx/6), whose dense strip tables (about 2.3 GB per pair here) exceed 
 Next: dx/6 on a larger machine, or dense coupling restricted to cells near the partition
 boundary; then jump outcomes and rsf_solve integration.
 
+### TPV14 / TPV15 branched-fault benchmarks, first runs with images (2026-10-29)
+
+fd3d_test tpv14 <dx> [14|15] [t_end] [gap] (run_tpv14): SCEC TPV14/15 (Barall, SCEC workshop
+2011): vertical strike-slip main fault from -16 to +12 km along strike, 15 km deep; vertical
+branch from the junction at x = 0, 12 km long, turned 30 degrees to the "near side" (-y); half
+space by free-surface images (G3a, both faults vertical); linear slip weakening (mu_s 0.677,
+mu_d 0.525, d0 0.4 m), normal stress 120 MPa with normal-stress changes; 3 x 3 km nucleation
+at x = -8 km, 7.5 km depth (81.6 MPa). TPV14: right-lateral, 70 MPa on both faults; TPV15:
+left-lateral, 70 MPa on the main fault, 78 MPa on the branch. In the marcher frames right-lateral
+is negative slip; the sign is confirmed by the branch being unclamped (by 3.6 to 5.6 MPa near
+the junction before it slips) in TPV14, as expected on the extensional side, and hardly
+(0.4 to 0.6 MPa) in TPV15. gap = 1 starts the branch one cell from the junction (the
+benchmark's rule: zero branch slip at the junction). Outputs tpv1x_rt_main.dat and
+tpv1x_rt_branch.dat (along strike, depth, rupture time at 1 mm/s, final slip).
+Expected outcomes (Barall): TPV14 the main fault ruptures completely, the branch partially;
+TPV15 the main-fault rupture stops past the junction, the branch ruptures completely.
+Results (the benchmark asks for 100 m; the dense cross tables limit the sandbox to 750 m):
+
+| case | dx | main fault ruptured (beyond junction) | branch ruptured |
+|---|---|---|---|
+| TPV14 | 1 km | 100 % (100 %) | 100 % |
+| TPV14, gap | 1 km | 100 % (100 %) | 0 % |
+| TPV14 | 750 m, 18 s | 100 % (100 %) | 100 % |
+| TPV15 | 1 km | 57 % (0 %) | 100 % |
+| TPV15 | 750 m | 59 % (5 %) | 100 % |
+
+TPV15 reproduces the expected outcome at both resolutions. In TPV14 the main fault completes,
+as expected, but the branch ruptures completely (partially expected), and the outcome at 1 km
+depends on the junction treatment (gap 0 or 1): at 7 to 10 cells per process zone short of the
+benchmark's resolution this is not yet a test. Finer runs are limited by memory: the dense
+main-branch cross tables (receiver x source x lags, shear and normal, both directions) need
+about 10 GB at 500 m and of the order of 100 GB at 250 m; the domain partitioning of gate 2
+(about 15 numbers per pair and component instead of 130 to 540 lags) is needed before a
+benchmark-resolution comparison, and is next on the list for that reason.
+
 ### WP7, C implementation in rsf_solve: status (2026-10-18)
 Done, each verified in the sandbox before delivery (details in
 fd_c_design.md sections 6 to 10, usage in rsf_solve_fd.md):
