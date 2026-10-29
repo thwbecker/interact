@@ -2499,8 +2499,28 @@ traction over the run):
 So the turned strips are stable and their resolution sensitivity grows with the angle, from
 6.5 to 27 percent in shear between 333 and 250 m cells; whether this converges needs a third
 resolution (dx/6), whose dense strip tables (about 2.3 GB per pair here) exceed the sandbox.
-Next: dx/6 on a larger machine, or dense coupling restricted to cells near the partition
-boundary; then jump outcomes and rsf_solve integration.
+Third resolution (dx/6, run on a larger machine) and a correction: the turns +30 and +60
+degrees bring the second fault towards the first; at +60 its trace crosses the first fault's
+(smallest distance between cell centres 328 m, at +30 893 m), so those numbers measure faults
+touching, not strips meeting (the largest differences sit in the top-row cells at the
+crossing). fd3d_h6_strike_run now reports the smallest distance between the two faults' cells
+and refuses set-ups closer than 1.5 cells; fd3d_test h6strike prints where (fault, cell, step)
+the largest differences are. Turns away from the first fault (smallest distance 2.7 to 2.9 km):
+
+| turn | dx/3 vs dx/4, shear | dx/4 vs dx/6, shear | dx/3 vs dx/4, normal | dx/4 vs dx/6, normal |
+|---|---|---|---|---|
+| 0 degrees | 6.5 % | 2.8 % | 15 % | 4.8 % |
+| -30 degrees | 4.3 % | 1.5 % | 21 % | 4.0 % |
+| -60 degrees | 5.4 % | 1.4 % | 26 % | 3.6 % |
+| +30 (893 m apart) | 11.6 % | 8.9 % | 27 % | 19 % |
+| +60 (crossing) | 27 % | 10.5 % | 23 % | 33 % |
+
+So strips of different strikes, partitioned by the nearest trace with overlapping cells
+trimmed, converge as well as strips of a shared strike (the differences fall by 3 to 4 in
+shear and 4 to 7 in normal traction from dx/3-dx/4 to dx/4-dx/6), and at dx/4 are within a few
+percent. Faults that come within a cell of each other, or meet (branches), need their own
+treatment of the shared edge (as the junction in TPV14).
+Next: rsf_solve integration of the strips and the domain partitioning of the dense tables.
 
 ### TPV14 / TPV15 branched-fault benchmarks, first runs with images (2026-10-29)
 
@@ -2528,6 +2548,10 @@ Results (the benchmark asks for 100 m; the dense cross tables limit the sandbox 
 | TPV15 | 1 km | 57 % (0 %) | 100 % |
 | TPV15 | 750 m | 59 % (5 %) | 100 % |
 
+At 500 m (run on a larger machine): TPV14 with the branch touching the junction: main 100 %,
+branch 100 %; with the branch starting one cell (500 m) away: main 100 %, branch 0 % (largest
+unclamping of its first column 6.9 MPa). gap is now given in metres (the benchmark's split-node
+rule corresponds to about 100 m) instead of cells.
 TPV15 reproduces the expected outcome at both resolutions. In TPV14 the main fault completes,
 as expected, but the branch ruptures completely (partially expected), and the outcome at 1 km
 depends on the junction treatment (gap 0 or 1): at 7 to 10 cells per process zone short of the

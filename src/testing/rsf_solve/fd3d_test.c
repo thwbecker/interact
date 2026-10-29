@@ -917,7 +917,8 @@ static void run_sw_setup(struct fd3d *f, int nzp, double i0, double dx, int nxal
    TPV14: right-lateral, 70 MPa on both faults; TPV15: left-lateral, 70 MPa on the main fault and
    78 MPa on the branch. Frames: main e1 = x, e2 = z, e3 = -y; branch e1 = (cos 30, -sin 30, 0),
    e2 = z, e3 = e1 x e2; slip along e1 of the +e3 side, so right-lateral is negative here.
-   gap = 1: the branch starts one cell from the junction (the benchmark's split-node rule).
+   gap: distance in m from the junction to the start of the branch (0: touching; the benchmark's
+   split-node rule corresponds to one 100 m element; earlier versions took 1 for one cell).
    Writes tpv14_rt_main.dat and tpv14_rt_branch.dat (x along strike, depth, rupture time,
    final slip) and prints the ruptured fractions. */
 static void tpv14_frame(double az_deg, double E[3][3])
@@ -953,7 +954,7 @@ static void tpv14_friction(struct fd3d *f, int nx, int nz, double dx, double tau
         f->tau0[i*nz + j] = tnuc;
     }
 }
-static int run_tpv14(double dx, int which, double tend, int gap)
+static int run_tpv14(double dx, int which, double tend, double gap)
 {
   double cL, cT, rho, dt, sgn, tau_b, x0b, tnmax, vthr;
   double *rt[2], *slip[2];
@@ -972,7 +973,7 @@ static int run_tpv14(double dx, int which, double tend, int gap)
   ns = (int)(tend/dt + 0.5);
   nz = (int)(15000.0/dx + 0.5);
   nxm = (int)(28000.0/dx + 0.5);
-  x0b = gap ? dx : 0.0;
+  x0b = gap;
   nxb = (int)((12000.0 - x0b)/dx + 0.5);
   nx[0] = nxm;
   nx[1] = nxb;
@@ -1036,8 +1037,8 @@ static int run_tpv14(double dx, int which, double tend, int gap)
   for(i = 0; i < fa[0]->N; i++)
     if(rt[0][i] >= 0.0 && (-16000.0 + (i/nz + 0.5)*dx) > 0.0)
       nrup_beyond++;
-  printf("tpv%d: dx %g m, %g s: main fault ruptured %.0f %% (beyond the junction %.0f %%), branch %.0f %%; largest unclamping of the branch's first column before it slips %.2f MPa\n",
-         which, dx, tend, 100.0*nrup[0]/fa[0]->N, 100.0*nrup_beyond/(double)((nxm - (int)(16000.0/dx + 0.5))*nz),
+  printf("tpv%d: dx %g m, gap %g m, %g s: main fault ruptured %.0f %% (beyond the junction %.0f %%), branch %.0f %%; largest unclamping of the branch's first column before it slips %.2f MPa\n",
+         which, dx, gap, tend, 100.0*nrup[0]/fa[0]->N, 100.0*nrup_beyond/(double)((nxm - (int)(16000.0/dx + 0.5))*nz),
          100.0*nrup[1]/fa[1]->N, tnmax/1e6);
   for(p = 0; p < 2; p++){
     sprintf(fn, "tpv%d_rt_%s.dat", which, p ? "branch" : "main");
@@ -1374,6 +1375,35 @@ static int run_kernels(const char *ref)
 }
 
 static int main0(int argc, char **argv);
+/* H6 step 4: where the largest differences between two resolutions are: per fault and traction
+   component (shear, normal), the cell (along strike i, down dip j; 2 rows) and the step */
+static void h6strike_where(const double *t1, const double *t2, int ns, int N)
+{
+  double best[2][2], d;
+  int best_i[2][2], best_n[2][2];
+  int n, k, i, c;
+  for(k = 0; k < 2; k++)
+    for(c = 0; c < 2; c++){
+      best[k][c] = 0.0;
+      best_i[k][c] = 0;
+      best_n[k][c] = 0;
+    }
+  for(n = 0; n < ns; n++)
+    for(k = 0; k < 2; k++)
+      for(i = 0; i < 2*N; i++){
+        c = (i >= N);
+        d = fabs(t1[((size_t)n*2 + k)*2*N + i] - t2[((size_t)n*2 + k)*2*N + i]);
+        if(d > best[k][c]){
+          best[k][c] = d;
+          best_i[k][c] = i % N;
+          best_n[k][c] = n;
+        }
+      }
+  for(k = 0; k < 2; k++)
+    printf("h6strike: fault %d: largest shear difference %.3e at cell (%d, %d), step %d; normal %.3e at cell (%d, %d), step %d\n",
+           k, best[k][0], best_i[k][0]/2, best_i[k][0]%2, best_n[k][0], best[k][1], best_i[k][1]/2, best_i[k][1]%2, best_n[k][1]);
+}
+
 int main(int argc, char **argv)
 {
   int r;
@@ -1536,13 +1566,14 @@ static int main0(int argc, char **argv)
           }
       free(t0);
     }
+    h6strike_where(t1, t2, ns_2, N);
     printf("fd3d_test h6strike: turn %g deg: cells dx/%d against dx/%d: shear %.3e of %.3e (largest change of shear), normal %.3e of %.3e\n", ang, m1, m2, es, ss, en, sn_2);
     free(t1);
     free(t2);
     return 0;
   }
   if(argc >= 3 && !strcmp(argv[1], "tpv14"))
-    return run_tpv14(atof(argv[2]), argc > 3 ? atoi(argv[3]) : 14, argc > 4 ? atof(argv[4]) : 12.0, argc > 5 ? atoi(argv[5]) : 0);
+    return run_tpv14(atof(argv[2]), argc > 3 ? atoi(argv[3]) : 14, argc > 4 ? atof(argv[4]) : 12.0, argc > 5 ? atof(argv[5]) : 0.0);
   if(argc >= 2 && !strcmp(argv[1], "h6strips")){
     fl_2 = fd3d_h6_strips_check(1);
     printf("fd3d_test h6strips: %s\n", fl_2 ? "FAIL" : "PASS");

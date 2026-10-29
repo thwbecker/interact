@@ -6438,6 +6438,25 @@ double fd3d_h6_step_check(int nsteps, int sw, double th_deg, int verbose)
   return scale > 0.0 ? worst/scale : -1.0;
 }
 
+/* smallest distance between the centres of cells of two different faults of the strips */
+static double strips_min_fault_distance(const struct fd3d_strips *s)
+{
+  double dmin, d, *a, *b;
+  int k, q, i, j;
+  dmin = 1e300;
+  for(k = 0; k < s->nf; k++)
+    for(q = k + 1; q < s->nf; q++)
+      for(i = 0; i < s->f[k]->N; i++)
+        for(j = 0; j < s->f[q]->N; j++){
+          a = s->fg[k] + 3*(size_t)i;
+          b = s->fg[q] + 3*(size_t)j;
+          d = sqrt((a[0] - b[0])*(a[0] - b[0]) + (a[1] - b[1])*(a[1] - b[1]) + (a[2] - b[2])*(a[2] - b[2]));
+          if(d < dmin)
+            dmin = d;
+        }
+  return dmin;
+}
+
 /* H6 step 4 (fd3d_test h6strike): two faults whose strikes differ by `ang` degrees, each with
    a strip of cells dx/m aligned with its own trace (rows +-2.5 km, columns 1.5 km beyond the
    trace ends), partitioned by the nearest trace. Fault 0 along x from the origin, dipping 60
@@ -6456,6 +6475,7 @@ int fd3d_h6_strike_run(double ang, int m, int nsteps, double *tau, int verbose)
   double *vp = malloc(sizeof(double)*nx*nz);
   int nb;
   int nc;
+  double dmin;
   int a0;
   int a1;
   {
@@ -6480,7 +6500,17 @@ int fd3d_h6_strike_run(double ang, int m, int nsteps, double *tau, int verbose)
     fprintf(stderr, "h6strike: setup failed\n");
     return 1;
   }
+  /* the study is about strips meeting at an angle, not about faults that touch or cross: refuse
+     configurations whose fault cells come closer than 1.5 cells (a +60 degree turn crosses the
+     first fault's trace) */
+  dmin = strips_min_fault_distance(s);
+  if(dmin < 1.5*dx){
+    fprintf(stderr, "h6strike: turn %g deg: the faults come within %g m of each other (cells of %g m); choose a turn away from fault 0 (negative angles)\n", ang, dmin, dx);
+    fd3d_strips_free(s);
+    return 2;
+  }
   if(verbose){
+    fprintf(stderr, "h6strike: smallest distance between cells of the two faults %g m\n", dmin);
     a0 = 0;
     a1 = 0;
     for(i = 0; i < s->ly[0]->ns; i++)
