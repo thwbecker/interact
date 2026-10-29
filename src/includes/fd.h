@@ -54,6 +54,9 @@ struct fd_vars {
   struct fd3d *f3b;			/* two parallel planes (stepovers): the second plane's marcher */
   struct fd3d_pair *pair3;		/* and their coupling; NULL for one plane */
   struct fd3d_multi *multi3;		/* several planes of any orientation (G2); NULL otherwise */
+  struct fd3d_strips *strips3;		/* several faults of any strike, a surface strip each (H6) */
+  PetscInt strips_opt;			/* -fd_strips 1: use the strips also for a shared strike */
+  PetscReal surf_band;			/* -fd_surface_band: half width of a strip (m; 0: the fault's depth extent) */
   struct fd3d_msurf *msurf3;		/* several faults sharing the strike with one virtual surface (G3b) */
   struct fd3d_tab *tabm3[FD3D_MULTI_MAX];
   int nm3, off3[FD3D_MULTI_MAX];

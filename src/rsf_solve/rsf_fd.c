@@ -158,6 +158,10 @@ PetscErrorCode rsf_fd_setup(struct interact_ctx *par, PetscReal shear_modulus_si
   {
     PetscBool set = PETSC_FALSE;
     PetscCall(PetscOptionsGetInt(NULL,NULL,"-fd_surface_m",&fd->surf_m,&set));
+    fd->strips_opt = 0;
+    PetscCall(PetscOptionsGetInt(NULL,NULL,"-fd_strips",&fd->strips_opt,NULL));
+    fd->surf_band = 0.0;
+    PetscCall(PetscOptionsGetReal(NULL,NULL,"-fd_surface_band",&fd->surf_band,NULL));
     fd->surf_m_default = set ? PETSC_FALSE : PETSC_TRUE;
   }
   PetscCall(PetscOptionsGetInt(NULL,NULL,"-fd_layer",&fd->layer_w,NULL));
@@ -887,6 +891,96 @@ static PetscErrorCode fd3d_setup_msurf(struct interact_ctx *par, struct fd_vars 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+/* several faults of any strike and dip in a half space (fd_plan.md H6): each plane gets a surface
+   strip aligned with its own strike, about one fault depth wide on each side of its trace
+   (-fd_surface_band in m overrides), with cells of dx/m (-fd_surface_m), margins multiples of
+   the cell size so that the trace and the fault ends lie on cell boundaries; the strips are
+   partitioned by the nearest trace. Plane p's local frame: x along its strike e1, y = z x x,
+   z up, origin above the corner of its cell (0, 0); its dip from e2 (between 0 and 180 degrees,
+   the marcher frame is kept, so the slip sign is +1). */
+static PetscErrorCode fd3d_setup_strips(struct fd_vars *fd, int np, struct fd3d **fp, struct fd3d_mplane *geom,
+                                        int comp, const int *nx, const int *nz)
+{
+  double th[FD3D_MULTI_MAX], O[FD3D_MULTI_MAX][3], x0f[FD3D_MULTI_MAX], ytop[FD3D_MULTI_MAX], ztop[FD3D_MULTI_MAX];
+  double dip[FD3D_MULTI_MAX], fsg[FD3D_MULTI_MAX], xs0[FD3D_MULTI_MAX];
+  double *yc[FD3D_MULTI_MAX], *wy[FD3D_MULTI_MAX];
+  int nxs[FD3D_MULTI_MAX], nys[FD3D_MULTI_MAX];
+  double dx, hs, yl[3], band, bb[4], tr[2][2], zmax, diag, mem;
+  int m, p, i, nb, nc, L, na;
+
+  PetscFunctionBeginUser;
+  dx = geom[0].dx;
+  m = (int)fd->surf_m;
+  hs = dx/m;
+  bb[0] = bb[1] = 1e300;
+  bb[2] = bb[3] = -1e300;
+  zmax = 0.0;
+  for(p = 0;p < np;p++){
+    th[p] = atan2(geom[p].E[0][1],geom[p].E[0][0])*180.0/M_PI;
+    yl[0] = -geom[p].E[0][1];
+    yl[1] = geom[p].E[0][0];
+    yl[2] = 0.0;
+    dip[p] = atan2(geom[p].E[1][2],geom[p].E[1][0]*yl[0] + geom[p].E[1][1]*yl[1])*180.0/M_PI;
+    PetscCheck(fabs(geom[p].E[0][2]) < 1e-9 && dip[p] > 0.0 && dip[p] < 180.0,PETSC_COMM_WORLD,PETSC_ERR_SUP,
+        "rsf_fd_setup: strips need a horizontal strike and an up-dip direction above the horizontal (plane %d)",p);
+    O[p][0] = geom[p].O[0];
+    O[p][1] = geom[p].O[1];
+    O[p][2] = 0.0;
+    x0f[p] = 0.0;
+    ytop[p] = 0.0;
+    ztop[p] = geom[p].O[2];
+    fsg[p] = 1.0;
+    band = (fd->surf_band > 0.0) ? fd->surf_band : nz[p]*dx*sin(dip[p]*M_PI/180.0) - ztop[p];
+    nb = (int)ceil(band/hs - 1e-9);
+    nc = (int)ceil(0.5*band/hs - 1e-9);
+    if(nb < 2)
+      nb = 2;
+    if(nc < 1)
+      nc = 1;
+    nys[p] = 2*nb;
+    nxs[p] = nx[p]*m + 2*nc;
+    xs0[p] = -nc*hs;
+    PetscCall(PetscMalloc2(nys[p],&yc[p],nys[p],&wy[p]));
+    for(i = 0;i < nys[p];i++){
+      yc[p][i] = -nb*hs + (i + 0.5)*hs;
+      wy[p][i] = hs;
+    }
+    /* bounding box of the strips (for the window of the dense tables) */
+    tr[0][0] = O[p][0] + xs0[p]*geom[p].E[0][0];
+    tr[0][1] = O[p][1] + xs0[p]*geom[p].E[0][1];
+    tr[1][0] = O[p][0] + (xs0[p] + nxs[p]*hs)*geom[p].E[0][0];
+    tr[1][1] = O[p][1] + (xs0[p] + nxs[p]*hs)*geom[p].E[0][1];
+    for(i = 0;i < 2;i++){
+      bb[0] = fmin(bb[0],tr[i][0] - nb*hs);
+      bb[1] = fmin(bb[1],tr[i][1] - nb*hs);
+      bb[2] = fmax(bb[2],tr[i][0] + nb*hs);
+      bb[3] = fmax(bb[3],tr[i][1] + nb*hs);
+    }
+    zmax = fmax(zmax,-ztop[p] + nz[p]*dx*sin(dip[p]*M_PI/180.0));
+  }
+  diag = sqrt(pow(bb[2] - bb[0],2) + pow(bb[3] - bb[1],2) + zmax*zmax);
+  L = (int)ceil(diag/(fd->beta*fd->dt_min)) + 2;
+  mem = 0.0;
+  for(p = 0;p < np;p++)
+    for(i = 0;i < np;i++)
+      if(i != p)
+        mem += 8.0*L*(9.0*nxs[p]*nys[p]*nxs[i]*nys[i] + 6.0*fp[p]->N*nxs[i]*nys[i]);
+  PetscCall(PetscPrintf(PETSC_COMM_WORLD,"rsf_fd_setup: surface strips (H6): %d faults, cells of %g m, %d lags, dense strip tables about %.0f MB\n",
+      np,hs,L,mem/1e6));
+  fd->strips3 = fd3d_strips_create(np,fp,th,(const double (*)[3])O,x0f,ytop,ztop,dip,fsg,comp,m,nxs,nys,xs0,
+      (const double **)yc,(const double **)wy,L);
+  PetscCheck(fd->strips3,PETSC_COMM_WORLD,PETSC_ERR_LIB,"rsf_fd_setup: surface strips: setup failed (one MPI rank)");
+  for(p = 0;p < np;p++){
+    na = 0;
+    for(i = 0;i < fd->strips3->ly[p]->ns;i++)
+      na += fd->strips3->active[p][i];
+    PetscCall(PetscPrintf(PETSC_COMM_WORLD,"rsf_fd_setup: fault %d: strike %.2f deg, dip %.2f deg, top at z = %.1f m; strip %d x %d cells, %d active\n",
+        p,th[p],dip[p],ztop[p],nxs[p],nys[p],na));
+    PetscCall(PetscFree2(yc[p],wy[p]));
+  }
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 static PetscErrorCode fd3d_setup_multi(struct interact_ctx *par, struct fd_vars *fd)
 {
   PetscInt gi, cg, ncols;
@@ -900,6 +994,9 @@ static PetscErrorCode fd3d_setup_multi(struct interact_ctx *par, struct fd_vars 
   struct fd3d_mplane geom[FD3D_MULTI_MAX];
   struct fd3d *fp[FD3D_MULTI_MAX];
   int need;
+  int shared;
+  int strips;
+  int mir;
   double d[3];
   double c;
   double dn;
@@ -934,7 +1031,8 @@ static PetscErrorCode fd3d_setup_multi(struct interact_ctx *par, struct fd_vars 
   int g_3;
   double v_2;
   PetscFunctionBeginUser;
-  int mir = !medium->full_space && !fd->hs_static;
+  strips = 0;
+  mir = !medium->full_space && !fd->hs_static;
   /* half space (G3a): vertical strike-slip planes reaching the surface, by free-surface images;
      dipping planes in a half space need the virtual surface for several faults (G3b);
      -fd_hs_static (G4): any geometry, whole-space dynamics with the exact half-space statics */
@@ -944,8 +1042,18 @@ static PetscErrorCode fd3d_setup_multi(struct interact_ctx *par, struct fd_vars 
     for(i = 0;i < n;i++)
       if(fabs(fault[i].normal[2]) > 1e-9)
         need = 1;
-    if(need || getenv("FD_FORCE_MSURF"))
+    /* one shared strike: one virtual surface (G3b); different strikes, or -fd_strips 1: a strip per
+       fault (H6), with whole-space marchers */
+    shared = 1;
+    for(i = 1;i < n;i++)
+      if(fabs(fabs(fault[i].t_strike[0]*fault[0].t_strike[0] + fault[i].t_strike[1]*fault[0].t_strike[1] + fault[i].t_strike[2]*fault[0].t_strike[2]) - 1.0) > 1e-9)
+        shared = 0;
+    if((need || getenv("FD_FORCE_MSURF")) && shared && !fd->strips_opt)
       return fd3d_setup_msurf(par,fd);
+    if(need || fd->strips_opt){
+      strips = 1;
+      mir = 0;
+    }
   }
   PetscCheck((rsf->slip_mode == STRIKE) || (rsf->slip_mode == DIP),PETSC_COMM_WORLD,PETSC_ERR_SUP,"-fd_mode: 3-D planes need pure strike or dip slip");
   PetscCall(PetscMalloc3(n,&pa,n,&pb,n,&plane));
@@ -1063,7 +1171,17 @@ static PetscErrorCode fd3d_setup_multi(struct interact_ctx *par, struct fd_vars 
     }
   }
   fd->f3 = fp[0];
-  fd->multi3 = fd3d_multi_create(np,fp,geom);
+  if(strips){
+    PetscCall(fd3d_setup_strips(fd,np,fp,geom,comp,nx,nz));
+    fd->multi3 = fd->strips3->mx;
+    for(p = 0;p < np;p++)
+      fd->strips3->ly[p]->normal_coupling = rsf->calc_sigma_dot ? 1 : 0;
+    if(rsf->calc_sigma_dot){
+      fd->strips3->static_n_fn = fd3d_multi_static_in;
+      fd->strips3->static_n_ctx = (void *)par;
+    }
+  } else
+    fd->multi3 = fd3d_multi_create(np,fp,geom);
   PetscCheck(fd->multi3,PETSC_COMM_WORLD,PETSC_ERR_SUP,"rsf_fd_setup: several 3-D planes: setup failed (one MPI rank only in this version)");
   fd->multi3->static_fn = fd3d_multi_static_is;
   fd->multi3->static_ctx = (void *)par;
@@ -1146,8 +1264,8 @@ static PetscErrorCode fd3d_setup_multi(struct interact_ctx *par, struct fd_vars 
     PetscCall(PetscPrintf(PETSC_COMM_WORLD,"rsf_fd_setup: 3-D plane %d: %d x %d squares of %g m, normal (%.3f, %.3f, %.3f), window %d lags%s\n",p,nx[p],nz[p],dx,
         E[p][2][0],E[p][2][1],E[p][2][2],fd->tabm3[p]->L,fd->multi3->implicit ? "" : ""));
   PetscCall(PetscPrintf(PETSC_COMM_WORLD,"rsf_fd_setup: 3-D, %d planes, %s, dt_min %.3e s, cross first lag %s; static gate: rel dev from Is %.3e within planes, %.3e across, normal across from -In %.3e%s\n",
-      np,mir ? "half space (images)" : ((fd->hs_static && !medium->full_space) ? "half space: whole-space dynamics, exact half-space statics (-fd_hs_static)" : "whole space"),(double)fd->dt_min,fd->multi3->implicit ? "kept (planes meet)" : "zero",dev[0],dev[1],devn,mir ? " (images: a few percent expected)" : ""));
-  PetscCheck(mir || (fd->hs_static && !medium->full_space) || ((dev[0] <= 5.0*fd->gate_tol) && (dev[1] <= 5.0*fd->gate_tol) && ((devn < 0.0) || (devn <= 5.0*fd->gate_tol))),PETSC_COMM_WORLD,PETSC_ERR_USER,
+      np,mir ? "half space (images)" : (strips ? "half space (surface strips, H6; tables in a whole space)" : ((fd->hs_static && !medium->full_space) ? "half space: whole-space dynamics, exact half-space statics (-fd_hs_static)" : "whole space")),(double)fd->dt_min,fd->multi3->implicit ? "kept (planes meet)" : "zero",dev[0],dev[1],devn,mir ? " (images: a few percent expected)" : ""));
+  PetscCheck(mir || strips || (fd->hs_static && !medium->full_space) || ((dev[0] <= 5.0*fd->gate_tol) && (dev[1] <= 5.0*fd->gate_tol) && ((devn < 0.0) || (devn <= 5.0*fd->gate_tol))),PETSC_COMM_WORLD,PETSC_ERR_USER,
       "rsf_fd_setup: 3-D static gate failed for the planes (%g, %g, %g)",dev[0],dev[1],devn);
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -1212,6 +1330,8 @@ static PetscErrorCode fd3d_run_phase_multi(TS ts, struct interact_ctx *par, stru
       m->sig0[p][i] = x[4*g+2];
       if(fd->msurf3)
         fd->msurf3->ly[p]->sig0[i] = x[4*g+2];
+      if(fd->strips3)
+        fd->strips3->ly[p]->sig0[i] = x[4*g+2];
       vI = 2.0*rsf->v0*exp(-x[4*g]/fault[g].mu_sa)*sinh(x[4*g+1]/(fault[g].mu_sa*x[4*g+2]));
       f->V[i] = s*vI;
       f->theta[i] = f->Lc[i]/f->V0*exp((x[4*g] - f->f0)/f->b[i]);
@@ -1267,7 +1387,9 @@ static PetscErrorCode fd3d_run_phase_multi(TS ts, struct interact_ctx *par, stru
         g = fd->g_of_s[fd->off3[p] + i];
         load[p][i] = (g >= 0) ? fd->sgn3[p]*fault[g].sinc[0]*trel : 0.0;
       }
-    if(fd->msurf3)
+    if(fd->strips3)
+      fd3d_strips_step(fd->strips3,load);
+    else if(fd->msurf3)
       fd3d_msurf_step(fd->msurf3,load);
     else
       fd3d_multi_step(m,load);
@@ -1355,7 +1477,7 @@ static PetscErrorCode fd3d_run_phase_multi(TS ts, struct interact_ctx *par, stru
         x[4*g] = f_2->f0 + f_2->b[i]*log(f_2->V0*f_2->theta[i]/f_2->Lc[i]);
         x[4*g+1] = s_3*f_2->tau[i];
         x[4*g+3] += s_3*f_2->delta[i];
-        if(m->normal_coupling || (fd->msurf3 && fd->msurf3->ly[p]->normal_coupling))
+        if(m->normal_coupling || (fd->msurf3 && fd->msurf3->ly[p]->normal_coupling) || (fd->strips3 && fd->strips3->ly[p]->normal_coupling))
           x[4*g+2] = f_2->sigma[i];
         slip[p] += f_2->delta[i];
         cnt[p]++;

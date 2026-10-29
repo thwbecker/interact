@@ -2520,7 +2520,24 @@ trimmed, converge as well as strips of a shared strike (the differences fall by 
 shear and 4 to 7 in normal traction from dx/3-dx/4 to dx/4-dx/6), and at dx/4 are within a few
 percent. Faults that come within a cell of each other, or meet (branches), need their own
 treatment of the shared edge (as the junction in TPV14).
-Next: rsf_solve integration of the strips and the domain partitioning of the dense tables.
+Step 5, rsf_solve integration (first version): in a half space, planes that need a surface
+(dipping, or dip slip) and do not share one strike now go to the strips (fd3d_setup_strips in
+rsf_fd.c; -fd_strips 1 forces the strips also for a shared strike, which otherwise keeps the
+several-fault surface of G3b). Each plane's strip is built in its own frame (x along its
+strike, y = z x x, origin above the corner of its cell (0, 0); the marcher frame is kept, the
+dip from its up-dip vector between 0 and 180 degrees, slip sign +1), half width
+-fd_surface_band (m; default the plane's depth extent), cells dx/m (-fd_surface_m), margins
+multiples of the cell size; the window covers the strips' bounding box. Statics exact (Is,
+and In with -calc_sigma_dot) as in G3b; the static gate is skipped (whole-space tables).
+Tests (sandbox, cells of dx/3, half width 2 km): the shared-strike thrust pair of H3 (30 and
+60 degrees, 4 km apart): several-fault surface 1.715 / 1.978 m, 8.52 m/s, both rupture;
+strips 1.551 / 1.441 m, 8.12 m/s, both rupture: the 2 km strips cover less surface than G3b's
+(H2/H3: bands narrower than about one fault depth lose a few to 25 percent); the second fault
+turned 30 degrees away (strike 120 against 90 degrees, picked automatically): fault 1 1.556 m,
+fault 2 does not rupture. Memory: the dense strip-to-strip tables are stored for all strip
+cells, masked or not, and for all lags: 6.5 GB for this small pair at dx/4 with the default
+half widths (the run did not fit in the sandbox). Storing active cells only, and the domain
+partitioning of gate 2, are needed before production use.
 
 ### TPV14 / TPV15 branched-fault benchmarks, first runs with images (2026-10-29)
 
