@@ -16,7 +16,8 @@ int fd_band_width(int N, const double *A, double thr)
   int i, j, bw = 0;
   for(i = 0; i < N; i++)
     for(j = 0; j < N; j++)
-      if(fabs(A[(size_t)i * N + j]) > thr && abs(i - j) > bw) bw = abs(i - j);
+      if(fabs(A[(size_t)i * N + j]) > thr && abs(i - j) > bw)
+        bw = abs(i - j);
   return bw;
 }
 
@@ -37,15 +38,17 @@ int fd_band_solve(int N, int bw, const double *ab, const double *rhs, double *x)
   memcpy(abc, ab, sizeof(double) * (size_t)ldab * N);
   memcpy(x, rhs, sizeof(double) * N);
   dgbsv_(&n, &kl, &ku, &nrhs, abc, &ldab, ipiv, x, &ldb, &info);
-  free(abc); free(ipiv);
+  free(abc);
+  free(ipiv);
   return info;
 }
 
 void fd_band_mult(int N, int bw, const double *ab, const double *x, double *y)
 {
   int i, j, ldab = 3 * bw + 1;
+  double s;
   for(i = 0; i < N; i++){
-    double s = 0.0;
+    s = 0.0;
     for(j = (i - bw > 0 ? i - bw : 0); j <= (i + bw < N - 1 ? i + bw : N - 1); j++)
       s += ab[(2 * bw + i - j) + (size_t)j * ldab] * x[j];
     y[i] = s;

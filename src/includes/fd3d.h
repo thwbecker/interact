@@ -296,6 +296,7 @@ struct fd3d_strips {
   struct fd3d_layer *ly[FD3D_MULTI_MAX];
   double O[FD3D_MULTI_MAX][3], th[FD3D_MULTI_MAX], fsg[FD3D_MULTI_MAX];
   char *active[FD3D_MULTI_MAX];                 /* per strip cell (p nys + q): 1 active, 0 masked */
+  double ta[FD3D_MULTI_MAX][3], tb[FD3D_MULTI_MAX][3];   /* trace end points (global) */
   double *xg[FD3D_MULTI_MAX];                   /* global centres of the strip cells (3 per cell) */
   double *fg[FD3D_MULTI_MAX];                   /* global centres of the fault cells (3 per cell) */
   struct fd3d_dtab fs[FD3D_MULTI_MAX][FD3D_MULTI_MAX], sf[FD3D_MULTI_MAX][FD3D_MULTI_MAX], ss[FD3D_MULTI_MAX][FD3D_MULTI_MAX];

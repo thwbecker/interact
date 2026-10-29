@@ -64,6 +64,7 @@ static PetscErrorCode fd_gate_static(struct interact_ctx *par, struct fd_vars *f
 
 PetscErrorCode rsf_fd_setup(struct interact_ctx *par, PetscReal shear_modulus_si, PetscReal s_wave_speed_si)
 {
+  PetscBool set3;
   struct med *medium = par->medium;
   struct flt *fault = par->fault;
   struct rsf_vars *rsf = medium->rsf;
@@ -92,15 +93,27 @@ PetscErrorCode rsf_fd_setup(struct interact_ctx *par, PetscReal shear_modulus_si
      (fd_plan.md S2); the 2-D code runs on one rank */
   PetscCheck((size == 1) || (n3d > 0),PETSC_COMM_WORLD,PETSC_ERR_SUP,"-fd_mode: 2-D faults on one MPI rank only in this version");
   PetscCheck((n3d > 0) || ((n2d + nanti) == medium->nrflt),PETSC_COMM_WORLD,PETSC_ERR_SUP,
-	     "-fd_mode: all elements must be 2-D segments (plane strain or antiplane) in this version");
+      "-fd_mode: all elements must be 2-D segments (plane strain or antiplane) in this version");
   PetscCheck((n2d == 0) || (nanti == 0),PETSC_COMM_WORLD,PETSC_ERR_SUP,"-fd_mode: mixed in-plane and antiplane elements");
   PetscCall(PetscCalloc1(1,&fd));
   fd->mode = mode;
-  fd->vsw = 1e-3; fd->vback = 1e-4; fd->tol = 1e-2; fd->et = 1.0; fd->xi = 0.25; fd->kmax = 64;
-  fd->cfl = 0.5; fd->lmax = 0; fd->gate_tol = 0.05; fd->length_scale = 1.0;
-  fd->max_steps = 2000000; fd->dt_restart = 1e-2;
-  fd->conv = 2; fd->conv_block = 0;
-  fd->back_eps = 0.0; fd->back_vmax = -1.0; fd->coarse = 1;
+  fd->vsw = 1e-3;
+  fd->vback = 1e-4;
+  fd->tol = 1e-2;
+  fd->et = 1.0;
+  fd->xi = 0.25;
+  fd->kmax = 64;
+  fd->cfl = 0.5;
+  fd->lmax = 0;
+  fd->gate_tol = 0.05;
+  fd->length_scale = 1.0;
+  fd->max_steps = 2000000;
+  fd->dt_restart = 1e-2;
+  fd->conv = 2;
+  fd->conv_block = 0;
+  fd->back_eps = 0.0;
+  fd->back_vmax = -1.0;
+  fd->coarse = 1;
   PetscCall(PetscOptionsGetReal(NULL,NULL,"-fd_vsw",&fd->vsw,NULL));
   PetscCall(PetscOptionsGetReal(NULL,NULL,"-fd_vback",&fd->vback,NULL));
   PetscCall(PetscOptionsGetReal(NULL,NULL,"-fd_tol",&fd->tol,NULL));
@@ -118,19 +131,28 @@ PetscErrorCode rsf_fd_setup(struct interact_ctx *par, PetscReal shear_modulus_si
   PetscCall(PetscOptionsGetReal(NULL,NULL,"-fd_back_eps",&fd->back_eps,NULL));
   PetscCall(PetscOptionsGetInt(NULL,NULL,"-fd_coarse",&fd->coarse,NULL));
   PetscCall(PetscOptionsGetReal(NULL,NULL,"-fd_back_vmax",&fd->back_vmax,NULL));
-  fd->back_dyn = 0.0; fd->back_nwin = 10; fd->reentry = 1.0;
+  fd->back_dyn = 0.0;
+  fd->back_nwin = 10;
+  fd->reentry = 1.0;
   PetscCall(PetscOptionsGetReal(NULL,NULL,"-fd_back_dyn",&fd->back_dyn,NULL));
   PetscCall(PetscOptionsGetInt(NULL,NULL,"-fd_back_nwin",&fd->back_nwin,NULL));
   PetscCall(PetscOptionsGetReal(NULL,NULL,"-fd_reentry",&fd->reentry,NULL));
   fd->hs_static = 0;
   PetscCall(PetscOptionsGetInt(NULL,NULL,"-fd_hs_static",&fd->hs_static,NULL));
-  if(fd->back_vmax <= 0.0) fd->back_vmax = 0.5*fd->vsw;
+  if(fd->back_vmax <= 0.0)
+    fd->back_vmax = 0.5*fd->vsw;
   fd->vsw_eff = fd->vsw;
   fd->nl = 1;			/* second-order time marching (Noda et al. 2020) by default */
-  fd->layer_w = 0; fd->layer_m = 2; fd->layer_margin = -1; fd->surface_opt = 0; fd->surf_ext = -1;
+  fd->layer_w = 0;
+  fd->layer_m = 2;
+  fd->layer_margin = -1;
+  fd->surface_opt = 0;
+  fd->surf_ext = -1;
   PetscCall(PetscOptionsGetInt(NULL,NULL,"-fd_surface",&fd->surface_opt,NULL));
   PetscCall(PetscOptionsGetInt(NULL,NULL,"-fd_surface_ext",&fd->surf_ext,NULL));
-  fd->surf_m = 4; fd->surf_grade = 1; fd->surf_extend = -1;
+  fd->surf_m = 4;
+  fd->surf_grade = 1;
+  fd->surf_extend = -1;
   PetscCall(PetscOptionsGetInt(NULL,NULL,"-fd_surface_extend",&fd->surf_extend,NULL));
   PetscCall(PetscOptionsGetInt(NULL,NULL,"-fd_surface_grade",&fd->surf_grade,NULL));
   {
@@ -146,7 +168,8 @@ PetscErrorCode rsf_fd_setup(struct interact_ctx *par, PetscReal shear_modulus_si
   PetscCall(PetscOptionsGetInt(NULL,NULL,"-fd_nl",&fd->nl,NULL));
   fd->nstat = 16;
   PetscCall(PetscOptionsGetIntArray(NULL,NULL,"-fd_stations",fd->stat,&fd->nstat,&set));
-  if(!set) fd->nstat = 0;
+  if(!set)
+    fd->nstat = 0;
   PetscCheck(fd->vback < fd->vsw,PETSC_COMM_WORLD,PETSC_ERR_ARG_OUTOFRANGE,"-fd_vback must be below -fd_vsw");
   PetscCheck(fd->kmax >= 1 && fd->kmax <= 32768 && (fd->kmax & (fd->kmax - 1)) == 0,PETSC_COMM_WORLD,PETSC_ERR_ARG_OUTOFRANGE,"-fd_kmax must be a power of two up to 32768");
   if(n3d > 0){
@@ -157,22 +180,25 @@ PetscErrorCode rsf_fd_setup(struct interact_ctx *par, PetscReal shear_modulus_si
       /* 3-D defaults for speed (fd_plan.md L2, L3), unless given: quasi-steady hand-back,
 	 hand-back by traction difference (10 kPa), re-entry only above 10 vsw until the
 	 peak rate has dropped below the hand-back limit */
-      PetscBool set;
-      PetscCall(PetscOptionsHasName(NULL,NULL,"-fd_back_eps",&set));
-      if(!set) fd->back_eps = 0.05;
-      PetscCall(PetscOptionsHasName(NULL,NULL,"-fd_back_dyn",&set));
-      if(!set) fd->back_dyn = 1e4;
-      PetscCall(PetscOptionsHasName(NULL,NULL,"-fd_reentry",&set));
-      if(!set) fd->reentry = 10.0;
+      PetscCall(PetscOptionsHasName(NULL,NULL,"-fd_back_eps",&set3));
+      if(!set3)
+        fd->back_eps = 0.05;
+      PetscCall(PetscOptionsHasName(NULL,NULL,"-fd_back_dyn",&set3));
+      if(!set3)
+        fd->back_dyn = 1e4;
+      PetscCall(PetscOptionsHasName(NULL,NULL,"-fd_reentry",&set3));
+      if(!set3)
+        fd->reentry = 10.0;
     }
-    fd->mu = shear_modulus_si; fd->beta = s_wave_speed_si;
+    fd->mu = shear_modulus_si;
+    fd->beta = s_wave_speed_si;
     fd->nu = medium->elastic.poisson;
     fd->rho = fd->mu/(fd->beta*fd->beta);
     fd->alpha = fd->beta*sqrt(2.0*(1.0 - fd->nu)/(1.0 - 2.0*fd->nu));
     rsf->fd = fd;
     PetscCall(fd3d_setup_from_geometry(par,fd));
     PetscCall(PetscPrintf(PETSC_COMM_WORLD,"rsf_fd_setup: 3-D fully dynamic extension, mode %d, %s, vsw %.1e vback %.1e m/s, fixed fine steps, %s time marching\n",
-			  (int)fd->mode,fd->mirror3 ? "half space (mirror-image free surface, exact static Is)" : (fd->surf3 ? "half space (virtual free surface, exact static Is)" : "whole space"),(double)fd->vsw,(double)fd->vback,fd->nl ? "second-order (-fd_nl 1)" : "first-order"));
+        (int)fd->mode,fd->mirror3 ? "half space (mirror-image free surface, exact static Is)" : (fd->surf3 ? "half space (virtual free surface, exact static Is)" : "whole space"),(double)fd->vsw,(double)fd->vback,fd->nl ? "second-order (-fd_nl 1)" : "first-order"));
     PetscFunctionReturn(PETSC_SUCCESS);
   }
   /* medium: shear modulus and S speed from the run settings (SI), Poisson from interact */
@@ -185,23 +211,29 @@ PetscErrorCode rsf_fd_setup(struct interact_ctx *par, PetscReal shear_modulus_si
     fd->halfplane = PETSC_TRUE;
   PetscCheck(!(fd->halfplane && (fd->mode2d == FD_MODE_INPLANE)),PETSC_COMM_WORLD,PETSC_ERR_SUP,"-fd_mode: in-plane half-plane geometries are not supported (M7)");
   PetscCheck(rsf->state_law == RSF_AGING_LAW,PETSC_COMM_WORLD,PETSC_ERR_SUP,"-fd_mode: aging law only (-state_law 1) in this version");
-  fd->mu = shear_modulus_si; fd->beta = s_wave_speed_si;
+  fd->mu = shear_modulus_si;
+  fd->beta = s_wave_speed_si;
   fd->nu = medium->elastic.poisson;
   fd->rho = fd->mu/(fd->beta*fd->beta);
   fd->alpha = fd->beta*sqrt(2.0*(1.0 - fd->nu)/(1.0 - 2.0*fd->nu));
-  fd->nphase = 0; fd->nflag = 0; fd->t_last_flag = -1.0; fd->restart_done = PETSC_FALSE;
+  fd->nphase = 0;
+  fd->nflag = 0;
+  fd->t_last_flag = -1.0;
+  fd->restart_done = PETSC_FALSE;
   rsf->fd = fd;
   PetscCall(fd_build_tables(par,fd));
   PetscCall(fd_gate_static(par,fd));
   /* accepted-step record for the history seeding */
-  fd->nrec = 64; fd->irec = 0; fd->nrec_used = 0;
+  fd->nrec = 64;
+  fd->irec = 0;
+  fd->nrec_used = 0;
   PetscCall(PetscMalloc2(fd->nrec,&fd->rec_t,(size_t)fd->nrec*medium->nrflt,&fd->rec_v));
   PetscCall(PetscPrintf(PETSC_COMM_WORLD,
-		"rsf_fd_setup: fully dynamic extension, mode %d, %s%s, %ld segments, dt_min %.3e s, "
-		"vsw %.1e vback %.1e m/s, tol %.1e, et %.2f, xi %.2f, kmax %d, tables %.1f MB, fft %s\n",
-		(int)fd->mode,fd->mode2d == FD_MODE_ANTIPLANE ? "antiplane" : "in-plane",fd->halfplane ? " half plane (image sources)" : "",(long)fd->segs->nseg,(double)fd->dt_min,
-		(double)fd->vsw,(double)fd->vback,(double)fd->tol,(double)fd->et,(double)fd->xi,(int)fd->kmax,
-		(double)fd->nbytes/1048576.0,fd_fft_backend()));
+      "rsf_fd_setup: fully dynamic extension, mode %d, %s%s, %ld segments, dt_min %.3e s, "
+      "vsw %.1e vback %.1e m/s, tol %.1e, et %.2f, xi %.2f, kmax %d, tables %.1f MB, fft %s\n",
+      (int)fd->mode,fd->mode2d == FD_MODE_ANTIPLANE ? "antiplane" : "in-plane",fd->halfplane ? " half plane (image sources)" : "",(long)fd->segs->nseg,(double)fd->dt_min,
+      (double)fd->vsw,(double)fd->vback,(double)fd->tol,(double)fd->et,(double)fd->xi,(int)fd->kmax,
+      (double)fd->nbytes/1048576.0,fd_fft_backend()));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
@@ -215,7 +247,10 @@ static PetscErrorCode fd_full_get(Vec X, VecScatter *sc, Vec *Xall, PetscScalar 
   PetscMPIInt size;
   PetscFunctionBeginUser;
   PetscCallMPI(MPI_Comm_size(PetscObjectComm((PetscObject)X),&size));
-  if(size == 1){ PetscCall(VecGetArray(X,x)); PetscFunctionReturn(PETSC_SUCCESS); }
+  if(size == 1){
+    PetscCall(VecGetArray(X,x));
+    PetscFunctionReturn(PETSC_SUCCESS);
+  }
   return fd_full_scatter(X,sc,Xall,x);
 }
 /* read-only variant: on one rank the vector's state is not touched (VecGetArrayRead), so the
@@ -225,7 +260,10 @@ static PetscErrorCode fd_full_get_read(Vec X, VecScatter *sc, Vec *Xall, PetscSc
   PetscMPIInt size;
   PetscFunctionBeginUser;
   PetscCallMPI(MPI_Comm_size(PetscObjectComm((PetscObject)X),&size));
-  if(size == 1){ PetscCall(VecGetArrayRead(X,(const PetscScalar **)x)); PetscFunctionReturn(PETSC_SUCCESS); }
+  if(size == 1){
+    PetscCall(VecGetArrayRead(X,(const PetscScalar **)x));
+    PetscFunctionReturn(PETSC_SUCCESS);
+  }
   return fd_full_scatter(X,sc,Xall,x);
 }
 static PetscErrorCode fd_full_put_read(Vec X, VecScatter *sc, Vec *Xall, PetscScalar **x)
@@ -233,7 +271,10 @@ static PetscErrorCode fd_full_put_read(Vec X, VecScatter *sc, Vec *Xall, PetscSc
   PetscMPIInt size;
   PetscFunctionBeginUser;
   PetscCallMPI(MPI_Comm_size(PetscObjectComm((PetscObject)X),&size));
-  if(size == 1){ PetscCall(VecRestoreArrayRead(X,(const PetscScalar **)x)); PetscFunctionReturn(PETSC_SUCCESS); }
+  if(size == 1){
+    PetscCall(VecRestoreArrayRead(X,(const PetscScalar **)x));
+    PetscFunctionReturn(PETSC_SUCCESS);
+  }
   (void)sc;
   PetscCall(VecRestoreArray(*Xall,x));
   PetscFunctionReturn(PETSC_SUCCESS);
@@ -241,7 +282,8 @@ static PetscErrorCode fd_full_put_read(Vec X, VecScatter *sc, Vec *Xall, PetscSc
 static PetscErrorCode fd_full_scatter(Vec X, VecScatter *sc, Vec *Xall, PetscScalar **x)
 {
   PetscFunctionBeginUser;
-  if(!*sc) PetscCall(VecScatterCreateToAll(X,sc,Xall));
+  if(!*sc)
+    PetscCall(VecScatterCreateToAll(X,sc,Xall));
   PetscCall(VecScatterBegin(*sc,X,*Xall,INSERT_VALUES,SCATTER_FORWARD));
   PetscCall(VecScatterEnd(*sc,X,*Xall,INSERT_VALUES,SCATTER_FORWARD));
   PetscCall(VecGetArray(*Xall,x));
@@ -253,7 +295,10 @@ static PetscErrorCode fd_full_put(Vec X, VecScatter *sc, Vec *Xall, PetscScalar 
   PetscMPIInt size;
   PetscFunctionBeginUser;
   PetscCallMPI(MPI_Comm_size(PetscObjectComm((PetscObject)X),&size));
-  if(size == 1){ PetscCall(VecRestoreArray(X,x)); PetscFunctionReturn(PETSC_SUCCESS); }
+  if(size == 1){
+    PetscCall(VecRestoreArray(X,x));
+    PetscFunctionReturn(PETSC_SUCCESS);
+  }
   PetscCall(VecRestoreArray(*Xall,x));
   if(write){
     PetscCall(VecScatterBegin(*sc,*Xall,X,INSERT_VALUES,SCATTER_REVERSE));
@@ -271,11 +316,14 @@ static void fd3d_static_is(void *ctx, const double *delta, double *out)
   int i, n = fd->f3->N;
   PetscCallAbort(PETSC_COMM_WORLD,VecGetOwnershipRange(fd->v3a,&lo,&hi));
   PetscCallAbort(PETSC_COMM_WORLD,VecGetArray(fd->v3a,&a));
-  for(i = 0;i < n;i++) if((fd->g_of_s[i] >= lo) && (fd->g_of_s[i] < hi)) a[fd->g_of_s[i] - lo] = delta[i];
+  for(i = 0;i < n;i++)
+    if((fd->g_of_s[i] >= lo) && (fd->g_of_s[i] < hi))
+      a[fd->g_of_s[i] - lo] = delta[i];
   PetscCallAbort(PETSC_COMM_WORLD,VecRestoreArray(fd->v3a,&a));
   PetscCallAbort(PETSC_COMM_WORLD,MatMult(par->medium->Is,fd->v3a,fd->v3b));
   PetscCallAbort(PETSC_COMM_WORLD,fd_full_get_read(fd->v3b,&fd->sc3,&fd->v3all,&b));
-  for(i = 0;i < n;i++) out[i] = PetscRealPart(b[fd->g_of_s[i]]);
+  for(i = 0;i < n;i++)
+    out[i] = PetscRealPart(b[fd->g_of_s[i]]);
   PetscCallAbort(PETSC_COMM_WORLD,fd_full_put_read(fd->v3b,&fd->sc3,&fd->v3all,&b));
 }
 
@@ -289,11 +337,14 @@ static void fd3d_static_in(void *ctx, const double *delta, double *out)
   int i, n = fd->f3->N;
   PetscCallAbort(PETSC_COMM_WORLD,VecGetOwnershipRange(fd->v3a,&lo,&hi));
   PetscCallAbort(PETSC_COMM_WORLD,VecGetArray(fd->v3a,&a));
-  for(i = 0;i < n;i++) if((fd->g_of_s[i] >= lo) && (fd->g_of_s[i] < hi)) a[fd->g_of_s[i] - lo] = delta[i];
+  for(i = 0;i < n;i++)
+    if((fd->g_of_s[i] >= lo) && (fd->g_of_s[i] < hi))
+      a[fd->g_of_s[i] - lo] = delta[i];
   PetscCallAbort(PETSC_COMM_WORLD,VecRestoreArray(fd->v3a,&a));
   PetscCallAbort(PETSC_COMM_WORLD,MatMult(par->medium->In,fd->v3a,fd->v3b));
   PetscCallAbort(PETSC_COMM_WORLD,fd_full_get_read(fd->v3b,&fd->sc3,&fd->v3all,&b));
-  for(i = 0;i < n;i++) out[i] = -PetscRealPart(b[fd->g_of_s[i]]);
+  for(i = 0;i < n;i++)
+    out[i] = -PetscRealPart(b[fd->g_of_s[i]]);
   PetscCallAbort(PETSC_COMM_WORLD,fd_full_put_read(fd->v3b,&fd->sc3,&fd->v3all,&b));
 }
 
@@ -311,112 +362,195 @@ static PetscErrorCode fd3d_run_phase_pair(TS ts, struct interact_ctx *par, struc
   PetscScalar *x;
   int N = fd->f3->N, NT = 2*N, i, p, g, l, a, nsteps = 0, L = fd->tab3->L, ndyn_quiet = 0;
   double dt = fd->tab3->dt, eta = 0.5*fd->mu/fd->beta, vmax, vpeak = 0.0, below = 0.0, slipsum = 0.0, *vtmp, *load[2], *vref, t_wall0, t_wall1;
+  struct fd3d *f;
+  double tl;
+  double w;
+  int k;
+  int i0;
+  int i1;
+  int idx;
+  char fn[128];
+  PetscMPIInt rk;
+  double trel;
+  struct fd3d *f_2;
+  int s;
+  double dmax;
+  double *s0;
+  double *s1;
+  double qd;
+  double dd;
+  int quiet;
+  double slip[2];
+  int cnt[2];
   PetscFunctionBeginUser;
   (void)ts;
   PetscCall(PetscTime(&t_wall0));
   PetscCall(PetscMalloc4(NT,&vtmp,N,&load[0],N,&load[1],NT,&vref));
-  for(p = 0;p < 2;p++) fd3d_reset(fm[p]);
+  for(p = 0;p < 2;p++)
+    fd3d_reset(fm[p]);
   PetscCall(fd_full_get(X,&fd->scX,&fd->Xall,&x));
   vmax = 0.0;
-  for(p = 0;p < 2;p++) for(i = 0;i < N;i++){
-    struct fd3d *f = fm[p];
-    g = fd->g_of_s[p*N + i];
-    if(g < 0){ f->sigma[i] = 0.0; f->V[i] = 0.0; f->tau0[i] = 0.0; pp->sig0[p][i] = 0.0; continue; }
-    f->sigma[i] = x[4*g+2]; pp->sig0[p][i] = x[4*g+2];
-    f->V[i] = 2.0*rsf->v0*exp(-x[4*g]/fault[g].mu_sa)*sinh(x[4*g+1]/(fault[g].mu_sa*x[4*g+2]));
-    f->theta[i] = f->Lc[i]/f->V0*exp((x[4*g] - f->f0)/f->b[i]);
-    f->tau0[i] = x[4*g+1] + eta*f->V[i];
-    if(fabs(f->V[i]) > vmax) vmax = fabs(f->V[i]);
-  }
+  for(p = 0;p < 2;p++)
+    for(i = 0;i < N;i++){
+      f = fm[p];
+      g = fd->g_of_s[p*N + i];
+      if(g < 0){
+        f->sigma[i] = 0.0;
+        f->V[i] = 0.0;
+        f->tau0[i] = 0.0;
+        pp->sig0[p][i] = 0.0;
+        continue;
+      }
+      f->sigma[i] = x[4*g+2];
+      pp->sig0[p][i] = x[4*g+2];
+      f->V[i] = 2.0*rsf->v0*exp(-x[4*g]/fault[g].mu_sa)*sinh(x[4*g+1]/(fault[g].mu_sa*x[4*g+2]));
+      f->theta[i] = f->Lc[i]/f->V0*exp((x[4*g] - f->f0)/f->b[i]);
+      f->tau0[i] = x[4*g+1] + eta*f->V[i];
+      if(fabs(f->V[i]) > vmax)
+        vmax = fabs(f->V[i]);
+    }
   /* history from the accepted-step record (combined order) */
   for(l = L;l >= 1;l--){
-    double tl = t - l*dt, w; int k, i0 = -1, i1 = -1;
+    tl = t - l*dt;
+    i0 = -1;
+    i1 = -1;
     for(k = 0;k < fd->nrec_used;k++){
-      int idx = (fd->irec - fd->nrec_used + k + fd->nrec) % fd->nrec;
-      if(fd->rec_t[idx] <= tl) i0 = idx;
-      if((fd->rec_t[idx] >= tl) && (i1 < 0)) i1 = idx;
+      idx = (fd->irec - fd->nrec_used + k + fd->nrec) % fd->nrec;
+      if(fd->rec_t[idx] <= tl)
+        i0 = idx;
+      if((fd->rec_t[idx] >= tl) && (i1 < 0))
+        i1 = idx;
     }
-    if(fd->nrec_used == 0){ for(i = 0;i < NT;i++) vtmp[i] = 0.0; }
-    else{
-      if(i0 < 0) i0 = (fd->irec - fd->nrec_used + fd->nrec) % fd->nrec;
-      if(i1 < 0) i1 = (fd->irec - 1 + fd->nrec) % fd->nrec;
+    if(fd->nrec_used == 0){
+      for(i = 0;i < NT;i++)
+        vtmp[i] = 0.0;
+    } else{
+      if(i0 < 0)
+        i0 = (fd->irec - fd->nrec_used + fd->nrec) % fd->nrec;
+      if(i1 < 0)
+        i1 = (fd->irec - 1 + fd->nrec) % fd->nrec;
       w = (fd->rec_t[i1] > fd->rec_t[i0]) ? (tl - fd->rec_t[i0])/(fd->rec_t[i1] - fd->rec_t[i0]) : 0.0;
-      if(w < 0.0) w = 0.0;
-      if(w > 1.0) w = 1.0;
-      for(i = 0;i < NT;i++) vtmp[i] = (1.0 - w)*fd->rec_v[(size_t)i0*NT + i] + w*fd->rec_v[(size_t)i1*NT + i];
+      if(w < 0.0)
+        w = 0.0;
+      if(w > 1.0)
+        w = 1.0;
+      for(i = 0;i < NT;i++)
+        vtmp[i] = (1.0 - w)*fd->rec_v[(size_t)i0*NT + i] + w*fd->rec_v[(size_t)i1*NT + i];
     }
-    for(p = 0;p < 2;p++) fd3d_push(fm[p],vtmp + p*N);
+    for(p = 0;p < 2;p++)
+      fd3d_push(fm[p],vtmp + p*N);
   }
   for(a = 0;a < fd->nstat;a++){
-    char fn[128]; PetscMPIInt rk;
     sprintf(fn,"fd_phase_%ld_st%ld.dat",(long)fd->nphase + 1,(long)fd->stat[a]);
-    MPI_Comm_rank(PETSC_COMM_WORLD,&rk); fd->fstat[a] = (rk == 0) ? fopen(fn,"w") : NULL;
+    MPI_Comm_rank(PETSC_COMM_WORLD,&rk);
+    fd->fstat[a] = (rk == 0) ? fopen(fn,"w") : NULL;
     fd->sstat[a] = -1;
-    for(i = 0;i < NT;i++) if(fd->g_of_s[i] == fd->stat[a]) fd->sstat[a] = i;
+    for(i = 0;i < NT;i++)
+      if(fd->g_of_s[i] == fd->stat[a])
+        fd->sstat[a] = i;
   }
   for(;;){
-    double trel = fm[0]->time + dt;
-    for(p = 0;p < 2;p++) for(i = 0;i < N;i++){ g = fd->g_of_s[p*N + i]; load[p][i] = (g >= 0) ? fault[g].sinc[0]*trel : 0.0; }
+    trel = fm[0]->time + dt;
+    for(p = 0;p < 2;p++)
+      for(i = 0;i < N;i++){
+        g = fd->g_of_s[p*N + i];
+        load[p][i] = (g >= 0) ? fault[g].sinc[0]*trel : 0.0;
+      }
     fd3d_pair_step(pp,load[0],load[1]);
     nsteps++;
     for(a = 0;a < fd->nstat;a++)
       if(fd->sstat[a] >= 0 && fd->fstat[a]){
-        struct fd3d *f = fm[fd->sstat[a]/N]; int s = fd->sstat[a]%N;
-        fprintf(fd->fstat[a],"%.10e %.10e %.10e %.10e %.6e\n",f->time,f->delta[s],f->V[s],f->tau[s],f->sigma[s]);
+        f_2 = fm[fd->sstat[a]/N];
+        s = fd->sstat[a]%N;
+        fprintf(fd->fstat[a],"%.10e %.10e %.10e %.10e %.6e\n",f_2->time,f_2->delta[s],f_2->V[s],f_2->tau[s],f_2->sigma[s]);
       }
     vmax = 0.0;
-    for(p = 0;p < 2;p++) for(i = 0;i < N;i++) if(fabs(fm[p]->V[i]) > vmax) vmax = fabs(fm[p]->V[i]);
-    if(vmax > vpeak) vpeak = vmax;
+    for(p = 0;p < 2;p++)
+      for(i = 0;i < N;i++)
+        if(fabs(fm[p]->V[i]) > vmax)
+          vmax = fabs(fm[p]->V[i]);
+    if(vmax > vpeak)
+      vpeak = vmax;
     if(fd->back_dyn > 0.0 && vmax < fd->vsw*(fd->reentry > 1.0 ? fd->reentry : 1.0) && pp->static_fn){
       /* as in fd3d_run_phase: FD traction against the QD traction of both planes */
-      double dmax = 0.0, *s0 = vtmp, *s1 = vtmp + N;
+      dmax = 0.0;
+      s0 = vtmp;
+      s1 = vtmp + N;
       pp->static_fn(pp->static_ctx, fm[0]->delta, fm[1]->delta, s0, s1);
-      for(p = 0;p < 2;p++) for(i = 0;i < N;i++){
-	double qd, dd;
-	if(fm[p]->locked[i]) continue;
-	qd = fm[p]->tau0[i] + (p ? s1[i] : s0[i]) + load[p][i] - eta*fm[p]->V[i]; dd = fabs(fm[p]->tau[i] - qd);
-	if(dd > dmax) dmax = dd;
-      }
-      if(dmax < fd->back_dyn) ndyn_quiet++; else ndyn_quiet = 0;
-      if(ndyn_quiet >= fd->back_nwin) break;
+      for(p = 0;p < 2;p++)
+        for(i = 0;i < N;i++){
+          if(fm[p]->locked[i])
+            continue;
+          qd = fm[p]->tau0[i] + (p ? s1[i] : s0[i]) + load[p][i] - eta*fm[p]->V[i];
+          dd = fabs(fm[p]->tau[i] - qd);
+          if(dd > dmax)
+            dmax = dd;
+        }
+      if(dmax < fd->back_dyn)
+        ndyn_quiet++;
+      else
+        ndyn_quiet = 0;
+      if(ndyn_quiet >= fd->back_nwin)
+        break;
     }
     if(fd->back_eps > 0.0){
-      int quiet = (vmax < fd->back_vmax);
+      quiet = (vmax < fd->back_vmax);
       if(quiet && (below > 0.0))
-	for(p = 0;p < 2 && quiet;p++) for(i = 0;i < N;i++)
-	  if(fabs(fm[p]->V[i] - vref[p*N + i]) > fd->back_eps*(fabs(vref[p*N + i]) + fd->vback)){ quiet = 0; break; }
+        for(p = 0;p < 2 && quiet;p++)
+          for(i = 0;i < N;i++)
+            if(fabs(fm[p]->V[i] - vref[p*N + i]) > fd->back_eps*(fabs(vref[p*N + i]) + fd->vback)){
+              quiet = 0;
+              break;
+            }
       if(!quiet || (below == 0.0)){
-	for(p = 0;p < 2;p++) memcpy(vref + p*N,fm[p]->V,sizeof(double)*N);
-	below = quiet ? 1e-30 : 0.0;
+        for(p = 0;p < 2;p++)
+          memcpy(vref + p*N,fm[p]->V,sizeof(double)*N);
+        below = quiet ? 1e-30 : 0.0;
       }else
-	below += dt;
+        below += dt;
     }else{
-      if(vmax < fd->vback) below += dt; else below = 0.0;
+      if(vmax < fd->vback)
+        below += dt;
+      else
+        below = 0.0;
     }
-    if(below >= L*dt) break;
+    if(below >= L*dt)
+      break;
     PetscCheck(nsteps < fd->max_steps,PETSC_COMM_WORLD,PETSC_ERR_CONV_FAILED,
-	       "rsf_fd: 3-D phase exceeded -fd_max_steps = %ld steps (t - t_switch %g s, max V %g)",(long)fd->max_steps,fm[0]->time,vmax);
+        "rsf_fd: 3-D phase exceeded -fd_max_steps = %ld steps (t - t_switch %g s, max V %g)",(long)fd->max_steps,fm[0]->time,vmax);
   }
-  for(a = 0;a < fd->nstat;a++) if(fd->fstat[a]){ fclose(fd->fstat[a]); fd->fstat[a] = NULL; }
-  {
-    double slip[2] = {0, 0}; int cnt[2] = {0, 0};
-    for(p = 0;p < 2;p++) for(i = 0;i < N;i++){
-      struct fd3d *f = fm[p];
-      g = fd->g_of_s[p*N + i];
-      if(g < 0) continue;
-      x[4*g] = f->f0 + f->b[i]*log(f->V0*f->theta[i]/f->Lc[i]);
-      x[4*g+1] = f->tau[i];
-      x[4*g+3] += f->delta[i];
-      if(pp->normal_coupling) x[4*g+2] = f->sigma[i];
-      if(getenv("FD_DEBUG_REENTRY") && (!isfinite(x[4*g]) || !isfinite(x[4*g+1]) || !(x[4*g+2] > 0.0)))
-        PetscCall(PetscPrintf(PETSC_COMM_WORLD,"hand-back: patch %d plane %d cell %d: psi %g tau %g sigma %g theta %g V %g\n",g,p,i,(double)x[4*g],(double)x[4*g+1],(double)x[4*g+2],f->theta[i],f->V[i]));
-      slip[p] += f->delta[i]; cnt[p]++; slipsum += f->delta[i];
+  for(a = 0;a < fd->nstat;a++)
+    if(fd->fstat[a]){
+      fclose(fd->fstat[a]);
+      fd->fstat[a] = NULL;
     }
+  {
+    slip[0] = 0;
+    slip[1] = 0;
+    cnt[0] = 0;
+    cnt[1] = 0;
+    for(p = 0;p < 2;p++)
+      for(i = 0;i < N;i++){
+        struct fd3d *f = fm[p];
+        g = fd->g_of_s[p*N + i];
+        if(g < 0)
+          continue;
+        x[4*g] = f->f0 + f->b[i]*log(f->V0*f->theta[i]/f->Lc[i]);
+        x[4*g+1] = f->tau[i];
+        x[4*g+3] += f->delta[i];
+        if(pp->normal_coupling)
+          x[4*g+2] = f->sigma[i];
+        if(getenv("FD_DEBUG_REENTRY") && (!isfinite(x[4*g]) || !isfinite(x[4*g+1]) || !(x[4*g+2] > 0.0)))
+          PetscCall(PetscPrintf(PETSC_COMM_WORLD,"hand-back: patch %d plane %d cell %d: psi %g tau %g sigma %g theta %g V %g\n",g,p,i,(double)x[4*g],(double)x[4*g+1],(double)x[4*g+2],f->theta[i],f->V[i]));
+        slip[p] += f->delta[i];
+        cnt[p]++;
+        slipsum += f->delta[i];
+      }
     PetscCall(fd_full_put(X,&fd->scX,&fd->Xall,&x,1));
     *t_end = t + fm[0]->time;
     PetscCall(PetscTime(&t_wall1));
     PetscCall(PetscPrintf(PETSC_COMM_WORLD,"rsf_fd: 3-D phase %ld (two planes): t %.8f yr, %d steps over %.1f s, peak slip rate %.3f m/s, mean slip %.4f m (plane 1) and %.4f m (plane 2), wall %.1f s\n",
-			  (long)fd->nphase + 1,(double)(t/SEC_PER_YEAR),nsteps,fm[0]->time,vpeak,slip[0]/(cnt[0] > 0 ? cnt[0] : 1),slip[1]/(cnt[1] > 0 ? cnt[1] : 1),t_wall1 - t_wall0));
+        (long)fd->nphase + 1,(double)(t/SEC_PER_YEAR),nsteps,fm[0]->time,vpeak,slip[0]/(cnt[0] > 0 ? cnt[0] : 1),slip[1]/(cnt[1] > 0 ? cnt[1] : 1),t_wall1 - t_wall0));
   }
   PetscCall(PetscFree4(vtmp,load[0],load[1],vref));
   PetscFunctionReturn(PETSC_SUCCESS);
@@ -435,19 +569,24 @@ static void fd3d_multi_apply(struct interact_ctx *par, Mat A, double **din, doub
   PetscScalar *a, *b;
   PetscInt lo, hi;
   int p, i;
+  int g;
   PetscCallAbort(PETSC_COMM_WORLD,VecGetOwnershipRange(fd->v3a,&lo,&hi));
   PetscCallAbort(PETSC_COMM_WORLD,VecGetArray(fd->v3a,&a));
-  for(p = 0;p < m->np;p++) for(i = 0;i < m->f[p]->N;i++){
-    int g = fd->g_of_s[fd->off3[p] + i];
-    if((g >= lo) && (g < hi)) a[g - lo] = fd->sgn3[p]*din[p][i];          /* interact's slip */
-  }
+  for(p = 0;p < m->np;p++)
+    for(i = 0;i < m->f[p]->N;i++){
+      g = fd->g_of_s[fd->off3[p] + i];
+      if((g >= lo) && (g < hi))
+        a[g - lo] = fd->sgn3[p]*din[p][i];          /* interact's slip */
+    }
   PetscCallAbort(PETSC_COMM_WORLD,VecRestoreArray(fd->v3a,&a));
   PetscCallAbort(PETSC_COMM_WORLD,MatMult(A,fd->v3a,fd->v3b));
   PetscCallAbort(PETSC_COMM_WORLD,fd_full_get_read(fd->v3b,&fd->sc3,&fd->v3all,&b));
-  for(p = 0;p < m->np;p++) if(out[p]) for(i = 0;i < m->f[p]->N;i++){
-    int g = fd->g_of_s[fd->off3[p] + i];
-    out[p][i] = (g < 0) ? 0.0 : (normal ? -PetscRealPart(b[g]) : fd->sgn3[p]*PetscRealPart(b[g]));
-  }
+  for(p = 0;p < m->np;p++)
+    if(out[p])
+      for(i = 0;i < m->f[p]->N;i++){
+        int g = fd->g_of_s[fd->off3[p] + i];
+        out[p][i] = (g < 0) ? 0.0 : (normal ? -PetscRealPart(b[g]) : fd->sgn3[p]*PetscRealPart(b[g]));
+      }
   PetscCallAbort(PETSC_COMM_WORLD,fd_full_put_read(fd->v3b,&fd->sc3,&fd->v3all,&b));
 }
 static void fd3d_multi_static_is(void *ctx, double **delta, double **out)
@@ -458,8 +597,10 @@ static void fd3d_multi_static_is(void *ctx, double **delta, double **out)
 static void fd3d_multi_static_in(void *ctx, int p, double **delta, double *out)
 {
   struct interact_ctx *par = (struct interact_ctx *)ctx;
-  double *o[FD3D_MULTI_MAX]; int q;
-  for(q = 0;q < par->medium->rsf->fd->multi3->np;q++) o[q] = (q == p) ? out : NULL;
+  double *o[FD3D_MULTI_MAX];
+  int q;
+  for(q = 0;q < par->medium->rsf->fd->multi3->np;q++)
+    o[q] = (q == p) ? out : NULL;
   fd3d_multi_apply(par,par->medium->In,delta,o,1);
 }
 
@@ -481,134 +622,274 @@ static PetscErrorCode fd3d_setup_msurf(struct interact_ctx *par, struct fd_vars 
   double ylo = 1e300, yhi = -1e300;
   int *plane, np = 0, rep[FD3D_MULTI_MAX], i, k, p, nx, nz[FD3D_MULTI_MAX], comp = (rsf->slip_mode == STRIKE) ? 1 : 2, m, mg, nxs, nys, Lsf;
   struct fd3d *fp[FD3D_MULTI_MAX];
+  double nrm;
+  double d[3];
+  double yl;
+  double zl;
+  double c;
+  double dn;
+  double nl[2];
+  double uy;
+  double uz;
+  double un;
+  double e3l[2];
+  double sn;
+  double st;
+  int nzm;
+  int nzp;
+  double yl_2;
+  double zl_2;
+  double rr;
+  double perp;
+  double d_2[3];
+  double yb;
+  int ii;
+  int jj;
+  int s;
+  struct fd3d *f;
+  int N;
+  int g;
+  double hx;
+  double y0;
+  double ys;
+  double *yc;
+  double *wy;
+  double zmax;
+  double band;
+  int k2;
+  int kept;
+  int near;
+  struct fd3d_layer *ly;
   PetscFunctionBeginUser;
-  (void)mo; (void)mgo;
+  (void)mo;
+  (void)mgo;
   m = (int)fd->surf_m;                                 /* as the one-fault surface: -fd_surface_m (stability band), -fd_surface_ext */
-  for(k = 0;k < 3;k++){ ex[k] = fault[0].t_strike[k]; O[k] = fault[0].x[k]*ls; }
-  { double nrm = sqrt(ex[0]*ex[0] + ex[1]*ex[1]); PetscCheck(nrm > 1e-9,PETSC_COMM_WORLD,PETSC_ERR_SUP,"-fd_mode: horizontal strike needed"); ex[0] /= nrm; ex[1] /= nrm; ex[2] = 0.0; }
-  ey[0] = -ex[1]; ey[1] = ex[0]; ey[2] = 0.0;               /* z x x' */
+  for(k = 0;k < 3;k++){
+    ex[k] = fault[0].t_strike[k];
+    O[k] = fault[0].x[k]*ls;
+  }
+  {
+    nrm = sqrt(ex[0]*ex[0] + ex[1]*ex[1]);
+    PetscCheck(nrm > 1e-9,PETSC_COMM_WORLD,PETSC_ERR_SUP,"-fd_mode: horizontal strike needed");
+    ex[0] /= nrm;
+    ex[1] /= nrm;
+    ex[2] = 0.0;
+  }
+  ey[0] = -ex[1];
+  ey[1] = ex[0];
+  ey[2] = 0.0;               /* z x x' */
   PetscCall(PetscMalloc3(n,&xp,n,&rowc,n,&plane));
   for(i = 0;i < n;i++){
-    double d[3], yl, zl;
     PetscCheck(fabs(fabs(fault[i].t_strike[0]*ex[0] + fault[i].t_strike[1]*ex[1] + fault[i].t_strike[2]*ex[2]) - 1.0) < 1e-9,PETSC_COMM_WORLD,PETSC_ERR_SUP,
-	       "-fd_mode: dipping faults in a half space must share the strike direction (patch %d; fd_plan.md G3b)",i);
+        "-fd_mode: dipping faults in a half space must share the strike direction (patch %d; fd_plan.md G3b)",i);
     plane[i] = -1;
     for(p = 0;p < np;p++){
-      double c = fabs(fault[i].normal[0]*fault[rep[p]].normal[0] + fault[i].normal[1]*fault[rep[p]].normal[1] + fault[i].normal[2]*fault[rep[p]].normal[2]), dn = 0.0;
-      for(k = 0;k < 3;k++) dn += (fault[i].x[k] - fault[rep[p]].x[k])*ls*fault[rep[p]].normal[k];
-      if((c > 1.0 - 1e-9) && (fabs(dn) < 1e-6*dx)){ plane[i] = p; break; }
+      c = fabs(fault[i].normal[0]*fault[rep[p]].normal[0] + fault[i].normal[1]*fault[rep[p]].normal[1] + fault[i].normal[2]*fault[rep[p]].normal[2]);
+      dn = 0.0;
+      for(k = 0;k < 3;k++)
+        dn += (fault[i].x[k] - fault[rep[p]].x[k])*ls*fault[rep[p]].normal[k];
+      if((c > 1.0 - 1e-9) && (fabs(dn) < 1e-6*dx)){
+        plane[i] = p;
+        break;
+      }
     }
     if(plane[i] < 0){
-      double nl[2] = {fault[i].normal[0]*ey[0] + fault[i].normal[1]*ey[1], fault[i].normal[2]}, uy = -nl[1], uz = nl[0];   /* u perpendicular to n in (y', z) */
+      nl[0] = fault[i].normal[0]*ey[0] + fault[i].normal[1]*ey[1];
+      nl[1] = fault[i].normal[2];
+      uy = -nl[1];
+      uz = nl[0];   /* u perpendicular to n in (y', z) */
       PetscCheck(np < FD3D_MULTI_MAX,PETSC_COMM_WORLD,PETSC_ERR_SUP,"-fd_mode: at most %d 3-D planes",FD3D_MULTI_MAX);
-      if((uz < -1e-12) || ((fabs(uz) <= 1e-12) && (uy < 0.0))){ uy = -uy; uz = -uz; }
-      { double un = sqrt(uy*uy + uz*uz); uy /= un; uz /= un; }
-      u[np][0] = uy; u[np][1] = uz; dipd[np] = atan2(uz, uy)*180.0/M_PI;
+      if((uz < -1e-12) || ((fabs(uz) <= 1e-12) && (uy < 0.0))){
+        uy = -uy;
+        uz = -uz;
+      }
+      {
+        un = sqrt(uy*uy + uz*uz);
+        uy /= un;
+        uz /= un;
+      }
+      u[np][0] = uy;
+      u[np][1] = uz;
+      dipd[np] = atan2(uz, uy)*180.0/M_PI;
       {
         /* sign: kernel frame F = (x', u, x' x u); interact's normal and slip direction there */
-        double e3l[2] = {-uz, uy}, sn = (nl[0]*e3l[0] + nl[1]*e3l[1]) > 0.0 ? 1.0 : -1.0, st;
-        if(comp == 1) st = (fault[i].t_strike[0]*ex[0] + fault[i].t_strike[1]*ex[1] + fault[i].t_strike[2]*ex[2]) > 0.0 ? 1.0 : -1.0;
-        else st = ((fault[i].t_dip[0]*ey[0] + fault[i].t_dip[1]*ey[1])*uy + fault[i].t_dip[2]*uz) > 0.0 ? 1.0 : -1.0;
+        e3l[0] = -uz;
+        e3l[1] = uy;
+        sn = (nl[0]*e3l[0] + nl[1]*e3l[1]) > 0.0 ? 1.0 : -1.0;
+        if(comp == 1)
+          st = (fault[i].t_strike[0]*ex[0] + fault[i].t_strike[1]*ex[1] + fault[i].t_strike[2]*ex[2]) > 0.0 ? 1.0 : -1.0;
+        else
+          st = ((fault[i].t_dip[0]*ey[0] + fault[i].t_dip[1]*ey[1])*uy + fault[i].t_dip[2]*uz) > 0.0 ? 1.0 : -1.0;
         fsg[np] = sn*st;
       }
-      rmin[np] = 1e300; rmax[np] = -1e300; rep[np] = i; plane[i] = np; np++;
+      rmin[np] = 1e300;
+      rmax[np] = -1e300;
+      rep[np] = i;
+      plane[i] = np;
+      np++;
     }
     p = plane[i];
-    for(k = 0;k < 3;k++) d[k] = fault[i].x[k]*ls - O[k];
+    for(k = 0;k < 3;k++)
+      d[k] = fault[i].x[k]*ls - O[k];
     xp[i] = d[0]*ex[0] + d[1]*ex[1] + d[2]*ex[2];
-    yl = d[0]*ey[0] + d[1]*ey[1]; zl = fault[i].x[2]*ls;
+    yl = d[0]*ey[0] + d[1]*ey[1];
+    zl = fault[i].x[2]*ls;
     rowc[i] = -(yl*u[p][0] + zl*u[p][1]);                    /* down-dip coordinate */
-    if(xp[i] < xmin) xmin = xp[i];
-    if(xp[i] > xmax) xmax = xp[i];
-    if(rowc[i] < rmin[p]) rmin[p] = rowc[i];
-    if(rowc[i] > rmax[p]) rmax[p] = rowc[i];
+    if(xp[i] < xmin)
+      xmin = xp[i];
+    if(xp[i] > xmax)
+      xmax = xp[i];
+    if(rowc[i] < rmin[p])
+      rmin[p] = rowc[i];
+    if(rowc[i] > rmax[p])
+      rmax[p] = rowc[i];
   }
   PetscCheck(np >= 2,PETSC_COMM_WORLD,PETSC_ERR_SUP,"-fd_mode: fd3d_setup_msurf needs two or more planes");
-  { int nzm = 2; for(p = 0;p < np;p++){ int nzp = (int)floor((rmax[p] - rmin[p])/dx + 0.5) + 1; if(nzp > nzm) nzm = nzp; }
-    mg = (int)(fd->surf_ext > 0 ? fd->surf_ext : nzm); }
+  {
+    nzm = 2;
+    for(p = 0;p < np;p++){
+      nzp = (int)floor((rmax[p] - rmin[p])/dx + 0.5) + 1;
+      if(nzp > nzm)
+        nzm = nzp;
+    }
+    mg = (int)(fd->surf_ext > 0 ? fd->surf_ext : nzm);
+  }
   nx = (int)floor((xmax - xmin)/dx + 0.5) + 1;
   fd->n3tot = 0;
   for(p = 0;p < np;p++){
-    double yl, zl, rr, perp;
     nz[p] = (int)floor((rmax[p] - rmin[p])/dx + 0.5) + 1;
-    fd->off3[p] = fd->n3tot; fd->n3tot += nx*nz[p];
+    fd->off3[p] = fd->n3tot;
+    fd->n3tot += nx*nz[p];
     /* the plane's offset along its normal in (y', z): any of its patches */
-    { double d[3]; for(k = 0;k < 3;k++) d[k] = fault[rep[p]].x[k]*ls - O[k]; yl = d[0]*ey[0] + d[1]*ey[1]; zl = fault[rep[p]].x[2]*ls; }
-    perp = yl*(-u[p][1]) + zl*u[p][0];                       /* component along e3l = (-uz, uy) */
+    {
+      for(k = 0;k < 3;k++)
+        d_2[k] = fault[rep[p]].x[k]*ls - O[k];
+      yl_2 = d_2[0]*ey[0] + d_2[1]*ey[1];
+      zl_2 = fault[rep[p]].x[2]*ls;
+    }
+    perp = yl_2*(-u[p][1]) + zl_2*u[p][0];                       /* component along e3l = (-uz, uy) */
     rr = rmin[p] - 0.5*dx;                                   /* top edge, down-dip coordinate */
-    ytop[p] = -rr*u[p][0] + perp*(-u[p][1]); ztop[p] = -rr*u[p][1] + perp*u[p][0];
+    ytop[p] = -rr*u[p][0] + perp*(-u[p][1]);
+    ztop[p] = -rr*u[p][1] + perp*u[p][0];
     PetscCheck(ztop[p] <= 1e-6*dx,PETSC_COMM_WORLD,PETSC_ERR_SUP,"-fd_mode: plane %d above the surface",p);
-    { double yb = ytop[p] - nz[p]*dx*u[p][0]; if(fmin(ytop[p],yb) < ylo) ylo = fmin(ytop[p],yb); if(fmax(ytop[p],yb) > yhi) yhi = fmax(ytop[p],yb); }
+    {
+      yb = ytop[p] - nz[p]*dx*u[p][0];
+      if(fmin(ytop[p],yb) < ylo)
+        ylo = fmin(ytop[p],yb);
+      if(fmax(ytop[p],yb) > yhi)
+        yhi = fmax(ytop[p],yb);
+    }
   }
   PetscCall(PetscMalloc1(fd->n3tot,&fd->g_of_s));
-  for(i = 0;i < fd->n3tot;i++) fd->g_of_s[i] = -1;
+  for(i = 0;i < fd->n3tot;i++)
+    fd->g_of_s[i] = -1;
   for(i = 0;i < n;i++){
-    int ii = (int)floor((xp[i] - xmin)/dx + 0.5), jj = (int)floor((rowc[i] - rmin[plane[i]])/dx + 0.5), s = fd->off3[plane[i]] + ii*nz[plane[i]] + jj;
+    ii = (int)floor((xp[i] - xmin)/dx + 0.5);
+    jj = (int)floor((rowc[i] - rmin[plane[i]])/dx + 0.5);
+    s = fd->off3[plane[i]] + ii*nz[plane[i]] + jj;
     PetscCheck((fabs((xp[i] - xmin)/dx - ii) < 1e-6) && (fabs((rowc[i] - rmin[plane[i]])/dx - jj) < 1e-6),PETSC_COMM_WORLD,PETSC_ERR_SUP,"-fd_mode: patch %d is off the common lattice (x %g, down dip %g in units of dx; strike (%g %g %g))",i,(xp[i] - xmin)/dx,(rowc[i] - rmin[plane[i]])/dx,ex[0],ex[1],ex[2]);
     PetscCheck(fd->g_of_s[s] < 0,PETSC_COMM_WORLD,PETSC_ERR_SUP,"-fd_mode: duplicate patch (patch %d)",i);
     fd->g_of_s[s] = i;
   }
   PetscCall(PetscFree3(xp,rowc,plane));
-  fd->nm3 = np; fd->dt_min = fd->cfl*dx/fd->beta; fd->mirror3 = PETSC_FALSE; fd->surf3 = PETSC_TRUE;
+  fd->nm3 = np;
+  fd->dt_min = fd->cfl*dx/fd->beta;
+  fd->mirror3 = PETSC_FALSE;
+  fd->surf3 = PETSC_TRUE;
   for(p = 0;p < np;p++){
-    struct fd3d *f; int N = nx*nz[p];
+    N = nx*nz[p];
     fd->sgn3[p] = 1.0;
     fd->tabm3[p] = fd3d_tab_create_c(nx,nz[p],dx,fd->dt_min,fd->alpha,fd->beta,fd->rho,(int)fd->lmax,comp);
     PetscCheck(fd->tabm3[p],PETSC_COMM_WORLD,PETSC_ERR_MEM,"rsf_fd_setup: 3-D table allocation failed");
     fp[p] = f = fd3d_create(fd->tabm3[p]);
-    f->law = 1; f->f0 = rsf->f0; f->V0 = rsf->v0; f->nl = (int)fd->nl;
+    f->law = 1;
+    f->f0 = rsf->f0;
+    f->V0 = rsf->v0;
+    f->nl = (int)fd->nl;
     PetscCall(PetscMalloc4(N,&f->a,N,&f->b,N,&f->Lc,N,&f->theta));
     f->locked = (int *)calloc(N,sizeof(int));
     for(i = 0;i < N;i++){
-      int g = fd->g_of_s[fd->off3[p] + i];
-      if(g >= 0){ f->a[i] = fault[g].mu_sa; f->b[i] = fault[g].mu_db; f->Lc[i] = rsf->dc_vec ? rsf->dc_vec[g] : rsf->dc; }
-      else{ f->a[i] = 0.01; f->b[i] = 0.01; f->Lc[i] = 1.0; f->locked[i] = 1; f->theta[i] = 1.0; }
+      g = fd->g_of_s[fd->off3[p] + i];
+      if(g >= 0){
+        f->a[i] = fault[g].mu_sa;
+        f->b[i] = fault[g].mu_db;
+        f->Lc[i] = rsf->dc_vec ? rsf->dc_vec[g] : rsf->dc;
+      } else{
+        f->a[i] = 0.01;
+        f->b[i] = 0.01;
+        f->Lc[i] = 1.0;
+        f->locked[i] = 1;
+        f->theta[i] = 1.0;
+      }
     }
   }
   /* surface: uniform rows of dx/m on the lattice through plane 0's top line, margins mg dx */
   {
-    double hx = dx/m, y0 = ytop[0], ys = y0 - ceil((y0 - (ylo - mg*dx))/hx)*hx, *yc, *wy, zmax = 0.0;
-    nys = (int)ceil((yhi + mg*dx - ys)/hx); nxs = (nx + 2*mg)*m;
-    yc = malloc(sizeof(double)*nys); wy = malloc(sizeof(double)*nys);
-    for(i = 0;i < nys;i++){ yc[i] = ys + (i + 0.5)*hx; wy[i] = hx; }
+    hx = dx/m;
+    y0 = ytop[0];
+    ys = y0 - ceil((y0 - (ylo - mg*dx))/hx)*hx;
+    zmax = 0.0;
+    nys = (int)ceil((yhi + mg*dx - ys)/hx);
+    nxs = (nx + 2*mg)*m;
+    yc = malloc(sizeof(double)*nys);
+    wy = malloc(sizeof(double)*nys);
+    for(i = 0;i < nys;i++){
+      yc[i] = ys + (i + 0.5)*hx;
+      wy[i] = hx;
+    }
     if(getenv("FD_SURF_BAND")){
       /* experiment (fd_plan.md H3): the surface only within a band around any fault's trace;
          all couplings of the remaining rows are kept (a smaller but consistent system) */
-      double band = atof(getenv("FD_SURF_BAND"));
-      int k2 = 0, kept;
+      band = atof(getenv("FD_SURF_BAND"));
+      k2 = 0;
       for(i = 0;i < nys;i++){
-        int near = 0;
-        for(p = 0;p < np;p++) if(fabs(yc[i] - ytop[p]) <= band) near = 1;
-        if(near){ yc[k2] = yc[i]; wy[k2] = wy[i]; k2++; }
+        near = 0;
+        for(p = 0;p < np;p++)
+          if(fabs(yc[i] - ytop[p]) <= band)
+            near = 1;
+        if(near){
+          yc[k2] = yc[i];
+          wy[k2] = wy[i];
+          k2++;
+        }
       }
       kept = k2;
       PetscCall(PetscPrintf(PETSC_COMM_WORLD,"rsf_fd_setup: FD_SURF_BAND %g m: %d of %d surface rows kept\n",band,kept,nys));
       nys = kept;
     }
-    for(p = 0;p < np;p++) zmax = fmax(zmax, -(ztop[p] - nz[p]*dx*u[p][1]));
+    for(p = 0;p < np;p++)
+      zmax = fmax(zmax, -(ztop[p] - nz[p]*dx*u[p][1]));
     Lsf = (int)ceil(sqrt(pow((nx + 2*mg)*dx, 2) + pow(yhi - ylo + 2*mg*dx, 2) + zmax*zmax)/(fd->beta*fd->dt_min)) + 2;
     fd->msurf3 = fd3d_msurf_create(np,fp,ytop,ztop,dipd,fsg,comp,xmin - 0.5*dx,m,nxs,nys,xmin - 0.5*dx - mg*dx,yc,wy,Lsf);
-    free(yc); free(wy);
+    free(yc);
+    free(wy);
     PetscCheck(fd->msurf3,PETSC_COMM_WORLD,PETSC_ERR_LIB,"rsf_fd_setup: several faults with a virtual surface: setup failed (one MPI rank; same along-strike lattice)");
     PetscCall(PetscPrintf(PETSC_COMM_WORLD,"rsf_fd_setup: virtual surface for %d faults: %d x %d surface elements of %g m, %d lags\n",np,nxs,nys,hx,Lsf));
   }
   fd->multi3 = fd->msurf3->mx;
   fd->f3 = fp[0];
-  fd->multi3->static_fn = fd3d_multi_static_is; fd->multi3->static_ctx = (void *)par;
+  fd->multi3->static_fn = fd3d_multi_static_is;
+  fd->multi3->static_ctx = (void *)par;
   for(p = 0;p < np;p++){
-    struct fd3d_layer *ly = fd->msurf3->ly[p];
+    ly = fd->msurf3->ly[p];
     ly->normal_coupling = rsf->calc_sigma_dot ? 1 : 0;
     PetscCall(PetscPrintf(PETSC_COMM_WORLD,"rsf_fd_setup: fault %d: %d x %d squares of %g m, dip %.2f deg, top (y', z) = (%.1f, %.1f) m, slip sign %+.0f\n",p,nx,nz[p],dx,dipd[p],ytop[p],ztop[p],fsg[p]));
   }
-  if(rsf->calc_sigma_dot){ fd->msurf3->static_n_fn = fd3d_multi_static_in; fd->msurf3->static_n_ctx = (void *)par; }
+  if(rsf->calc_sigma_dot){
+    fd->msurf3->static_n_fn = fd3d_multi_static_in;
+    fd->msurf3->static_n_ctx = (void *)par;
+  }
   PetscCall(MatCreateVecs(medium->Is,&fd->v3a,&fd->v3b));
-  fd->nrec = 64; fd->irec = 0; fd->nrec_used = 0;
+  fd->nrec = 64;
+  fd->irec = 0;
+  fd->nrec_used = 0;
   PetscCall(PetscMalloc2(fd->nrec,&fd->rec_t,(size_t)fd->nrec*fd->n3tot,&fd->rec_v));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 static PetscErrorCode fd3d_setup_multi(struct interact_ctx *par, struct fd_vars *fd)
 {
+  PetscInt gi, cg, ncols;
   struct med *medium = par->medium;
   struct flt *fault = par->fault;
   struct rsf_vars *rsf = medium->rsf;
@@ -618,6 +899,40 @@ static PetscErrorCode fd3d_setup_multi(struct interact_ctx *par, struct fd_vars 
   double lo1[FD3D_MULTI_MAX], lo2[FD3D_MULTI_MAX], E[FD3D_MULTI_MAX][3][3], X0[FD3D_MULTI_MAX][3];
   struct fd3d_mplane geom[FD3D_MULTI_MAX];
   struct fd3d *fp[FD3D_MULTI_MAX];
+  int need;
+  double d[3];
+  double c;
+  double dn;
+  int ii;
+  int jj;
+  int ii_2;
+  int jj_2;
+  int s;
+  struct fd3d *f;
+  int N;
+  double ztop;
+  int g;
+  const PetscInt *cols;
+  const PetscScalar *vals;
+  int *pl_of;
+  int *s_of;
+  int q;
+  int pp;
+  int g_2;
+  int si;
+  int sj;
+  int ours;
+  int self;
+  double v;
+  int di;
+  int dj;
+  int nt;
+  int sjr;
+  int tj;
+  int djr;
+  int dji;
+  int g_3;
+  double v_2;
   PetscFunctionBeginUser;
   int mir = !medium->full_space && !fd->hs_static;
   /* half space (G3a): vertical strike-slip planes reaching the surface, by free-surface images;
@@ -625,146 +940,215 @@ static PetscErrorCode fd3d_setup_multi(struct interact_ctx *par, struct fd_vars 
      -fd_hs_static (G4): any geometry, whole-space dynamics with the exact half-space statics */
   if(mir){
     /* dipping planes or dip slip in a half space: one virtual surface for all (G3b) */
-    int need = (rsf->slip_mode != STRIKE);
-    for(i = 0;i < n;i++) if(fabs(fault[i].normal[2]) > 1e-9) need = 1;
-    if(need || getenv("FD_FORCE_MSURF")) return fd3d_setup_msurf(par,fd);
+    need = (rsf->slip_mode != STRIKE);
+    for(i = 0;i < n;i++)
+      if(fabs(fault[i].normal[2]) > 1e-9)
+        need = 1;
+    if(need || getenv("FD_FORCE_MSURF"))
+      return fd3d_setup_msurf(par,fd);
   }
   PetscCheck((rsf->slip_mode == STRIKE) || (rsf->slip_mode == DIP),PETSC_COMM_WORLD,PETSC_ERR_SUP,"-fd_mode: 3-D planes need pure strike or dip slip");
   PetscCall(PetscMalloc3(n,&pa,n,&pb,n,&plane));
   for(i = 0;i < n;i++){
-    double d[3];
     PetscCheck((fabs(2.0*fault[i].l*ls - dx) < 1e-6*dx) && (fabs(2.0*fault[i].w*ls - dx) < 1e-6*dx),PETSC_COMM_WORLD,PETSC_ERR_SUP,
-	       "-fd_mode: 3-D elements must be squares of one size (patch %d)",i);
+        "-fd_mode: 3-D elements must be squares of one size (patch %d)",i);
     plane[i] = -1;
     for(p = 0;p < np;p++){                     /* same plane as representative rep[p]: parallel normal, zero offset */
-      double c = fault[i].normal[0]*fault[rep[p]].normal[0] + fault[i].normal[1]*fault[rep[p]].normal[1] + fault[i].normal[2]*fault[rep[p]].normal[2], dn = 0.0;
-      for(k = 0;k < 3;k++){ d[k] = (fault[i].x[k] - fault[rep[p]].x[k])*ls; dn += d[k]*fault[rep[p]].normal[k]; }
-      if((c > 1.0 - 1e-9) && (fabs(dn) < 1e-6*dx)){ plane[i] = p; break; }
+      c = fault[i].normal[0]*fault[rep[p]].normal[0] + fault[i].normal[1]*fault[rep[p]].normal[1] + fault[i].normal[2]*fault[rep[p]].normal[2];
+      dn = 0.0;
+      for(k = 0;k < 3;k++){
+        d[k] = (fault[i].x[k] - fault[rep[p]].x[k])*ls;
+        dn += d[k]*fault[rep[p]].normal[k];
+      }
+      if((c > 1.0 - 1e-9) && (fabs(dn) < 1e-6*dx)){
+        plane[i] = p;
+        break;
+      }
     }
     if(plane[i] < 0){
       PetscCheck(np < FD3D_MULTI_MAX,PETSC_COMM_WORLD,PETSC_ERR_SUP,"-fd_mode: at most %d 3-D planes",FD3D_MULTI_MAX);
-      rep[np] = i; plane[i] = np;
-      for(k = 0;k < 3;k++){ E[np][0][k] = fault[i].t_strike[k]; E[np][2][k] = fault[i].normal[k]; X0[np][k] = fault[i].x[k]*ls; }
+      rep[np] = i;
+      plane[i] = np;
+      for(k = 0;k < 3;k++){
+        E[np][0][k] = fault[i].t_strike[k];
+        E[np][2][k] = fault[i].normal[k];
+        X0[np][k] = fault[i].x[k]*ls;
+      }
       E[np][1][0] = E[np][2][1]*E[np][0][2] - E[np][2][2]*E[np][0][1];     /* e2 = e3 x e1 */
       E[np][1][1] = E[np][2][2]*E[np][0][0] - E[np][2][0]*E[np][0][2];
       E[np][1][2] = E[np][2][0]*E[np][0][1] - E[np][2][1]*E[np][0][0];
       fd->sgn3[np] = (comp == 1) ? 1.0 : ((E[np][1][0]*fault[i].t_dip[0] + E[np][1][1]*fault[i].t_dip[1] + E[np][1][2]*fault[i].t_dip[2]) > 0.0 ? 1.0 : -1.0);
-      lo1[np] = lo2[np] = 1e300; nx[np] = nz[np] = 0;
+      lo1[np] = lo2[np] = 1e300;
+      nx[np] = nz[np] = 0;
       np++;
     }
     p = plane[i];
-    for(k = 0;k < 3;k++) d[k] = fault[i].x[k]*ls - X0[p][k];
+    for(k = 0;k < 3;k++)
+      d[k] = fault[i].x[k]*ls - X0[p][k];
     pa[i] = d[0]*E[p][0][0] + d[1]*E[p][0][1] + d[2]*E[p][0][2];
     pb[i] = -(d[0]*E[p][1][0] + d[1]*E[p][1][1] + d[2]*E[p][1][2]);      /* row coordinate along -e2 */
-    if(pa[i] < lo1[p]) lo1[p] = pa[i];
-    if(pb[i] < lo2[p]) lo2[p] = pb[i];
+    if(pa[i] < lo1[p])
+      lo1[p] = pa[i];
+    if(pb[i] < lo2[p])
+      lo2[p] = pb[i];
   }
   for(i = 0;i < n;i++){
-    int ii = (int)floor((pa[i] - lo1[plane[i]])/dx + 0.5), jj = (int)floor((pb[i] - lo2[plane[i]])/dx + 0.5);
+    ii = (int)floor((pa[i] - lo1[plane[i]])/dx + 0.5);
+    jj = (int)floor((pb[i] - lo2[plane[i]])/dx + 0.5);
     PetscCheck((fabs((pa[i] - lo1[plane[i]])/dx - ii) < 1e-6) && (fabs((pb[i] - lo2[plane[i]])/dx - jj) < 1e-6),PETSC_COMM_WORLD,PETSC_ERR_SUP,
-	       "-fd_mode: patch %d is off its plane's lattice",i);
-    if(ii + 1 > nx[plane[i]]) nx[plane[i]] = ii + 1;
-    if(jj + 1 > nz[plane[i]]) nz[plane[i]] = jj + 1;
+        "-fd_mode: patch %d is off its plane's lattice",i);
+    if(ii + 1 > nx[plane[i]])
+      nx[plane[i]] = ii + 1;
+    if(jj + 1 > nz[plane[i]])
+      nz[plane[i]] = jj + 1;
   }
-  fd->nm3 = np; fd->n3tot = 0;
-  for(p = 0;p < np;p++){ fd->off3[p] = fd->n3tot; fd->n3tot += nx[p]*nz[p]; }
+  fd->nm3 = np;
+  fd->n3tot = 0;
+  for(p = 0;p < np;p++){
+    fd->off3[p] = fd->n3tot;
+    fd->n3tot += nx[p]*nz[p];
+  }
   PetscCall(PetscMalloc1(fd->n3tot,&fd->g_of_s));
-  for(i = 0;i < fd->n3tot;i++) fd->g_of_s[i] = -1;
+  for(i = 0;i < fd->n3tot;i++)
+    fd->g_of_s[i] = -1;
   for(i = 0;i < n;i++){
-    int ii = (int)floor((pa[i] - lo1[plane[i]])/dx + 0.5), jj = (int)floor((pb[i] - lo2[plane[i]])/dx + 0.5), s = fd->off3[plane[i]] + ii*nz[plane[i]] + jj;
+    ii_2 = (int)floor((pa[i] - lo1[plane[i]])/dx + 0.5);
+    jj_2 = (int)floor((pb[i] - lo2[plane[i]])/dx + 0.5);
+    s = fd->off3[plane[i]] + ii_2*nz[plane[i]] + jj_2;
     PetscCheck(fd->g_of_s[s] < 0,PETSC_COMM_WORLD,PETSC_ERR_SUP,"-fd_mode: duplicate patch in a 3-D lattice (patch %d)",i);
     fd->g_of_s[s] = i;
   }
   fd->dt_min = fd->cfl*dx/fd->beta;
-  fd->mirror3 = mir ? PETSC_TRUE : PETSC_FALSE; fd->surf3 = PETSC_FALSE;
+  fd->mirror3 = mir ? PETSC_TRUE : PETSC_FALSE;
+  fd->surf3 = PETSC_FALSE;
   for(p = 0;p < np;p++){
-    struct fd3d *f;
-    int N = nx[p]*nz[p];
+    N = nx[p]*nz[p];
     if(mir){                                       /* the plane's top row must be at the surface, rows by depth */
-      double ztop = X0[p][2] - (lo2[p] - 0.5*dx)*E[p][1][2];
+      ztop = X0[p][2] - (lo2[p] - 0.5*dx)*E[p][1][2];
       PetscCheck(fabs(E[p][1][2]) > 1.0 - 1e-9,PETSC_COMM_WORLD,PETSC_ERR_SUP,"-fd_mode: half space: plane %d not vertical",p);
       PetscCheck(fabs(ztop) < 1e-6*dx,PETSC_COMM_WORLD,PETSC_ERR_SUP,"-fd_mode: half space: plane %d must reach the surface (top at %g m)",p,ztop);
     }
     fd->tabm3[p] = fd3d_tab_create_c(nx[p],mir ? 2*nz[p] : nz[p],dx,fd->dt_min,fd->alpha,fd->beta,fd->rho,(int)fd->lmax,comp);
     PetscCheck(fd->tabm3[p],PETSC_COMM_WORLD,PETSC_ERR_MEM,"rsf_fd_setup: 3-D table allocation failed");
     fp[p] = f = fd3d_create2(fd->tabm3[p],nz[p],mir);
-    f->law = 1; f->f0 = rsf->f0; f->V0 = rsf->v0; f->nl = (int)fd->nl;
+    f->law = 1;
+    f->f0 = rsf->f0;
+    f->V0 = rsf->v0;
+    f->nl = (int)fd->nl;
     PetscCall(PetscMalloc4(N,&f->a,N,&f->b,N,&f->Lc,N,&f->theta));
     f->locked = (int *)calloc(N,sizeof(int));
     for(i = 0;i < N;i++){
-      int g = fd->g_of_s[fd->off3[p] + i];
-      if(g >= 0){ f->a[i] = fault[g].mu_sa; f->b[i] = fault[g].mu_db; f->Lc[i] = rsf->dc_vec ? rsf->dc_vec[g] : rsf->dc; }
-      else{ f->a[i] = 0.01; f->b[i] = 0.01; f->Lc[i] = 1.0; f->locked[i] = 1; f->theta[i] = 1.0; }
+      g = fd->g_of_s[fd->off3[p] + i];
+      if(g >= 0){
+        f->a[i] = fault[g].mu_sa;
+        f->b[i] = fault[g].mu_db;
+        f->Lc[i] = rsf->dc_vec ? rsf->dc_vec[g] : rsf->dc;
+      } else{
+        f->a[i] = 0.01;
+        f->b[i] = 0.01;
+        f->Lc[i] = 1.0;
+        f->locked[i] = 1;
+        f->theta[i] = 1.0;
+      }
     }
     memset(&geom[p],0,sizeof(geom[p]));
-    geom[p].dx = dx; geom[p].comp = comp; geom[p].mirror = mir;
+    geom[p].dx = dx;
+    geom[p].comp = comp;
+    geom[p].mirror = mir;
     for(k = 0;k < 3;k++){
-      geom[p].E[0][k] = E[p][0][k]; geom[p].E[1][k] = E[p][1][k]; geom[p].E[2][k] = E[p][2][k];
+      geom[p].E[0][k] = E[p][0][k];
+      geom[p].E[1][k] = E[p][1][k];
+      geom[p].E[2][k] = E[p][2][k];
       geom[p].O[k] = X0[p][k] + (lo1[p] - 0.5*dx)*E[p][0][k] - (lo2[p] - 0.5*dx)*E[p][1][k];
     }
   }
   fd->f3 = fp[0];
   fd->multi3 = fd3d_multi_create(np,fp,geom);
   PetscCheck(fd->multi3,PETSC_COMM_WORLD,PETSC_ERR_SUP,"rsf_fd_setup: several 3-D planes: setup failed (one MPI rank only in this version)");
-  fd->multi3->static_fn = fd3d_multi_static_is; fd->multi3->static_ctx = (void *)par;
+  fd->multi3->static_fn = fd3d_multi_static_is;
+  fd->multi3->static_ctx = (void *)par;
   fd->multi3->normal_coupling = rsf->calc_sigma_dot ? 1 : 0;
-  if(rsf->calc_sigma_dot){ fd->multi3->static_n_fn = fd3d_multi_static_in; fd->multi3->static_n_ctx = (void *)par; }
+  if(rsf->calc_sigma_dot){
+    fd->multi3->static_n_fn = fd3d_multi_static_in;
+    fd->multi3->static_n_ctx = (void *)par;
+  }
   PetscCall(MatCreateVecs(medium->Is,&fd->v3a,&fd->v3b));
   /* static gate: tables (self: Toeplitz static offsets; cross: dense static blocks) against Is and -In */
   {
-    PetscInt gi, c, ncols;
-    const PetscInt *cols; const PetscScalar *vals;
-    int *pl_of = malloc(sizeof(int)*n), *s_of = malloc(sizeof(int)*n), q;
-    for(i = 0;i < fd->n3tot;i++) if(fd->g_of_s[i] >= 0){
-      int pp = 0; while((pp + 1 < np) && (i >= fd->off3[pp + 1])) pp++;
-      pl_of[fd->g_of_s[i]] = pp; s_of[fd->g_of_s[i]] = i - fd->off3[pp];
-    }
+    pl_of = malloc(sizeof(int)*n);
+    s_of = malloc(sizeof(int)*n);
+    for(i = 0;i < fd->n3tot;i++)
+      if(fd->g_of_s[i] >= 0){
+        pp = 0;
+        while((pp + 1 < np) && (i >= fd->off3[pp + 1]))
+          pp++;
+        pl_of[fd->g_of_s[i]] = pp;
+        s_of[fd->g_of_s[i]] = i - fd->off3[pp];
+      }
     for(gi = 0;gi < n;gi++){
       PetscCall(MatGetRow(medium->Is,gi,&ncols,&cols,&vals));
       p = pl_of[gi];
-      for(c = 0;c < ncols;c++){
-        int g = (int)cols[c], si = s_of[gi], sj = s_of[g], ours, self;
-        double v; q = pl_of[g]; self = (p == q);
+      for(cg = 0;cg < ncols;cg++){
+        g_2 = (int)cols[cg];
+        si = s_of[gi];
+        sj = s_of[g_2];
+        q = pl_of[g_2];
+        self = (p == q);
         if(self){
-          int di = si/nz[p] - sj/nz[p], dj = si%nz[p] - sj%nz[p];
-          if((abs(di) <= 1) && (abs(dj) <= 1)) continue;
+          di = si/nz[p] - sj/nz[p];
+          dj = si%nz[p] - sj%nz[p];
+          if((abs(di) <= 1) && (abs(dj) <= 1))
+            continue;
           if(mir){                                   /* doubled rows: the cell and its image */
-            int nt = 2*nz[p], sjr = si%nz[p], tj = sj%nz[p], djr = sjr - tj, dji = (nz[p] + sjr) - (nz[p] - 1 - tj);
+            nt = 2*nz[p];
+            sjr = si%nz[p];
+            tj = sj%nz[p];
+            djr = sjr - tj;
+            dji = (nz[p] + sjr) - (nz[p] - 1 - tj);
             v = fd->tabm3[p]->ks_off[(size_t)(di + nx[p] - 1)*(2*nt - 1) + (djr + nt - 1)] + fd->tabm3[p]->ks_off[(size_t)(di + nx[p] - 1)*(2*nt - 1) + (dji + nt - 1)];
           }else
-          v = fd->tabm3[p]->ks_off[(size_t)(di + nx[p] - 1)*(2*nz[p] - 1) + (dj + nz[p] - 1)];
+            v = fd->tabm3[p]->ks_off[(size_t)(di + nx[p] - 1)*(2*nz[p] - 1) + (dj + nz[p] - 1)];
         }else
           v = fd->multi3->c[q][p].Ks[(size_t)si*fd->multi3->c[q][p].ns + sj];
-        v *= fd->sgn3[p]*fd->sgn3[q]; ours = 0;
+        v *= fd->sgn3[p]*fd->sgn3[q];
+        ours = 0;
         (void)ours;
-        dev[!self] += (PetscRealPart(vals[c]) - v)*(PetscRealPart(vals[c]) - v); nrm[!self] += PetscRealPart(vals[c])*PetscRealPart(vals[c]);
+        dev[!self] += (PetscRealPart(vals[cg]) - v)*(PetscRealPart(vals[cg]) - v);
+        nrm[!self] += PetscRealPart(vals[cg])*PetscRealPart(vals[cg]);
       }
       PetscCall(MatRestoreRow(medium->Is,gi,&ncols,&cols,&vals));
       if(medium->In){
         PetscCall(MatGetRow(medium->In,gi,&ncols,&cols,&vals));
-        for(c = 0;c < ncols;c++){
-          int g = (int)cols[c]; double v;
-          q = pl_of[g];
-          if(q == p) continue;
-          v = fd->multi3->c[q][p].Kn[(size_t)s_of[gi]*fd->multi3->c[q][p].ns + s_of[g]]*fd->sgn3[q];
-          devn += (-PetscRealPart(vals[c]) - v)*(-PetscRealPart(vals[c]) - v); nrmn += PetscRealPart(vals[c])*PetscRealPart(vals[c]);
+        for(cg = 0;cg < ncols;cg++){
+          g_3 = (int)cols[cg];
+          q = pl_of[g_3];
+          if(q == p)
+            continue;
+          v_2 = fd->multi3->c[q][p].Kn[(size_t)s_of[gi]*fd->multi3->c[q][p].ns + s_of[g_3]]*fd->sgn3[q];
+          devn += (-PetscRealPart(vals[cg]) - v_2)*(-PetscRealPart(vals[cg]) - v_2);
+          nrmn += PetscRealPart(vals[cg])*PetscRealPart(vals[cg]);
         }
         PetscCall(MatRestoreRow(medium->In,gi,&ncols,&cols,&vals));
       }
     }
-    free(pl_of); free(s_of);
-    dev[0] = sqrt(dev[0]/(nrm[0] + 1e-300)); dev[1] = sqrt(dev[1]/(nrm[1] + 1e-300)); devn = nrmn > 0.0 ? sqrt(devn/nrmn) : -1.0;
+    free(pl_of);
+    free(s_of);
+    dev[0] = sqrt(dev[0]/(nrm[0] + 1e-300));
+    dev[1] = sqrt(dev[1]/(nrm[1] + 1e-300));
+    devn = nrmn > 0.0 ? sqrt(devn/nrmn) : -1.0;
   }
   PetscCall(PetscFree3(pa,pb,plane));
-  fd->nrec = 64; fd->irec = 0; fd->nrec_used = 0;
+  fd->nrec = 64;
+  fd->irec = 0;
+  fd->nrec_used = 0;
   PetscCall(PetscMalloc2(fd->nrec,&fd->rec_t,(size_t)fd->nrec*fd->n3tot,&fd->rec_v));
   for(p = 0;p < np;p++)
     PetscCall(PetscPrintf(PETSC_COMM_WORLD,"rsf_fd_setup: 3-D plane %d: %d x %d squares of %g m, normal (%.3f, %.3f, %.3f), window %d lags%s\n",p,nx[p],nz[p],dx,
-			  E[p][2][0],E[p][2][1],E[p][2][2],fd->tabm3[p]->L,fd->multi3->implicit ? "" : ""));
+        E[p][2][0],E[p][2][1],E[p][2][2],fd->tabm3[p]->L,fd->multi3->implicit ? "" : ""));
   PetscCall(PetscPrintf(PETSC_COMM_WORLD,"rsf_fd_setup: 3-D, %d planes, %s, dt_min %.3e s, cross first lag %s; static gate: rel dev from Is %.3e within planes, %.3e across, normal across from -In %.3e%s\n",
-			np,mir ? "half space (images)" : ((fd->hs_static && !medium->full_space) ? "half space: whole-space dynamics, exact half-space statics (-fd_hs_static)" : "whole space"),(double)fd->dt_min,fd->multi3->implicit ? "kept (planes meet)" : "zero",dev[0],dev[1],devn,mir ? " (images: a few percent expected)" : ""));
+      np,mir ? "half space (images)" : ((fd->hs_static && !medium->full_space) ? "half space: whole-space dynamics, exact half-space statics (-fd_hs_static)" : "whole space"),(double)fd->dt_min,fd->multi3->implicit ? "kept (planes meet)" : "zero",dev[0],dev[1],devn,mir ? " (images: a few percent expected)" : ""));
   PetscCheck(mir || (fd->hs_static && !medium->full_space) || ((dev[0] <= 5.0*fd->gate_tol) && (dev[1] <= 5.0*fd->gate_tol) && ((devn < 0.0) || (devn <= 5.0*fd->gate_tol))),PETSC_COMM_WORLD,PETSC_ERR_USER,
-	     "rsf_fd_setup: 3-D static gate failed for the planes (%g, %g, %g)",dev[0],dev[1],devn);
+      "rsf_fd_setup: 3-D static gate failed for the planes (%g, %g, %g)",dev[0],dev[1],devn);
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
@@ -778,127 +1162,246 @@ static PetscErrorCode fd3d_run_phase_multi(TS ts, struct interact_ctx *par, stru
   PetscScalar *x;
   int np = m->np, NT = fd->n3tot, i, p, g, l, a, nsteps = 0, L = m->Lb - 1, ndyn_quiet = 0;
   double dt = fd->dt_min, eta = 0.5*fd->mu/fd->beta, vmax, vpeak = 0.0, below = 0.0, *vtmp, *vref, *load[FD3D_MULTI_MAX], *sl[FD3D_MULTI_MAX], t_wall0, t_wall1;
+  struct fd3d *f;
+  double s;
+  double vI;
+  double tl;
+  double w;
+  int k;
+  int i0;
+  int i1;
+  int idx;
+  char fn[128];
+  PetscMPIInt rk;
+  double trel;
+  int pp;
+  int s_2;
+  double dmax;
+  double * so[8];
+  double * dl[8];
+  double qd;
+  double dd;
+  int quiet;
+  double slip[8];
+  int cnt[8];
+  char buf[512];
+  char one[64];
+  struct fd3d *f_2;
+  double s_3;
   PetscFunctionBeginUser;
   (void)ts;
   PetscCall(PetscTime(&t_wall0));
   PetscCall(PetscMalloc2(NT,&vtmp,NT,&vref));
-  for(p = 0;p < np;p++) load[p] = malloc(sizeof(double)*m->f[p]->N);
+  for(p = 0;p < np;p++)
+    load[p] = malloc(sizeof(double)*m->f[p]->N);
   fd3d_multi_reset(m);
   PetscCall(fd_full_get(X,&fd->scX,&fd->Xall,&x));
-  for(p = 0;p < np;p++) for(i = 0;i < m->f[p]->N;i++){
-    struct fd3d *f = m->f[p];
-    double s = fd->sgn3[p], vI;
-    g = fd->g_of_s[fd->off3[p] + i];
-    if(g < 0){ f->sigma[i] = 0.0; f->V[i] = 0.0; f->tau0[i] = 0.0; m->sig0[p][i] = 0.0; continue; }
-    f->sigma[i] = x[4*g+2]; m->sig0[p][i] = x[4*g+2];
-    if(fd->msurf3) fd->msurf3->ly[p]->sig0[i] = x[4*g+2];
-    vI = 2.0*rsf->v0*exp(-x[4*g]/fault[g].mu_sa)*sinh(x[4*g+1]/(fault[g].mu_sa*x[4*g+2]));
-    f->V[i] = s*vI;
-    f->theta[i] = f->Lc[i]/f->V0*exp((x[4*g] - f->f0)/f->b[i]);
-    f->tau0[i] = s*(x[4*g+1] + eta*vI);
-  }
+  for(p = 0;p < np;p++)
+    for(i = 0;i < m->f[p]->N;i++){
+      f = m->f[p];
+      s = fd->sgn3[p];
+      g = fd->g_of_s[fd->off3[p] + i];
+      if(g < 0){
+        f->sigma[i] = 0.0;
+        f->V[i] = 0.0;
+        f->tau0[i] = 0.0;
+        m->sig0[p][i] = 0.0;
+        continue;
+      }
+      f->sigma[i] = x[4*g+2];
+      m->sig0[p][i] = x[4*g+2];
+      if(fd->msurf3)
+        fd->msurf3->ly[p]->sig0[i] = x[4*g+2];
+      vI = 2.0*rsf->v0*exp(-x[4*g]/fault[g].mu_sa)*sinh(x[4*g+1]/(fault[g].mu_sa*x[4*g+2]));
+      f->V[i] = s*vI;
+      f->theta[i] = f->Lc[i]/f->V0*exp((x[4*g] - f->f0)/f->b[i]);
+      f->tau0[i] = s*(x[4*g+1] + eta*vI);
+    }
   for(l = L;l >= 1;l--){                       /* history from the accepted-step record */
-    double tl = t - l*dt, w; int k, i0 = -1, i1 = -1;
+    tl = t - l*dt;
+    i0 = -1;
+    i1 = -1;
     for(k = 0;k < fd->nrec_used;k++){
-      int idx = (fd->irec - fd->nrec_used + k + fd->nrec) % fd->nrec;
-      if(fd->rec_t[idx] <= tl) i0 = idx;
-      if((fd->rec_t[idx] >= tl) && (i1 < 0)) i1 = idx;
+      idx = (fd->irec - fd->nrec_used + k + fd->nrec) % fd->nrec;
+      if(fd->rec_t[idx] <= tl)
+        i0 = idx;
+      if((fd->rec_t[idx] >= tl) && (i1 < 0))
+        i1 = idx;
     }
-    if(fd->nrec_used == 0){ for(i = 0;i < NT;i++) vtmp[i] = 0.0; }
-    else{
-      if(i0 < 0) i0 = (fd->irec - fd->nrec_used + fd->nrec) % fd->nrec;
-      if(i1 < 0) i1 = (fd->irec - 1 + fd->nrec) % fd->nrec;
+    if(fd->nrec_used == 0){
+      for(i = 0;i < NT;i++)
+        vtmp[i] = 0.0;
+    } else{
+      if(i0 < 0)
+        i0 = (fd->irec - fd->nrec_used + fd->nrec) % fd->nrec;
+      if(i1 < 0)
+        i1 = (fd->irec - 1 + fd->nrec) % fd->nrec;
       w = (fd->rec_t[i1] > fd->rec_t[i0]) ? (tl - fd->rec_t[i0])/(fd->rec_t[i1] - fd->rec_t[i0]) : 0.0;
-      if(w < 0.0) w = 0.0;
-      if(w > 1.0) w = 1.0;
-      for(i = 0;i < NT;i++) vtmp[i] = (1.0 - w)*fd->rec_v[(size_t)i0*NT + i] + w*fd->rec_v[(size_t)i1*NT + i];
+      if(w < 0.0)
+        w = 0.0;
+      if(w > 1.0)
+        w = 1.0;
+      for(i = 0;i < NT;i++)
+        vtmp[i] = (1.0 - w)*fd->rec_v[(size_t)i0*NT + i] + w*fd->rec_v[(size_t)i1*NT + i];
     }
-    for(p = 0;p < np;p++){ sl[p] = vtmp + fd->off3[p]; for(i = 0;i < m->f[p]->N;i++) sl[p][i] *= fd->sgn3[p]; }
+    for(p = 0;p < np;p++){
+      sl[p] = vtmp + fd->off3[p];
+      for(i = 0;i < m->f[p]->N;i++)
+        sl[p][i] *= fd->sgn3[p];
+    }
     fd3d_multi_push(m,sl);
   }
   for(a = 0;a < fd->nstat;a++){
-    char fn[128]; PetscMPIInt rk;
     sprintf(fn,"fd_phase_%ld_st%ld.dat",(long)fd->nphase + 1,(long)fd->stat[a]);
-    MPI_Comm_rank(PETSC_COMM_WORLD,&rk); fd->fstat[a] = (rk == 0) ? fopen(fn,"w") : NULL;
+    MPI_Comm_rank(PETSC_COMM_WORLD,&rk);
+    fd->fstat[a] = (rk == 0) ? fopen(fn,"w") : NULL;
     fd->sstat[a] = -1;
-    for(i = 0;i < NT;i++) if(fd->g_of_s[i] == fd->stat[a]) fd->sstat[a] = i;
+    for(i = 0;i < NT;i++)
+      if(fd->g_of_s[i] == fd->stat[a])
+        fd->sstat[a] = i;
   }
   for(;;){
-    double trel = m->f[0]->time + dt;
-    for(p = 0;p < np;p++) for(i = 0;i < m->f[p]->N;i++){ g = fd->g_of_s[fd->off3[p] + i]; load[p][i] = (g >= 0) ? fd->sgn3[p]*fault[g].sinc[0]*trel : 0.0; }
-    if(fd->msurf3) fd3d_msurf_step(fd->msurf3,load); else fd3d_multi_step(m,load);
+    trel = m->f[0]->time + dt;
+    for(p = 0;p < np;p++)
+      for(i = 0;i < m->f[p]->N;i++){
+        g = fd->g_of_s[fd->off3[p] + i];
+        load[p][i] = (g >= 0) ? fd->sgn3[p]*fault[g].sinc[0]*trel : 0.0;
+      }
+    if(fd->msurf3)
+      fd3d_msurf_step(fd->msurf3,load);
+    else
+      fd3d_multi_step(m,load);
     nsteps++;
     for(a = 0;a < fd->nstat;a++)
       if(fd->sstat[a] >= 0 && fd->fstat[a]){
-        int pp = 0, s; while((pp + 1 < np) && (fd->sstat[a] >= fd->off3[pp + 1])) pp++;
-        s = fd->sstat[a] - fd->off3[pp];
-        fprintf(fd->fstat[a],"%.10e %.10e %.10e %.10e %.6e\n",m->f[pp]->time,fd->sgn3[pp]*m->f[pp]->delta[s],fd->sgn3[pp]*m->f[pp]->V[s],fd->sgn3[pp]*m->f[pp]->tau[s],m->f[pp]->sigma[s]);
+        pp = 0;
+        while((pp + 1 < np) && (fd->sstat[a] >= fd->off3[pp + 1]))
+          pp++;
+        s_2 = fd->sstat[a] - fd->off3[pp];
+        fprintf(fd->fstat[a],"%.10e %.10e %.10e %.10e %.6e\n",m->f[pp]->time,fd->sgn3[pp]*m->f[pp]->delta[s_2],fd->sgn3[pp]*m->f[pp]->V[s_2],fd->sgn3[pp]*m->f[pp]->tau[s_2],m->f[pp]->sigma[s_2]);
       }
     vmax = 0.0;
-    for(p = 0;p < np;p++) for(i = 0;i < m->f[p]->N;i++) if(fabs(m->f[p]->V[i]) > vmax) vmax = fabs(m->f[p]->V[i]);
-    if(vmax > vpeak) vpeak = vmax;
+    for(p = 0;p < np;p++)
+      for(i = 0;i < m->f[p]->N;i++)
+        if(fabs(m->f[p]->V[i]) > vmax)
+          vmax = fabs(m->f[p]->V[i]);
+    if(vmax > vpeak)
+      vpeak = vmax;
     if(fd->back_dyn > 0.0 && vmax < fd->vsw*(fd->reentry > 1.0 ? fd->reentry : 1.0)){
-      double dmax = 0.0, *so[FD3D_MULTI_MAX], *dl[FD3D_MULTI_MAX];
-      for(p = 0;p < np;p++){ so[p] = vtmp + fd->off3[p]; dl[p] = m->f[p]->delta; }
-      fd3d_multi_static_is((void *)par,dl,so);
-      for(p = 0;p < np;p++) for(i = 0;i < m->f[p]->N;i++){
-        double qd, dd;
-        if(m->f[p]->locked[i]) continue;
-        qd = m->f[p]->tau0[i] + so[p][i] + load[p][i] - eta*m->f[p]->V[i]; dd = fabs(m->f[p]->tau[i] - qd);
-        if(dd > dmax) dmax = dd;
+      dmax = 0.0;
+      for(p = 0;p < np;p++){
+        so[p] = vtmp + fd->off3[p];
+        dl[p] = m->f[p]->delta;
       }
-      if(dmax < fd->back_dyn) ndyn_quiet++; else ndyn_quiet = 0;
-      if(ndyn_quiet >= fd->back_nwin) break;
+      fd3d_multi_static_is((void *)par,dl,so);
+      for(p = 0;p < np;p++)
+        for(i = 0;i < m->f[p]->N;i++){
+          if(m->f[p]->locked[i])
+            continue;
+          qd = m->f[p]->tau0[i] + so[p][i] + load[p][i] - eta*m->f[p]->V[i];
+          dd = fabs(m->f[p]->tau[i] - qd);
+          if(dd > dmax)
+            dmax = dd;
+        }
+      if(dmax < fd->back_dyn)
+        ndyn_quiet++;
+      else
+        ndyn_quiet = 0;
+      if(ndyn_quiet >= fd->back_nwin)
+        break;
     }
     if(fd->back_eps > 0.0){
-      int quiet = (vmax < fd->back_vmax);
+      quiet = (vmax < fd->back_vmax);
       if(quiet && (below > 0.0))
-	for(p = 0;p < np && quiet;p++) for(i = 0;i < m->f[p]->N;i++)
-	  if(fabs(m->f[p]->V[i] - vref[fd->off3[p] + i]) > fd->back_eps*(fabs(vref[fd->off3[p] + i]) + fd->vback)){ quiet = 0; break; }
+        for(p = 0;p < np && quiet;p++)
+          for(i = 0;i < m->f[p]->N;i++)
+            if(fabs(m->f[p]->V[i] - vref[fd->off3[p] + i]) > fd->back_eps*(fabs(vref[fd->off3[p] + i]) + fd->vback)){
+              quiet = 0;
+              break;
+            }
       if(!quiet || (below == 0.0)){
-	for(p = 0;p < np;p++) memcpy(vref + fd->off3[p],m->f[p]->V,sizeof(double)*m->f[p]->N);
-	below = quiet ? 1e-30 : 0.0;
+        for(p = 0;p < np;p++)
+          memcpy(vref + fd->off3[p],m->f[p]->V,sizeof(double)*m->f[p]->N);
+        below = quiet ? 1e-30 : 0.0;
       }else
-	below += dt;
+        below += dt;
     }else{
-      if(vmax < fd->vback) below += dt; else below = 0.0;
+      if(vmax < fd->vback)
+        below += dt;
+      else
+        below = 0.0;
     }
-    if(below >= L*dt) break;
+    if(below >= L*dt)
+      break;
     PetscCheck(nsteps < fd->max_steps,PETSC_COMM_WORLD,PETSC_ERR_CONV_FAILED,
-	       "rsf_fd: 3-D phase exceeded -fd_max_steps = %ld steps (max V %g)",(long)fd->max_steps,vmax);
+        "rsf_fd: 3-D phase exceeded -fd_max_steps = %ld steps (max V %g)",(long)fd->max_steps,vmax);
   }
-  for(a = 0;a < fd->nstat;a++) if(fd->fstat[a]){ fclose(fd->fstat[a]); fd->fstat[a] = NULL; }
+  for(a = 0;a < fd->nstat;a++)
+    if(fd->fstat[a]){
+      fclose(fd->fstat[a]);
+      fd->fstat[a] = NULL;
+    }
   {
-    double slip[FD3D_MULTI_MAX]; int cnt[FD3D_MULTI_MAX]; char buf[512] = "", one[64];
+    buf[0] = '\0';
     for(p = 0;p < np;p++){
-      struct fd3d *f = m->f[p]; double s = fd->sgn3[p];
-      slip[p] = 0.0; cnt[p] = 0;
-      for(i = 0;i < f->N;i++){
+      f_2 = m->f[p];
+      s_3 = fd->sgn3[p];
+      slip[p] = 0.0;
+      cnt[p] = 0;
+      for(i = 0;i < f_2->N;i++){
         g = fd->g_of_s[fd->off3[p] + i];
-        if(g < 0) continue;
-        x[4*g] = f->f0 + f->b[i]*log(f->V0*f->theta[i]/f->Lc[i]);
-        x[4*g+1] = s*f->tau[i];
-        x[4*g+3] += s*f->delta[i];
-        if(m->normal_coupling || (fd->msurf3 && fd->msurf3->ly[p]->normal_coupling)) x[4*g+2] = f->sigma[i];
-        slip[p] += f->delta[i]; cnt[p]++;
+        if(g < 0)
+          continue;
+        x[4*g] = f_2->f0 + f_2->b[i]*log(f_2->V0*f_2->theta[i]/f_2->Lc[i]);
+        x[4*g+1] = s_3*f_2->tau[i];
+        x[4*g+3] += s_3*f_2->delta[i];
+        if(m->normal_coupling || (fd->msurf3 && fd->msurf3->ly[p]->normal_coupling))
+          x[4*g+2] = f_2->sigma[i];
+        slip[p] += f_2->delta[i];
+        cnt[p]++;
       }
-      sprintf(one,"%s%.4f",p ? " / " : "",slip[p]/(cnt[p] > 0 ? cnt[p] : 1)); strcat(buf,one);
+      sprintf(one,"%s%.4f",p ? " / " : "",slip[p]/(cnt[p] > 0 ? cnt[p] : 1));
+      strcat(buf,one);
     }
     PetscCall(fd_full_put(X,&fd->scX,&fd->Xall,&x,1));
     *t_end = t + m->f[0]->time;
     PetscCall(PetscTime(&t_wall1));
     PetscCall(PetscPrintf(PETSC_COMM_WORLD,"rsf_fd: 3-D phase %ld (%d planes): t %.8f yr, %d steps over %.1f s, peak slip rate %.3f m/s, mean slip %s m, wall %.1f s\n",
-			  (long)fd->nphase + 1,np,(double)(t/SEC_PER_YEAR),nsteps,m->f[0]->time,vpeak,buf,t_wall1 - t_wall0));
+        (long)fd->nphase + 1,np,(double)(t/SEC_PER_YEAR),nsteps,m->f[0]->time,vpeak,buf,t_wall1 - t_wall0));
   }
-  for(p = 0;p < np;p++) free(load[p]);
+  for(p = 0;p < np;p++)
+    free(load[p]);
   PetscCall(PetscFree2(vtmp,vref));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
 static PetscErrorCode fd3d_run_phase(TS ts, struct interact_ctx *par, struct fd_vars *fd, PetscReal t, Vec X, PetscReal *t_end)
 {
-  if(fd->pair3) return fd3d_run_phase_pair(ts,par,fd,t,X,t_end);
-  if(fd->multi3) return fd3d_run_phase_multi(ts,par,fd,t,X,t_end);
+  double tl;
+  int k;
+  int i0;
+  int i1;
+  double w;
+  int idx;
+  int a;
+  char fn[128];
+  PetscMPIInt rk;
+  double trel;
+  double kd;
+  double dcmin;
+  double rate;
+  double ka;
+  int e;
+  int q;
+  double dmax;
+  double qd;
+  double dd;
+  int quiet;
+  int a_3;
+  if(fd->pair3)
+    return fd3d_run_phase_pair(ts,par,fd,t,X,t_end);
+  if(fd->multi3)
+    return fd3d_run_phase_multi(ts,par,fd,t,X,t_end);
   struct med *medium = par->medium;
   struct flt *fault = par->fault;
   struct rsf_vars *rsf = medium->rsf;
@@ -918,45 +1421,68 @@ static PetscErrorCode fd3d_run_phase(TS ts, struct interact_ctx *par, struct fd_
     f->V[i] = 2.0*rsf->v0*exp(-x[4*g]/fault[g].mu_sa)*sinh(x[4*g+1]/(fault[g].mu_sa*x[4*g+2]));
     f->theta[i] = f->Lc[i]/f->V0*exp((x[4*g] - f->f0)/f->b[i]);       /* psi = f0 + b ln(V0 theta/L) */
     f->tau0[i] = x[4*g+1] + eta*f->V[i];                               /* elastic stress at the switch */
-    if(f->layer && f->layer->surf) f->layer->sig0[i] = x[4*g+2];
-    if(fabs(f->V[i]) > vmax) vmax = fabs(f->V[i]);
+    if(f->layer && f->layer->surf)
+      f->layer->sig0[i] = x[4*g+2];
+    if(fabs(f->V[i]) > vmax)
+      vmax = fabs(f->V[i]);
   }
   /* history from the accepted-step record (marcher order) */
   for(l = L;l >= 1;l--){
-    double tl = t - l*dt; int k, i0 = -1, i1 = -1; double w;
+    tl = t - l*dt;
+    i0 = -1;
+    i1 = -1;
     for(k = 0;k < fd->nrec_used;k++){
-      int idx = (fd->irec - fd->nrec_used + k + fd->nrec) % fd->nrec;
-      if(fd->rec_t[idx] <= tl) i0 = idx;
-      if((fd->rec_t[idx] >= tl) && (i1 < 0)) i1 = idx;
+      idx = (fd->irec - fd->nrec_used + k + fd->nrec) % fd->nrec;
+      if(fd->rec_t[idx] <= tl)
+        i0 = idx;
+      if((fd->rec_t[idx] >= tl) && (i1 < 0))
+        i1 = idx;
     }
-    if(fd->nrec_used == 0){ for(i = 0;i < N;i++) vtmp[i] = 0.0; }
-    else{
-      if(i0 < 0) i0 = (fd->irec - fd->nrec_used + fd->nrec) % fd->nrec;
-      if(i1 < 0) i1 = (fd->irec - 1 + fd->nrec) % fd->nrec;
+    if(fd->nrec_used == 0){
+      for(i = 0;i < N;i++)
+        vtmp[i] = 0.0;
+    } else{
+      if(i0 < 0)
+        i0 = (fd->irec - fd->nrec_used + fd->nrec) % fd->nrec;
+      if(i1 < 0)
+        i1 = (fd->irec - 1 + fd->nrec) % fd->nrec;
       w = (fd->rec_t[i1] > fd->rec_t[i0]) ? (tl - fd->rec_t[i0])/(fd->rec_t[i1] - fd->rec_t[i0]) : 0.0;
-      if(w < 0.0) w = 0.0;
-      if(w > 1.0) w = 1.0;
-      for(i = 0;i < N;i++) vtmp[i] = (1.0 - w)*fd->rec_v[(size_t)i0*N + i] + w*fd->rec_v[(size_t)i1*N + i];
+      if(w < 0.0)
+        w = 0.0;
+      if(w > 1.0)
+        w = 1.0;
+      for(i = 0;i < N;i++)
+        vtmp[i] = (1.0 - w)*fd->rec_v[(size_t)i0*N + i] + w*fd->rec_v[(size_t)i1*N + i];
     }
     fd3d_push(f,vtmp);
   }
   {
-    int a;
     for(a = 0;a < fd->nstat;a++){
-      char fn[128]; sprintf(fn,"fd_phase_%ld_st%ld.dat",(long)fd->nphase + 1,(long)fd->stat[a]);
-      { PetscMPIInt rk; MPI_Comm_rank(PETSC_COMM_WORLD,&rk); fd->fstat[a] = (rk == 0) ? fopen(fn,"w") : NULL; }   /* rank 0 writes */
+      sprintf(fn,"fd_phase_%ld_st%ld.dat",(long)fd->nphase + 1,(long)fd->stat[a]);
+      {
+        MPI_Comm_rank(PETSC_COMM_WORLD,&rk);
+        fd->fstat[a] = (rk == 0) ? fopen(fn,"w") : NULL;
+      }   /* rank 0 writes */
       fd->sstat[a] = -1;
-      for(i = 0;i < N;i++) if(fd->g_of_s[i] == fd->stat[a]) fd->sstat[a] = i;
+      for(i = 0;i < N;i++)
+        if(fd->g_of_s[i] == fd->stat[a])
+          fd->sstat[a] = i;
     }
   }
-  double vprev = 0.0, *vref; int kprev = 0, nretry = 0, khist[7] = {0, 0, 0, 0, 0, 0, 0}, ndyn_quiet = 0;
+  double vprev = 0.0, *vref;
+  int kprev = 0, nretry = 0, khist[7] = {0, 0, 0, 0, 0, 0, 0}, ndyn_quiet = 0;
   PetscCall(PetscMalloc1(N,&vref));
   for(;;){
-    double trel, kd, dcmin = 1e300;
-    int a, k = 1;
+    dcmin = 1e300;
+    int a_2, k = 1;
     /* variable substeps as in 2-D: powers of two up to kmax and xi dc/(V dt) */
     vmax = 0.0;
-    for(i = 0;i < N;i++){ if(fabs(f->V[i]) > vmax) vmax = fabs(f->V[i]); if(f->Lc[i] < dcmin) dcmin = f->Lc[i]; }
+    for(i = 0;i < N;i++){
+      if(fabs(f->V[i]) > vmax)
+        vmax = fabs(f->V[i]);
+      if(f->Lc[i] < dcmin)
+        dcmin = f->Lc[i];
+    }
     kd = fd->xi*dcmin/((vmax > 1e-30 ? vmax : 1e-30)*dt);
     /* also limit the step by how fast the peak slip rate changes (relative change of
        at most 10 percent per step, from the previous step), and grow k by at most a
@@ -964,70 +1490,110 @@ static PetscErrorCode fd3d_run_phase(TS ts, struct interact_ctx *par, struct fd_
        (dt = 0.29 s at 2 km), and the slip-distance criterion alone lets a slowly
        starting rupture be stepped over */
     if(kprev > 0 && vprev > 0.0){
-      double rate = fabs(vmax - vprev)/(kprev*dt), ka = (rate > 0.0) ? 0.1*vmax/(rate*dt) : 1e300;
-      if(ka < kd) kd = ka;
-      if(kd > 2*kprev) kd = 2*kprev;
+      rate = fabs(vmax - vprev)/(kprev*dt);
+      ka = (rate > 0.0) ? 0.1*vmax/(rate*dt) : 1e300;
+      if(ka < kd)
+        kd = ka;
+      if(kd > 2*kprev)
+        kd = 2*kprev;
     }
-    if(!fd->kmax3) kd = 1.0;              /* long steps in 3-D only on request (-fd_kmax3 1) */
-    while((2*k <= fd->kmax) && (2*k <= kd) && (2*k <= 64)) k *= 2;
-    vprev = vmax; kprev = k;
+    if(!fd->kmax3)
+      kd = 1.0;              /* long steps in 3-D only on request (-fd_kmax3 1) */
+    while((2*k <= fd->kmax) && (2*k <= kd) && (2*k <= 64))
+      k *= 2;
+    vprev = vmax;
+    kprev = k;
     trel = f->time + k*dt;
-    for(i = 0;i < N;i++) load[i] = fault[fd->g_of_s[i]].sinc[0]*trel;    /* backslip loading since the switch */
+    for(i = 0;i < N;i++)
+      load[i] = fault[fd->g_of_s[i]].sinc[0]*trel;    /* backslip loading since the switch */
     for(;;){
-      int e = fd3d_step_k(f,load,k);
-      if(e >= 0) break;
+      e = fd3d_step_k(f,load,k);
+      if(e >= 0)
+        break;
       PetscCheck((e == -2) && (k > 1),PETSC_COMM_WORLD,PETSC_ERR_LIB,"rsf_fd: 3-D step of %d substeps failed (%d)",k,e);
-      k /= 2; kprev = k; nretry++;       /* not converged: halve the step and retry */
+      k /= 2;
+      kprev = k;
+      nretry++;       /* not converged: halve the step and retry */
       trel = f->time + k*dt;
-      for(i = 0;i < N;i++) load[i] = fault[fd->g_of_s[i]].sinc[0]*trel;
+      for(i = 0;i < N;i++)
+        load[i] = fault[fd->g_of_s[i]].sinc[0]*trel;
     }
     nsteps++;
-    { int q = 0; while((1 << q) < k) q++; if(q < 7) khist[q]++; }
-    for(a = 0;a < fd->nstat;a++)
-      if(fd->sstat[a] >= 0 && fd->fstat[a])
-	fprintf(fd->fstat[a],"%.10e %.10e %.10e %.10e %d\n",f->time,f->delta[fd->sstat[a]],f->V[fd->sstat[a]],f->tau[fd->sstat[a]],k);
+    {
+      q = 0;
+      while((1 << q) < k)
+        q++;
+      if(q < 7)
+        khist[q]++;
+    }
+    for(a_2 = 0;a_2 < fd->nstat;a_2++)
+      if(fd->sstat[a_2] >= 0 && fd->fstat[a_2])
+        fprintf(fd->fstat[a_2],"%.10e %.10e %.10e %.10e %d\n",f->time,f->delta[fd->sstat[a_2]],f->V[fd->sstat[a_2]],f->tau[fd->sstat[a_2]],k);
     vmax = 0.0;
-    for(i = 0;i < N;i++) if(fabs(f->V[i]) > vmax) vmax = fabs(f->V[i]);
-    if(vmax > vpeak) vpeak = vmax;
+    for(i = 0;i < N;i++)
+      if(fabs(f->V[i]) > vmax)
+        vmax = fabs(f->V[i]);
+    if(vmax > vpeak)
+      vpeak = vmax;
     if(fd->back_dyn > 0.0 && vmax < fd->vsw*(fd->reentry > 1.0 ? fd->reentry : 1.0) && f->static_fn){
       /* hand back once the fully dynamic traction equals the quasi-dynamic one (elastostatic
 	 interaction plus radiation damping) to within back_dyn everywhere, for back_nwin steps
 	 in a row (fd_plan.md L2): from then on the QD integrator reproduces the phase */
-      double dmax = 0.0;
+      dmax = 0.0;
       f->static_fn(f->static_ctx, f->delta, vtmp);
       for(i = 0;i < N;i++){
-	double qd = f->tau0[i] + vtmp[i] + load[i] - eta*f->V[i], dd = fabs(f->tau[i] - qd);
-	if(dd > dmax) dmax = dd;
+        qd = f->tau0[i] + vtmp[i] + load[i] - eta*f->V[i];
+        dd = fabs(f->tau[i] - qd);
+        if(dd > dmax)
+          dmax = dd;
       }
-      if(dmax < fd->back_dyn) ndyn_quiet++; else ndyn_quiet = 0;
-      if(ndyn_quiet >= fd->back_nwin) break;
+      if(dmax < fd->back_dyn)
+        ndyn_quiet++;
+      else
+        ndyn_quiet = 0;
+      if(ndyn_quiet >= fd->back_nwin)
+        break;
     }
     if(fd->back_eps > 0.0){
       /* quasi-steady hand-back as in 2-D: every slip rate changed by less than back_eps
 	 (relative, floored at vback) over a full window, peak below back_vmax */
-      int quiet = (vmax < fd->back_vmax);
+      quiet = (vmax < fd->back_vmax);
       if(quiet && (below > 0.0))
-	for(i = 0;i < N;i++)
-	  if(fabs(f->V[i] - vref[i]) > fd->back_eps*(fabs(vref[i]) + fd->vback)){ quiet = 0; break; }
+        for(i = 0;i < N;i++)
+          if(fabs(f->V[i] - vref[i]) > fd->back_eps*(fabs(vref[i]) + fd->vback)){
+            quiet = 0;
+            break;
+          }
       if(!quiet || (below == 0.0)){
-	memcpy(vref,f->V,sizeof(double)*N);
-	below = quiet ? 1e-30 : 0.0;
+        memcpy(vref,f->V,sizeof(double)*N);
+        below = quiet ? 1e-30 : 0.0;
       }else
-	below += k*dt;
+        below += k*dt;
     }else{
-      if(vmax < fd->vback) below += k*dt; else below = 0.0;
+      if(vmax < fd->vback)
+        below += k*dt;
+      else
+        below = 0.0;
     }
-    if(below >= L*dt) break;
+    if(below >= L*dt)
+      break;
     PetscCheck(nsteps < fd->max_steps,PETSC_COMM_WORLD,PETSC_ERR_CONV_FAILED,
-	       "rsf_fd: 3-D phase exceeded -fd_max_steps = %ld steps (t - t_switch %g s, max V %g)",(long)fd->max_steps,f->time,vmax);
+        "rsf_fd: 3-D phase exceeded -fd_max_steps = %ld steps (t - t_switch %g s, max V %g)",(long)fd->max_steps,f->time,vmax);
   }
-  { int a; for(a = 0;a < fd->nstat;a++) if(fd->fstat[a]){ fclose(fd->fstat[a]); fd->fstat[a] = NULL; } }
+  {
+    for(a_3 = 0;a_3 < fd->nstat;a_3++)
+      if(fd->fstat[a_3]){
+        fclose(fd->fstat[a_3]);
+        fd->fstat[a_3] = NULL;
+      }
+  }
   for(i = 0;i < N;i++){
     g = fd->g_of_s[i];
     x[4*g] = f->f0 + f->b[i]*log(f->V0*f->theta[i]/f->Lc[i]);
     x[4*g+1] = f->tau[i];
     x[4*g+3] += f->delta[i];
-    if(f->layer && f->layer->surf && rsf->calc_sigma_dot) x[4*g+2] = f->sigma[i];   /* normal stress from the phase */
+    if(f->layer && f->layer->surf && rsf->calc_sigma_dot)
+      x[4*g+2] = f->sigma[i];   /* normal stress from the phase */
     slipsum += f->delta[i];
   }
   PetscCall(fd_full_put(X,&fd->scX,&fd->Xall,&x,1));
@@ -1035,12 +1601,12 @@ static PetscErrorCode fd3d_run_phase(TS ts, struct interact_ctx *par, struct fd_
   PetscCall(PetscTime(&t_wall1));
   if(f->layer && f->layer->n_steps > 0)
     PetscCall(PetscPrintf(PETSC_COMM_WORLD,"rsf_fd: free-surface layer: %.1f outer and %.1f inner iterations per step; time in known part %.1f s, fault solves %.1f s, layer solves %.1f s, finish %.1f s\n",
-			  (double)f->layer->n_outer/f->layer->n_steps,(double)f->layer->n_inner/f->layer->n_steps,
-			  fd3d_layer_prof[0],fd3d_layer_prof[1],fd3d_layer_prof[2],fd3d_layer_prof[3]));
+        (double)f->layer->n_outer/f->layer->n_steps,(double)f->layer->n_inner/f->layer->n_steps,
+        fd3d_layer_prof[0],fd3d_layer_prof[1],fd3d_layer_prof[2],fd3d_layer_prof[3]));
   PetscCall(PetscPrintf(PETSC_COMM_WORLD,"rsf_fd: 3-D phase steps by substeps k = 1..64: %d %d %d %d %d %d %d, retries %d\n",
-			khist[0],khist[1],khist[2],khist[3],khist[4],khist[5],khist[6],nretry));
+      khist[0],khist[1],khist[2],khist[3],khist[4],khist[5],khist[6],nretry));
   PetscCall(PetscPrintf(PETSC_COMM_WORLD,"rsf_fd: 3-D phase %ld: t %.8f yr, %d steps over %.1f s, peak slip rate %.3f m/s, mean slip %.4f m, wall %.1f s\n",
-			(long)fd->nphase + 1,(double)(t/SEC_PER_YEAR),nsteps,f->time,vpeak,slipsum/N,(double)(t_wall1 - t_wall0)));
+      (long)fd->nphase + 1,(double)(t/SEC_PER_YEAR),nsteps,f->time,vpeak,slipsum/N,(double)(t_wall1 - t_wall0)));
   PetscCall(PetscFree2(vtmp,load));
   PetscCall(PetscFree(vref));
   PetscFunctionReturn(PETSC_SUCCESS);
@@ -1063,19 +1629,23 @@ static void fd3d_pair_apply(struct interact_ctx *par, Mat A, double sgn, const d
   int i, p, N = fd->f3->N;
   const double *din[2] = {d0, d1};
   double *out[2] = {o0, o1};
+  int g;
   PetscCallAbort(PETSC_COMM_WORLD,VecGetOwnershipRange(fd->v3a,&lo,&hi));
   PetscCallAbort(PETSC_COMM_WORLD,VecGetArray(fd->v3a,&a));
-  for(p = 0;p < 2;p++) for(i = 0;i < N;i++){
-    int g = fd->g_of_s[p*N + i];
-    if((g >= lo) && (g < hi)) a[g - lo] = din[p][i];
-  }
+  for(p = 0;p < 2;p++)
+    for(i = 0;i < N;i++){
+      g = fd->g_of_s[p*N + i];
+      if((g >= lo) && (g < hi))
+        a[g - lo] = din[p][i];
+    }
   PetscCallAbort(PETSC_COMM_WORLD,VecRestoreArray(fd->v3a,&a));
   PetscCallAbort(PETSC_COMM_WORLD,MatMult(A,fd->v3a,fd->v3b));
   PetscCallAbort(PETSC_COMM_WORLD,fd_full_get_read(fd->v3b,&fd->sc3,&fd->v3all,&b));
-  for(p = 0;p < 2;p++) for(i = 0;i < N;i++){
-    int g = fd->g_of_s[p*N + i];
-    out[p][i] = (g >= 0) ? sgn*PetscRealPart(b[g]) : 0.0;
-  }
+  for(p = 0;p < 2;p++)
+    for(i = 0;i < N;i++){
+      int g = fd->g_of_s[p*N + i];
+      out[p][i] = (g >= 0) ? sgn*PetscRealPart(b[g]) : 0.0;
+    }
   PetscCallAbort(PETSC_COMM_WORLD,fd_full_put_read(fd->v3b,&fd->sc3,&fd->v3all,&b));
 }
 static void fd3d_pair_static_is(void *ctx, const double *d0, const double *d1, double *o0, double *o1)
@@ -1089,10 +1659,13 @@ static void fd3d_pair_static_in(void *ctx, int p, const double *d_other, const d
   struct fd_vars *fd = par->medium->rsf->fd;
   int N = fd->f3->N;
   double *o0 = malloc(sizeof(double)*N), *o1 = malloc(sizeof(double)*N);
-  if(p == 0) fd3d_pair_apply(par,par->medium->In,-1.0,d_own,d_other,o0,o1);
-  else fd3d_pair_apply(par,par->medium->In,-1.0,d_other,d_own,o0,o1);
+  if(p == 0)
+    fd3d_pair_apply(par,par->medium->In,-1.0,d_own,d_other,o0,o1);
+  else
+    fd3d_pair_apply(par,par->medium->In,-1.0,d_other,d_own,o0,o1);
   memcpy(out,p == 0 ? o0 : o1,sizeof(double)*N);
-  free(o0); free(o1);
+  free(o0);
+  free(o1);
 }
 
 /* setup for two parallel planes of equal squares (stepovers): strike slip, whole space or
@@ -1109,39 +1682,103 @@ static PetscErrorCode fd3d_setup_pair(struct interact_ctx *par, struct fd_vars *
   double dx, ls = fd->length_scale, e1[3], e2[3], nn[3], x0[3], e3t[3], dpl[2] = {0, 0}, lo1 = 1e300, lo2 = 1e300, hi1 = -1e300, hi2 = -1e300, *pa, *pb, sgn, Wt;
   double dev[2] = {0, 0}, nrm[2] = {0, 0}, devn = 0.0, nrmn = 0.0;
   int *plane, nx, nz, N, i, k, p;
+  double d[3];
+  double dn;
+  double zmax;
+  double fi;
+  double fj;
+  int ii;
+  int jj;
+  int s;
+  PetscMPIInt sz;
+  struct fd3d *f;
+  int g;
+  PetscInt rlo;
+  PetscInt rhi;
+  int *pl_of;
+  int *s_of;
+  int si;
+  int sj;
+  int pr;
+  int ti;
+  int tj;
+  int di;
+  int dj;
+  int ps;
+  int self;
+  int nt;
+  double ours;
+  double dv;
+  const double *ko;
+  int djr;
+  int dji;
+  int si_2;
+  int sj_2;
+  int pr_2;
+  int ti_2;
+  int tj_2;
+  int di_2;
+  int dj_2;
+  int ps_2;
+  int nt_2;
+  double ours_2;
+  double dv_2;
+  const double *ko_2;
+  int djr_2;
+  int dji_2;
+  double sums[6];
   PetscFunctionBeginUser;
   PetscCheck(rsf->slip_mode == STRIKE,PETSC_COMM_WORLD,PETSC_ERR_SUP,"-fd_mode: two 3-D planes need strike slip (-rsf_slip_mode 0)");
   dx = 2.0*fault[0].l*ls;
-  for(k = 0;k < 3;k++){ e1[k] = fault[0].t_strike[k]; e2[k] = fault[0].t_dip[k]; nn[k] = fault[0].normal[k]; x0[k] = fault[0].x[k]*ls; }
-  if(e2[2] > 0.0) for(k = 0;k < 3;k++) e2[k] = -e2[k];          /* rows by depth */
+  for(k = 0;k < 3;k++){
+    e1[k] = fault[0].t_strike[k];
+    e2[k] = fault[0].t_dip[k];
+    nn[k] = fault[0].normal[k];
+    x0[k] = fault[0].x[k]*ls;
+  }
+  if(e2[2] > 0.0)
+    for(k = 0;k < 3;k++)
+      e2[k] = -e2[k];          /* rows by depth */
   PetscCall(PetscMalloc3(n,&pa,n,&pb,n,&plane));
   dpl[1] = 1e300;
   for(i = 0;i < n;i++){
-    double d[3], dn;
     PetscCheck((fabs(2.0*fault[i].l*ls - dx) < 1e-6*dx) && (fabs(2.0*fault[i].w*ls - dx) < 1e-6*dx),PETSC_COMM_WORLD,PETSC_ERR_SUP,
-	       "-fd_mode: 3-D elements must be squares of one size (patch %d)",i);
+        "-fd_mode: 3-D elements must be squares of one size (patch %d)",i);
     PetscCheck(fabs(fault[i].normal[0]*nn[0] + fault[i].normal[1]*nn[1] + fault[i].normal[2]*nn[2]) > 1.0 - 1e-9,PETSC_COMM_WORLD,PETSC_ERR_SUP,
-	       "-fd_mode: the 3-D planes must be parallel (patch %d)",i);
-    for(k = 0;k < 3;k++) d[k] = fault[i].x[k]*ls - x0[k];
+        "-fd_mode: the 3-D planes must be parallel (patch %d)",i);
+    for(k = 0;k < 3;k++)
+      d[k] = fault[i].x[k]*ls - x0[k];
     dn = d[0]*nn[0] + d[1]*nn[1] + d[2]*nn[2];
-    if(fabs(dn) < 1e-6*dx) plane[i] = 0;
+    if(fabs(dn) < 1e-6*dx)
+      plane[i] = 0;
     else{
-      if(dpl[1] > 1e299) dpl[1] = dn;
+      if(dpl[1] > 1e299)
+        dpl[1] = dn;
       PetscCheck(fabs(dn - dpl[1]) < 1e-6*dx,PETSC_COMM_WORLD,PETSC_ERR_SUP,"-fd_mode: at most two parallel 3-D planes (patch %d at %g m)",i,dn);
       plane[i] = 1;
     }
-    pa[i] = d[0]*e1[0] + d[1]*e1[1] + d[2]*e1[2]; pb[i] = d[0]*e2[0] + d[1]*e2[1] + d[2]*e2[2];
-    if(pa[i] < lo1) lo1 = pa[i];
-    if(pa[i] > hi1) hi1 = pa[i];
-    if(pb[i] < lo2) lo2 = pb[i];
-    if(pb[i] > hi2) hi2 = pb[i];
+    pa[i] = d[0]*e1[0] + d[1]*e1[1] + d[2]*e1[2];
+    pb[i] = d[0]*e2[0] + d[1]*e2[1] + d[2]*e2[2];
+    if(pa[i] < lo1)
+      lo1 = pa[i];
+    if(pa[i] > hi1)
+      hi1 = pa[i];
+    if(pb[i] < lo2)
+      lo2 = pb[i];
+    if(pb[i] > hi2)
+      hi2 = pb[i];
   }
-  nx = (int)floor((hi1 - lo1)/dx + 0.5) + 1; nz = (int)floor((hi2 - lo2)/dx + 0.5) + 1; N = nx*nz;
-  fd->mirror3 = PETSC_FALSE; fd->surf3 = PETSC_FALSE;
+  nx = (int)floor((hi1 - lo1)/dx + 0.5) + 1;
+  nz = (int)floor((hi2 - lo2)/dx + 0.5) + 1;
+  N = nx*nz;
+  fd->mirror3 = PETSC_FALSE;
+  fd->surf3 = PETSC_FALSE;
   if(!medium->full_space){
-    double zmax = -1e300;
+    zmax = -1e300;
     PetscCheck(fabs(nn[2]) < 1e-9,PETSC_COMM_WORLD,PETSC_ERR_SUP,"-fd_mode: two 3-D planes in a half space must be vertical (mirror image)");
-    for(i = 0;i < n;i++) if(fault[i].x[INT_Z]*ls > zmax) zmax = fault[i].x[INT_Z]*ls;
+    for(i = 0;i < n;i++)
+      if(fault[i].x[INT_Z]*ls > zmax)
+        zmax = fault[i].x[INT_Z]*ls;
     PetscCheck(fabs(zmax + 0.5*dx) < 1e-6*dx,PETSC_COMM_WORLD,PETSC_ERR_SUP,"-fd_mode: 3-D half space: the shallowest row must reach the surface");
     fd->mirror3 = PETSC_TRUE;
   }
@@ -1149,102 +1786,168 @@ static PetscErrorCode fd3d_setup_pair(struct interact_ctx *par, struct fd_vars *
      motion of the +x3 side relative to the -x3 side, interact as that of the side its normal
      points to, so x3 is measured along interact's normal (the in-plane axes then follow; the
      strike-slip kernels are even in x2). Checked by the normal-traction gate against In. */
-  (void)e3t; sgn = 1.0;
+  (void)e3t;
+  sgn = 1.0;
   Wt = sgn*dpl[1];
   PetscCall(PetscMalloc1(2*N,&fd->g_of_s));
-  for(i = 0;i < 2*N;i++) fd->g_of_s[i] = -1;
+  for(i = 0;i < 2*N;i++)
+    fd->g_of_s[i] = -1;
   for(i = 0;i < n;i++){
-    double fi = (pa[i] - lo1)/dx, fj = (pb[i] - lo2)/dx;
-    int ii = (int)floor(fi + 0.5), jj = (int)floor(fj + 0.5), s = plane[i]*N + ii*nz + jj;
+    fi = (pa[i] - lo1)/dx;
+    fj = (pb[i] - lo2)/dx;
+    ii = (int)floor(fi + 0.5);
+    jj = (int)floor(fj + 0.5);
+    s = plane[i]*N + ii*nz + jj;
     PetscCheck((fabs(fi - ii) < 1e-6) && (fabs(fj - jj) < 1e-6),PETSC_COMM_WORLD,PETSC_ERR_SUP,"-fd_mode: patch %d is off the common 3-D lattice",i);
     PetscCheck(fd->g_of_s[s] < 0,PETSC_COMM_WORLD,PETSC_ERR_SUP,"-fd_mode: duplicate patch in the 3-D lattice (patch %d)",i);
     fd->g_of_s[s] = i;
   }
   fd->dt_min = fd->cfl*dx/fd->beta;
-  fd->nx3 = nx; fd->nz3 = nz; fd->n3tot = 2*N;
+  fd->nx3 = nx;
+  fd->nz3 = nz;
+  fd->n3tot = 2*N;
 #ifdef FD3D_MPI
-  { PetscMPIInt sz; PetscCallMPI(MPI_Comm_size(PETSC_COMM_WORLD,&sz)); if(sz > 1) fd3d_set_comm(PETSC_COMM_WORLD); }
+  {
+    PetscCallMPI(MPI_Comm_size(PETSC_COMM_WORLD,&sz));
+    if(sz > 1)
+      fd3d_set_comm(PETSC_COMM_WORLD);
+  }
 #endif
   fd->tab3 = fd3d_tab_create(nx,fd->mirror3 ? 2*nz : nz,dx,fd->dt_min,fd->alpha,fd->beta,fd->rho,(int)fd->lmax);
   PetscCheck(fd->tab3,PETSC_COMM_WORLD,PETSC_ERR_MEM,"rsf_fd_setup: 3-D table allocation failed");
-  fd->f3 = fd3d_create2(fd->tab3,nz,fd->mirror3 ? 1 : 0); fd->f3b = fd3d_create2(fd->tab3,nz,fd->mirror3 ? 1 : 0);
+  fd->f3 = fd3d_create2(fd->tab3,nz,fd->mirror3 ? 1 : 0);
+  fd->f3b = fd3d_create2(fd->tab3,nz,fd->mirror3 ? 1 : 0);
   PetscCheck(fd->f3 && fd->f3b,PETSC_COMM_WORLD,PETSC_ERR_MEM,"rsf_fd_setup: 3-D marcher allocation failed");
   for(p = 0;p < 2;p++){
-    struct fd3d *f = p ? fd->f3b : fd->f3;
-    f->law = 1; f->f0 = rsf->f0; f->V0 = rsf->v0; f->nl = (int)fd->nl;
+    f = p ? fd->f3b : fd->f3;
+    f->law = 1;
+    f->f0 = rsf->f0;
+    f->V0 = rsf->v0;
+    f->nl = (int)fd->nl;
     PetscCall(PetscMalloc4(N,&f->a,N,&f->b,N,&f->Lc,N,&f->theta));
     f->locked = (int *)calloc(N,sizeof(int));
     for(i = 0;i < N;i++){
-      int g = fd->g_of_s[p*N + i];
-      if(g >= 0){ f->a[i] = fault[g].mu_sa; f->b[i] = fault[g].mu_db; f->Lc[i] = rsf->dc_vec ? rsf->dc_vec[g]*1.0 : rsf->dc; }
-      else{ f->a[i] = 0.01; f->b[i] = 0.01; f->Lc[i] = 1.0; f->locked[i] = 1; f->theta[i] = 1.0; }
+      g = fd->g_of_s[p*N + i];
+      if(g >= 0){
+        f->a[i] = fault[g].mu_sa;
+        f->b[i] = fault[g].mu_db;
+        f->Lc[i] = rsf->dc_vec ? rsf->dc_vec[g]*1.0 : rsf->dc;
+      } else{
+        f->a[i] = 0.01;
+        f->b[i] = 0.01;
+        f->Lc[i] = 1.0;
+        f->locked[i] = 1;
+        f->theta[i] = 1.0;
+      }
     }
   }
   fd->pair3 = fd3d_pair_create(fd->f3,fd->f3b,Wt,1);
   PetscCheck(fd->pair3,PETSC_COMM_WORLD,PETSC_ERR_SUP,"-fd_mode: the two 3-D planes (%g m apart) interact within one step; use smaller elements",fabs(dpl[1]));
-  fd->pair3->static_fn = fd3d_pair_static_is; fd->pair3->static_ctx = (void *)par;
+  fd->pair3->static_fn = fd3d_pair_static_is;
+  fd->pair3->static_ctx = (void *)par;
   fd->pair3->normal_coupling = rsf->calc_sigma_dot ? 1 : 0;
-  if(rsf->calc_sigma_dot){ fd->pair3->static_n_fn = fd3d_pair_static_in; fd->pair3->static_n_ctx = (void *)par; }
+  if(rsf->calc_sigma_dot){
+    fd->pair3->static_n_fn = fd3d_pair_static_in;
+    fd->pair3->static_n_ctx = (void *)par;
+  }
   /* static gate: Is against the self (p = q) and cross (p != q) tables, off the 3 x 3 self
      neighbourhood; the cross tables' static slopes are in pair3->ks_off */
   {
-    PetscInt rlo, rhi;
-    int *pl_of = malloc(sizeof(int)*n), *s_of = malloc(sizeof(int)*n);
-    for(i = 0;i < 2*N;i++) if(fd->g_of_s[i] >= 0){ pl_of[fd->g_of_s[i]] = i/N; s_of[fd->g_of_s[i]] = i%N; }
+    pl_of = malloc(sizeof(int)*n);
+    s_of = malloc(sizeof(int)*n);
+    for(i = 0;i < 2*N;i++)
+      if(fd->g_of_s[i] >= 0){
+        pl_of[fd->g_of_s[i]] = i/N;
+        s_of[fd->g_of_s[i]] = i%N;
+      }
     PetscCall(MatGetOwnershipRange(medium->Is,&rlo,&rhi));
     for(gi = rlo;gi < rhi && gi < n;gi++){
-      int si = s_of[gi]/nz, sj = s_of[gi]%nz, pr = pl_of[gi];
+      si = s_of[gi]/nz;
+      sj = s_of[gi]%nz;
+      pr = pl_of[gi];
       PetscCall(MatGetRow(medium->Is,gi,&ncols,&cols,&vals));
       for(c = 0;c < ncols;c++){
-        int ti = s_of[cols[c]]/nz, tj = s_of[cols[c]]%nz, di = si - ti, dj = sj - tj, ps = pl_of[cols[c]], self = (ps == pr), nt = fd->mirror3 ? 2*nz : nz;
-        double ours = 0.0, dv;
-        const double *ko = self ? fd->tab3->ks_off : fd->pair3->ks_off[ps][0];
-        if(self && (abs(di) <= 1) && (abs(dj) <= 1)) continue;
+        ti = s_of[cols[c]]/nz;
+        tj = s_of[cols[c]]%nz;
+        di = si - ti;
+        dj = sj - tj;
+        ps = pl_of[cols[c]];
+        self = (ps == pr);
+        nt = fd->mirror3 ? 2*nz : nz;
+        ours = 0.0;
+        ko = self ? fd->tab3->ks_off : fd->pair3->ks_off[ps][0];
+        if(self && (abs(di) <= 1) && (abs(dj) <= 1))
+          continue;
         if(fd->mirror3){
-          int djr = (nz + sj) - (nz + tj), dji = (nz + sj) - (nz - 1 - tj);
+          djr = (nz + sj) - (nz + tj);
+          dji = (nz + sj) - (nz - 1 - tj);
           ours = ko[(size_t)(di + nx - 1)*(2*nt - 1) + (djr + nt - 1)] + ko[(size_t)(di + nx - 1)*(2*nt - 1) + (dji + nt - 1)];
         }else
           ours = ko[(size_t)(di + nx - 1)*(2*nt - 1) + (dj + nt - 1)];
         dv = PetscRealPart(vals[c]) - ours;
-        dev[!self] += dv*dv; nrm[!self] += PetscRealPart(vals[c])*PetscRealPart(vals[c]);
+        dev[!self] += dv*dv;
+        nrm[!self] += PetscRealPart(vals[c])*PetscRealPart(vals[c]);
       }
       PetscCall(MatRestoreRow(medium->Is,gi,&ncols,&cols,&vals));
     }
     if(medium->In){                                 /* normal traction across planes: tables (tension +) against -In */
       for(gi = rlo;gi < rhi && gi < n;gi++){
-        int si = s_of[gi]/nz, sj = s_of[gi]%nz, pr = pl_of[gi];
+        si_2 = s_of[gi]/nz;
+        sj_2 = s_of[gi]%nz;
+        pr_2 = pl_of[gi];
         PetscCall(MatGetRow(medium->In,gi,&ncols,&cols,&vals));
         for(c = 0;c < ncols;c++){
-          int ti = s_of[cols[c]]/nz, tj = s_of[cols[c]]%nz, di = si - ti, dj = sj - tj, ps = pl_of[cols[c]], nt = fd->mirror3 ? 2*nz : nz;
-          double ours, dv;
-          const double *ko = fd->pair3->ks_off[ps][1];
-          if(ps == pr) continue;
+          ti_2 = s_of[cols[c]]/nz;
+          tj_2 = s_of[cols[c]]%nz;
+          di_2 = si_2 - ti_2;
+          dj_2 = sj_2 - tj_2;
+          ps_2 = pl_of[cols[c]];
+          nt_2 = fd->mirror3 ? 2*nz : nz;
+
+          ko_2 = fd->pair3->ks_off[ps_2][1];
+          if(ps_2 == pr_2)
+            continue;
           if(fd->mirror3){
-            int djr = (nz + sj) - (nz + tj), dji = (nz + sj) - (nz - 1 - tj);
-            ours = ko[(size_t)(di + nx - 1)*(2*nt - 1) + (djr + nt - 1)] + ko[(size_t)(di + nx - 1)*(2*nt - 1) + (dji + nt - 1)];
+            djr_2 = (nz + sj_2) - (nz + tj_2);
+            dji_2 = (nz + sj_2) - (nz - 1 - tj_2);
+            ours_2 = ko_2[(size_t)(di_2 + nx - 1)*(2*nt_2 - 1) + (djr_2 + nt_2 - 1)] + ko_2[(size_t)(di_2 + nx - 1)*(2*nt_2 - 1) + (dji_2 + nt_2 - 1)];
           }else
-            ours = ko[(size_t)(di + nx - 1)*(2*nt - 1) + (dj + nt - 1)];
-          dv = -PetscRealPart(vals[c]) - ours;
-          devn += dv*dv; nrmn += PetscRealPart(vals[c])*PetscRealPart(vals[c]);
+            ours_2 = ko_2[(size_t)(di_2 + nx - 1)*(2*nt_2 - 1) + (dj_2 + nt_2 - 1)];
+          dv_2 = -PetscRealPart(vals[c]) - ours_2;
+          devn += dv_2*dv_2;
+          nrmn += PetscRealPart(vals[c])*PetscRealPart(vals[c]);
         }
         PetscCall(MatRestoreRow(medium->In,gi,&ncols,&cols,&vals));
       }
     }
-    { double sums[6] = {dev[0], dev[1], nrm[0], nrm[1], devn, nrmn}; PetscCallMPI(MPI_Allreduce(MPI_IN_PLACE,sums,6,MPI_DOUBLE,MPI_SUM,PETSC_COMM_WORLD));
-      dev[0] = sqrt(sums[0]/(sums[2] + 1e-300)); dev[1] = sqrt(sums[1]/(sums[3] + 1e-300)); devn = (sums[5] > 0.0) ? sqrt(sums[4]/sums[5]) : -1.0; }
-    free(pl_of); free(s_of);
+    {
+      sums[0] = dev[0];
+      sums[1] = dev[1];
+      sums[2] = nrm[0];
+      sums[3] = nrm[1];
+      sums[4] = devn;
+      sums[5] = nrmn;
+      PetscCallMPI(MPI_Allreduce(MPI_IN_PLACE,sums,6,MPI_DOUBLE,MPI_SUM,PETSC_COMM_WORLD));
+      dev[0] = sqrt(sums[0]/(sums[2] + 1e-300));
+      dev[1] = sqrt(sums[1]/(sums[3] + 1e-300));
+      devn = (sums[5] > 0.0) ? sqrt(sums[4]/sums[5]) : -1.0;
+    }
+    free(pl_of);
+    free(s_of);
   }
   PetscCall(PetscFree3(pa,pb,plane));
   PetscCall(MatCreateVecs(medium->Is,&fd->v3a,&fd->v3b));
-  fd->nrec = 64; fd->irec = 0; fd->nrec_used = 0;
+  fd->nrec = 64;
+  fd->irec = 0;
+  fd->nrec_used = 0;
   PetscCall(PetscMalloc2(fd->nrec,&fd->rec_t,(size_t)fd->nrec*2*N,&fd->rec_v));
   PetscCall(PetscPrintf(PETSC_COMM_WORLD,"rsf_fd_setup: 3-D, two parallel planes %g m apart, one lattice of %d x %d squares of %g m, dt_min %.3e s, window %d lags, FFT %d x %d, %s\n",
-			fabs(dpl[1]),nx,nz,dx,(double)fd->dt_min,fd->tab3->L,fd->tab3->Mx,fd->tab3->Mz,fd->mirror3 ? "half space (mirror image)" : "whole space"));
+      fabs(dpl[1]),nx,nz,dx,(double)fd->dt_min,fd->tab3->L,fd->tab3->Mx,fd->tab3->Mz,fd->mirror3 ? "half space (mirror image)" : "whole space"));
   PetscCall(PetscPrintf(PETSC_COMM_WORLD,"rsf_fd_setup: 3-D static gate, two planes: rel dev of the tables from Is %.3e within planes, %.3e across, normal traction across from -In %.3e%s; normal-stress coupling %s\n",
-			dev[0],dev[1],devn,fd->mirror3 ? " (mirror: a few percent expected)" : "",fd->pair3->normal_coupling ? "on (exact In)" : "off"));
+      dev[0],dev[1],devn,fd->mirror3 ? " (mirror: a few percent expected)" : "",fd->pair3->normal_coupling ? "on (exact In)" : "off"));
   PetscCheck((devn < 0.0) || fd->mirror3 || (devn <= 5.0*fd->gate_tol),PETSC_COMM_WORLD,PETSC_ERR_USER,"rsf_fd_setup: 3-D normal-traction gate failed for the two planes (%g)",devn);
   PetscCheck(fd->mirror3 || ((dev[0] <= 5.0*fd->gate_tol) && (dev[1] <= 5.0*fd->gate_tol)),PETSC_COMM_WORLD,PETSC_ERR_USER,
-	     "rsf_fd_setup: 3-D static gate failed for the two planes (%g, %g)",dev[0],dev[1]);
+      "rsf_fd_setup: 3-D static gate failed for the two planes (%g, %g)",dev[0],dev[1]);
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
@@ -1258,6 +1961,84 @@ PetscErrorCode fd3d_setup_from_geometry(struct interact_ctx *par, struct fd_vars
   const PetscScalar *vals;
   double dx, e1[3], e2[3], nn[3], x0[3], lo1 = 1e300, lo2 = 1e300, hi1 = -1e300, hi2 = -1e300, *pa, *pb, dev = 0.0, nrm = 0.0, ls;
   int nx, nz, *cnt, *s_of_g, i;
+  int off;
+  double dn;
+  int par2;
+  int nplanes;
+  double dn2;
+  double c_2;
+  double dn_2;
+  int vertical;
+  double tmp;
+  double zmax;
+  double tmp_2;
+  double fi;
+  double fj;
+  int ii;
+  int jj;
+  PetscMPIInt sz;
+  double sind0;
+  double zc0;
+  double ztop0;
+  PetscInt rlo;
+  PetscInt rhi;
+  int si;
+  int sj;
+  int ti;
+  int tj;
+  int di;
+  int dj;
+  double ours;
+  double dv;
+  int nt;
+  int djr;
+  int dji;
+  double sums[2];
+  int g;
+  PetscInt nk;
+  PetscInt ts;
+  double sind;
+  double cosd;
+  double dipdeg;
+  double zc0_2;
+  double ytop;
+  double ztop;
+  double ys0;
+  double Wd;
+  double fsign;
+  int m;
+  int mg;
+  int nys;
+  int nxs;
+  int Lsf;
+  double up[3];
+  double yh[3];
+  double yn;
+  double cr;
+  double nloc[3];
+  double ss;
+  double hx;
+  double *yc;
+  double *wy;
+  double y;
+  double w;
+  double ylo;
+  double yhi;
+  double band;
+  int nr;
+  int cap;
+  double dep;
+  int a;
+  int b;
+  double t1;
+  double t2;
+  struct fd3d_layer *ly;
+  double mb;
+  double wmin;
+  double wmax;
+  int q;
+  double x0f;
+  double rmax;
   PetscFunctionBeginUser;
   PetscCheck((rsf->slip_mode == STRIKE) || (rsf->slip_mode == DIP),PETSC_COMM_WORLD,PETSC_ERR_SUP,"-fd_mode: 3-D needs a fixed slip direction (-rsf_slip_mode strike or dip)");
   ls = fd->length_scale;
@@ -1271,27 +2052,37 @@ PetscErrorCode fd3d_setup_from_geometry(struct interact_ctx *par, struct fd_vars
   }
   {
     /* two parallel planes (stepovers, fd_plan.md P2): elements off the plane of patch 0 */
-    int off = 0;
+    off = 0;
     for(i = 0;i < n;i++){
-      double dn = 0.0;
-      for(k = 0;k < 3;k++) dn += (fault[i].x[k] - fault[0].x[k])*ls*fault[0].normal[k];
-      if(fabs(dn) > 1e-6*dx) off = 1;
+      dn = 0.0;
+      for(k = 0;k < 3;k++)
+        dn += (fault[i].x[k] - fault[0].x[k])*ls*fault[0].normal[k];
+      if(fabs(dn) > 1e-6*dx)
+        off = 1;
     }
     if(off){
       /* two parallel planes with strike slip: the Toeplitz pair (P1/P2, half space and MPI);
 	 anything else (other orientations, more planes, dip slip): several planes (G2) */
-      int par2 = (rsf->slip_mode == STRIKE), nplanes = 1;
-      double dn2 = 0.0;
+      par2 = (rsf->slip_mode == STRIKE);
+      nplanes = 1;
+      dn2 = 0.0;
       for(i = 0;i < n && par2;i++){
-	double c = fault[i].normal[0]*fault[0].normal[0] + fault[i].normal[1]*fault[0].normal[1] + fault[i].normal[2]*fault[0].normal[2], dn = 0.0;
-	if(c < 1.0 - 1e-9) par2 = 0;
-	for(k = 0;k < 3;k++) dn += (fault[i].x[k] - fault[0].x[k])*ls*fault[0].normal[k];
-	if(fabs(dn) > 1e-6*dx){
-	  if(nplanes == 1){ nplanes = 2; dn2 = dn; }
-	  else if(fabs(dn - dn2) > 1e-6*dx) par2 = 0;
-	}
+        c_2 = fault[i].normal[0]*fault[0].normal[0] + fault[i].normal[1]*fault[0].normal[1] + fault[i].normal[2]*fault[0].normal[2];
+        dn_2 = 0.0;
+        if(c_2 < 1.0 - 1e-9)
+          par2 = 0;
+        for(k = 0;k < 3;k++)
+          dn_2 += (fault[i].x[k] - fault[0].x[k])*ls*fault[0].normal[k];
+        if(fabs(dn_2) > 1e-6*dx){
+          if(nplanes == 1){
+            nplanes = 2;
+            dn2 = dn_2;
+          } else if(fabs(dn_2 - dn2) > 1e-6*dx)
+            par2 = 0;
+        }
       }
-      if(par2 && (medium->full_space || (fabs(fault[0].normal[2]) < 1e-9))) return fd3d_setup_pair(par,fd);
+      if(par2 && (medium->full_space || (fabs(fault[0].normal[2]) < 1e-9)))
+        return fd3d_setup_pair(par,fd);
       return fd3d_setup_multi(par,fd);
     }
   }
@@ -1300,77 +2091,116 @@ PetscErrorCode fd3d_setup_from_geometry(struct interact_ctx *par, struct fd_vars
      grid axis 1 along strike and slip along axis 1 (strike) or axis 2 (dip) */
   fd->surf3 = PETSC_FALSE;
   if(!medium->full_space){
-    int vertical = fabs(fault[0].normal[2]) < 1e-9;
-    if(fd->surface_opt || !vertical || (rsf->slip_mode == DIP)) fd->surf3 = PETSC_TRUE;
+    vertical = fabs(fault[0].normal[2]) < 1e-9;
+    if(fd->surface_opt || !vertical || (rsf->slip_mode == DIP))
+      fd->surf3 = PETSC_TRUE;
   }
   for(k = 0;k < 3;k++){
-    if(fd->surf3){ e1[k] = fault[0].t_strike[k]; e2[k] = fault[0].t_dip[k]; }
-    else{
+    if(fd->surf3){
+      e1[k] = fault[0].t_strike[k];
+      e2[k] = fault[0].t_dip[k];
+    } else{
       e1[k] = (rsf->slip_mode == STRIKE) ? fault[0].t_strike[k] : fault[0].t_dip[k];
       e2[k] = (rsf->slip_mode == STRIKE) ? fault[0].t_dip[k] : fault[0].t_strike[k];
     }
-    nn[k] = fault[0].normal[k]; x0[k] = fault[0].x[k]*ls;
+    nn[k] = fault[0].normal[k];
+    x0[k] = fault[0].x[k]*ls;
   }
   PetscCall(PetscMalloc2(n,&pa,n,&pb));
   for(i = 0;i < n;i++){
     double d[3], dn;
     PetscCheck((fabs(2.0*fault[i].l*ls - dx) < 1e-6*dx) && (fabs(2.0*fault[i].w*ls - dx) < 1e-6*dx),PETSC_COMM_WORLD,PETSC_ERR_SUP,
-	       "-fd_mode: 3-D elements must be squares of one size (patch %d: half-lengths %g, %g)",i,fault[i].l,fault[i].w);
+        "-fd_mode: 3-D elements must be squares of one size (patch %d: half-lengths %g, %g)",i,fault[i].l,fault[i].w);
     PetscCheck(fabs(fault[i].normal[0]*nn[0] + fault[i].normal[1]*nn[1] + fault[i].normal[2]*nn[2]) > 1.0 - 1e-9,PETSC_COMM_WORLD,PETSC_ERR_SUP,
-	       "-fd_mode: 3-D elements must lie on one plane (patch %d has a different orientation)",i);
-    for(k = 0;k < 3;k++) d[k] = fault[i].x[k]*ls - x0[k];
+        "-fd_mode: 3-D elements must lie on one plane (patch %d has a different orientation)",i);
+    for(k = 0;k < 3;k++)
+      d[k] = fault[i].x[k]*ls - x0[k];
     dn = d[0]*nn[0] + d[1]*nn[1] + d[2]*nn[2];
     PetscCheck(fabs(dn) < 1e-6*dx,PETSC_COMM_WORLD,PETSC_ERR_SUP,"-fd_mode: 3-D elements must lie on one plane (patch %d is %g m off)",i,dn);
-    pa[i] = d[0]*e1[0] + d[1]*e1[1] + d[2]*e1[2]; pb[i] = d[0]*e2[0] + d[1]*e2[1] + d[2]*e2[2];
-    if(pa[i] < lo1) lo1 = pa[i];
-    if(pa[i] > hi1) hi1 = pa[i];
-    if(pb[i] < lo2) lo2 = pb[i];
-    if(pb[i] > hi2) hi2 = pb[i];
+    pa[i] = d[0]*e1[0] + d[1]*e1[1] + d[2]*e1[2];
+    pb[i] = d[0]*e2[0] + d[1]*e2[1] + d[2]*e2[2];
+    if(pa[i] < lo1)
+      lo1 = pa[i];
+    if(pa[i] > hi1)
+      hi1 = pa[i];
+    if(pb[i] < lo2)
+      lo2 = pb[i];
+    if(pb[i] > hi2)
+      hi2 = pb[i];
   }
-  nx = (int)floor((hi1 - lo1)/dx + 0.5) + 1; nz = (int)floor((hi2 - lo2)/dx + 0.5) + 1;
+  nx = (int)floor((hi1 - lo1)/dx + 0.5) + 1;
+  nz = (int)floor((hi2 - lo2)/dx + 0.5) + 1;
   fd->mirror3 = PETSC_FALSE;
   if(fd->surf3){
     /* rows ordered by depth (row 0 shallowest): flip the dip axis if it points up */
     if(e2[2] > 0.0){
-      for(i = 0;i < n;i++) pb[i] = -pb[i];
-      { double tmp = lo2; lo2 = -hi2; hi2 = -tmp; }
-      for(k = 0;k < 3;k++) e2[k] = -e2[k];
+      for(i = 0;i < n;i++)
+        pb[i] = -pb[i];
+      {
+        tmp = lo2;
+        lo2 = -hi2;
+        hi2 = -tmp;
+      }
+      for(k = 0;k < 3;k++)
+        e2[k] = -e2[k];
     }
   }else if(!medium->full_space){
     /* half space: vertical fault reaching the surface z = 0, mirror image in the surface.
        Order the rows by depth (row 0 at the surface) */
-    double zmax = -1e300;
+    zmax = -1e300;
     PetscCheck(fabs(nn[2]) < 1e-9,PETSC_COMM_WORLD,PETSC_ERR_SUP,"-fd_mode: 3-D half space needs a vertical fault");
-    for(i = 0;i < n;i++) if(fault[i].x[INT_Z]*ls > zmax) zmax = fault[i].x[INT_Z]*ls;
+    for(i = 0;i < n;i++)
+      if(fault[i].x[INT_Z]*ls > zmax)
+        zmax = fault[i].x[INT_Z]*ls;
     PetscCheck(fabs(zmax + 0.5*dx) < 1e-6*dx,PETSC_COMM_WORLD,PETSC_ERR_SUP,
-	       "-fd_mode: 3-D half space: the shallowest row must reach the surface (centre at -dx/2, have %g)",zmax);
+        "-fd_mode: 3-D half space: the shallowest row must reach the surface (centre at -dx/2, have %g)",zmax);
     if(e2[2] > 0.0){		/* dip axis points up: flip so that row index grows with depth */
-      for(i = 0;i < n;i++) pb[i] = -pb[i];
-      { double tmp = lo2; lo2 = -hi2; hi2 = -tmp; }
-      for(k = 0;k < 3;k++) e2[k] = -e2[k];
+      for(i = 0;i < n;i++)
+        pb[i] = -pb[i];
+      {
+        tmp_2 = lo2;
+        lo2 = -hi2;
+        hi2 = -tmp_2;
+      }
+      for(k = 0;k < 3;k++)
+        e2[k] = -e2[k];
     }
     fd->mirror3 = PETSC_TRUE;
   }
   PetscCheck(nx*nz == n,PETSC_COMM_WORLD,PETSC_ERR_SUP,"-fd_mode: 3-D elements must form a complete %d x %d grid (have %d)",nx,nz,(int)n);
-  PetscCall(PetscCalloc1(n,&cnt)); PetscCall(PetscMalloc1(n,&fd->g_of_s)); PetscCall(PetscMalloc1(n,&s_of_g));
+  PetscCall(PetscCalloc1(n,&cnt));
+  PetscCall(PetscMalloc1(n,&fd->g_of_s));
+  PetscCall(PetscMalloc1(n,&s_of_g));
   for(i = 0;i < n;i++){
-    double fi = (pa[i] - lo1)/dx, fj = (pb[i] - lo2)/dx;
-    int ii = (int)floor(fi + 0.5), jj = (int)floor(fj + 0.5);
+    fi = (pa[i] - lo1)/dx;
+    fj = (pb[i] - lo2)/dx;
+    ii = (int)floor(fi + 0.5);
+    jj = (int)floor(fj + 0.5);
     PetscCheck((fabs(fi - ii) < 1e-6) && (fabs(fj - jj) < 1e-6),PETSC_COMM_WORLD,PETSC_ERR_SUP,"-fd_mode: patch %d is off the regular 3-D grid",i);
     cnt[ii*nz + jj]++;
-    fd->g_of_s[ii*nz + jj] = i; s_of_g[i] = ii*nz + jj;
+    fd->g_of_s[ii*nz + jj] = i;
+    s_of_g[i] = ii*nz + jj;
   }
-  for(i = 0;i < n;i++) PetscCheck(cnt[i] == 1,PETSC_COMM_WORLD,PETSC_ERR_SUP,"-fd_mode: duplicate or missing patch in the 3-D grid");
-  PetscCall(PetscFree(cnt)); PetscCall(PetscFree2(pa,pb));
+  for(i = 0;i < n;i++)
+    PetscCheck(cnt[i] == 1,PETSC_COMM_WORLD,PETSC_ERR_SUP,"-fd_mode: duplicate or missing patch in the 3-D grid");
+  PetscCall(PetscFree(cnt));
+  PetscCall(PetscFree2(pa,pb));
   fd->dt_min = fd->cfl*dx/fd->beta;
-  fd->nx3 = nx; fd->nz3 = nz;
+  fd->nx3 = nx;
+  fd->nz3 = nz;
 #ifdef FD3D_MPI
-  { PetscMPIInt sz; PetscCallMPI(MPI_Comm_size(PETSC_COMM_WORLD,&sz)); if(sz > 1) fd3d_set_comm(PETSC_COMM_WORLD); }
+  {
+    PetscCallMPI(MPI_Comm_size(PETSC_COMM_WORLD,&sz));
+    if(sz > 1)
+      fd3d_set_comm(PETSC_COMM_WORLD);
+  }
 #endif
   if(fd->surf3){
     /* a fault whose top edge lies in the surface continues above it by next rows tied to the
        top row (fd_plan.md B7): the table has nz + next rows */
-    double sind0 = fabs(e2[2]), zc0 = fault[fd->g_of_s[0]].x[INT_Z]*ls, ztop0 = zc0 + 0.5*dx*sind0;
+    sind0 = fabs(e2[2]);
+    zc0 = fault[fd->g_of_s[0]].x[INT_Z]*ls;
+    ztop0 = zc0 + 0.5*dx*sind0;
     fd->next3 = (fd->surf_extend >= 0) ? (int)fd->surf_extend : ((fabs(ztop0) < 1e-6*dx) ? 1 : 0);
     fd->tab3 = fd3d_tab_create_c(nx,nz + fd->next3,dx,fd->dt_min,fd->alpha,fd->beta,fd->rho,(int)fd->lmax,(rsf->slip_mode == STRIKE) ? 1 : 2);
   }else
@@ -1379,65 +2209,95 @@ PetscErrorCode fd3d_setup_from_geometry(struct interact_ctx *par, struct fd_vars
   /* static gate: Is(receiver, source) against the offset table, skipping the
      3 x 3 self neighbourhood whose regularisation may differ */
   {
-    PetscInt rlo, rhi;                             /* MPI: own rows of Is, sums reduced below */
+    /* MPI: own rows of Is, sums reduced below */
     PetscCall(MatGetOwnershipRange(medium->Is,&rlo,&rhi));
-  for(gi = rlo;gi < rhi && gi < n;gi++){
-    int si = s_of_g[gi]/nz, sj = s_of_g[gi]%nz;
-    PetscCall(MatGetRow(medium->Is,gi,&ncols,&cols,&vals));
-    for(c = 0;c < ncols;c++){
-      int ti = s_of_g[cols[c]]/nz, tj = s_of_g[cols[c]]%nz, di = si - ti, dj = sj - tj;
-      double ours, dv;
-      if((abs(di) <= 1) && (abs(dj) <= 1)) continue;
-      if(fd->mirror3){
-	int nt = 2*nz, djr = (nz + sj) - (nz + tj), dji = (nz + sj) - (nz - 1 - tj);   /* real source and its image */
-	ours = fd->tab3->ks_off[(size_t)(di + nx - 1)*(2*nt - 1) + (djr + nt - 1)] + fd->tab3->ks_off[(size_t)(di + nx - 1)*(2*nt - 1) + (dji + nt - 1)];
-      }else
-	ours = fd->tab3->ks_off[(size_t)(di + nx - 1)*(2*nz - 1) + (dj + nz - 1)];
-      dv = PetscRealPart(vals[c]) - ours;
-      dev += dv*dv; nrm += PetscRealPart(vals[c])*PetscRealPart(vals[c]);
+    for(gi = rlo;gi < rhi && gi < n;gi++){
+      si = s_of_g[gi]/nz;
+      sj = s_of_g[gi]%nz;
+      PetscCall(MatGetRow(medium->Is,gi,&ncols,&cols,&vals));
+      for(c = 0;c < ncols;c++){
+        ti = s_of_g[cols[c]]/nz;
+        tj = s_of_g[cols[c]]%nz;
+        di = si - ti;
+        dj = sj - tj;
+
+        if((abs(di) <= 1) && (abs(dj) <= 1))
+          continue;
+        if(fd->mirror3){
+          nt = 2*nz;
+          djr = (nz + sj) - (nz + tj);
+          dji = (nz + sj) - (nz - 1 - tj);   /* real source and its image */
+          ours = fd->tab3->ks_off[(size_t)(di + nx - 1)*(2*nt - 1) + (djr + nt - 1)] + fd->tab3->ks_off[(size_t)(di + nx - 1)*(2*nt - 1) + (dji + nt - 1)];
+        }else
+          ours = fd->tab3->ks_off[(size_t)(di + nx - 1)*(2*nz - 1) + (dj + nz - 1)];
+        dv = PetscRealPart(vals[c]) - ours;
+        dev += dv*dv;
+        nrm += PetscRealPart(vals[c])*PetscRealPart(vals[c]);
+      }
+      PetscCall(MatRestoreRow(medium->Is,gi,&ncols,&cols,&vals));
     }
-    PetscCall(MatRestoreRow(medium->Is,gi,&ncols,&cols,&vals));
-  }
-    { double sums[2] = {dev, nrm}; PetscCallMPI(MPI_Allreduce(MPI_IN_PLACE,sums,2,MPI_DOUBLE,MPI_SUM,PETSC_COMM_WORLD)); dev = sums[0]; nrm = sums[1]; }
+    {
+      sums[0] = dev;
+      sums[1] = nrm;
+      PetscCallMPI(MPI_Allreduce(MPI_IN_PLACE,sums,2,MPI_DOUBLE,MPI_SUM,PETSC_COMM_WORLD));
+      dev = sums[0];
+      nrm = sums[1];
+    }
   }
   PetscCall(PetscFree(s_of_g));
   dev = sqrt(dev/(nrm + 1e-300));
   fd->f3 = fd->surf3 ? fd3d_create3(fd->tab3,nz,0,fd->next3) : fd3d_create2(fd->tab3,nz,fd->mirror3 ? 1 : 0);
   PetscCheck(fd->f3,PETSC_COMM_WORLD,PETSC_ERR_MEM,"rsf_fd_setup: 3-D marcher allocation failed");
-  fd->f3->law = 1; fd->f3->f0 = rsf->f0; fd->f3->V0 = rsf->v0;
+  fd->f3->law = 1;
+  fd->f3->f0 = rsf->f0;
+  fd->f3->V0 = rsf->v0;
   fd->f3->nl = (int)fd->nl;
   PetscCall(PetscMalloc4(n,&fd->f3->a,n,&fd->f3->b,n,&fd->f3->Lc,n,&fd->f3->theta));
   for(i = 0;i < n;i++){
-    int g = fd->g_of_s[i];
-    fd->f3->a[i] = fault[g].mu_sa; fd->f3->b[i] = fault[g].mu_db; fd->f3->Lc[i] = rsf->dc_vec ? rsf->dc_vec[g]*1.0 : rsf->dc;
+    g = fd->g_of_s[i];
+    fd->f3->a[i] = fault[g].mu_sa;
+    fd->f3->b[i] = fault[g].mu_db;
+    fd->f3->Lc[i] = rsf->dc_vec ? rsf->dc_vec[g]*1.0 : rsf->dc;
   }
-  fd->f3->static_fn = fd3d_static_is; fd->f3->static_ctx = (void *)par;
+  fd->f3->static_fn = fd3d_static_is;
+  fd->f3->static_ctx = (void *)par;
   {
-    PetscInt nk = 0;                              /* -fd_nk 1: Newton-Krylov for long steps (fd_plan.md L1) */
+    nk = 0;                              /* -fd_nk 1: Newton-Krylov for long steps (fd_plan.md L1) */
     PetscCall(PetscOptionsGetInt(NULL,NULL,"-fd_nk",&nk,NULL));
-    if(nk) fd->f3->nk = (int)nk;
+    if(nk)
+      fd->f3->nk = (int)nk;
   }
   {
-    PetscInt ts = 0;                              /* -fd_table_statics 1: the tables' own statics instead of Is (experiments) */
+    ts = 0;                              /* -fd_table_statics 1: the tables' own statics instead of Is (experiments) */
     PetscCall(PetscOptionsGetInt(NULL,NULL,"-fd_table_statics",&ts,NULL));
-    if(ts){ fd->f3->static_fn = NULL; fd->f3->static_ctx = NULL; PetscCall(PetscPrintf(PETSC_COMM_WORLD,"rsf_fd_setup: 3-D static part from the tables (-fd_table_statics 1), not from Is\n")); }
+    if(ts){
+      fd->f3->static_fn = NULL;
+      fd->f3->static_ctx = NULL;
+      PetscCall(PetscPrintf(PETSC_COMM_WORLD,"rsf_fd_setup: 3-D static part from the tables (-fd_table_statics 1), not from Is\n"));
+    }
   }
   if(fd->surf3){
     /* full virtual surface: the marcher's frame has x' along strike (column 0 at x' = 0),
        y' horizontal towards the up-dip side, z up; element (0, 0) centred at y' = 0 */
-    double sind = -e2[2], cosd = sqrt(1.0 - sind*sind), dipdeg = asin(sind)*180.0/M_PI, zc0, ytop, ztop, ys0, Wd, fsign;
+    sind = -e2[2];
+    cosd = sqrt(1.0 - sind*sind);
+    dipdeg = asin(sind)*180.0/M_PI;
     /* surface elements of dx/m: m = 4 by default. With the NL scheme the surface's shear
        components grew in a random-perturbation test at cS dt/hs = 1 (m = 2) and decayed at 0.5
        (m = 1) and 2 (m = 4); m = 4 also meets the static accuracy rule (a quarter of the fault
        element near the trace) */
-    int m = (int)fd->surf_m, mg = (int)(fd->surf_ext > 0 ? fd->surf_ext : (nz > 2 ? nz : 2)), nys, nxs, Lsf;
+    m = (int)fd->surf_m;
+    mg = (int)(fd->surf_ext > 0 ? fd->surf_ext : (nz > 2 ? nz : 2));
     /* the unstable band (cS dt/hs about 0.85 to 1.05, fd_plan.md B3): with the default, keep
        cS dt/hs = m cfl at 2 or more (m = 4 at cfl 0.5, more for smaller steps) */
-    if(fd->surf_m_default) while(m*fd->cfl < 1.999) m++;
+    if(fd->surf_m_default)
+      while(m*fd->cfl < 1.999)
+        m++;
     if(m*fd->cfl > 0.8 && m*fd->cfl < 1.2)
       PetscCall(PetscPrintf(PETSC_COMM_WORLD,"rsf_fd_setup: WARNING: surface elements of dx/%d give cS dt/hs = %.2f, inside the band where the surface's shear modes grow (0.85 to 1.05)\n",m,(double)(m*fd->cfl)));
-    zc0 = fault[fd->g_of_s[0]].x[INT_Z]*ls;
-    ytop = 0.5*dx*cosd; ztop = zc0 + 0.5*dx*sind;
+    zc0_2 = fault[fd->g_of_s[0]].x[INT_Z]*ls;
+    ytop = 0.5*dx*cosd;
+    ztop = zc0_2 + 0.5*dx*sind;
     PetscCheck(ztop <= 1e-6*dx,PETSC_COMM_WORLD,PETSC_ERR_SUP,"-fd_mode: the fault must lie below the surface (top edge at z = %g m)",ztop);
     Wd = nz*dx*cosd;
     /* rows: the fault's surface projection plus mg fault elements either side; the top edge line
@@ -1451,8 +2311,20 @@ PetscErrorCode fd3d_setup_from_geometry(struct interact_ctx *par, struct fd_vars
       /* sign of the QD slip direction in the surface code's frame (x' = strike, e2 = up dip,
          y' = horizontal part of up dip): dip slip along interact's t_dip, strike slip along
          t_strike in a frame that may be left-handed */
-      double up[3] = {-e2[0], -e2[1], -e2[2]}, yh[3] = {up[0], up[1], 0.0}, yn = sqrt(up[0]*up[0] + up[1]*up[1]), cr;
-      if(yn > 1e-12){ yh[0] /= yn; yh[1] /= yn; } else { yh[0] = -e1[1]; yh[1] = e1[0]; }
+      up[0] = -e2[0];
+      up[1] = -e2[1];
+      up[2] = -e2[2];
+      yh[0] = up[0];
+      yh[1] = up[1];
+      yh[2] = 0.0;
+      yn = sqrt(up[0]*up[0] + up[1]*up[1]);
+      if(yn > 1e-12){
+        yh[0] /= yn;
+        yh[1] /= yn;
+      } else {
+        yh[0] = -e1[1];
+        yh[1] = e1[0];
+      }
       cr = e1[0]*yh[1] - e1[1]*yh[0];                                  /* (x' x y') . z */
       fsign = (rsf->slip_mode == STRIKE) ? (cr > 0 ? 1.0 : -1.0) : (fault[0].t_dip[2] > 0.0 ? 1.0 : -1.0);
       {
@@ -1461,9 +2333,12 @@ PetscErrorCode fd3d_setup_from_geometry(struct interact_ctx *par, struct fd_vars
            its normal points to; a mismatch reverses the slip variable as well (fd_plan.md P2) */
         /* in the surface code's own frame (x' = e1, y' = horizontal up dip, z up), where the
            kernels live: its e3 = (0, -sin(dip), cos(dip)); interact's normal there */
-        double nloc[3] = {nn[0]*e1[0] + nn[1]*e1[1] + nn[2]*e1[2], nn[0]*yh[0] + nn[1]*yh[1], nn[2]};
-        double ss = (-sind*nloc[1] + cosd*nloc[2]) > 0.0 ? 1.0 : -1.0;
-        if(ss < 0.0) PetscCall(PetscPrintf(PETSC_COMM_WORLD,"rsf_fd_setup: virtual surface: interact's fault normal points to the kernel frame's -e3 side\n"));
+        nloc[0] = nn[0]*e1[0] + nn[1]*e1[1] + nn[2]*e1[2];
+        nloc[1] = nn[0]*yh[0] + nn[1]*yh[1];
+        nloc[2] = nn[2];
+        ss = (-sind*nloc[1] + cosd*nloc[2]) > 0.0 ? 1.0 : -1.0;
+        if(ss < 0.0)
+          PetscCall(PetscPrintf(PETSC_COMM_WORLD,"rsf_fd_setup: virtual surface: interact's fault normal points to the kernel frame's -e3 side\n"));
         fsign *= ss;
       }
     }
@@ -1475,14 +2350,20 @@ PetscErrorCode fd3d_setup_from_geometry(struct interact_ctx *par, struct fd_vars
          fault's surface projection d = top depth + (ytop - y') tan(dip); beyond the bottom edge
          the bottom depth; above the trace the distance from it), a power of two times dx/m
          between dx/m and dx, growing at most by two from row to row */
-      double hx = dx/m, *yc, *wy, y, w, ylo = ytop - Wd - mg*dx, yhi = ytop + mg*dx;
+      hx = dx/m;
+      ylo = ytop - Wd - mg*dx;
+      yhi = ytop + mg*dx;
       if(getenv("FD_SURF_BAND")){                     /* experiment (fd_plan.md H1): surface only within a band of +-band m of the trace */
-        double band = atof(getenv("FD_SURF_BAND"));
-        if(ytop - band > ylo) ylo = ytop - band;
-        if(ytop + band < yhi) yhi = ytop + band;
+        band = atof(getenv("FD_SURF_BAND"));
+        if(ytop - band > ylo)
+          ylo = ytop - band;
+        if(ytop + band < yhi)
+          yhi = ytop + band;
       }
-      int nr = 0, cap = 4096;
-      yc = malloc(sizeof(double)*cap); wy = malloc(sizeof(double)*cap);
+      nr = 0;
+      cap = 4096;
+      yc = malloc(sizeof(double)*cap);
+      wy = malloc(sizeof(double)*cap);
 #define ROW_W(dep, wprev) do{ double wa = 0.5*(dep); if(wa > dx) wa = dx; if(wa > 2*(wprev)) wa = 2*(wprev); w = hx; while(2*w <= wa + 1e-9) w *= 2.0; }while(0)
       /* dep: distance from the surface point to the nearest part of the fault (vertical depth over
          the projection, distance to the top or bottom edge line outside it) */
@@ -1492,67 +2373,105 @@ PetscErrorCode fd3d_setup_from_geometry(struct interact_ctx *par, struct fd_vars
         tt = ((yy - ay)*vy + (0.0 - az)*vz)/(vy*vy + vz*vz + 1e-30); if(tt < 0) tt = 0; if(tt > 1) tt = 1; \
         sqrt(pow(yy - (ay + tt*vy), 2) + pow(0.0 - (az + tt*vz), 2)); })
       for(y = ytop, w = hx; y < yhi - 1e-9; ){
-        double dep = SEG_DIST(y);
-        ROW_W(dep, w); if(y + w > yhi + 1e-9) break; yc[nr] = y + 0.5*w; wy[nr++] = w; y += w;
+        dep = SEG_DIST(y);
+        ROW_W(dep, w);
+        if(y + w > yhi + 1e-9)
+          break;
+        yc[nr] = y + 0.5*w;
+        wy[nr++] = w;
+        y += w;
       }
       for(y = ytop, w = hx; y > ylo + 1e-9; ){
         double dep = SEG_DIST(y);
-        ROW_W(dep, w); if(y - w < ylo - 1e-9) break; yc[nr] = y - 0.5*w; wy[nr++] = w; y -= w;
+        ROW_W(dep, w);
+        if(y - w < ylo - 1e-9)
+          break;
+        yc[nr] = y - 0.5*w;
+        wy[nr++] = w;
+        y -= w;
       }
 #undef SEG_DIST
 #undef ROW_W
-      { int a,b; for(a = 0; a < nr; a++) for(b = a + 1; b < nr; b++) if(yc[b] < yc[a]){ double t1 = yc[a], t2 = wy[a]; yc[a] = yc[b]; wy[a] = wy[b]; yc[b] = t1; wy[b] = t2; } }
+      {
+        for(a = 0; a < nr; a++)
+          for(b = a + 1; b < nr; b++)
+            if(yc[b] < yc[a]){
+              t1 = yc[a];
+              t2 = wy[a];
+              yc[a] = yc[b];
+              wy[a] = wy[b];
+              yc[b] = t1;
+              wy[b] = t2;
+            }
+      }
       nys = nr;
       fd->f3->layer = fd3d_surf_create_rows(fd->f3,-0.5*dx,ytop,ztop,dipdeg,(rsf->slip_mode == STRIKE) ? 1 : 2,m,nxs,nys,-0.5*dx - mg*dx,yc,wy,Lsf,fsign);
-      free(yc); free(wy);
+      free(yc);
+      free(wy);
     }else
       fd->f3->layer = fd3d_surf_create(fd->f3,-0.5*dx,ytop,ztop,dipdeg,(rsf->slip_mode == STRIKE) ? 1 : 2,m,nxs,nys,-0.5*dx - mg*dx,ys0,Lsf,fsign);
     PetscCheck(fd->f3->layer,PETSC_COMM_WORLD,PETSC_ERR_LIB,"rsf_fd_setup: virtual surface setup failed");
     fd->f3->layer->normal_coupling = rsf->calc_sigma_dot ? 1 : 0;
-    if(rsf->calc_sigma_dot){ fd->f3->layer->static_n_fn = fd3d_static_in; fd->f3->layer->static_n_ctx = (void *)par; }
+    if(rsf->calc_sigma_dot){
+      fd->f3->layer->static_n_fn = fd3d_static_in;
+      fd->f3->layer->static_n_ctx = (void *)par;
+    }
     {
-      struct fd3d_layer *ly = fd->f3->layer;
-      double mb = 16.0*((double)5*(ly->L + 2)*ly->Mh*ly->nys*ly->nys + 9.0*(ly->L + 2)*ly->Mh*ly->nys*ly->nz + (double)ly->L*ly->Mh*(3*ly->nys + ly->nz))/1048576.0;
-      double wmin = 1e300, wmax = 0.0; int q; for(q = 0; q < ly->nys; q++){ if(ly->wy[q] < wmin) wmin = ly->wy[q]; if(ly->wy[q] > wmax) wmax = ly->wy[q]; }
+      ly = fd->f3->layer;
+      mb = 16.0*((double)5*(ly->L + 2)*ly->Mh*ly->nys*ly->nys + 9.0*(ly->L + 2)*ly->Mh*ly->nys*ly->nz + (double)ly->L*ly->Mh*(3*ly->nys + ly->nz))/1048576.0;
+      wmin = 1e300;
+      wmax = 0.0;
+      for(q = 0; q < ly->nys; q++){
+        if(ly->wy[q] < wmin)
+          wmin = ly->wy[q];
+        if(ly->wy[q] > wmax)
+          wmax = ly->wy[q];
+      }
       PetscCall(PetscPrintf(PETSC_COMM_WORLD,"rsf_fd_setup: virtual free surface: dip %.1f deg, %s slip, %d columns of %g m x %d rows of %g to %g m (3 unknowns each), %d lags, about %.0f MB; normal-stress changes %s\n",
-			    dipdeg,(rsf->slip_mode == STRIKE) ? "strike" : "dip",ly->nxs,ly->hx,ly->nys,wmin,wmax,ly->L,mb,rsf->calc_sigma_dot ? "on (exact static In)" : "off (no -calc_sigma_dot)"));
-      if(fd->next3) PetscCall(PetscPrintf(PETSC_COMM_WORLD,"rsf_fd_setup: the fault reaches the surface: its plane continues %d row(s) above it, tied to the top row\n",(int)fd->next3));
+          dipdeg,(rsf->slip_mode == STRIKE) ? "strike" : "dip",ly->nxs,ly->hx,ly->nys,wmin,wmax,ly->L,mb,rsf->calc_sigma_dot ? "on (exact static In)" : "off (no -calc_sigma_dot)"));
+      if(fd->next3)
+        PetscCall(PetscPrintf(PETSC_COMM_WORLD,"rsf_fd_setup: the fault reaches the surface: its plane continues %d row(s) above it, tied to the top row\n",(int)fd->next3));
     }
   }
   if(fd->mirror3 && (fd->layer_w > 0)){
     /* free-surface layer completing the mirror (fd_plan.md, stage A): a strip of opening
        elements of dx/m along the trace, +-layer_w fault elements wide, layer_margin fault
        elements beyond the fault ends */
-    int m = (int)fd->layer_m, mg = (int)fd->layer_margin, Lly;
-    double x0f = -0.5*dx, rmax;                     /* the marcher's along-strike origin: element 0 centred at 0 */
-    if(mg < 0) mg = (int)fd->layer_w;
+    int m_2 = (int)fd->layer_m, mg = (int)fd->layer_margin, Lly;
+    x0f = -0.5*dx;                     /* the marcher's along-strike origin: element 0 centred at 0 */
+    if(mg < 0)
+      mg = (int)fd->layer_w;
     rmax = sqrt(pow((nx + 2*mg)*dx, 2) + pow((nz + fd->layer_w)*dx, 2));
     Lly = (int)ceil(rmax/(fd->beta*fd->dt_min)) + 2;
-    fd->f3->layer = fd3d_layer_create_fft(fd->f3,x0f,m,(nx + 2*mg)*m,(int)(2*fd->layer_w*m),x0f - mg*dx,Lly);
+    fd->f3->layer = fd3d_layer_create_fft(fd->f3,x0f,m_2,(nx + 2*mg)*m_2,(int)(2*fd->layer_w*m_2),x0f - mg*dx,Lly);
     PetscCheck(fd->f3->layer,PETSC_COMM_WORLD,PETSC_ERR_LIB,"rsf_fd_setup: free-surface layer setup failed");
     {
       struct fd3d_layer *ly = fd->f3->layer;
       double mb = 16.0*((double)ly->L*ly->Mx2*ly->Mh2 + 2.0*ly->L*ly->Mh*ly->nys*ly->nz + (double)ly->L*ly->Mh*(ly->nys + ly->nz) + (double)ly->L*ly->Mx2*ly->Mh2)/1048576.0;
       PetscCall(PetscPrintf(PETSC_COMM_WORLD,"rsf_fd_setup: free-surface layer: %d x %d opening elements of %g m (+-%d fault elements across the trace, %d beyond the ends), %d lags, about %.0f MB\n",
-			    ly->nxs,ly->nys,ly->hx,(int)fd->layer_w,mg,ly->L,mb));
+          ly->nxs,ly->nys,ly->hx,(int)fd->layer_w,mg,ly->L,mb));
     }
   }
   PetscCall(MatCreateVecs(medium->Is,&fd->v3a,&fd->v3b));
-  fd->nrec = 64; fd->irec = 0; fd->nrec_used = 0;
+  fd->nrec = 64;
+  fd->irec = 0;
+  fd->nrec_used = 0;
   PetscCall(PetscMalloc2(fd->nrec,&fd->rec_t,(size_t)fd->nrec*n,&fd->rec_v));
   PetscCall(PetscPrintf(PETSC_COMM_WORLD,"rsf_fd_setup: 3-D, %d x %d squares of %g m, dt_min %.3e s, window %d lags, FFT %d x %d, tables %.1f MB\n",
-			nx,nz,dx,(double)fd->dt_min,fd->tab3->L,fd->tab3->Mx,fd->tab3->Mz,
-			(double)fd->tab3->L*fd->tab3->Mx*fd->tab3->Mh*sizeof(fd3d_cplx)/1048576.0));
+      nx,nz,dx,(double)fd->dt_min,fd->tab3->L,fd->tab3->Mx,fd->tab3->Mz,
+      (double)fd->tab3->L*fd->tab3->Mx*fd->tab3->Mh*sizeof(fd3d_cplx)/1048576.0));
   if(fd->mirror3)
     PetscCall(PetscPrintf(PETSC_COMM_WORLD,"rsf_fd_setup: 3-D half space by mirror image: static operator of fault plus image deviates %.3e from the exact half-space Is "
-			  "(expected, a few percent); the dynamic phases use the exact Is for the static part\n",dev));
+                                            "(expected, a few percent); the dynamic phases use the exact Is for the static part\n",
+        dev));
   else if(!fd->surf3)
     PetscCall(PetscPrintf(PETSC_COMM_WORLD,"rsf_fd_setup: 3-D static gate: rel dev of Ks(tables) from Is %.3e (tol %g)\n",dev,(double)fd->gate_tol));
   if(fd->surf3)
     PetscCall(PetscPrintf(PETSC_COMM_WORLD,"rsf_fd_setup: 3-D half space by a virtual surface: the full-space tables deviate %.3e from the exact half-space Is "
-			  "(the free-surface part); the dynamic phases use the exact Is (and In) for the static part\n",dev));
+                                            "(the free-surface part); the dynamic phases use the exact Is (and In) for the static part\n",
+        dev));
   PetscCheck(fd->mirror3 || fd->surf3 || (dev <= 5.0*fd->gate_tol),PETSC_COMM_WORLD,PETSC_ERR_USER,
-	     "rsf_fd_setup: 3-D static limit deviates %.3e from the assembled Is: convention mismatch (a sign flip gives 2)",dev);
+      "rsf_fd_setup: 3-D static limit deviates %.3e from the assembled Is: convention mismatch (a sign flip gives 2)",dev);
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
@@ -1564,22 +2483,28 @@ static PetscErrorCode fd_build_tables(struct interact_ctx *par, struct fd_vars *
   PetscInt n = medium->nrflt, i, k, l, nm;
   double *cx,*cy,*tx,*ty,*hl,dx0 = -1.0,tn;
   char err[256];
+  struct fd_segment *im;
+  struct fd_segment *re;
+  struct fd_pair *p;
   PetscFunctionBeginUser;
   PetscCall(PetscMalloc5(n,&cx,n,&cy,n,&tx,n,&ty,n,&hl));
   for(i = 0;i < n;i++){
-    cx[i] = fault[i].x[INT_X]*fd->length_scale; cy[i] = fault[i].x[INT_Y]*fd->length_scale;
+    cx[i] = fault[i].x[INT_X]*fd->length_scale;
+    cy[i] = fault[i].x[INT_Y]*fd->length_scale;
     tn = hypot(fault[i].t_strike[INT_X],fault[i].t_strike[INT_Y]);
-    tx[i] = fault[i].t_strike[INT_X]/tn; ty[i] = fault[i].t_strike[INT_Y]/tn;
+    tx[i] = fault[i].t_strike[INT_X]/tn;
+    ty[i] = fault[i].t_strike[INT_Y]/tn;
     hl[i] = fault[i].l*fd->length_scale;
   }
   fd->segs = fd_detect_segments((int)n,cx,cy,tx,ty,hl,1e-6,err);
   PetscCall(PetscFree5(cx,cy,tx,ty,hl));
   PetscCheck(fd->segs,PETSC_COMM_WORLD,PETSC_ERR_SUP,"rsf_fd_setup: segment detection failed: %s",err);
   for(k = 0;k < fd->segs->nseg;k++){
-    if(dx0 < 0.0) dx0 = fd->segs->seg[k].dx;
+    if(dx0 < 0.0)
+      dx0 = fd->segs->seg[k].dx;
     PetscCheck(fabs(fd->segs->seg[k].dx - dx0) < 1e-9*dx0,PETSC_COMM_WORLD,PETSC_ERR_SUP,
-	       "rsf_fd_setup: segments with different element sizes (%g vs %g): one common size required in this version",
-	       fd->segs->seg[k].dx,dx0);
+        "rsf_fd_setup: segments with different element sizes (%g vs %g): one common size required in this version",
+        fd->segs->seg[k].dx,dx0);
     /* non-parallel segments (bends, branches) use dense pair tables (fd_plan.md N1) */
   }
   fd->dt_min = fd->cfl*dx0/fd->beta;
@@ -1589,37 +2514,45 @@ static PetscErrorCode fd_build_tables(struct interact_ctx *par, struct fd_vars *
   fd->nsrc = fd->segs->nseg*(fd->halfplane ? 2 : 1);
   PetscCall(PetscMalloc3(fd->nsrc,&fd->srcseg,fd->nsrc,&fd->src_of,fd->nsrc,&fd->src_rev));
   for(k = 0;k < fd->segs->nseg;k++){
-    fd->srcseg[k] = fd->segs->seg[k]; fd->src_of[k] = (int)k; fd->src_rev[k] = 0;
+    fd->srcseg[k] = fd->segs->seg[k];
+    fd->src_of[k] = (int)k;
+    fd->src_rev[k] = 0;
     if(fd->halfplane){
-      struct fd_segment *im = fd->srcseg + fd->segs->nseg + k, *re = fd->segs->seg + k;
+      im = fd->srcseg + fd->segs->nseg + k;
+      re = fd->segs->seg + k;
       /* image: the mirrored segment in reversed element order, tangent (-s_x, s_y), so that a
          vertical segment keeps its tangent (as before); a dipping segment's image is not
          parallel to it and gets a dense table (fd_plan.md N1) */
       *im = *re;
-      im->s[0] = -re->s[0]; im->s[1] = re->s[1];
+      im->s[0] = -re->s[0];
+      im->s[1] = re->s[1];
       im->X0[0] = re->X0[0] + (re->n - 1)*re->dx*re->s[0];
       im->X0[1] = -(re->X0[1] + (re->n - 1)*re->dx*re->s[1]);
-      fd->src_of[fd->segs->nseg + k] = (int)k; fd->src_rev[fd->segs->nseg + k] = 1;
+      fd->src_of[fd->segs->nseg + k] = (int)k;
+      fd->src_rev[fd->segs->nseg + k] = 1;
     }
   }
   /* one padded FFT length for all pairs: smallest power of two >= 2 nmax - 1 */
   nm = 0;
   for(k = 0;k < fd->segs->nseg;k++)
-    if(fd->segs->seg[k].n > nm) nm = fd->segs->seg[k].n;
+    if(fd->segs->seg[k].n > nm)
+      nm = fd->segs->seg[k].n;
   fd->M = fd_fft_size_for(2*nm - 1);
   PetscCall(PetscCalloc1((size_t)fd->nsrc*fd->segs->nseg,&fd->pairs));
-  fd->nbytes = 0; fd->L = 0;
+  fd->nbytes = 0;
+  fd->L = 0;
   for(k = 0;k < fd->nsrc;k++)			/* source */
     for(l = 0;l < fd->segs->nseg;l++){		/* receiver */
-      struct fd_pair *p = fd_pair_build(fd->srcseg + k,fd->segs->seg + l,fd->mode2d,fd->dt_min,fd->et,
-					fd->alpha,fd->beta,fd->rho,fd->tol,(int)fd->lmax,fd->lmax > 0,fd->M,err);
+      p = fd_pair_build(fd->srcseg + k,fd->segs->seg + l,fd->mode2d,fd->dt_min,fd->et,
+          fd->alpha,fd->beta,fd->rho,fd->tol,(int)fd->lmax,fd->lmax > 0,fd->M,err);
       PetscCheck(p,PETSC_COMM_WORLD,PETSC_ERR_SUP,"rsf_fd_setup: table for pair (%ld,%ld) failed: %s",(long)k,(long)l,err);
       fd->pairs[k*fd->segs->nseg + l] = p;
       fd->nbytes += (double)p->L*p->M*16.0*(p->has_normal ? 2 : 1);
-      if(p->L > fd->L) fd->L = p->L;
+      if(p->L > fd->L)
+        fd->L = p->L;
       PetscCall(PetscPrintf(PETSC_COMM_WORLD,"rsf_fd_setup: pair (%s%ld -> %ld): %d x %d elements, window %d lags (%.2f s)%s\n",
-			    k >= fd->segs->nseg ? "image " : "",(long)fd->src_of[k],(long)l,p->src->n,p->rcv->n,p->L,(double)(p->L*fd->dt_min),
-			    p->dense ? ", dense (not parallel)" : ""));
+          k >= fd->segs->nseg ? "image " : "",(long)fd->src_of[k],(long)l,p->src->n,p->rcv->n,p->L,(double)(p->L*fd->dt_min),
+          p->dense ? ", dense (not parallel)" : ""));
     }
   fd->sys = fd_sys_create(fd->segs,fd->pairs,(int)fd->nsrc,fd->src_of,fd->src_rev,fd->mode2d,fd->dt_min,fd->alpha,fd->beta,fd->rho,+1);
   PetscCheck(fd->sys,PETSC_COMM_WORLD,PETSC_ERR_MEM,"rsf_fd_setup: marcher system allocation failed");
@@ -1630,10 +2563,10 @@ static PetscErrorCode fd_build_tables(struct interact_ctx *par, struct fd_vars *
   if(fd->conv){
     PetscCheck((fd->conv == 1) || (fd->conv == 2),PETSC_COMM_WORLD,PETSC_ERR_ARG_OUTOFRANGE,"-fd_conv must be 0, 1 or 2");
     PetscCheck(fd_sys_set_conv(fd->sys,(int)fd->conv,(int)fd->conv_block,(int)fd->kmax) == 0,PETSC_COMM_WORLD,PETSC_ERR_ARG_OUTOFRANGE,
-	       "rsf_fd_setup: -fd_conv_block must be a power of two (or 0 for automatic)");
+        "rsf_fd_setup: -fd_conv_block must be a power of two (or 0 for automatic)");
     if(fd->sys->conv)
       PetscCall(PetscPrintf(PETSC_COMM_WORLD,"rsf_fd_setup: %s convolution: blocks of %d lags, lags 1..%d direct, FFT length %d\n",
-			    fd->sys->conv == 2 ? "hybrid partitioned" : "partitioned",fd->sys->B,fd->sys->D,fd->sys->F));
+          fd->sys->conv == 2 ? "hybrid partitioned" : "partitioned",fd->sys->B,fd->sys->D,fd->sys->F));
     else
       PetscCall(PetscPrintf(PETSC_COMM_WORLD,"rsf_fd_setup: window (%d lags) too short for the partitioned convolution, direct sum used\n",fd->sys->L));
   }
@@ -1669,26 +2602,32 @@ static PetscErrorCode fd_gate_one(struct fd_vars *fd, Mat A, const double *K, Pe
     for(i = 0;i < fd->segs->seg[k].n;i++)
       s_of_g[fd->segs->gidx[k][i]] = fd->sys->off[k] + i;
   for(gi = 0;gi < nrflt;gi++){
-    for(c = 0;c < nrflt;c++) row[c] = 0.0;
+    for(c = 0;c < nrflt;c++)
+      row[c] = 0.0;
     PetscCall(MatGetRow(A,gi,&ncols,&cols,&vals));
-    for(c = 0;c < ncols;c++) row[cols[c]] = PetscRealPart(vals[c]);
+    for(c = 0;c < ncols;c++)
+      row[cols[c]] = PetscRealPart(vals[c]);
     PetscCall(MatRestoreRow(A,gi,&ncols,&cols,&vals));
     si = s_of_g[gi];
     for(c = 0;c < nrflt;c++){
       sj = s_of_g[c];
       /* skip near-diagonal self terms within one segment */
       if(labs((long)si - (long)sj) <= 1){
-	for(k = 0;k < fd->segs->nseg;k++)
-	  if((si >= fd->sys->off[k]) && (si < fd->sys->off[k+1]) && (sj >= fd->sys->off[k]) && (sj < fd->sys->off[k+1]))
-	    break;
-	if(k < fd->segs->nseg) continue;
+        for(k = 0;k < fd->segs->nseg;k++)
+          if((si >= fd->sys->off[k]) && (si < fd->sys->off[k+1]) && (sj >= fd->sys->off[k]) && (sj < fd->sys->off[k+1]))
+            break;
+        if(k < fd->segs->nseg)
+          continue;
       }
       dv = row[c] - K[(size_t)si*N + sj];
-      dev += dv*dv; nrm += row[c]*row[c];
+      dev += dv*dv;
+      nrm += row[c]*row[c];
     }
   }
-  PetscCall(PetscFree(row)); PetscCall(PetscFree(s_of_g));
-  *dev2 = dev; *nrm2 = nrm;
+  PetscCall(PetscFree(row));
+  PetscCall(PetscFree(s_of_g));
+  *dev2 = dev;
+  *nrm2 = nrm;
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
@@ -1711,9 +2650,9 @@ static PetscErrorCode fd_gate_static(struct interact_ctx *par, struct fd_vars *f
     PetscCall(PetscPrintf(PETSC_COMM_WORLD,"rsf_fd_setup: static gate: rel dev of Kn(tables) from In %.3e (normal norm / shear norm %.2e)\n",devn,sqrt(nn2/(n2 + 1e-300))));
   }
   PetscCheck(dev <= 5.0*fd->gate_tol,PETSC_COMM_WORLD,PETSC_ERR_USER,
-	     "rsf_fd_setup: static limit of the dynamic tables deviates %.3e from the assembled Is: convention mismatch (a sign flip gives 2)",dev);
+      "rsf_fd_setup: static limit of the dynamic tables deviates %.3e from the assembled Is: convention mismatch (a sign flip gives 2)",dev);
   PetscCheck(devn <= 5.0*fd->gate_tol,PETSC_COMM_WORLD,PETSC_ERR_USER,
-	     "rsf_fd_setup: normal static limit deviates %.3e from the assembled In (a sign flip gives 2)",devn);
+      "rsf_fd_setup: normal static limit deviates %.3e from the assembled In (a sign flip gives 2)",devn);
   if((dev > fd->gate_tol) || (devn > fd->gate_tol))
     PetscCall(PetscPrintf(PETSC_COMM_WORLD,"rsf_fd_setup: WARNING: static gate deviation exceeds %g\n",(double)fd->gate_tol));
   PetscFunctionReturn(PETSC_SUCCESS);
@@ -1725,19 +2664,31 @@ static void fd_record_interp(struct fd_vars *fd, PetscReal t, double *V)
   int n = fd->nrec_used, i, i0, i1, N = fd->sys->N, j;
   double w;
   PetscReal *tt = fd->rec_t;
-  if(n == 0){ for(j = 0;j < N;j++) V[j] = 0.0; return; }
-  /* records are stored cyclically; find the two bracketing entries (times increase) */
-  i0 = -1; i1 = -1;
-  for(i = 0;i < n;i++){
-    int idx = (fd->irec - n + i + fd->nrec) % fd->nrec;
-    if(tt[idx] <= t) i0 = idx;
-    if((tt[idx] >= t) && (i1 < 0)) i1 = idx;
+  int idx;
+  if(n == 0){
+    for(j = 0;j < N;j++)
+      V[j] = 0.0;
+    return;
   }
-  if(i0 < 0) i0 = (fd->irec - n + fd->nrec) % fd->nrec;
-  if(i1 < 0) i1 = (fd->irec - 1 + fd->nrec) % fd->nrec;
+  /* records are stored cyclically; find the two bracketing entries (times increase) */
+  i0 = -1;
+  i1 = -1;
+  for(i = 0;i < n;i++){
+    idx = (fd->irec - n + i + fd->nrec) % fd->nrec;
+    if(tt[idx] <= t)
+      i0 = idx;
+    if((tt[idx] >= t) && (i1 < 0))
+      i1 = idx;
+  }
+  if(i0 < 0)
+    i0 = (fd->irec - n + fd->nrec) % fd->nrec;
+  if(i1 < 0)
+    i1 = (fd->irec - 1 + fd->nrec) % fd->nrec;
   w = (tt[i1] > tt[i0]) ? (t - tt[i0])/(tt[i1] - tt[i0]) : 0.0;
-  if(w < 0.0) w = 0.0;
-  if(w > 1.0) w = 1.0;
+  if(w < 0.0)
+    w = 0.0;
+  if(w > 1.0)
+    w = 1.0;
   for(j = 0;j < N;j++)
     V[j] = (1.0 - w)*fd->rec_v[(size_t)i0*N + j] + w*fd->rec_v[(size_t)i1*N + j];
 }
@@ -1755,9 +2706,28 @@ static PetscErrorCode fd_run_phase(TS ts, struct interact_ctx *par, struct fd_va
   PetscScalar *x;
   int N = sy->N, i, g, l, k, nsteps = 0, kk;
   double vmax = 0.0, below = 0.0, dcmin = 1e30, *vtmp, *vref, vpeak = 0.0, slipsum = 0.0, t_wall0, t_wall1;
+  double rmax;
+  double vm;
+  int im;
+  double r;
+  int a;
+  char fn[128];
+  int a_2;
+  double kd;
+  int im_2;
+  double hs;
+  int quiet;
+  int a_3;
+  char fn_2[128];
+  FILE *fp;
+  extern double fd_prof[6];
   PetscFunctionBeginUser;
   PetscCall(PetscTime(&t_wall0));
-  fr.N = N; fr.v0 = rsf->v0; fr.f0 = rsf->f0; fr.tol = 1e-10; fr.max_iter = 50;
+  fr.N = N;
+  fr.v0 = rsf->v0;
+  fr.f0 = rsf->f0;
+  fr.tol = 1e-10;
+  fr.max_iter = 50;
   PetscCall(PetscMalloc3(N,&fr.a,N,&fr.b,N,&fr.dc));
   PetscCall(PetscMalloc1(N,&vtmp));
   PetscCall(PetscMalloc1(N,&vref));
@@ -1766,15 +2736,21 @@ static PetscErrorCode fd_run_phase(TS ts, struct interact_ctx *par, struct fd_va
   PetscCall(VecGetArray(X,&x));
   for(i = 0;i < N;i++){
     g = fd->g_of_s[i];
-    fr.a[i] = fault[g].mu_sa; fr.b[i] = fault[g].mu_db; fr.dc[i] = rsf->dc_vec ? rsf->dc_vec[g] : rsf->dc;
-    if(fr.dc[i] < dcmin) dcmin = fr.dc[i];
-    st->psi[i] = x[4*g]; st->sigma0[i] = x[4*g+2];
+    fr.a[i] = fault[g].mu_sa;
+    fr.b[i] = fault[g].mu_db;
+    fr.dc[i] = rsf->dc_vec ? rsf->dc_vec[g] : rsf->dc;
+    if(fr.dc[i] < dcmin)
+      dcmin = fr.dc[i];
+    st->psi[i] = x[4*g];
+    st->sigma0[i] = x[4*g+2];
     st->V[i] = 2.0*rsf->v0*exp(-x[4*g]/fault[g].mu_sa)*sinh(x[4*g+1]/(fault[g].mu_sa*x[4*g+2]));
     st->tau0[i] = x[4*g+1] + sy->eta*st->V[i];	/* elastic stress at the switch */
     st->taudot[i] = fault[g].sinc[0];
     st->Hn_dot[i] = rsf->calc_sigma_dot ? fault[g].sinc[1] : 0.0;
-    st->sigma[i] = st->sigma0[i]; st->tau[i] = x[4*g+1];
-    if(st->V[i] > vmax) vmax = st->V[i];
+    st->sigma[i] = st->sigma0[i];
+    st->tau[i] = x[4*g+1];
+    if(st->V[i] > vmax)
+      vmax = st->V[i];
   }
   /* seed the fine-grid history from the accepted-step record */
   fd_sys_reset_history(sy);
@@ -1785,94 +2761,127 @@ static PetscErrorCode fd_run_phase(TS ts, struct interact_ctx *par, struct fd_va
   st->t = 0.0;			/* marcher time is relative to the switch (loading = taudot * (t - t_switch)) */
   if(getenv("FD_DEBUG")){
     /* consistency at the switch: elastic stress tau0 against strength plus damping */
-    double rmax = 0.0, vm = 0.0; int im = 0;
+    rmax = 0.0;
+    vm = 0.0;
+    im = 0;
     for(i = 0;i < N;i++){
-      double r = st->tau0[i] - sy->eta*st->V[i] - fd_rsf_tau(&fr,i,st->V[i],st->psi[i],st->sigma0[i]);
-      if(fabs(r) > rmax) rmax = fabs(r);
-      if(st->V[i] > vm){ vm = st->V[i]; im = i; }
+      r = st->tau0[i] - sy->eta*st->V[i] - fd_rsf_tau(&fr,i,st->V[i],st->psi[i],st->sigma0[i]);
+      if(fabs(r) > rmax)
+        rmax = fabs(r);
+      if(st->V[i] > vm){
+        vm = st->V[i];
+        im = i;
+      }
     }
     fprintf(stderr,"FD_DEBUG: switch at t %.6f yr: vmax %.3e at s-index %d (z %.0f m), max |tau0 - eta V - tau_f| %.3e Pa, eta %.3e, L %d, nsrc %d, N %d\n",
-	    t/SEC_PER_YEAR,vm,im,-(double)(fd->segs->seg[0].X0[1] + im*fd->segs->seg[0].dx*fd->segs->seg[0].s[1]),rmax,sy->eta,sy->L,sy->nsrc,N);
+        t/SEC_PER_YEAR,vm,im,-(double)(fd->segs->seg[0].X0[1] + im*fd->segs->seg[0].dx*fd->segs->seg[0].s[1]),rmax,sy->eta,sy->L,sy->nsrc,N);
   }
   {
-    int a;
     for(a = 0;a < fd->nstat;a++){
-      char fn[128]; sprintf(fn,"fd_phase_%ld_st%ld.dat",(long)fd->nphase + 1,(long)fd->stat[a]);
+      sprintf(fn,"fd_phase_%ld_st%ld.dat",(long)fd->nphase + 1,(long)fd->stat[a]);
       fd->fstat[a] = fopen(fn,"w");
       fd->sstat[a] = -1;
-      for(i = 0;i < N;i++) if(fd->g_of_s[i] == fd->stat[a]) fd->sstat[a] = i;
+      for(i = 0;i < N;i++)
+        if(fd->g_of_s[i] == fd->stat[a])
+          fd->sstat[a] = i;
     }
   }
   for(;;){
-    int a;
-    double kd = fd->xi*dcmin/(vmax*sy->dt);
+    kd = fd->xi*dcmin/(vmax*sy->dt);
     k = 1;
     /* powers of two up to kmax and xi dc / (V dt); with the coarse history the
        step must also start at a multiple of its length (aligned blocks) */
-    while((2*k <= fd->kmax) && (2*k <= kd) && (!sy->Kc || (sy->hk[0] % (2*k) == 0))) k *= 2;
+    while((2*k <= fd->kmax) && (2*k <= kd) && (!sy->Kc || (sy->hk[0] % (2*k) == 0)))
+      k *= 2;
     if(fd_step_rsf(sy,st,&fr,k) != 0)
       SETERRQ(PETSC_COMM_WORLD,PETSC_ERR_LIB,"rsf_fd: marcher step failed");
     nsteps++;
     vmax = 0.0;
-    for(i = 0;i < N;i++) if(st->V[i] > vmax) vmax = st->V[i];
+    for(i = 0;i < N;i++)
+      if(st->V[i] > vmax)
+        vmax = st->V[i];
     if(getenv("FD_DEBUG") && (nsteps <= 3)){
-      int im = 0; double hs = 0.0;
-      for(i = 0;i < N;i++){ if(st->V[i] == vmax) im = i; if(fabs(st->hs[i]) > hs) hs = fabs(st->hs[i]); }
+      im_2 = 0;
+      hs = 0.0;
+      for(i = 0;i < N;i++){
+        if(st->V[i] == vmax)
+          im_2 = i;
+        if(fabs(st->hs[i]) > hs)
+          hs = fabs(st->hs[i]);
+      }
       fprintf(stderr,"FD_DEBUG: step %d k %d: vmax %.3e at s-index %d, V[0] %.2e V[N/2] %.2e V[N-1] %.2e, max|hist| %.3e, tau at im %.4e, H at im %.4e\n",
-	      nsteps,k,vmax,im,st->V[0],st->V[N/2],st->V[N-1],hs,st->tau[im],st->H[im]);
+          nsteps,k,vmax,im_2,st->V[0],st->V[N/2],st->V[N-1],hs,st->tau[im_2],st->H[im_2]);
     }
-    for(a = 0;a < fd->nstat;a++)
-      if(fd->sstat[a] >= 0)
-	fprintf(fd->fstat[a],"%.10e %.10e %.10e %.10e %.4e %d\n",st->t,st->delta[fd->sstat[a]],st->V[fd->sstat[a]],st->tau[fd->sstat[a]],vmax,k);
-    if(vmax > vpeak) vpeak = vmax;
+    for(a_2 = 0;a_2 < fd->nstat;a_2++)
+      if(fd->sstat[a_2] >= 0)
+        fprintf(fd->fstat[a_2],"%.10e %.10e %.10e %.10e %.4e %d\n",st->t,st->delta[fd->sstat[a_2]],st->V[fd->sstat[a_2]],st->tau[fd->sstat[a_2]],vmax,k);
+    if(vmax > vpeak)
+      vpeak = vmax;
     if(fd->back_eps > 0.0){
       /* quasi-steady hand-back: the hereditary term of a slip rate that is
 	 constant over one window equals the QD radiation damping, so the
 	 phase can end once every element's slip rate has changed by less
 	 than back_eps (relative, floored at vback) over a full window and the
 	 fault-wide maximum is below back_vmax */
-      int quiet = (vmax < fd->back_vmax);
+      quiet = (vmax < fd->back_vmax);
       if(quiet && (below > 0.0))
-	for(i = 0;i < N;i++)
-	  if(fabs(st->V[i] - vref[i]) > fd->back_eps*(fabs(vref[i]) + fd->vback)){ quiet = 0; break; }
+        for(i = 0;i < N;i++)
+          if(fabs(st->V[i] - vref[i]) > fd->back_eps*(fabs(vref[i]) + fd->vback)){
+            quiet = 0;
+            break;
+          }
       if(!quiet || (below == 0.0)){
-	memcpy(vref,st->V,sizeof(double)*N);
-	below = quiet ? 1e-30 : 0.0;
+        memcpy(vref,st->V,sizeof(double)*N);
+        below = quiet ? 1e-30 : 0.0;
       }else
-	below += k*sy->dt;
+        below += k*sy->dt;
     }else{
-      if(vmax < fd->vback) below += k*sy->dt; else below = 0.0;
+      if(vmax < fd->vback)
+        below += k*sy->dt;
+      else
+        below = 0.0;
     }
-    if(below >= sy->L*sy->dt) break;
+    if(below >= sy->L*sy->dt)
+      break;
     if(nsteps >= fd->max_steps)
       SETERRQ(PETSC_COMM_WORLD,PETSC_ERR_CONV_FAILED,"rsf_fd: dynamic phase exceeded -fd_max_steps = %ld steps (t - t_switch = %g s, max V %g)",(long)fd->max_steps,(double)st->t,vmax);
   }
   {
-    int a; char fn[128]; FILE *fp;
-    for(a = 0;a < fd->nstat;a++) if(fd->fstat[a]) fclose(fd->fstat[a]);
-    sprintf(fn,"fd_phase_%ld_slip.dat",(long)fd->nphase + 1); fp = fopen(fn,"w");
-    for(i = 0;i < N;i++) fprintf(fp,"%d %ld %.10e %.6e %.6e\n",i,(long)fd->g_of_s[i],st->delta[i],st->V[i],st->psi[i]);
+    for(a_3 = 0;a_3 < fd->nstat;a_3++)
+      if(fd->fstat[a_3])
+        fclose(fd->fstat[a_3]);
+    sprintf(fn_2,"fd_phase_%ld_slip.dat",(long)fd->nphase + 1);
+    fp = fopen(fn_2,"w");
+    for(i = 0;i < N;i++)
+      fprintf(fp,"%d %ld %.10e %.6e %.6e\n",i,(long)fd->g_of_s[i],st->delta[i],st->V[i],st->psi[i]);
     fclose(fp);
   }
   /* hand back: psi, tau (= strength at the final slip rate = elastic stress at the end of the last step), sigma, slip */
   for(i = 0;i < N;i++){
     g = fd->g_of_s[i];
-    x[4*g] = st->psi[i]; x[4*g+1] = st->tau[i]; x[4*g+2] = st->sigma[i]; x[4*g+3] += st->delta[i];
+    x[4*g] = st->psi[i];
+    x[4*g+1] = st->tau[i];
+    x[4*g+2] = st->sigma[i];
+    x[4*g+3] += st->delta[i];
     slipsum += st->delta[i];
   }
   PetscCall(VecRestoreArray(X,&x));
   *t_end = t + st->t;
   PetscCall(PetscTime(&t_wall1));
   if(getenv("FD_PROFILE")){
-    extern double fd_prof[6];
     fprintf(stderr,"FD_PROFILE phase: history %.1f s, static %.1f s, solve %.1f s, push %.1f s, other %.1f s\n",fd_prof[0],fd_prof[1],fd_prof[2],fd_prof[3],fd_prof[5]);
-    for(i = 0;i < 6;i++) fd_prof[i] = 0.0;
+    for(i = 0;i < 6;i++)
+      fd_prof[i] = 0.0;
   }
-  for(kk = 0,i = 0;i < sy->nops;i++) if(sy->ops[i].bw > kk) kk = sy->ops[i].bw;
+  for(kk = 0,i = 0;i < sy->nops;i++)
+    if(sy->ops[i].bw > kk)
+      kk = sy->ops[i].bw;
   PetscCall(PetscPrintf(PETSC_COMM_WORLD,
-		"rsf_fd: phase %ld: t %.8f yr, %d steps over %.1f s, peak slip rate %.3f m/s, mean slip %.4f m, max band %d, wall %.1f s\n",
-		(long)fd->nphase + 1,(double)(t/SEC_PER_YEAR),nsteps,(double)st->t,vpeak,slipsum/N,kk,(double)(t_wall1 - t_wall0)));
-  PetscCall(PetscFree3(fr.a,fr.b,fr.dc)); PetscCall(PetscFree(vtmp)); PetscCall(PetscFree(vref));
+      "rsf_fd: phase %ld: t %.8f yr, %d steps over %.1f s, peak slip rate %.3f m/s, mean slip %.4f m, max band %d, wall %.1f s\n",
+      (long)fd->nphase + 1,(double)(t/SEC_PER_YEAR),nsteps,(double)st->t,vpeak,slipsum/N,kk,(double)(t_wall1 - t_wall0)));
+  PetscCall(PetscFree3(fr.a,fr.b,fr.dc));
+  PetscCall(PetscFree(vtmp));
+  PetscCall(PetscFree(vref));
   fd_state_free(st);
   PetscFunctionReturn(PETSC_SUCCESS);
 }
@@ -1893,22 +2902,28 @@ PetscErrorCode rsf_fd_monitor(TS ts, PetscInt step, PetscReal time, Vec X, void 
   struct fd_vars *fd = rsf->fd;
   PetscScalar *v;
   PetscInt i;
+  int N;
+  double vm;
   PetscFunctionBeginUser;
   if(!fd)
     PetscFunctionReturn(PETSC_SUCCESS);
   PetscCall(fd_full_get_read(rsf->vel,&fd->scV,&fd->Vall,&v));
   fd->rec_t[fd->irec] = time;
   {
-    int N = fd->dim3 ? ((fd->pair3 || fd->multi3) ? fd->n3tot : fd->f3->N) : fd->sys->N;
-    double vm = 0.0;
+    N = fd->dim3 ? ((fd->pair3 || fd->multi3) ? fd->n3tot : fd->f3->N) : fd->sys->N;
+    vm = 0.0;
     for(i = 0;i < N;i++){
       fd->rec_v[(size_t)fd->irec*N + i] = (fd->g_of_s[i] >= 0) ? PetscRealPart(v[fd->g_of_s[i]]) : 0.0;
-      if(fabs(fd->rec_v[(size_t)fd->irec*N + i]) > vm) vm = fabs(fd->rec_v[(size_t)fd->irec*N + i]);
+      if(fabs(fd->rec_v[(size_t)fd->irec*N + i]) > vm)
+        vm = fabs(fd->rec_v[(size_t)fd->irec*N + i]);
     }
-    if((fd->vsw_eff > fd->vsw) && (vm < fd->vback)) fd->vsw_eff = fd->vsw;   /* end of the re-entry hysteresis: afterslip below vback */
+    if((fd->vsw_eff > fd->vsw) && (vm < fd->vback))
+      fd->vsw_eff = fd->vsw;   /* end of the re-entry hysteresis: afterslip below vback */
   }
   PetscCall(fd_full_put_read(rsf->vel,&fd->scV,&fd->Vall,&v));
-  fd->irec = (fd->irec + 1) % fd->nrec; if(fd->nrec_used < fd->nrec) fd->nrec_used++;
+  fd->irec = (fd->irec + 1) % fd->nrec;
+  if(fd->nrec_used < fd->nrec)
+    fd->nrec_used++;
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
@@ -1923,25 +2938,31 @@ PetscErrorCode rsf_fd_postevent(TS ts, struct interact_ctx *par, PetscReal t, Ve
   if(!fd)
     PetscFunctionReturn(PETSC_SUCCESS);
   fd->nflag++;
-  if(getenv("FD_DEBUG_REENTRY")) PetscCall(PetscPrintf(PETSC_COMM_WORLD,"rsf_fd_postevent: t %.9f yr, switching threshold %g\n",(double)(t/SEC_PER_YEAR),(double)fd->vsw_eff));
+  if(getenv("FD_DEBUG_REENTRY"))
+    PetscCall(PetscPrintf(PETSC_COMM_WORLD,"rsf_fd_postevent: t %.9f yr, switching threshold %g\n",(double)(t/SEC_PER_YEAR),(double)fd->vsw_eff));
   if(fd->mode == 1){
-    if(fd->dim3) PetscCall(fd3d_run_phase(ts,par,fd,t,X,&t_end));
-    else PetscCall(fd_run_phase(ts,par,fd,t,X,&t_end));
+    if(fd->dim3)
+      PetscCall(fd3d_run_phase(ts,par,fd,t,X,&t_end));
+    else
+      PetscCall(fd_run_phase(ts,par,fd,t,X,&t_end));
     fd->nphase++;
-    fd->nrec_used = 0; fd->irec = 0;	/* the record is stale after the phase */
+    fd->nrec_used = 0;
+    fd->irec = 0;	/* the record is stale after the phase */
     /* re-entry hysteresis (fd_plan.md L3): right after a phase, the afterslip may exceed vsw
        again; QD reproduces it (the hand-back tested that), so a new phase opens only above
        reentry vsw until the peak rate has fallen below vback (reset in rsf_fd_monitor) */
-    if(fd->reentry > 1.0) fd->vsw_eff = fd->reentry*fd->vsw;
+    if(fd->reentry > 1.0)
+      fd->vsw_eff = fd->reentry*fd->vsw;
     PetscCall(TSSetTime(ts,t_end));
     PetscCall(TSSetTimeStep(ts,fd->dt_restart));
     /* the event handler otherwise resumes with its own step (the pre-event one), which after an
        early hand-back (-fd_back_dyn) can be far too long for the still-fast afterslip (the
        error estimate turned NaN and the integration stalled, fd_plan.md L3) */
-    if(fd->dim3) PetscCall(TSSetPostEventStep(ts,fd->dt_restart));   /* 3-D only: 2-D runs unchanged */
+    if(fd->dim3)
+      PetscCall(TSSetPostEventStep(ts,fd->dt_restart));   /* 3-D only: 2-D runs unchanged */
   }else
     PetscCall(PetscPrintf(PETSC_COMM_WORLD,"rsf_fd_postevent: t %.6f yr: switch threshold crossed (mode %d: no phase)\n",
-			  (double)(t/SEC_PER_YEAR),(int)fd->mode));
+        (double)(t/SEC_PER_YEAR),(int)fd->mode));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
@@ -1964,17 +2985,22 @@ PetscErrorCode rsf_fd_initial(TS ts, struct interact_ctx *par, Vec X)
   PetscCall(fd_full_get_read(X,&fd->scX,&fd->Xall,&x));
   for(i = 0;i < medium->nrflt;i++){
     v = 2.0*rsf->v0*exp(-x[4*i]/fault[i].mu_sa)*sinh(x[4*i+1]/(fault[i].mu_sa*x[4*i+2]));
-    if(fabs(v) > vmax) vmax = fabs(v);
+    if(fabs(v) > vmax)
+      vmax = fabs(v);
   }
   PetscCall(fd_full_put_read(X,&fd->scX,&fd->Xall,&x));
   if(vmax <= fd->vsw)
     PetscFunctionReturn(PETSC_SUCCESS);
   PetscCall(TSGetTime(ts,&t));
   PetscCall(PetscPrintf(PETSC_COMM_WORLD,"rsf_fd_initial: initial max slip rate %.3e m/s above vsw: dynamic phase from t = %g s\n",(double)vmax,(double)t));
-  if(fd->dim3) PetscCall(fd3d_run_phase(ts,par,fd,t,X,&t_end));
-  else PetscCall(fd_run_phase(ts,par,fd,t,X,&t_end));
-  fd->nphase++; fd->nflag++;
-  fd->nrec_used = 0; fd->irec = 0;
+  if(fd->dim3)
+    PetscCall(fd3d_run_phase(ts,par,fd,t,X,&t_end));
+  else
+    PetscCall(fd_run_phase(ts,par,fd,t,X,&t_end));
+  fd->nphase++;
+  fd->nflag++;
+  fd->nrec_used = 0;
+  fd->irec = 0;
   PetscCall(TSSetTime(ts,t_end));
   PetscCall(TSSetTimeStep(ts,fd->dt_restart));
   PetscFunctionReturn(PETSC_SUCCESS);
@@ -1989,26 +3015,42 @@ PetscErrorCode rsf_fd_finalize(struct interact_ctx *par)
   if(!fd)
     PetscFunctionReturn(PETSC_SUCCESS);
   PetscCall(PetscPrintf(PETSC_COMM_WORLD,"rsf_fd_finalize: %ld accepted steps above vsw, %ld dynamic phases\n",
-		(long)fd->nflag,(long)fd->nphase));
+      (long)fd->nflag,(long)fd->nphase));
   if(fd->f3){
     PetscCall(PetscFree4(fd->f3->a,fd->f3->b,fd->f3->Lc,fd->f3->theta));
     fd3d_free(fd->f3);
-    PetscCall(VecDestroy(&fd->v3a)); PetscCall(VecDestroy(&fd->v3b));
-    if(fd->sc3){ PetscCall(VecScatterDestroy(&fd->sc3)); PetscCall(VecDestroy(&fd->v3all)); }
-    if(fd->scX){ PetscCall(VecScatterDestroy(&fd->scX)); PetscCall(VecDestroy(&fd->Xall)); }
-    if(fd->scV){ PetscCall(VecScatterDestroy(&fd->scV)); PetscCall(VecDestroy(&fd->Vall)); }
+    PetscCall(VecDestroy(&fd->v3a));
+    PetscCall(VecDestroy(&fd->v3b));
+    if(fd->sc3){
+      PetscCall(VecScatterDestroy(&fd->sc3));
+      PetscCall(VecDestroy(&fd->v3all));
+    }
+    if(fd->scX){
+      PetscCall(VecScatterDestroy(&fd->scX));
+      PetscCall(VecDestroy(&fd->Xall));
+    }
+    if(fd->scV){
+      PetscCall(VecScatterDestroy(&fd->scV));
+      PetscCall(VecDestroy(&fd->Vall));
+    }
   }
-  if(fd->tab3) fd3d_tab_free(fd->tab3);
-  if(fd->sys) fd_sys_free(fd->sys);
+  if(fd->tab3)
+    fd3d_tab_free(fd->tab3);
+  if(fd->sys)
+    fd_sys_free(fd->sys);
   if(fd->pairs){
     for(k = 0;k < fd->nsrc*fd->segs->nseg;k++)
       fd_pair_free(fd->pairs[k]);
     PetscCall(PetscFree(fd->pairs));
   }
-  if(fd->srcseg) PetscCall(PetscFree3(fd->srcseg,fd->src_of,fd->src_rev));
-  if(fd->g_of_s) PetscCall(PetscFree(fd->g_of_s));
-  if(fd->rec_t) PetscCall(PetscFree2(fd->rec_t,fd->rec_v));
-  if(fd->segs) fd_seglist_free(fd->segs);
+  if(fd->srcseg)
+    PetscCall(PetscFree3(fd->srcseg,fd->src_of,fd->src_rev));
+  if(fd->g_of_s)
+    PetscCall(PetscFree(fd->g_of_s));
+  if(fd->rec_t)
+    PetscCall(PetscFree2(fd->rec_t,fd->rec_v));
+  if(fd->segs)
+    fd_seglist_free(fd->segs);
   PetscCall(PetscFree(fd));
   rsf->fd = NULL;
   PetscFunctionReturn(PETSC_SUCCESS);

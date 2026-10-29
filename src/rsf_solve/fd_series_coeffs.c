@@ -83,4 +83,3 @@ double fd_c_12p_m5(double X, double x2, double alpha, double beta)
   double x5 = pow(X, 2)*pow(x2, 2);
   return (1.0/160.0)*X*(7*x0*x1 + 35*x0*x4 + 10*x0*x5 + 5*x1*x3 + 25*x3*x4 + 30*x3*x5)/(M_PI*pow(beta, 5)*x0);
 }
-

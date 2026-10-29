@@ -19,21 +19,43 @@ int main(int argc, char **argv)
   char err[256];
   FILE *fo = fopen(argc > 3 ? argv[3] : "fd_dense.txt", "w");
   double *Ws = malloc(sizeof(double)*ns*nr), *Wn = malloc(sizeof(double)*ns*nr);
-  src.X0[0] = 0.5*dx; src.X0[1] = 0.0; src.s[0] = 1.0; src.s[1] = 0.0; src.dx = dx; src.a = 0.5*dx; src.n = ns;
+  src.X0[0] = 0.5*dx;
+  src.X0[1] = 0.0;
+  src.s[0] = 1.0;
+  src.s[1] = 0.0;
+  src.dx = dx;
+  src.a = 0.5*dx;
+  src.n = ns;
   /* receiver starts at the source's far end (x = ns dx), rotated by ang */
-  rcv.s[0] = cos(ang); rcv.s[1] = sin(ang); rcv.dx = dx; rcv.a = 0.5*dx; rcv.n = nr;
-  rcv.X0[0] = ns*dx + 0.5*dx*rcv.s[0]; rcv.X0[1] = 0.5*dx*rcv.s[1];
+  rcv.s[0] = cos(ang);
+  rcv.s[1] = sin(ang);
+  rcv.dx = dx;
+  rcv.a = 0.5*dx;
+  rcv.n = nr;
+  rcv.X0[0] = ns*dx + 0.5*dx*rcv.s[0];
+  rcv.X0[1] = 0.5*dx*rcv.s[1];
   p = fd_pair_build(&src, &rcv, mode, dt, 1.0, alpha, beta, rho, 1e-9, 200, 1, 0, err);   /* tight: no tail cut before lag 60 */
-  if(!p){ fprintf(stderr, "build failed: %s\n", err); return 1; }
+  if(!p){
+    fprintf(stderr, "build failed: %s\n", err);
+    return 1;
+  }
   fprintf(fo, "# dense %d L %d\n", p->dense, p->L);
   fd_pair_static_dense(p, Ws, Wn);
-  for(i = 0; i < nr; i++) for(j = 0; j < ns; j++) fprintf(fo, "0 %d %d %.15e %.15e\n", i, j, Ws[i*ns + j], Wn[i*ns + j]);
+  for(i = 0; i < nr; i++)
+    for(j = 0; j < ns; j++)
+      fprintf(fo, "0 %d %d %.15e %.15e\n", i, j, Ws[i*ns + j], Wn[i*ns + j]);
   for(l = 0; l < 5; l++){
-    if(lags[l] > p->L) continue;
+    if(lags[l] > p->L)
+      continue;
     fd_pair_W_dense(p, lags[l], Ws, Wn);
-    for(i = 0; i < nr; i++) for(j = 0; j < ns; j++) fprintf(fo, "%d %d %d %.15e %.15e\n", lags[l], i, j, Ws[i*ns + j], Wn[i*ns + j]);
+    for(i = 0; i < nr; i++)
+      for(j = 0; j < ns; j++)
+        fprintf(fo, "%d %d %d %.15e %.15e\n", lags[l], i, j, Ws[i*ns + j], Wn[i*ns + j]);
   }
-  fclose(fo); fd_pair_free(p); free(Ws); free(Wn);
+  fclose(fo);
+  fd_pair_free(p);
+  free(Ws);
+  free(Wn);
   printf("test_fd_dense: angle %g deg, mode %d, L %d, written\n", ang*180.0/M_PI, mode, p ? 0 : 0);
   return 0;
 }
