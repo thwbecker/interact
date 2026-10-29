@@ -5058,34 +5058,108 @@ static double seg2_dist(const double p[2], const double a[2], const double b[2])
   return hypot(p[0] - a[0] - u*ab[0], p[1] - a[1] - u*ab[1]);
 }
 
-static void dtab_alloc(struct fd3d_dtab *d, int nr, int nc, int L)
+/* a dense coupling between the active cells: rows ridx (full receiver indices), columns cidx */
+static void dtab_alloc(struct fd3d_dtab *d, int nr, const int *ridx, int nc, const int *cidx, int L)
 {
+  size_t ne;
+  ne = (size_t)nr*nc;
   d->nr = nr;
   d->nc = nc;
   d->L = L;
-  d->W = calloc((size_t)L*nr*nc, sizeof(double));
-  d->Ks = calloc((size_t)nr*nc, sizeof(double));
-  d->K1 = calloc((size_t)nr*nc, sizeof(double));
+  d->ridx = malloc(sizeof(int)*(nr > 0 ? nr : 1));
+  d->cidx = malloc(sizeof(int)*(nc > 0 ? nc : 1));
+  memcpy(d->ridx, ridx, sizeof(int)*nr);
+  memcpy(d->cidx, cidx, sizeof(int)*nc);
+  d->Ks = calloc(ne > 0 ? ne : 1, sizeof(double));
+  d->K1 = calloc(ne > 0 ? ne : 1, sizeof(double));
+  d->lo = calloc(ne > 0 ? ne : 1, sizeof(int));
+  d->hi = calloc(ne > 0 ? ne : 1, sizeof(int));
+  d->woff = calloc(ne > 0 ? ne : 1, sizeof(size_t));
+  d->nwcap = ne*4 + 16;
+  d->nw = 0;
+  d->W = malloc(sizeof(double)*d->nwcap);
 }
 static void dtab_free(struct fd3d_dtab *d)
 {
-  free(d->W);
+  free(d->ridx);
+  free(d->cidx);
   free(d->Ks);
   free(d->K1);
+  free(d->lo);
+  free(d->hi);
+  free(d->woff);
+  free(d->W);
 }
 
-/* one receiver row of a dense table from fd3d_elem_resp: lag increments K (L values) and static
-   slope ks of that row, times sgn, into column col */
-static void dtab_fill_row(struct fd3d_dtab *d, const struct fd3d_tab *t, int col, int row, const double *K, double ks, double sgn)
+/* one entry (stored row, stored column) from fd3d_elem_resp: lag increments K (L values) and
+   static slope ks, times sgn; only the lags between the first and the last nonzero value of
+   K - ks dt are kept (the increments are exactly zero before the first arrival) */
+static void dtab_fill(struct fd3d_dtab *d, const struct fd3d_tab *t, int col, int row, const double *K, double ks, double sgn)
 {
-  int l, L;
+  int l, lo, hi, L;
   size_t e;
+  double w;
   L = d->L;
   e = (size_t)row*d->nc + col;
   d->Ks[e] = sgn*ks;
   d->K1[e] = sgn*K[0];
-  for(l = 0; l < L; l++)
-    d->W[(size_t)l*d->nr*d->nc + e] = sgn*(K[l] - ks*t->dt);
+  lo = 0;
+  hi = -1;
+  for(l = 0; l < L; l++){
+    w = sgn*(K[l] - ks*t->dt);
+    if(w != 0.0){
+      if(hi < lo)
+        lo = l;
+      hi = l;
+    }
+  }
+  d->lo[e] = lo + 1;
+  d->hi[e] = hi + 1;
+  if(hi < lo)
+    return;
+  if(d->nw + (size_t)(hi - lo + 1) > d->nwcap){
+    while(d->nw + (size_t)(hi - lo + 1) > d->nwcap)
+      d->nwcap *= 2;
+    d->W = realloc(d->W, sizeof(double)*d->nwcap);
+  }
+  d->woff[e] = d->nw;
+  for(l = lo; l <= hi; l++)
+    d->W[d->nw++] = sgn*(K[l] - ks*t->dt);
+}
+
+/* y[ridx - rlo] += w M x[cidx] for M = Ks or K1, over the stored rows whose full index is in
+   [rlo, rhi) (rows in stored order, columns in increasing index, as the full dense product) */
+static void dtab_mv(const struct fd3d_dtab *d, const double *M, const double *x, double w, int rlo, int rhi, double *y)
+{
+  int r, c;
+  double a;
+  for(r = 0; r < d->nr; r++){
+    if(d->ridx[r] < rlo || d->ridx[r] >= rhi)
+      continue;
+    a = 0.0;
+    for(c = 0; c < d->nc; c++)
+      a += M[(size_t)r*d->nc + c]*x[d->cidx[c]];
+    y[d->ridx[r] - rlo] += w*a;
+  }
+}
+
+/* one lag l of the history: y[ridx - rlo] += W_l v[cidx] over the stored rows in [rlo, rhi) */
+static void dtab_lag(const struct fd3d_dtab *d, int l, const double *v, int rlo, int rhi, double *y)
+{
+  int r, c;
+  size_t e;
+  double a;
+  for(r = 0; r < d->nr; r++){
+    if(d->ridx[r] < rlo || d->ridx[r] >= rhi)
+      continue;
+    a = 0.0;
+    for(c = 0; c < d->nc; c++){
+      e = (size_t)r*d->nc + c;
+      if(l >= d->lo[e] && l <= d->hi[e])
+        a += d->W[d->woff[e] + (l - d->lo[e])]*v[d->cidx[c]];
+    }
+    y[d->ridx[r] - rlo] += a;
+  }
 }
 
 /* fault <-> fault: the several-plane tables (G1) in global frames; cell (0, 0) at the top row,
@@ -5277,7 +5351,8 @@ static void strips_dense_pair(struct fd3d_strips *s, int q, int k, const double 
   const struct fd3d_tab *t;
   double Fq[3][3], Fk[3][3], Rq[3][3], Rk[3][3], RSq[3][3], dirs_s[3][3], dk2[2][3], e[3], sl[3], sdk[3], nk[3];
   double ez[3] = {0, 0, 1}, ks[3], *K;
-  int Nq, Nk, nsk, nsq, L, r, i, j, c;
+  int Nq, Nk, nsk, nsq, L, r, i, j, c, nak, naq, a, b;
+  int *rows_s, *cols_s, *rows_f, *cols_f;
   lk = s->ly[k];
   lq = s->ly[q];
   t = s->f[0]->t;
@@ -5308,32 +5383,83 @@ static void strips_dense_pair(struct fd3d_strips *s, int q, int k, const double 
     dk2[0][i] = sdk[i];
     dk2[1][i] = nk[i];
   }
-  /* fault q -> strip k (source slip: the marcher's variable, fsign along Fq[fcomp-1]) */
-  dtab_alloc(&s->fs[q][k], 3*nsk, Nq, L);
+  /* active cells of strip k (receivers, 3 components) and strip q (sources, 3 components), in
+     increasing full index c ns + i; all fault cells */
+  nak = 0;
+  for(i = 0; i < nsk; i++)
+    nak += s->active[k][i];
+  naq = 0;
+  for(i = 0; i < nsq; i++)
+    naq += s->active[q][i];
+  rows_s = malloc(sizeof(int)*3*nak + sizeof(int));
+  cols_s = malloc(sizeof(int)*3*naq + sizeof(int));
+  rows_f = calloc(2*Nk + 1, sizeof(int));
+  cols_f = calloc(Nq + 1, sizeof(int));
+  a = 0;
+  for(r = 0; r < 3; r++)
+    for(i = 0; i < nsk; i++)
+      if(s->active[k][i])
+        rows_s[a++] = r*nsk + i;
+  b = 0;
+  for(c = 0; c < 3; c++)
+    for(j = 0; j < nsq; j++)
+      if(s->active[q][j])
+        cols_s[b++] = c*nsq + j;
+  for(i = 0; i < 2*Nk; i++)
+    rows_f[i] = i;
   for(j = 0; j < Nq; j++)
+    cols_f[j] = j;
+  /* fault q -> strip k (source slip: the marcher's variable, fsign along Fq[fcomp-1]) */
+  dtab_alloc(&s->fs[q][k], 3*nak, rows_s, Nq, cols_f, L);
+  for(j = 0; j < Nq; j++){
+    a = 0;
     for(i = 0; i < nsk; i++){
+      if(!s->active[k][i])
+        continue;
       fd3d_elem_resp(t, s->fg[q] + 3*(size_t)j, Rq, fcomp, 0.5*t->dx, 0.5*t->dx, s->xg[k] + 3*(size_t)i, ez, 3, dirs_s, L, K, ks);
       for(r = 0; r < 3; r++)
-        dtab_fill_row(&s->fs[q][k], t, j, r*nsk + i, K + (size_t)r*L, ks[r], fsign[q]);
+        dtab_fill(&s->fs[q][k], t, j, r*nak + a, K + (size_t)r*L, ks[r], fsign[q]);
+      a++;
     }
+  }
   /* strip q -> fault k (receiver: shear along fault k's slip direction, normal) */
-  dtab_alloc(&s->sf[q][k], 2*Nk, 3*nsq, L);
-  for(c = 1; c <= 3; c++)
-    for(j = 0; j < nsq; j++)
+  dtab_alloc(&s->sf[q][k], 2*Nk, rows_f, 3*naq, cols_s, L);
+  for(c = 1; c <= 3; c++){
+    b = 0;
+    for(j = 0; j < nsq; j++){
+      if(!s->active[q][j])
+        continue;
       for(i = 0; i < Nk; i++){
         fd3d_elem_resp(t, s->xg[q] + 3*(size_t)j, RSq, c, 0.5*lq->hx, 0.5*lq->wy[j % lq->nys], s->fg[k] + 3*(size_t)i, nk, 2, dk2, L, K, ks);
         for(r = 0; r < 2; r++)
-          dtab_fill_row(&s->sf[q][k], t, (c - 1)*nsq + j, r*Nk + i, K + (size_t)r*L, ks[r], 1.0);
+          dtab_fill(&s->sf[q][k], t, (c - 1)*naq + b, r*Nk + i, K + (size_t)r*L, ks[r], 1.0);
       }
+      b++;
+    }
+  }
   /* strip q -> strip k */
-  dtab_alloc(&s->ss[q][k], 3*nsk, 3*nsq, L);
-  for(c = 1; c <= 3; c++)
-    for(j = 0; j < nsq; j++)
+  dtab_alloc(&s->ss[q][k], 3*nak, rows_s, 3*naq, cols_s, L);
+  for(c = 1; c <= 3; c++){
+    b = 0;
+    for(j = 0; j < nsq; j++){
+      if(!s->active[q][j])
+        continue;
+      a = 0;
       for(i = 0; i < nsk; i++){
+        if(!s->active[k][i])
+          continue;
         fd3d_elem_resp(t, s->xg[q] + 3*(size_t)j, RSq, c, 0.5*lq->hx, 0.5*lq->wy[j % lq->nys], s->xg[k] + 3*(size_t)i, ez, 3, dirs_s, L, K, ks);
         for(r = 0; r < 3; r++)
-          dtab_fill_row(&s->ss[q][k], t, (c - 1)*nsq + j, r*nsk + i, K + (size_t)r*L, ks[r], 1.0);
+          dtab_fill(&s->ss[q][k], t, (c - 1)*naq + b, r*nak + a, K + (size_t)r*L, ks[r], 1.0);
+        a++;
       }
+      b++;
+    }
+  }
+  free(rows_s);
+  free(cols_s);
+  free(rows_f);
+  free(cols_f);
   free(K);
 }
 
@@ -5393,6 +5519,29 @@ struct fd3d_strips *fd3d_strips_create(int nf, struct fd3d **f, const double *th
   return s;
 }
 
+/* memory of the dense couplings of the strips (bytes) */
+double fd3d_strips_memory(const struct fd3d_strips *s)
+{
+  const struct fd3d_dtab *d[3];
+  double mem;
+  int k, q, u;
+  size_t ne;
+  mem = 0.0;
+  for(k = 0; k < s->nf; k++)
+    for(q = 0; q < s->nf; q++){
+      if(k == q)
+        continue;
+      d[0] = &s->fs[k][q];
+      d[1] = &s->sf[k][q];
+      d[2] = &s->ss[k][q];
+      for(u = 0; u < 3; u++){
+        ne = (size_t)d[u]->nr*d[u]->nc;
+        mem += 8.0*d[u]->nw + ne*(2.0*8.0 + 2.0*sizeof(int) + sizeof(size_t));
+      }
+    }
+  return mem;
+}
+
 void fd3d_strips_free(struct fd3d_strips *s)
 {
   int k, q;
@@ -5423,12 +5572,33 @@ void fd3d_strips_free(struct fd3d_strips *s)
   free(s);
 }
 
+/* the increment of lag l (1-based) of the entry (full row, full column) of a dense coupling,
+   W + Ks dt; NAN if the entry is not stored (a masked cell) */
+static double dtab_value(const struct fd3d_dtab *d, int rfull, int cfull, int l, double dt)
+{
+  int r, c;
+  size_t e;
+  double w;
+  for(r = 0; r < d->nr; r++)
+    if(d->ridx[r] == rfull)
+      break;
+  for(c = 0; c < d->nc; c++)
+    if(d->cidx[c] == cfull)
+      break;
+  if(r == d->nr || c == d->nc)
+    return NAN;
+  e = (size_t)r*d->nc + c;
+  w = (l >= d->lo[e] && l <= d->hi[e]) ? d->W[d->woff[e] + (l - d->lo[e])] : 0.0;
+  return w + d->Ks[e]*dt;
+}
+
 /* step-2 check (fd3d_test h6strips): two faults; (a) the active cells of all strips cover each
    global cell position once; (b) shared strike: the dense strip-to-strip and fault-to-strip
    entries equal surf_resp evaluated in the common local frame; (c) a rigid rotation of the
    whole configuration leaves every dense table unchanged. Returns 0 if all pass. */
 int fd3d_h6_strips_check(int verbose)
 {
+  double wa, wb;
   double cL = 6000, cT = 3464, rho = 2670, dx = 1000.0, dt = 0.5*dx/cT;
   int nx = 4, nz = 2, m = 4, L = 12, k, i, fail = 0, nxs[2] = {24, 24}, nys[2] = {16, 16};
   double th[2] = {0.0, 0.0}, O[2][3] = {{0, 0, 0}, {0, 0, 0}}, x0f[2] = {0.0, 0.0}, ytop[2] = {0.0, -3000.0}, ztop[2] = {0.0, 0.0}, dip[2] = {60.0, 75.0}, fs[2] = {1.0, -1.0};
@@ -5509,7 +5679,9 @@ int fd3d_h6_strips_check(int verbose)
           surf_resp(tb, F1, 0, cc, s1->xg[1] + 3*j, 0.5*hs, 0.5*hs, s1->xg[0] + 3*i, 0, sd0, L, K, ks);
           for(r = 0; r < 3; r++)
             for(l = 0; l < L; l++){
-              ours = s1->ss[1][0].W[(size_t)l*s1->ss[1][0].nr*s1->ss[1][0].nc + (size_t)(r*ns_2 + i)*s1->ss[1][0].nc + (cc - 1)*ns_2 + j] + s1->ss[1][0].Ks[(size_t)(r*ns_2 + i)*s1->ss[1][0].nc + (cc - 1)*ns_2 + j]*dt;
+              ours = dtab_value(&s1->ss[1][0], r*ns_2 + i, (cc - 1)*ns_2 + j, l + 1, dt);
+              if(isnan(ours))
+                continue;                     /* masked cell: not stored */
               worst_b = fmax(worst_b, fabs(ours - K[(size_t)r*L + l]));
               scale_b = fmax(scale_b, fabs(K[(size_t)r*L + l]));
             }
@@ -5520,7 +5692,9 @@ int fd3d_h6_strips_check(int verbose)
         surf_resp(tb, F1, 1, 2, s1->fg[1] + 3*j, 0.5*dx, 0.5*dx, s1->xg[0] + 3*i, 0, sd0, L, K, ks);
         for(r = 0; r < 3; r++)
           for(l = 0; l < L; l++){
-            ours_2 = s1->fs[1][0].W[(size_t)l*s1->fs[1][0].nr*s1->fs[1][0].nc + (size_t)(r*ns_2 + i)*s1->fs[1][0].nc + j] + s1->fs[1][0].Ks[(size_t)(r*ns_2 + i)*s1->fs[1][0].nc + j]*dt;
+            ours_2 = dtab_value(&s1->fs[1][0], r*ns_2 + i, j, l + 1, dt);
+            if(isnan(ours_2))
+              continue;
             worst_b = fmax(worst_b, fabs(ours_2 - fs[1]*K[(size_t)r*L + l]));
             scale_b = fmax(scale_b, fabs(K[(size_t)r*L + l]));
           }
@@ -5553,15 +5727,20 @@ int fd3d_h6_strips_check(int verbose)
       b[2] = &s2->ss[0][1];
 
       for(u = 0; u < 3; u++){
-        n = (size_t)a[u]->L*a[u]->nr*a[u]->nc;
-        for(e = 0; e < n; e++){
-          worst_c = fmax(worst_c, fabs(a[u]->W[e] - b[u]->W[e]));
-          scale_c = fmax(scale_c, fabs(a[u]->W[e]));
+        if(a[u]->nr != b[u]->nr || a[u]->nc != b[u]->nc){
+          worst_c = 1e300;
+          continue;
         }
         n = (size_t)a[u]->nr*a[u]->nc;
         for(e = 0; e < n; e++){
           worst_c = fmax(worst_c, fabs(a[u]->Ks[e] - b[u]->Ks[e])*dt);
           worst_c = fmax(worst_c, fabs(a[u]->K1[e] - b[u]->K1[e]));
+          for(l = 1; l <= a[u]->L; l++){
+            wa = (l >= a[u]->lo[e] && l <= a[u]->hi[e]) ? a[u]->W[a[u]->woff[e] + (l - a[u]->lo[e])] : 0.0;
+            wb = (l >= b[u]->lo[e] && l <= b[u]->hi[e]) ? b[u]->W[b[u]->woff[e] + (l - b[u]->lo[e])] : 0.0;
+            worst_c = fmax(worst_c, fabs(wa - wb));
+            scale_c = fmax(scale_c, fabs(wa));
+          }
         }
       }
       for(k = 0; k < 2; k++)
@@ -5587,19 +5766,6 @@ int fd3d_h6_strips_check(int verbose)
 }
 
 /* y[r] += w sum_c M[r][c] x[c] for an nr x nc row-major matrix */
-static void dmv(const double *M, int nr, int nc, const double *x, double w, double *y)
-{
-  int r, c;
-  double a;
-  const double *row;
-  for(r = 0; r < nr; r++){
-    a = 0.0;
-    row = M + (size_t)r*nc;
-    for(c = 0; c < nc; c++)
-      a += row[c]*x[c];
-    y[r] += w*a;
-  }
-}
 /* joint operator of all strips' zero-traction conditions on the stacked rates v (strip k at
    off[k], 3 ns_k each), masked cells held at zero: out = A v restricted to active rows */
 struct strips_ctx {
@@ -5633,7 +5799,7 @@ static void strips_A(struct strips_ctx *x, const double *v, double *out)
     surf_A(s->ly[k], x->nl, x->hw, x->Es, vm + x->off[k], out + x->off[k], x->S3[k], x->P3[k]);
     for(j = 0; j < s->nf; j++)
       if(j != k)
-        dmv(s->ss[j][k].K1, s->ss[j][k].nr, s->ss[j][k].nc, vm + x->off[j], x->hw, out + x->off[k]);
+        dtab_mv(&s->ss[j][k], s->ss[j][k].K1, vm + x->off[j], x->hw, 0, 3*s->ly[k]->ns, out + x->off[k]);
   }
   strips_mask(x, out);
   free(vm);
@@ -6043,26 +6209,26 @@ int fd3d_strips_step(struct fd3d_strips *s, double **load)
       Nk = s->f[k]->N;
       if(q == k)
         continue;
-      dmv(a->Ks, a->nr, a->nc, s->f[q]->delta, 1.0, Hs[k]);
-      dmv(b->Ks, b->nr, b->nc, s->ly[q]->delta3, 1.0, Hs[k]);
+      dtab_mv(a, a->Ks, s->f[q]->delta, 1.0, 0, nsk, Hs[k]);
+      dtab_mv(b, b->Ks, s->ly[q]->delta3, 1.0, 0, nsk, Hs[k]);
       if(!s->f[k]->static_fn)
-        dmv(d->Ks, Nk, d->nc, s->ly[q]->delta3, 1.0, Kx[k]);
+        dtab_mv(d, d->Ks, s->ly[q]->delta3, 1.0, 0, Nk, Kx[k]);
       if(!s->static_n_fn)
-        dmv(d->Ks + (size_t)Nk*d->nc, Nk, d->nc, s->ly[q]->delta3, 1.0, Kn[k]);
+        dtab_mv(d, d->Ks, s->ly[q]->delta3, 1.0, Nk, 2*Nk, Kn[k]);
       for(l = 2; l <= s->L && l - 1 <= lmaxd; l++){
         slot_2 = (s->hk - (l - 1) + (long)s->Lb*1000) % s->Lb;
         vf = s->fring[q] + (size_t)slot_2*Nq;
         vs = s->sring[q] + (size_t)slot_2*nsq;
-        dmv(a->W + (size_t)(l - 1)*a->nr*a->nc, a->nr, a->nc, vf, 1.0, Hs[k]);
-        dmv(b->W + (size_t)(l - 1)*b->nr*b->nc, b->nr, b->nc, vs, 1.0, Hs[k]);
-        dmv(d->W + (size_t)(l - 1)*d->nr*d->nc, Nk, d->nc, vs, 1.0, Kx[k]);
-        dmv(d->W + (size_t)(l - 1)*d->nr*d->nc + (size_t)Nk*d->nc, Nk, d->nc, vs, 1.0, Kn[k]);
+        dtab_lag(a, l, vf, 0, nsk, Hs[k]);
+        dtab_lag(b, l, vs, 0, nsk, Hs[k]);
+        dtab_lag(d, l, vs, 0, Nk, Kx[k]);
+        dtab_lag(d, l, vs, Nk, 2*Nk, Kn[k]);
       }
       if(nl){
-        dmv(a->K1, a->nr, a->nc, s->f[q]->Vold, 0.5, Hs[k]);
-        dmv(b->K1, b->nr, b->nc, s->ly[q]->Vold3, 0.5, Hs[k]);
-        dmv(d->K1, Nk, d->nc, s->ly[q]->Vold3, 0.5, Kx[k]);
-        dmv(d->K1 + (size_t)Nk*d->nc, Nk, d->nc, s->ly[q]->Vold3, 0.5, Kn[k]);
+        dtab_mv(a, a->K1, s->f[q]->Vold, 0.5, 0, nsk, Hs[k]);
+        dtab_mv(b, b->K1, s->ly[q]->Vold3, 0.5, 0, nsk, Hs[k]);
+        dtab_mv(d, d->K1, s->ly[q]->Vold3, 0.5, 0, Nk, Kx[k]);
+        dtab_mv(d, d->K1, s->ly[q]->Vold3, 0.5, Nk, 2*Nk, Kn[k]);
       }
       (void)nsk;
     }
@@ -6151,8 +6317,8 @@ int fd3d_strips_step(struct fd3d_strips *s, double **load)
       for(q = 0; q < nf; q++)
         if(q != k){               /* the current step's other strips -> fault k */
           d_2 = &s->sf[q][k];
-          dmv(d_2->K1, N_2, d_2->nc, V + X.off[q], hw, hsx);
-          dmv(d_2->K1 + (size_t)N_2*d_2->nc, N_2, d_2->nc, V + X.off[q], hw, hsx + N_2);
+          dtab_mv(d_2, d_2->K1, V + X.off[q], hw, 0, N_2, hsx);
+          dtab_mv(d_2, d_2->K1, V + X.off[q], hw, N_2, 2*N_2, hsx + N_2);
         }
       for(i = 0; i < N_2; i++){
         Hf[i] += hsx[i];
@@ -6221,7 +6387,7 @@ int fd3d_strips_step(struct fd3d_strips *s, double **load)
         lx_inv(ly_4, nys_4, Ys[k] + (size_t)c*Q_3, ly_4->nxs, 1, -hw, rhs + X.off[k] + (size_t)c*ns_3);
       for(q = 0; q < nf; q++)
         if(q != k)
-          dmv(s->fs[q][k].K1, s->fs[q][k].nr, s->fs[q][k].nc, s->f[q]->V, -hw, rhs + X.off[k]);
+          dtab_mv(&s->fs[q][k], s->fs[q][k].K1, s->f[q]->V, -hw, 0, 3*s->ly[k]->ns, rhs + X.off[k]);
     }
     {
       Vn = malloc(sizeof(double)*nst);
@@ -6289,7 +6455,7 @@ int fd3d_strips_step(struct fd3d_strips *s, double **load)
       f_2->H[i] += Hx[k][i] + Kx[k][i] + tmpf[i];
     for(q = 0; q < nf; q++)
       if(q != k)
-        dmv(s->sf[q][k].K1, N_3, s->sf[q][k].nc, s->ly[q]->V3, hw, f_2->H);
+        dtab_mv(&s->sf[q][k], s->sf[q][k].K1, s->ly[q]->V3, hw, 0, N_3, f_2->H);
     if(s->mx)
       for(q = 0; q < nf; q++){
         cp_3 = &s->mx->c[q][k];

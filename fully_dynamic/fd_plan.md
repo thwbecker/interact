@@ -2578,6 +2578,35 @@ about 10 GB at 500 m and of the order of 100 GB at 250 m; the domain partitionin
 (about 15 numbers per pair and component instead of 130 to 540 lags) is needed before a
 benchmark-resolution comparison, and is next on the list for that reason.
 
+### H6 step 6: compressed dense couplings (active cells, nonzero lags), plan for MPI (2026-10-30)
+
+struct fd3d_dtab now stores a dense coupling only between active cells (masked strip cells
+are neither sources nor receivers), with index maps to the full vectors (ridx, cidx), and for
+each entry only the lags from the first to the last nonzero increment (exactly zero before the
+first arrival), packed (lo, hi, woff, W); dtab_mv (static slope, first lag) and dtab_lag (one
+lag of the history) keep the order of the former full products, so results are unchanged:
+h6step (shared strike, prescribed slip) 5.588e-8 as before; the rotated slip-weakening case
+2.847e-5 against 2.842e-5 Pa (of 8.1e7; round-off level, as in the restyle). h6strips checks
+(a) to (c) pass on the compressed tables (dtab_value). fd3d_strips_memory and rsf_solve report
+the stored size. In the sandbox the full-width shared-strike pair at dx/4 still did not finish
+its table build within 290 s (2 GB resident at 200 s); building the tables (fd3d_elem_resp per
+pair and lag) is now the slow part, which the MPI distribution below also addresses.
+Plan for the remaining scaling work, with accuracy kept:
+1. MPI, dense couplings: each rank owns a contiguous block of receiver rows of every dense
+   coupling (fd3d_dtab, and the several-plane cross tables of G1), builds only those rows and
+   applies them with the full source histories (replicated rings, O(N L) per rank); the results
+   are gathered (MPI_Allgatherv) into the full vectors each step. Every row is computed whole on
+   one rank in a fixed order, so results are bit-identical for any number of ranks; checks: the
+   h6step and multi checks and TPV14 at 1 km on 1, 2 and 4 ranks, byte-for-byte.
+2. MPI, the strip solve: the factorised first-lag operator is small (3 x active cells); it is
+   assembled from the distributed rows, gathered and factorised on every rank (identical), so
+   the solve stays exact and identical across ranks; GMRES with a per-strip preconditioner and
+   a boundary block is the route once it no longer fits.
+3. Domain partitioning (gate 2): the history between the P and S strips by four cubic
+   coefficients per entry with running moment sums of each source's history; exact to 1e-13;
+   checked against the windowed tables (step 6) on the same cases.
+4. TPV14/15 at 250 m with 1 to 8 ranks; then TPV14 at 100 m on a cluster.
+
 ### WP7, C implementation in rsf_solve: status (2026-10-18)
 Done, each verified in the sandbox before delivery (details in
 fd_c_design.md sections 6 to 10, usage in rsf_solve_fd.md):

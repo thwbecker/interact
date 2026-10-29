@@ -289,7 +289,15 @@ double fd3d_h6_frame_check(const struct fd3d_tab *t, double dip_deg, int fcomp, 
    fs[q][k]: fault q -> strip k (3 ns_k x N_q), sf[k][q]: strip k -> fault q (2 N_q x 3 ns_k:
    shear along the marcher's slip direction, normal), ss[j][k]: strip j -> strip k
    (3 ns_k x 3 ns_j); components of a strip in its own frame (x, y, opening). */
-struct fd3d_dtab { int nr, nc, L; double *W, *Ks, *K1; };
+struct fd3d_dtab {      /* dense coupling, active receivers x active sources (fd_plan.md H6 step 6) */
+  int nr, nc, L;        /* stored rows and columns (active cells only), lags */
+  int *ridx, *cidx;     /* stored row / column -> index in the full receiver / source vector */
+  double *Ks, *K1;      /* static slope and first lag, nr x nc */
+  int *lo, *hi;         /* per entry: lags lo..hi (1-based) hold the nonzero increments; hi < lo: none */
+  size_t *woff;         /* per entry: offset of lag lo in W */
+  double *W;            /* packed increments minus the static slope times dt */
+  size_t nw, nwcap;
+};
 struct fd3d_strips {
   int nf, L;
   struct fd3d *f[FD3D_MULTI_MAX];
@@ -317,4 +325,5 @@ void fd3d_strips_free(struct fd3d_strips *s);
 int fd3d_h6_strips_check(int verbose);
 double fd3d_h6_step_check(int nsteps, int sw, double th_deg, int verbose);
 int fd3d_h6_strike_run(double ang, int m, int nsteps, double *tau, int verbose);
+double fd3d_strips_memory(const struct fd3d_strips *s);
 #endif

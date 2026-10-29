@@ -965,11 +965,12 @@ static PetscErrorCode fd3d_setup_strips(struct fd_vars *fd, int np, struct fd3d 
     for(i = 0;i < np;i++)
       if(i != p)
         mem += 8.0*L*(9.0*nxs[p]*nys[p]*nxs[i]*nys[i] + 6.0*fp[p]->N*nxs[i]*nys[i]);
-  PetscCall(PetscPrintf(PETSC_COMM_WORLD,"rsf_fd_setup: surface strips (H6): %d faults, cells of %g m, %d lags, dense strip tables about %.0f MB\n",
+  PetscCall(PetscPrintf(PETSC_COMM_WORLD,"rsf_fd_setup: surface strips (H6): %d faults, cells of %g m, %d lags, dense strip tables at most %.0f MB before masking\n",
       np,hs,L,mem/1e6));
   fd->strips3 = fd3d_strips_create(np,fp,th,(const double (*)[3])O,x0f,ytop,ztop,dip,fsg,comp,m,nxs,nys,xs0,
       (const double **)yc,(const double **)wy,L);
   PetscCheck(fd->strips3,PETSC_COMM_WORLD,PETSC_ERR_LIB,"rsf_fd_setup: surface strips: setup failed (one MPI rank)");
+  PetscCall(PetscPrintf(PETSC_COMM_WORLD,"rsf_fd_setup: surface strips: dense couplings %.0f MB (active cells, nonzero lags)\n",fd3d_strips_memory(fd->strips3)/1e6));
   for(p = 0;p < np;p++){
     na = 0;
     for(i = 0;i < fd->strips3->ly[p]->ns;i++)
