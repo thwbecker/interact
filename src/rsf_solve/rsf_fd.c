@@ -664,6 +664,7 @@ static PetscErrorCode fd3d_setup_msurf(struct interact_ctx *par, struct fd_vars 
   int kept;
   int near;
   struct fd3d_layer *ly;
+  PetscMPIInt sz;
   PetscFunctionBeginUser;
   (void)mo;
   (void)mgo;
@@ -798,6 +799,11 @@ static PetscErrorCode fd3d_setup_msurf(struct interact_ctx *par, struct fd_vars 
   PetscCall(PetscFree3(xp,rowc,plane));
   fd->nm3 = np;
   fd->dt_min = fd->cfl*dx/fd->beta;
+#ifdef FD3D_MPI
+  PetscCallMPI(MPI_Comm_size(PETSC_COMM_WORLD,&sz));
+  if(sz > 1)
+    fd3d_set_comm(PETSC_COMM_WORLD);   /* tables, surface and dense couplings split over the ranks (fd_plan.md H7) */
+#endif
   fd->mirror3 = PETSC_FALSE;
   fd->surf3 = PETSC_TRUE;
   for(p = 0;p < np;p++){
@@ -867,7 +873,7 @@ static PetscErrorCode fd3d_setup_msurf(struct interact_ctx *par, struct fd_vars 
     fd->msurf3 = fd3d_msurf_create(np,fp,ytop,ztop,dipd,fsg,comp,xmin - 0.5*dx,m,nxs,nys,xmin - 0.5*dx - mg*dx,yc,wy,Lsf);
     free(yc);
     free(wy);
-    PetscCheck(fd->msurf3,PETSC_COMM_WORLD,PETSC_ERR_LIB,"rsf_fd_setup: several faults with a virtual surface: setup failed (one MPI rank; same along-strike lattice)");
+    PetscCheck(fd->msurf3,PETSC_COMM_WORLD,PETSC_ERR_LIB,"rsf_fd_setup: several faults with a virtual surface: setup failed (same along-strike lattice needed)");
     PetscCall(PetscPrintf(PETSC_COMM_WORLD,"rsf_fd_setup: virtual surface for %d faults: %d x %d surface elements of %g m, %d lags\n",np,nxs,nys,hx,Lsf));
   }
   fd->multi3 = fd->msurf3->mx;
@@ -905,7 +911,7 @@ static PetscErrorCode fd3d_setup_strips(struct fd_vars *fd, int np, struct fd3d 
   double dip[FD3D_MULTI_MAX], fsg[FD3D_MULTI_MAX], xs0[FD3D_MULTI_MAX];
   double *yc[FD3D_MULTI_MAX], *wy[FD3D_MULTI_MAX];
   int nxs[FD3D_MULTI_MAX], nys[FD3D_MULTI_MAX];
-  double dx, hs, yl[3], band, bb[4], tr[2][2], zmax, diag, mem;
+  double dx, hs, yl[3], band, bb[4], tr[2][2], zmax, diag, mem, mm[2];
   int m, p, i, nb, nc, L, na;
 
   PetscFunctionBeginUser;
@@ -969,8 +975,14 @@ static PetscErrorCode fd3d_setup_strips(struct fd_vars *fd, int np, struct fd3d 
       np,hs,L,mem/1e6));
   fd->strips3 = fd3d_strips_create(np,fp,th,(const double (*)[3])O,x0f,ytop,ztop,dip,fsg,comp,m,nxs,nys,xs0,
       (const double **)yc,(const double **)wy,L);
-  PetscCheck(fd->strips3,PETSC_COMM_WORLD,PETSC_ERR_LIB,"rsf_fd_setup: surface strips: setup failed (one MPI rank)");
-  PetscCall(PetscPrintf(PETSC_COMM_WORLD,"rsf_fd_setup: surface strips: dense couplings %.0f MB (active cells, nonzero lags)\n",fd3d_strips_memory(fd->strips3)/1e6));
+  PetscCheck(fd->strips3,PETSC_COMM_WORLD,PETSC_ERR_LIB,"rsf_fd_setup: surface strips: setup failed");
+  {
+    mm[0] = fd3d_strips_memory(fd->strips3);
+    mm[1] = mm[0];
+    PetscCallMPI(MPI_Allreduce(MPI_IN_PLACE,&mm[0],1,MPI_DOUBLE,MPI_SUM,PETSC_COMM_WORLD));
+    PetscCallMPI(MPI_Allreduce(MPI_IN_PLACE,&mm[1],1,MPI_DOUBLE,MPI_MAX,PETSC_COMM_WORLD));
+    PetscCall(PetscPrintf(PETSC_COMM_WORLD,"rsf_fd_setup: surface strips: dense couplings %.0f MB (active cells, nonzero lags), largest share of one rank %.0f MB\n",mm[0]/1e6,mm[1]/1e6));
+  }
   for(p = 0;p < np;p++){
     na = 0;
     for(i = 0;i < fd->strips3->ly[p]->ns;i++)
@@ -1019,7 +1031,6 @@ static PetscErrorCode fd3d_setup_multi(struct interact_ctx *par, struct fd_vars 
   int g_2;
   int si;
   int sj;
-  int ours;
   int self;
   double v;
   int di;
@@ -1031,6 +1042,15 @@ static PetscErrorCode fd3d_setup_multi(struct interact_ctx *par, struct fd_vars 
   int dji;
   int g_3;
   double v_2;
+  PetscInt nown;
+  PetscInt u;
+  PetscInt *grows;
+  IS isr;
+  IS isc;
+  Mat *subs = NULL;
+  Mat *subn = NULL;
+  double sums[6];
+  PetscMPIInt sz;
   PetscFunctionBeginUser;
   strips = 0;
   mir = !medium->full_space && !fd->hs_static;
@@ -1128,6 +1148,11 @@ static PetscErrorCode fd3d_setup_multi(struct interact_ctx *par, struct fd_vars 
     fd->g_of_s[s] = i;
   }
   fd->dt_min = fd->cfl*dx/fd->beta;
+#ifdef FD3D_MPI
+  PetscCallMPI(MPI_Comm_size(PETSC_COMM_WORLD,&sz));
+  if(sz > 1)
+    fd3d_set_comm(PETSC_COMM_WORLD);   /* tables, local solves and dense couplings split over the ranks (fd_plan.md H7) */
+#endif
   fd->mirror3 = mir ? PETSC_TRUE : PETSC_FALSE;
   fd->surf3 = PETSC_FALSE;
   for(p = 0;p < np;p++){
@@ -1183,7 +1208,7 @@ static PetscErrorCode fd3d_setup_multi(struct interact_ctx *par, struct fd_vars 
     }
   } else
     fd->multi3 = fd3d_multi_create(np,fp,geom);
-  PetscCheck(fd->multi3,PETSC_COMM_WORLD,PETSC_ERR_SUP,"rsf_fd_setup: several 3-D planes: setup failed (one MPI rank only in this version)");
+  PetscCheck(fd->multi3,PETSC_COMM_WORLD,PETSC_ERR_SUP,"rsf_fd_setup: several 3-D planes: setup failed");
   fd->multi3->static_fn = fd3d_multi_static_is;
   fd->multi3->static_ctx = (void *)par;
   fd->multi3->normal_coupling = rsf->calc_sigma_dot ? 1 : 0;
@@ -1192,7 +1217,9 @@ static PetscErrorCode fd3d_setup_multi(struct interact_ctx *par, struct fd_vars 
     fd->multi3->static_n_ctx = (void *)par;
   }
   PetscCall(MatCreateVecs(medium->Is,&fd->v3a,&fd->v3b));
-  /* static gate: tables (self: Toeplitz static offsets; cross: dense static blocks) against Is and -In */
+  /* static gate: tables (self: Toeplitz static offsets; cross: dense static blocks) against Is and -In.
+     MPI (fd_plan.md H7): the dense blocks hold each rank's own receiver rows, so every rank takes
+     those rows of Is and In (MatCreateSubMatrices) and the sums are reduced */
   {
     pl_of = malloc(sizeof(int)*n);
     s_of = malloc(sizeof(int)*n);
@@ -1204,9 +1231,22 @@ static PetscErrorCode fd3d_setup_multi(struct interact_ctx *par, struct fd_vars 
         pl_of[fd->g_of_s[i]] = pp;
         s_of[fd->g_of_s[i]] = i - fd->off3[pp];
       }
+    nown = 0;
+    PetscCall(PetscMalloc1(n + 1,&grows));
     for(gi = 0;gi < n;gi++){
-      PetscCall(MatGetRow(medium->Is,gi,&ncols,&cols,&vals));
       p = pl_of[gi];
+      if((s_of[gi] >= fd->multi3->rdsp[p][fd->multi3->mpi_rank]) && (s_of[gi] < fd->multi3->rdsp[p][fd->multi3->mpi_rank] + fd->multi3->rcnt[p][fd->multi3->mpi_rank]))
+        grows[nown++] = gi;                      /* increasing */
+    }
+    PetscCall(ISCreateGeneral(PETSC_COMM_SELF,nown,grows,PETSC_COPY_VALUES,&isr));
+    PetscCall(ISCreateStride(PETSC_COMM_SELF,n,0,1,&isc));
+    PetscCall(MatCreateSubMatrices(medium->Is,1,&isr,&isc,MAT_INITIAL_MATRIX,&subs));
+    if(medium->In)
+      PetscCall(MatCreateSubMatrices(medium->In,1,&isr,&isc,MAT_INITIAL_MATRIX,&subn));
+    for(u = 0;u < nown;u++){
+      gi = grows[u];
+      p = pl_of[gi];
+      PetscCall(MatGetRow(subs[0],u,&ncols,&cols,&vals));
       for(cg = 0;cg < ncols;cg++){
         g_2 = (int)cols[cg];
         si = s_of[gi];
@@ -1228,28 +1268,45 @@ static PetscErrorCode fd3d_setup_multi(struct interact_ctx *par, struct fd_vars 
           }else
             v = fd->tabm3[p]->ks_off[(size_t)(di + nx[p] - 1)*(2*nz[p] - 1) + (dj + nz[p] - 1)];
         }else
-          v = fd->multi3->c[q][p].Ks[(size_t)si*fd->multi3->c[q][p].ns + sj];
+          v = fd->multi3->c[q][p].Ks[(size_t)(si - fd->multi3->c[q][p].r0)*fd->multi3->c[q][p].ns + sj];
         v *= fd->sgn3[p]*fd->sgn3[q];
-        ours = 0;
-        (void)ours;
         dev[!self] += (PetscRealPart(vals[cg]) - v)*(PetscRealPart(vals[cg]) - v);
         nrm[!self] += PetscRealPart(vals[cg])*PetscRealPart(vals[cg]);
       }
-      PetscCall(MatRestoreRow(medium->Is,gi,&ncols,&cols,&vals));
+      PetscCall(MatRestoreRow(subs[0],u,&ncols,&cols,&vals));
       if(medium->In){
-        PetscCall(MatGetRow(medium->In,gi,&ncols,&cols,&vals));
+        PetscCall(MatGetRow(subn[0],u,&ncols,&cols,&vals));
         for(cg = 0;cg < ncols;cg++){
           g_3 = (int)cols[cg];
           q = pl_of[g_3];
           if(q == p)
             continue;
-          v_2 = fd->multi3->c[q][p].Kn[(size_t)s_of[gi]*fd->multi3->c[q][p].ns + s_of[g_3]]*fd->sgn3[q];
+          v_2 = fd->multi3->c[q][p].Kn[(size_t)(s_of[gi] - fd->multi3->c[q][p].r0)*fd->multi3->c[q][p].ns + s_of[g_3]]*fd->sgn3[q];
           devn += (-PetscRealPart(vals[cg]) - v_2)*(-PetscRealPart(vals[cg]) - v_2);
           nrmn += PetscRealPart(vals[cg])*PetscRealPart(vals[cg]);
         }
-        PetscCall(MatRestoreRow(medium->In,gi,&ncols,&cols,&vals));
+        PetscCall(MatRestoreRow(subn[0],u,&ncols,&cols,&vals));
       }
     }
+    PetscCall(MatDestroySubMatrices(1,&subs));
+    if(medium->In)
+      PetscCall(MatDestroySubMatrices(1,&subn));
+    PetscCall(ISDestroy(&isr));
+    PetscCall(ISDestroy(&isc));
+    PetscCall(PetscFree(grows));
+    sums[0] = dev[0];
+    sums[1] = dev[1];
+    sums[2] = nrm[0];
+    sums[3] = nrm[1];
+    sums[4] = devn;
+    sums[5] = nrmn;
+    PetscCallMPI(MPI_Allreduce(MPI_IN_PLACE,sums,6,MPI_DOUBLE,MPI_SUM,PETSC_COMM_WORLD));
+    dev[0] = sums[0];
+    dev[1] = sums[1];
+    nrm[0] = sums[2];
+    nrm[1] = sums[3];
+    devn = sums[4];
+    nrmn = sums[5];
     free(pl_of);
     free(s_of);
     dev[0] = sqrt(dev[0]/(nrm[0] + 1e-300));

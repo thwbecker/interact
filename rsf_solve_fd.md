@@ -22,7 +22,7 @@ Capabilities at a glance (2026-10-25):
   exact solutions, TPV205-2D, Harris-Day and SEAS BP1.
 - 3-D, several planes of any orientation (bends, branches, dipping and turned planes;
   strike or dip slip; fd_plan.md G2): whole space, or half space for vertical strike-slip
-  planes reaching the surface (free-surface images, G3a); one MPI rank; dense cross tables
+  planes reaching the surface (free-surface images, G3a); dense cross tables
   cost L nr ns per step. Check: src/testing/rsf_solve/test_fd3d_multi.sh.
   Any other fault system in a half space: -fd_hs_static 1 (whole-space dynamics, exact
   half-space statics; within a few percent for buried faults; for ruptures reaching the
@@ -30,7 +30,16 @@ Capabilities at a glance (2026-10-25):
   fd_plan.md G4).
   Dipping faults (and dip slip) in a half space: several faults sharing the strike
   direction with one virtual surface (fd_plan.md G3b); check
-  src/testing/rsf_solve/test_fd3d_msurf.sh.
+  src/testing/rsf_solve/test_fd3d_msurf.sh. Faults of different strikes: a surface strip
+  per fault (fd_plan.md H6).
+- MPI (3-D paths; fd_plan.md S2, S3, H7): the planes' tables, the local solves, the virtual
+  surface and the dense couplings between planes, faults and strips are split over the
+  ranks (the dense couplings by receiver rows, which also divides their memory and build
+  time). The results do not depend on the number of ranks: the checks
+  (src/testing/rsf_solve/test_fd3d_mpi.sh, and run_tests.sh) compare station files and
+  final states byte for byte on 1, 2 and 4 ranks. The direct solve of the strips assembles
+  and factorises the strips' first-lag operator on every rank. Speed-ups have not yet been
+  measured on a multi-core machine.
 - 2-D, any segment geometry: pairs of parallel segments use Toeplitz tables, other pairs
   (bends, branches, images of dipping segments) dense tables, which cost L nr ns per step
   (fd_plan.md N1); coarse history applies to the parallel pairs only and the partitioned
@@ -259,7 +268,7 @@ the jump threshold of a stepover, triggering delays at 100 m may be too
 short and should be checked at finer resolution. See fd_plan.md.
 
 Restrictions in this version, refused with a message at start: one MPI
-rank; `-ve_mode 0`; aging law (`-state_law 1`); 2-D elements only, forming
+rank for 2-D faults (the 3-D paths run on any number of ranks); `-ve_mode 0`; aging law (`-state_law 1`); 2-D elements only, forming
 straight runs of equal, collinear elements with one common element size,
 all parallel; full plane for in-plane, full or half plane (vertical
 segments) for antiplane. H-matrix backends for `Is` are fine (the static

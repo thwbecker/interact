@@ -1040,6 +1040,13 @@ static int run_tpv14(double dx, int which, double tend, double gap)
   printf("tpv%d: dx %g m, gap %g m, %g s: main fault ruptured %.0f %% (beyond the junction %.0f %%), branch %.0f %%; largest unclamping of the branch's first column before it slips %.2f MPa\n",
          which, dx, gap, tend, 100.0*nrup[0]/fa[0]->N, 100.0*nrup_beyond/(double)((nxm - (int)(16000.0/dx + 0.5))*nz),
          100.0*nrup[1]/fa[1]->N, tnmax/1e6);
+  if(getenv("FD3D_DUMP")){                        /* exact state for byte comparisons (MPI, fd_plan.md H7) */
+    fd3d_dump_state(getenv("FD3D_DUMP"), "w", 2, fa);
+    for(p = 0; p < 2; p++){
+      fd3d_dump_vec(getenv("FD3D_DUMP"), p ? "rt1" : "rt0", fa[p]->N, rt[p]);
+      fd3d_dump_vec(getenv("FD3D_DUMP"), p ? "tn1" : "tn0", fa[p]->N, m->tn[p]);
+    }
+  }
   for(p = 0; p < 2; p++){
     sprintf(fn, "tpv%d_rt_%s.dat", which, p ? "branch" : "main");
     out = fopen(fn, "w");
@@ -1160,6 +1167,11 @@ static int run_multi(double ang, double dip, double tend, int comp, int mir)
         s2 += fa[p]->delta[i];
     printf("fd3d_test multi%s: comp %d, turn %g deg, dip %g deg, %d steps: max |V(two planes) - V(one plane)| %.3e of %.3f m/s; mean slip %.5f (one plane) %.5f (two planes) m; fixed-point iterations last step %d\n",
         mir ? " (half space, images)" : "", comp, ang, dip, ns, emax, smax, s1/f1->N, s2/(2*fa[0]->N), m->last_iters);
+    if(getenv("FD3D_DUMP")){                      /* exact state for byte comparisons (MPI, fd_plan.md H7) */
+      fd3d_dump_state(getenv("FD3D_DUMP"), "w", 2, fa);
+      for(p = 0; p < 2; p++)
+        fd3d_dump_vec(getenv("FD3D_DUMP"), p ? "tn1" : "tn0", fa[p]->N, m->tn[p]);
+    }
     if((ang == 0.0 && dip >= 90.0) || dip < 0.0){
       ok = emax <= (dip < 0.0 ? 1e-7 : 1e-8)*smax;   /* rotated: round-off of the rotations, amplified by the rupture */
       printf("fd3d_test multi: %s\n", ok ? "PASS" : "FAIL");
@@ -1334,6 +1346,10 @@ static int run_msurf(int comp, double tend)
     printf("fd3d_test msurf: comp %d, dip %g, %d steps: max |V(two faults) - V(one fault)| %.3e of %.3f m/s; mean slip %.5f / %.5f m; outer iterations last step %d\n",
         comp, dip, ns, emax, smax, s1/f1->N, s2/f1->N, ms->last_iters);
     printf("fd3d_test msurf: %s\n", ok ? "PASS" : "FAIL");
+    if(getenv("FD3D_DUMP")){                      /* exact state for byte comparisons (MPI, fd_plan.md H7) */
+      fd3d_dump_state(getenv("FD3D_DUMP"), "w", ms->nf, fa);
+      fd3d_dump_vec(getenv("FD3D_DUMP"), "surf", 3*ms->ly[0]->ns, ms->ly[0]->V3);
+    }
     return !ok;
   }
 }

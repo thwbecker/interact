@@ -98,6 +98,21 @@ if command -v mpirun > /dev/null 2>&1; then
   else echo "fd3d_test MPI surface (1 and 3 ranks bit-identical): FAIL"; fail=1; fi
   if cmp -s tmp_fd_dynamic/mpi1/tpv101_rt.dat tmp_fd_dynamic/mpi3/tpv101_rt.dat; then echo "fd3d_test MPI (1 and 3 ranks bit-identical): PASS"
   else echo "fd3d_test MPI (1 and 3 ranks bit-identical): FAIL"; fail=1; fi
+  # dense couplings split by receiver rows (fd_plan.md H7): several planes (30 degree bend, images),
+  # several faults with one surface, strips of different strikes (rotated), TPV14 at 1 km; exact
+  # dumps of the final state on 1, 2 and 4 ranks must be identical
+  for c in "multi 30 90 2 1 1" "msurf 1 2" "h6step 8 2" "tpv14 1000 14 2"; do
+    t=`echo $c | cut -d' ' -f1`
+    for n in 1 2 4; do
+      mkdir -p tmp_fd_dynamic/h7_$t/n$n
+      ( cd tmp_fd_dynamic/h7_$t/n$n && rm -f dump.txt && \
+        ( FD3D_DUMP=dump.txt mpirun --oversubscribe -np $n ../../../bin/fd3d_test $c > out 2>/dev/null || \
+          FD3D_DUMP=dump.txt mpirun --allow-run-as-root --oversubscribe -np $n ../../../bin/fd3d_test $c > out 2>/dev/null ) )
+    done
+    if [ -s tmp_fd_dynamic/h7_$t/n1/dump.txt ] && cmp -s tmp_fd_dynamic/h7_$t/n1/dump.txt tmp_fd_dynamic/h7_$t/n2/dump.txt && \
+       cmp -s tmp_fd_dynamic/h7_$t/n1/dump.txt tmp_fd_dynamic/h7_$t/n4/dump.txt; then echo "fd3d_test MPI dense couplings, $t (1, 2 and 4 ranks identical): PASS"
+    else echo "fd3d_test MPI dense couplings, $t (1, 2 and 4 ranks identical): FAIL"; fail=1; fi
+  done
 else
   echo "fd3d_test MPI: skipped (no mpirun)"
 fi

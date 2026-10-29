@@ -231,12 +231,23 @@ struct fd3d_mplane {
 };
 struct fd3d_mpair {     /* source q to receiver p, dense, receiver x source */
   int L, nr, ns, has_k1;
+  /* MPI (fd_plan.md H7): the lag tables Ws, Wn hold this rank's receiver rows r0 .. r0 + nrl - 1
+     only (L x nrl x ns); the static and first-lag blocks Ks, Kn, K1s, K1n are complete on every
+     rank (nr x ns). One rank: r0 = 0, nrl = nr. */
+  int r0, nrl;
   double *Ws, *Wn, *Ks, *Kn, *K1s, *K1n;
 };
 struct fd3d_multi;
 struct fd3d_multi_slot { struct fd3d_multi *m; int p; };
 struct fd3d_multi {
   int np, implicit, maxit, last_iters, Lb;
+  /* MPI (fd_plan.md H7): the planes' tables share one communicator; the receiver rows of plane p
+     are split in blocks, rank r owning rows rdsp[p][r] .. rdsp[p][r] + rcnt[p][r] - 1 */
+  int mpi_rank, mpi_size;
+  int *rcnt[FD3D_MULTI_MAX], *rdsp[FD3D_MULTI_MAX];
+#ifdef FD3D_MPI
+  MPI_Comm comm;
+#endif
   long hk;
   double tol;
   struct fd3d *f[FD3D_MULTI_MAX];
@@ -292,9 +303,12 @@ double fd3d_h6_frame_check(const struct fd3d_tab *t, double dip_deg, int fcomp, 
 struct fd3d_dtab {      /* dense coupling, active receivers x active sources (fd_plan.md H6 step 6) */
   int nr, nc, L;        /* stored rows and columns (active cells only), lags */
   int *ridx, *cidx;     /* stored row / column -> index in the full receiver / source vector */
-  double *Ks, *K1;      /* static slope and first lag, nr x nc */
-  int *lo, *hi;         /* per entry: lags lo..hi (1-based) hold the nonzero increments; hi < lo: none */
-  size_t *woff;         /* per entry: offset of lag lo in W */
+  double *Ks, *K1;      /* static slope and first lag, nr x nc (complete on every rank) */
+  /* MPI (fd_plan.md H7): the lag data below are kept for this rank's rows only; rown: owner of
+     each stored row, lrow: its local row (-1: another rank's), nrl local rows */
+  int *rown, *lrow, nrl;
+  int *lo, *hi;         /* per local entry (nrl x nc): lags lo..hi (1-based) hold the nonzero increments; hi < lo: none */
+  size_t *woff;         /* per local entry: offset of lag lo in W */
   double *W;            /* packed increments minus the static slope times dt */
   size_t nw, nwcap;
 };
@@ -312,6 +326,15 @@ struct fd3d_strips {
   int Lb; long hk;                              /* real-space rings of the pushed slices (the dense couplings' history) */
   double *sring[FD3D_MULTI_MAX], *fring[FD3D_MULTI_MAX];
   double *lu; int *lpiv, *aidx, na;              /* the strips' first-lag operator over active cells, LU (direct solve) */
+  /* MPI (fd_plan.md H7): owners of the receiver cells of the dense couplings (fault cells in the
+     blocks of fd3d_multi, active strip cells in blocks of equal count; -1: masked); the lists of
+     full receiver indices in rank order for gathering the known parts */
+  int mpi_rank, mpi_size;
+  int *fown[FD3D_MULTI_MAX], *sown[FD3D_MULTI_MAX];
+  int *sg_idx[FD3D_MULTI_MAX], *sg_cnt[FD3D_MULTI_MAX], *sg_dsp[FD3D_MULTI_MAX];
+#ifdef FD3D_MPI
+  MPI_Comm comm;
+#endif
   int last_iters, n_steps, n_outer, n_inner;
   void (*static_n_fn)(void *ctx, int k, double **delta, double *out);   /* exact static normal traction of fault k (optional) */
   void *static_n_ctx;
@@ -326,4 +349,7 @@ int fd3d_h6_strips_check(int verbose);
 double fd3d_h6_step_check(int nsteps, int sw, double th_deg, int verbose);
 int fd3d_h6_strike_run(double ang, int m, int nsteps, double *tau, int verbose);
 double fd3d_strips_memory(const struct fd3d_strips *s);
+/* tests: exact (hexadecimal) dumps for byte comparisons */
+void fd3d_dump_state(const char *fn, const char *mode, int nf, struct fd3d **f);
+void fd3d_dump_vec(const char *fn, const char *tag, int n, const double *v);
 #endif

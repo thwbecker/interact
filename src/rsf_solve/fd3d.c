@@ -3843,6 +3843,67 @@ static void cross_resp(const struct fd3d_mplane *gq, int iq, int jq, const struc
   }
 }
 
+/* ---------------- MPI for the dense couplings (fd_plan.md H7) ----------------
+   Every dense coupling keeps its lag tables only for the rank's own receiver rows; the static and
+   first-lag blocks are complete on every rank. A receiver row is computed whole on its owner, in
+   the order of the one-rank code, and the finished known parts are gathered, so the results do
+   not depend on the number of ranks. */
+#ifdef FD3D_MPI
+#define COMM_PTR(x) ((void *)&(x)->comm)
+#else
+#define COMM_PTR(x) NULL
+#endif
+static int blk_lo(int n, int r, int P)
+{
+  return (int)(((long)n*r)/P);
+}
+/* owner of element i of n split in P blocks (as blk_lo) */
+static int blk_owner(int n, int i, int P)
+{
+  int r;
+  r = (int)(((long)i*P)/(n > 0 ? n : 1));
+  while(r > 0 && i < blk_lo(n, r, P))
+    r--;
+  while(r < P - 1 && i >= blk_lo(n, r + 1, P))
+    r++;
+  return r;
+}
+/* rows in place: each rank's block (counts cnt, offsets dsp, in units of w doubles) to all */
+static void dense_allgather(double *a, const int *cnt, const int *dsp, int w, int P, void *comm)
+{
+#ifdef FD3D_MPI
+  int *c, *d, r;
+  if(P <= 1)
+    return;
+  c = malloc(sizeof(int)*P);
+  d = malloc(sizeof(int)*P);
+  for(r = 0; r < P; r++){
+    c[r] = cnt[r]*w;
+    d[r] = dsp[r]*w;
+  }
+  MPI_Allgatherv(MPI_IN_PLACE, 0, MPI_DATATYPE_NULL, a, c, d, MPI_DOUBLE, *(MPI_Comm *)comm);
+  free(c);
+  free(d);
+#else
+  (void)a;
+  (void)cnt;
+  (void)dsp;
+  (void)w;
+  (void)P;
+  (void)comm;
+#endif
+}
+/* the full known part of plane p's receivers from the owners of its row blocks */
+static void multi_gather(const struct fd3d_multi *m, int p, double *v)
+{
+  dense_allgather(v, m->rcnt[p], m->rdsp[p], 1, m->mpi_size, COMM_PTR(m));
+}
+static void multi_rows(const struct fd3d_multi *m, int p, int *i0, int *i1)
+{
+  *i0 = m->rdsp[p][m->mpi_rank];
+  *i1 = *i0 + m->rcnt[p][m->mpi_rank];
+}
+
 struct fd3d_multi *fd3d_multi_create(int np, struct fd3d **f, const struct fd3d_mplane *geom)
 {
   struct fd3d_multi *m = calloc(1, sizeof(*m));
@@ -3881,6 +3942,12 @@ struct fd3d_multi *fd3d_multi_create(int np, struct fd3d **f, const struct fd3d_
   double kself;
   double km;
   size_t e_2;
+  int r;
+  int i0;
+  int i1;
+#ifdef FD3D_MPI
+  int cmp;
+#endif
   m->np = np;
   for(p = 0; p < np; p++){
     m->f[p] = f[p];
@@ -3890,11 +3957,34 @@ struct fd3d_multi *fd3d_multi_create(int np, struct fd3d **f, const struct fd3d_
       free(m);
       return NULL;
     }
-    if(f[p]->layer || fabs(f[p]->t->dt - dt) > 1e-12*dt || f[p]->t->mpi_size > 1){
+    if(f[p]->layer || fabs(f[p]->t->dt - dt) > 1e-12*dt || f[p]->t->mpi_size != f[0]->t->mpi_size){
       free(m);
       return NULL;
     }
+#ifdef FD3D_MPI
+    if(f[p]->t->mpi_size > 1){
+      MPI_Comm_compare(f[p]->t->comm, f[0]->t->comm, &cmp);
+      if(cmp != MPI_IDENT && cmp != MPI_CONGRUENT){
+        free(m);
+        return NULL;
+      }
+    }
+#endif
     /* extension rows above the surface (f->next) are not in the cross tables (fd_plan.md G3b) */
+  }
+  /* MPI: the planes' communicator; receiver rows of each plane in blocks */
+  m->mpi_size = f[0]->t->mpi_size;
+  m->mpi_rank = f[0]->t->mpi_rank;
+#ifdef FD3D_MPI
+  m->comm = f[0]->t->comm;
+#endif
+  for(p = 0; p < np; p++){
+    m->rcnt[p] = malloc(sizeof(int)*m->mpi_size);
+    m->rdsp[p] = malloc(sizeof(int)*m->mpi_size);
+    for(r = 0; r < m->mpi_size; r++){
+      m->rdsp[p][r] = blk_lo(f[p]->N, r, m->mpi_size);
+      m->rcnt[p][r] = blk_lo(f[p]->N, r + 1, m->mpi_size) - m->rdsp[p][r];
+    }
   }
   for(p = 0; p < np; p++)
     for(q = 0; q < np; q++){
@@ -3929,16 +4019,19 @@ struct fd3d_multi *fd3d_multi_create(int np, struct fd3d **f, const struct fd3d_
       c->L = L;
       c->nr = nr;
       c->ns = ns;
-      c->Ws = calloc((size_t)L*nr*ns, sizeof(double));
-      c->Wn = calloc((size_t)L*nr*ns, sizeof(double));
-      c->Ks = malloc(sizeof(double)*nr*ns);
-      c->Kn = malloc(sizeof(double)*nr*ns);
-      c->K1s = malloc(sizeof(double)*nr*ns);
-      c->K1n = malloc(sizeof(double)*nr*ns);
-      for(i = 0; i < nr; i++){
+      multi_rows(m, p, &i0, &i1);
+      c->r0 = i0;
+      c->nrl = i1 - i0;
+      c->Ws = calloc((size_t)L*c->nrl*ns + 1, sizeof(double));
+      c->Wn = calloc((size_t)L*c->nrl*ns + 1, sizeof(double));
+      c->Ks = calloc((size_t)c->nrl*ns + 1, sizeof(double));
+      c->Kn = calloc((size_t)c->nrl*ns + 1, sizeof(double));
+      c->K1s = calloc((size_t)c->nrl*ns + 1, sizeof(double));
+      c->K1n = calloc((size_t)c->nrl*ns + 1, sizeof(double));
+      for(i = i0; i < i1; i++){
         plane_centre(&m->g[p], i/f[p]->nzp, i%f[p]->nzp, X_2);
         for(j = 0; j < ns; j++){
-          e = (size_t)i*ns + j;
+          e = (size_t)(i - i0)*ns + j;
 
           iq = j/f[q]->nzp;
           jq = j%f[q]->nzp;
@@ -3955,19 +4048,24 @@ struct fd3d_multi *fd3d_multi_create(int np, struct fd3d **f, const struct fd3d_
               c->K1s[e] = s1;
               c->K1n[e] = n1;
             }
-            c->Ws[(size_t)(l - 1)*nr*ns + e] = s1 - s0 - As*dt;
-            c->Wn[(size_t)(l - 1)*nr*ns + e] = n1 - n0 - An*dt;
+            c->Ws[(size_t)(l - 1)*c->nrl*ns + e] = s1 - s0 - As*dt;
+            c->Wn[(size_t)(l - 1)*c->nrl*ns + e] = n1 - n0 - An*dt;
             s0 = s1;
             n0 = n1;
           }
         }
       }
+
       {                                                 /* the cross first lag, kept only where it matters */
         kself = fabs(f[p]->t->k1[1][1]);
         km = 0.0;
-        for(e_2 = 0; e_2 < (size_t)nr*ns; e_2++)
+        for(e_2 = 0; e_2 < (size_t)c->nrl*ns; e_2++)
           if(fabs(c->K1s[e_2]) > km)
             km = fabs(c->K1s[e_2]);
+#ifdef FD3D_MPI
+        if(m->mpi_size > 1)
+          MPI_Allreduce(MPI_IN_PLACE, &km, 1, MPI_DOUBLE, MPI_MAX, m->comm);
+#endif
         c->has_k1 = km > 1e-12*kself;
         if(c->has_k1)
           m->implicit = 1;
@@ -4000,6 +4098,8 @@ void fd3d_multi_free(struct fd3d_multi *m)
     free(m->sig0[p]);
     free(m->tn[p]);
     free(m->sbuf[p]);
+    free(m->rcnt[p]);
+    free(m->rdsp[p]);
     for(q = 0; q < m->np; q++){
       c = &m->c[q][p];
       free(c->Ws);
@@ -4073,6 +4173,9 @@ int fd3d_multi_step(struct fd3d_multi *m, double **load)
   double b_4;
   struct fd3d *f_2;
   double *sl;
+  int i0;
+  int i1;
+  int dist;
   if(m->static_fn){                                   /* exact statics of all planes from all slips */
 
     for(p = 0; p < np; p++){
@@ -4093,6 +4196,7 @@ int fd3d_multi_step(struct fd3d_multi *m, double **load)
   /* known cross part: statics (tables unless exact) and lags >= 2 */
   for(p = 0; p < np; p++){
     nr = m->f[p]->N;
+    multi_rows(m, p, &i0, &i1);                    /* MPI: own receiver rows, gathered below */
     Kx[p] = calloc(nr, sizeof(double));
     Kn[p] = calloc(nr, sizeof(double));
     Hs[p] = malloc(sizeof(double)*nr);
@@ -4104,11 +4208,11 @@ int fd3d_multi_step(struct fd3d_multi *m, double **load)
         continue;
       ns = c->ns;
       if(!m->static_fn)
-        for(i = 0; i < nr; i++){
+        for(i = i0; i < i1; i++){
           a = 0.0;
           b = 0.0;
-          rs = c->Ks + (size_t)i*ns;
-          rn = c->Kn + (size_t)i*ns;
+          rs = c->Ks + (size_t)(i - i0)*ns;
+          rn = c->Kn + (size_t)(i - i0)*ns;
           for(j = 0; j < ns; j++){
             a += rs[j]*m->f[q]->delta[j];
             b += rn[j]*m->f[q]->delta[j];
@@ -4118,31 +4222,33 @@ int fd3d_multi_step(struct fd3d_multi *m, double **load)
         }
       for(l = 2; l <= c->L && l - 1 <= m->hk; l++){
         v = m->ring[q] + (size_t)((m->hk - (l - 1) + (long)m->Lb*1000) % m->Lb)*ns;
-        Ws = c->Ws + (size_t)(l - 1)*nr*ns;
-        Wn = c->Wn + (size_t)(l - 1)*nr*ns;
-        for(i = 0; i < nr; i++){
+        Ws = c->Ws + (size_t)(l - 1)*c->nrl*ns;
+        Wn = c->Wn + (size_t)(l - 1)*c->nrl*ns;
+        for(i = i0; i < i1; i++){
           a_2 = 0.0;
           b_2 = 0.0;
           for(j = 0; j < ns; j++){
-            a_2 += Ws[(size_t)i*ns + j]*v[j];
-            b_2 += Wn[(size_t)i*ns + j]*v[j];
+            a_2 += Ws[(size_t)(i - i0)*ns + j]*v[j];
+            b_2 += Wn[(size_t)(i - i0)*ns + j]*v[j];
           }
           Kx[p][i] += a_2;
           Kn[p][i] += b_2;
         }
       }
       if(m->f[p]->nl && c->has_k1)
-        for(i = 0; i < nr; i++){   /* NL: half of the current-step term from V_old */
+        for(i = i0; i < i1; i++){   /* NL: half of the current-step term from V_old */
           a_3 = 0.0;
           b_3 = 0.0;
           for(j = 0; j < ns; j++){
-            a_3 += c->K1s[(size_t)i*ns + j]*m->f[q]->Vold[j];
-            b_3 += c->K1n[(size_t)i*ns + j]*m->f[q]->Vold[j];
+            a_3 += c->K1s[(size_t)(i - i0)*ns + j]*m->f[q]->Vold[j];
+            b_3 += c->K1n[(size_t)(i - i0)*ns + j]*m->f[q]->Vold[j];
           }
           Kx[p][i] += 0.5*a_3;
           Kn[p][i] += 0.5*b_3;
         }
     }
+    multi_gather(m, p, Kx[p]);
+    multi_gather(m, p, Kn[p]);
   }
   if(m->static_n_fn)
     for(p = 0; p < np; p++){       /* exact static normal traction (all planes' slips) */
@@ -4176,20 +4282,27 @@ int fd3d_multi_step(struct fd3d_multi *m, double **load)
       tnc = calloc(nr_2, sizeof(double));
       for(i = 0; i < nr_2; i++)
         Hs[p][i] = Kx[p][i];
+      multi_rows(m, p, &i0, &i1);
+      dist = 0;
       for(q = 0; q < np; q++){
         c_2 = &m->c[q][p];
         if(p == q || !c_2->has_k1)
           continue;
-        for(i = 0; i < nr_2; i++){
+        dist = 1;
+        for(i = i0; i < i1; i++){
           a_4 = 0.0;
           b_4 = 0.0;
           for(j = 0; j < c_2->ns; j++){
-            a_4 += c_2->K1s[(size_t)i*c_2->ns + j]*m->f[q]->V[j];
-            b_4 += c_2->K1n[(size_t)i*c_2->ns + j]*m->f[q]->V[j];
+            a_4 += c_2->K1s[(size_t)(i - i0)*c_2->ns + j]*m->f[q]->V[j];
+            b_4 += c_2->K1n[(size_t)(i - i0)*c_2->ns + j]*m->f[q]->V[j];
           }
           Hs[p][i] += hw*a_4;
           tnc[i] += hw*b_4;
         }
+      }
+      if(dist){                                    /* MPI: own rows above, gathered */
+        multi_gather(m, p, Hs[p]);
+        multi_gather(m, p, tnc);
       }
       for(i = 0; i < nr_2; i++)
         m->tn[p][i] = Kn[p][i] + tnc[i];
@@ -4436,6 +4549,9 @@ int fd3d_msurf_step(struct fd3d_msurf *s, double **load)
   double a_5;
   struct fd3d *f_3;
   struct fd3d_layer *ly_5;
+  int i0;
+  int i1;
+  int dist;
   Es[0] = Es[1] = 0.5*t->rho*t->cT;
   Es[2] = 0.5*t->rho*t->cL;
   /* exact statics over all faults (shear), as fd3d_multi_step */
@@ -4542,44 +4658,51 @@ int fd3d_msurf_step(struct fd3d_msurf *s, double **load)
         nsr = cp->ns;
         if(k == q)
           continue;
+        multi_rows(s->mx, k, &i0, &i1);           /* MPI: own rows, gathered below */
+        (void)nr;
         if(!s->mx->static_fn)
-          for(i = 0; i < nr; i++){
+          for(i = i0; i < i1; i++){
             a = 0.0;
             b = 0.0;
             for(j = 0; j < nsr; j++){
-              a += cp->Ks[(size_t)i*nsr + j]*s->f[q]->delta[j];
-              b += cp->Kn[(size_t)i*nsr + j]*s->f[q]->delta[j];
+              a += cp->Ks[(size_t)(i - i0)*nsr + j]*s->f[q]->delta[j];
+              b += cp->Kn[(size_t)(i - i0)*nsr + j]*s->f[q]->delta[j];
             }
             Kx[k][i] += sg*a;
             Kn[k][i] += sn*b;
           }
         for(l = 2; l <= cp->L && l - 1 <= s->mx->hk; l++){
           v = s->mx->ring[q] + (size_t)((s->mx->hk - (l - 1) + (long)s->mx->Lb*1000) % s->mx->Lb)*nsr;
-          Ws = cp->Ws + (size_t)(l - 1)*nr*nsr;
-          Wn = cp->Wn + (size_t)(l - 1)*nr*nsr;
-          for(i = 0; i < nr; i++){
+          Ws = cp->Ws + (size_t)(l - 1)*cp->nrl*nsr;
+          Wn = cp->Wn + (size_t)(l - 1)*cp->nrl*nsr;
+          for(i = i0; i < i1; i++){
             a_2 = 0.0;
             b_2 = 0.0;
             for(j = 0; j < nsr; j++){
-              a_2 += Ws[(size_t)i*nsr + j]*v[j];
-              b_2 += Wn[(size_t)i*nsr + j]*v[j];
+              a_2 += Ws[(size_t)(i - i0)*nsr + j]*v[j];
+              b_2 += Wn[(size_t)(i - i0)*nsr + j]*v[j];
             }
             Kx[k][i] += sg*a_2;
             Kn[k][i] += sn*b_2;
           }
         }
         if(nl && cp->has_k1)
-          for(i = 0; i < nr; i++){
+          for(i = i0; i < i1; i++){
             a_3 = 0.0;
             b_3 = 0.0;
             for(j = 0; j < nsr; j++){
-              a_3 += cp->K1s[(size_t)i*nsr + j]*s->f[q]->Vold[j];
-              b_3 += cp->K1n[(size_t)i*nsr + j]*s->f[q]->Vold[j];
+              a_3 += cp->K1s[(size_t)(i - i0)*nsr + j]*s->f[q]->Vold[j];
+              b_3 += cp->K1n[(size_t)(i - i0)*nsr + j]*s->f[q]->Vold[j];
             }
             Kx[k][i] += 0.5*sg*a_3;
             Kn[k][i] += 0.5*sn*b_3;
           }
       }
+  if(s->mx)
+    for(k = 0; k < nf; k++){
+      multi_gather(s->mx, k, Kx[k]);
+      multi_gather(s->mx, k, Kn[k]);
+    }
   /* ---- iterate faults and surface ---- */
   memcpy(V3, L0->Vold3, sizeof(double)*3*ns);
   for(k = 0; k < nf; k++)
@@ -4615,22 +4738,29 @@ int fd3d_msurf_step(struct fd3d_msurf *s, double **load)
       lx_inv(ly_2, nz_3, Yf[k] + Mh*nz_3, ly_2->nx, ly_2->m, hw, ly_2->tn);
       for(i = 0; i < N_2; i++)
         ly_2->tn[i] += Kn[k][i];
+      dist = 0;
       if(s->mx)
         for(q = 0; q < nf; q++){                 /* the current step's fault <- fault term */
           cp_2 = &s->mx->c[q][k];
           if(q == k || !cp_2->has_k1)
             continue;
-          for(i = 0; i < N_2; i++){
+          multi_rows(s->mx, k, &i0, &i1);
+          dist = 1;
+          for(i = i0; i < i1; i++){
             a_4 = 0.0;
             b_4 = 0.0;
             for(j = 0; j < cp_2->ns; j++){
-              a_4 += cp_2->K1s[(size_t)i*cp_2->ns + j]*s->f[q]->V[j];
-              b_4 += cp_2->K1n[(size_t)i*cp_2->ns + j]*s->f[q]->V[j];
+              a_4 += cp_2->K1s[(size_t)(i - i0)*cp_2->ns + j]*s->f[q]->V[j];
+              b_4 += cp_2->K1n[(size_t)(i - i0)*cp_2->ns + j]*s->f[q]->V[j];
             }
             Hf[i] += hw*s->fsg[k]*s->fsg[q]*a_4;
             tnc[i] += hw*s->fsg[q]*b_4;
           }
         }
+      if(dist){                                  /* MPI: own rows above, gathered */
+        multi_gather(s->mx, k, Hf);
+        multi_gather(s->mx, k, tnc);
+      }
       for(i = 0; i < N_2; i++)
         ly_2->tn[i] += tnc[i];
       if(s->static_n_fn){                                /* exact static normal traction at the end of the step (all faults) */
@@ -4796,18 +4926,23 @@ int fd3d_msurf_step(struct fd3d_msurf *s, double **load)
       lx_inv(ly_4, nz_4, Yf[k], ly_4->nx, ly_4->m, hw, tmpf);
       for(i = 0; i < N_3; i++)
         f_2->H[i] += Hx[k][i] + Kx[k][i] + tmpf[i];
+      dist = 0;
       if(s->mx)
         for(q = 0; q < nf; q++){                 /* the current step's fault <- fault term, final rates */
           cp_3 = &s->mx->c[q][k];
           if(q == k || !cp_3->has_k1)
             continue;
-          for(i = 0; i < N_3; i++){
+          multi_rows(s->mx, k, &i0, &i1);
+          dist = 1;
+          for(i = i0; i < i1; i++){
             a_5 = 0.0;
             for(j = 0; j < cp_3->ns; j++)
-              a_5 += cp_3->K1s[(size_t)i*cp_3->ns + j]*s->f[q]->V[j];
+              a_5 += cp_3->K1s[(size_t)(i - i0)*cp_3->ns + j]*s->f[q]->V[j];
             f_2->H[i] += hw*s->fsg[k]*s->fsg[q]*a_5;
           }
         }
+      if(dist)
+        multi_gather(s->mx, k, f_2->H);
       for(i = 0; i < N_3; i++)
         vmf[i] = nl ? 0.5*(f_2->Vold[i] + f_2->V[i]) : f_2->V[i];
       fault_rows_hat(ly_4, vmf, ly_4->hfx + (size_t)slot_3*Mh*nz_4);
@@ -5058,18 +5193,32 @@ static double seg2_dist(const double p[2], const double a[2], const double b[2])
   return hypot(p[0] - a[0] - u*ab[0], p[1] - a[1] - u*ab[1]);
 }
 
-/* a dense coupling between the active cells: rows ridx (full receiver indices), columns cidx */
-static void dtab_alloc(struct fd3d_dtab *d, int nr, const int *ridx, int nc, const int *cidx, int L)
+/* a dense coupling between the active cells: rows ridx (full receiver indices), columns cidx;
+   rown: owner rank of each stored row; this rank keeps its own rows only (fd_plan.md H7) */
+static void dtab_alloc(struct fd3d_dtab *d, int nr, const int *ridx, int nc, const int *cidx, int L,
+    const int *rown, int rank)
 {
   size_t ne;
-  ne = (size_t)nr*nc;
+  int r;
   d->nr = nr;
   d->nc = nc;
   d->L = L;
   d->ridx = malloc(sizeof(int)*(nr > 0 ? nr : 1));
   d->cidx = malloc(sizeof(int)*(nc > 0 ? nc : 1));
+  d->rown = malloc(sizeof(int)*(nr > 0 ? nr : 1));
+  d->lrow = malloc(sizeof(int)*(nr > 0 ? nr : 1));
   memcpy(d->ridx, ridx, sizeof(int)*nr);
   memcpy(d->cidx, cidx, sizeof(int)*nc);
+  d->nrl = 0;
+  for(r = 0; r < nr; r++){
+    d->rown[r] = rown[r];
+    if(rown[r] == rank){
+      d->lrow[r] = d->nrl;
+      d->nrl++;
+    }else
+      d->lrow[r] = -1;
+  }
+  ne = (size_t)d->nrl*nc;
   d->Ks = calloc(ne > 0 ? ne : 1, sizeof(double));
   d->K1 = calloc(ne > 0 ? ne : 1, sizeof(double));
   d->lo = calloc(ne > 0 ? ne : 1, sizeof(int));
@@ -5083,6 +5232,8 @@ static void dtab_free(struct fd3d_dtab *d)
 {
   free(d->ridx);
   free(d->cidx);
+  free(d->rown);
+  free(d->lrow);
   free(d->Ks);
   free(d->K1);
   free(d->lo);
@@ -5093,14 +5244,17 @@ static void dtab_free(struct fd3d_dtab *d)
 
 /* one entry (stored row, stored column) from fd3d_elem_resp: lag increments K (L values) and
    static slope ks, times sgn; only the lags between the first and the last nonzero value of
-   K - ks dt are kept (the increments are exactly zero before the first arrival) */
+   K - ks dt are kept (the increments are exactly zero before the first arrival). Rows of
+   other ranks are skipped. */
 static void dtab_fill(struct fd3d_dtab *d, const struct fd3d_tab *t, int col, int row, const double *K, double ks, double sgn)
 {
   int l, lo, hi, L;
   size_t e;
   double w;
+  if(d->lrow[row] < 0)
+    return;
   L = d->L;
-  e = (size_t)row*d->nc + col;
+  e = (size_t)d->lrow[row]*d->nc + col;
   d->Ks[e] = sgn*ks;
   d->K1[e] = sgn*K[0];
   lo = 0;
@@ -5127,38 +5281,103 @@ static void dtab_fill(struct fd3d_dtab *d, const struct fd3d_tab *t, int col, in
     d->W[d->nw++] = sgn*(K[l] - ks*t->dt);
 }
 
-/* y[ridx - rlo] += w M x[cidx] for M = Ks or K1, over the stored rows whose full index is in
-   [rlo, rhi) (rows in stored order, columns in increasing index, as the full dense product) */
+/* y[ridx - rlo] += w M x[cidx] for M = Ks or K1, over this rank's stored rows whose full index
+   is in [rlo, rhi) (rows in stored order, columns in increasing index, as the full dense
+   product); the other ranks' rows are left unchanged (gathered by the caller) */
 static void dtab_mv(const struct fd3d_dtab *d, const double *M, const double *x, double w, int rlo, int rhi, double *y)
 {
   int r, c;
   double a;
+  const double *Mr;
   for(r = 0; r < d->nr; r++){
-    if(d->ridx[r] < rlo || d->ridx[r] >= rhi)
+    if(d->lrow[r] < 0 || d->ridx[r] < rlo || d->ridx[r] >= rhi)
       continue;
+    Mr = M + (size_t)d->lrow[r]*d->nc;
     a = 0.0;
     for(c = 0; c < d->nc; c++)
-      a += M[(size_t)r*d->nc + c]*x[d->cidx[c]];
+      a += Mr[c]*x[d->cidx[c]];
     y[d->ridx[r] - rlo] += w*a;
   }
 }
 
-/* one lag l of the history: y[ridx - rlo] += W_l v[cidx] over the stored rows in [rlo, rhi) */
+/* one lag l of the history: y[ridx - rlo] += W_l v[cidx] over this rank's stored rows in [rlo, rhi) */
 static void dtab_lag(const struct fd3d_dtab *d, int l, const double *v, int rlo, int rhi, double *y)
 {
   int r, c;
   size_t e;
   double a;
   for(r = 0; r < d->nr; r++){
-    if(d->ridx[r] < rlo || d->ridx[r] >= rhi)
+    if(d->lrow[r] < 0 || d->ridx[r] < rlo || d->ridx[r] >= rhi)
       continue;
     a = 0.0;
     for(c = 0; c < d->nc; c++){
-      e = (size_t)r*d->nc + c;
+      e = (size_t)d->lrow[r]*d->nc + c;
       if(l >= d->lo[e] && l <= d->hi[e])
         a += d->W[d->woff[e] + (l - d->lo[e])]*v[d->cidx[c]];
     }
     y[d->ridx[r] - rlo] += a;
+  }
+}
+
+/* MPI: the active cells of strip k owned by this rank and the others, gathered into v (3 ns_k) */
+static void strips_sgather(const struct fd3d_strips *s, int k, double *v)
+{
+  int P, n, u, u0, u1;
+  double *buf;
+  P = s->mpi_size;
+  if(P <= 1)
+    return;
+  n = s->sg_dsp[k][P - 1] + s->sg_cnt[k][P - 1];
+  buf = malloc(sizeof(double)*(n > 0 ? n : 1));
+  u0 = s->sg_dsp[k][s->mpi_rank];
+  u1 = u0 + s->sg_cnt[k][s->mpi_rank];
+  for(u = u0; u < u1; u++)
+    buf[u] = v[s->sg_idx[k][u]];
+  dense_allgather(buf, s->sg_cnt[k], s->sg_dsp[k], 1, P, COMM_PTR(s));
+  for(u = 0; u < n; u++)
+    v[s->sg_idx[k][u]] = buf[u];
+  free(buf);
+}
+/* MPI: fault k's vector from the owners of its cells (the blocks of fd3d_multi) */
+static void strips_fgather(const struct fd3d_strips *s, int k, double *v)
+{
+  if(s->mx && s->mpi_size > 1)
+    multi_gather(s->mx, k, v);
+}
+/* owners of the receiver cells and the gather lists (after the masks) */
+static void strips_owners(struct fd3d_strips *s)
+{
+  int k, i, c, r, P, ns, na, a, u;
+  P = s->mpi_size;
+  for(k = 0; k < s->nf; k++){
+    s->fown[k] = malloc(sizeof(int)*(s->f[k]->N > 0 ? s->f[k]->N : 1));
+    for(i = 0; i < s->f[k]->N; i++)
+      s->fown[k][i] = blk_owner(s->f[k]->N, i, P);
+    ns = s->ly[k]->ns;
+    na = 0;
+    for(i = 0; i < ns; i++)
+      na += s->active[k][i];
+    s->sown[k] = malloc(sizeof(int)*(ns > 0 ? ns : 1));
+    a = 0;
+    for(i = 0; i < ns; i++){
+      if(s->active[k][i]){
+        s->sown[k][i] = blk_owner(na, a, P);
+        a++;
+      }else
+        s->sown[k][i] = -1;
+    }
+    s->sg_cnt[k] = calloc(P, sizeof(int));
+    s->sg_dsp[k] = calloc(P, sizeof(int));
+    s->sg_idx[k] = malloc(sizeof(int)*(3*na > 0 ? 3*na : 1));
+    u = 0;
+    for(r = 0; r < P; r++){
+      s->sg_dsp[k][r] = u;
+      for(c = 0; c < 3; c++)
+        for(i = 0; i < ns; i++)
+          if(s->sown[k][i] == r)
+            s->sg_idx[k][u++] = c*ns + i;
+      s->sg_cnt[k][r] = u - s->sg_dsp[k][r];
+    }
   }
 }
 
@@ -5352,7 +5571,7 @@ static void strips_dense_pair(struct fd3d_strips *s, int q, int k, const double 
   double Fq[3][3], Fk[3][3], Rq[3][3], Rk[3][3], RSq[3][3], dirs_s[3][3], dk2[2][3], e[3], sl[3], sdk[3], nk[3];
   double ez[3] = {0, 0, 1}, ks[3], *K;
   int Nq, Nk, nsk, nsq, L, r, i, j, c, nak, naq, a, b;
-  int *rows_s, *cols_s, *rows_f, *cols_f;
+  int *rows_s, *cols_s, *rows_f, *cols_f, *own_s, *own_f, rk;
   lk = s->ly[k];
   lq = s->ly[q];
   t = s->f[0]->t;
@@ -5409,13 +5628,25 @@ static void strips_dense_pair(struct fd3d_strips *s, int q, int k, const double 
     rows_f[i] = i;
   for(j = 0; j < Nq; j++)
     cols_f[j] = j;
+  /* MPI: owners of the receiver rows (a cell's components stay together) */
+  own_s = malloc(sizeof(int)*3*nak + sizeof(int));
+  own_f = malloc(sizeof(int)*(2*Nk + 1));
+  for(i = 0; i < 3*nak; i++)
+    own_s[i] = s->sown[k][rows_s[i] % nsk];
+  for(i = 0; i < 2*Nk; i++)
+    own_f[i] = s->fown[k][i % Nk];
+  rk = s->mpi_rank;
   /* fault q -> strip k (source slip: the marcher's variable, fsign along Fq[fcomp-1]) */
-  dtab_alloc(&s->fs[q][k], 3*nak, rows_s, Nq, cols_f, L);
+  dtab_alloc(&s->fs[q][k], 3*nak, rows_s, Nq, cols_f, L, own_s, rk);
   for(j = 0; j < Nq; j++){
     a = 0;
     for(i = 0; i < nsk; i++){
       if(!s->active[k][i])
         continue;
+      if(s->sown[k][i] != rk){
+        a++;
+        continue;
+      }
       fd3d_elem_resp(t, s->fg[q] + 3*(size_t)j, Rq, fcomp, 0.5*t->dx, 0.5*t->dx, s->xg[k] + 3*(size_t)i, ez, 3, dirs_s, L, K, ks);
       for(r = 0; r < 3; r++)
         dtab_fill(&s->fs[q][k], t, j, r*nak + a, K + (size_t)r*L, ks[r], fsign[q]);
@@ -5423,13 +5654,15 @@ static void strips_dense_pair(struct fd3d_strips *s, int q, int k, const double 
     }
   }
   /* strip q -> fault k (receiver: shear along fault k's slip direction, normal) */
-  dtab_alloc(&s->sf[q][k], 2*Nk, rows_f, 3*naq, cols_s, L);
+  dtab_alloc(&s->sf[q][k], 2*Nk, rows_f, 3*naq, cols_s, L, own_f, rk);
   for(c = 1; c <= 3; c++){
     b = 0;
     for(j = 0; j < nsq; j++){
       if(!s->active[q][j])
         continue;
       for(i = 0; i < Nk; i++){
+        if(s->fown[k][i] != rk)
+          continue;
         fd3d_elem_resp(t, s->xg[q] + 3*(size_t)j, RSq, c, 0.5*lq->hx, 0.5*lq->wy[j % lq->nys], s->fg[k] + 3*(size_t)i, nk, 2, dk2, L, K, ks);
         for(r = 0; r < 2; r++)
           dtab_fill(&s->sf[q][k], t, (c - 1)*naq + b, r*Nk + i, K + (size_t)r*L, ks[r], 1.0);
@@ -5438,7 +5671,7 @@ static void strips_dense_pair(struct fd3d_strips *s, int q, int k, const double 
     }
   }
   /* strip q -> strip k */
-  dtab_alloc(&s->ss[q][k], 3*nak, rows_s, 3*naq, cols_s, L);
+  dtab_alloc(&s->ss[q][k], 3*nak, rows_s, 3*naq, cols_s, L, own_s, rk);
   for(c = 1; c <= 3; c++){
     b = 0;
     for(j = 0; j < nsq; j++){
@@ -5448,6 +5681,10 @@ static void strips_dense_pair(struct fd3d_strips *s, int q, int k, const double 
       for(i = 0; i < nsk; i++){
         if(!s->active[k][i])
           continue;
+        if(s->sown[k][i] != rk){
+          a++;
+          continue;
+        }
         fd3d_elem_resp(t, s->xg[q] + 3*(size_t)j, RSq, c, 0.5*lq->hx, 0.5*lq->wy[j % lq->nys], s->xg[k] + 3*(size_t)i, ez, 3, dirs_s, L, K, ks);
         for(r = 0; r < 3; r++)
           dtab_fill(&s->ss[q][k], t, (c - 1)*naq + b, r*nak + a, K + (size_t)r*L, ks[r], 1.0);
@@ -5460,6 +5697,8 @@ static void strips_dense_pair(struct fd3d_strips *s, int q, int k, const double 
   free(cols_s);
   free(rows_f);
   free(cols_f);
+  free(own_s);
+  free(own_f);
   free(K);
 }
 
@@ -5505,6 +5744,12 @@ struct fd3d_strips *fd3d_strips_create(int nf, struct fd3d **f, const double *th
   strips_geometry(s, x0f, ytop, ztop, dip_deg, xs0);
   strips_masks(s);
   strips_trim(s);
+  s->mpi_size = t->mpi_size;
+  s->mpi_rank = t->mpi_rank;
+#ifdef FD3D_MPI
+  s->comm = t->comm;
+#endif
+  strips_owners(s);
   for(q = 0; q < nf; q++)
     for(k = 0; k < nf; k++)
       if(q != k)
@@ -5535,8 +5780,8 @@ double fd3d_strips_memory(const struct fd3d_strips *s)
       d[1] = &s->sf[k][q];
       d[2] = &s->ss[k][q];
       for(u = 0; u < 3; u++){
-        ne = (size_t)d[u]->nr*d[u]->nc;
-        mem += 8.0*d[u]->nw + ne*(2.0*8.0 + 2.0*sizeof(int) + sizeof(size_t));
+        ne = (size_t)d[u]->nrl*d[u]->nc;
+        mem += 8.0*d[u]->nw + ne*(2.0*8.0 + 2.0*sizeof(int) + sizeof(size_t)) + 4.0*sizeof(int)*d[u]->nr;
       }
     }
   return mem;
@@ -5558,6 +5803,11 @@ void fd3d_strips_free(struct fd3d_strips *s)
     free(s->active[k]);
     free(s->xg[k]);
     free(s->fg[k]);
+    free(s->fown[k]);
+    free(s->sown[k]);
+    free(s->sg_idx[k]);
+    free(s->sg_cnt[k]);
+    free(s->sg_dsp[k]);
     free(s->sring[k]);
     free(s->fring[k]);
     for(q = 0; q < s->nf; q++){
@@ -5585,9 +5835,9 @@ static double dtab_value(const struct fd3d_dtab *d, int rfull, int cfull, int l,
   for(c = 0; c < d->nc; c++)
     if(d->cidx[c] == cfull)
       break;
-  if(r == d->nr || c == d->nc)
+  if(r == d->nr || c == d->nc || d->lrow[r] < 0)
     return NAN;
-  e = (size_t)r*d->nc + c;
+  e = (size_t)d->lrow[r]*d->nc + c;
   w = (l >= d->lo[e] && l <= d->hi[e]) ? d->W[d->woff[e] + (l - d->lo[e])] : 0.0;
   return w + d->Ks[e]*dt;
 }
@@ -5727,11 +5977,11 @@ int fd3d_h6_strips_check(int verbose)
       b[2] = &s2->ss[0][1];
 
       for(u = 0; u < 3; u++){
-        if(a[u]->nr != b[u]->nr || a[u]->nc != b[u]->nc){
+        if(a[u]->nrl != b[u]->nrl || a[u]->nc != b[u]->nc){
           worst_c = 1e300;
           continue;
         }
-        n = (size_t)a[u]->nr*a[u]->nc;
+        n = (size_t)a[u]->nrl*a[u]->nc;
         for(e = 0; e < n; e++){
           worst_c = fmax(worst_c, fabs(a[u]->Ks[e] - b[u]->Ks[e])*dt);
           worst_c = fmax(worst_c, fabs(a[u]->K1[e] - b[u]->K1[e]));
@@ -5788,7 +6038,8 @@ static void strips_mask(struct strips_ctx *x, double *v)
           v[x->off[k] + c*ns + i] = 0.0;
   }
 }
-static void strips_A(struct strips_ctx *x, const double *v, double *out)
+/* gather = 0: the dense parts only on this rank's rows (MPI; the other rows are incomplete) */
+static void strips_A_g(struct strips_ctx *x, const double *v, double *out, int gather)
 {
   struct fd3d_strips *s = x->s;
   int k, j;
@@ -5800,9 +6051,15 @@ static void strips_A(struct strips_ctx *x, const double *v, double *out)
     for(j = 0; j < s->nf; j++)
       if(j != k)
         dtab_mv(&s->ss[j][k], s->ss[j][k].K1, vm + x->off[j], x->hw, 0, 3*s->ly[k]->ns, out + x->off[k]);
+    if(gather && s->nf > 1)
+      strips_sgather(s, k, out + x->off[k]);
   }
   strips_mask(x, out);
   free(vm);
+}
+static void strips_A(struct strips_ctx *x, const double *v, double *out)
+{
+  strips_A_g(x, v, out, 1);
 }
 static void strips_P(struct strips_ctx *x, const double *r, double *z)
 {
@@ -5820,6 +6077,70 @@ static void strips_P(struct strips_ctx *x, const double *r, double *z)
    preconditioned per strip, converged slowly where the partition cuts strips obliquely (355
    iterations per step at 30 degrees against 15 with a shared strike). FD_STRIPS_GMRES=1 keeps
    GMRES. Dense: (3 active cells)^2 doubles; fine for test sizes, not for production strips. */
+/* MPI (fd_plan.md H7): every rank evaluates the columns with the dense parts on its own rows,
+   keeps those rows (row major), and one gather gives each rank the whole operator, entry for
+   entry as on one rank, so that the factors are identical on all ranks */
+static void strips_assemble_mpi(struct strips_ctx *x, double *e, double *col)
+{
+  struct fd3d_strips *s = x->s;
+  int na, P, rk, i, j, k, c, r, u, cell;
+  int *aown, *cnt, *dsp;
+  double *blk;
+  size_t nown, tot;
+  na = s->na;
+  P = s->mpi_size;
+  rk = s->mpi_rank;
+  aown = malloc(sizeof(int)*(na > 0 ? na : 1));
+  cnt = calloc(P, sizeof(int));
+  dsp = calloc(P, sizeof(int));
+  for(i = 0; i < na; i++){
+    k = 0;
+    while(k + 1 < s->nf && s->aidx[i] >= x->off[k + 1])
+      k++;
+    cell = (s->aidx[i] - x->off[k]) % s->ly[k]->ns;
+    aown[i] = s->sown[k][cell];
+    cnt[aown[i]]++;
+  }
+  tot = (size_t)na*na;
+  if(tot > 2147483647u)
+    fprintf(stderr, "fd3d_strips: the strip operator (%d unknowns) is too large for the gather\n", na);
+  u = 0;
+  for(r = 0; r < P; r++){
+    dsp[r] = u*na;
+    u += cnt[r];
+    cnt[r] *= na;
+  }
+  nown = (size_t)cnt[rk]/(na > 0 ? na : 1);
+  blk = malloc(sizeof(double)*(tot > 0 ? tot : 1));
+  for(j = 0; j < na; j++){
+    e[s->aidx[j]] = 1.0;
+    strips_A_g(x, e, col, 0);
+    u = 0;
+    for(i = 0; i < na; i++)
+      if(aown[i] == rk){
+        blk[(size_t)dsp[rk] + (size_t)u*na + j] = col[s->aidx[i]];
+        u++;
+      }
+    e[s->aidx[j]] = 0.0;
+  }
+  (void)nown;
+#ifdef FD3D_MPI
+  MPI_Allgatherv(MPI_IN_PLACE, 0, MPI_DATATYPE_NULL, blk, cnt, dsp, MPI_DOUBLE, s->comm);
+#endif
+  for(r = 0; r < P; r++){
+    u = 0;
+    for(i = 0; i < na; i++)
+      if(aown[i] == r){
+        for(c = 0; c < na; c++)
+          s->lu[(size_t)c*na + i] = blk[(size_t)dsp[r] + (size_t)u*na + c];   /* column major */
+        u++;
+      }
+  }
+  free(blk);
+  free(aown);
+  free(cnt);
+  free(dsp);
+}
 extern void dgetrf_(int *m, int *n, double *a, int *lda, int *ipiv, int *info);
 extern void dgetrs_(char *tr, int *n, int *nrhs, double *a, int *lda, int *ipiv, double *b, int *ldb, int *info);
 static int strips_direct(struct strips_ctx *x, const double *rhs, double *V)
@@ -5848,13 +6169,16 @@ static int strips_direct(struct strips_ctx *x, const double *rhs, double *V)
     s->na = na;
     s->lu = malloc(sizeof(double)*(size_t)na*na);
     s->lpiv = malloc(sizeof(int)*na);
-    for(j = 0; j < na; j++){
-      e[s->aidx[j]] = 1.0;
-      strips_A(x, e, col);
-      for(i = 0; i < na; i++)
-        s->lu[(size_t)j*na + i] = col[s->aidx[i]];          /* column major */
-      e[s->aidx[j]] = 0.0;
-    }
+    if(s->mpi_size <= 1 || s->nf < 2){
+      for(j = 0; j < na; j++){
+        e[s->aidx[j]] = 1.0;
+        strips_A(x, e, col);
+        for(i = 0; i < na; i++)
+          s->lu[(size_t)j*na + i] = col[s->aidx[i]];          /* column major */
+        e[s->aidx[j]] = 0.0;
+      }
+    }else
+      strips_assemble_mpi(x, e, col);
     dgetrf_(&na, &na, s->lu, &na, s->lpiv, &info);
     free(e);
     free(col);
@@ -6083,6 +6407,8 @@ int fd3d_strips_step(struct fd3d_strips *s, double **load)
   double a_6;
   struct fd3d *f_3;
   struct fd3d_layer *ly_6;
+  int i0;
+  int i1;
   memset(&X, 0, sizeof(X));
   X.s = s;
   X.nl = nl;
@@ -6243,44 +6569,52 @@ int fd3d_strips_step(struct fd3d_strips *s, double **load)
         nsr = cp->ns;
         if(k == q)
           continue;
+        multi_rows(s->mx, k, &i0, &i1);           /* MPI: own rows, gathered below */
+        (void)nr;
         if(!s->mx->static_fn)
-          for(i = 0; i < nr; i++){
+          for(i = i0; i < i1; i++){
             a_2 = 0.0;
             b_2 = 0.0;
             for(j = 0; j < nsr; j++){
-              a_2 += cp->Ks[(size_t)i*nsr + j]*s->f[q]->delta[j];
-              b_2 += cp->Kn[(size_t)i*nsr + j]*s->f[q]->delta[j];
+              a_2 += cp->Ks[(size_t)(i - i0)*nsr + j]*s->f[q]->delta[j];
+              b_2 += cp->Kn[(size_t)(i - i0)*nsr + j]*s->f[q]->delta[j];
             }
             Kx[k][i] += sg*a_2;
             Kn[k][i] += sn*b_2;
           }
         for(l = 2; l <= cp->L && l - 1 <= s->mx->hk; l++){
           v = s->mx->ring[q] + (size_t)((s->mx->hk - (l - 1) + (long)s->mx->Lb*1000) % s->mx->Lb)*nsr;
-          Ws = cp->Ws + (size_t)(l - 1)*nr*nsr;
-          Wn = cp->Wn + (size_t)(l - 1)*nr*nsr;
-          for(i = 0; i < nr; i++){
+          Ws = cp->Ws + (size_t)(l - 1)*cp->nrl*nsr;
+          Wn = cp->Wn + (size_t)(l - 1)*cp->nrl*nsr;
+          for(i = i0; i < i1; i++){
             a_3 = 0.0;
             b_3 = 0.0;
             for(j = 0; j < nsr; j++){
-              a_3 += Ws[(size_t)i*nsr + j]*v[j];
-              b_3 += Wn[(size_t)i*nsr + j]*v[j];
+              a_3 += Ws[(size_t)(i - i0)*nsr + j]*v[j];
+              b_3 += Wn[(size_t)(i - i0)*nsr + j]*v[j];
             }
             Kx[k][i] += sg*a_3;
             Kn[k][i] += sn*b_3;
           }
         }
         if(nl && cp->has_k1)
-          for(i = 0; i < nr; i++){
+          for(i = i0; i < i1; i++){
             a_4 = 0.0;
             b_4 = 0.0;
             for(j = 0; j < nsr; j++){
-              a_4 += cp->K1s[(size_t)i*nsr + j]*s->f[q]->Vold[j];
-              b_4 += cp->K1n[(size_t)i*nsr + j]*s->f[q]->Vold[j];
+              a_4 += cp->K1s[(size_t)(i - i0)*nsr + j]*s->f[q]->Vold[j];
+              b_4 += cp->K1n[(size_t)(i - i0)*nsr + j]*s->f[q]->Vold[j];
             }
             Kx[k][i] += 0.5*sg*a_4;
             Kn[k][i] += 0.5*sn*b_4;
           }
       }
+  if(nf > 1)
+    for(k = 0; k < nf; k++){                   /* MPI: the known parts from the owners of their rows */
+      strips_sgather(s, k, Hs[k]);
+      strips_fgather(s, k, Kx[k]);
+      strips_fgather(s, k, Kn[k]);
+    }
   /* ---- iterate faults and strips ---- */
   for(k = 0; k < nf; k++){
     memcpy(V + X.off[k], s->ly[k]->Vold3, sizeof(double)*3*s->ly[k]->ns);
@@ -6329,17 +6663,22 @@ int fd3d_strips_step(struct fd3d_strips *s, double **load)
           cp_2 = &s->mx->c[q][k];
           if(q == k || !cp_2->has_k1)
             continue;
-          for(i = 0; i < N_2; i++){
+          multi_rows(s->mx, k, &i0, &i1);
+          for(i = i0; i < i1; i++){
             a_5 = 0.0;
             b_5 = 0.0;
             for(j = 0; j < cp_2->ns; j++){
-              a_5 += cp_2->K1s[(size_t)i*cp_2->ns + j]*s->f[q]->V[j];
-              b_5 += cp_2->K1n[(size_t)i*cp_2->ns + j]*s->f[q]->V[j];
+              a_5 += cp_2->K1s[(size_t)(i - i0)*cp_2->ns + j]*s->f[q]->V[j];
+              b_5 += cp_2->K1n[(size_t)(i - i0)*cp_2->ns + j]*s->f[q]->V[j];
             }
             Hf[i] += hw*s->fsg[k]*s->fsg[q]*a_5;
             tnc[i] += hw*s->fsg[q]*b_5;
           }
         }
+      if(nf > 1){                                /* MPI: own rows above, gathered */
+        strips_fgather(s, k, Hf);
+        strips_fgather(s, k, tnc);
+      }
       for(i = 0; i < N_2; i++)
         ly_3->tn[i] += tnc[i];
       if(s->static_n_fn){
@@ -6388,6 +6727,8 @@ int fd3d_strips_step(struct fd3d_strips *s, double **load)
       for(q = 0; q < nf; q++)
         if(q != k)
           dtab_mv(&s->fs[q][k], s->fs[q][k].K1, s->f[q]->V, -hw, 0, 3*s->ly[k]->ns, rhs + X.off[k]);
+      if(nf > 1)
+        strips_sgather(s, k, rhs + X.off[k]);
     }
     {
       Vn = malloc(sizeof(double)*nst);
@@ -6461,13 +6802,16 @@ int fd3d_strips_step(struct fd3d_strips *s, double **load)
         cp_3 = &s->mx->c[q][k];
         if(q == k || !cp_3->has_k1)
           continue;
-        for(i = 0; i < N_3; i++){
+        multi_rows(s->mx, k, &i0, &i1);
+        for(i = i0; i < i1; i++){
           a_6 = 0.0;
           for(j = 0; j < cp_3->ns; j++)
-            a_6 += cp_3->K1s[(size_t)i*cp_3->ns + j]*s->f[q]->V[j];
+            a_6 += cp_3->K1s[(size_t)(i - i0)*cp_3->ns + j]*s->f[q]->V[j];
           f_2->H[i] += hw*s->fsg[k]*s->fsg[q]*a_6;
         }
       }
+    if(nf > 1)
+      strips_fgather(s, k, f_2->H);
     for(i = 0; i < N_3; i++)
       vmf[i] = nl ? 0.5*(f_2->Vold[i] + f_2->V[i]) : f_2->V[i];
     fault_rows_hat(ly_5, vmf, ly_5->hfx + (size_t)slot_3*Mh_5*nz_4);
@@ -6585,6 +6929,13 @@ double fd3d_h6_step_check(int nsteps, int sw, double th_deg, int verbose)
         wv = fmax(wv, fabs(fa[k]->V[i] - fb[k]->V[i]));
         sv = fmax(sv, fabs(fa[k]->V[i]));
       }
+  }
+  if(getenv("FD3D_DUMP")){
+    fd3d_dump_state(getenv("FD3D_DUMP"), "w", 2, fa);
+    fd3d_dump_state(getenv("FD3D_DUMP"), "a", 2, fb);
+    fd3d_dump_vec(getenv("FD3D_DUMP"), "msurf", 3*ms->ly[0]->ns, ms->ly[0]->V3);
+    for(k = 0; k < 2; k++)
+      fd3d_dump_vec(getenv("FD3D_DUMP"), k ? "strip1" : "strip0", 3*st->ly[k]->ns, st->ly[k]->V3);
   }
   if(verbose)
     printf("h6step: %d steps (%s), strike %g: max |tau(strips) - tau(G3b)| %.3e of %.3e (traction change), max |V diff| %.3e of %.3e; outer iterations %.1f, GMRES %.1f per step\n",
@@ -6710,4 +7061,30 @@ int fd3d_h6_strike_run(double ang, int m, int nsteps, double *tau, int verbose)
   fd3d_tab_free(tb);
   free(vp);
   return 0;
+}
+
+/* tests (fd_plan.md H7): the faults' state and other vectors in exact hexadecimal form, for byte
+   comparisons between runs on different numbers of ranks */
+void fd3d_dump_state(const char *fn, const char *mode, int nf, struct fd3d **f)
+{
+  FILE *o;
+  int k, i;
+  o = fopen(fn, mode);
+  if(!o)
+    return;
+  for(k = 0; k < nf; k++)
+    for(i = 0; i < f[k]->N; i++)
+      fprintf(o, "f %d %d %a %a %a %a\n", k, i, f[k]->V[i], f[k]->delta[i], f[k]->tau[i], f[k]->sigma[i]);
+  fclose(o);
+}
+void fd3d_dump_vec(const char *fn, const char *tag, int n, const double *v)
+{
+  FILE *o;
+  int i;
+  o = fopen(fn, "a");
+  if(!o)
+    return;
+  for(i = 0; i < n; i++)
+    fprintf(o, "%s %d %a\n", tag, i, v[i]);
+  fclose(o);
 }

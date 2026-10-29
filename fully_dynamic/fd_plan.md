@@ -2607,6 +2607,58 @@ Plan for the remaining scaling work, with accuracy kept:
    checked against the windowed tables (step 6) on the same cases.
 4. TPV14/15 at 250 m with 1 to 8 ranks; then TPV14 at 100 m on a cluster.
 
+### H7: MPI for the dense couplings and the strip solve (2026-10-29)
+
+Steps 1 and 2 of the plan in H6 step 6, with all dense blocks distributed (decided 2026-10-29:
+also the static and first-lag blocks, not only the lag tables).
+- fd3d_multi (G1 tables, also inside msurf and strips): the planes' tables may now be split
+  over the ranks (one communicator for all planes). The receiver rows of plane p are split in
+  blocks (rcnt, rdsp); each rank builds and stores only its own rows of Ws, Wn, Ks, Kn, K1s, K1n
+  (c->r0, c->nrl), so memory and build time divide by the number of ranks; has_k1 is reduced
+  over the ranks. In fd3d_multi_step, fd3d_msurf_step and fd3d_strips_step the known cross
+  part, the junction term of the fixed point and the finishing term are computed for the own
+  rows only, in the order of the one-rank code, and the finished vectors are gathered
+  (MPI_Allgatherv), so every row is computed whole on one rank.
+- fd3d_dtab (strips): rows owned per receiver cell, fault cells in the blocks of fd3d_multi,
+  active strip cells in blocks of equal count with a cell's three components together
+  (strips_owners: fown, sown, gather lists sg_*). The kernel evaluations of a row are done on
+  its owner only; Ks, K1 and the packed lags are stored for the own rows (lrow). dtab_mv and
+  dtab_lag act on the own rows; the known parts, the outer iteration's terms, the strips'
+  right-hand side and the finish are gathered once each.
+- strip solve: the direct solve assembles the strips' first-lag operator column by column with
+  the dense parts on the own rows (strips_A_g with gather 0), keeps the own rows, and one
+  MPI_Allgatherv gives every rank the whole operator entry for entry as on one rank; dgetrf is
+  then repeated on every rank. The GMRES path (FD_STRIPS_GMRES=1) gathers inside each product.
+- rsf_fd.c: fd3d_set_comm for the several-plane, several-fault and strip paths; the static
+  gate of the several-plane path reads each rank's own rows of Is and In through
+  MatCreateSubMatrices and reduces the sums; the strips report the memory of the dense
+  couplings in total and the largest share of one rank.
+- tests: FD3D_DUMP=<file> writes the final state (V, slip, tau, sigma, and the normal traction,
+  rupture times or surface rates) in hexadecimal for the fd3d_test cases multi, msurf, tpv14
+  and h6step; run_tests.sh compares these dumps on 1, 2 and 4 ranks; test_fd3d_mpi.sh runs
+  rsf_solve on 1, 2 and 4 ranks for the three paths (a 30 degree bend with images and
+  -calc_sigma_dot, a thrust with a 50 degree lower half on one virtual surface, two
+  surface-breaking faults of strikes 90 and 120 degrees with strips) and compares the station
+  files byte for byte.
+Checks (sandbox, one core, ranks oversubscribed):
+- fd3d_test on 1, 2 and 4 ranks, dumps identical byte for byte: multi (0 degree split with the
+  junction first lag, rigidly rotated 35/30 degrees with dip slip, 30 degree bend with images),
+  msurf 1 and 2, h6step cases 0, 1 and 2 (shared strike, slip weakening, strips rotated by
+  37 degrees: the distributed dense tables and the gathered LU), tpv14 at 1 km for 4 s.
+- One rank against the previous code: identical for the multi cases and tpv14; msurf and h6step
+  differ at round-off (2.034e-11 against 2.033e-11, 2.845e-5 against 2.848e-5) with the default
+  flags, and are identical byte for byte when both versions are built with -ffp-contract=off,
+  so the difference comes from fused multiply-add code generation, not from the arithmetic.
+- rsf_solve (test_fd3d_mpi.sh): station files identical on 1, 2 and 4 ranks for the three
+  paths, and the one-rank files identical to those of the previous binary; the static gate
+  prints the same deviations on every rank count; the strips' dense couplings take 193 MB on
+  one rank and at most 96 and 48 MB per rank on 2 and 4.
+Limits: the strip LU needs the dense operator twice during assembly (na^2 doubles each), and
+the gather counts are int (na below about 46,000); the surface part of each column is still
+evaluated on every rank, so the assembly does not get faster with more ranks; the strip
+layers' own Toeplitz tables follow the wavenumber split of S3. Speed-ups need a multi-core
+machine. Next: gate 2 (domain partitioning of the dense histories), then TPV14/15 at 250 m.
+
 ### WP7, C implementation in rsf_solve: status (2026-10-18)
 Done, each verified in the sandbox before delivery (details in
 fd_c_design.md sections 6 to 10, usage in rsf_solve_fd.md):
