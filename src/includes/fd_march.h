@@ -41,6 +41,10 @@ struct fd_sys {
   double _Complex **hist;
   double **histr;               /* real-space ring per source, only with dense pairs (ndense > 0) */
   int ndense;
+  double *ctP;                  /* prefix moments of one source's history (compressed dense pairs, D2) */
+  const double **ctV;
+  size_t ctP_cap;
+  int ctV_cap;
   int *hk;
   fd_fft_plan pf, pb;
   double _Complex *w1, *w2, *w3;

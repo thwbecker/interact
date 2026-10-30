@@ -2818,6 +2818,152 @@ ranks (wall time, final states compared byte for byte); g, TPV14 with graded str
 plus opening layer; b, the band preconditioned strip solve against the dense LU (TPV14 at 1 km,
 strips dx/3). Each part appends to summary.txt in the output directory.
 
+### H12: TPV14 against the SCEC stations (first look, 2026-10-30)
+
+SCEC files from one group (Barall, FaultMod, 100 m elements; on-fault stations at 2 km along
+strike on the surface of the main fault, beyond the junction, and of the branch). fd3d_test
+tpv14 and tpv14s write station series with FD3D_TPV14_STATIONS="k:s:z,..." (fault k, s metres
+along strike from the junction, z metres deep; linear between cell centres, the top row for
+the surface); src/testing/rsf_solve/tpv14_stcmp.py compares them (it reads the saved HTML).
+
+| run | main, 2 km: rupture, peak rate, slip at 12 s | branch, 2 km: rupture, peak rate, slip at 12 s |
+|---|---|---|
+| SCEC (FaultMod, 100 m) | 4.72 s, 5.8 m/s, 4.69 m | 4.99 s, 4.9 m/s, 0.62 m |
+| mirror, 1 km | 6.50 s, 6.7 m/s, 4.39 m | 6.64 s, 7.6 m/s, 2.25 m |
+| strips +-15 km graded, 1 km | 5.92 s, 5.3 m/s, 3.30 m | 6.35 s, 4.4 m/s, 1.69 m |
+| mirror, 750 m | 7.90 s, 2.4 m/s, 2.02 m | 7.36 s, 4.0 m/s, 2.31 m |
+
+These cell sizes do not resolve the slip-weakening zone: with mu (0.677 - 0.525) 120 MPa =
+18.2 MPa strength drop, Dc 0.4 m and mu = 32 GPa the static process zone is about
+0.88 mu Dc / 18.2 MPa = 620 m and shrinks as the rupture speeds up, so 1 km and 750 m cells
+put less than one cell into it. The rupture is then too slow and depends erratically on the
+cell size (1 km arrives earlier than 750 m), and the branch keeps slipping where the reference
+arrests after 0.62 m. The comparison becomes meaningful from about 250 m (2.5 cells in the
+static zone) and needs 100 to 200 m for agreement; that is part r of
+run_h11_measurements.sh (ladder 1000 to 250 m by default) on a larger machine, with the
+transient unclamping of the branch (3.6 MPa in the reference) as an additional check.
+
+### Stock-taking (2026-10-30)
+
+TPV15 against the SCEC station (Barall, FaultMod 100 m; main fault 2 km before the junction,
+surface): reference rupture 3.98 s, peak slip rate 10.0 m/s, slip -5.84 m at 12 s; mirror at
+1 km: 5.92 s, 13.7 m/s, -7.08 m. As for TPV14 (H12) the 1 km cells do not resolve the
+slip-weakening zone; the comparison waits for part r of run_h11_measurements.sh. (The station
+signs of fd3d_test were fixed for TPV15: right-lateral positive as in the SCEC files.)
+
+3-D half space, what exists and what it costs:
+- planar faults: self tables Toeplitz (FFT), cheap; cross tables dense, O(N_r N_s L), divided
+  by 3 to 4 by D1 at 750 m to 1 km (more at finer cells, not yet measured) and by the number of
+  ranks (H7);
+- free surface: mirror (vertical strike slip; the near-surface rupture about 0.5 s late at 1 km,
+  H10); mirror plus opening layer (vertical strike slip, one plane, exact); virtual surface
+  (one fault or faults sharing a strike); strips (any strike), which need bands of the order of
+  the fault depth (H10), so for several faults the strip-to-strip dense couplings, O((N_strip)^2
+  L), dominate;
+- benchmarks: TPV14/15 need cells of 100 to 250 m (process zone about 600 m at rest); at 250 m
+  the dense parts of TPV14 with graded strips are estimated at tens of GB, to be measured (H11).
+The open question for 4 to 5 faults of variable strike and dip is the cost of the dense
+surface couplings, not their accuracy. Options: (a) one shared graded surface patch with the
+dense blocks compressed (low rank in space, D1 in time); (b) keep the BIE for the faults and
+use a volume method for the near-surface region (the hybrid option considered on 2026-10-28);
+(c) whole-space dynamics with exact half-space statics (-fd_hs_static) for buried faults,
+where G4 measured a few percent. The H11 numbers (memory against cell size, speed-up) decide
+between (a) and (b).
+
+2-D in-plane (mode II) with a free surface, for megathrust cycles (test_twod/cascadia):
+- QD: works (rsf_solve on PD06_nosigma, 3588 elements of 100 m, plane strain half plane,
+  checked over 5 years here without the H-matrix);
+- FD: refused, "-fd_mode: in-plane half-plane geometries are not supported (M7)". What exists:
+  in-plane whole plane in C (Toeplitz for parallel pairs, dense tables for other pairs, N1);
+  the free surface in 2-D in-plane only in the Python prototype (opening kernels,
+  inplane_open.py; dense fault-plus-surface system with the surface eliminated per step,
+  densesys.py; checks in test_fs_dyn2d.py, free surface steps 1 to 3 above);
+- cost: the Cascadia sections are curved (every pair dense) and 2-D kernels have tails (no
+  lacuna, so D1's zero after the S strip does not apply and the history must cover the whole
+  phase). Dense tables over a 60 s phase for PD06 (about 360 km of fault, shear and normal):
+  860 GB at 100 m, 55 GB at 250 m, 7 GB at 500 m, 0.9 GB at 1 km, plus the surface elements.
+  FD at the QD resolution of 100 m therefore needs a compressed history for dense pairs (the
+  exact coarse history of the parallel pairs, extended to dense pairs) or a coarser dynamic
+  mesh.
+Plan for 2-D in-plane with a free surface (M7, in this order):
+1. port the in-plane opening kernel to C, checked against inplane_open.py and against Crouch
+   and Starfield's static solution (interact's tdd);
+2. a surface segment type in the 2-D FD (shear and opening unknowns, zero traction, refined
+   near traces: h_s a quarter to a half of h_f, traces on element boundaries, half-length about
+   two fault lengths, graded outwards), dense tables fault-surface and surface-surface, the
+   surface eliminated per step (direct factorisation), statics of the fault from interact's
+   exact half-plane operator;
+3. the checks of test_fs_dyn2d.py in C (antiplane against images; buried 30 degree fault
+   against the half-plane static limit; spontaneous thrust and normal sense; a thrust reaching
+   the surface), then a small megathrust (one curved fault, one splay) QD against QD plus FD
+   events;
+4. the coarse history for dense pairs, then one Cascadia event (PD13, the smallest section)
+   at 500 m and 250 m.
+
+### D2: compressed dense tables for 2-D non-parallel pairs (2026-10-31)
+
+Correction to the stock-taking estimate: the 2-D windows are not the whole phase. The window
+criterion (-fd_tol, default 1e-2 of the static envelope per lag) ends them a little after the
+S arrival from the farthest element: on a curved fault of 300 elements of 200 m (57 km) the
+pair windows are 208 lags median, 664 at most (about 1.2 S transit times). For Cascadia PD06 at
+100 m the full windows are then of the order of 400 GB rather than 860 GB (to be measured).
+
+What changed (fd_tables.c, fd_march.c, rsf_fd.c):
+- The dense tables of non-parallel pairs (and of pairs forced dense with FD_FORCE_DENSE) are
+  compressed per entry: the window is trimmed at the last lag above the compression tolerance;
+  runs of lags that lie on one quadratic within the tolerance (the constant -Ks dt before the
+  P arrival, the smooth stretches between and after the fronts) are found greedily (longest run
+  by doubling and bisection of a least-squares fit, verified at every lag) and kept as three
+  coefficients; the other lags stay explicit (struct fd_ctab).
+- The history of a run uses prefix moments of the source's history ring (fd_ctab_prefix, one
+  pass over the window per source and step), so a run costs the same at any length
+  (fd_ctab_hist); the cumulative kernels of the substeps read single lags (fd_ctab_value).
+- Tolerance: -fd_ctol, relative to the window envelope of each entry, default 1e-5 fd_tol
+  (1e-7); 0 keeps the full windows. FD_CT_OFF=1 in the environment does the same, for tests;
+  FD_CT_EXPLICIT=n keeps lags 1..n explicit (default 1).
+Checks (2-D in-plane, rate and state, 10 km fault of 200 m, two events; the self pair forced
+dense, which with full windows reproduces the Toeplitz run exactly):
+
+| -fd_ctol | lag data (full 4.7 MB) | second event | peak slip rate, events 1 and 2 |
+|---|---|---|---|
+| 0 (full windows) | 4.7 MB | 43.23214171 yr | 0.619, 0.679 m/s |
+| 1e-8 | 2.1 MB | 43.23214165 yr | same |
+| 1e-7 (default) | 1.5 MB | 43.23214490 yr | 0.619, 0.679 m/s |
+| 1e-6 | 1.2 MB | 43.21534208 yr | 0.620, 0.676 m/s |
+| 1e-5 | 1.6 MB (64 lags explicit) | 42.99 yr | |
+| 1e-4 | 1.4 MB (64 lags explicit) | 42.03 yr | 0.505, 0.560 m/s |
+
+The quadratic runs have zero mean residual, but their errors are coherent over many entries,
+so the tolerance has to sit far below the window criterion (which only removes values that
+are small and of one sign at the end of the tail). Keeping the first 64 lags explicit did not
+change the results, so only lag 1 stays explicit. Curved fault (300 elements, windows of 231
+lags on average): 333 MB full, 112 MB at 1e-6; the fronts of the 2-D in-plane kernels are
+square-root singular, so a band of lags around each front stays explicit; the fraction kept
+falls as the windows lengthen (the constant before the P arrival is about 40 percent of a
+far pair's window and costs one run).
+Not yet done: the spectral ring of the Toeplitz pairs is still allocated when all pairs are
+dense (N pairs of one element each for a curved fault: about 16 N L M bytes), and the pair
+structures are per segment pair (N^2 of them when every element is its own segment); both
+matter for Cascadia and come with the free-surface work (grouping elements into polyline
+segments with dense blocks).
+
+### M7 step 1: the in-plane opening kernel in C (2026-10-31)
+
+fd_kernels_open.c ports inplane_open.py: Gauss-Legendre quadrature (12 points, cubic map
+against the endpoint singularities) of the generated point field between the P and S front
+crossings, refined around receivers near the source line, and the complement identity (whole
+line = plane P wave) for receivers on the segment; tshift > 0 averages t -+ tshift as the
+prototype's tables do. The point field is generated as C by gen_inplane_open_c.py (same sympy
+expressions as gen_inplane_open.py) into fd_kernels_open_gen.c. The static field of an opening
+element will come from interact's tdd_coeff (full plane), already checked against the
+prototype's closed form to 1e-16 (free surface step 2).
+Check: bin/test_fd_open and test_fd_open.py, 200 random receivers (far, on the segment, near
+the source line), times 0.01 to 2 s: largest difference to the prototype 6e-10 of the
+largest value (run_tests.sh).
+Next (step 2): the surface segment type in the 2-D marcher (shear and opening unknowns, zero
+traction), with elements grouped into polyline segments with dense blocks (so that a curved
+fault is not N^2 pair structures, and no spectral ring is kept when all pairs are dense).
+
 ### WP7, C implementation in rsf_solve: status (2026-10-18)
 Done, each verified in the sandbox before delivery (details in
 fd_c_design.md sections 6 to 10, usage in rsf_solve_fd.md):

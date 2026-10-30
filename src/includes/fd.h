@@ -18,6 +18,7 @@ struct fd_vars {
   PetscReal vsw;		/* QD to FD switch slip rate [m/s] */
   PetscReal vback;		/* FD to QD return threshold [m/s], held for one window */
   PetscReal tol;		/* window tolerance relative to the static interaction envelope */
+  PetscReal ctol;		/* compression tolerance of dense tables (fd_plan.md D2) */
   PetscReal et;			/* collocation offset in units of dt_min (1 end of step, >1 Peirce-Siebrits) */
   PetscReal xi;			/* variable step: dt <= xi dc / V_max */
   PetscInt  kmax;		/* largest substep multiple (power of two) */

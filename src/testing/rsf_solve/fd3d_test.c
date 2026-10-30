@@ -954,6 +954,95 @@ static void tpv14_friction(struct fd3d *f, int nx, int nz, double dx, double tau
         f->tau0[i*nz + j] = tnuc;
     }
 }
+/* TPV14/15 stations (FD3D_TPV14_STATIONS="k:s:z,...": fault k = 0 main, 1 branch, s metres
+   along strike from the junction, z metres deep): the cells' values interpolated linearly
+   between cell centres (held constant beyond the first and last centres, so a station at the
+   surface takes the top row), written per step to tpv<which>_st_<k>_<s>_<z>.dat as time,
+   horizontal slip, slip rate, shear stress (MPa), normal stress (MPa, negative in compression),
+   with the signs of the SCEC files (right-lateral positive: TPV14 positive, TPV15 negative) */
+#define TPV14_MAXST 32
+struct tpv14_st {
+  int n, k[TPV14_MAXST], c[TPV14_MAXST][4];
+  double w[TPV14_MAXST][4];
+  FILE *out[TPV14_MAXST];
+};
+static void tpv14_st_weights(double u, double h, int n, int *i0, int *i1, double *w1)
+{
+  double q;
+  q = u/h - 0.5;
+  if(q <= 0.0){
+    *i0 = 0;
+    *i1 = 0;
+    *w1 = 0.0;
+  }else if(q >= n - 1){
+    *i0 = n - 1;
+    *i1 = n - 1;
+    *w1 = 0.0;
+  }else{
+    *i0 = (int)floor(q);
+    *i1 = *i0 + 1;
+    *w1 = q - *i0;
+  }
+}
+static void tpv14_st_setup(struct tpv14_st *st, int which, const int *nx, int nz, double dx, const double *x0)
+{
+  char *spec, *tok, fn[128];
+  int k, ia, ib, ja, jb;
+  double sv, zv, wi, wj;
+  st->n = 0;
+  if(!getenv("FD3D_TPV14_STATIONS"))
+    return;
+  spec = strdup(getenv("FD3D_TPV14_STATIONS"));
+  for(tok = strtok(spec, ","); tok && st->n < TPV14_MAXST; tok = strtok(NULL, ",")){
+    if(sscanf(tok, "%d:%lf:%lf", &k, &sv, &zv) != 3 || k < 0 || k > 1)
+      continue;
+    tpv14_st_weights(sv - x0[k], dx, nx[k], &ia, &ib, &wi);
+    tpv14_st_weights(zv, dx, nz, &ja, &jb, &wj);
+    st->k[st->n] = k;
+    st->c[st->n][0] = ia*nz + ja;
+    st->c[st->n][1] = ib*nz + ja;
+    st->c[st->n][2] = ia*nz + jb;
+    st->c[st->n][3] = ib*nz + jb;
+    st->w[st->n][0] = (1.0 - wi)*(1.0 - wj);
+    st->w[st->n][1] = wi*(1.0 - wj);
+    st->w[st->n][2] = (1.0 - wi)*wj;
+    st->w[st->n][3] = wi*wj;
+    sprintf(fn, "tpv%d_st_%d_%.0f_%.0f.dat", which, k, sv, zv);
+    st->out[st->n] = fopen(fn, "w");
+    if(st->out[st->n])
+      fprintf(st->out[st->n], "# t h-slip h-slip-rate h-shear-stress(MPa) n-stress(MPa); fault %d, %g m along strike, %g m deep\n", k, sv, zv);
+    st->n++;
+  }
+  free(spec);
+}
+static void tpv14_st_record(struct tpv14_st *st, double t, double sgn, struct fd3d **fa, double **slip)
+{
+  /* the marcher's slip is left-lateral positive in the drivers' frame, for either benchmark */
+  (void)sgn;
+  sgn = -1.0;
+  int u, q, c;
+  double a[4];
+  for(u = 0; u < st->n; u++){
+    if(!st->out[u])
+      continue;
+    a[0] = a[1] = a[2] = a[3] = 0.0;
+    for(q = 0; q < 4; q++){
+      c = st->c[u][q];
+      a[0] += st->w[u][q]*sgn*slip[st->k[u]][c];
+      a[1] += st->w[u][q]*sgn*fa[st->k[u]]->V[c];
+      a[2] += st->w[u][q]*sgn*fa[st->k[u]]->tau[c]/1e6;
+      a[3] += st->w[u][q]*(-fa[st->k[u]]->sigma[c])/1e6;
+    }
+    fprintf(st->out[u], "%.6e %.6e %.6e %.6e %.6e\n", t, a[0], a[1], a[2], a[3]);
+  }
+}
+static void tpv14_st_close(struct tpv14_st *st)
+{
+  int u;
+  for(u = 0; u < st->n; u++)
+    if(st->out[u])
+      fclose(st->out[u]);
+}
 /* the cross tables' lag data (all ranks) against the dense windows (gate 2) */
 static void report_multi_memory(const struct fd3d_multi *m)
 {
@@ -973,6 +1062,9 @@ static int run_tpv14(double dx, int which, double tend, double gap)
   double cL, cT, rho, dt, sgn, tau_b, x0b, tnmax, vthr;
   double *rt[2], *slip[2];
   int nxm, nxb, nz, ns, n, p, i, j, nx[2], nrup[2], nrup_beyond;
+  int nxst[2];
+  double xst[2];
+  struct tpv14_st stn;
   struct fd3d_tab *tm, *tb;
   struct fd3d *fa[2];
   struct fd3d_mplane g[2];
@@ -1029,6 +1121,11 @@ static int run_tpv14(double dx, int which, double tend, double gap)
   fprintf(stderr, "tpv%d: dx %g m, main %d x %d, branch %d x %d cells, %d steps of %.4f s, cross windows %d / %d lags\n",
           which, dx, nxm, nz, nxb, nz, ns, dt, m->c[0][1].L, m->c[1][0].L);
   tnmax = 0.0;
+  xst[0] = -16000.0;
+  xst[1] = x0b;
+  nxst[0] = nxm;
+  nxst[1] = nxb;
+  tpv14_st_setup(&stn, which, nxst, nz, dx, xst);
   for(n = 0; n < ns; n++){
     fd3d_multi_step(m, NULL);
     for(p = 0; p < 2; p++)
@@ -1037,11 +1134,13 @@ static int run_tpv14(double dx, int which, double tend, double gap)
         if(rt[p][i] < 0.0 && fabs(fa[p]->V[i]) > vthr)
           rt[p][i] = (n + 1)*dt;
       }
+    tpv14_st_record(&stn, (n + 1)*dt, sgn, fa, slip);
     /* normal traction change on the branch's first column before it slips (unclamping > 0) */
     for(j = 0; j < nz; j++)
       if(rt[1][j] < 0.0 && m->tn[1][j] > tnmax)
         tnmax = m->tn[1][j];
   }
+  tpv14_st_close(&stn);
   for(p = 0; p < 2; p++){
     nrup[p] = 0;
     for(i = 0; i < fa[p]->N; i++)
@@ -1158,6 +1257,8 @@ static int run_tpv14s(double dx, int which, double tend, double gap, int m, doub
   double th[2], O[2][3], x0f[2], ytop[2], ztop[2], dip[2], fs[2], xs0[2], *yc[2], *wy[2];
   int nxm, nxb, nz, ns, n, p, i, j, nx[2], nrup[2], nrup_beyond, nc, nxs[2], nys[2], L;
   double grade;
+  double xst[2];
+  struct tpv14_st stn;
   struct fd3d_tab *tm, *tb;
   struct fd3d *fa[2];
   struct fd3d_strips *st;
@@ -1228,6 +1329,9 @@ static int run_tpv14s(double dx, int which, double tend, double gap, int m, doub
       rt[p][i] = -1.0;
   }
   tnmax = 0.0;
+  xst[0] = -16000.0;
+  xst[1] = gap;
+  tpv14_st_setup(&stn, which, nx, nz, dx, xst);
   for(n = 0; n < ns; n++){
     fd3d_strips_step(st, NULL);                  /* returns the iterations */
     for(p = 0; p < 2; p++)
@@ -1236,10 +1340,12 @@ static int run_tpv14s(double dx, int which, double tend, double gap, int m, doub
         if(rt[p][i] < 0.0 && fabs(fa[p]->V[i]) > vthr)
           rt[p][i] = (n + 1)*dt;
       }
+    tpv14_st_record(&stn, (n + 1)*dt, sgn, fa, slip);
     for(j = 0; j < nz; j++)
       if(rt[1][j] < 0.0 && st->ly[1]->tn[j] > tnmax)
         tnmax = st->ly[1]->tn[j];
   }
+  tpv14_st_close(&stn);
   for(p = 0; p < 2; p++){
     nrup[p] = 0;
     for(i = 0; i < fa[p]->N; i++)

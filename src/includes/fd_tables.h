@@ -24,6 +24,26 @@ struct fd_segment {
   int n;		/* number of elements */
 };
 
+/* compressed dense lag tables (fd_plan.md D2): per entry the increments of lags 1..hi (the
+   window trimmed where they fall below the compression tolerance), runs of lags on a quadratic
+   kept as coefficients of 1, y, y^2 (y = l/FD_CT_LNORM), the other lags explicitly */
+#define FD_CT_LNORM 4096.0
+struct fd_crun {
+  int a, b;             /* lags a..b (1-based) */
+  double c[3];
+};
+struct fd_ctab {
+  size_t ne;
+  int *hi;              /* per entry: last lag kept (0: none) */
+  unsigned short *nm;   /* per entry: number of runs */
+  size_t *woff, *moff;  /* per entry: first explicit value in W, first run in run */
+  double *W;
+  size_t nw, nwcap;
+  struct fd_crun *run;
+  size_t nrun, nruncap;
+  size_t nlag_win;      /* statistics: lags 1..hi summed over the entries */
+};
+
 struct fd_pair {
   const struct fd_segment *src, *rcv;
   int mode, L, M, has_normal, nm;
@@ -37,6 +57,9 @@ struct fd_pair {
      static blocks; Ws_hat/Wn_hat, m, ks_row, kn_row are then unused */
   int dense;
   double *Wd_s, *Wd_n, *Kd_s, *Kd_n;
+  /* compressed dense tables (fd_plan.md D2): Wd_s, Wd_n are then NULL */
+  int compressed;
+  struct fd_ctab cs, cn;
 };
 
 /* build the table; lmax caps the window (cap_ok: accept the cap silently),
@@ -55,4 +78,20 @@ int  fd_segments_parallel(const struct fd_segment *a, const struct fd_segment *b
 struct fd_pair *fd_pair_build_dense(const struct fd_segment *src, const struct fd_segment *rcv, int mode,
                                     double dt, double et, double alpha, double beta, double rho,
                                     double tol, int lmax, int cap_ok, int M, char *errmsg);
+/* compression of the dense tables (fd_plan.md D2): ctol > 0 compresses with that tolerance
+   relative to the window's envelope of each entry; ctol <= 0 keeps the full windows */
+void fd_tables_set_compress(double ctol);
+/* lags 1..nexp of every entry stay explicit (default 1) */
+void fd_tables_set_compress_explicit(int nexp);
+double fd_tables_get_compress(void);
+/* increment of a compressed table at lag l (1-based) for entry e */
+double fd_ctab_value(const struct fd_ctab *c, size_t e, int l);
+/* bytes of the lag data of a dense pair (compressed or not) and of its full windows */
+double fd_pair_dense_bytes(const struct fd_pair *p, double *win);
+/* prefix moments of one source's history for the compressed tables: P[k][m] = sum of
+   y_l^k v(l) over lags lag0 <= l <= min(m, lav), m = 0..L; v(l) = ring + ((pos0 - l) mod Lbuf) n */
+void fd_ctab_prefix(const double *ring, int Lbuf, long pos0, int lag0, int lav, int L, int n, double *P, const double **vl);
+/* history of a compressed dense pair: out[i] += sum over source j and lags lag0..lav, receiver i
+   of nr, source of ns elements */
+void fd_ctab_hist(const struct fd_ctab *c, int nr, int ns, const double *P, const double *const *vl, int lag0, int lav, int L, double *out);
 #endif

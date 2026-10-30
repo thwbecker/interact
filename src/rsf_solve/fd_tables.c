@@ -11,6 +11,11 @@
 #include "fd_kernels.h"
 #include "fd_tables.h"
 
+static double g_ctol;
+static int g_cexp;
+static void ct_compress_pair(struct fd_pair *p, const double *xr, const double *yr, double mu, double nu);
+static void ct_free(struct fd_ctab *c);
+
 int fd_segments_parallel(const struct fd_segment *a, const struct fd_segment *b)
 {
   double tol = 1e-12;
@@ -302,6 +307,8 @@ struct fd_pair *fd_pair_build_dense(const struct fd_segment *src, const struct f
     }
   free(Ws);
   free(Wn);
+  if(g_ctol > 0.0 && !getenv("FD_CT_OFF"))
+    ct_compress_pair(p, xr, yr, mu, nu);
   free(xr);
   free(yr);
   return p;
@@ -320,6 +327,10 @@ void fd_pair_free(struct fd_pair *p)
   free(p->Wd_n);
   free(p->Kd_s);
   free(p->Kd_n);
+  if(p->compressed){
+    ct_free(&p->cs);
+    ct_free(&p->cn);
+  }
   if(!p->dense){
     fd_fft_plan_destroy(p->pf);
     fd_fft_plan_destroy(p->pb);
@@ -353,6 +364,16 @@ void fd_pair_W_dense(const struct fd_pair *p, int l1, double *Ws, double *Wn)
 {
   int i, j, k, ns = p->src->n, nr = p->rcv->n, m, idx;
   size_t np;
+  size_t e;
+  if(p->dense && p->compressed){
+    np = (size_t)ns*nr;
+    for(e = 0; e < np; e++){
+      Ws[e] = fd_ctab_value(&p->cs, e, l1);
+      if(Wn)
+        Wn[e] = p->has_normal ? fd_ctab_value(&p->cn, e, l1) : 0.0;
+    }
+    return;
+  }
   if(p->dense){
     np = (size_t)ns*nr;
     memcpy(Ws, p->Wd_s + (size_t)(l1 - 1)*np, sizeof(double)*np);
@@ -384,4 +405,366 @@ void fd_pair_W_dense(const struct fd_pair *p, int l1, double *Ws, double *Wn)
     }
   free(c);
   free(cn);
+}
+
+/* ---------------- compressed dense tables (fd_plan.md D2) ----------------
+   The dense lag tables of non-parallel pairs hold, per (receiver, source) element pair, the
+   increments W of all lags of the window. Between and after the wavefront arrivals they are
+   smooth in the lag (a constant before the P arrival, smooth between P and S, the slowly
+   decaying 2-D tail after S), so runs of lags are replaced by least-squares quadratics, each
+   verified at every lag against the full increments to ctol times the entry's envelope (the
+   normalisation of the window criterion), and the history of a run uses prefix moments of the
+   source's history ring, so its cost does not depend on the run's length. */
+static double g_ctol = 1e-7;                    /* default: 1e-5 of the default window tolerance of rsf_fd */
+
+static int g_cexp = 1;                          /* lags 1..g_cexp stay explicit (FD_CT_EXPLICIT) */
+
+void fd_tables_set_compress(double ctol)
+{
+  g_ctol = ctol;
+  if(getenv("FD_CT_EXPLICIT"))
+    g_cexp = atoi(getenv("FD_CT_EXPLICIT"));
+}
+
+void fd_tables_set_compress_explicit(int nexp)
+{
+  g_cexp = getenv("FD_CT_EXPLICIT") ? atoi(getenv("FD_CT_EXPLICIT")) : nexp;
+}
+
+double fd_tables_get_compress(void)
+{
+  return g_ctol;
+}
+
+/* least-squares quadratic through w[a..b] (index l is lag l + 1) in a local basis, converted to
+   1, y, y^2 with y = (l + 1)/FD_CT_LNORM; 0 if a point misses by more than tol */
+static int ct_fit(const double *w, int a, int b, double tol, double *cf)
+{
+  double lm, h, t, A[3][4], f, piv, al, be, y, r;
+  double e[3];
+  int l, i, j, k, ip;
+  lm = 0.5*(a + b);
+  h = 0.5*(b - a);
+  for(i = 0; i < 3; i++)
+    for(j = 0; j < 4; j++)
+      A[i][j] = 0.0;
+  for(l = a; l <= b; l++){
+    t = (l - lm)/h;
+    A[0][0] += 1.0;
+    A[0][1] += t;
+    A[0][2] += t*t;
+    A[1][2] += t*t*t;
+    A[2][2] += t*t*t*t;
+    A[0][3] += w[l];
+    A[1][3] += t*w[l];
+    A[2][3] += t*t*w[l];
+  }
+  A[1][0] = A[0][1];
+  A[1][1] = A[0][2];
+  A[2][0] = A[0][2];
+  A[2][1] = A[1][2];
+  for(k = 0; k < 3; k++){
+    ip = k;
+    for(i = k + 1; i < 3; i++)
+      if(fabs(A[i][k]) > fabs(A[ip][k]))
+        ip = i;
+    for(j = 0; j < 4; j++){
+      f = A[k][j];
+      A[k][j] = A[ip][j];
+      A[ip][j] = f;
+    }
+    piv = A[k][k];
+    if(piv == 0.0)
+      return 0;
+    for(i = k + 1; i < 3; i++){
+      f = A[i][k]/piv;
+      for(j = k; j < 4; j++)
+        A[i][j] -= f*A[k][j];
+    }
+  }
+  for(k = 2; k >= 0; k--){
+    f = A[k][3];
+    for(j = k + 1; j < 3; j++)
+      f -= A[k][j]*e[j];
+    e[k] = f/A[k][k];
+  }
+  al = FD_CT_LNORM/h;
+  be = -(lm + 1.0)/h;
+  cf[0] = e[0] + e[1]*be + e[2]*be*be;
+  cf[1] = e[1]*al + 2.0*e[2]*al*be;
+  cf[2] = e[2]*al*al;
+  for(l = a; l <= b; l++){
+    y = (l + 1)/FD_CT_LNORM;
+    r = cf[0] + cf[1]*y + cf[2]*y*y - w[l];
+    if(fabs(r) > tol)
+      return 0;
+  }
+  return 1;
+}
+
+#define FD_CT_MINRUN 6
+static void ct_init(struct fd_ctab *c, size_t ne)
+{
+  memset(c, 0, sizeof(*c));
+  c->ne = ne;
+  c->hi = (int *)calloc(ne + 1, sizeof(int));
+  c->nm = (unsigned short *)calloc(ne + 1, sizeof(unsigned short));
+  c->woff = (size_t *)calloc(ne + 1, sizeof(size_t));
+  c->moff = (size_t *)calloc(ne + 1, sizeof(size_t));
+  c->nwcap = 16*ne + 16;
+  c->W = (double *)malloc(sizeof(double)*c->nwcap);
+  c->nruncap = 2*ne + 16;
+  c->run = (struct fd_crun *)malloc(sizeof(struct fd_crun)*c->nruncap);
+}
+static void ct_free(struct fd_ctab *c)
+{
+  free(c->hi);
+  free(c->nm);
+  free(c->woff);
+  free(c->moff);
+  free(c->W);
+  free(c->run);
+  memset(c, 0, sizeof(*c));
+}
+static void ct_push_w(struct fd_ctab *c, double v)
+{
+  if(c->nw >= c->nwcap){
+    c->nwcap *= 2;
+    c->W = (double *)realloc(c->W, sizeof(double)*c->nwcap);
+  }
+  c->W[c->nw] = v;
+  c->nw++;
+}
+static void ct_push_run(struct fd_ctab *c, int a, int b, const double *cf)
+{
+  if(c->nrun >= c->nruncap){
+    c->nruncap *= 2;
+    c->run = (struct fd_crun *)realloc(c->run, sizeof(struct fd_crun)*c->nruncap);
+  }
+  c->run[c->nrun].a = a;
+  c->run[c->nrun].b = b;
+  c->run[c->nrun].c[0] = cf[0];
+  c->run[c->nrun].c[1] = cf[1];
+  c->run[c->nrun].c[2] = cf[2];
+  c->nrun++;
+}
+/* the longest run from index a (at most to hi) on one quadratic: doubling, then bisection;
+   returns its last index, or a - 1 if not even FD_CT_MINRUN lags fit */
+static int ct_longest(const double *w, int a, int hi, double tol, double *cf)
+{
+  int ok, bad, mid, len;
+  double ct[3];
+  if(a + FD_CT_MINRUN - 1 > hi || !ct_fit(w, a, a + FD_CT_MINRUN - 1, tol, cf))
+    return a - 1;
+  ok = a + FD_CT_MINRUN - 1;
+  len = FD_CT_MINRUN;
+  bad = -1;
+  while(bad < 0){
+    len *= 2;
+    mid = a + len - 1;
+    if(mid > hi)
+      mid = hi;
+    if(mid == ok)
+      break;
+    if(ct_fit(w, a, mid, tol, ct)){
+      ok = mid;
+      memcpy(cf, ct, sizeof(ct));
+      if(mid == hi)
+        break;
+    }else
+      bad = mid;
+  }
+  while(bad > ok + 1){
+    mid = (ok + bad)/2;
+    if(ct_fit(w, a, mid, tol, ct)){
+      ok = mid;
+      memcpy(cf, ct, sizeof(ct));
+    }else
+      bad = mid;
+  }
+  return ok;
+}
+/* entry e from the full window w[0..L-1] (index l is lag l + 1); tol: absolute tolerance */
+static void ct_entry(struct fd_ctab *c, size_t e, const double *w, int L, double tol)
+{
+  int hi, pos, b, n;
+  double cf[3];
+  hi = L - 1;
+  while(hi >= 0 && fabs(w[hi]) <= tol)
+    hi--;
+  c->hi[e] = hi + 1;
+  c->woff[e] = c->nw;
+  c->moff[e] = c->nrun;
+  c->nm[e] = 0;
+  if(hi < 0)
+    return;
+  c->nlag_win += (size_t)(hi + 1);
+  for(pos = 0; pos < g_cexp && pos <= hi; pos++)  /* the first lags stay explicit */
+    ct_push_w(c, w[pos]);
+  if(pos < 1)
+    pos = 1;
+  n = 0;
+  while(pos <= hi){
+    b = (n < 65535) ? ct_longest(w, pos, hi, tol, cf) : pos - 1;
+    if(b >= pos){
+      ct_push_run(c, pos + 1, b + 1, cf);
+      n++;
+      pos = b + 1;
+    }else{
+      ct_push_w(c, w[pos]);
+      pos++;
+    }
+  }
+  c->nm[e] = (unsigned short)n;
+}
+
+double fd_ctab_value(const struct fd_ctab *c, size_t e, int l)
+{
+  int k, pos, u;
+  const struct fd_crun *r;
+  double y;
+  if(l < 1 || l > c->hi[e])
+    return 0.0;
+  r = c->run + c->moff[e];
+  u = 0;
+  pos = 1;
+  for(k = 0; k < c->nm[e]; k++){
+    if(l < r[k].a)
+      return c->W[c->woff[e] + u + (l - pos)];
+    u += r[k].a - pos;
+    if(l <= r[k].b){
+      y = l/FD_CT_LNORM;
+      return r[k].c[0] + r[k].c[1]*y + r[k].c[2]*y*y;
+    }
+    pos = r[k].b + 1;
+  }
+  return c->W[c->woff[e] + u + (l - pos)];
+}
+
+/* compress a dense pair built with full windows (Wd_s, Wd_n: L x np, lag-major) */
+static void ct_compress_pair(struct fd_pair *p, const double *xr, const double *yr, double mu, double nu)
+{
+  size_t np, e;
+  int l, c, L;
+  double *w, rr, env;
+  const double *Wsrc;
+  struct fd_ctab *ct;
+  np = (size_t)p->src->n*p->rcv->n;
+  L = p->L;
+  w = (double *)malloc(sizeof(double)*(L + 1));
+  for(c = 0; c < (p->Wd_n ? 2 : 1); c++){
+    ct = c ? &p->cn : &p->cs;
+    Wsrc = c ? p->Wd_n : p->Wd_s;
+    ct_init(ct, np);
+    for(e = 0; e < np; e++){
+      rr = fmax(hypot(xr[e], yr[e]), p->src->a);
+      env = mu*p->src->dx*p->src->dx/(2.0*M_PI*(p->mode == FD_MODE_INPLANE ? (1.0 - nu) : 1.0)*rr*rr)*p->dt;
+      for(l = 0; l < L; l++)
+        w[l] = Wsrc[(size_t)l*np + e];
+      ct_entry(ct, e, w, L, g_ctol*env);
+    }
+  }
+  free(w);
+  free(p->Wd_s);
+  free(p->Wd_n);
+  p->Wd_s = NULL;
+  p->Wd_n = NULL;
+  p->compressed = 1;
+}
+
+double fd_pair_dense_bytes(const struct fd_pair *p, double *win)
+{
+  double b;
+  size_t np;
+  int c;
+  const struct fd_ctab *ct;
+  np = (size_t)p->src->n*p->rcv->n;
+  if(win)
+    *win = 8.0*(double)p->L*np*(p->has_normal ? 2 : 1);
+  if(!p->compressed)
+    return 8.0*(double)p->L*np*(p->has_normal ? 2 : 1);
+  b = 0.0;
+  for(c = 0; c < (p->has_normal ? 2 : 1); c++){
+    ct = c ? &p->cn : &p->cs;
+    b += 8.0*ct->nw + (double)sizeof(struct fd_crun)*ct->nrun + (double)ct->ne*(sizeof(int) + sizeof(unsigned short) + 2.0*sizeof(size_t));
+  }
+  return b;
+}
+
+void fd_ctab_prefix(const double *ring, int Lbuf, long pos0, int lag0, int lav, int L, int n, double *P, const double **vl)
+{
+  int l, k, j;
+  double y, yk;
+  double *Pk, *Pm;
+  const double *v;
+  if(lav > L)
+    lav = L;
+  for(l = 0; l <= L; l++)
+    vl[l] = (l >= lag0 && l <= lav) ? ring + (size_t)((pos0 - l) % Lbuf)*n : NULL;
+  for(k = 0; k < 3; k++){
+    Pk = P + (size_t)k*(L + 1)*n;
+    for(j = 0; j < n; j++)
+      Pk[j] = 0.0;
+    for(l = 1; l <= L; l++){
+      Pm = Pk + (size_t)l*n;
+      v = vl[l];
+      if(v){
+        y = l/FD_CT_LNORM;
+        yk = (k == 0) ? 1.0 : (k == 1 ? y : y*y);
+        for(j = 0; j < n; j++)
+          Pm[j] = Pm[j - n] + yk*v[j];
+      }else
+        memcpy(Pm, Pm - n, sizeof(double)*n);
+    }
+  }
+}
+
+void fd_ctab_hist(const struct fd_ctab *c, int nr, int ns, const double *P, const double *const *vl, int lag0, int lav, int L, double *out)
+{
+  int i, j, k, l, pos, hi, u, ma, mb;
+  size_t e, L1;
+  double a, b;
+  const double *w, *P0, *P1, *P2;
+  const struct fd_crun *r;
+  L1 = (size_t)L + 1;
+  P0 = P;
+  P1 = P + L1*ns;
+  P2 = P + 2*L1*ns;
+  if(lav > L)
+    lav = L;
+  for(i = 0; i < nr; i++){
+    a = 0.0;
+    for(j = 0; j < ns; j++){
+      e = (size_t)i*ns + j;
+      hi = c->hi[e];
+      if(hi < 1)
+        continue;
+      w = c->W + c->woff[e];
+      r = c->run + c->moff[e];
+      u = 0;
+      pos = 1;
+      for(k = 0; k < c->nm[e]; k++){
+        ma = r[k].a;
+        mb = r[k].b;
+        for(l = pos; l < ma; l++){
+          if(l >= lag0 && l <= lav)
+            a += w[u]*vl[l][j];
+          u++;
+        }
+        if(ma <= lav && mb >= lag0){
+          b = r[k].c[0]*(P0[(size_t)mb*ns + j] - P0[(size_t)(ma - 1)*ns + j]);
+          b += r[k].c[1]*(P1[(size_t)mb*ns + j] - P1[(size_t)(ma - 1)*ns + j]);
+          b += r[k].c[2]*(P2[(size_t)mb*ns + j] - P2[(size_t)(ma - 1)*ns + j]);
+          a += b;
+        }
+        pos = mb + 1;
+      }
+      for(l = pos; l <= hi; l++){
+        if(l >= lag0 && l <= lav)
+          a += w[u]*vl[l][j];
+        u++;
+      }
+    }
+    out[i] += a;
+  }
 }

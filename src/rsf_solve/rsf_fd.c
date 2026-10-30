@@ -19,6 +19,8 @@
     -fd_vsw <m/s>       switch threshold (default 1e-3)
     -fd_vback <m/s>     return threshold (default 1e-4)
     -fd_tol <f>         window tolerance (default 1e-2)
+    -fd_ctol <f>        compression tolerance of the dense tables of non-parallel pairs,
+                        relative to the window envelope (default 1e-5 fd_tol; 0: full windows)
     -fd_et <f>          collocation offset (default 1.0)
     -fd_xi <f>          variable-step factor (default 0.25)
     -fd_kmax <n>        largest substep multiple (default 64)
@@ -117,6 +119,8 @@ PetscErrorCode rsf_fd_setup(struct interact_ctx *par, PetscReal shear_modulus_si
   PetscCall(PetscOptionsGetReal(NULL,NULL,"-fd_vsw",&fd->vsw,NULL));
   PetscCall(PetscOptionsGetReal(NULL,NULL,"-fd_vback",&fd->vback,NULL));
   PetscCall(PetscOptionsGetReal(NULL,NULL,"-fd_tol",&fd->tol,NULL));
+  fd->ctol = 1e-5*fd->tol;
+  PetscCall(PetscOptionsGetReal(NULL,NULL,"-fd_ctol",&fd->ctol,NULL));
   PetscCall(PetscOptionsGetReal(NULL,NULL,"-fd_et",&fd->et,NULL));
   PetscCall(PetscOptionsGetReal(NULL,NULL,"-fd_xi",&fd->xi,NULL));
   PetscCall(PetscOptionsGetInt(NULL,NULL,"-fd_kmax",&fd->kmax,NULL));
@@ -2670,6 +2674,9 @@ static PetscErrorCode fd_build_tables(struct interact_ctx *par, struct fd_vars *
   struct fd_segment *im;
   struct fd_segment *re;
   struct fd_pair *p;
+  double dbytes;
+  double dwin;
+  double w1;
   PetscFunctionBeginUser;
   PetscCall(PetscMalloc5(n,&cx,n,&cy,n,&tx,n,&ty,n,&hl));
   for(i = 0;i < n;i++){
@@ -2725,6 +2732,10 @@ static PetscErrorCode fd_build_tables(struct interact_ctx *par, struct fd_vars *
   PetscCall(PetscCalloc1((size_t)fd->nsrc*fd->segs->nseg,&fd->pairs));
   fd->nbytes = 0;
   fd->L = 0;
+  fd_tables_set_compress(fd->ctol);          /* dense tables of non-parallel pairs (fd_plan.md D2) */
+  fd_tables_set_compress_explicit(1);           /* only the current-step lag stays explicit */
+  dbytes = 0.0;
+  dwin = 0.0;
   for(k = 0;k < fd->nsrc;k++)			/* source */
     for(l = 0;l < fd->segs->nseg;l++){		/* receiver */
       p = fd_pair_build(fd->srcseg + k,fd->segs->seg + l,fd->mode2d,fd->dt_min,fd->et,
@@ -2732,12 +2743,19 @@ static PetscErrorCode fd_build_tables(struct interact_ctx *par, struct fd_vars *
       PetscCheck(p,PETSC_COMM_WORLD,PETSC_ERR_SUP,"rsf_fd_setup: table for pair (%ld,%ld) failed: %s",(long)k,(long)l,err);
       fd->pairs[k*fd->segs->nseg + l] = p;
       fd->nbytes += (double)p->L*p->M*16.0*(p->has_normal ? 2 : 1);
+      if(p->dense){
+        dbytes += fd_pair_dense_bytes(p,&w1);
+        dwin += w1;
+      }
       if(p->L > fd->L)
         fd->L = p->L;
       PetscCall(PetscPrintf(PETSC_COMM_WORLD,"rsf_fd_setup: pair (%s%ld -> %ld): %d x %d elements, window %d lags (%.2f s)%s\n",
           k >= fd->segs->nseg ? "image " : "",(long)fd->src_of[k],(long)l,p->src->n,p->rcv->n,p->L,(double)(p->L*fd->dt_min),
           p->dense ? ", dense (not parallel)" : ""));
     }
+  if(dwin > 0.0)
+    PetscCall(PetscPrintf(PETSC_COMM_WORLD,"rsf_fd_setup: dense pairs: lag data %.1f MB, full windows %.1f MB (compression tolerance %g of the envelope%s)\n",
+        dbytes/1e6,dwin/1e6,(double)fd->ctol,fd->ctol > 0.0 ? "" : ", off"));
   fd->sys = fd_sys_create(fd->segs,fd->pairs,(int)fd->nsrc,fd->src_of,fd->src_rev,fd->mode2d,fd->dt_min,fd->alpha,fd->beta,fd->rho,+1);
   PetscCheck(fd->sys,PETSC_COMM_WORLD,PETSC_ERR_MEM,"rsf_fd_setup: marcher system allocation failed");
   if(fd->coarse && (fd->conv != 1) && (fd->kmax >= 2)){

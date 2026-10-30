@@ -176,6 +176,8 @@ void fd_sys_free(struct fd_sys *s)
     free(s->histr[k]);
   }
   free(s->histr);
+  free(s->ctP);
+  free(s->ctV);
   if(s->conv){
     np = s->nsrc * s->nseg;
     for(k = 0; k < np; k++){
@@ -412,7 +414,7 @@ double fd_sys_bytes(const struct fd_sys *s)
     p = s->pairs[k];
     lt = (s->conv == 1) ? (p->L < s->D ? p->L : s->D) : p->L;
     if(p->dense){
-      b += 8.0 * lt * (double)p->src->n * p->rcv->n * (p->has_normal ? 2 : 1);
+      b += fd_pair_dense_bytes(p, NULL);       /* compressed (D2) or full windows */
       continue;
     }
     b += 16.0 * lt * p->M * (p->has_normal ? 2 : 1);
@@ -626,13 +628,46 @@ void fd_sys_history(struct fd_sys *s, int lag0, double *ts, double *tn)
   long cb;
   int kk_2;
   int it;
+  int have_pref;
+  int Lp;
+  size_t need;
   memset(ts, 0, sizeof(double) * s->N);
   if(tn)
     memset(tn, 0, sizeof(double) * s->N);
   for(a = 0; a < s->nsrc; a++){          /* source */
     hk = s->hk[a];
+    have_pref = 0;
     for(b = 0; b < s->nseg; b++){        /* receiver */
       p = s->pairs[a * s->nseg + b];
+      if(p->dense && p->compressed){
+        /* compressed dense pair (fd_plan.md D2): prefix moments of the source's history, built
+           once per source and call */
+        nsr = p->src->n;
+        lmax = p->L < hk + sh ? p->L : hk + sh;
+        if(!have_pref){
+          Lp = 0;
+          for(q = 0; q < s->nseg; q++)
+            if(s->pairs[a*s->nseg + q]->L > Lp)
+              Lp = s->pairs[a*s->nseg + q]->L;
+          need = (size_t)3*(Lp + 1)*nsr;
+          if(need > s->ctP_cap){
+            free(s->ctP);
+            s->ctP = (double *)malloc(sizeof(double)*need);
+            s->ctP_cap = need;
+          }
+          if(Lp + 1 > s->ctV_cap){
+            free(s->ctV);
+            s->ctV = (const double **)malloc(sizeof(double *)*(Lp + 1));
+            s->ctV_cap = Lp + 1;
+          }
+          fd_ctab_prefix(s->histr[a], s->Lbuf, (long)hk + sh, lag0, hk + sh, Lp, nsr, s->ctP, s->ctV);
+          have_pref = 1;
+        }
+        fd_ctab_hist(&p->cs, p->rcv->n, nsr, s->ctP, s->ctV, lag0, lmax, Lp, ts + s->off[b]);
+        if(p->has_normal && tn)
+          fd_ctab_hist(&p->cn, p->rcv->n, nsr, s->ctP, s->ctV, lag0, lmax, Lp, tn + s->off[b]);
+        continue;
+      }
       if(p->dense){
         /* non-parallel pair: direct sum over the real-space ring, W[l] dense (receiver x source) */
         nr = p->rcv->n;

@@ -91,10 +91,15 @@ if command -v python3 > /dev/null 2>&1; then
   if [ $st -eq 0 ]; then echo "fd3d_test h6step, band preconditioned strip solve against LU: PASS"
   else echo "fd3d_test h6step, band preconditioned strip solve against LU: FAIL ($(cat tmp_fd_dynamic/fd3d.out))"; fail=1; fi
 fi
+# 2-D in-plane opening kernel (fd_plan.md M7 step 1) against the prototype
+if command -v python3 > /dev/null 2>&1; then
+  ( cd tmp_fd_dynamic && python3 ../fully_dynamic/test_fd_open.py ../bin/test_fd_open > fd3d.out 2>&1 )
+  tail -1 tmp_fd_dynamic/fd3d.out; grep -q PASS tmp_fd_dynamic/fd3d.out || fail=1
+fi
 # non-parallel 2-D pairs (fd_plan.md N1): dense tables against the prototype for a kinked pair
 if command -v python3 > /dev/null 2>&1; then
   for a in 30 -45; do for m in 0 1; do
-    ( cd tmp_fd_dynamic && ../bin/test_fd_dense $a $m dense_${a}_${m}.txt > /dev/null 2>&1 && \
+    ( cd tmp_fd_dynamic && FD_CT_OFF=1 ../bin/test_fd_dense $a $m dense_${a}_${m}.txt > /dev/null 2>&1 && \
       python3 ../fully_dynamic/test_fd_dense.py $a $m dense_${a}_${m}.txt > fd3d.out 2>&1 ); st=$?
     tail -1 tmp_fd_dynamic/fd3d.out; grep -q PASS tmp_fd_dynamic/fd3d.out || fail=1
   done; done

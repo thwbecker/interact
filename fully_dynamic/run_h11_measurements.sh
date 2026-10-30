@@ -14,13 +14,22 @@
 #        alone at 500 m against the mirror plus opening layer
 #     b  the band preconditioned strip solve against the dense LU where it is chosen (TPV14,
 #        1 km faults, strips of 333 m graded to +-15 km, 3 s; several GB)
+#     r  resolution ladder against the SCEC stations: TPV14 (mirror) at 1000, 750, 500, 375 and
+#        250 m over 12 s with the on-fault stations at 2 km along strike on the main fault and the
+#        branch (surface); compared with the SCEC files in [scec dir] if given (files named
+#        faultst020dp000* and branchst020dp000*, HTML as saved from the web site is fine)
 #   max ranks: largest number of MPI ranks (default 16)
 #   mpirun command: default "mpirun"
 #   output dir: default h11_out
+#   scec dir: directory with SCEC station files (optional, for part r)
+#   r ladder: cell sizes of part r (default "1000 750 500 375 250"; 200 or 150 m need much more
+#     memory, see the m part for the trend)
 parts=${1-"t m s g b"}
 nmax=${2-16}
 mpi=${3-mpirun}
 out=${4-h11_out}
+scec=${5-}
+ladder=${6-"1000 750 500 375 250"}
 bin=`pwd`/bin/fd3d_test
 d=`pwd`/src/testing/rsf_solve
 mkdir -p $out
@@ -75,10 +84,10 @@ for p in $parts; do
     mkdir -p $out/g && cd $out/g
     for dx in 750 500; do
       mkdir -p tpv14s_$dx && cd tpv14s_$dx
-      r=`peak env FD3D_TPV14S_GRADE=1.3 FD_STRIPS_DIAG=1 $bin tpv14s $dx 14 10 0 1 90 15000 > run.log 2>&1; tail -1 run.log`
+      r=`peak env FD3D_TPV14_STATIONS=0:2000:0,1:2000:0 FD3D_TPV14S_GRADE=1.3 FD_STRIPS_DIAG=1 $bin tpv14s $dx 14 10 0 1 90 15000 > run.log 2>&1; tail -1 run.log`
       echo "g: `grep '^tpv14s: dx' run.log | tail -1` ($r)" >> $sum
       mkdir -p ../tpv14_$dx && cd ../tpv14_$dx
-      $bin tpv14 $dx 14 10 > run.log 2>&1
+      env FD3D_TPV14_STATIONS=0:2000:0,1:2000:0 $bin tpv14 $dx 14 10 > run.log 2>&1
       echo "g: mirror: `tail -1 run.log`" >> $sum
       python3 - ../tpv14_$dx/tpv14_rt_%s.dat ../tpv14s_$dx/tpv14s_rt_%s.dat >> $sum << 'PYEOF'
 import sys, math
@@ -100,6 +109,33 @@ PYEOF
     for sv in bj lu; do
       r=`peak env FD_STRIPS_SOLVER=$sv FD_STRIPS_DIAG=1 FD3D_TPV14S_GRADE=1.3 $bin tpv14s 1000 14 3 0 3 90 15000 > $sv.log 2>&1; tail -1 $sv.log`
       echo "b: solver $sv: `grep 'GMRES iterations' $sv.log` ($r)" >> $sum
+    done
+    cd - > /dev/null
+    ;;
+  r)
+    if [ -n "$scec" ]; then
+      scec=`cd $scec && pwd`
+    fi
+    mkdir -p $out/r && cd $out/r
+    for dx in $ladder; do
+      mkdir -p dx$dx && cd dx$dx
+      r=`peak env FD3D_TPV14_STATIONS=0:2000:0,1:2000:0 $bin tpv14 $dx 14 12 > run.log 2>&1; tail -1 run.log`
+      echo "r: `grep '^tpv14: dx' run.log | tail -1 | cut -c1-120` ($r)" >> $sum
+      for st in 0 1; do
+        if [ $st -eq 0 ]; then nm=faultst020dp000; else nm=branchst020dp000; fi
+        ref=`ls $scec/${nm}* 2> /dev/null | head -1`
+        if [ -n "$ref" ] && [ -s tpv14_st_${st}_2000_0.dat ]; then
+          python3 $d/tpv14_stcmp.py "$ref" tpv14_st_${st}_2000_0.dat | sed "s/^/r: $dx m: /" >> $sum
+        elif [ -s tpv14_st_${st}_2000_0.dat ]; then
+          python3 - tpv14_st_${st}_2000_0.dat >> $sum << 'PYEOF'
+import sys, numpy as np
+d = np.loadtxt(sys.argv[1], comments='#')
+i = np.argmax(np.abs(d[:, 2]) > 1e-3)
+print(f"r:   {sys.argv[1]}: rupture {d[i, 0]:.2f} s, peak rate {np.abs(d[:, 2]).max():.2f} m/s, final slip {d[-1, 1]:.2f} m")
+PYEOF
+        fi
+      done
+      cd ..
     done
     cd - > /dev/null
     ;;

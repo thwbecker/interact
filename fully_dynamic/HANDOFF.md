@@ -100,6 +100,13 @@ for large strip sets (H8).
    order of the fault depth (graded rows); the mirror image alone makes the
    rupture reach the top 3 km about 0.5 s late at 1 km (TPV14 main fault),
    so it is not a reference for near-surface comparisons.
+1e. 2-D in-plane free surface (M7): D2 (compressed dense tables) and step 1
+   (opening kernel in C) done; next step 2, the surface segment type.
+1d. Stock-taking (fd_plan.md, 2026-10-30): 3-D half-space options (shared
+   graded surface patch with compression, or a volume method near the
+   surface) to be decided from the H11 numbers; 2-D in-plane with a free
+   surface (M7) for megathrust cycles: plan of four steps, starting with the
+   C port of the in-plane opening kernel.
 1c. H11, measurements on a multi-core machine:
    fully_dynamic/run_h11_measurements.sh (regression, memory of the
    partitioned tables at 1000 to 250 m, MPI speed-up at 500 m, graded strips
