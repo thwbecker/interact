@@ -1050,6 +1050,7 @@ static PetscErrorCode fd3d_setup_multi(struct interact_ctx *par, struct fd_vars 
   Mat *subs = NULL;
   Mat *subn = NULL;
   double sums[6];
+  double mm[2];
   PetscMPIInt sz;
   PetscFunctionBeginUser;
   strips = 0;
@@ -1209,6 +1210,9 @@ static PetscErrorCode fd3d_setup_multi(struct interact_ctx *par, struct fd_vars 
   } else
     fd->multi3 = fd3d_multi_create(np,fp,geom);
   PetscCheck(fd->multi3,PETSC_COMM_WORLD,PETSC_ERR_SUP,"rsf_fd_setup: several 3-D planes: setup failed");
+  mm[0] = fd3d_multi_memory(fd->multi3,&mm[1]);
+  PetscCallMPI(MPI_Allreduce(MPI_IN_PLACE,mm,2,MPI_DOUBLE,MPI_SUM,PETSC_COMM_WORLD));
+  PetscCall(PetscPrintf(PETSC_COMM_WORLD,"rsf_fd_setup: cross tables between the planes: lag data %.1f MB (dense windows %.1f MB)\n",mm[0]/1e6,mm[1]/1e6));
   fd->multi3->static_fn = fd3d_multi_static_is;
   fd->multi3->static_ctx = (void *)par;
   fd->multi3->normal_coupling = rsf->calc_sigma_dot ? 1 : 0;

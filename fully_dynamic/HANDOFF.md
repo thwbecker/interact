@@ -1,8 +1,9 @@
 # Hand-off: fully dynamic extension of rsf_solve
 
-Updated 2026-10-29 (H7) so that the work can be resumed in a new session or
-on another machine. The record of every step, with numbers, is `fd_plan.md`
-(the sections G1 to H7 near its end describe the most recent work); user-facing
+Updated 2026-10-29 (H7, D1, H8) so that the work can be resumed in a new
+session or on another machine. The record of every step, with numbers, is
+`fd_plan.md` (the sections G1 to H10 near its end describe the most recent
+work); user-facing
 documentation is in `../rsf_solve_fd.md`; design notes of the C code in
 `fd_c_design.md`; the sandbox build recipe in `c_port/SANDBOX.md`.
 
@@ -73,6 +74,10 @@ the compiler, the flags or a reorganisation of the code (fused multiply-add);
   the strip checks; `h6strike` refuses such set-ups.
 - C style of the code: declarations at the top of each routine, one
   statement per line, loops on separate lines.
+- Dense lag tables are partitioned (D1, default on): changes to how they
+  are built must keep the per-entry verification against the full
+  increments; FD3D_DP=0 gives the unpartitioned reference, and
+  src/testing/rsf_solve/fd3d_dumpdiff.py compares exact dumps.
 - MPI: every 3-D path splits its tables over the ranks; the dense couplings
   by receiver rows (H7). A receiver row is always computed whole on its
   owner and the results are gathered, so results do not depend on the
@@ -82,14 +87,28 @@ the compiler, the flags or a reorganisation of the code (fused multiply-add);
 - Patches: every change is delivered as a `git apply --index` patch against
   the current GitHub master.
 
-## 5. What to do next (fd_plan.md, H6 step 6 and H7)
+## 5. What to do next (fd_plan.md, H7, D1, H8)
 
-Done in H7: MPI for the dense couplings and the strip solve.
-1. Domain partitioning of the dense histories (cubic between the P and S
-   strips, gate 2), checked against the windowed tables; it must keep the
-   own-rows rule of H7.
-2. Speed-up measurements on a multi-core machine (the sandbox has one core).
-3. TPV14/15 at 250 m, then 100 m.
+Done: MPI for the dense couplings and the strip solve (H7); domain
+partitioning of the dense lag tables (D1); band block-Jacobi preconditioner
+for large strip sets (H8).
+1. Faults that meet in a half space (H9): corners behave like separated
+   faults; branches from the middle of a trace converge poorly in shear at
+   the junction cell. Next: the gap rule for the strip path, a TPV14-like
+   dipping branch in rsf_solve.
+1b. Free surface for deep faults (H10): surface strips need bands of the
+   order of the fault depth (graded rows); the mirror image alone makes the
+   rupture reach the top 3 km about 0.5 s late at 1 km (TPV14 main fault),
+   so it is not a reference for near-surface comparisons.
+1c. H11, measurements on a multi-core machine:
+   fully_dynamic/run_h11_measurements.sh (regression, memory of the
+   partitioned tables at 1000 to 250 m, MPI speed-up at 500 m, graded strips
+   at 750 and 500 m, the band preconditioned strip solve); its summary.txt
+   is what the next session needs.
+2. Memory and speed-up measurements on a multi-core machine: D1 at 500 and
+   250 m, H7 scaling, H8 above 6000 strip unknowns (the sandbox has one core).
+3. Benchmarks: TPV14/15 at 250 m, TPV22/23 (needs forced nucleation),
+   TPV10 and TPV36/37 at 250 m, TPV102.
 
 ## 6. Known weak points
 

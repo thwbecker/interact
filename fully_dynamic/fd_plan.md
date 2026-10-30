@@ -2659,6 +2659,165 @@ evaluated on every rank, so the assembly does not get faster with more ranks; th
 layers' own Toeplitz tables follow the wavenumber split of S3. Speed-ups need a multi-core
 machine. Next: gate 2 (domain partitioning of the dense histories), then TPV14/15 at 250 m.
 
+### D1: domain partitioning of the dense lag tables (gate 2 in the code, 2026-10-29)
+
+What changed (fd3d.c):
+- The several-plane cross tables (fd3d_mpair) now use the compressed table structure of the
+  strips (fd3d_dtab), one for shear and one for normal traction; Ks, Kn, K1s, K1n point into
+  them, so the H7 row ownership and the static gate are unchanged.
+- Per entry the increments minus the static slope (W) are trimmed at both ends where they fall
+  below FD3D_DP_TOL of the entry's largest value (after the S strip they are round-off of a
+  vanishing difference; before this change every window ran to the full L for that reason).
+- Runs of at least 6 lags whose third differences vanish (to FD3D_DP_TOL) lie on one quadratic:
+  the constant -ks dt before the first arrival and the stretch between the P and the S strip
+  of each source and of its image. Up to 8 runs per entry are fitted (least squares in a local
+  basis, converted to y = l/1024), each verified point by point against W to FD3D_DP_TOL of the
+  entry's largest value, and kept as three coefficients; the other lags stay explicit.
+- The history of a run uses prefix moments of the source's slip-rate history (sums of y^k v,
+  k = 0, 1, 2, one pass over L lags per source vector and step; dpref_build), so its cost per
+  entry does not depend on its length (dtab_hist). Each row is still computed whole on its
+  owner (H7).
+- FD3D_DP=0 keeps all lags (the windows, trimmed only at exact zeros); FD3D_DP_TOL (default
+  1e-10); FD3D_DP_DIAG=1 prints the statistics per pair.
+Checks (same code, partitioned against FD3D_DP=0, exact dumps compared):
+- TPV14 at 1 km, 10 s: largest relative difference 1.7e-9 (slip rate), rupture times identical,
+  main fault 97 % and branch 97 % ruptured in both; TPV15: 1.2e-11, outcome identical (57 % /
+  100 %); several planes (bend with images, split, rotated dip slip), one surface, strips
+  (h6step): 1e-14 to 1e-11.
+- 1, 2 and 4 ranks identical byte for byte: several planes with images, one surface, strips
+  (h6step), TPV14 at 1 km.
+Memory of the TPV14 cross tables (both directions, shear and normal):
+
+| dx | all L lags (before) | windows trimmed | partitioned | lags kept |
+|---|---|---|---|---|
+| 1 km | 337 MB | 129 MB | 93 MB | 46 % |
+| 750 m | about 1.3 GB | 554 MB | 342 MB | 39 % |
+
+The fraction of lags kept falls with the cell size, as gate 2 predicts (the strips keep 3 to 5
+lags each, the runs between them grow as 1/dx); with images an entry has four strips (P and S
+of the source and of the image), which sets the floor at coarse resolution. The fixed cost per
+entry (static and first lag, offsets) is about 40 bytes. Not yet measured: 500 m and 250 m.
+
+### H8: band block-Jacobi preconditioner for the strip solve (2026-10-29)
+
+The first-lag operator of a strip couples only cells within reach of one step (3 cells at
+dx/3), so a strip's own operator over its active cells, masks included, is a band matrix with
+the unknowns ordered along strike, across, component. strips_bj_setup probes it with
+3 (2R + 1)^2 applications of surf_A (unit vectors on cells 2R + 1 apart; R from one probe at
+the strip's centre) and factorises it with dgbtrf; GMRES (the existing solver) handles the
+coupling between strips with this block-Jacobi preconditioner. Choice: dense LU up to 6000
+active unknowns, above that the band preconditioner; FD_STRIPS_SOLVER=lu|circ|bj overrides
+(circ: the circulant preconditioner, as FD_STRIPS_GMRES=1 before); FD_STRIPS_DIAG=1 prints the
+band sizes and iterations. All ranks probe and factorise identically.
+Checks: h6step with the strips rotated by 37 degrees, slip weakening, 12 steps: LU, circulant
+and band preconditioners agree to 1e-13 in V and strip rates; 7.4 GMRES iterations per solve
+(band) against 7.9 (circulant); h6strike at -30 degrees (strips of different strikes, cells
+dx/3): 5.1 against 5.4 iterations. The 355 iterations per step reported in H6 for oblique
+cuts did not recur with the present masks, so this test set does not separate the two
+preconditioners; the band version is kept because its cost is known (memory 8 (3 kl + 1) n,
+kl about 3 (R + 1) nys) and it represents the masks exactly. Not yet run: a strip set above
+6000 unknowns in the sandbox.
+
+### H9: faults that meet in a half space, first tests with strips (2026-10-30)
+
+fd3d_test h6strike with FD3D_H6_JUNCTION=1 starts fault 1 at the end of fault 0's trace (a
+corner, a bend in map view), =2 at the middle of fault 0's trace (a branch); the refusal of
+faults closer than 1.5 cells is lifted for these runs. Faults of 4 x 2 cells of 1 km, dips 60
+and 75 degrees, prescribed slip for 5 steps, 12 steps; the numbers are the largest differences
+of the fault tractions between strip resolutions, relative to the largest change of the
+traction (H6 step 4 measure), with the separated faults of H6 (3 km apart) for comparison:
+
+| geometry, turn | dx/3 against dx/4: shear, normal | dx/4 against dx/6: shear, normal |
+|---|---|---|
+| separated, -30 (H6) | 4.3 %, 21 % | 1.5 %, 4.0 % |
+| corner, -30 | 5.3 %, 27 % | 3.2 %, 5.5 % |
+| corner, +30 | 5.0 %, 23 % | |
+| corner, 0 (dip change only) | 4.8 %, 20 % | |
+| branch, +30 | 9.6 %, 15 % | 7.8 %, 6.3 % |
+| branch, -30 (cells 180 m apart at depth) | 12 %, 23 % | |
+
+Corners run stably and converge, a little more slowly than separated faults, with the largest
+differences in the two cells at the corner. Branches converge in normal traction but hardly in
+shear; the largest difference is always the branch's first cell at the junction, so refining
+the surface strips alone does not resolve it (the fault cells stay 1 km). The -30 degree branch
+puts the two planes within 180 m of each other at depth, close to intersecting faults. With
+the partitioned tables (D1) the dx/6 runs need 2.1 GB (before D1 they did not fit in 4 GB).
+Gap rule (FD3D_H6_GAP=<m>: the branch starts that far along its strike from the junction),
+branch +30 degrees:
+
+| gap | dx/3 against dx/4: shear, normal | dx/4 against dx/6: shear, normal |
+|---|---|---|
+| 0 | 9.6 %, 15 % | 7.8 %, 6.3 % |
+| 500 m | 15 %, 18 % | 4.5 %, 8.5 % |
+| 1000 m | 9.9 %, 25 % | |
+
+With a gap of half a cell the coarse pair differs more, but the differences then fall by 3.4
+in shear (against 1.2 without a gap), so the touching junction cell, not the strips near the
+branch's trace, is what stops convergence; the largest differences remain in the branch's
+first cells. Next: a TPV14-like dipping branch in rsf_solve with the gap rule, and a third
+strip resolution for the gapped branch (dx/8 needs a larger machine).
+
+### H10: surface strips and images for a 15 km deep vertical fault (TPV14), 2026-10-30
+
+fd3d_test tpv14s dx [14|15] [tend] [gap] [m] [branch dip] [band] runs TPV14/15 with both faults
+in a whole space and the free surface as surface strips (cells dx/m, rows +-band about each
+trace, graded by FD3D_TPV14S_GRADE, 1.5 km beyond the fault ends); fd3d_test tpv14one dx [tend]
+[m] [band] runs the main fault alone three ways: mirror image alone (the G3a treatment),
+virtual surface (one strip, as above), and as reference the mirror plus an opening layer of 1 km
+cells over +-20 km (the exact free-surface treatment for vertical strike slip, step A2; its
+normal coupling is not implemented, the others couple the normal traction).
+
+Correction to the first reading of these runs: the mirror image is not exact in 3-D (it leaves
+the normal traction on the surface; fd_plan.md, free surface in 3-D), so it is not a reference.
+Main fault alone, 1 km, 10 s, against the mirror plus opening layer (top-row mean slip 3.94 m):
+
+| treatment | rupture time rms | top 3 km mean offset | top-row mean slip |
+|---|---|---|---|
+| mirror alone (G3a) | 0.28 s | +0.49 s (late) | 3.89 m |
+| virtual surface dx/1, +-2.5 km | 0.33 s | +0.61 s | 3.00 m |
+| dx/1, +-5 km | 0.18 s | +0.20 s | 3.47 m |
+| dx/1, +-7.5 km | 0.07 s | +0.09 s | 3.67 m |
+| dx/1, +-15 km, rows graded 1.3 | 0.08 s | -0.01 s | 3.71 m |
+| dx/2, +-15 km, graded 1.3 | 0.08 s | -0.02 s | 3.78 m |
+| dx/1, +-20 km, graded 1.2 | 0.07 s | +0.03 s | 3.74 m |
+
+Findings: (1) the virtual surface converges to the reference as the band reaches the fault's
+depth; with rows graded away from the trace a +-15 to 20 km band costs 14 to 18 rows; the
+remaining 4 to 6 % in top-row slip falls with finer cells (dx/2). (2) The mirror alone makes
+the rupture reach the top 3 km about 0.5 s late at 1 km (3.5 steps), with nearly the right
+slip; this affects the TPV14/15 runs of G2, G3a and H7 to H9 near the surface, which used the
+mirror. (3) Bands of +-2 to 2.5 km, adequate for the 2 km deep faults of H2 to H9, are far too
+narrow for seismogenic depths. TPV14 with two strips (graded +-15 km at dx/1, 258 MB dense
+couplings at 1 km) ruptures 98 / 96 / 98 % (main, beyond the junction, branch), the mirror
+97 / 93 / 97 %; the difference of the rupture times to the mirror (rms 0.28 s, near surface
+0.6 s earlier) is the mirror's error measured above.
+Further checks (1 km, 10 s, graded +-15 km, grade 1.3):
+- Normal coupling: the virtual surface without normal coupling (as the reference) gives the
+  same numbers to the printed digits (rms 0.080 s, offset -0.014 s, slip 3.707 m), so the
+  reference's missing normal coupling does not matter for this vertical fault.
+- TPV14, strips dx/2 (1084 MB dense couplings) against dx/1 (258 MB): 99 / 97 / 98 % against
+  98 / 96 / 98 %; rupture time rms 0.09 s on both faults, largest 0.43 s; slip within 1.3 m of
+  4.9 m at the worst cell.
+- TPV14 with the branch dipping 60 degrees away from the main fault (cell centres 509 m apart
+  at the junction): main fault 100 % (beyond the junction 100 %), branch 4 % at dx/1 and 2 % at
+  dx/2 (rupture time rms 0.08 s on the main fault between the two), unclamping of the branch's
+  first column 7.4 MPa. With the benchmark's prestress on the branch (prescribed per fault, not
+  resolved from a stress tensor), rupture does not take the dipping branch within 10 s.
+Next: a finer fault (750 m, 500 m) on a larger machine; one shared graded surface patch
+against one strip per fault for several faults. For a system of 4 to 5 faults, bands of the seismogenic depth cover most of the region
+around the faults, so one shared graded surface patch may cost less than one strip per fault
+(the dense strip to strip couplings grow with the square of the strip cells).
+
+### H11: measurements on a multi-core machine (to be run)
+
+fully_dynamic/run_h11_measurements.sh [parts] [max ranks] [mpirun command] [output dir] runs,
+from the repository root: t, run_tests.sh; m, the partitioned TPV14 cross tables at 1000, 750,
+500 and 250 m (lag data, lags kept, peak memory); s, TPV14 at 500 m for 2 s on 1, 2, 4, ...
+ranks (wall time, final states compared byte for byte); g, TPV14 with graded strips (+-15 km,
+1.3) at 750 and 500 m against the mirror, and the main fault alone at 500 m against the mirror
+plus opening layer; b, the band preconditioned strip solve against the dense LU (TPV14 at 1 km,
+strips dx/3). Each part appends to summary.txt in the output directory.
+
 ### WP7, C implementation in rsf_solve: status (2026-10-18)
 Done, each verified in the sandbox before delivery (details in
 fd_c_design.md sections 6 to 10, usage in rsf_solve_fd.md):

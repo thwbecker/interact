@@ -954,6 +954,20 @@ static void tpv14_friction(struct fd3d *f, int nx, int nz, double dx, double tau
         f->tau0[i*nz + j] = tnuc;
     }
 }
+/* the cross tables' lag data (all ranks) against the dense windows (gate 2) */
+static void report_multi_memory(const struct fd3d_multi *m)
+{
+  double mm[2];
+  int rank;
+  mm[0] = fd3d_multi_memory(m, &mm[1]);
+  rank = 0;
+#ifdef FD3D_MPI
+  MPI_Allreduce(MPI_IN_PLACE, mm, 2, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+#endif
+  if(rank == 0)
+    printf("cross tables: lag data %.1f MB, dense windows %.1f MB (partitioned: %s)\n", mm[0]/1e6, mm[1]/1e6, getenv("FD3D_DP") && !atoi(getenv("FD3D_DP")) ? "no" : "yes");
+}
 static int run_tpv14(double dx, int which, double tend, double gap)
 {
   double cL, cT, rho, dt, sgn, tau_b, x0b, tnmax, vthr;
@@ -1002,6 +1016,7 @@ static int run_tpv14(double dx, int which, double tend, double gap)
     fprintf(stderr, "tpv14: setup failed\n");
     return 1;
   }
+  report_multi_memory(m);
   m->normal_coupling = 1;
   for(p = 0; p < 2; p++){
     rt[p] = malloc(sizeof(double)*fa[p]->N);
@@ -1062,6 +1077,350 @@ static int run_tpv14(double dx, int which, double tend, double gap)
     fd3d_free(fa[p]);
   fd3d_tab_free(tm);
   fd3d_tab_free(tb);
+  return 0;
+}
+
+/* rows of a strip, symmetric about the trace: width hs at the trace, each further row grade
+   times wider (grade 1: uniform), until band is reached on either side */
+static void tpv14s_rows(double hs, double band, double grade, int *ny, double **yc, double **wy)
+{
+  int nh, i;
+  double w, y;
+  nh = 0;
+  w = hs;
+  y = 0.0;
+  while(y < band - 1e-6){
+    y += w;
+    w *= grade;
+    nh++;
+  }
+  *ny = 2*nh;
+  *yc = malloc(sizeof(double)*2*nh);
+  *wy = malloc(sizeof(double)*2*nh);
+  w = hs;
+  y = 0.0;
+  for(i = 0; i < nh; i++){
+    (*wy)[nh + i] = w;
+    (*yc)[nh + i] = y + 0.5*w;
+    (*wy)[nh - 1 - i] = w;
+    (*yc)[nh - 1 - i] = -(y + 0.5*w);
+    y += w;
+    w *= grade;
+  }
+}
+/* smallest distance between the cell centres of the two faults (strike th from x, dipping
+   towards the local -y side, cells from O along strike) */
+static double tpv14s_dmin(const int *nx, int nz, double dx, const double *th, const double (*O)[3], const double *dip)
+{
+  int p, i, j, i2, j2;
+  double c[2][3], d, dmin, a, dp, x[3];
+  double *xc[2];
+  dmin = 1e30;
+  for(p = 0; p < 2; p++){
+    xc[p] = malloc(sizeof(double)*3*nx[p]*nz);
+    a = th[p]*M_PI/180.0;
+    dp = dip[p]*M_PI/180.0;
+    for(i = 0; i < nx[p]; i++)
+      for(j = 0; j < nz; j++){
+        x[0] = O[p][0] + (i + 0.5)*dx*cos(a) + (j + 0.5)*dx*cos(dp)*sin(a);
+        x[1] = O[p][1] + (i + 0.5)*dx*sin(a) - (j + 0.5)*dx*cos(dp)*cos(a);
+        x[2] = -(j + 0.5)*dx*sin(dp);
+        xc[p][3*(i*nz + j)] = x[0];
+        xc[p][3*(i*nz + j) + 1] = x[1];
+        xc[p][3*(i*nz + j) + 2] = x[2];
+      }
+  }
+  for(i = 0; i < nx[0]*nz; i++)
+    for(j = 0; j < nx[1]*nz; j++){
+      for(i2 = 0; i2 < 3; i2++){
+        c[0][i2] = xc[0][3*i + i2];
+        c[1][i2] = xc[1][3*j + i2];
+      }
+      d = 0.0;
+      for(j2 = 0; j2 < 3; j2++)
+        d += (c[0][j2] - c[1][j2])*(c[0][j2] - c[1][j2]);
+      if(sqrt(d) < dmin)
+        dmin = sqrt(d);
+    }
+  free(xc[0]);
+  free(xc[1]);
+  return dmin;
+}
+/* TPV14/15 with the free surface represented by surface strips (fd_plan.md H6, H10) instead of
+   images: both faults in a whole space, each with a strip of cells dx/m reaching band metres to
+   either side of its trace and 1.5 km beyond its ends, partitioned by the nearest trace. With
+   dipb = 90 the problem is the benchmark itself, for which the images are exact, so the
+   rupture times test the strips; dipb < 90 dips the branch (towards its local -y side). */
+static int run_tpv14s(double dx, int which, double tend, double gap, int m, double dipb, double band)
+{
+  double cL, cT, rho, dt, sgn, tau_b, tnmax, vthr, hs, rmax;
+  double *rt[2], *slip[2];
+  double th[2], O[2][3], x0f[2], ytop[2], ztop[2], dip[2], fs[2], xs0[2], *yc[2], *wy[2];
+  int nxm, nxb, nz, ns, n, p, i, j, nx[2], nrup[2], nrup_beyond, nc, nxs[2], nys[2], L;
+  double grade;
+  struct fd3d_tab *tm, *tb;
+  struct fd3d *fa[2];
+  struct fd3d_strips *st;
+  FILE *out;
+  char fn[64];
+
+  cL = 6000.0;
+  cT = 3464.0;
+  rho = 2670.0;
+  dt = 0.5*dx/cT;
+  ns = (int)(tend/dt + 0.5);
+  nz = (int)(15000.0/dx + 0.5);
+  nxm = (int)(28000.0/dx + 0.5);
+  nxb = (int)((12000.0 - gap)/dx + 0.5);
+  nx[0] = nxm;
+  nx[1] = nxb;
+  sgn = (which == 15) ? 1.0 : -1.0;
+  tau_b = (which == 15) ? 78e6 : 70e6;
+  vthr = 1e-3;
+  tm = fd3d_tab_create_c(nxm, nz, dx, dt, cL, cT, rho, 0, 1);
+  tb = fd3d_tab_create_c(nxb, nz, dx, dt, cL, cT, rho, 0, 1);
+  fa[0] = fd3d_create(tm);
+  fa[1] = fd3d_create(tb);
+  tpv14_friction(fa[0], nxm, nz, dx, sgn*70e6, sgn*81.6e6, -16000.0);
+  tpv14_friction(fa[1], nxb, nz, dx, sgn*tau_b, 0.0, 0.0);
+  /* strips: cells hs, rows +-band about the trace, 1.5 km beyond the fault ends */
+  hs = dx/m;
+  nc = (int)ceil(1500.0/hs - 1e-9);
+  grade = getenv("FD3D_TPV14S_GRADE") ? atof(getenv("FD3D_TPV14S_GRADE")) : 1.0;
+  th[0] = 0.0;
+  th[1] = -30.0;
+  for(i = 0; i < 3; i++){
+    O[0][i] = 0.0;
+    O[1][i] = 0.0;
+  }
+  O[0][0] = -16000.0;
+  O[1][0] = gap*cos(-30.0*M_PI/180.0);
+  O[1][1] = gap*sin(-30.0*M_PI/180.0);
+  dip[0] = 90.0;
+  dip[1] = dipb;
+  for(p = 0; p < 2; p++){
+    x0f[p] = 0.0;
+    ytop[p] = 0.0;
+    ztop[p] = 0.0;
+    fs[p] = 1.0;
+    xs0[p] = -nc*hs;
+    nxs[p] = (int)floor(nx[p]*dx/hs + 0.5) + 2*nc;
+    tpv14s_rows(hs, band, grade, &nys[p], &yc[p], &wy[p]);
+  }
+  /* lags: the S wave across the whole configuration */
+  rmax = sqrt(pow(28000.0 + 2*1500.0, 2) + pow(15000.0, 2) + pow(12000.0, 2));
+  L = (int)(rmax/cT/dt) + 10;
+  st = fd3d_strips_create(2, fa, th, (const double (*)[3])O, x0f, ytop, ztop, dip, fs, 1, m, nxs, nys, xs0, (const double **)yc, (const double **)wy, L);
+  if(!st){
+    fprintf(stderr, "tpv14s: setup failed\n");
+    return 1;
+  }
+  for(p = 0; p < 2; p++)
+    for(i = 0; i < fa[p]->N; i++)
+      st->ly[p]->sig0[i] = 120e6;
+  fprintf(stderr, "tpv%ds: smallest distance between cell centres of the two faults %.0f m\n", which, tpv14s_dmin(nx, nz, dx, th, O, dip));
+  fprintf(stderr, "tpv%ds: dx %g m, strips dx/%d, band %g m (grade %g), branch dip %g, gap %g m, %d steps of %.4f s, L %d, strips %d x %d and %d x %d, dense couplings %.0f MB\n",
+          which, dx, m, band, grade, dipb, gap, ns, dt, L, nxs[0], nys[0], nxs[1], nys[1], fd3d_strips_memory(st)/1e6);
+  for(p = 0; p < 2; p++){
+    rt[p] = malloc(sizeof(double)*fa[p]->N);
+    slip[p] = calloc(fa[p]->N, sizeof(double));
+    for(i = 0; i < fa[p]->N; i++)
+      rt[p][i] = -1.0;
+  }
+  tnmax = 0.0;
+  for(n = 0; n < ns; n++){
+    fd3d_strips_step(st, NULL);                  /* returns the iterations */
+    for(p = 0; p < 2; p++)
+      for(i = 0; i < fa[p]->N; i++){
+        slip[p][i] += fa[p]->V[i]*dt;
+        if(rt[p][i] < 0.0 && fabs(fa[p]->V[i]) > vthr)
+          rt[p][i] = (n + 1)*dt;
+      }
+    for(j = 0; j < nz; j++)
+      if(rt[1][j] < 0.0 && st->ly[1]->tn[j] > tnmax)
+        tnmax = st->ly[1]->tn[j];
+  }
+  for(p = 0; p < 2; p++){
+    nrup[p] = 0;
+    for(i = 0; i < fa[p]->N; i++)
+      if(rt[p][i] >= 0.0)
+        nrup[p]++;
+  }
+  nrup_beyond = 0;
+  for(i = 0; i < fa[0]->N; i++)
+    if(rt[0][i] >= 0.0 && (-16000.0 + (i/nz + 0.5)*dx) > 0.0)
+      nrup_beyond++;
+  printf("tpv%ds: dx %g m, strips dx/%d, branch dip %g, gap %g m, %g s: main fault ruptured %.0f %% (beyond the junction %.0f %%), branch %.0f %%; largest unclamping of the branch's first column before it slips %.2f MPa\n",
+         which, dx, m, dipb, gap, tend, 100.0*nrup[0]/fa[0]->N, 100.0*nrup_beyond/(double)((nxm - (int)(16000.0/dx + 0.5))*nz),
+         100.0*nrup[1]/fa[1]->N, tnmax/1e6);
+  if(getenv("FD3D_DUMP")){
+    fd3d_dump_state(getenv("FD3D_DUMP"), "w", 2, fa);
+    for(p = 0; p < 2; p++)
+      fd3d_dump_vec(getenv("FD3D_DUMP"), p ? "rt1" : "rt0", fa[p]->N, rt[p]);
+  }
+  for(p = 0; p < 2; p++){
+    sprintf(fn, "tpv%ds_rt_%s.dat", which, p ? "branch" : "main");
+    out = fopen(fn, "w");
+    for(i = 0; i < nx[p]; i++)
+      for(j = 0; j < nz; j++)
+        fprintf(out, "%g %g %g %g\n", (p ? gap : -16000.0) + (i + 0.5)*dx, (j + 0.5)*dx, rt[p][i*nz + j], slip[p][i*nz + j]);
+    fclose(out);
+    free(rt[p]);
+    free(slip[p]);
+    free(yc[p]);
+    free(wy[p]);
+  }
+  fd3d_strips_free(st);
+  for(p = 0; p < 2; p++)
+    fd3d_free(fa[p]);
+  fd3d_tab_free(tm);
+  fd3d_tab_free(tb);
+  return 0;
+}
+
+/* H10: the main fault of TPV14 alone (vertical, 28 x 15 km, nucleation at x = -8 km), with the
+   free surface as (a) images (exact) and (b) one surface layer of cells dx/m, rows +-band about
+   the trace (FD3D_TPV14S_GRADE grades them), FD3D_TPV14S_END metres beyond the fault ends
+   (default 1500); prints the differences of rupture time and slip */
+static void tpv14one_run(double dx, double tend, int m, double band, int surf, double *rt, double *slip)
+{
+  double cL, cT, rho, dt, hs, grade, end, *yc, *wy, rmax;
+  int nxm, nz, ns, n, i, nc, nxs, nys, L;
+  struct fd3d_tab *t;
+  struct fd3d *f;
+  cL = 6000.0;
+  cT = 3464.0;
+  rho = 2670.0;
+  dt = 0.5*dx/cT;
+  ns = (int)(tend/dt + 0.5);
+  nz = (int)(15000.0/dx + 0.5);
+  nxm = (int)(28000.0/dx + 0.5);
+  yc = NULL;
+  wy = NULL;
+  if(surf != 1){
+    t = fd3d_tab_create_c(nxm, 2*nz, dx, dt, cL, cT, rho, 0, 1);
+    f = fd3d_create2(t, nz, 1);
+  }else{
+    t = fd3d_tab_create_c(nxm, nz, dx, dt, cL, cT, rho, 0, 1);
+    f = fd3d_create(t);
+  }
+  tpv14_friction(f, nxm, nz, dx, -70e6, -81.6e6, -16000.0);
+  if(surf == 2){                                 /* mirror plus opening layer (exact free surface in the limit) */
+    hs = dx/m;
+    end = getenv("FD3D_TPV14S_END") ? atof(getenv("FD3D_TPV14S_END")) : 1500.0;
+    nc = (int)ceil(end/hs - 1e-9);
+    nxs = (int)floor(nxm*dx/hs + 0.5) + 2*nc;
+    nys = 2*(int)ceil(band/hs - 1e-9);
+    rmax = sqrt(pow(28000.0 + 2*end, 2) + pow(15000.0, 2) + pow(band, 2));
+    L = (int)(rmax/cT/dt) + 10;
+    f->layer = fd3d_layer_create_fft(f, 0.0, m, nxs, nys, -nc*hs, L);
+    if(!f->layer){
+      fprintf(stderr, "tpv14one: opening layer setup failed\n");
+      return;
+    }
+    if(f->layer->sig0)                           /* the opening layer may not couple the normal traction */
+      for(i = 0; i < f->N; i++)
+        f->layer->sig0[i] = 120e6;
+    fprintf(stderr, "tpv14one: mirror plus opening layer (normal coupling %s)", f->layer->sig0 ? "yes" : "no");
+    fprintf(stderr, ", dx/%d, %d x %d, band %g m, L %d\n", m, nxs, nys, band, L);
+  }
+  if(surf == 1){
+    hs = dx/m;
+    grade = getenv("FD3D_TPV14S_GRADE") ? atof(getenv("FD3D_TPV14S_GRADE")) : 1.0;
+    end = getenv("FD3D_TPV14S_END") ? atof(getenv("FD3D_TPV14S_END")) : 1500.0;
+    nc = (int)ceil(end/hs - 1e-9);
+    nxs = (int)floor(nxm*dx/hs + 0.5) + 2*nc;
+    tpv14s_rows(hs, band, grade, &nys, &yc, &wy);
+    rmax = sqrt(pow(28000.0 + 2*end, 2) + pow(15000.0, 2) + pow(band, 2));
+    L = (int)(rmax/cT/dt) + 10;
+    f->layer = fd3d_surf_create_rows(f, 0.0, 0.0, 0.0, 90.0, 1, m, nxs, nys, -nc*hs, yc, wy, L, 1.0);
+    if(!f->layer){
+      fprintf(stderr, "tpv14one: surface setup failed\n");
+      return;
+    }
+    for(i = 0; i < f->N; i++)
+      f->layer->sig0[i] = 120e6;
+    if(getenv("FD3D_TPV14S_NONORMAL"))             /* as the reference: no normal coupling */
+      f->layer->normal_coupling = 0;
+    fprintf(stderr, "tpv14one: surface cells dx/%d, %d x %d, band %g m, grade %g, end %g m, L %d\n", m, nxs, nys, band, grade, end, L);
+  }
+  for(i = 0; i < f->N; i++){
+    rt[i] = -1.0;
+    slip[i] = 0.0;
+  }
+  for(n = 0; n < ns; n++){
+    fd3d_step(f, NULL);
+    for(i = 0; i < f->N; i++){
+      slip[i] += f->V[i]*dt;
+      if(rt[i] < 0.0 && fabs(f->V[i]) > 1e-3)
+        rt[i] = (n + 1)*dt;
+    }
+  }
+  if(f->layer)
+    fd3d_layer_free(f->layer);
+  f->layer = NULL;
+  fd3d_free(f);
+  fd3d_tab_free(t);
+  free(yc);
+  free(wy);
+}
+/* compare run a against reference b: rupture time rms, top 3 km mean offset, top-row slip */
+static void tpv14one_cmp(const char *name, int nxm, int nz, double dx, const double *rta, const double *sla, const double *rtb, const double *slb)
+{
+  int i, j, nb, ntop, nrt;
+  double rms, dtop, s0, s1;
+  nb = 0;
+  nrt = 0;
+  ntop = 0;
+  dtop = 0.0;
+  rms = 0.0;
+  s0 = 0.0;
+  s1 = 0.0;
+  for(i = 0; i < nxm; i++)
+    for(j = 0; j < nz; j++){
+      if((rta[i*nz + j] < 0.0) != (rtb[i*nz + j] < 0.0))
+        nb++;
+      if(rta[i*nz + j] >= 0.0 && rtb[i*nz + j] >= 0.0){
+        rms += pow(rta[i*nz + j] - rtb[i*nz + j], 2);
+        nrt++;
+        if((j + 0.5)*dx < 3000.0){
+          dtop += rta[i*nz + j] - rtb[i*nz + j];
+          ntop++;
+        }
+      }
+      if(j == 0){
+        s0 += fabs(slb[i*nz + j]);
+        s1 += fabs(sla[i*nz + j]);
+      }
+    }
+  printf("tpv14one: %s against mirror plus opening layer: rupture time rms %.3f s, top 3 km mean offset %+.3f s, top-row mean slip %.3f m (reference %.3f m), %d cells ruptured in one only\n",
+         name, sqrt(rms/(nrt > 0 ? nrt : 1)), dtop/(ntop > 0 ? ntop : 1), s1/nxm, s0/nxm, nb);
+}
+static int run_tpv14one(double dx, double tend, int m, double band)
+{
+  int nz, nxm, N, i;
+  double *rt[3], *sl[3];
+  double bref;
+  char name[64];
+  nz = (int)(15000.0/dx + 0.5);
+  nxm = (int)(28000.0/dx + 0.5);
+  N = nxm*nz;
+  for(i = 0; i < 3; i++){
+    rt[i] = malloc(sizeof(double)*N);
+    sl[i] = malloc(sizeof(double)*N);
+  }
+  /* reference: mirror plus opening layer of 1 km cells over +-FD3D_TPV14ONE_REFBAND (default 20 km) */
+  bref = getenv("FD3D_TPV14ONE_REFBAND") ? atof(getenv("FD3D_TPV14ONE_REFBAND")) : 20000.0;
+  tpv14one_run(dx, tend, 1, bref, 2, rt[2], sl[2]);
+  tpv14one_run(dx, tend, m, band, 0, rt[0], sl[0]);
+  tpv14one_run(dx, tend, m, band, 1, rt[1], sl[1]);
+  tpv14one_cmp("mirror alone", nxm, nz, dx, rt[0], sl[0], rt[2], sl[2]);
+  sprintf(name, "virtual surface dx/%d +-%g m", m, band);
+  tpv14one_cmp(name, nxm, nz, dx, rt[1], sl[1], rt[2], sl[2]);
+  for(i = 0; i < 3; i++){
+    free(rt[i]);
+    free(sl[i]);
+  }
   return 0;
 }
 
@@ -1141,6 +1500,7 @@ static int run_multi(double ang, double dip, double tend, int comp, int mir)
     fprintf(stderr, "multi setup failed\n");
     return 1;
   }
+  report_multi_memory(m);
   fprintf(stderr, "multi: turn %g deg, dip %g deg, cross first lag %s, cross windows %d / %d lags\n", ang, dip, m->implicit ? "kept (implicit)" : "zero", m->c[0][1].L, m->c[1][0].L);
   for(n = 0; n < ns; n++){
     fd3d_step(f1, NULL);
@@ -1588,6 +1948,11 @@ static int main0(int argc, char **argv)
     free(t2);
     return 0;
   }
+  if(argc >= 3 && !strcmp(argv[1], "tpv14one"))  /* dx [tend] [m] [band] */
+    return run_tpv14one(atof(argv[2]), argc > 3 ? atof(argv[3]) : 10.0, argc > 4 ? atoi(argv[4]) : 1, argc > 5 ? atof(argv[5]) : 2500.0);
+  if(argc >= 3 && !strcmp(argv[1], "tpv14s"))   /* dx [14|15] [tend] [gap] [m] [branch dip] [band] */
+    return run_tpv14s(atof(argv[2]), argc > 3 ? atoi(argv[3]) : 14, argc > 4 ? atof(argv[4]) : 12.0, argc > 5 ? atof(argv[5]) : 0.0,
+        argc > 6 ? atoi(argv[6]) : 2, argc > 7 ? atof(argv[7]) : 90.0, argc > 8 ? atof(argv[8]) : 2500.0);
   if(argc >= 3 && !strcmp(argv[1], "tpv14"))
     return run_tpv14(atof(argv[2]), argc > 3 ? atoi(argv[3]) : 14, argc > 4 ? atof(argv[4]) : 12.0, argc > 5 ? atof(argv[5]) : 0.0);
   if(argc >= 2 && !strcmp(argv[1], "h6strips")){

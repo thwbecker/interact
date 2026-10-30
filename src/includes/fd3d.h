@@ -229,13 +229,47 @@ struct fd3d_mplane {
   int mirror;           /* half space by the free-surface image (vertical strike-slip plane, top row at z = 0;
                            its marcher created with fd3d_create2(t, nz, 1) on a table of 2 nz rows) */
 };
+struct fd3d_dtab {      /* dense coupling, active receivers x active sources (fd_plan.md H6 step 6) */
+  int nr, nc, L;        /* stored rows and columns (active cells only), lags */
+  int *ridx, *cidx;     /* stored row / column -> index in the full receiver / source vector */
+  double *Ks, *K1;      /* static slope and first lag (own rows, nrl x nc) */
+  /* MPI (fd_plan.md H7): the lag data below are kept for this rank's rows only; rown: owner of
+     each stored row, lrow: its local row (-1: another rank's), nrl local rows */
+  int *rown, *lrow, nrl;
+  int *lo, *hi;         /* per local entry (nrl x nc): lags lo..hi (1-based) hold the nonzero increments; hi < lo: none */
+  size_t *woff;         /* per local entry: offset of lag lo in W */
+  double *W;            /* packed increments minus the static slope times dt */
+  size_t nw, nwcap;
+  /* domain partitioning (fd_plan.md gate 2, D1): outside the wavefront strips the increments
+     are a quadratic in the lag (a constant before the first arrival, a quadratic between the P
+     and the S strip of each source and image); per local entry nm[e] runs of lags are kept as
+     coefficients (mid[moff[e] ..], in increasing lag order), the other lags explicitly in W */
+  int dp;               /* 1: partitioned */
+  unsigned char *nm;
+  size_t *moff;
+  struct fd3d_dpmid { int a, b; double c[3]; } *mid; /* lags a..b (1-based), c: coefficients of 1, y, y^2, y = l/FD3D_DP_LNORM */
+  size_t nmd, nmdcap;
+  double *wk;           /* work space (L) */
+  size_t nent, nmid, nlag_win; /* statistics: entries, entries with a middle, lags of the dense windows */
+};
+#define FD3D_DP_LNORM 1024.0
+/* prefix moments of one source's history for the partitioned tables: P[k][m] = sum over lags
+   l = 2..m of y_l^k v(l), y_l = l/FD3D_DP_LNORM, k = 0, 1, 2, m = 0..L (n values each) */
+struct fd3d_dpref {
+  int n, L, lav;
+  double *P;            /* (3 x (L + 1) x n) */
+  const double **vl;    /* vl[l]: the source vector at lag l, l = 2..lav */
+};
 struct fd3d_mpair {     /* source q to receiver p, dense, receiver x source */
   int L, nr, ns, has_k1;
   /* MPI (fd_plan.md H7): the lag tables Ws, Wn hold this rank's receiver rows r0 .. r0 + nrl - 1
      only (L x nrl x ns); the static and first-lag blocks Ks, Kn, K1s, K1n are complete on every
      rank (nr x ns). One rank: r0 = 0, nrl = nr. */
   int r0, nrl;
-  double *Ws, *Wn, *Ks, *Kn, *K1s, *K1n;
+  /* the lag tables as partitioned dense tables (gate 2, D1): rows = receiver cells (own rows
+     only), columns = source cells; Ks, Kn, K1s, K1n point into them */
+  struct fd3d_dtab hs, hn;
+  double *Ks, *Kn, *K1s, *K1n;
 };
 struct fd3d_multi;
 struct fd3d_multi_slot { struct fd3d_multi *m; int p; };
@@ -245,6 +279,7 @@ struct fd3d_multi {
      are split in blocks, rank r owning rows rdsp[p][r] .. rdsp[p][r] + rcnt[p][r] - 1 */
   int mpi_rank, mpi_size;
   int *rcnt[FD3D_MULTI_MAX], *rdsp[FD3D_MULTI_MAX];
+  struct fd3d_dpref pr[FD3D_MULTI_MAX];          /* prefix moments of the planes' histories (gate 2) */
 #ifdef FD3D_MPI
   MPI_Comm comm;
 #endif
@@ -300,18 +335,7 @@ double fd3d_h6_frame_check(const struct fd3d_tab *t, double dip_deg, int fcomp, 
    fs[q][k]: fault q -> strip k (3 ns_k x N_q), sf[k][q]: strip k -> fault q (2 N_q x 3 ns_k:
    shear along the marcher's slip direction, normal), ss[j][k]: strip j -> strip k
    (3 ns_k x 3 ns_j); components of a strip in its own frame (x, y, opening). */
-struct fd3d_dtab {      /* dense coupling, active receivers x active sources (fd_plan.md H6 step 6) */
-  int nr, nc, L;        /* stored rows and columns (active cells only), lags */
-  int *ridx, *cidx;     /* stored row / column -> index in the full receiver / source vector */
-  double *Ks, *K1;      /* static slope and first lag, nr x nc (complete on every rank) */
-  /* MPI (fd_plan.md H7): the lag data below are kept for this rank's rows only; rown: owner of
-     each stored row, lrow: its local row (-1: another rank's), nrl local rows */
-  int *rown, *lrow, nrl;
-  int *lo, *hi;         /* per local entry (nrl x nc): lags lo..hi (1-based) hold the nonzero increments; hi < lo: none */
-  size_t *woff;         /* per local entry: offset of lag lo in W */
-  double *W;            /* packed increments minus the static slope times dt */
-  size_t nw, nwcap;
-};
+
 struct fd3d_strips {
   int nf, L;
   struct fd3d *f[FD3D_MULTI_MAX];
@@ -326,11 +350,19 @@ struct fd3d_strips {
   int Lb; long hk;                              /* real-space rings of the pushed slices (the dense couplings' history) */
   double *sring[FD3D_MULTI_MAX], *fring[FD3D_MULTI_MAX];
   double *lu; int *lpiv, *aidx, na;              /* the strips' first-lag operator over active cells, LU (direct solve) */
+  /* block-Jacobi preconditioner of the iterative strip solve (fd_plan.md H8): each strip's own
+     first-lag operator over its active cells as a band matrix (cells along strike, across,
+     components), LU-factorised; bpos: band index -> index in the strip's vector */
+  double *bab[FD3D_MULTI_MAX];
+  int *bpiv[FD3D_MULTI_MAX], *bpos[FD3D_MULTI_MAX], bn[FD3D_MULTI_MAX], bkl[FD3D_MULTI_MAX], bR[FD3D_MULTI_MAX];
+  int solver;                                    /* 0: dense LU, 1: GMRES circulant, 2: GMRES block-Jacobi (band LU) */
+  long n_solves, n_gmres;
   /* MPI (fd_plan.md H7): owners of the receiver cells of the dense couplings (fault cells in the
      blocks of fd3d_multi, active strip cells in blocks of equal count; -1: masked); the lists of
      full receiver indices in rank order for gathering the known parts */
   int mpi_rank, mpi_size;
   int *fown[FD3D_MULTI_MAX], *sown[FD3D_MULTI_MAX];
+  struct fd3d_dpref pf[FD3D_MULTI_MAX], ps[FD3D_MULTI_MAX];  /* prefix moments of fault and strip histories (gate 2) */
   int *sg_idx[FD3D_MULTI_MAX], *sg_cnt[FD3D_MULTI_MAX], *sg_dsp[FD3D_MULTI_MAX];
 #ifdef FD3D_MPI
   MPI_Comm comm;
@@ -349,6 +381,7 @@ int fd3d_h6_strips_check(int verbose);
 double fd3d_h6_step_check(int nsteps, int sw, double th_deg, int verbose);
 int fd3d_h6_strike_run(double ang, int m, int nsteps, double *tau, int verbose);
 double fd3d_strips_memory(const struct fd3d_strips *s);
+double fd3d_multi_memory(const struct fd3d_multi *m, double *win);
 /* tests: exact (hexadecimal) dumps for byte comparisons */
 void fd3d_dump_state(const char *fn, const char *mode, int nf, struct fd3d **f);
 void fd3d_dump_vec(const char *fn, const char *tag, int n, const double *v);

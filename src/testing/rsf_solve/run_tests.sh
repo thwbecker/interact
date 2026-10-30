@@ -76,6 +76,21 @@ tail -1 tmp_fd_dynamic/fd3d.out; [ $st -eq 0 ] || fail=1
 # surface (G3b) on the same cells, prescribed slip (the full check: fd3d_test h6step 12)
 ( cd tmp_fd_dynamic && ../bin/fd3d_test h6step 8 0 > fd3d.out 2>/dev/null ); st=$?
 tail -1 tmp_fd_dynamic/fd3d.out; [ $st -eq 0 ] || fail=1
+# D1: partitioned dense lag tables against all lags (FD3D_DP=0), TPV14 at 1 km over 10 s (the
+# rupture reaches the branch), exact dumps within 1e-7 relative; H8: the band block-Jacobi strip
+# solve against the dense LU, strips rotated by 37 degrees, within 1e-10
+if command -v python3 > /dev/null 2>&1; then
+  ( cd tmp_fd_dynamic && FD3D_DP=0 FD3D_DUMP=dp0.txt ../bin/fd3d_test tpv14 1000 14 10 > /dev/null 2>&1 && \
+    FD3D_DP=1 FD3D_DUMP=dp1.txt ../bin/fd3d_test tpv14 1000 14 10 > /dev/null 2>&1 && \
+    python3 ../$d/fd3d_dumpdiff.py dp0.txt dp1.txt 1e-7 > fd3d.out 2>&1 ); st=$?
+  if [ $st -eq 0 ]; then echo "fd3d_test tpv14, partitioned tables against all lags: PASS ($(cat tmp_fd_dynamic/fd3d.out))"
+  else echo "fd3d_test tpv14, partitioned tables against all lags: FAIL ($(cat tmp_fd_dynamic/fd3d.out))"; fail=1; fi
+  ( cd tmp_fd_dynamic && FD_STRIPS_SOLVER=lu FD3D_DUMP=sv0.txt ../bin/fd3d_test h6step 12 2 > /dev/null 2>&1 && \
+    FD_STRIPS_SOLVER=bj FD3D_DUMP=sv1.txt ../bin/fd3d_test h6step 12 2 > /dev/null 2>&1 && \
+    python3 ../$d/fd3d_dumpdiff.py sv0.txt sv1.txt 1e-10 > fd3d.out 2>&1 ); st=$?
+  if [ $st -eq 0 ]; then echo "fd3d_test h6step, band preconditioned strip solve against LU: PASS"
+  else echo "fd3d_test h6step, band preconditioned strip solve against LU: FAIL ($(cat tmp_fd_dynamic/fd3d.out))"; fail=1; fi
+fi
 # non-parallel 2-D pairs (fd_plan.md N1): dense tables against the prototype for a kinked pair
 if command -v python3 > /dev/null 2>&1; then
   for a in 30 -45; do for m in 0 1; do
