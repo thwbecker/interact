@@ -2994,6 +2994,42 @@ Next (step 2b): the marcher, with the surface unknowns eliminated in every opera
 the setup in rsf_fd.c (a surface line refined near traces, graded outwards; the element
 grouping for curved faults).
 
+### M7 step 2b: the virtual free surface in the 2-D marcher (2026-10-31)
+
+fd_march.c: surface segments (kinds FD_SEG_SURF_*) follow the fault segments (fd_sys Nf, Nu);
+every operator K_k (first and second order) is built over all unknowns as before and then
+the surface unknowns are eliminated: B_ss factorised (LAPACK), P = B_ss^-1 B_sf, and the fault
+operators B_ff - B_fs P (shear, with its band) and Kn_ff - Kn_fs P (normal) kept in op->el; per
+step q = B_ss^-1 H_s, the friction solvers (slip weakening, rate and state, unchanged) work on
+the fault with H_f - B_fs q and Hn_f - Kn_fs q, and the surface rates follow as -(q + P V_f).
+The second-order scheme's instantaneous coefficient is rho alpha/2 for opening unknowns (mu/(2
+beta) otherwise, per unknown, etai). The spectral ring of the Toeplitz pairs is now kept only
+for sources that have a Toeplitz pair (a surface segment, or one element of a curved fault, has
+dense pairs only); before, a surface segment longer than the FFT length of the fault overran
+the push buffer. The LAPACK calls with a character argument (dgetrs, dgbtrs, also in fd3d.c)
+now pass the hidden string length of the gfortran ABI.
+Check (fd_dynamic fsrup, run_tests.sh): the prototype's spontaneous rupture of
+test_fs_dyn2d.inplane_rupture (slip weakening, normal-stress coupling, NL, 3 km fault of 200 m
+dipping 30 degrees, top 400 m deep, surface +-4 km of 200 m, 3 s; full windows):
+
+| case | prototype: |slip| top / middle / bottom, arrival at the top, peak rate | C |
+|---|---|---|
+| thrust, no surface | 0.249 / 0.819 / 0.520 m, 1.617 s, 2.01 m/s | 0.248 / 0.819 / 0.520 m, 1.617 s, 1.88 m/s |
+| thrust, surface | 0.672 / 1.318 / 0.650 m, 1.357 s, 4.50 m/s | 0.671 / 1.317 / 0.650 m, 1.386 s, 4.38 m/s |
+| normal, surface | 0.194 / 0.859 / 0.541 m, 1.934 s, 2.01 m/s | 0.193 / 0.859 / 0.541 m, 1.934 s, 1.88 m/s |
+
+The surface tractions stay below 3e-10 Pa. Final slip agrees to 1 mm; the peak slip rate is
+6 percent lower in C with or without the surface and the thrust's arrival one step later
+(the slip-weakening solvers differ: the prototype's damped Jacobi against C's active set;
+not yet traced). A thrust is the prototype's fault mirrored at x = 0 with positive slip
+(C's slip weakening slips in the positive direction only, and flipping the tangent alone
+leaves the dislocation unchanged, since the normal turns with it). With D2 compression the
+results are unchanged at the printed digits; with the rsf_solve window tolerance of 1e-2
+instead of full windows the thrust's slip changes by up to 2 percent (0.667 / 1.305 /
+0.637 m).
+Next (step 2c): the setup in rsf_fd.c (surface line refined near traces, graded outwards; the
+element grouping of curved faults), then the prototype's other checks in C (step 3).
+
 ### WP7, C implementation in rsf_solve: status (2026-10-18)
 Done, each verified in the sandbox before delivery (details in
 fd_c_design.md sections 6 to 10, usage in rsf_solve_fd.md):

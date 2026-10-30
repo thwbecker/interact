@@ -101,9 +101,9 @@ for large strip sets (H8).
    rupture reach the top 3 km about 0.5 s late at 1 km (TPV14 main fault),
    so it is not a reference for near-surface comparisons.
 1e. 2-D in-plane free surface (M7): D2 (compressed dense tables), step 1
-   (opening kernel in C) and step 2a (tables with surface elements, checked
-   against densesys.py) done; next step 2b, the surface unknowns in the
-   marcher (Schur complement per K_k) and the setup in rsf_fd.c.
+   (opening kernel in C), step 2a (tables with surface elements) and step 2b
+   (surface unknowns eliminated in the marcher, spontaneous rupture checked
+   against the prototype) done; next step 2c, the setup in rsf_fd.c.
 1d. Stock-taking (fd_plan.md, 2026-10-30): 3-D half-space options (shared
    graded surface patch with compression, or a volume method near the
    surface) to be decided from the H11 numbers; 2-D in-plane with a free

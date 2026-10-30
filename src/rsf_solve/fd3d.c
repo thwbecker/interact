@@ -6434,7 +6434,8 @@ static void strips_A(struct strips_ctx *x, const double *v, double *out)
   strips_A_g(x, v, out, 1);
 }
 extern void dgbtrf_(int *m, int *n, int *kl, int *ku, double *ab, int *ldab, int *ipiv, int *info);
-extern void dgbtrs_(char *tr, int *n, int *kl, int *ku, int *nrhs, double *ab, int *ldab, int *ipiv, double *b, int *ldb, int *info);
+/* the trailing size_t is the hidden length of the character argument (gfortran ABI) */
+extern void dgbtrs_(char *tr, int *n, int *kl, int *ku, int *nrhs, double *ab, int *ldab, int *ipiv, double *b, int *ldb, int *info, size_t ltr);
 
 /* ---------------- block-Jacobi preconditioner of the strip solve (fd_plan.md H8) ----------------
    The first-lag operator of a strip couples only cells within reach of one time step, so the
@@ -6613,7 +6614,7 @@ static void strips_P(struct strips_ctx *x, const double *r, double *z)
       b = malloc(sizeof(double)*(n > 0 ? n : 1));
       for(i = 0; i < n; i++)
         b[i] = r[x->off[k] + s->bpos[k][i]];
-      dgbtrs_(&tr, &n, &kl, &ku, &one, s->bab[k], &ld, s->bpiv[k], b, &n, &info);
+      dgbtrs_(&tr, &n, &kl, &ku, &one, s->bab[k], &ld, s->bpiv[k], b, &n, &info, 1);
       for(i = 0; i < n; i++)
         z[x->off[k] + s->bpos[k][i]] = b[i];
       free(b);
@@ -6697,7 +6698,8 @@ static void strips_assemble_mpi(struct strips_ctx *x, double *e, double *col)
   free(dsp);
 }
 extern void dgetrf_(int *m, int *n, double *a, int *lda, int *ipiv, int *info);
-extern void dgetrs_(char *tr, int *n, int *nrhs, double *a, int *lda, int *ipiv, double *b, int *ldb, int *info);
+/* the trailing size_t is the hidden length of the character argument (gfortran ABI) */
+extern void dgetrs_(char *tr, int *n, int *nrhs, double *a, int *lda, int *ipiv, double *b, int *ldb, int *info, size_t ltr);
 static int strips_direct(struct strips_ctx *x, const double *rhs, double *V)
 {
   struct fd3d_strips *s = x->s;
@@ -6746,7 +6748,7 @@ static int strips_direct(struct strips_ctx *x, const double *rhs, double *V)
     b = malloc(sizeof(double)*na_2);
     for(i = 0; i < na_2; i++)
       b[i] = rhs[s->aidx[i]];
-    dgetrs_(&tr, &na_2, &one, s->lu, &na_2, s->lpiv, b, &na_2, &info);
+    dgetrs_(&tr, &na_2, &one, s->lu, &na_2, s->lpiv, b, &na_2, &info, 1);
     memset(V, 0, sizeof(double)*n);
     for(i = 0; i < na_2; i++)
       V[s->aidx[i]] = b[i];

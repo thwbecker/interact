@@ -28,10 +28,20 @@ struct fd_ops {                 /* operators for one substep multiple k */
      slip rate linear across the k substeps; Ks/Kn/ab hold B_k, Cs/Cn the C_k operators */
   int nl;
   double *Cs, *Cn;
+  /* virtual free surface (fd_plan.md M7 step 2b): the surface unknowns (indices Nf..N-1) are
+     eliminated, V_s = -(q + P V_f) with q = B_ss^-1 H_s; el is the fault's operator
+     B_ff - B_fs P (and Kn_ff - Kn_fs P), Nf x Nf, with its band */
+  struct fd_ops *el;
+  double *lu;                   /* LU of B_ss, Nu x Nu, column-major */
+  int *piv;
+  double *P;                    /* B_ss^-1 B_sf, Nu x Nf, column-major */
+  double *Bfs, *Knfs;           /* Nf x Nu, row-major */
 };
 
 struct fd_sys {
   int N, nseg, nsrc, M, L, Lbuf, mode, has_normal, nsign;
+  int Nf, Nu;                   /* fault unknowns 0..Nf-1, surface unknowns Nf..N-1 (segments of kind FD_SEG_SURF_*, after the faults) */
+  double *etai;                 /* instantaneous coefficient per unknown: mu/(2 beta), rho alpha/2 for opening */
   double dt, eta, alpha, beta, rho;
   struct fd_seglist *segs;      /* receivers (real segments) */
   struct fd_pair **pairs;       /* pairs[src*nseg + rcv], src over nsrc sources */
@@ -40,6 +50,9 @@ struct fd_sys {
   /* history: per source segment a ring of Lbuf FFT'd slices */
   double _Complex **hist;
   double **histr;               /* real-space ring per source, only with dense pairs (ndense > 0) */
+  int *spec;                    /* per source: 1 if it has a Toeplitz (spectral) pair; the spectral ring
+                                   hist[k] is kept only then (a source with dense pairs only, such as a
+                                   surface or a single element of a curved fault, has none) */
   int ndense;
   double *ctP;                  /* prefix moments of one source's history (compressed dense pairs, D2) */
   const double **ctV;

@@ -106,6 +106,24 @@ struct fd_sys *fd_sys_create(struct fd_seglist *segs, struct fd_pair **pairs, in
   for(k = 0; k < s->nseg; k++)
     s->off[k + 1] = s->off[k] + segs->seg[k].n;
   s->N = s->off[s->nseg];
+  /* surface segments (M7 step 2b) must follow all fault segments */
+  s->Nf = s->N;
+  for(k = 0; k < s->nseg; k++)
+    if(segs->seg[k].kind != FD_SEG_FAULT){
+      s->Nf = s->off[k];
+      break;
+    }
+  for(; k < s->nseg; k++)
+    if(segs->seg[k].kind == FD_SEG_FAULT){
+      free(s->off);
+      free(s);
+      return NULL;
+    }
+  s->Nu = s->N - s->Nf;
+  s->etai = (double *)malloc(sizeof(double)*(s->N > 0 ? s->N : 1));
+  for(k = 0; k < s->nseg; k++)
+    for(i = s->off[k]; i < s->off[k + 1]; i++)
+      s->etai[i] = (segs->seg[k].kind == FD_SEG_SURF_OPEN) ? 0.5*rho*alpha : rho*beta*beta/(2.0*beta);
   s->M = 0;
   s->L = 0;
   s->ndense = 0;
@@ -132,8 +150,13 @@ struct fd_sys *fd_sys_create(struct fd_seglist *segs, struct fd_pair **pairs, in
       s->histr[k] = (double *)calloc((size_t)s->Lbuf * segs->seg[s->src_of[k]].n, sizeof(double));
   s->hist = (double _Complex **)malloc(sizeof(double _Complex *) * (size_t)s->nsrc);
   s->hk = (int *)calloc((size_t)s->nsrc, sizeof(int));
-  for(k = 0; k < s->nsrc; k++)
-    s->hist[k] = (double _Complex *)calloc((size_t)s->Lbuf * s->M, sizeof(double _Complex));
+  s->spec = (int *)calloc((size_t)s->nsrc, sizeof(int));
+  for(k = 0; k < s->nsrc; k++){
+    for(l = 0; l < s->nseg; l++)
+      if(!pairs[k*s->nseg + l]->dense)
+        s->spec[k] = 1;
+    s->hist[k] = s->spec[k] ? (double _Complex *)calloc((size_t)s->Lbuf * s->M, sizeof(double _Complex)) : NULL;
+  }
   s->pf = fd_fft_plan_create(s->M, FD_FFT_FORWARD);
   s->pb = fd_fft_plan_create(s->M, FD_FFT_BACKWARD);
   s->w1 = (double _Complex *)malloc(sizeof(double _Complex) * s->M);
@@ -178,6 +201,8 @@ void fd_sys_free(struct fd_sys *s)
   free(s->histr);
   free(s->ctP);
   free(s->ctV);
+  free(s->etai);
+  free(s->spec);
   if(s->conv){
     np = s->nsrc * s->nseg;
     for(k = 0; k < np; k++){
@@ -237,6 +262,17 @@ void fd_sys_free(struct fd_sys *s)
     free(s->ops[k].ab);
     free(s->ops[k].Cs);
     free(s->ops[k].Cn);
+    if(s->ops[k].el){
+      free(s->ops[k].el->Ks);
+      free(s->ops[k].el->Kn);
+      free(s->ops[k].el->ab);
+      free(s->ops[k].el);
+    }
+    free(s->ops[k].lu);
+    free(s->ops[k].piv);
+    free(s->ops[k].P);
+    free(s->ops[k].Bfs);
+    free(s->ops[k].Knfs);
   }
   fd_fft_plan_destroy(s->pf);
   fd_fft_plan_destroy(s->pb);
@@ -249,7 +285,8 @@ void fd_sys_reset_history(struct fd_sys *s)
   int q;
   s->coarse_from = -1;
   for(k = 0; k < s->nsrc; k++){
-    memset(s->hist[k], 0, sizeof(double _Complex) * (size_t)s->Lbuf * s->M);
+    if(s->hist[k])
+      memset(s->hist[k], 0, sizeof(double _Complex) * (size_t)s->Lbuf * s->M);
     s->hk[k] = 0;
     if(s->histr[k])
       memset(s->histr[k], 0, sizeof(double) * (size_t)s->Lbuf * s->segs->seg[s->src_of[k]].n);
@@ -290,12 +327,16 @@ void fd_sys_push_k(struct fd_sys *s, const double *V, int kk)
     r = s->src_of[k];
     n = s->segs->seg[r].n;
     for(q = 0; q < kk; q++){
-      slot = s->hist[k] + (size_t)(s->hk[k] % s->Lbuf) * s->M;
       if(s->histr[k]){
         rs = s->histr[k] + (size_t)(s->hk[k] % s->Lbuf) * n;
         for(i = 0; i < n; i++)
           rs[i] = V[s->off[r] + (s->src_rev[k] ? n - 1 - i : i)];
       }
+      if(!s->spec[k]){                           /* dense pairs only: no spectral ring */
+        s->hk[k]++;
+        continue;
+      }
+      slot = s->hist[k] + (size_t)(s->hk[k] % s->Lbuf) * s->M;
       if(!first){
         memset(s->w1, 0, sizeof(double _Complex) * s->M);
         for(i = 0; i < n; i++)
@@ -330,20 +371,23 @@ void fd_sys_push_lin(struct fd_sys *s, const double *Vold, const double *V, int 
   for(k = 0; k < s->nsrc; k++){
     r = s->src_of[k];
     n = s->segs->seg[r].n;
-    memset(s->w1, 0, sizeof(double _Complex) * s->M);
-    memset(s->w3, 0, sizeof(double _Complex) * s->M);
-    for(i = 0; i < n; i++){
-      s->w1[i] = Vold[s->off[r] + (s->src_rev[k] ? n - 1 - i : i)];
-      s->w3[i] = V[s->off[r] + (s->src_rev[k] ? n - 1 - i : i)];
+    if(s->spec[k]){
+      memset(s->w1, 0, sizeof(double _Complex) * s->M);
+      memset(s->w3, 0, sizeof(double _Complex) * s->M);
+      for(i = 0; i < n; i++){
+        s->w1[i] = Vold[s->off[r] + (s->src_rev[k] ? n - 1 - i : i)];
+        s->w3[i] = V[s->off[r] + (s->src_rev[k] ? n - 1 - i : i)];
+      }
+      fd_fft_exec(s->pf, s->w1, s->w2);          /* w2 = F(Vold) */
+      fd_fft_exec(s->pf, s->w3, s->w1);          /* w1 = F(V) */
     }
-    fd_fft_exec(s->pf, s->w1, s->w2);            /* w2 = F(Vold) */
-    fd_fft_exec(s->pf, s->w3, s->w1);            /* w1 = F(V) */
     for(q = 1; q <= kk; q++){
       w = (q - 0.5) / kk;
-      slot = s->hist[k] + (size_t)(s->hk[k] % s->Lbuf) * s->M;
-
-      for(m = 0; m < s->M; m++)
-        slot[m] = (1.0 - w) * s->w2[m] + w * s->w1[m];
+      if(s->spec[k]){
+        slot = s->hist[k] + (size_t)(s->hk[k] % s->Lbuf) * s->M;
+        for(m = 0; m < s->M; m++)
+          slot[m] = (1.0 - w) * s->w2[m] + w * s->w1[m];
+      }
       if(s->histr[k]){
         rs = s->histr[k] + (size_t)(s->hk[k] % s->Lbuf) * n;
         for(i = 0; i < n; i++){
@@ -811,6 +855,123 @@ void fd_sys_static(struct fd_sys *s, const double *delta, double *ts, double *tn
   }
 }
 
+/* ---------------- virtual free surface: elimination of the surface unknowns (M7 step 2b) ----------------
+   The surface rows say H_s + B_ss V_s + B_sf V_f = 0 (zero traction), so V_s = -(q + P V_f) with
+   q = B_ss^-1 H_s and P = B_ss^-1 B_sf; the fault rows become tau_f = (H_f - B_fs q) +
+   (B_ff - B_fs P) V_f and the normal rows (Hn_f - Kn_fs q) + (Kn_ff - Kn_fs P) V_f. The friction
+   solvers then work on the fault alone with op->el. B_ss is dense and factorised once per k. */
+extern void dgetrf_(int *m, int *n, double *a, int *lda, int *ipiv, int *info);
+/* the trailing size_t is the hidden length of the character argument (gfortran ABI) */
+extern void dgetrs_(char *tr, int *n, int *nrhs, double *a, int *lda, int *ipiv, double *b, int *ldb, int *info, size_t ltr);
+
+static int surf_eliminate(struct fd_sys *s, struct fd_ops *op)
+{
+  int N, Nf, Nu, i, j, m, info, bw;
+  char tr;
+  double *Ae, *Ke, amax, thr, acc;
+  struct fd_ops *el;
+  N = s->N;
+  Nf = s->Nf;
+  Nu = s->Nu;
+  op->lu = (double *)malloc(sizeof(double)*(size_t)Nu*Nu);
+  op->piv = (int *)malloc(sizeof(int)*(size_t)Nu);
+  op->P = (double *)malloc(sizeof(double)*(size_t)Nu*(Nf > 0 ? Nf : 1));
+  op->Bfs = (double *)malloc(sizeof(double)*(size_t)(Nf > 0 ? Nf : 1)*Nu);
+  op->Knfs = (double *)malloc(sizeof(double)*(size_t)(Nf > 0 ? Nf : 1)*Nu);
+  for(j = 0; j < Nu; j++)
+    for(i = 0; i < Nu; i++)
+      op->lu[(size_t)j*Nu + i] = op->Ks[(size_t)(Nf + i)*N + Nf + j];
+  for(j = 0; j < Nf; j++)
+    for(i = 0; i < Nu; i++)
+      op->P[(size_t)j*Nu + i] = op->Ks[(size_t)(Nf + i)*N + j];
+  for(i = 0; i < Nf; i++)
+    for(j = 0; j < Nu; j++){
+      op->Bfs[(size_t)i*Nu + j] = op->Ks[(size_t)i*N + Nf + j];
+      op->Knfs[(size_t)i*Nu + j] = op->Kn[(size_t)i*N + Nf + j];
+    }
+  dgetrf_(&Nu, &Nu, op->lu, &Nu, op->piv, &info);
+  if(info != 0){
+    fprintf(stderr, "fd_march: surface operator singular (k %d, dgetrf %d)\n", op->k, info);
+    return 1;
+  }
+  tr = 'N';
+  if(Nf > 0)
+    dgetrs_(&tr, &Nu, &Nf, op->lu, &Nu, op->piv, op->P, &Nu, &info, 1);
+  el = (struct fd_ops *)calloc(1, sizeof(struct fd_ops));
+  el->k = op->k;
+  el->nl = op->nl;
+  Ae = (double *)malloc(sizeof(double)*(size_t)(Nf > 0 ? Nf : 1)*Nf);
+  Ke = (double *)malloc(sizeof(double)*(size_t)(Nf > 0 ? Nf : 1)*Nf);
+  amax = 0.0;
+  for(i = 0; i < Nf; i++)
+    for(j = 0; j < Nf; j++){
+      acc = op->Ks[(size_t)i*N + j];
+      for(m = 0; m < Nu; m++)
+        acc -= op->Bfs[(size_t)i*Nu + m]*op->P[(size_t)j*Nu + m];
+      Ae[(size_t)i*Nf + j] = acc;
+      if(fabs(acc) > amax)
+        amax = fabs(acc);
+      acc = op->Kn[(size_t)i*N + j];
+      for(m = 0; m < Nu; m++)
+        acc -= op->Knfs[(size_t)i*Nu + m]*op->P[(size_t)j*Nu + m];
+      Ke[(size_t)i*Nf + j] = acc;
+    }
+  thr = 1e-13*amax;                             /* as for the full operator: prune round-off for the band */
+  for(i = 0; i < Nf*Nf; i++)
+    if(fabs(Ae[i]) <= thr)
+      Ae[i] = 0.0;
+  el->Ks = Ae;
+  el->Kn = Ke;
+  bw = fd_band_width(Nf, Ae, 0.0);
+  el->bw = bw;
+  el->ab = (double *)malloc(sizeof(double)*(size_t)(3*bw + 1)*(Nf > 0 ? Nf : 1));
+  fd_band_from_dense(Nf, bw, Ae, el->ab);
+  op->el = el;
+  return 0;
+}
+
+/* the fault's known parts with the surface eliminated: He = H_f - B_fs q, Hne = Hn_f - Kn_fs q,
+   q = B_ss^-1 H_s (returned) */
+static void surf_reduce(const struct fd_sys *s, const struct fd_ops *op, const double *H, const double *Hn, double *He, double *Hne, double *q)
+{
+  int i, m, Nf, Nu, one, info;
+  char tr;
+  double acc;
+  Nf = s->Nf;
+  Nu = s->Nu;
+  for(m = 0; m < Nu; m++)
+    q[m] = H[Nf + m];
+  tr = 'N';
+  one = 1;
+  dgetrs_(&tr, &Nu, &one, (double *)op->lu, &Nu, (int *)op->piv, q, &Nu, &info, 1);
+  for(i = 0; i < Nf; i++){
+    acc = H[i];
+    for(m = 0; m < Nu; m++)
+      acc -= op->Bfs[(size_t)i*Nu + m]*q[m];
+    He[i] = acc;
+    if(Hn && Hne){
+      acc = Hn[i];
+      for(m = 0; m < Nu; m++)
+        acc -= op->Knfs[(size_t)i*Nu + m]*q[m];
+      Hne[i] = acc;
+    }
+  }
+}
+/* the surface rates from the fault rates: V_s = -(q + P V_f) */
+static void surf_recover(const struct fd_sys *s, const struct fd_ops *op, const double *q, double *V)
+{
+  int j, m, Nf, Nu;
+  double acc;
+  Nf = s->Nf;
+  Nu = s->Nu;
+  for(m = 0; m < Nu; m++){
+    acc = q[m];
+    for(j = 0; j < Nf; j++)
+      acc += op->P[(size_t)j*Nu + m]*V[j];
+    V[Nf + m] = -acc;
+  }
+}
+
 /* K_k = sum_{l<=k} W[l] + k Ks dt, dense in segment order, plus its band */
 struct fd_ops *fd_sys_ops(struct fd_sys *s, int k)
 {
@@ -871,6 +1032,8 @@ struct fd_ops *fd_sys_ops(struct fd_sys *s, int k)
   op->bw = bw;
   op->ab = (double *)malloc(sizeof(double) * (size_t)(3 * bw + 1) * s->N);
   fd_band_from_dense(s->N, bw, op->Ks, op->ab);
+  if(s->Nu > 0 && surf_eliminate(s, op))
+    return NULL;
   s->nops++;
   return op;
 }
@@ -933,8 +1096,8 @@ struct fd_ops *fd_sys_ops_nl(struct fd_sys *s, int k)
       free(Wn);
     }
   for(i = 0; i < s->N; i++){
-    op->Ks[(size_t)i * s->N + i] += (w1 - 1.0) * s->eta;
-    op->Cs[(size_t)i * s->N + i] += (1.0 - w1) * s->eta;
+    op->Ks[(size_t)i * s->N + i] += (w1 - 1.0) * s->etai[i];
+    op->Cs[(size_t)i * s->N + i] += (1.0 - w1) * s->etai[i];
   }
   for(ii = 0; ii < NN; ii++)
     if(fabs(op->Ks[ii]) > amax)
@@ -954,6 +1117,8 @@ struct fd_ops *fd_sys_ops_nl(struct fd_sys *s, int k)
   op->bw = bw;
   op->ab = (double *)malloc(sizeof(double) * (size_t)(3 * bw + 1) * s->N);
   fd_band_from_dense(s->N, bw, op->Ks, op->ab);
+  if(s->Nu > 0 && surf_eliminate(s, op))
+    return NULL;
   s->nops++;
   return op;
 }
@@ -1144,6 +1309,51 @@ void fd_state_free(struct fd_state *st)
   free(st);
 }
 
+/* the friction solves on the fault with the surface unknowns eliminated (M7 step 2b); without a
+   surface they are the plain solves */
+static void surf_solve_sw(struct fd_slipweak *f, struct fd_sys *s, struct fd_ops *op, const double *H, const double *Hn,
+    const double *sigma0, int normal_coupling, double t, double dt, const double *delta, const double *Vguess, double *V, double *sigma)
+{
+  double *He, *Hne, *q;
+  int N;
+  if(s->Nu == 0){
+    fd_slipweak_solve(f, s, op, H, Hn, sigma0, normal_coupling, t, dt, delta, Vguess, V, sigma);
+    return;
+  }
+  He = (double *)malloc(sizeof(double)*(s->Nf + 1));
+  Hne = (double *)malloc(sizeof(double)*(s->Nf + 1));
+  q = (double *)malloc(sizeof(double)*s->Nu);
+  surf_reduce(s, op, H, Hn, He, Hne, q);
+  N = s->N;
+  s->N = s->Nf;
+  fd_slipweak_solve(f, s, op->el, He, Hne, sigma0, normal_coupling, t, dt, delta, Vguess, V, sigma);
+  s->N = N;
+  surf_recover(s, op, q, V);
+  free(He);
+  free(Hne);
+  free(q);
+}
+static void surf_solve_rsf(const struct fd_rsf *f, struct fd_sys *s, struct fd_ops *op, const double *H, const double *sigma,
+    const double *psi, const double *Vg, double *V)
+{
+  double *He, *q;
+  int N;
+  if(s->Nu == 0){
+    fd_rsf_solve(f, s, op, H, sigma, psi, Vg, V);
+    return;
+  }
+  He = (double *)malloc(sizeof(double)*(s->Nf + 1));
+  q = (double *)malloc(sizeof(double)*s->Nu);
+  surf_reduce(s, op, H, NULL, He, NULL, q);
+  N = s->N;
+  s->N = s->Nf;
+  fd_rsf_solve(f, s, op->el, He, sigma, psi, Vg, V);
+  s->N = N;
+  surf_recover(s, op, q, V);
+  free(He);
+  free(q);
+}
+
 static int fd_step_slipweak_nl(struct fd_sys *s, struct fd_state *st, struct fd_slipweak *f, int k)
 {
   int i, N = s->N;
@@ -1167,7 +1377,7 @@ static int fd_step_slipweak_nl(struct fd_sys *s, struct fd_state *st, struct fd_
     for(i = 0; i < N; i++)
       st->Hn[i] += st->work[i];
   }
-  fd_slipweak_solve(f, s, op, st->H, st->Hn, st->sigma0, st->normal_coupling, t1, 0.5 * dt, d1, st->V, st->work, st->sigma);
+  surf_solve_sw(f, s, op, st->H, st->Hn, st->sigma0, st->normal_coupling, t1, 0.5 * dt, d1, st->V, st->work, st->sigma);
   memcpy(st->V, st->work, sizeof(double) * N);
   fd_band_mult(N, op->bw, op->ab, st->V, st->work);
   for(i = 0; i < N; i++)
@@ -1200,7 +1410,7 @@ int fd_step_slipweak(struct fd_sys *s, struct fd_state *st, struct fd_slipweak *
     st->H[i] += st->tau0[i] + st->taudot[i] * t1 + st->hs[i];
     st->Hn[i] += st->Hn_dot[i] * t1 + st->hn[i];
   }
-  fd_slipweak_solve(f, s, op, st->H, st->Hn, st->sigma0, st->normal_coupling, t1, dt, st->delta, st->V, st->work, st->sigma);
+  surf_solve_sw(f, s, op, st->H, st->Hn, st->sigma0, st->normal_coupling, t1, dt, st->delta, st->V, st->work, st->sigma);
   memcpy(st->V, st->work, sizeof(double) * N);
   fd_band_mult(N, op->bw, op->ab, st->V, st->work);
   for(i = 0; i < N; i++)
@@ -1409,17 +1619,17 @@ static int fd_step_rsf_nl(struct fd_sys *s, struct fd_state *st, const struct fd
       sig[i] = st->sigma0[i] + s->nsign * (st->Hn[i] + sig[i]);
   }
   /* predictor, corrector: state over the step at the mean rate */
-  for(i = 0; i < N; i++)
+  for(i = 0; i < s->Nf; i++)
     psi_s[i] = fd_rsf_psi_advance(f, i, st->psi[i], Vold[i], Vold[i], dt);
-  fd_rsf_solve(f, s, op, st->H, sig, psi_s, Vold, Vs);
+  surf_solve_rsf(f, s, op, st->H, sig, psi_s, Vold, Vs);
   if(st->normal_coupling){
     dense_mult(N, op->Kn, Vs, sig);
     for(i = 0; i < N; i++)
       sig[i] = st->sigma0[i] + s->nsign * (st->Hn[i] + sig[i]);
   }
-  for(i = 0; i < N; i++)
+  for(i = 0; i < s->Nf; i++)
     psi_s[i] = fd_rsf_psi_advance(f, i, st->psi[i], Vold[i], Vs[i], dt);
-  fd_rsf_solve(f, s, op, st->H, sig, psi_s, Vs, st->V);
+  surf_solve_rsf(f, s, op, st->H, sig, psi_s, Vs, st->V);
   tp1 = fd_now();
   fd_prof[2] += tp1 - tp0;
   tp0 = tp1;
@@ -1484,18 +1694,18 @@ int fd_step_rsf(struct fd_sys *s, struct fd_state *st, const struct fd_rsf *f, i
   } else
     for(i = 0; i < N; i++)
       sig[i] = st->sigma0[i];
-  for(i = 0; i < N; i++)
+  for(i = 0; i < s->Nf; i++)
     psi_s[i] = fd_rsf_psi_advance(f, i, st->psi[i], st->V[i], st->V[i], dt);
-  fd_rsf_solve(f, s, op, st->H, sig, psi_s, st->V, Vs);
+  surf_solve_rsf(f, s, op, st->H, sig, psi_s, st->V, Vs);
   /* corrector */
   if(st->normal_coupling){
     dense_mult(N, op->Kn, Vs, sig);
     for(i = 0; i < N; i++)
       sig[i] = st->sigma0[i] + s->nsign * (st->Hn[i] + sig[i]);
   }
-  for(i = 0; i < N; i++)
+  for(i = 0; i < s->Nf; i++)
     psi_s[i] = fd_rsf_psi_advance(f, i, st->psi[i], st->V[i], Vs[i], dt);
-  fd_rsf_solve(f, s, op, st->H, sig, psi_s, Vs, st->V);
+  surf_solve_rsf(f, s, op, st->H, sig, psi_s, Vs, st->V);
   tp1 = fd_now();
   fd_prof[2] += tp1 - tp0;
   tp0 = tp1;

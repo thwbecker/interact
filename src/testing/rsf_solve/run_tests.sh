@@ -96,6 +96,17 @@ if command -v python3 > /dev/null 2>&1; then
   ( cd tmp_fd_dynamic && python3 ../fully_dynamic/test_fd_open.py ../bin/test_fd_open > fd3d.out 2>&1 )
   tail -1 tmp_fd_dynamic/fd3d.out; grep -q PASS tmp_fd_dynamic/fd3d.out || fail=1
 fi
+# virtual free surface in the 2-D marcher (fd_plan.md M7 step 2b): spontaneous rupture on a 3 km
+# fault dipping 30 degrees, top 400 m deep, with a surface of +-4 km, against the prototype's
+# test_fs_dyn2d.inplane_rupture (|slip| top / middle / bottom: thrust 0.672 / 1.318 / 0.650 m,
+# normal 0.194 / 0.859 / 0.541 m), within 5 mm; about 1 minute
+for c in "-1 0.672 1.318 0.650" "1 0.194 0.859 0.541"; do
+  set -- $c
+  ( cd tmp_fd_dynamic && ../bin/fd_dynamic fsrup $1 1 > fsrup.out 2>/dev/null )
+  awk -v t=$2 -v m=$3 -v b=$4 '{for(i=1;i<=NF;i++) if($i=="bottom"){split($(i+1),x," "); top=$(i+1); mid=$(i+3); bot=$(i+5)}}
+       END {d=0; e=top-t; if(e<0)e=-e; if(e>d)d=e; e=mid-m; if(e<0)e=-e; if(e>d)d=e; e=bot-b; if(e<0)e=-e; if(e>d)d=e;
+            if(d<=0.005) print "fd_dynamic fsrup (free surface, sense " sense "): PASS (largest slip difference to the prototype " d " m)"; else {print "fd_dynamic fsrup: FAIL (" d " m)"; exit 1}}' sense=$1 tmp_fd_dynamic/fsrup.out || fail=1
+done
 # dense tables with virtual free-surface elements (fd_plan.md M7 step 2) against densesys.py;
 # needs the prototype's tdd library (TDD_LIB, default /tmp/tdd/libtdd.so: gfortran -O2 -fPIC -shared
 # -Isrc/includes -DUSE_DOUBLE_PRECISION src/green/tdd_coeff.F -o /tmp/tdd/libtdd.so); skipped without it
