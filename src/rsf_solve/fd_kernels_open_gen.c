@@ -670,3 +670,55 @@ void fd_sig_open_p(double x, double y, double t, double alpha, double beta, doub
   s[1] = (1.0/4.0)*x*x117*x91*y*(2*x102 - 2*x104 + x106*x119 + 2*x109 + 8*x110 + 2*x111 + x119*x18*x3 - x120*x84 - x120*x87 - x121*x55 - x121*x56 + x121*x63 - 7*x13 + 10*x18 - 10*x21 + 8*x23*x37 + 20*x25 - 40.0/3.0*x33 + x46 - 8.0/3.0*x72 + x80*x88 - x82 + 2*x94*(-x100*x2 + x119*x37 + x2*x51 + x2*x95 - x2*x97 + x2*x98 + x2*x99 - x44 + x53 + x59 + x66) + (1.0/6.0)*x94*(12*x101*x2 - x113 - x114 - 6*x13 + 24*x17*x8*x9 - 24*x21 + 48*x23*x24 + 24*x23*x37 + 24*x23*x80 - 32*x33 + 6*x4*x43 - x73 - x83));
   s[2] = x118*(x116 + x92*(x115 - 16*x40 + x90));
 }
+
+/* full-plane static stress of unit opening on |x'| <= a, physical sign; G shear modulus */
+void fd_static_open_cs(double x, double y, double a, double G, double nu, double *s)
+{
+  double x0;
+  double x1;
+  double x2;
+  double x3;
+  double x4;
+  double x5;
+  double x6;
+  double x7;
+  double x8;
+  double x9;
+  double x10;
+  double x11;
+  double x12;
+  double x13;
+  double x14;
+  double x15;
+  double x16;
+  double x17;
+  double x18;
+  double x19;
+  double x20;
+  double x21;
+  x0 = a - x;
+  x1 = pow(y, 2);
+  x2 = a + x;
+  x3 = pow(x2, 2);
+  x4 = x1 + x3;
+  x5 = pow(x4, 2);
+  x6 = x0*x5;
+  x7 = pow(x0, 2);
+  x8 = x1 + x7;
+  x9 = pow(x8, 2);
+  x10 = x2*x9;
+  x11 = 4*x1;
+  x12 = 2*x1;
+  x13 = x10*x12 + x10*x4 + x12*x6 + x6*x8;
+  x14 = (1.0/2.0)*G/(M_PI*(nu - 1));
+  x15 = x14/(x5*x9);
+  x16 = pow(x4, 3);
+  x17 = pow(x8, 3);
+  x18 = 8*x1;
+  x19 = 3*x16;
+  x20 = 3*x17;
+  x21 = 3*x1;
+  s[0] = x15*(-x11*(x10 + x6) + x13);
+  s[1] = x14*y*(x12*(-x11*x16 + x11*x17 + x19*x8 - x20*x4) - x16*x18*x7 + 2*x16*x8*(x21 + x7) + x17*x18*x3 - 2*x17*x4*(x21 + x3) - x19*x9 + x20*x5)/(x16*x17);
+  s[2] = x13*x15;
+}

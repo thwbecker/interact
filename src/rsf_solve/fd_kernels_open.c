@@ -183,3 +183,22 @@ void fd_seg_ramp_inplane_open(double xr, double yr, double t, double a, double a
   }
   open_at(xr, yr, t, a, alpha, beta, rho, st);
 }
+
+void fd_static_open_cs(double x, double y, double a, double G, double nu, double *s);
+
+/* full-plane static stress (sxx, sxy, syy) in the source frame from unit opening on |x'| <= a
+   (Crouch and Starfield, physical sign; generated in fd_kernels_open_gen.c); the closed form has
+   a removable 0/0 on the normals through the element ends, averaged over a tiny offset there */
+void fd_static_inplane_open(double x, double y, double a, double mu, double nu, double st[3])
+{
+  double lo[3], hi[3], e;
+  int k;
+  fd_static_open_cs(x, y, a, mu, nu, st);
+  if(isfinite(st[0]) && isfinite(st[1]) && isfinite(st[2]))
+    return;
+  e = 1e-7*a;
+  fd_static_open_cs(x - e, y, a, mu, nu, lo);
+  fd_static_open_cs(x + e, y, a, mu, nu, hi);
+  for(k = 0; k < 3; k++)
+    st[k] = 0.5*(lo[k] + hi[k]);
+}

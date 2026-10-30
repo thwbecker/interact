@@ -34,11 +34,13 @@ int main(int argc, char **argv)
   }
   /* the prototype's X0 is the segment start; element 0 centre is half an element along */
   s.n = ns;
+  s.kind = FD_SEG_FAULT;
   s.dx = dx;
   s.a = dx / 2;
   s.X0[0] += 0.5 * dx * s.s[0];
   s.X0[1] += 0.5 * dx * s.s[1];
   r.n = nr;
+  r.kind = FD_SEG_FAULT;
   r.dx = dx;
   r.a = dx / 2;
   r.X0[0] += 0.5 * dx * r.s[0];

@@ -48,7 +48,7 @@ struct fd_pair *fd_pair_build(const struct fd_segment *src, const struct fd_segm
   const double *ss = src->s, *sr = rcv->s;
   if(errmsg)
     errmsg[0] = 0;
-  if(!fd_segments_parallel(src, rcv) || getenv("FD_FORCE_DENSE"))
+  if(!fd_segments_parallel(src, rcv) || src->kind != FD_SEG_FAULT || rcv->kind != FD_SEG_FAULT || getenv("FD_FORCE_DENSE"))
     return fd_pair_build_dense(src, rcv, mode, dt, et, alpha, beta, rho, tol, lmax, cap_ok, M, errmsg);
   if(lmax <= 0){
     /* generous bound: S arrival at the farthest pair times (1 + 2/sqrt(tol)) */
@@ -175,6 +175,170 @@ struct fd_pair *fd_pair_build(const struct fd_segment *src, const struct fd_segm
 }
 
 
+/* ---------------- surface elements (fd_plan.md M7 step 2) ----------------
+   Opening sources use the quadrature kernel of fd_kernels_open.c, which is expensive, so the
+   stress histories are cached by the receiver's position in the source frame (on a straight
+   surface the relative positions repeat) and evaluated only until the window criterion has held
+   for FD_OPEN_QUIET lags after the S arrival from the far end of the source. */
+#define FD_OPEN_QUIET 32
+/* the symmetric time average of the opening kernel (as the prototype's tshift), 1.7e-3 of the
+   step rather than the prototype's 1e-4: with surface elements of a whole number of S steps the
+   fronts cross element ends, or touch the source line, exactly at sample times, and the
+   quadrature is ill-conditioned within beta tshift of such a coincidence. The values are stable
+   (to 3e-4 relative) for shifts of 7e-4 to 5e-3 in the cases found (an on-line receiver as an S
+   front passes a segment end, a front tangent to the source line); 1e-4 was 2 percent off in
+   the second case and 1e-3 met another coincidence (a spike of 1e12 Pa) */
+#define FD_OPEN_TSHIFT 1.7e-3
+struct open_cache_entry {
+  long kx;
+  long ky;
+  long ka;
+  int n;                        /* lags evaluated (values beyond are zero increments) */
+  double *s;                    /* 3 x (n + 1) stresses at (et + l - 1) dt, l = 0..n, s[0] at t = 0 */
+};
+static struct open_cache_entry *g_oc = NULL;
+static size_t g_oc_n = 0, g_oc_cap = 0;
+
+void fd_tables_open_cache_clear(void)
+{
+  size_t i;
+  for(i = 0; i < g_oc_cap; i++)
+    free(g_oc[i].s);
+  free(g_oc);
+  g_oc = NULL;
+  g_oc_n = 0;
+  g_oc_cap = 0;
+}
+static size_t oc_hash(long kx, long ky, long ka, size_t cap)
+{
+  unsigned long h;
+  h = (unsigned long)kx*1000003UL ^ (unsigned long)ky*998244353UL ^ (unsigned long)ka*19260817UL;
+  return (size_t)(h % cap);
+}
+static struct open_cache_entry *oc_find(long kx, long ky, long ka, int insert)
+{
+  size_t i, j, cap;
+  struct open_cache_entry *old;
+  if(g_oc_cap == 0 || (insert && 2*(g_oc_n + 1) > g_oc_cap)){
+    old = g_oc;
+    cap = g_oc_cap;
+    g_oc_cap = cap ? 2*cap : 1024;
+    g_oc = (struct open_cache_entry *)calloc(g_oc_cap, sizeof(*g_oc));
+    for(i = 0; i < cap; i++)
+      if(old[i].s){
+        j = oc_hash(old[i].kx, old[i].ky, old[i].ka, g_oc_cap);
+        while(g_oc[j].s)
+          j = (j + 1) % g_oc_cap;
+        g_oc[j] = old[i];
+      }
+    free(old);
+  }
+  i = oc_hash(kx, ky, ka, g_oc_cap);
+  while(g_oc[i].s){
+    if(g_oc[i].kx == kx && g_oc[i].ky == ky && g_oc[i].ka == ka)
+      return g_oc + i;
+    i = (i + 1) % g_oc_cap;
+  }
+  if(!insert)
+    return NULL;
+  g_oc[i].kx = kx;
+  g_oc[i].ky = ky;
+  g_oc[i].ka = ka;
+  g_oc_n++;
+  return g_oc + i;
+}
+
+/* one dense entry with a surface element involved (in-plane): the source's stress history
+   (slip: closed-form ramp and series as below; opening: quadrature, cached), projected on the
+   receiver's primary row (shear, or normal for an opening receiver) into W and the normal row
+   into Wn; K: static values of both rows. Increments of lags l = 1..lmax as W[l - 1]. */
+static void dense_entry_open(const struct fd_segment *src, const struct fd_segment *rcv, double x, double y,
+    double dt, double et, double alpha, double beta, double rho, double mu, double nu, double tol, int lmax,
+    double *W, double *Wn, double *Kp, double *Kn)
+{
+  double st[3], s0[3], s1[3], d[3], ts, tn, kps, kpn, rfar, env, rr;
+  int l, k, quiet, lS, nl;
+  long kx;
+  long ky;
+  long ka;
+  struct open_cache_entry *ce;
+  double *hist;
+  /* static */
+  if(src->kind == FD_SEG_SURF_OPEN)
+    fd_static_inplane_open(x, y, src->a, mu, nu, st);
+  else
+    fd_static_inplane(x, y, src->a, mu, nu, st);
+  fd_project(st[0], st[1], st[2], src->s, rcv->s, &kps, &kpn);
+  *Kp = (rcv->kind == FD_SEG_SURF_OPEN) ? kpn : kps;
+  *Kn = kpn;
+  rr = fmax(hypot(x, y), src->a);
+  env = mu*src->dx*src->dx/(2.0*M_PI*(1.0 - nu)*rr*rr)*dt;
+  rfar = fmax(hypot(x + src->a, y), hypot(x - src->a, y));
+  lS = (int)ceil(rfar/beta/dt) + 2;
+  /* stress history in the source frame, from the cache for opening sources */
+  hist = NULL;
+  nl = 0;
+  ce = NULL;
+  kx = 0;
+  ky = 0;
+  ka = 0;
+  if(src->kind == FD_SEG_SURF_OPEN){
+    kx = lround(x*1e3);
+    ky = lround(y*1e3);
+    ka = lround(src->a*1e3);
+    ce = oc_find(kx, ky, ka, 0);
+    if(ce){
+      hist = ce->s;
+      nl = ce->n;
+    }
+  }
+  if(!hist){
+    hist = (double *)malloc(sizeof(double)*3*(size_t)(lmax + 1));
+    hist[0] = hist[1] = hist[2] = 0.0;
+    quiet = 0;
+    for(l = 1; l <= lmax; l++){
+      if(src->kind == FD_SEG_SURF_OPEN)
+        fd_seg_ramp_inplane_open(x, y, (et + l - 1)*dt, src->a, alpha, beta, rho, FD_OPEN_TSHIFT*dt, s1);
+      else
+        fd_seg_ramp_inplane(x, y, (et + l - 1)*dt, src->a, alpha, beta, rho, s1);
+      for(k = 0; k < 3; k++)
+        hist[3*l + k] = s1[k];
+      nl = l;
+      /* stop once the increments minus the static slope stay below the window criterion */
+      for(k = 0; k < 3; k++){
+        d[k] = s1[k] - hist[3*(l - 1) + k];
+        s0[k] = st[k]*dt;
+      }
+      fd_project(d[0] - s0[0], d[1] - s0[1], d[2] - s0[2], src->s, rcv->s, &ts, &tn);
+      if(l > lS && fabs(ts) <= tol*env && fabs(tn) <= tol*env)
+        quiet++;
+      else
+        quiet = 0;
+      if(quiet >= FD_OPEN_QUIET)
+        break;
+    }
+    if(src->kind == FD_SEG_SURF_OPEN){
+      ce = oc_find(kx, ky, ka, 1);
+      ce->s = hist;
+      ce->n = nl;
+    }
+  }
+  for(l = 1; l <= lmax; l++){
+    if(l <= nl){
+      for(k = 0; k < 3; k++)
+        d[k] = hist[3*l + k] - hist[3*(l - 1) + k];
+    }else{
+      for(k = 0; k < 3; k++)
+        d[k] = st[k]*dt;                       /* the static rate: zero increment after the window */
+    }
+    fd_project(d[0], d[1], d[2], src->s, rcv->s, &ts, &tn);
+    W[l - 1] = ((rcv->kind == FD_SEG_SURF_OPEN) ? tn : ts) - (*Kp)*dt;
+    Wn[l - 1] = tn - kpn*dt;
+  }
+  if(src->kind != FD_SEG_SURF_OPEN)
+    free(hist);
+}
+
 /* dense pair (fd_plan.md N1): the same columns as fd_pair_build for every (receiver, source)
    element pair, receiver centre in the source element's frame */
 struct fd_pair *fd_pair_build_dense(const struct fd_segment *src, const struct fd_segment *rcv, int mode,
@@ -222,7 +386,7 @@ struct fd_pair *fd_pair_build_dense(const struct fd_segment *src, const struct f
   p->dt = dt;
   p->et = et;
   p->dense = 1;
-  p->has_normal = (mode == FD_MODE_INPLANE);
+  p->has_normal = (mode == FD_MODE_INPLANE);     /* (surface receivers do not need it; kept for uniformity) */
   p->Kd_s = (double *)malloc(sizeof(double)*np);
   p->Kd_n = (double *)calloc(np, sizeof(double));
   Ws = (double *)calloc(np*lmax, sizeof(double));
@@ -234,6 +398,11 @@ struct fd_pair *fd_pair_build_dense(const struct fd_segment *src, const struct f
   for(e = 0; e < np; e++){
     x = xr[e];
     y = yr[e];
+    if(mode == FD_MODE_INPLANE && (src->kind == FD_SEG_SURF_OPEN || rcv->kind == FD_SEG_SURF_OPEN)){
+      /* surface elements (M7 step 2): opening sources and/or normal-traction receivers */
+      dense_entry_open(src, rcv, x, y, dt, et, alpha, beta, rho, mu, nu, tol, lmax, Ws + e*lmax, Wn + e*lmax, &p->Kd_s[e], &p->Kd_n[e]);
+      continue;
+    }
     if(mode == FD_MODE_INPLANE){
       fd_static_inplane(x, y, src->a, mu, nu, st);
       fd_project(st[0], st[1], st[2], ss, sr, &p->Kd_s[e], &p->Kd_n[e]);

@@ -2964,6 +2964,36 @@ Next (step 2): the surface segment type in the 2-D marcher (shear and opening un
 traction), with elements grouped into polyline segments with dense blocks (so that a curved
 fault is not N^2 pair structures, and no spectral ring is kept when all pairs are dense).
 
+### M7 step 2a: tables with virtual free-surface elements (2026-10-31)
+
+Segment kinds (fd_tables.h): FD_SEG_FAULT (slip, friction on the shear traction),
+FD_SEG_SURF_SLIP (slip, zero shear traction) and FD_SEG_SURF_OPEN (opening, zero normal
+traction); a surface element in-plane is two segments of the same geometry. Pairs involving a
+surface segment are dense; for an opening source the static block comes from Crouch and
+Starfield's full-plane solution (generated into fd_kernels_open_gen.c, with the removable 0/0
+on the normals through the element ends averaged; equal to the prototype's sympy form, and
+to the large-time slope of the dynamic kernel to 1e-5) and the history from the quadrature
+kernel, cached by the receiver's position in the source frame and evaluated only until the
+window criterion has held for 32 lags after the far S arrival; the primary row of an opening
+receiver is its normal traction.
+Kernel conditioning found on the way: with surface elements of a whole number of S steps (here
+250 m, beta dt = 125 m) fronts cross element ends, or touch the source line, exactly at sample
+times, and the quadrature loses digits within beta tshift of such a coincidence. The
+prototype's symmetric average over t -+ 1e-4 dt was 2 percent off for a front tangent to the
+source line (and depended on floating-point contraction), 1e-3 met a coincidence that gave a
+spike of 1e12 Pa; values are stable to 3e-4 for shifts of 7e-4 to 5e-3, and the C tables use
+1.7e-3. The prototype's static opening field also used fixed MU = 3.2e10, NU = 0.25 instead
+of the material's (1.2e-3 different here).
+Check (bin/test_fd_surf, fully_dynamic/test_fd_surf.py, run_tests.sh; needs the prototype's
+tdd library): a fault of 4 elements of 500 m dipping 30 degrees, top 500 m deep, under a
+surface line of 8 elements of 250 m; all nine blocks (fault, surface slip, surface opening as
+sources and receivers), 30 lags, static and normal rows: tables within 1.0e-1 of 3.7e6, static
+within 2.9e-8 of 1.1e8 of densesys.py (with the same time average and material constants).
+Next (step 2b): the marcher, with the surface unknowns eliminated in every operator K_k
+(Schur complement; the fault solvers then see the eliminated operator and known part), and
+the setup in rsf_fd.c (a surface line refined near traces, graded outwards; the element
+grouping for curved faults).
+
 ### WP7, C implementation in rsf_solve: status (2026-10-18)
 Done, each verified in the sandbox before delivery (details in
 fd_c_design.md sections 6 to 10, usage in rsf_solve_fd.md):

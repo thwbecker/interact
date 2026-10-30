@@ -65,6 +65,7 @@ struct fd_seglist *fd_detect_segments(int n, const double *cx, const double *cy,
         S->gidx = (int **)realloc(S->gidx, sizeof(int *) * cap);
       }
       S->seg[S->nseg].n = hi - lo + 1;
+      S->seg[S->nseg].kind = FD_SEG_FAULT;
       S->seg[S->nseg].dx = dx;
       S->seg[S->nseg].a = hl[i];
       S->seg[S->nseg].s[0] = tx[i];

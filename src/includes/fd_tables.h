@@ -17,11 +17,20 @@
 #define FD_MODE_INPLANE   0
 #define FD_MODE_ANTIPLANE 1
 
+/* segment kinds (fd_plan.md M7 step 2): a fault segment has slip as unknown and its shear
+   traction as equation (friction); a virtual free surface element (in-plane) is represented by
+   two segments of the same geometry, one with slip and zero shear traction (FD_SEG_SURF_SLIP),
+   one with opening and zero normal traction (FD_SEG_SURF_OPEN); antiplane surfaces need the
+   first only */
+#define FD_SEG_FAULT     0
+#define FD_SEG_SURF_SLIP 1
+#define FD_SEG_SURF_OPEN 2
 struct fd_segment {
   double X0[2];		/* centre of element 0 */
   double s[2];		/* unit tangent */
   double dx, a;		/* element length, half-length */
   int n;		/* number of elements */
+  int kind;		/* FD_SEG_* */
 };
 
 /* compressed dense lag tables (fd_plan.md D2): per entry the increments of lags 1..hi (the
@@ -80,6 +89,8 @@ struct fd_pair *fd_pair_build_dense(const struct fd_segment *src, const struct f
                                     double tol, int lmax, int cap_ok, int M, char *errmsg);
 /* compression of the dense tables (fd_plan.md D2): ctol > 0 compresses with that tolerance
    relative to the window's envelope of each entry; ctol <= 0 keeps the full windows */
+/* the cache of opening-source stress histories (surface elements), release after building */
+void fd_tables_open_cache_clear(void);
 void fd_tables_set_compress(double ctol);
 /* lags 1..nexp of every entry stay explicit (default 1) */
 void fd_tables_set_compress_explicit(int nexp);

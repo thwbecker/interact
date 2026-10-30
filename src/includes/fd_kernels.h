@@ -7,6 +7,8 @@ void fd_seg_ramp_inplane(double xr, double yr, double t, double a, double alpha,
    source frame (fd_kernels_open.c, port of inplane_open.py); tshift > 0 averages t -+ tshift */
 void fd_seg_ramp_inplane_open(double xr, double yr, double t, double a, double alpha, double beta, double rho,
                               double tshift, double s[3]);
+/* full-plane static stress (sxx, sxy, syy) of unit opening on |x'| <= a, source frame */
+void fd_static_inplane_open(double x, double y, double a, double mu, double nu, double st[3]);
 void fd_I_antiplane(double x1, double x2, double t, double beta, double I[2]);
 void fd_seg_ramp_antiplane(double xr, double yr, double t, double a, double beta, double rho, double s[2]);
 void fd_static_inplane(double xr, double yr, double a, double mu, double nu, double s[3]);

@@ -26,12 +26,14 @@ int main(int argc, char **argv)
   src.dx = dx;
   src.a = 0.5*dx;
   src.n = ns;
+  src.kind = FD_SEG_FAULT;
   /* receiver starts at the source's far end (x = ns dx), rotated by ang */
   rcv.s[0] = cos(ang);
   rcv.s[1] = sin(ang);
   rcv.dx = dx;
   rcv.a = 0.5*dx;
   rcv.n = nr;
+  rcv.kind = FD_SEG_FAULT;
   rcv.X0[0] = ns*dx + 0.5*dx*rcv.s[0];
   rcv.X0[1] = 0.5*dx*rcv.s[1];
   p = fd_pair_build(&src, &rcv, mode, dt, 1.0, alpha, beta, rho, 1e-9, 200, 1, 0, err);   /* tight: no tail cut before lag 60 */

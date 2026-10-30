@@ -87,6 +87,7 @@ int main(int argc, char **argv)
   dt = 0.5 * dx / BE;
   nsteps = (int)floor(tend / dt + 0.5);
   seg.n = n;
+  seg.kind = FD_SEG_FAULT;
   seg.dx = dx;
   seg.a = dx / 2;
   seg.s[0] = 1.0;
@@ -276,6 +277,7 @@ static int run_hd(int argc, char **argv)
   nsteps = (int)floor(tend / dt + 0.5);
   for(j = 0; j < 2; j++){
     seg[j].n = n;
+    seg[j].kind = FD_SEG_FAULT;
     seg[j].dx = dx;
     seg[j].a = dx / 2;
     seg[j].s[0] = 1.0;

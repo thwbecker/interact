@@ -96,6 +96,14 @@ if command -v python3 > /dev/null 2>&1; then
   ( cd tmp_fd_dynamic && python3 ../fully_dynamic/test_fd_open.py ../bin/test_fd_open > fd3d.out 2>&1 )
   tail -1 tmp_fd_dynamic/fd3d.out; grep -q PASS tmp_fd_dynamic/fd3d.out || fail=1
 fi
+# dense tables with virtual free-surface elements (fd_plan.md M7 step 2) against densesys.py;
+# needs the prototype's tdd library (TDD_LIB, default /tmp/tdd/libtdd.so: gfortran -O2 -fPIC -shared
+# -Isrc/includes -DUSE_DOUBLE_PRECISION src/green/tdd_coeff.F -o /tmp/tdd/libtdd.so); skipped without it
+if command -v python3 > /dev/null 2>&1 && [ -s ${TDD_LIB-/tmp/tdd/libtdd.so} ]; then
+  ( cd tmp_fd_dynamic && FD_CT_OFF=1 ../bin/test_fd_surf 4 8 30 > surf.txt 2>/dev/null && \
+    python3 ../fully_dynamic/test_fd_surf.py surf.txt 4 8 30 > fd3d.out 2>&1 ); st=$?
+  tail -1 tmp_fd_dynamic/fd3d.out; [ $st -eq 0 ] || fail=1
+fi
 # non-parallel 2-D pairs (fd_plan.md N1): dense tables against the prototype for a kinked pair
 if command -v python3 > /dev/null 2>&1; then
   for a in 30 -45; do for m in 0 1; do
