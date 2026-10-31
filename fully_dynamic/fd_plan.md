@@ -3200,8 +3200,11 @@ the cells must be.
   compressed into its own table and appended in row order, so the tables do not depend on the
   number of threads (station series identical on 1 and 4 threads); the cache of the opening
   kernel is shared under a critical section.
-- coarsen_2d.py joins m consecutive elements of each group (near-equal blocks) with averaged
-  rate-and-state inputs, for dynamic tests of the Cascadia sections at coarser elements.
+- coarsen_2d.py resamples each group's polyline into nb = round(S/h) equal pieces (S its arc
+  length, h the target length) with the rate-and-state inputs averaged by overlap along the arc,
+  for dynamic tests of the Cascadia sections at coarser elements (PD13 at 500 m: 453 elements of
+  490 to 519 m; joining whole blocks of 5 elements gave 398 to 594 m, beyond the 25 percent
+  that the second-order marching allows).
 Instability found with PD13 at about 1 km: the first dynamic phase diverged about 200 s in
 (slip rate growing by a factor of 400 every 26 s at k = 1), with surface elements of 1250 m
 and of 900 m alike, with and without the splays; the same run in a full space (no surface) is
