@@ -251,6 +251,7 @@ struct fd3d_dtab {      /* dense coupling, active receivers x active sources (fd
   size_t nmd, nmdcap;
   double *wk;           /* work space (L) */
   size_t nent, nmid, nlag_win; /* statistics: entries, entries with a middle, lags of the dense windows */
+  size_t nmaxed;        /* statistics: entries that used all FD3D_DP_MAXMID runs */
 };
 #define FD3D_DP_LNORM 1024.0
 /* prefix moments of one source's history for the partitioned tables: P[k][m] = sum over lags

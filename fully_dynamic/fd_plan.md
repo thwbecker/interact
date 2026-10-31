@@ -3145,6 +3145,42 @@ Next: the r ladder (stations against SCEC) to 250 m on 16 ranks with the mirror 
 tables, about 4.3 GB per rank); the 7 failing tests; for 100 m, low-rank compression of the
 cross tables in space.
 
+### L1: scoping the compression of the dense couplings beyond D1/D2 (2026-11-01)
+
+Where the memory is (diagnostic at 1 km, TPV14 cross tables, typical far entries of 37 to 55
+lags): the increments are exactly cubic between the wavefronts (third differences 1e-14 of the
+entry's largest value), so the runs of D1 hold them in three coefficients; the stored lags are
+those at and right after the four fronts (P and S of the source and of its image), about 4 to 6
+per front, because the third differences need 3 lags to restart after a jump. At 250 m the H11
+runs stored 93 lags per entry of 259; whether these are still only the fronts, or entries that
+used all 8 runs (FD3D_DP_MAXMID) or runs shorter than 6 lags, is the first thing to measure
+(FD3D_DP_DIAG now also prints the entries that used all runs).
+Options, in order of effort:
+1. Raise FD3D_DP_MAXMID and lower the run threshold if the 250 m diagnostic shows saturation
+   (hours; a factor of up to 2 if so, nothing otherwise).
+2. Low rank in space for the smooth parts: for a pair of clusters (receivers R, sources S, sizes
+   d_R, d_S, distance D > eta max(d_R, d_S)) the cubic coefficients between the fronts and the
+   static slope are smooth in (i, j), so they compress by adaptive cross approximation (ACA).
+   It removes the per-entry coefficients but not the front lags, which dominate; on its own the
+   gain is small.
+3. Front-aligned (retarded) low rank: in a far pair of clusters the delays are separable to
+   first order, r_ij ~ D + a_i - b_j (plane-wave approximation), so W_ij(l) ~ sum_k U_ik V_jk
+   g_k(l - a_i + b_j). The history becomes a source-side aggregation z_k(t) = sum_j V_jk v_j(t +
+   b_j), a convolution with g_k, and a receiver-side spread, O(rank (|R| + |S|) window) instead of
+   |R| |S| window. The delay error d^2/(2 D) must stay well below c dt, so the admissibility is
+   D > d^2/(c dt) (at 250 m, clusters of 2.5 km would need D > 50 km): a single level does not
+   cover the near and middle field, and a multilevel version (as in plane-wave time-domain
+   methods) is a project of months.
+4. A volume method near the faults and the surface (the hybrid option): the BIE keeps the
+   planar Toeplitz self terms; the cross couplings and the free surface go to a volume solver.
+For the 2-D in-plane Cascadia case the same structure holds (fronts, smooth between them, a
+smooth tail instead of zero after S, measured 3x by D2); the immediate needs there are
+engineering: polyline segments with dense blocks instead of one pair structure per element pair,
+and the table-building cost of the surface (opening kernel evaluations).
+Recommendation: measure (1) at 250 m; do the 2-D grouping and table cost now (needed in any case);
+decide between (3) and (4) for 4 to 5 faults at 100 m after the TPV14/15 ladder shows how fine
+the cells must be.
+
 ### WP7, C implementation in rsf_solve: status (2026-10-18)
 Done, each verified in the sandbox before delivery (details in
 fd_c_design.md sections 6 to 10, usage in rsf_solve_fd.md):

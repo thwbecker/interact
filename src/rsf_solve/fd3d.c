@@ -4146,6 +4146,8 @@ static void dtab_fill(struct fd3d_dtab *d, const struct fd3d_tab *t, int col, in
   n = 0;
   if(d->dp)
     n = dp_middle(w, lo, hi, scale, FD3D_DP_MAXMID, ma, mb, cf);
+  if(n == FD3D_DP_MAXMID)
+    d->nmaxed++;
   if(n > 0){
     d->nmid++;
     if(d->nmd + n > d->nmdcap){
@@ -4473,8 +4475,8 @@ struct fd3d_multi *fd3d_multi_create(int np, struct fd3d **f, const struct fd3d_
       free(kis);
       free(kin);
       if(getenv("FD3D_DP_DIAG"))
-        fprintf(stderr, "fd3d_multi: pair %d -> %d: L %d, entries %zu / %zu with a middle (shear) %zu / %zu (normal); lags stored %zu / %zu of %zu / %zu in the windows\n",
-            q, p, L, c->hs.nmid, c->hs.nent, c->hn.nmid, c->hn.nent, c->hs.nw, c->hn.nw, c->hs.nlag_win, c->hn.nlag_win);
+        fprintf(stderr, "fd3d_multi: pair %d -> %d: L %d, entries %zu / %zu with a middle (shear) %zu / %zu (normal); lags stored %zu / %zu of %zu / %zu in the windows; entries with all %d runs used %zu / %zu\n",
+            q, p, L, c->hs.nmid, c->hs.nent, c->hn.nmid, c->hn.nent, c->hs.nw, c->hn.nw, c->hs.nlag_win, c->hn.nlag_win, FD3D_DP_MAXMID, c->hs.nmaxed, c->hn.nmaxed);
       c->Ks = c->hs.Ks;                                /* own rows, (i - r0) x ns */
       c->K1s = c->hs.K1;
       c->Kn = c->hn.Ks;

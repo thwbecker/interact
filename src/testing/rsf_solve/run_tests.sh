@@ -1,7 +1,18 @@
 #!/bin/sh
 # unit tests of the fully dynamic extension; run from the repository root after make rsf_testing
+# usage: run_tests.sh [MPI launch command, e.g. "mpirun", "mpiexec", "srun"] (default: the first
+# of mpirun, mpirun --oversubscribe, mpirun --allow-run-as-root --oversubscribe that starts 4 ranks)
 d=src/testing/rsf_solve
 fail=0
+mpi=${1-}
+if [ -z "$mpi" ] && command -v mpirun > /dev/null 2>&1; then
+  for m in "mpirun" "mpirun --oversubscribe" "mpirun --allow-run-as-root --oversubscribe"; do
+    if $m -np 4 true > /dev/null 2>&1; then
+      mpi=$m
+      break
+    fi
+  done
+fi
 bin/test_fd_fft || fail=1
 bin/test_fd_segments || fail=1
 for f in $d/ref/ref_inplane_*.txt $d/ref/ref_antiplane_*.txt; do bin/test_fd_tables $f || fail=1; done
@@ -124,15 +135,14 @@ if command -v python3 > /dev/null 2>&1; then
   done; done
 fi
 # MPI (fd_plan.md S2): the 3-D marcher must give bit-identical results on 1 and 3 ranks
-if command -v mpirun > /dev/null 2>&1; then
+if [ -n "$mpi" ]; then
+  echo "MPI launch command: $mpi"
   mkdir -p tmp_fd_dynamic/mpi1 tmp_fd_dynamic/mpi3
   ( cd tmp_fd_dynamic/mpi1 && FD3D_NL=1 ../../bin/fd3d_test tpv101 500 - 4 > out 2>/dev/null )
-  ( cd tmp_fd_dynamic/mpi3 && FD3D_NL=1 mpirun --oversubscribe -np 3 ../../bin/fd3d_test tpv101 500 - 4 > out 2>/dev/null \
-      || FD3D_NL=1 mpirun --allow-run-as-root --oversubscribe -np 3 ../../bin/fd3d_test tpv101 500 - 4 > out 2>/dev/null )
+  ( cd tmp_fd_dynamic/mpi3 && FD3D_NL=1 $mpi -np 3 ../../bin/fd3d_test tpv101 500 - 4 > out 2>/dev/null )
   # the virtual surface (tables split by wavenumber, S3): TPV10 at 1 km for 3 s
   ( cd tmp_fd_dynamic/mpi1 && ../../bin/fd3d_test tpv10 1000 30000 0 2 tv > /dev/null 2>&1 )
-  ( cd tmp_fd_dynamic/mpi3 && ( mpirun --oversubscribe -np 3 ../../bin/fd3d_test tpv10 1000 30000 0 2 tv > /dev/null 2>&1 || \
-      mpirun --allow-run-as-root --oversubscribe -np 3 ../../bin/fd3d_test tpv10 1000 30000 0 2 tv > /dev/null 2>&1 ) )
+  ( cd tmp_fd_dynamic/mpi3 && $mpi -np 3 ../../bin/fd3d_test tpv10 1000 30000 0 2 tv > /dev/null 2>&1 )
   if cmp -s tmp_fd_dynamic/mpi1/tv_st12000.dat tmp_fd_dynamic/mpi3/tv_st12000.dat && cmp -s tmp_fd_dynamic/mpi1/tv_st00000.dat tmp_fd_dynamic/mpi3/tv_st00000.dat; then echo "fd3d_test MPI surface (1 and 3 ranks bit-identical): PASS"
   else echo "fd3d_test MPI surface (1 and 3 ranks bit-identical): FAIL"; fail=1; fi
   if cmp -s tmp_fd_dynamic/mpi1/tpv101_rt.dat tmp_fd_dynamic/mpi3/tpv101_rt.dat; then echo "fd3d_test MPI (1 and 3 ranks bit-identical): PASS"
@@ -144,16 +154,14 @@ if command -v mpirun > /dev/null 2>&1; then
     t=`echo $c | cut -d' ' -f1`
     for n in 1 2 4; do
       mkdir -p tmp_fd_dynamic/h7_$t/n$n
-      ( cd tmp_fd_dynamic/h7_$t/n$n && rm -f dump.txt && \
-        ( FD3D_DUMP=dump.txt mpirun --oversubscribe -np $n ../../../bin/fd3d_test $c > out 2>/dev/null || \
-          FD3D_DUMP=dump.txt mpirun --allow-run-as-root --oversubscribe -np $n ../../../bin/fd3d_test $c > out 2>/dev/null ) )
+      ( cd tmp_fd_dynamic/h7_$t/n$n && rm -f dump.txt && FD3D_DUMP=dump.txt $mpi -np $n ../../../bin/fd3d_test $c > out 2>/dev/null )
     done
     if [ -s tmp_fd_dynamic/h7_$t/n1/dump.txt ] && cmp -s tmp_fd_dynamic/h7_$t/n1/dump.txt tmp_fd_dynamic/h7_$t/n2/dump.txt && \
        cmp -s tmp_fd_dynamic/h7_$t/n1/dump.txt tmp_fd_dynamic/h7_$t/n4/dump.txt; then echo "fd3d_test MPI dense couplings, $t (1, 2 and 4 ranks identical): PASS"
     else echo "fd3d_test MPI dense couplings, $t (1, 2 and 4 ranks identical): FAIL"; fail=1; fi
   done
 else
-  echo "fd3d_test MPI: skipped (no mpirun)"
+  echo "fd3d_test MPI: skipped (no MPI launch command that starts 4 ranks)"
 fi
 ( cd tmp_fd_dynamic && FD3D_NL=1 ../bin/fd3d_test mirror 500 6 > fd3d.out 2>/dev/null ); st=$?
 echo "(second-order marching) $(tail -1 tmp_fd_dynamic/fd3d.out)"; [ $st -eq 0 ] || fail=1
