@@ -3104,6 +3104,47 @@ generous bound before the window criterion trims them).
 Next: the cost of building the tables; step 3 (the prototype's checks in C, a small megathrust
 with a splay, QD against QD plus FD events).
 
+### H11 results (64-core machine, run_h11_measurements.sh "t m s g b", 2026-10-30/31)
+
+Run with the code of 2026-10-30 (before D2 and M7). run_tests.sh: 41 PASS, 7 FAIL there (all
+pass in the sandbox; the failing items are to be identified from h11_out/t.log).
+
+Memory of the partitioned TPV14 cross tables (D1, FD3D_DP_TOL 1e-10, one rank):
+
+| dx | lag data | trimmed windows | lags kept | explicit lags per entry (window) | table build |
+|---|---|---|---|---|---|
+| 1000 m | 93 MB | 129 MB | 46 % | 25 (55) | 52 s |
+| 750 m | 342 MB | 554 MB | 39 % | 30 (75) | 210 s |
+| 500 m | 2.3 GB | 4.4 GB | 35 % | 41 (118) | 26 min |
+| 250 m | 69 GB | 157 GB | 36 % | 93 (259) | 13.6 h |
+
+Gate 2 expected the explicit lags per entry (the strips) to stay at a few, so that the fraction
+kept falls as 1/dx; it does not: the explicit lags grow about as fast as the windows, and the
+fraction kept settles near 35 percent (2.3 times less than the trimmed windows, about 4.6 times
+less than all L lags). The fronts of a square source are not sharp at the 1e-10 tolerance:
+the response leaves a quadratic over a width that grows with the number of lags per front
+crossing. Looser tolerances help little (1 km: 71 MB at 1e-8 with dumps within 7e-9 of all
+lags, 69 MB at 1e-6 within 1.3e-5; 750 m: 226 MB at 1e-6). Since the entries grow as dx^-4 and
+the windows as dx^-1, TPV14 at 100 m would need about 100 times the 250 m tables (several TB):
+the cross tables need compression in space (low rank between distant blocks) for 100 m.
+MPI (TPV14, 500 m, 2 s, mostly table build): 1570, 795, 400, 203, 102 s on 1, 2, 4, 8, 16
+ranks (15.4 times on 16), final states identical byte for byte on all rank counts. The stepping
+alone was not separated; with 2 s of simulated time the build dominates.
+Free surface (H10), at 500 m: the mirror against the mirror plus opening layer (main fault
+alone): rupture time rms 0.029 s, top 3 km +0.020 s, top-row slip 3.768 against 3.775 m; the
+graded strips (+-15 km): rms 0.022 s, top 3 km -0.001 s, top-row slip 3.503 m (7 percent low).
+So the mirror's late near-surface rupture of 0.5 s at 1 km (H10) was mostly under-resolution,
+and for vertical strike slip the mirror is the better choice (slip within 0.2 percent); the
+strips keep a top-row slip deficit of 6 to 7 percent at 1 km and 500 m, which finer strip cells
+reduced at 1 km (H10). TPV14 with strips against the mirror: 750 m rms 0.17 s (main), 500 m
+0.044 s (main) and 0.028 s (branch); at 750 m only 70 percent of the main fault ruptures (100
+percent at 500 m), the cell size still decides the outcome there.
+Strip solve (b; TPV14 at 1 km, strips of 333 m): band preconditioner 3.5 GMRES iterations per
+solve, wall 1596 s and 4577 MB against 1757 s and 4894 MB with the dense LU.
+Next: the r ladder (stations against SCEC) to 250 m on 16 ranks with the mirror (69 GB of cross
+tables, about 4.3 GB per rank); the 7 failing tests; for 100 m, low-rank compression of the
+cross tables in space.
+
 ### WP7, C implementation in rsf_solve: status (2026-10-18)
 Done, each verified in the sandbox before delivery (details in
 fd_c_design.md sections 6 to 10, usage in rsf_solve_fd.md):
