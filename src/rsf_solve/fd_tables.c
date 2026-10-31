@@ -13,8 +13,12 @@
 
 static double g_ctol;
 static int g_cexp;
+struct fd_ctab;
+static void ct_init(struct fd_ctab *c, size_t ne);
+static void ct_entry(struct fd_ctab *c, size_t e, const double *w, int L, double tol);
 static void ct_compress_pair(struct fd_pair *p, const double *xr, const double *yr, double mu, double nu);
 static void ct_free(struct fd_ctab *c);
+static void ct_append(struct fd_ctab *c, const struct fd_ctab *t, size_t e0);
 
 int fd_segments_parallel(const struct fd_segment *a, const struct fd_segment *b)
 {
@@ -48,6 +52,13 @@ struct fd_pair *fd_pair_build(const struct fd_segment *src, const struct fd_segm
   const double *ss = src->s, *sr = rcv->s;
   if(errmsg)
     errmsg[0] = 0;
+  /* dense pairs: entry by entry and compressed at once when compression is on (polylines always;
+     the full-window builder below holds np x lmax values and is kept for FD_CT_OFF and the tests) */
+  if(src->pc || rcv->pc)
+    return fd_pair_build_poly(src, rcv, mode, dt, et, alpha, beta, rho, tol, lmax, M, errmsg);
+  if((!fd_segments_parallel(src, rcv) || src->kind != FD_SEG_FAULT || rcv->kind != FD_SEG_FAULT || getenv("FD_FORCE_DENSE"))
+     && g_ctol > 0.0 && !getenv("FD_CT_OFF"))
+    return fd_pair_build_poly(src, rcv, mode, dt, et, alpha, beta, rho, tol, lmax, M, errmsg);
   if(!fd_segments_parallel(src, rcv) || src->kind != FD_SEG_FAULT || rcv->kind != FD_SEG_FAULT || getenv("FD_FORCE_DENSE"))
     return fd_pair_build_dense(src, rcv, mode, dt, et, alpha, beta, rho, tol, lmax, cap_ok, M, errmsg);
   if(lmax <= 0){
@@ -286,10 +297,13 @@ static void dense_entry_open(const struct fd_segment *src, const struct fd_segme
     kx = lround(x*1e3);
     ky = lround(y*1e3);
     ka = lround(src->a*1e3);
-    ce = oc_find(kx, ky, ka, 0);
-    if(ce){
-      hist = ce->s;
-      nl = ce->n;
+#pragma omp critical(fd_open_cache)
+    {
+      ce = oc_find(kx, ky, ka, 0);
+      if(ce){
+        hist = ce->s;
+        nl = ce->n;
+      }
     }
   }
   if(!hist){
@@ -318,9 +332,18 @@ static void dense_entry_open(const struct fd_segment *src, const struct fd_segme
         break;
     }
     if(src->kind == FD_SEG_SURF_OPEN){
-      ce = oc_find(kx, ky, ka, 1);
-      ce->s = hist;
-      ce->n = nl;
+#pragma omp critical(fd_open_cache)
+      {
+        ce = oc_find(kx, ky, ka, 1);
+        if(ce->s){                               /* another thread got there first */
+          free(hist);
+          hist = ce->s;
+          nl = ce->n;
+        }else{
+          ce->s = hist;
+          ce->n = nl;
+        }
+      }
     }
   }
   for(l = 1; l <= lmax; l++){
@@ -337,6 +360,242 @@ static void dense_entry_open(const struct fd_segment *src, const struct fd_segme
   }
   if(src->kind != FD_SEG_SURF_OPEN)
     free(hist);
+}
+
+/* ---------------- polyline segments (curved faults, fd_plan.md M7) ----------------
+   Entries are built one at a time with each element's own centre, tangent and half-length, the
+   window ended once the criterion has held for FD_OPEN_QUIET lags after the far S arrival, and
+   compressed at once (D2), so no full window of the pair is ever held. */
+static void poly_entry(const struct fd_segment *src, const struct fd_segment *rcv, int i, int j, int mode,
+    double dt, double et, double alpha, double beta, double rho, double mu, double nu, double tol, int lmax, int full,
+    double *W, double *Wn, double *Kp, double *Kn, double *env_out)
+{
+  double Xr[2], tr[2], ar, Xs[2], ts_[2], as, dd[2], x, y, st[3], s0[3], s1[3], d[3], ts, tn, rfar, rr, env, a2[2], b2[2], nrg[2], nss[2];
+  int l, lsw, lS, quiet, k;
+  struct fd_segment se, re;
+  fd_seg_element(rcv, i, Xr, tr, &ar);
+  fd_seg_element(src, j, Xs, ts_, &as);
+  dd[0] = Xr[0] - Xs[0];
+  dd[1] = Xr[1] - Xs[1];
+  x = dd[0]*ts_[0] + dd[1]*ts_[1];
+  y = -dd[0]*ts_[1] + dd[1]*ts_[0];
+  rr = fmax(hypot(x, y), as);
+  env = mu*(2.0*as)*(2.0*as)/(2.0*M_PI*(mode == FD_MODE_INPLANE ? (1.0 - nu) : 1.0)*rr*rr)*dt;
+  *env_out = env;
+  for(l = 0; l < lmax; l++){
+    W[l] = 0.0;
+    Wn[l] = 0.0;
+  }
+  if(mode == FD_MODE_INPLANE && (src->kind == FD_SEG_SURF_OPEN || rcv->kind == FD_SEG_SURF_OPEN)){
+    memset(&se, 0, sizeof(se));
+    memset(&re, 0, sizeof(re));
+    se.kind = src->kind;
+    se.n = 1;
+    se.a = as;
+    se.dx = 2.0*as;
+    se.s[0] = ts_[0];
+    se.s[1] = ts_[1];
+    re.kind = rcv->kind;
+    re.n = 1;
+    re.a = ar;
+    re.dx = 2.0*ar;
+    re.s[0] = tr[0];
+    re.s[1] = tr[1];
+    dense_entry_open(&se, &re, x, y, dt, et, alpha, beta, rho, mu, nu, tol, lmax, W, Wn, Kp, Kn);
+    return;
+  }
+  if(mode == FD_MODE_INPLANE){
+    fd_static_inplane(x, y, as, mu, nu, st);
+    fd_project(st[0], st[1], st[2], ts_, tr, Kp, Kn);
+    if(rcv->kind == FD_SEG_SURF_OPEN)
+      *Kp = *Kn;
+    rfar = fmax(hypot(x + as, y), hypot(x - as, y));
+    lsw = (int)ceil(10.0*rfar/beta/dt - et) + 2;
+    lS = (int)ceil(rfar/beta/dt) + 2;
+    quiet = 0;
+    fd_seg_ramp_inplane(x, y, 0.0, as, alpha, beta, rho, s0);
+    for(l = 0; l < lmax; l++){
+      if(l < lsw){
+        fd_seg_ramp_inplane(x, y, (et + l)*dt, as, alpha, beta, rho, s1);
+        for(k = 0; k < 3; k++)
+          d[k] = s1[k] - s0[k];
+        memcpy(s0, s1, sizeof(s0));
+        fd_project(d[0], d[1], d[2], ts_, tr, &ts, &tn);
+        W[l] = ts - (*Kp)*dt;
+        Wn[l] = tn - (*Kn)*dt;
+      }else{
+        fd_series_inplane(x, y, (l - 1 + et)*dt, dt, as, alpha, beta, rho, d);
+        fd_project(d[0], d[1], d[2], ts_, tr, &ts, &tn);
+        W[l] = ts;
+        Wn[l] = tn;
+      }
+      if(l > lS && fabs(W[l]) <= tol*env && fabs(Wn[l]) <= tol*env)
+        quiet++;
+      else
+        quiet = 0;
+      if(quiet >= FD_OPEN_QUIET && !full)
+        break;
+    }
+    return;
+  }
+  /* antiplane */
+  nrg[0] = -tr[1];
+  nrg[1] = tr[0];
+  nss[0] = nrg[0]*ts_[0] + nrg[1]*ts_[1];
+  nss[1] = nrg[0]*(-ts_[1]) + nrg[1]*ts_[0];
+  fd_static_antiplane(x, y, as, mu, a2);
+  *Kp = nss[0]*a2[0] + nss[1]*a2[1];
+  *Kn = 0.0;
+  rfar = fmax(hypot(x + as, y), hypot(x - as, y));
+  lS = (int)ceil(rfar/beta/dt) + 2;
+  quiet = 0;
+  fd_seg_ramp_antiplane(x, y, 0.0, as, beta, rho, a2);
+  for(l = 0; l < lmax; l++){
+    fd_seg_ramp_antiplane(x, y, (et + l)*dt, as, beta, rho, b2);
+    W[l] = nss[0]*(b2[0] - a2[0]) + nss[1]*(b2[1] - a2[1]) - (*Kp)*dt;
+    a2[0] = b2[0];
+    a2[1] = b2[1];
+    if(l > lS && fabs(W[l]) <= tol*env)
+      quiet++;
+    else
+      quiet = 0;
+    if(quiet >= FD_OPEN_QUIET)
+      break;
+  }
+}
+
+/* append a chunk's compressed entries (rows in order) to the pair's table */
+static void ct_append(struct fd_ctab *c, const struct fd_ctab *t, size_t e0)
+{
+  size_t e, k;
+  for(e = 0; e < t->ne; e++){
+    c->hi[e0 + e] = t->hi[e];
+    c->nm[e0 + e] = t->nm[e];
+    c->woff[e0 + e] = c->nw + t->woff[e];
+    c->moff[e0 + e] = c->nrun + t->moff[e];
+  }
+  if(c->nw + t->nw > c->nwcap){
+    c->nwcap = c->nw + t->nw + 16;
+    c->W = (double *)realloc(c->W, sizeof(double)*c->nwcap);
+  }
+  memcpy(c->W + c->nw, t->W, sizeof(double)*t->nw);
+  c->nw += t->nw;
+  if(c->nrun + t->nrun > c->nruncap){
+    c->nruncap = c->nrun + t->nrun + 16;
+    c->run = (struct fd_crun *)realloc(c->run, sizeof(struct fd_crun)*c->nruncap);
+  }
+  for(k = 0; k < t->nrun; k++)
+    c->run[c->nrun + k] = t->run[k];
+  c->nrun += t->nrun;
+  c->nlag_win += t->nlag_win;
+}
+
+struct fd_pair *fd_pair_build_poly(const struct fd_segment *src, const struct fd_segment *rcv, int mode,
+    double dt, double et, double alpha, double beta, double rho, double tol, int lmax, int M, char *errmsg)
+{
+  struct fd_pair *p;
+  int ns, nr, i, j, L, full, nch, ch;
+  size_t np;
+  double mu, nu, dmax, Xr[2], tr[2], ar, Xs[2], ts_[2], as, ctol;
+  struct fd_ctab *tcs, *tcn;
+  int *Lch;
+  int i0c;
+  int i1c;
+  int ic;
+  int jc;
+  int hiL;
+  size_t e;
+  size_t el;
+  double env;
+  double *W;
+  double *Wn;
+  ns = src->n;
+  nr = rcv->n;
+  np = (size_t)ns*nr;
+  mu = rho*beta*beta;
+  nu = (alpha*alpha - 2.0*beta*beta)/(2.0*(alpha*alpha - beta*beta));
+  if(errmsg)
+    errmsg[0] = 0;
+  dmax = 0.0;
+  for(i = 0; i < nr; i++)
+    for(j = 0; j < ns; j++){
+      fd_seg_element(rcv, i, Xr, tr, &ar);
+      fd_seg_element(src, j, Xs, ts_, &as);
+      if(hypot(Xr[0] - Xs[0], Xr[1] - Xs[1]) + as > dmax)
+        dmax = hypot(Xr[0] - Xs[0], Xr[1] - Xs[1]) + as;
+    }
+  if(lmax <= 0)
+    lmax = (int)ceil(dmax/beta/dt*(1.0 + 2.0/sqrt(tol))) + 2;
+  ctol = (g_ctol > 0.0 && !getenv("FD_CT_OFF")) ? g_ctol : 1e-14;
+  full = getenv("FD_POLY_FULL") ? 1 : 0;
+  fd_kernels_open_init();                         /* the quadrature nodes, before any threads */
+  p = (struct fd_pair *)calloc(1, sizeof(*p));
+  p->src = src;
+  p->rcv = rcv;
+  p->mode = mode;
+  p->dt = dt;
+  p->et = et;
+  p->dense = 1;
+  p->compressed = 1;
+  p->has_normal = (mode == FD_MODE_INPLANE);
+  p->M = M;
+  p->Kd_s = (double *)malloc(sizeof(double)*(np > 0 ? np : 1));
+  p->Kd_n = (double *)calloc(np > 0 ? np : 1, sizeof(double));
+  /* receiver rows in chunks, each chunk compressed into its own table (OpenMP threads when the
+     file is compiled with them), then appended in row order: the result does not depend on the
+     number of threads */
+  nch = nr < 64 ? nr : 64;
+  if(nch < 1)
+    nch = 1;
+  tcs = (struct fd_ctab *)calloc(nch, sizeof(struct fd_ctab));
+  tcn = (struct fd_ctab *)calloc(nch, sizeof(struct fd_ctab));
+  Lch = (int *)calloc(nch, sizeof(int));
+#pragma omp parallel for schedule(dynamic, 1) private(i0c, i1c, ic, jc, hiL, e, el, env, W, Wn)
+  for(ch = 0; ch < nch; ch++){
+    i0c = (int)(((long)nr*ch)/nch);
+    i1c = (int)(((long)nr*(ch + 1))/nch);
+    ct_init(&tcs[ch], (size_t)(i1c - i0c)*ns);
+    ct_init(&tcn[ch], (size_t)(i1c - i0c)*ns);
+    W = (double *)malloc(sizeof(double)*(lmax + 1));
+    Wn = (double *)malloc(sizeof(double)*(lmax + 1));
+    Lch[ch] = 1;
+    for(ic = i0c; ic < i1c; ic++)
+      for(jc = 0; jc < ns; jc++){
+        e = (size_t)ic*ns + jc;
+        el = (size_t)(ic - i0c)*ns + jc;
+        poly_entry(src, rcv, ic, jc, mode, dt, et, alpha, beta, rho, mu, nu, tol, lmax, full, W, Wn, &p->Kd_s[e], &p->Kd_n[e], &env);
+        /* the window criterion of the pair builders, per entry */
+        for(hiL = lmax - 1; hiL >= 0; hiL--)
+          if(fabs(W[hiL]) > tol*env || fabs(Wn[hiL]) > tol*env)
+            break;
+        if(hiL < 0)
+          hiL = 0;                               /* lag 1 always (as the pair windows of at least one lag) */
+        if(hiL > lmax - 2)
+          hiL = lmax - 2;                        /* the window is capped at lmax - 1 lags (as the full-window builder) */
+        if(hiL + 1 > Lch[ch])
+          Lch[ch] = hiL + 1;
+        ct_entry(&tcs[ch], el, W, hiL + 1, ctol*env);
+        ct_entry(&tcn[ch], el, Wn, hiL + 1, ctol*env);
+      }
+    free(W);
+    free(Wn);
+  }
+  ct_init(&p->cs, np);
+  ct_init(&p->cn, np);
+  L = 1;
+  for(ch = 0; ch < nch; ch++){
+    ct_append(&p->cs, &tcs[ch], (size_t)(((long)nr*ch)/nch)*ns);
+    ct_append(&p->cn, &tcn[ch], (size_t)(((long)nr*ch)/nch)*ns);
+    ct_free(&tcs[ch]);
+    ct_free(&tcn[ch]);
+    if(Lch[ch] > L)
+      L = Lch[ch];
+  }
+  free(tcs);
+  free(tcn);
+  free(Lch);
+  p->L = L;
+  return p;
 }
 
 /* dense pair (fd_plan.md N1): the same columns as fd_pair_build for every (receiver, source)

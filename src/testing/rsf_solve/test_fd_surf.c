@@ -29,6 +29,9 @@ int main(int argc, char **argv)
   dip = 30.0*M_PI/180.0;
   /* fault: from (0, -500) down-dip towards +x, elements of 500 m */
   seg[0].kind = FD_SEG_FAULT;
+  seg[0].pc = NULL;
+  seg[0].pt = NULL;
+  seg[0].pa = NULL;
   seg[0].n = nf;
   seg[0].dx = 500.0;
   seg[0].a = 250.0;
@@ -39,6 +42,9 @@ int main(int argc, char **argv)
   /* surface line y = 0 from x = -1000, elements of 250 m, twice (slip and opening) */
   for(a = 1; a <= 2; a++){
     seg[a].kind = (a == 1) ? FD_SEG_SURF_SLIP : FD_SEG_SURF_OPEN;
+    seg[a].pc = NULL;
+    seg[a].pt = NULL;
+    seg[a].pa = NULL;
     seg[a].n = ns;
     seg[a].dx = 250.0;
     seg[a].a = 125.0;

@@ -31,7 +31,12 @@ struct fd_segment {
   double dx, a;		/* element length, half-length */
   int n;		/* number of elements */
   int kind;		/* FD_SEG_* */
+  /* polyline segment (fd_plan.md M7, curved faults): per element centre pc[2 i], unit tangent
+     pt[2 i] and half-length pa[i]; NULL for a straight run of equal elements (X0, s, dx, a) */
+  double *pc, *pt, *pa;
 };
+/* element geometry of a segment (straight or polyline) */
+void fd_seg_element(const struct fd_segment *g, int i, double X[2], double t[2], double *a);
 
 /* compressed dense lag tables (fd_plan.md D2): per entry the increments of lags 1..hi (the
    window trimmed where they fall below the compression tolerance), runs of lags on a quadratic
@@ -91,6 +96,9 @@ struct fd_pair *fd_pair_build_dense(const struct fd_segment *src, const struct f
    relative to the window's envelope of each entry; ctol <= 0 keeps the full windows */
 /* the cache of opening-source stress histories (surface elements), release after building */
 void fd_tables_open_cache_clear(void);
+/* dense pair of polyline segments (curved faults), built entry by entry and compressed */
+struct fd_pair *fd_pair_build_poly(const struct fd_segment *src, const struct fd_segment *rcv, int mode,
+    double dt, double et, double alpha, double beta, double rho, double tol, int lmax, int M, char *errmsg);
 void fd_tables_set_compress(double ctol);
 /* lags 1..nexp of every entry stay explicit (default 1) */
 void fd_tables_set_compress_explicit(int nexp);

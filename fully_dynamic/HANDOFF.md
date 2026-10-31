@@ -105,7 +105,14 @@ for large strip sets (H8).
    (surface unknowns eliminated in the marcher, spontaneous rupture checked
    against the prototype) and step 2c (rsf_solve sets up the surface for
    in-plane half-plane geometries; static gate against the exact half plane;
-   sequences run) done; next step 3 and the cost of building the tables.
+   sequences run) and step 2d (polyline segments for curved faults, streaming
+   and threaded table builds, -fd_tol_surf after a PD13 instability) done;
+   PD13 at 1 km runs 700 yr with two stable dynamic events; next PD13 at
+   500 m on a multi-core machine, then step 3 (the prototype's checks, a
+   megathrust with a splay).
+1f. TPV14/15 ladder (H13): main-fault rupture times converge to SCEC at
+   250 m; the branch and the junction do not (outcomes jump with the cell
+   size): more SCEC stations beyond the junction, and the junction treatment.
 1d. Stock-taking (fd_plan.md, 2026-10-30): 3-D half-space options (shared
    graded surface patch with compression, or a volume method near the
    surface) to be decided from the H11 numbers; 2-D in-plane with a free

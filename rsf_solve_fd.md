@@ -272,6 +272,13 @@ benchmark tried (BP1-FD, BP5-FD, TPV205, a rate-and-state rupture); near
 the jump threshold of a stepover, triggering delays at 100 m may be too
 short and should be checked at finer resolution. See fd_plan.md.
 
+Curved 2-D faults (runs of fewer than four equal collinear elements joined end to start)
+become polyline segments with dense tables (element sizes within 25 percent; FD_NO_POLY=1 to
+keep straight runs); the dense tables are built with OpenMP threads (OMP_NUM_THREADS), since the
+2-D path runs on one MPI rank. Pairs with virtual surface elements use the window tolerance
+-fd_tol_surf (default 1e-3; 1e-2 let a long Cascadia phase diverge), and surface elements must
+keep beta dt / h within 0.4 to 2.
+
 Restrictions in this version, refused with a message at start: one MPI
 rank for 2-D faults (the 3-D paths run on any number of ranks); `-ve_mode 0`; aging law (`-state_law 1`); 2-D elements only, forming
 straight runs of equal, collinear elements with one common element size

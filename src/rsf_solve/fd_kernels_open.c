@@ -202,3 +202,9 @@ void fd_static_inplane_open(double x, double y, double a, double mu, double nu, 
   for(k = 0; k < 3; k++)
     st[k] = 0.5*(lo[k] + hi[k]);
 }
+
+/* the quadrature nodes, to be set up before threads use the kernel */
+void fd_kernels_open_init(void)
+{
+  gl_init();
+}

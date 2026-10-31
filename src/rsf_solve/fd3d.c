@@ -3997,7 +3997,7 @@ static int dp_fit(const double *w, int a, int b, double tol, double *cf)
    each (third differences below FD3D_DP_TOL), disjoint, each fitted and verified; returns how
    many were kept (at most nmax), in increasing order, in ma, mb (0-based), cf (3 per run) */
 #define FD3D_DP_MINRUN 6
-#define FD3D_DP_MAXMID 8
+#define FD3D_DP_MAXMID 32
 static int dp_middle(const double *w, int lo, int hi, double scale, int nmax, int *ma, int *mb, double *cf)
 {
   int l, run0, a, n, ca, cb, last;

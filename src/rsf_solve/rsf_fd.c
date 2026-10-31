@@ -19,6 +19,7 @@
     -fd_vsw <m/s>       switch threshold (default 1e-3)
     -fd_vback <m/s>     return threshold (default 1e-4)
     -fd_tol <f>         window tolerance (default 1e-2)
+    -fd_tol_surf <f>    window tolerance of pairs with a virtual surface segment (default 1e-3)
     -fd_ctol <f>        compression tolerance of the dense tables of non-parallel pairs,
                         relative to the window envelope (default 1e-5 fd_tol; 0: full windows)
     -fd_et <f>          collocation offset (default 1.0)
@@ -28,7 +29,7 @@
     -fd_lmax <n>        cap on the window in fine-grid lags (default 0: prototype bound)
     -fd_surf_h_near <m> 2-D in-plane half plane: surface elements near traces (default hf/2)
     -fd_surf_w_near <m>   half-width of the refined zone about traces and shallow tops (default 4 hf)
-    -fd_surf_h_far <m>    surface elements elsewhere (default hf; hf/4 to 1.25 hf for NL stability)
+    -fd_surf_h_far <m>    surface elements elsewhere (default hf; beta dt / h within 0.4 to 2 required)
     -fd_surf_margin <m>   surface beyond the faults' x extent (default twice the deepest fault depth)
     -fd_gate_tol <f>    static gate tolerance (default 0.05; abort at 5x)
     -fd_length_scale    geometry unit in metres (default 1.0)
@@ -124,6 +125,8 @@ PetscErrorCode rsf_fd_setup(struct interact_ctx *par, PetscReal shear_modulus_si
   PetscCall(PetscOptionsGetReal(NULL,NULL,"-fd_vsw",&fd->vsw,NULL));
   PetscCall(PetscOptionsGetReal(NULL,NULL,"-fd_vback",&fd->vback,NULL));
   PetscCall(PetscOptionsGetReal(NULL,NULL,"-fd_tol",&fd->tol,NULL));
+  fd->tol_surf = 1e-3;
+  PetscCall(PetscOptionsGetReal(NULL,NULL,"-fd_tol_surf",&fd->tol_surf,NULL));
   fd->ctol = 1e-5*fd->tol;
   PetscCall(PetscOptionsGetReal(NULL,NULL,"-fd_ctol",&fd->ctol,NULL));
   PetscCall(PetscOptionsGetReal(NULL,NULL,"-fd_et",&fd->et,NULL));
@@ -2689,7 +2692,7 @@ PetscErrorCode fd3d_setup_from_geometry(struct interact_ctx *par, struct fd_vars
 static PetscErrorCode fd_surface_2d(struct fd_vars *fd, double hf)
 {
   struct fd_segment *g;
-  double xe[2], ye[2], xmin, xmax, ymin, *xtr, *xsh, hn, wn, hfar, mg;
+  double xe[2], ye[2], xmin, xmax, ymin, *xtr, *xsh, hn, wn, hfar, mg, Xe[2], te[2], ae;
   int k, e, ntr, nsh, nseg0, nel;
   PetscFunctionBeginUser;
   nseg0 = fd->segs->nseg;
@@ -2701,10 +2704,12 @@ static PetscErrorCode fd_surface_2d(struct fd_vars *fd, double hf)
   ymin = 0.0;
   for(k = 0;k < nseg0;k++){
     g = fd->segs->seg + k;
-    xe[0] = g->X0[0] - g->a*g->s[0];
-    ye[0] = g->X0[1] - g->a*g->s[1];
-    xe[1] = g->X0[0] + ((g->n - 1)*g->dx + g->a)*g->s[0];
-    ye[1] = g->X0[1] + ((g->n - 1)*g->dx + g->a)*g->s[1];
+    fd_seg_element(g,0,Xe,te,&ae);
+    xe[0] = Xe[0] - ae*te[0];
+    ye[0] = Xe[1] - ae*te[1];
+    fd_seg_element(g,g->n - 1,Xe,te,&ae);
+    xe[1] = Xe[0] + ae*te[0];
+    ye[1] = Xe[1] + ae*te[1];
     for(e = 0;e < 2;e++){
       PetscCheck(ye[e] < 1e-6*hf,PETSC_COMM_WORLD,PETSC_ERR_USER,"rsf_fd_setup: a fault segment reaches above the surface (y %g > 0)",ye[e]);
       xmin = PetscMin(xmin,xe[e]);
@@ -2720,8 +2725,12 @@ static PetscErrorCode fd_surface_2d(struct fd_vars *fd, double hf)
   wn = (fd->surf_wnear > 0.0) ? fd->surf_wnear : 4.0*hf;
   hfar = (fd->surf_hfar > 0.0) ? fd->surf_hfar : hf;
   mg = (fd->surf_margin > 0.0) ? fd->surf_margin : 2.0*fabs(ymin);
-  if((hn < 0.25*hf) || (hfar > 1.25*hf) || (hn > 1.25*hf) || (hfar < 0.25*hf))
-    PetscCall(PetscPrintf(PETSC_COMM_WORLD,"rsf_fd_setup: WARNING: surface elements outside hf/4 .. 1.25 hf (%g, %g for hf %g): the second-order marching may be unstable on them\n",hn,hfar,hf));
+  /* the second-order marching is stable for beta dt / h of about 0.4 to 2 (prototype,
+     stab_random.py); with dt = cfl hf / beta that bounds the surface elements (a PD13 test with
+     elements of 1.39 hf diverged after 200 s) */
+  PetscCheck((fd->cfl*hf/hn <= 2.0) && (fd->cfl*hf/hfar >= 0.4) && (fd->cfl*hf/hn >= 0.4) && (fd->cfl*hf/hfar <= 2.0),PETSC_COMM_WORLD,PETSC_ERR_USER,
+      "rsf_fd_setup: surface elements of %g and %g m give beta dt / h of %.2f and %.2f with fault elements of %g m: outside 0.4 to 2, where the second-order marching is stable",
+      hn,hfar,fd->cfl*hf/hn,fd->cfl*hf/hfar,hf);
   nel = fd_seglist_add_surface(fd->segs,xmin - mg,xmax + mg,ntr,xtr,nsh,xsh,hn,wn,hfar);
   PetscCheck(nel > 0,PETSC_COMM_WORLD,PETSC_ERR_LIB,"rsf_fd_setup: surface construction failed");
   fd->nsurf = nel;
@@ -2744,6 +2753,10 @@ static PetscErrorCode fd_build_tables(struct interact_ctx *par, struct fd_vars *
   double dbytes;
   double dwin;
   double w1;
+  double dxmax;
+  double hlen;
+  struct fd_segment *g0;
+  double ptol;
   PetscFunctionBeginUser;
   PetscCall(PetscMalloc5(n,&cx,n,&cy,n,&tx,n,&ty,n,&hl));
   for(i = 0;i < n;i++){
@@ -2757,14 +2770,35 @@ static PetscErrorCode fd_build_tables(struct interact_ctx *par, struct fd_vars *
   fd->segs = fd_detect_segments((int)n,cx,cy,tx,ty,hl,1e-6,err);
   PetscCall(PetscFree5(cx,cy,tx,ty,hl));
   PetscCheck(fd->segs,PETSC_COMM_WORLD,PETSC_ERR_SUP,"rsf_fd_setup: segment detection failed: %s",err);
-  for(k = 0;k < fd->segs->nseg;k++){
-    if(dx0 < 0.0)
-      dx0 = fd->segs->seg[k].dx;
-    PetscCheck(fabs(fd->segs->seg[k].dx - dx0) < 1e-9*dx0,PETSC_COMM_WORLD,PETSC_ERR_SUP,
-        "rsf_fd_setup: segments with different element sizes (%g vs %g): one common size required in this version",
-        fd->segs->seg[k].dx,dx0);
-    /* non-parallel segments (bends, branches) use dense pair tables (fd_plan.md N1) */
+  /* curved faults (runs of fewer than 4 equal collinear elements joined end to start) become
+     polyline segments with dense tables (fd_plan.md M7); not for the antiplane half plane, whose
+     image sources need straight vertical segments */
+  if(!fd->halfplane && !getenv("FD_NO_POLY")){
+    k = fd->segs->nseg;
+    fd_seglist_merge_polylines(fd->segs,1e-2,4);   /* ends within 1 percent of an element: tangent elements of a curve leave small gaps */
+    if(fd->segs->nseg != k)
+      PetscCall(PetscPrintf(PETSC_COMM_WORLD,"rsf_fd_setup: %d straight runs joined into %d segments (polylines for curved faults)\n",k,(int)fd->segs->nseg));
   }
+  /* element sizes: straight runs share one size (Toeplitz pairs); polyline elements may vary (25 percent)
+     by up to 10 percent; the time step follows the smallest element */
+  dxmax = 0.0;
+  for(k = 0;k < fd->segs->nseg;k++){
+    g0 = fd->segs->seg + k;
+    for(l = 0;l < g0->n;l++){
+      hlen = g0->pa ? 2.0*g0->pa[l] : g0->dx;
+      if((dx0 < 0.0) || (hlen < dx0))
+        dx0 = hlen;
+      if(hlen > dxmax)
+        dxmax = hlen;
+    }
+  }
+  for(k = 0;k < fd->segs->nseg;k++)
+    for(l = 0;l < fd->segs->nseg;l++)
+      if(!fd->segs->seg[k].pa && !fd->segs->seg[l].pa)
+        PetscCheck(fabs(fd->segs->seg[k].dx - fd->segs->seg[l].dx) < 1e-9*dx0,PETSC_COMM_WORLD,PETSC_ERR_SUP,
+            "rsf_fd_setup: straight runs with different element sizes (%g vs %g): one common size required in this version",
+            fd->segs->seg[k].dx,fd->segs->seg[l].dx);
+  PetscCheck(dxmax <= 1.25*dx0,PETSC_COMM_WORLD,PETSC_ERR_SUP,"rsf_fd_setup: element sizes from %g to %g m: at most 25 percent apart in this version (the second-order marching needs beta dt / h of 0.4 to 2)",dx0,dxmax);
   if(fd->surf2d)
     PetscCall(fd_surface_2d(fd,dx0));
   fd->dt_min = fd->cfl*dx0/fd->beta;
@@ -2807,8 +2841,11 @@ static PetscErrorCode fd_build_tables(struct interact_ctx *par, struct fd_vars *
   dwin = 0.0;
   for(k = 0;k < fd->nsrc;k++)			/* source */
     for(l = 0;l < fd->segs->nseg;l++){		/* receiver */
+      /* pairs with a virtual surface segment keep longer windows (-fd_tol_surf): the surface has
+         no friction to damp the truncation error of its tails, and PD13 diverged with 1e-2 */
+      ptol = ((fd->srcseg[k].kind != FD_SEG_FAULT) || (fd->segs->seg[l].kind != FD_SEG_FAULT)) ? PetscMin(fd->tol,fd->tol_surf) : fd->tol;
       p = fd_pair_build(fd->srcseg + k,fd->segs->seg + l,fd->mode2d,fd->dt_min,fd->et,
-          fd->alpha,fd->beta,fd->rho,fd->tol,(int)fd->lmax,fd->lmax > 0,fd->M,err);
+          fd->alpha,fd->beta,fd->rho,ptol,(int)fd->lmax,fd->lmax > 0,fd->M,err);
       PetscCheck(p,PETSC_COMM_WORLD,PETSC_ERR_SUP,"rsf_fd_setup: table for pair (%ld,%ld) failed: %s",(long)k,(long)l,err);
       fd->pairs[k*fd->segs->nseg + l] = p;
       fd->nbytes += (double)p->L*p->M*16.0*(p->has_normal ? 2 : 1);

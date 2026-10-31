@@ -15,6 +15,10 @@ struct fd_seglist {
 struct fd_seglist *fd_detect_segments(int n, const double *cx, const double *cy, const double *tx, const double *ty,
                                       const double *hl, double rtol, char *errmsg);
 void fd_seglist_free(struct fd_seglist *s);
+/* merge fault segments that join end to start (within tol of an element length) into polylines
+   (curved faults, fd_plan.md M7): one segment per connected chain that contains a run shorter
+   than minrun elements, elements in chain order; returns the number of segments after merging */
+int fd_seglist_merge_polylines(struct fd_seglist *S, double tol, int minrun);
 /* virtual free surface of a 2-D in-plane half plane (fd_plan.md M7 step 2c): the line y = 0,
    x in [xmin, xmax], appended as runs of equal elements (slip and opening segments, global
    index -1); traces xtr on element boundaries; elements of about hnear within wnear of a trace

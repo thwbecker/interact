@@ -3154,6 +3154,7 @@ those at and right after the four fronts (P and S of the source and of its image
 per front, because the third differences need 3 lags to restart after a jump. At 250 m the H11
 runs stored 93 lags per entry of 259; whether these are still only the fronts, or entries that
 used all 8 runs (FD3D_DP_MAXMID) or runs shorter than 6 lags, is the first thing to measure
+(measured, H13: up to 70 percent of the entries used all 8; now 32)
 (FD3D_DP_DIAG now also prints the entries that used all runs).
 Options, in order of effort:
 1. Raise FD3D_DP_MAXMID and lower the run threshold if the 250 m diagnostic shows saturation
@@ -3180,6 +3181,73 @@ and the table-building cost of the surface (opening kernel evaluations).
 Recommendation: measure (1) at 250 m; do the 2-D grouping and table cost now (needed in any case);
 decide between (3) and (4) for 4 to 5 faults at 100 m after the TPV14/15 ladder shows how fine
 the cells must be.
+
+### M7 step 2d: polyline segments for curved faults, streaming and threaded table builds (2026-11-01)
+
+- fd_segments.c: fault segments that join end to start (within 1 percent of an element) are
+  merged into one polyline segment per chain (per element centre, tangent and half-length; the
+  element keeps its own tangent, so the slip sign is interact's), when the chain contains a run
+  of fewer than 4 equal collinear elements (curved faults); bends between long straight runs
+  keep their Toeplitz self tables. Not for the antiplane half plane (images need straight
+  vertical segments); FD_NO_POLY=1 switches it off. Element sizes may differ by up to 25
+  percent (dt from the smallest; NL range 0.4 to 2 of beta dt / h).
+- fd_tables.c: dense pairs are built entry by entry and compressed at once (D2) whenever the
+  compression is on (polylines always); the full-window builder, which holds np x lmax values
+  (lmax the generous bound), remains for FD_CT_OFF and the table tests. Each entry keeps at least
+  its first lag (the instantaneous self term of an element is below the window criterion of
+  the far field; dropping it doubled the peak slip rate in the first test). Receiver rows are
+  built in 64 chunks with OpenMP threads (fd_tables.o compiled with OPENMP_FLAGS), each chunk
+  compressed into its own table and appended in row order, so the tables do not depend on the
+  number of threads (station series identical on 1 and 4 threads); the cache of the opening
+  kernel is shared under a critical section.
+- coarsen_2d.py joins m consecutive elements of each group (near-equal blocks) with averaged
+  rate-and-state inputs, for dynamic tests of the Cascadia sections at coarser elements.
+Instability found with PD13 at about 1 km: the first dynamic phase diverged about 200 s in
+(slip rate growing by a factor of 400 every 26 s at k = 1), with surface elements of 1250 m
+and of 900 m alike, with and without the splays; the same run in a full space (no surface) is
+stable (three events, phases of about 12,000 s). With -fd_tol 1e-3 the megathrust alone with
+the surface is stable (event at 21.3 yr, peak 0.77 m/s, mean slip 10.5 m). The window
+truncation at 1e-2 of the envelope cuts the tails of the surface couplings, and the surface,
+which has no friction, does not damp the error; pairs with a virtual surface segment now use
+-fd_tol_surf (default 1e-3). Surface elements outside 0.4 to 2 of beta dt / h are now refused
+(the NL stability range).
+PD13 at about 1 km with the four splays and the surface (default -fd_tol_surf 1e-3), 700 yr:
+dynamic events at 15.83 yr (QD alone: 15.83) and 568.6 yr (QD alone: 606.3), phases of 14,904 s
+(peak 0.65 m/s, 9.1 m mean slip, 743 s wall) and 5,003 s (peak 1.13 m/s, 11.2 m, 487 s wall) on
+one core, stable; the dynamic first event slips more and the second comes 38 yr earlier.
+Checks: a curved fault of 104 elements of 200 m (arc of 30 km radius): one polyline, results
+identical to the per-element segments (phase of 1006 steps, peak 0.511 m/s, mean slip 0.7951
+m), setup 3 s against 13 s, phase 1.7 s against 3.3 s. Cascadia PD13 coarsened to 225 elements
+of 0.9 to 1.1 km: 5 polylines (megathrust and four splays), virtual surface of 208 elements
+(refined near the six shallow splay tops), dense tables 306 MB compressed against 2.4 GB of
+full windows, static gate against interact's exact half plane 2.0e-2, setup 265 s on one
+core; QD alone has events at 15.8, 606 and 1206 yr.
+
+### H13: TPV14/15 resolution ladder against SCEC (FaultMod, 100 m), mirror path, 16 ranks (2026-10-31)
+
+Stations at the surface; rupture time (slip rate above 1 mm/s), slip at 12 s:
+
+| dx | TPV14 main +2 km | TPV14 branch +2 km | TPV15 main -2 km | outcome main (beyond junction) / branch |
+|---|---|---|---|---|
+| SCEC | 4.72 s, 4.69 m | 4.99 s, 0.62 m | 3.98 s, -5.84 m | |
+| 1000 m | 6.50 s, 4.39 m | 6.64 s, 2.25 m | 5.92 s, -7.08 m | TPV14 100 (100) / 100 %, TPV15 57 (0) / 100 % |
+| 750 m | 7.90 s, 2.02 m | 7.36 s, 2.31 m | 6.60 s, -4.93 m | 87 (70) / 100, 59 (5) / 100 |
+| 500 m | 5.63 s, 4.31 m | 5.85 s, 1.66 m | 4.84 s, -6.53 m | 100 (100) / 100, 57 (0) / 100 |
+| 375 m | 5.20 s, 4.77 m | 5.52 s, 0.17 m | 4.44 s, -7.52 m | 100 (100) / 12, 100 (100) / 100 |
+| 250 m | 4.94 s, 4.47 m | 5.12 s, 1.63 m | 4.19 s, -6.40 m | 100 (100) / 100, 59 (3) / 100 |
+
+The rupture times converge to the reference (0.22, 0.13 and 0.21 s late at 250 m), the main
+fault's slip to within 5 percent (TPV14) and 10 percent (TPV15). The branch does not: at 250 m
+it slips 1.63 m where the reference arrests after 0.62 m, and the outcomes jump between cell
+sizes (TPV14 branch 12 percent at 375 m, TPV15 main fault beyond the junction 100 percent at
+375 m and about 0 otherwise). The junction is where the cells matter: the branch's first
+column lies dx/2 from the main fault, so its coupling to the main fault changes with dx. More
+reference stations beyond the junction and on the branch are needed to tell which outcome is
+right; and the junction treatment (gap rule, first cross lag) has to be checked at 250 m.
+Cost at 250 m: 3741 s on 16 ranks (tables and 12 s of rupture).
+D1 at 250 m (FD3D_DP_DIAG per rank): up to 70 percent of a rank's entries used all 8 runs, the
+saturation that kept the stored fraction near 35 percent; FD3D_DP_MAXMID is now 32 (no
+change at 750 m, where no entry used all 8).
 
 ### WP7, C implementation in rsf_solve: status (2026-10-18)
 Done, each verified in the sandbox before delivery (details in

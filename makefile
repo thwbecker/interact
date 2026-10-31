@@ -1049,6 +1049,9 @@ $(ODIR)/ex_dense_v2.o:	ex_dense_v2.c $(GEN_P_INC)
 #
 # some generic rules with normal dependencies
 #
+# the dense tables of the 2-D fully dynamic extension are built with OpenMP threads
+$(ODIR)/fd_tables.o: CFLAGS += $(OPENMP_FLAGS)
+
 $(ODIR)/%.o:	%.c $(GEN_P_INC)
 	$(CC) $(CFLAGS)  $(OPTIM_FLAGS)  $(MY_PRECISION) -c $< -o $(ODIR)/$*.o
 

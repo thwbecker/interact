@@ -91,6 +91,9 @@ int main(int argc, char **argv)
   nsteps = (int)floor(tend / dt + 0.5);
   seg.n = n;
   seg.kind = FD_SEG_FAULT;
+  seg.pc = NULL;
+  seg.pt = NULL;
+  seg.pa = NULL;
   seg.dx = dx;
   seg.a = dx / 2;
   seg.s[0] = 1.0;
@@ -281,6 +284,9 @@ static int run_hd(int argc, char **argv)
   for(j = 0; j < 2; j++){
     seg[j].n = n;
     seg[j].kind = FD_SEG_FAULT;
+    seg[j].pc = NULL;
+    seg[j].pt = NULL;
+    seg[j].pa = NULL;
     seg[j].dx = dx;
     seg[j].a = dx / 2;
     seg[j].s[0] = 1.0;
@@ -437,6 +443,9 @@ static int run_fsrup(int argc, char **argv)
   if(sense < 0.0)
     sd[0] = -sd[0];
   seg[0].kind = FD_SEG_FAULT;
+  seg[0].pc = NULL;
+  seg[0].pt = NULL;
+  seg[0].pa = NULL;
   seg[0].n = nf;
   seg[0].dx = hf;
   seg[0].a = 0.5*hf;
@@ -451,6 +460,9 @@ static int run_fsrup(int argc, char **argv)
     x0s = 0.5*Lf*sd[0];
     for(k = 1; k <= 2; k++){
       seg[k].kind = (k == 1) ? FD_SEG_SURF_SLIP : FD_SEG_SURF_OPEN;
+      seg[k].pc = NULL;
+      seg[k].pt = NULL;
+      seg[k].pa = NULL;
       seg[k].n = ns;
       seg[k].dx = hs;
       seg[k].a = 0.5*hs;
