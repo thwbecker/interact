@@ -1122,77 +1122,88 @@ double fd_pair_dense_bytes(const struct fd_pair *p, double *win)
 void fd_ctab_prefix(const double *ring, int Lbuf, long pos0, int lag0, int lav, int L, int n, double *P, const double **vl)
 {
   int l, k, j;
-  double y, yk;
-  double *Pk, *Pm;
-  const double *v;
+  double y, yk, acc;
+  double *Pk;
   if(lav > L)
     lav = L;
   for(l = 0; l <= L; l++)
     vl[l] = (l >= lag0 && l <= lav) ? ring + (size_t)((pos0 - l) % Lbuf)*n : NULL;
   for(k = 0; k < 3; k++){
     Pk = P + (size_t)k*(L + 1)*n;
-    for(j = 0; j < n; j++)
+    /* one source element per thread; the sum over the lags runs in the same order as before */
+#pragma omp parallel for private(l, y, yk, acc) schedule(static) if((size_t)n*L > 20000)
+    for(j = 0; j < n; j++){
+      acc = 0.0;
       Pk[j] = 0.0;
-    for(l = 1; l <= L; l++){
-      Pm = Pk + (size_t)l*n;
-      v = vl[l];
-      if(v){
-        y = l/FD_CT_LNORM;
-        yk = (k == 0) ? 1.0 : (k == 1 ? y : y*y);
-        for(j = 0; j < n; j++)
-          Pm[j] = Pm[j - n] + yk*v[j];
-      }else
-        memcpy(Pm, Pm - n, sizeof(double)*n);
+      for(l = 1; l <= L; l++){
+        if(vl[l]){
+          y = l/FD_CT_LNORM;
+          yk = (k == 0) ? 1.0 : (k == 1 ? y : y*y);
+          acc = acc + yk*vl[l][j];
+        }
+        Pk[(size_t)l*n + j] = acc;
+      }
     }
   }
 }
 
+/* the history of receiver row i of a compressed table (explicit lags and runs) */
+static double ctab_row(const struct fd_ctab *c, int i, int ns, const double *P0, const double *P1, const double *P2,
+    const double *const *vl, int lag0, int lav)
+{
+  int j, k, l, pos, hi, u, ma, mb;
+  size_t e;
+  double a, b;
+  const double *w;
+  const struct fd_crun *r;
+  a = 0.0;
+  for(j = 0; j < ns; j++){
+    e = (size_t)i*ns + j;
+    hi = c->hi[e];
+    if(hi < 1)
+      continue;
+    w = c->W + c->woff[e];
+    r = c->run + c->moff[e];
+    u = 0;
+    pos = 1;
+    for(k = 0; k < c->nm[e]; k++){
+      ma = r[k].a;
+      mb = r[k].b;
+      for(l = pos; l < ma; l++){
+        if(l >= lag0 && l <= lav)
+          a += w[u]*vl[l][j];
+        u++;
+      }
+      if(ma <= lav && mb >= lag0){
+        b = r[k].c[0]*(P0[(size_t)mb*ns + j] - P0[(size_t)(ma - 1)*ns + j]);
+        b += r[k].c[1]*(P1[(size_t)mb*ns + j] - P1[(size_t)(ma - 1)*ns + j]);
+        b += r[k].c[2]*(P2[(size_t)mb*ns + j] - P2[(size_t)(ma - 1)*ns + j]);
+        a += b;
+      }
+      pos = mb + 1;
+    }
+    for(l = pos; l <= hi; l++){
+      if(l >= lag0 && l <= lav)
+        a += w[u]*vl[l][j];
+      u++;
+    }
+  }
+  return a;
+}
+
 void fd_ctab_hist(const struct fd_ctab *c, int nr, int ns, const double *P, const double *const *vl, int lag0, int lav, int L, double *out)
 {
-  int i, j, k, l, pos, hi, u, ma, mb;
-  size_t e, L1;
-  double a, b;
-  const double *w, *P0, *P1, *P2;
-  const struct fd_crun *r;
+  int i;
+  size_t L1;
+  const double *P0, *P1, *P2;
   L1 = (size_t)L + 1;
   P0 = P;
   P1 = P + L1*ns;
   P2 = P + 2*L1*ns;
   if(lav > L)
     lav = L;
-  for(i = 0; i < nr; i++){
-    a = 0.0;
-    for(j = 0; j < ns; j++){
-      e = (size_t)i*ns + j;
-      hi = c->hi[e];
-      if(hi < 1)
-        continue;
-      w = c->W + c->woff[e];
-      r = c->run + c->moff[e];
-      u = 0;
-      pos = 1;
-      for(k = 0; k < c->nm[e]; k++){
-        ma = r[k].a;
-        mb = r[k].b;
-        for(l = pos; l < ma; l++){
-          if(l >= lag0 && l <= lav)
-            a += w[u]*vl[l][j];
-          u++;
-        }
-        if(ma <= lav && mb >= lag0){
-          b = r[k].c[0]*(P0[(size_t)mb*ns + j] - P0[(size_t)(ma - 1)*ns + j]);
-          b += r[k].c[1]*(P1[(size_t)mb*ns + j] - P1[(size_t)(ma - 1)*ns + j]);
-          b += r[k].c[2]*(P2[(size_t)mb*ns + j] - P2[(size_t)(ma - 1)*ns + j]);
-          a += b;
-        }
-        pos = mb + 1;
-      }
-      for(l = pos; l <= hi; l++){
-        if(l >= lag0 && l <= lav)
-          a += w[u]*vl[l][j];
-        u++;
-      }
-    }
-    out[i] += a;
-  }
+  /* receiver rows on OpenMP threads: each row's sum is the same as on one thread */
+#pragma omp parallel for schedule(dynamic, 4) if((size_t)nr*ns > 4096)
+  for(i = 0; i < nr; i++)
+    out[i] += ctab_row(c, i, ns, P0, P1, P2, vl, lag0, lav);
 }

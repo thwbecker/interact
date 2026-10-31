@@ -57,6 +57,9 @@
   plane or half plane with vertical segments for antiplane; aging law;
   one MPI rank; no -ve_mode.
 */
+#ifdef _OPENMP
+#include <omp.h>
+#endif
 #include "interact.h"
 #include "properties.h"
 #include "petsc_prototypes.h"
@@ -2863,6 +2866,11 @@ static PetscErrorCode fd_build_tables(struct interact_ctx *par, struct fd_vars *
     PetscCall(PetscPrintf(PETSC_COMM_WORLD,"rsf_fd_setup: dense pairs: lag data %.1f MB, full windows %.1f MB (compression tolerance %g of the envelope%s)\n",
         dbytes/1e6,dwin/1e6,(double)fd->ctol,fd->ctol > 0.0 ? "" : ", off"));
   fd_tables_open_cache_clear();
+#ifdef _OPENMP
+  PetscCall(PetscPrintf(PETSC_COMM_WORLD,"rsf_fd_setup: dense tables and their history products on %d OpenMP threads (OMP_NUM_THREADS)\n",omp_get_max_threads()));
+#else
+  PetscCall(PetscPrintf(PETSC_COMM_WORLD,"rsf_fd_setup: built without OpenMP: dense tables and history products on one thread\n"));
+#endif
   fd->sys = fd_sys_create(fd->segs,fd->pairs,(int)fd->nsrc,fd->src_of,fd->src_rev,fd->mode2d,fd->dt_min,fd->alpha,fd->beta,fd->rho,+1);
   PetscCheck(fd->sys,PETSC_COMM_WORLD,PETSC_ERR_MEM,"rsf_fd_setup: marcher system allocation failed");
   if(fd->coarse && (fd->conv != 1) && (fd->kmax >= 2)){

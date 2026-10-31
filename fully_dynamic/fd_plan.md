@@ -3200,6 +3200,11 @@ the cells must be.
   compressed into its own table and appended in row order, so the tables do not depend on the
   number of threads (station series identical on 1 and 4 threads); the cache of the opening
   kernel is shared under a critical section.
+- The history products of the compressed dense tables run on OpenMP threads as well (receiver
+  rows in fd_ctab_hist, source elements in fd_ctab_prefix; each row's sum in the same order, so
+  the results do not depend on the thread count); rsf_fd.c reports the thread count at setup.
+  Before, only the table build was threaded and the dynamic phases (the history products are
+  most of their cost) ran on one core.
 - coarsen_2d.py resamples each group's polyline into nb = round(S/h) equal pieces (S its arc
   length, h the target length) with the rate-and-state inputs averaged by overlap along the arc,
   for dynamic tests of the Cascadia sections at coarser elements (PD13 at 500 m: 453 elements of
