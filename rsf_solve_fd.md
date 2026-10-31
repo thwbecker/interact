@@ -32,6 +32,11 @@ Capabilities at a glance (2026-10-25):
   direction with one virtual surface (fd_plan.md G3b); check
   src/testing/rsf_solve/test_fd3d_msurf.sh. Faults of different strikes: a surface strip
   per fault (fd_plan.md H6).
+- 2-D in-plane faults in a half plane (fd_plan.md M7): a virtual free surface of slip and
+  opening elements on y = 0, eliminated in every step; options -fd_surf_h_near,
+  -fd_surf_w_near, -fd_surf_h_far, -fd_surf_margin. A fault reaching the surface needs
+  surface elements of about a quarter of the fault elements near its trace (static gate
+  about 1e-2). Building the tables with opening elements is slow for wide surfaces.
 - MPI (3-D paths; fd_plan.md S2, S3, H7): the planes' tables, the local solves, the virtual
   surface and the dense couplings between planes, faults and strips are split over the
   ranks (the dense couplings by receiver rows, which also divides their memory and build
@@ -269,9 +274,10 @@ short and should be checked at finer resolution. See fd_plan.md.
 
 Restrictions in this version, refused with a message at start: one MPI
 rank for 2-D faults (the 3-D paths run on any number of ranks); `-ve_mode 0`; aging law (`-state_law 1`); 2-D elements only, forming
-straight runs of equal, collinear elements with one common element size,
-all parallel; full plane for in-plane, full or half plane (vertical
-segments) for antiplane. H-matrix backends for `Is` are fine (the static
+straight runs of equal, collinear elements with one common element size
+(non-parallel runs use dense tables); full plane or half plane (virtual
+free surface) for in-plane, full or half plane (vertical segments) for
+antiplane. H-matrix backends for `Is` are fine (the static
 part goes through `MatMult`); the dynamic tables are dense per segment pair.
 
 ## 4. Example

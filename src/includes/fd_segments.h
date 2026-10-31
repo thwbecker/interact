@@ -15,4 +15,10 @@ struct fd_seglist {
 struct fd_seglist *fd_detect_segments(int n, const double *cx, const double *cy, const double *tx, const double *ty,
                                       const double *hl, double rtol, char *errmsg);
 void fd_seglist_free(struct fd_seglist *s);
+/* virtual free surface of a 2-D in-plane half plane (fd_plan.md M7 step 2c): the line y = 0,
+   x in [xmin, xmax], appended as runs of equal elements (slip and opening segments, global
+   index -1); traces xtr on element boundaries; elements of about hnear within wnear of a trace
+   or a shallow fault top xsh, hfar elsewhere. Returns the surface elements per component. */
+int fd_seglist_add_surface(struct fd_seglist *S, double xmin, double xmax, int ntr, const double *xtr, int nsh, const double *xsh,
+                           double hnear, double wnear, double hfar);
 #endif

@@ -29,6 +29,12 @@ struct fd_vars {
   /* medium */
   int mode2d;			/* FD_MODE_INPLANE or FD_MODE_ANTIPLANE */
   PetscBool halfplane;
+  /* 2-D in-plane half plane: virtual free surface (fd_plan.md M7 step 2c), elements of about
+     surf_hnear within surf_wnear of a trace or shallow fault top, surf_hfar elsewhere, from the
+     faults' x extent -+ surf_margin (defaults: hf/2, 4 hf, hf, twice the deepest fault depth) */
+  PetscBool surf2d;
+  PetscReal surf_hnear, surf_wnear, surf_hfar, surf_margin;
+  int nsurf;
   PetscReal mu,nu,rho,alpha,beta,dt_min;
   PetscInt  max_steps;		/* abort a phase beyond this many steps */
   PetscInt  conv,conv_block;	/* history convolution: 1 partitioned (M6), 0 direct; partition length */

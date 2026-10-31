@@ -103,7 +103,9 @@ for large strip sets (H8).
 1e. 2-D in-plane free surface (M7): D2 (compressed dense tables), step 1
    (opening kernel in C), step 2a (tables with surface elements) and step 2b
    (surface unknowns eliminated in the marcher, spontaneous rupture checked
-   against the prototype) done; next step 2c, the setup in rsf_fd.c.
+   against the prototype) and step 2c (rsf_solve sets up the surface for
+   in-plane half-plane geometries; static gate against the exact half plane;
+   sequences run) done; next step 3 and the cost of building the tables.
 1d. Stock-taking (fd_plan.md, 2026-10-30): 3-D half-space options (shared
    graded surface patch with compression, or a volume method near the
    surface) to be decided from the H11 numbers; 2-D in-plane with a free

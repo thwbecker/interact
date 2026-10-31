@@ -3030,6 +3030,80 @@ instead of full windows the thrust's slip changes by up to 2 percent (0.667 / 1.
 Next (step 2c): the setup in rsf_fd.c (surface line refined near traces, graded outwards; the
 element grouping of curved faults), then the prototype's other checks in C (step 3).
 
+### M7 step 2c: the virtual free surface in rsf_solve (2026-11-01)
+
+rsf_fd.c: an in-plane geometry of half-plane elements (interact's plane strain half plane) no
+longer stops with "not supported (M7)"; it gets a virtual free surface (fd_surface_2d,
+fd_seglist_add_surface): the line y = 0 over the faults' x extent -+ a margin (default twice
+the deepest fault depth, -fd_surf_margin), in straight runs of equal elements, each run a slip
+and an opening segment after the faults; fault ends within 1 percent of an element of y = 0
+are traces and fall on element boundaries; elements of about hf/2 within 4 hf of a trace or of
+a top shallower than 2 hf, hf elsewhere (-fd_surf_h_near, -fd_surf_w_near, -fd_surf_h_far; a
+warning outside hf/4 .. 1.25 hf, the range in which the second-order marching was stable in
+the prototype). The static gate compares the fault's operators with the surface in static
+equilibrium (Schur complement of the static tables) with interact's exact half-plane Is and
+In. In a phase the surface unknowns start at rest and traction free, the step choice and the
+end of the phase use the fault rates only, and only the fault is handed back; the element map
+and the slip-rate record include the surface unknowns (global index -1, rate 0 before the
+switch: the quasi-static surface response to the slip before the switch is left out of the
+seeded history).
+Checks (a 30 degree thrust of 8 km, elements of 200 m, -calc_sigma_dot 1):
+
+| fault | surface near the trace | gate Is (shear) | gate In (normal) |
+|---|---|---|---|
+| top 1 km deep | 100 m, margin 2 km | 1.0e-3 | 2.0e-2 (normal norm 4 % of shear) |
+| reaching the surface | 100 m | 2.7e-2 | 1.2e-1 (warning) |
+| reaching the surface | 50 m (hf/4) | 8.2e-3 | 6.7e-2 (warning) |
+
+As in the prototype, a trace needs surface elements of about hf/4 and the normal operator
+converges more slowly. Earthquake sequence, top 1 km deep, velocity weakening in the middle
+70 percent, 80 years: quasi-dynamic events at 10.42 and 40.51 yr (slip of the first 0.30 m);
+with the dynamic phases (surface of 135 elements per component) events at 10.42 and 44.61 yr,
+mean slip 0.40 and 0.54 m, peak slip rates 0.61 and 0.86 m/s, about 10 s of wall time per
+phase, stable. Table building with opening sources is the cost: a +-16 km surface with 50 m
+elements near the trace took more than 8 minutes (quadrature of the opening kernel for every
+fault receiver); a parallel build and better reuse are needed before Cascadia-size problems.
+Check script: src/testing/rsf_solve/test_fd_halfplane.sh (the buried case above: gate below
+5e-3 and two dynamic phases in 80 years; about 4 minutes).
+Next: step 3 (the remaining prototype checks in C, a small megathrust with a splay), the
+table-building cost.
+
+### M7 step 2c: the virtual free surface in rsf_solve (2026-11-01)
+
+rsf_fd.c: an in-plane geometry in a half plane (interact's plane-strain half-plane elements) no
+longer stops with "not supported (M7)"; the marcher gets a virtual free surface instead of image
+sources (fd_surface_2d, fd_seglist_add_surface in fd_segments.c). The line y = 0 covers the
+faults' x extent plus -fd_surf_margin (default twice the deepest fault depth); a fault end within
+1 percent of an element of the surface is a trace and lies on an element boundary; elements of
+-fd_surf_h_near (default hf/2) within -fd_surf_w_near (default 4 hf) of a trace or of a fault top
+shallower than 2 hf, -fd_surf_h_far (default hf) elsewhere, each run of equal elements a pair of
+segments (slip and opening, global index -1) after the faults; a warning for elements outside hf/4
+to 1.25 hf (NL stability range). The static gate compares the fault operators with the surface in
+static equilibrium (Schur complement of the tables' statics) with interact's exact half-plane Is
+and In. The dynamic phase starts the surface at rest and traction free, decides step lengths and
+the end of the phase on the fault slip rates only and hands back the fault's values; the
+element map and the slip-rate record carry the surface unknowns (zero before the switch: the
+pre-switch history of the surface is neglected, as the slow pre-switch rates contribute little).
+Checks (rsf_solve, 30 degree thrust of 8 km, elements of 200 m):
+
+| fault top | surface elements | gate shear (Is) | gate normal (In) |
+|---|---|---|---|
+| 1 km | 200 m, x -10 to 17 km | 1.0e-3 | 2.0e-2 (normal norm 4 percent of shear) |
+| 0 (trace) | 100 m within 800 m of the trace | 2.7e-2 | 1.2e-1 |
+| 0 (trace) | 50 m within 800 m of the trace | 8.2e-3 | 6.7e-2 |
+
+As in the prototype, a fault reaching the surface needs surface elements of about hf/4 at the
+trace; the normal operator converges more slowly than the shear operator.
+Sequence (top 1 km, rate and state, VW patch over the middle 70 percent, -calc_sigma_dot 1,
+80 yr): QD alone has events at 10.42, 40.51, 70.71 yr; QD with FD phases (surface of 135
+elements) at 10.42 (phase of 615 steps, 743 s, peak 0.61 m/s, 0.40 m mean slip) and 44.61 yr
+(peak 0.86 m/s, 0.54 m), stable; the surface is traction free to round-off in the marcher.
+Table building is the cost to watch: a surface of +-16 km (beyond 8 km) took more than 8
+minutes (quadrature kernel of the opening sources and slip-source windows evaluated to the
+generous bound before the window criterion trims them).
+Next: the cost of building the tables; step 3 (the prototype's checks in C, a small megathrust
+with a splay, QD against QD plus FD events).
+
 ### WP7, C implementation in rsf_solve: status (2026-10-18)
 Done, each verified in the sandbox before delivery (details in
 fd_c_design.md sections 6 to 10, usage in rsf_solve_fd.md):

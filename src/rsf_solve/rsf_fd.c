@@ -26,6 +26,10 @@
     -fd_kmax <n>        largest substep multiple (default 64)
     -fd_cfl <f>         beta dt_min / dx (default 0.5)
     -fd_lmax <n>        cap on the window in fine-grid lags (default 0: prototype bound)
+    -fd_surf_h_near <m> 2-D in-plane half plane: surface elements near traces (default hf/2)
+    -fd_surf_w_near <m>   half-width of the refined zone about traces and shallow tops (default 4 hf)
+    -fd_surf_h_far <m>    surface elements elsewhere (default hf; hf/4 to 1.25 hf for NL stability)
+    -fd_surf_margin <m>   surface beyond the faults' x extent (default twice the deepest fault depth)
     -fd_gate_tol <f>    static gate tolerance (default 0.05; abort at 5x)
     -fd_length_scale    geometry unit in metres (default 1.0)
     -fd_max_steps <n>   abort a dynamic phase beyond this many steps (default 2e6)
@@ -63,6 +67,7 @@ extern double fd3d_layer_prof[4];
 
 static PetscErrorCode fd_build_tables(struct interact_ctx *par, struct fd_vars *fd);
 static PetscErrorCode fd_gate_static(struct interact_ctx *par, struct fd_vars *fd);
+static PetscErrorCode fd_surface_2d(struct fd_vars *fd, double hf);
 
 PetscErrorCode rsf_fd_setup(struct interact_ctx *par, PetscReal shear_modulus_si, PetscReal s_wave_speed_si)
 {
@@ -126,6 +131,14 @@ PetscErrorCode rsf_fd_setup(struct interact_ctx *par, PetscReal shear_modulus_si
   PetscCall(PetscOptionsGetInt(NULL,NULL,"-fd_kmax",&fd->kmax,NULL));
   PetscCall(PetscOptionsGetReal(NULL,NULL,"-fd_cfl",&fd->cfl,NULL));
   PetscCall(PetscOptionsGetInt(NULL,NULL,"-fd_lmax",&fd->lmax,NULL));
+  fd->surf_hnear = -1.0;
+  fd->surf_wnear = -1.0;
+  fd->surf_hfar = -1.0;
+  fd->surf_margin = -1.0;
+  PetscCall(PetscOptionsGetReal(NULL,NULL,"-fd_surf_h_near",&fd->surf_hnear,NULL));
+  PetscCall(PetscOptionsGetReal(NULL,NULL,"-fd_surf_w_near",&fd->surf_wnear,NULL));
+  PetscCall(PetscOptionsGetReal(NULL,NULL,"-fd_surf_h_far",&fd->surf_hfar,NULL));
+  PetscCall(PetscOptionsGetReal(NULL,NULL,"-fd_surf_margin",&fd->surf_margin,NULL));
   PetscCall(PetscOptionsGetReal(NULL,NULL,"-fd_gate_tol",&fd->gate_tol,NULL));
   PetscCall(PetscOptionsGetReal(NULL,NULL,"-fd_length_scale",&fd->length_scale,NULL));
   PetscCall(PetscOptionsGetInt(NULL,NULL,"-fd_max_steps",&fd->max_steps,NULL));
@@ -217,7 +230,13 @@ PetscErrorCode rsf_fd_setup(struct interact_ctx *par, PetscReal shear_modulus_si
       fd->halfplane = PETSC_TRUE;
   if((fd->mode2d == FD_MODE_ANTIPLANE) && (!medium->full_space))
     fd->halfplane = PETSC_TRUE;
-  PetscCheck(!(fd->halfplane && (fd->mode2d == FD_MODE_INPLANE)),PETSC_COMM_WORLD,PETSC_ERR_SUP,"-fd_mode: in-plane half-plane geometries are not supported (M7)");
+  /* in-plane half plane: a virtual free surface of slip and opening elements (fd_plan.md M7),
+     instead of image sources (which exist for antiplane only) */
+  fd->surf2d = PETSC_FALSE;
+  if(fd->halfplane && (fd->mode2d == FD_MODE_INPLANE)){
+    fd->surf2d = PETSC_TRUE;
+    fd->halfplane = PETSC_FALSE;
+  }
   PetscCheck(rsf->state_law == RSF_AGING_LAW,PETSC_COMM_WORLD,PETSC_ERR_SUP,"-fd_mode: aging law only (-state_law 1) in this version");
   fd->mu = shear_modulus_si;
   fd->beta = s_wave_speed_si;
@@ -235,11 +254,11 @@ PetscErrorCode rsf_fd_setup(struct interact_ctx *par, PetscReal shear_modulus_si
   fd->nrec = 64;
   fd->irec = 0;
   fd->nrec_used = 0;
-  PetscCall(PetscMalloc2(fd->nrec,&fd->rec_t,(size_t)fd->nrec*medium->nrflt,&fd->rec_v));
+  PetscCall(PetscMalloc2(fd->nrec,&fd->rec_t,(size_t)fd->nrec*fd->sys->N,&fd->rec_v));   /* with the surface unknowns */
   PetscCall(PetscPrintf(PETSC_COMM_WORLD,
       "rsf_fd_setup: fully dynamic extension, mode %d, %s%s, %ld segments, dt_min %.3e s, "
       "vsw %.1e vback %.1e m/s, tol %.1e, et %.2f, xi %.2f, kmax %d, tables %.1f MB, fft %s\n",
-      (int)fd->mode,fd->mode2d == FD_MODE_ANTIPLANE ? "antiplane" : "in-plane",fd->halfplane ? " half plane (image sources)" : "",(long)fd->segs->nseg,(double)fd->dt_min,
+      (int)fd->mode,fd->mode2d == FD_MODE_ANTIPLANE ? "antiplane" : "in-plane",fd->halfplane ? " half plane (image sources)" : (fd->surf2d ? " half plane (virtual free surface)" : ""),(long)fd->segs->nseg,(double)fd->dt_min,
       (double)fd->vsw,(double)fd->vback,(double)fd->tol,(double)fd->et,(double)fd->xi,(int)fd->kmax,
       (double)fd->nbytes/1048576.0,fd_fft_backend()));
   PetscFunctionReturn(PETSC_SUCCESS);
@@ -2664,6 +2683,54 @@ PetscErrorCode fd3d_setup_from_geometry(struct interact_ctx *par, struct fd_vars
 }
 
 /* segments from the 2-D geometry and one pair table per (source, receiver) */
+/* the virtual free surface of a 2-D in-plane half plane (fd_plan.md M7 step 2c): traces where a
+   fault segment ends within 1 percent of an element of the surface, shallow tops (within two
+   elements) refined as well; surface y = 0, solid y < 0 */
+static PetscErrorCode fd_surface_2d(struct fd_vars *fd, double hf)
+{
+  struct fd_segment *g;
+  double xe[2], ye[2], xmin, xmax, ymin, *xtr, *xsh, hn, wn, hfar, mg;
+  int k, e, ntr, nsh, nseg0, nel;
+  PetscFunctionBeginUser;
+  nseg0 = fd->segs->nseg;
+  PetscCall(PetscMalloc2(2*nseg0,&xtr,2*nseg0,&xsh));
+  ntr = 0;
+  nsh = 0;
+  xmin = 1e300;
+  xmax = -1e300;
+  ymin = 0.0;
+  for(k = 0;k < nseg0;k++){
+    g = fd->segs->seg + k;
+    xe[0] = g->X0[0] - g->a*g->s[0];
+    ye[0] = g->X0[1] - g->a*g->s[1];
+    xe[1] = g->X0[0] + ((g->n - 1)*g->dx + g->a)*g->s[0];
+    ye[1] = g->X0[1] + ((g->n - 1)*g->dx + g->a)*g->s[1];
+    for(e = 0;e < 2;e++){
+      PetscCheck(ye[e] < 1e-6*hf,PETSC_COMM_WORLD,PETSC_ERR_USER,"rsf_fd_setup: a fault segment reaches above the surface (y %g > 0)",ye[e]);
+      xmin = PetscMin(xmin,xe[e]);
+      xmax = PetscMax(xmax,xe[e]);
+      ymin = PetscMin(ymin,ye[e]);
+      if(fabs(ye[e]) < 1e-2*hf)
+        xtr[ntr++] = xe[e];
+      else if(fabs(ye[e]) < 2.0*hf)
+        xsh[nsh++] = xe[e];
+    }
+  }
+  hn = (fd->surf_hnear > 0.0) ? fd->surf_hnear : 0.5*hf;
+  wn = (fd->surf_wnear > 0.0) ? fd->surf_wnear : 4.0*hf;
+  hfar = (fd->surf_hfar > 0.0) ? fd->surf_hfar : hf;
+  mg = (fd->surf_margin > 0.0) ? fd->surf_margin : 2.0*fabs(ymin);
+  if((hn < 0.25*hf) || (hfar > 1.25*hf) || (hn > 1.25*hf) || (hfar < 0.25*hf))
+    PetscCall(PetscPrintf(PETSC_COMM_WORLD,"rsf_fd_setup: WARNING: surface elements outside hf/4 .. 1.25 hf (%g, %g for hf %g): the second-order marching may be unstable on them\n",hn,hfar,hf));
+  nel = fd_seglist_add_surface(fd->segs,xmin - mg,xmax + mg,ntr,xtr,nsh,xsh,hn,wn,hfar);
+  PetscCheck(nel > 0,PETSC_COMM_WORLD,PETSC_ERR_LIB,"rsf_fd_setup: surface construction failed");
+  fd->nsurf = nel;
+  PetscCall(PetscPrintf(PETSC_COMM_WORLD,"rsf_fd_setup: virtual free surface: x %.4g to %.4g m, %d elements (slip and opening each) in %d runs, %d traces, %d shallow tops, elements %g m near them (+-%g m), %g m elsewhere\n",
+      xmin - mg,xmax + mg,nel,(fd->segs->nseg - nseg0)/2,ntr,nsh,hn,wn,hfar));
+  PetscCall(PetscFree2(xtr,xsh));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 static PetscErrorCode fd_build_tables(struct interact_ctx *par, struct fd_vars *fd)
 {
   struct med *medium = par->medium;
@@ -2698,6 +2765,8 @@ static PetscErrorCode fd_build_tables(struct interact_ctx *par, struct fd_vars *
         fd->segs->seg[k].dx,dx0);
     /* non-parallel segments (bends, branches) use dense pair tables (fd_plan.md N1) */
   }
+  if(fd->surf2d)
+    PetscCall(fd_surface_2d(fd,dx0));
   fd->dt_min = fd->cfl*dx0/fd->beta;
   /* sources: the real segments, plus for the antiplane half plane the image of
      each (vertical) segment in the free surface y = 0, same tangent, reversed
@@ -2756,6 +2825,7 @@ static PetscErrorCode fd_build_tables(struct interact_ctx *par, struct fd_vars *
   if(dwin > 0.0)
     PetscCall(PetscPrintf(PETSC_COMM_WORLD,"rsf_fd_setup: dense pairs: lag data %.1f MB, full windows %.1f MB (compression tolerance %g of the envelope%s)\n",
         dbytes/1e6,dwin/1e6,(double)fd->ctol,fd->ctol > 0.0 ? "" : ", off"));
+  fd_tables_open_cache_clear();
   fd->sys = fd_sys_create(fd->segs,fd->pairs,(int)fd->nsrc,fd->src_of,fd->src_rev,fd->mode2d,fd->dt_min,fd->alpha,fd->beta,fd->rho,+1);
   PetscCheck(fd->sys,PETSC_COMM_WORLD,PETSC_ERR_MEM,"rsf_fd_setup: marcher system allocation failed");
   if(fd->coarse && (fd->conv != 1) && (fd->kmax >= 2)){
@@ -2774,7 +2844,7 @@ static PetscErrorCode fd_build_tables(struct interact_ctx *par, struct fd_vars *
   }
   fd->nbytes = fd_sys_bytes(fd->sys);
   /* element map: segment order <-> global */
-  PetscCall(PetscMalloc1(medium->nrflt,&fd->g_of_s));
+  PetscCall(PetscMalloc1(fd->sys->N,&fd->g_of_s));          /* surface unknowns: -1 */
   for(k = 0;k < fd->segs->nseg;k++)
     for(l = 0;l < fd->segs->seg[k].n;l++)
       fd->g_of_s[fd->sys->off[k] + l] = fd->segs->gidx[k][l];
@@ -2802,7 +2872,8 @@ static PetscErrorCode fd_gate_one(struct fd_vars *fd, Mat A, const double *K, Pe
   PetscCall(PetscMalloc1(nrflt,&s_of_g));
   for(k = 0;k < fd->segs->nseg;k++)
     for(i = 0;i < fd->segs->seg[k].n;i++)
-      s_of_g[fd->segs->gidx[k][i]] = fd->sys->off[k] + i;
+      if(fd->segs->gidx[k][i] >= 0)              /* surface elements have none */
+        s_of_g[fd->segs->gidx[k][i]] = fd->sys->off[k] + i;
   for(gi = 0;gi < nrflt;gi++){
     for(c = 0;c < nrflt;c++)
       row[c] = 0.0;
@@ -2833,13 +2904,74 @@ static PetscErrorCode fd_gate_one(struct fd_vars *fd, Mat A, const double *K, Pe
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+/* the static operators of the fault with the virtual surface in static equilibrium:
+   K_ff - K_fs K_ss^-1 K_sf for the shear and normal rows, in N x N arrays (fault block filled) */
+extern void dgetrf_(int *m, int *n, double *a, int *lda, int *ipiv, int *info);
+extern void dgetrs_(char *tr, int *n, int *nrhs, double *a, int *lda, int *ipiv, double *b, int *ldb, int *info, size_t ltr);
+static PetscErrorCode fd_static_eliminated(const struct fd_sys *sy, double **Kse, double **Kne)
+{
+  int N, Nf, Nu, i, j, m, info;
+  double *lu, *P, acc, acn;
+  int *piv;
+  char tr;
+  PetscFunctionBeginUser;
+  N = sy->N;
+  Nf = sy->Nf;
+  Nu = sy->Nu;
+  lu = (double *)malloc(sizeof(double)*(size_t)Nu*Nu);
+  P = (double *)malloc(sizeof(double)*(size_t)Nu*Nf);
+  piv = (int *)malloc(sizeof(int)*Nu);
+  *Kse = (double *)calloc((size_t)N*N,sizeof(double));
+  *Kne = (double *)calloc((size_t)N*N,sizeof(double));
+  for(j = 0;j < Nu;j++)
+    for(i = 0;i < Nu;i++)
+      lu[(size_t)j*Nu + i] = sy->Ks[(size_t)(Nf + i)*N + Nf + j];
+  for(j = 0;j < Nf;j++)
+    for(i = 0;i < Nu;i++)
+      P[(size_t)j*Nu + i] = sy->Ks[(size_t)(Nf + i)*N + j];
+  dgetrf_(&Nu,&Nu,lu,&Nu,piv,&info);
+  PetscCheck(info == 0,PETSC_COMM_SELF,PETSC_ERR_LIB,"rsf_fd_setup: static surface operator singular (%d)",info);
+  tr = 'N';
+  dgetrs_(&tr,&Nu,&Nf,lu,&Nu,piv,P,&Nu,&info,1);
+  for(i = 0;i < Nf;i++)
+    for(j = 0;j < Nf;j++){
+      acc = sy->Ks[(size_t)i*N + j];
+      acn = sy->Kn[(size_t)i*N + j];
+      for(m = 0;m < Nu;m++){
+        acc -= sy->Ks[(size_t)i*N + Nf + m]*P[(size_t)j*Nu + m];
+        acn -= sy->Kn[(size_t)i*N + Nf + m]*P[(size_t)j*Nu + m];
+      }
+      (*Kse)[(size_t)i*N + j] = acc;
+      (*Kne)[(size_t)i*N + j] = acn;
+    }
+  free(lu);
+  free(P);
+  free(piv);
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 static PetscErrorCode fd_gate_static(struct interact_ctx *par, struct fd_vars *fd)
 {
   struct med *medium = par->medium;
   struct rsf_vars *rsf = medium->rsf;
   double d2, n2, dev, devn = -1.0, dn2, nn2;
+  const double *Ks;
+  const double *Kn;
+  double *Kse;
+  double *Kne;
   PetscFunctionBeginUser;
-  PetscCall(fd_gate_one(fd,medium->Is,fd->sys->Ks,medium->nrflt,&d2,&n2));
+  Ks = fd->sys->Ks;
+  Kn = fd->sys->Kn;
+  Kse = NULL;
+  Kne = NULL;
+  if(fd->sys->Nu > 0){
+    /* virtual free surface: the fault's static operators with the surface in static
+       equilibrium (Schur complement), which approximate the half-plane Is and In */
+    PetscCall(fd_static_eliminated(fd->sys,&Kse,&Kne));
+    Ks = Kse;
+    Kn = Kne;
+  }
+  PetscCall(fd_gate_one(fd,medium->Is,Ks,medium->nrflt,&d2,&n2));
   dev = sqrt(d2/(n2 + 1e-300));
   PetscCall(PetscPrintf(PETSC_COMM_WORLD,"rsf_fd_setup: static gate: rel dev of Ks(tables) from Is %.3e (tol %g)\n",dev,(double)fd->gate_tol));
   if((fd->mode2d == FD_MODE_INPLANE) && rsf->calc_sigma_dot){
@@ -2847,7 +2979,7 @@ static PetscErrorCode fd_gate_static(struct interact_ctx *par, struct fd_vars *f
        which equals +Kn of the tables (tension positive for the prototype's right-lateral
        positive slip); a numerically zero In (single planar segment) is judged against
        the shear norm */
-    PetscCall(fd_gate_one(fd,medium->In,fd->sys->Kn,medium->nrflt,&dn2,&nn2));
+    PetscCall(fd_gate_one(fd,medium->In,Kn,medium->nrflt,&dn2,&nn2));
     devn = sqrt(dn2/fmax(nn2,1e-16*n2));
     PetscCall(PetscPrintf(PETSC_COMM_WORLD,"rsf_fd_setup: static gate: rel dev of Kn(tables) from In %.3e (normal norm / shear norm %.2e)\n",devn,sqrt(nn2/(n2 + 1e-300))));
   }
@@ -2857,6 +2989,8 @@ static PetscErrorCode fd_gate_static(struct interact_ctx *par, struct fd_vars *f
       "rsf_fd_setup: normal static limit deviates %.3e from the assembled In (a sign flip gives 2)",devn);
   if((dev > fd->gate_tol) || (devn > fd->gate_tol))
     PetscCall(PetscPrintf(PETSC_COMM_WORLD,"rsf_fd_setup: WARNING: static gate deviation exceeds %g\n",(double)fd->gate_tol));
+  free(Kse);
+  free(Kne);
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
@@ -2936,7 +3070,20 @@ static PetscErrorCode fd_run_phase(TS ts, struct interact_ctx *par, struct fd_va
   st->normal_coupling = (fd->mode2d == FD_MODE_INPLANE) && rsf->calc_sigma_dot;
   st->nl = (int)fd->nl;
   PetscCall(VecGetArray(X,&x));
-  for(i = 0;i < N;i++){
+  for(i = sy->Nf;i < N;i++){                      /* virtual free surface (M7): at rest, traction free */
+    fr.a[i] = 0.01;
+    fr.b[i] = 0.01;
+    fr.dc[i] = 1.0;
+    st->psi[i] = 0.0;
+    st->sigma0[i] = 0.0;
+    st->V[i] = 0.0;
+    st->tau0[i] = 0.0;
+    st->taudot[i] = 0.0;
+    st->Hn_dot[i] = 0.0;
+    st->sigma[i] = 0.0;
+    st->tau[i] = 0.0;
+  }
+  for(i = 0;i < sy->Nf;i++){
     g = fd->g_of_s[i];
     fr.a[i] = fault[g].mu_sa;
     fr.b[i] = fault[g].mu_db;
@@ -2999,7 +3146,7 @@ static PetscErrorCode fd_run_phase(TS ts, struct interact_ctx *par, struct fd_va
       SETERRQ(PETSC_COMM_WORLD,PETSC_ERR_LIB,"rsf_fd: marcher step failed");
     nsteps++;
     vmax = 0.0;
-    for(i = 0;i < N;i++)
+    for(i = 0;i < sy->Nf;i++)                     /* fault slip rates only */
       if(st->V[i] > vmax)
         vmax = st->V[i];
     if(getenv("FD_DEBUG") && (nsteps <= 3)){
@@ -3027,7 +3174,7 @@ static PetscErrorCode fd_run_phase(TS ts, struct interact_ctx *par, struct fd_va
 	 fault-wide maximum is below back_vmax */
       quiet = (vmax < fd->back_vmax);
       if(quiet && (below > 0.0))
-        for(i = 0;i < N;i++)
+        for(i = 0;i < sy->Nf;i++)
           if(fabs(st->V[i] - vref[i]) > fd->back_eps*(fabs(vref[i]) + fd->vback)){
             quiet = 0;
             break;
@@ -3059,7 +3206,7 @@ static PetscErrorCode fd_run_phase(TS ts, struct interact_ctx *par, struct fd_va
     fclose(fp);
   }
   /* hand back: psi, tau (= strength at the final slip rate = elastic stress at the end of the last step), sigma, slip */
-  for(i = 0;i < N;i++){
+  for(i = 0;i < sy->Nf;i++){
     g = fd->g_of_s[i];
     x[4*g] = st->psi[i];
     x[4*g+1] = st->tau[i];
@@ -3080,7 +3227,7 @@ static PetscErrorCode fd_run_phase(TS ts, struct interact_ctx *par, struct fd_va
       kk = sy->ops[i].bw;
   PetscCall(PetscPrintf(PETSC_COMM_WORLD,
       "rsf_fd: phase %ld: t %.8f yr, %d steps over %.1f s, peak slip rate %.3f m/s, mean slip %.4f m, max band %d, wall %.1f s\n",
-      (long)fd->nphase + 1,(double)(t/SEC_PER_YEAR),nsteps,(double)st->t,vpeak,slipsum/N,kk,(double)(t_wall1 - t_wall0)));
+      (long)fd->nphase + 1,(double)(t/SEC_PER_YEAR),nsteps,(double)st->t,vpeak,slipsum/sy->Nf,kk,(double)(t_wall1 - t_wall0)));
   PetscCall(PetscFree3(fr.a,fr.b,fr.dc));
   PetscCall(PetscFree(vtmp));
   PetscCall(PetscFree(vref));
