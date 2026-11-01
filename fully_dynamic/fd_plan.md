@@ -3291,6 +3291,52 @@ OpenMP (M7 step 2d) is a stop-gap; MPI is the intended parallelisation, as in 3-
   elements in a full plane (event at 11 yr) and a 30 degree thrust in a half plane with the
   virtual surface (event at 24 yr): station series identical byte for byte on 1, 2 and 4 ranks.
 
+### M9: before a 2-D QD and FD comparison of Cascadia sections (2026-11-01)
+
+Tools:
+- run_2d_cascadia.sh: a section resampled to elements of h (coarsen_2d.py); QD alone, setup
+  times with MPI and with OpenMP, QD with dynamic phases on MPI and on OpenMP, and a comparison
+  (events; MPI against OpenMP station files, which must be identical).
+- check_2d_resolution.py: per element Lb = mu' Dc / (b sigma) (mu' = mu / (1 - nu)), the
+  process zone at rest Lambda0 = (9 pi / 32) Lb and, for velocity-weakening elements,
+  h* = (2 / pi) mu' Dc / ((b - a) sigma); per group the smallest Lambda0 / h and h* / h against
+  thresholds (3 and 20 by default, cautious lower bounds of the order of the SEAS benchmark
+  recommendations rather than convergence criteria) and the largest element size meeting both.
+  PD13 as in the repository at 100 m (Dc 5 cm): min Lambda0/h 23.6, min h*/h 72.8; resampled to
+  500 m: 4.7 and 14.6 (199 velocity-weakening elements below 20); both met everywhere for
+  elements up to 364 m. The PD13 inputs differ between copies (9,047 elements and Dc of 8 mm in
+  one run log): the check has to be run on the inputs used.
+- run_2d_sensitivity.sh: one section up to a given time with a base run and variants
+  (-fd_tol_surf 1e-4, -fd_tol 1e-3, -fd_vsw 1e-4, -fd_vback 1e-5, -fd_surf_h_near h/4); per run the
+  event onsets, phases, mean slip at the end and, where the phase boundaries are the same, the
+  per-element phase slip against the base.
+Findings so far:
+- Normal-stress coupling (-calc_sigma_dot 1, which QD and FD must share in a comparison) needs
+  the normal operator of the virtual surface: for PD13 at 1 km its static gate is 1.6e-2 (shear
+  2.0e-2), at 2 km 0.51 (refused: the fault tops at 0.3 to 1.2 km depth lie within one element of
+  the surface). Sections with normal coupling therefore need elements of about 1 km or less
+  near shallow tops.
+- -ts_rk_type 3bs is needed for the QD integration after a dynamic phase (the default RK scheme
+  ran into a rejection storm after the first PD13 event).
+- Sensitivity at 2 km (PD13 resampled, 2 ranks, no normal coupling, one event at 15.56 yr; the
+  section is under-resolved there, Lambda0/h about 1.2 and h*/h about 3.6, so the numbers show
+  which parameters matter, not their size at a usable resolution):
+
+| variant | mean slip at 17 yr against base | phase slip against base (largest / rms of the largest slip) |
+|---|---|---|
+| -fd_tol_surf 1e-4 | -1.5 % | 2.1 % / 1.2 % |
+| -fd_tol 1e-3 (fault pairs) | +2.7 % | 5.4 % / 2.3 % |
+| -fd_vsw 1e-4 -fd_vback 1e-5 (earlier switch) | -0.05 % | (other phase boundaries) |
+| -fd_vback 1e-5 (later hand-back) | -0.005 % | (other phase boundaries) |
+| -fd_surf_h_near h/4 | +0.6 % | 1.3 % / 0.7 % |
+
+  The switch and hand-back thresholds hardly matter (neglecting the surface's history before
+  the switch, and the QD restart, are fine); the window tolerance of the fault pairs matters most
+  (the phase took about the same wall time with 1e-3), then the surface's window tolerance and
+  refinement. The base run reproduced itself exactly when repeated. To be repeated at a resolved
+  element size with normal coupling (run_2d_sensitivity.sh, default calc_sigma_dot 1) before
+  choosing defaults; -fd_tol 1e-3 for 2-D in-plane runs is the candidate change.
+
 ### WP7, C implementation in rsf_solve: status (2026-10-18)
 Done, each verified in the sandbox before delivery (details in
 fd_c_design.md sections 6 to 10, usage in rsf_solve_fd.md):

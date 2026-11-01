@@ -110,6 +110,10 @@ for large strip sets (H8).
    PD13 at 1 km runs 700 yr with two stable dynamic events; next PD13 at
    500 m on a multi-core machine, then step 3 (the prototype's checks, a
    megathrust with a splay).
+1g. Before a 2-D QD and FD Cascadia comparison (M9): check_2d_resolution.py
+   on the inputs used; run_2d_sensitivity.sh at a resolved element size with
+   -calc_sigma_dot 1 (about 1 km or finer near shallow tops); decide on
+   -fd_tol 1e-3 for 2-D in-plane runs.
 1f. TPV14/15 ladder (H13): main-fault rupture times converge to SCEC at
    250 m; the branch and the junction do not (outcomes jump with the cell
    size): more SCEC stations beyond the junction, and the junction treatment.
