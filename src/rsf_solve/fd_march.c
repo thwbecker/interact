@@ -831,6 +831,11 @@ void fd_sys_history(struct fd_sys *s, int lag0, double *ts, double *tn)
       }
     }
   }
+  if(s->gather){                                 /* MPI: the rows of the other ranks */
+    s->gather(s->gather_ctx, ts, 1);
+    if(tn)
+      s->gather(s->gather_ctx, tn, 1);
+  }
 }
 
 void fd_sys_static(struct fd_sys *s, const double *delta, double *ts, double *tn)
@@ -1017,6 +1022,14 @@ struct fd_ops *fd_sys_ops(struct fd_sys *s, int k)
       free(Ws);
       free(Wn);
     }
+  if(s->gather){                                 /* MPI: the rows of the other ranks, before the pruning */
+    s->gather(s->gather_ctx, op->Ks, s->N);
+    s->gather(s->gather_ctx, op->Kn, s->N);
+    if(op->Cs)
+      s->gather(s->gather_ctx, op->Cs, s->N);
+    if(op->Cn)
+      s->gather(s->gather_ctx, op->Cn, s->N);
+  }
   /* prune FFT round-trip noise so that the band is the physical one */
   for(i = 0; i < s->N * s->N; i++)
     if(fabs(op->Ks[i]) > amax)
@@ -1098,6 +1111,14 @@ struct fd_ops *fd_sys_ops_nl(struct fd_sys *s, int k)
   for(i = 0; i < s->N; i++){
     op->Ks[(size_t)i * s->N + i] += (w1 - 1.0) * s->etai[i];
     op->Cs[(size_t)i * s->N + i] += (1.0 - w1) * s->etai[i];
+  }
+  if(s->gather){                                 /* MPI: the rows of the other ranks, before the pruning */
+    s->gather(s->gather_ctx, op->Ks, s->N);
+    s->gather(s->gather_ctx, op->Kn, s->N);
+    if(op->Cs)
+      s->gather(s->gather_ctx, op->Cs, s->N);
+    if(op->Cn)
+      s->gather(s->gather_ctx, op->Cn, s->N);
   }
   for(ii = 0; ii < NN; ii++)
     if(fabs(op->Ks[ii]) > amax)

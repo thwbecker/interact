@@ -96,6 +96,9 @@ struct fd_pair *fd_pair_build_dense(const struct fd_segment *src, const struct f
    relative to the window's envelope of each entry; ctol <= 0 keeps the full windows */
 /* the cache of opening-source stress histories (surface elements), release after building */
 void fd_tables_open_cache_clear(void);
+/* MPI (fd_plan.md M8): the compressed dense builder fills only receiver rows r0 .. r1 - 1 of the
+   receiver segment (other rows empty, static values zero, to be gathered); r1 < 0: all rows */
+void fd_tables_set_rows(int r0, int r1);
 /* dense pair of polyline segments (curved faults), built entry by entry and compressed */
 struct fd_pair *fd_pair_build_poly(const struct fd_segment *src, const struct fd_segment *rcv, int mode,
     double dt, double et, double alpha, double beta, double rho, double tol, int lmax, int M, char *errmsg);

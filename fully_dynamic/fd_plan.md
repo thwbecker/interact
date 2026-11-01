@@ -3257,6 +3257,35 @@ D1 at 250 m (FD3D_DP_DIAG per rank): up to 70 percent of a rank's entries used a
 saturation that kept the stored fraction near 35 percent; FD3D_DP_MAXMID is now 32 (no
 change at 750 m, where no entry used all 8).
 
+### M8: MPI for the 2-D path (2026-11-01)
+
+OpenMP (M7 step 2d) is a stop-gap; MPI is the intended parallelisation, as in 3-D (H7).
+- rsf_fd.c: 2-D faults may now run on several ranks. The unknowns of the marcher (segments in
+  order: faults, then surface) are split in row blocks, rank r owning rows N r/P to N (r+1)/P - 1.
+  Before each pair is built, fd_tables_set_rows passes the rank's rows of the receiver segment;
+  the compressed dense builder (fd_pair_build_poly) fills only those rows (the others empty);
+  fd_pair_share then gathers the static values (Kd) and takes the largest window over the ranks.
+  The Toeplitz pairs of straight parallel segments are small and built in full on every rank.
+- fd_march.c: a gather hook (fd_sys->gather) replaces the other ranks' rows by the owners'
+  values: of the operators K_k (shear, normal, and the NL C_k) right after assembly, before the
+  pruning of round-off, and of the history after the products. The surface elimination, the
+  friction solves and the step control then run identically on every rank.
+- The phase driver gathers the whole state at the switch and scatters it back at the end
+  (fd_full_get / fd_full_put, as in 3-D); station and slip files are written by rank 0; the static
+  gate takes each rank's rows of Is and In and reduces the sums.
+- Rank independence: every row is computed whole on its owner in the one-rank order. One source
+  of rank dependence had to be removed: the cached opening-kernel histories (surface) were
+  computed at the first entry's exact position, and entries at the same rounded relative position
+  differ in the last bits, so the cached values depended on which entry (and with split rows,
+  which rank) came first (1806 of 94,500 dumped table entries differed at 1e-11). An opening
+  source's entry is now evaluated at its position rounded to 1 micrometre (the cache key), and
+  the length of a cached
+  history depends on the position only (not on the receiver or the pair). FD_MPI_ALLROWS=1 builds
+  all rows on every rank (a check that isolates the row split).
+- Check: src/testing/rsf_solve/test_fd_mpi2d.sh (also in run_tests.sh): a curved fault of 60
+  elements in a full plane (event at 11 yr) and a 30 degree thrust in a half plane with the
+  virtual surface (event at 24 yr): station series identical byte for byte on 1, 2 and 4 ranks.
+
 ### WP7, C implementation in rsf_solve: status (2026-10-18)
 Done, each verified in the sandbox before delivery (details in
 fd_c_design.md sections 6 to 10, usage in rsf_solve_fd.md):

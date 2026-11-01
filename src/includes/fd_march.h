@@ -41,6 +41,11 @@ struct fd_ops {                 /* operators for one substep multiple k */
 struct fd_sys {
   int N, nseg, nsrc, M, L, Lbuf, mode, has_normal, nsign;
   int Nf, Nu;                   /* fault unknowns 0..Nf-1, surface unknowns Nf..N-1 (segments of kind FD_SEG_SURF_*, after the faults) */
+  /* MPI (fd_plan.md M8): the dense lag tables hold each rank's own receiver rows only; gather(ctx,
+     A, ncol) replaces the other ranks' rows of the N x ncol row-major array A by the owners'
+     values (operators K_k after assembly, the history after the products); NULL on one rank */
+  void (*gather)(void *ctx, double *A, int ncol);
+  void *gather_ctx;
   double *etai;                 /* instantaneous coefficient per unknown: mu/(2 beta), rho alpha/2 for opening */
   double dt, eta, alpha, beta, rho;
   struct fd_seglist *segs;      /* receivers (real segments) */

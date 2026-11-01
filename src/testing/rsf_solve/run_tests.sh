@@ -160,6 +160,9 @@ if [ -n "$mpi" ]; then
        cmp -s tmp_fd_dynamic/h7_$t/n1/dump.txt tmp_fd_dynamic/h7_$t/n4/dump.txt; then echo "fd3d_test MPI dense couplings, $t (1, 2 and 4 ranks identical): PASS"
     else echo "fd3d_test MPI dense couplings, $t (1, 2 and 4 ranks identical): FAIL"; fail=1; fi
   done
+  # 2-D faults on several ranks (fd_plan.md M8): curved fault and half plane with the surface
+  ( src/testing/rsf_solve/test_fd_mpi2d.sh "$mpi" > tmp_fd_dynamic/mpi2d.out 2>&1 ); st=$?
+  cat tmp_fd_dynamic/mpi2d.out; [ $st -eq 0 ] || fail=1
 else
   echo "fd3d_test MPI: skipped (no MPI launch command that starts 4 ranks)"
 fi

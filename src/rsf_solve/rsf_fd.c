@@ -55,7 +55,7 @@
   elements (types 30 to 33) that form straight runs of equal, collinear
   elements with one common element size; full plane for in-plane, full
   plane or half plane with vertical segments for antiplane; aging law;
-  one MPI rank; no -ve_mode.
+  any number of MPI ranks (dense tables split by receiver rows, fd_plan.md M8); no -ve_mode.
 */
 #ifdef _OPENMP
 #include <omp.h>
@@ -102,7 +102,7 @@ PetscErrorCode rsf_fd_setup(struct interact_ctx *par, PetscReal shear_modulus_si
   PetscCheck((n3d == 0) || (n3d == medium->nrflt),PETSC_COMM_WORLD,PETSC_ERR_SUP,"-fd_mode: mixed 2-D and 3-D elements");
   /* MPI: the 3-D marcher splits its tables, histories and local solves over the ranks
      (fd_plan.md S2); the 2-D code runs on one rank */
-  PetscCheck((size == 1) || (n3d > 0),PETSC_COMM_WORLD,PETSC_ERR_SUP,"-fd_mode: 2-D faults on one MPI rank only in this version");
+  /* 2-D faults on several ranks (fd_plan.md M8): the dense lag tables are split by receiver rows */
   PetscCheck((n3d > 0) || ((n2d + nanti) == medium->nrflt),PETSC_COMM_WORLD,PETSC_ERR_SUP,
       "-fd_mode: all elements must be 2-D segments (plane strain or antiplane) in this version");
   PetscCheck((n2d == 0) || (nanti == 0),PETSC_COMM_WORLD,PETSC_ERR_SUP,"-fd_mode: mixed in-plane and antiplane elements");
@@ -2743,6 +2743,78 @@ static PetscErrorCode fd_surface_2d(struct fd_vars *fd, double hf)
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+/* ---------------- MPI for the 2-D dense tables (fd_plan.md M8) ----------------
+   The unknowns of the marcher (segments in order, faults then surface) are split in blocks of
+   rows, rank r owning rows N r / P .. N (r + 1) / P - 1. The dense lag tables keep only the own
+   receiver rows; the static values and the windows are shared after each build, the operators
+   K_k and the history gathered from the owners, so every row is computed whole on one rank and
+   the results do not depend on the number of ranks. */
+static int fd_seg_off(const struct fd_vars *fd, int l)
+{
+  int m, off;
+  off = 0;
+  for(m = 0;m < l;m++)
+    off += fd->segs->seg[m].n;
+  return off;
+}
+static int fd_ntot(const struct fd_vars *fd)
+{
+  return fd_seg_off(fd,fd->segs->nseg);
+}
+/* first row of rank r within segment l (clipped to 0 .. n_l) */
+static int fd_rows_lo(const struct fd_vars *fd, int l, int r)
+{
+  long N, g;
+  int off, n;
+  N = fd_ntot(fd);
+  g = (N*r)/fd->mpi_size;
+  off = fd_seg_off(fd,l);
+  n = fd->segs->seg[l].n;
+  g -= off;
+  if(g < 0)
+    g = 0;
+  if(g > n)
+    g = n;
+  return (int)g;
+}
+/* the static values of the other ranks' rows and the window of the whole pair */
+static PetscErrorCode fd_pair_share(struct fd_vars *fd, struct fd_pair *p, int l)
+{
+  int r, ns, *cnt, *dsp, L;
+  PetscFunctionBeginUser;
+  ns = p->src->n;
+  PetscCall(PetscMalloc2(fd->mpi_size,&cnt,fd->mpi_size,&dsp));
+  for(r = 0;r < fd->mpi_size;r++){
+    dsp[r] = fd_rows_lo(fd,l,r)*ns;
+    cnt[r] = fd_rows_lo(fd,l,r + 1)*ns - dsp[r];
+  }
+  PetscCallMPI(MPI_Allgatherv(MPI_IN_PLACE,0,MPI_DATATYPE_NULL,p->Kd_s,cnt,dsp,MPI_DOUBLE,PETSC_COMM_WORLD));
+  PetscCallMPI(MPI_Allgatherv(MPI_IN_PLACE,0,MPI_DATATYPE_NULL,p->Kd_n,cnt,dsp,MPI_DOUBLE,PETSC_COMM_WORLD));
+  L = p->L;
+  PetscCallMPI(MPI_Allreduce(MPI_IN_PLACE,&L,1,MPI_INT,MPI_MAX,PETSC_COMM_WORLD));
+  p->L = L;
+  PetscCall(PetscFree2(cnt,dsp));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+/* the marcher's gather hook: rows of the N x ncol array A from their owners */
+static void fd_gather_rows(void *ctx, double *A, int ncol)
+{
+  struct fd_vars *fd;
+  long N;
+  int r, *cnt, *dsp;
+  fd = (struct fd_vars *)ctx;
+  N = fd->sys->N;
+  cnt = (int *)malloc(sizeof(int)*fd->mpi_size);
+  dsp = (int *)malloc(sizeof(int)*fd->mpi_size);
+  for(r = 0;r < fd->mpi_size;r++){
+    dsp[r] = (int)((N*r)/fd->mpi_size)*ncol;
+    cnt[r] = (int)((N*(r + 1))/fd->mpi_size)*ncol - dsp[r];
+  }
+  MPI_Allgatherv(MPI_IN_PLACE,0,MPI_DATATYPE_NULL,A,cnt,dsp,MPI_DOUBLE,PETSC_COMM_WORLD);
+  free(cnt);
+  free(dsp);
+}
+
 static PetscErrorCode fd_build_tables(struct interact_ctx *par, struct fd_vars *fd)
 {
   struct med *medium = par->medium;
@@ -2761,6 +2833,8 @@ static PetscErrorCode fd_build_tables(struct interact_ctx *par, struct fd_vars *
   struct fd_segment *g0;
   double ptol;
   PetscFunctionBeginUser;
+  PetscCallMPI(MPI_Comm_size(PETSC_COMM_WORLD,&fd->mpi_size));
+  PetscCallMPI(MPI_Comm_rank(PETSC_COMM_WORLD,&fd->mpi_rank));
   PetscCall(PetscMalloc5(n,&cx,n,&cy,n,&tx,n,&ty,n,&hl));
   for(i = 0;i < n;i++){
     cx[i] = fault[i].x[INT_X]*fd->length_scale;
@@ -2847,9 +2921,13 @@ static PetscErrorCode fd_build_tables(struct interact_ctx *par, struct fd_vars *
       /* pairs with a virtual surface segment keep longer windows (-fd_tol_surf): the surface has
          no friction to damp the truncation error of its tails, and PD13 diverged with 1e-2 */
       ptol = ((fd->srcseg[k].kind != FD_SEG_FAULT) || (fd->segs->seg[l].kind != FD_SEG_FAULT)) ? PetscMin(fd->tol,fd->tol_surf) : fd->tol;
+      if((fd->mpi_size > 1) && !getenv("FD_MPI_ALLROWS"))   /* MPI: this rank's receiver rows of segment l (FD_MPI_ALLROWS: all, for checks) */
+        fd_tables_set_rows(fd_rows_lo(fd,l,fd->mpi_rank),fd_rows_lo(fd,l,fd->mpi_rank + 1));
       p = fd_pair_build(fd->srcseg + k,fd->segs->seg + l,fd->mode2d,fd->dt_min,fd->et,
           fd->alpha,fd->beta,fd->rho,ptol,(int)fd->lmax,fd->lmax > 0,fd->M,err);
       PetscCheck(p,PETSC_COMM_WORLD,PETSC_ERR_SUP,"rsf_fd_setup: table for pair (%ld,%ld) failed: %s",(long)k,(long)l,err);
+      if((fd->mpi_size > 1) && p->dense && p->compressed)
+        PetscCall(fd_pair_share(fd,p,l));
       fd->pairs[k*fd->segs->nseg + l] = p;
       fd->nbytes += (double)p->L*p->M*16.0*(p->has_normal ? 2 : 1);
       if(p->dense){
@@ -2866,6 +2944,7 @@ static PetscErrorCode fd_build_tables(struct interact_ctx *par, struct fd_vars *
     PetscCall(PetscPrintf(PETSC_COMM_WORLD,"rsf_fd_setup: dense pairs: lag data %.1f MB, full windows %.1f MB (compression tolerance %g of the envelope%s)\n",
         dbytes/1e6,dwin/1e6,(double)fd->ctol,fd->ctol > 0.0 ? "" : ", off"));
   fd_tables_open_cache_clear();
+  fd_tables_set_rows(0,-1);
 #ifdef _OPENMP
   PetscCall(PetscPrintf(PETSC_COMM_WORLD,"rsf_fd_setup: dense tables and their history products on %d OpenMP threads (OMP_NUM_THREADS)\n",omp_get_max_threads()));
 #else
@@ -2873,6 +2952,11 @@ static PetscErrorCode fd_build_tables(struct interact_ctx *par, struct fd_vars *
 #endif
   fd->sys = fd_sys_create(fd->segs,fd->pairs,(int)fd->nsrc,fd->src_of,fd->src_rev,fd->mode2d,fd->dt_min,fd->alpha,fd->beta,fd->rho,+1);
   PetscCheck(fd->sys,PETSC_COMM_WORLD,PETSC_ERR_MEM,"rsf_fd_setup: marcher system allocation failed");
+  if(fd->mpi_size > 1){
+    fd->sys->gather = fd_gather_rows;
+    fd->sys->gather_ctx = (void *)fd;
+    PetscCall(PetscPrintf(PETSC_COMM_WORLD,"rsf_fd_setup: 2-D dense tables split by receiver rows over %d ranks\n",fd->mpi_size));
+  }
   if(fd->coarse && (fd->conv != 1) && (fd->kmax >= 2)){
     PetscCheck(fd_sys_set_coarse(fd->sys,(int)fd->kmax) == 0,PETSC_COMM_WORLD,PETSC_ERR_LIB,"rsf_fd_setup: coarse history setup failed");
     PetscCall(PetscPrintf(PETSC_COMM_WORLD,"rsf_fd_setup: coarse history for aligned steps of %d substeps\n",(int)fd->kmax));
@@ -2907,7 +2991,7 @@ static PetscErrorCode fd_build_tables(struct interact_ctx *par, struct fd_vars *
 */
 static PetscErrorCode fd_gate_one(struct fd_vars *fd, Mat A, const double *K, PetscInt nrflt, double *dev2, double *nrm2)
 {
-  PetscInt gi, c, ncols, si, sj;
+  PetscInt gi, c, ncols, si, sj, rlo, rhi;
   const PetscInt *cols;
   const PetscScalar *vals;
   double *row, dev = 0.0, nrm = 0.0, dv;
@@ -2919,7 +3003,8 @@ static PetscErrorCode fd_gate_one(struct fd_vars *fd, Mat A, const double *K, Pe
     for(i = 0;i < fd->segs->seg[k].n;i++)
       if(fd->segs->gidx[k][i] >= 0)              /* surface elements have none */
         s_of_g[fd->segs->gidx[k][i]] = fd->sys->off[k] + i;
-  for(gi = 0;gi < nrflt;gi++){
+  PetscCall(MatGetOwnershipRange(A,&rlo,&rhi));
+  for(gi = rlo;gi < rhi;gi++){                    /* MPI: own rows of A, sums reduced below */
     for(c = 0;c < nrflt;c++)
       row[c] = 0.0;
     PetscCall(MatGetRow(A,gi,&ncols,&cols,&vals));
@@ -2944,6 +3029,8 @@ static PetscErrorCode fd_gate_one(struct fd_vars *fd, Mat A, const double *K, Pe
   }
   PetscCall(PetscFree(row));
   PetscCall(PetscFree(s_of_g));
+  PetscCallMPI(MPI_Allreduce(MPI_IN_PLACE,&dev,1,MPI_DOUBLE,MPI_SUM,PETSC_COMM_WORLD));
+  PetscCallMPI(MPI_Allreduce(MPI_IN_PLACE,&nrm,1,MPI_DOUBLE,MPI_SUM,PETSC_COMM_WORLD));
   *dev2 = dev;
   *nrm2 = nrm;
   PetscFunctionReturn(PETSC_SUCCESS);
@@ -3114,7 +3201,7 @@ static PetscErrorCode fd_run_phase(TS ts, struct interact_ctx *par, struct fd_va
   PetscCall(PetscMalloc1(N,&vref));
   st->normal_coupling = (fd->mode2d == FD_MODE_INPLANE) && rsf->calc_sigma_dot;
   st->nl = (int)fd->nl;
-  PetscCall(VecGetArray(X,&x));
+  PetscCall(fd_full_get(X,&fd->scX,&fd->Xall,&x));   /* the whole state on every rank (MPI) */
   for(i = sy->Nf;i < N;i++){                      /* virtual free surface (M7): at rest, traction free */
     fr.a[i] = 0.01;
     fr.b[i] = 0.01;
@@ -3173,7 +3260,7 @@ static PetscErrorCode fd_run_phase(TS ts, struct interact_ctx *par, struct fd_va
   {
     for(a = 0;a < fd->nstat;a++){
       sprintf(fn,"fd_phase_%ld_st%ld.dat",(long)fd->nphase + 1,(long)fd->stat[a]);
-      fd->fstat[a] = fopen(fn,"w");
+      fd->fstat[a] = (fd->mpi_rank == 0) ? fopen(fn,"w") : NULL;
       fd->sstat[a] = -1;
       for(i = 0;i < N;i++)
         if(fd->g_of_s[i] == fd->stat[a])
@@ -3207,7 +3294,7 @@ static PetscErrorCode fd_run_phase(TS ts, struct interact_ctx *par, struct fd_va
           nsteps,k,vmax,im_2,st->V[0],st->V[N/2],st->V[N-1],hs,st->tau[im_2],st->H[im_2]);
     }
     for(a_2 = 0;a_2 < fd->nstat;a_2++)
-      if(fd->sstat[a_2] >= 0)
+      if(fd->sstat[a_2] >= 0 && fd->fstat[a_2])
         fprintf(fd->fstat[a_2],"%.10e %.10e %.10e %.10e %.4e %d\n",st->t,st->delta[fd->sstat[a_2]],st->V[fd->sstat[a_2]],st->tau[fd->sstat[a_2]],vmax,k);
     if(vmax > vpeak)
       vpeak = vmax;
@@ -3245,10 +3332,12 @@ static PetscErrorCode fd_run_phase(TS ts, struct interact_ctx *par, struct fd_va
       if(fd->fstat[a_3])
         fclose(fd->fstat[a_3]);
     sprintf(fn_2,"fd_phase_%ld_slip.dat",(long)fd->nphase + 1);
-    fp = fopen(fn_2,"w");
-    for(i = 0;i < N;i++)
-      fprintf(fp,"%d %ld %.10e %.6e %.6e\n",i,(long)fd->g_of_s[i],st->delta[i],st->V[i],st->psi[i]);
-    fclose(fp);
+    if(fd->mpi_rank == 0){
+      fp = fopen(fn_2,"w");
+      for(i = 0;i < N;i++)
+        fprintf(fp,"%d %ld %.10e %.6e %.6e\n",i,(long)fd->g_of_s[i],st->delta[i],st->V[i],st->psi[i]);
+      fclose(fp);
+    }
   }
   /* hand back: psi, tau (= strength at the final slip rate = elastic stress at the end of the last step), sigma, slip */
   for(i = 0;i < sy->Nf;i++){
@@ -3259,7 +3348,7 @@ static PetscErrorCode fd_run_phase(TS ts, struct interact_ctx *par, struct fd_va
     x[4*g+3] += st->delta[i];
     slipsum += st->delta[i];
   }
-  PetscCall(VecRestoreArray(X,&x));
+  PetscCall(fd_full_put(X,&fd->scX,&fd->Xall,&x,1));
   *t_end = t + st->t;
   PetscCall(PetscTime(&t_wall1));
   if(getenv("FD_PROFILE")){

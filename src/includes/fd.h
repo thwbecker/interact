@@ -34,6 +34,7 @@ struct fd_vars {
      surf_hnear within surf_wnear of a trace or shallow fault top, surf_hfar elsewhere, from the
      faults' x extent -+ surf_margin (defaults: hf/2, 4 hf, hf, twice the deepest fault depth) */
   PetscBool surf2d;
+  int mpi_rank, mpi_size;        /* 2-D dense tables split by receiver rows (fd_plan.md M8) */
   PetscReal surf_hnear, surf_wnear, surf_hfar, surf_margin;
   int nsurf;
   PetscReal mu,nu,rho,alpha,beta,dt_min;

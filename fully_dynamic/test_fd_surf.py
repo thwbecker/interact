@@ -74,7 +74,9 @@ for line in open(fn):
         scale = max(scale, abs(d.W[l - 1, rs, cs]))
         if B == 0:
             worst = max(worst, abs(wn - d.Wn[l - 1, elem(B, i), cs]))
-ok = worst <= 1e-7*scale and worstk <= 1e-7*scalek
+# 1e-6 for the tables: the C code evaluates an opening source at its position rounded to 1 um
+# (the cache key, fd_plan.md M8), a few 1e-7 of the largest value near the source
+ok = worst <= 1e-6*scale and worstk <= 1e-7*scalek
 print(f"test_fd_surf.py: fault {nf} + surface {ns} elements, {L} lags: tables max diff {worst:.3e} of {scale:.3e}, "
       f"static max diff {worstk:.3e} of {scalek:.3e}: {'PASS' if ok else 'FAIL'}")
 sys.exit(0 if ok else 1)

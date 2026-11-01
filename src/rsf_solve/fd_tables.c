@@ -13,6 +13,7 @@
 
 static double g_ctol;
 static int g_cexp;
+static int g_r0 = 0, g_r1 = -1;                  /* receiver rows built by the dense builder (MPI, fd_plan.md M8); r1 < 0: all */
 struct fd_ctab;
 static void ct_init(struct fd_ctab *c, size_t ne);
 static void ct_entry(struct fd_ctab *c, size_t e, const double *w, int L, double tol);
@@ -268,12 +269,22 @@ static void dense_entry_open(const struct fd_segment *src, const struct fd_segme
     double *W, double *Wn, double *Kp, double *Kn)
 {
   double st[3], s0[3], s1[3], d[3], ts, tn, kps, kpn, rfar, env, rr;
+  int lend;
   int l, k, quiet, lS, nl;
   long kx;
   long ky;
   long ka;
   struct open_cache_entry *ce;
   double *hist;
+  /* an opening source's history is cached by the position in the source frame rounded to 1 um;
+     it is evaluated at that rounded position (and so is everything else of the entry), so that
+     its values do not depend on which entry computed it first: entries at the same relative
+     position differ in the last bits of x and y, and with the rows split over MPI ranks the
+     first entry differs */
+  if(src->kind == FD_SEG_SURF_OPEN){
+    x = llround(x*1e6)/1e6;
+    y = llround(y*1e6)/1e6;
+  }
   /* static */
   if(src->kind == FD_SEG_SURF_OPEN)
     fd_static_inplane_open(x, y, src->a, mu, nu, st);
@@ -294,9 +305,9 @@ static void dense_entry_open(const struct fd_segment *src, const struct fd_segme
   ky = 0;
   ka = 0;
   if(src->kind == FD_SEG_SURF_OPEN){
-    kx = lround(x*1e3);
-    ky = lround(y*1e3);
-    ka = lround(src->a*1e3);
+    kx = llround(x*1e6);
+    ky = llround(y*1e6);
+    ka = llround(src->a*1e6);
 #pragma omp critical(fd_open_cache)
     {
       ce = oc_find(kx, ky, ka, 0);
@@ -307,10 +318,18 @@ static void dense_entry_open(const struct fd_segment *src, const struct fd_segme
     }
   }
   if(!hist){
-    hist = (double *)malloc(sizeof(double)*3*(size_t)(lmax + 1));
+    /* a cached (opening) history ends at a bound set by the position alone, not by the pair's
+       lmax, so that it is the same whichever pair, receiver or MPI rank computes it first */
+    lend = lmax;
+    if(src->kind == FD_SEG_SURF_OPEN){
+      lend = 20*lS + 64;
+      if(lend < 256)
+        lend = 256;
+    }
+    hist = (double *)malloc(sizeof(double)*3*(size_t)(lend + 1));
     hist[0] = hist[1] = hist[2] = 0.0;
     quiet = 0;
-    for(l = 1; l <= lmax; l++){
+    for(l = 1; l <= lend; l++){
       if(src->kind == FD_SEG_SURF_OPEN)
         fd_seg_ramp_inplane_open(x, y, (et + l - 1)*dt, src->a, alpha, beta, rho, FD_OPEN_TSHIFT*dt, s1);
       else
@@ -323,8 +342,10 @@ static void dense_entry_open(const struct fd_segment *src, const struct fd_segme
         d[k] = s1[k] - hist[3*(l - 1) + k];
         s0[k] = st[k]*dt;
       }
-      fd_project(d[0] - s0[0], d[1] - s0[1], d[2] - s0[2], src->s, rcv->s, &ts, &tn);
-      if(l > lS && fabs(ts) <= tol*env && fabs(tn) <= tol*env)
+      /* the stress components in the source frame, so that the length of a cached history does
+         not depend on the receiver that first needed it (the tables are then the same for any
+         split of the receiver rows over MPI ranks) */
+      if(l > lS && fabs(d[0] - s0[0]) <= tol*env && fabs(d[1] - s0[1]) <= tol*env && fabs(d[2] - s0[2]) <= tol*env)
         quiet++;
       else
         quiet = 0;
@@ -563,6 +584,14 @@ struct fd_pair *fd_pair_build_poly(const struct fd_segment *src, const struct fd
       for(jc = 0; jc < ns; jc++){
         e = (size_t)ic*ns + jc;
         el = (size_t)(ic - i0c)*ns + jc;
+        if(g_r1 >= 0 && (ic < g_r0 || ic >= g_r1)){
+          /* another rank's receiver row (MPI): empty here, the static values are gathered */
+          p->Kd_s[e] = 0.0;
+          p->Kd_n[e] = 0.0;
+          ct_entry(&tcs[ch], el, W, 0, 0.0);
+          ct_entry(&tcn[ch], el, Wn, 0, 0.0);
+          continue;
+        }
         poly_entry(src, rcv, ic, jc, mode, dt, et, alpha, beta, rho, mu, nu, tol, lmax, full, W, Wn, &p->Kd_s[e], &p->Kd_n[e], &env);
         /* the window criterion of the pair builders, per entry */
         for(hiL = lmax - 1; hiL >= 0; hiL--)
@@ -843,6 +872,13 @@ void fd_pair_W_dense(const struct fd_pair *p, int l1, double *Ws, double *Wn)
    verified at every lag against the full increments to ctol times the entry's envelope (the
    normalisation of the window criterion), and the history of a run uses prefix moments of the
    source's history ring, so its cost does not depend on the run's length. */
+
+void fd_tables_set_rows(int r0, int r1)
+{
+  g_r0 = r0;
+  g_r1 = r1;
+}
+
 static double g_ctol = 1e-7;                    /* default: 1e-5 of the default window tolerance of rsf_fd */
 
 static int g_cexp = 1;                          /* lags 1..g_cexp stay explicit (FD_CT_EXPLICIT) */
