@@ -270,6 +270,7 @@ static void dense_entry_open(const struct fd_segment *src, const struct fd_segme
 {
   double st[3], s0[3], s1[3], d[3], ts, tn, kps, kpn, rfar, env, rr;
   int lend;
+  double sa;
   int l, k, quiet, lS, nl;
   long kx;
   long ky;
@@ -281,21 +282,23 @@ static void dense_entry_open(const struct fd_segment *src, const struct fd_segme
      its values do not depend on which entry computed it first: entries at the same relative
      position differ in the last bits of x and y, and with the rows split over MPI ranks the
      first entry differs */
+  sa = src->a;
   if(src->kind == FD_SEG_SURF_OPEN){
     x = llround(x*1e6)/1e6;
     y = llround(y*1e6)/1e6;
+    sa = llround(sa*1e6)/1e6;                   /* the half-length too: elements of different runs differ in the last bits */
   }
   /* static */
   if(src->kind == FD_SEG_SURF_OPEN)
-    fd_static_inplane_open(x, y, src->a, mu, nu, st);
+    fd_static_inplane_open(x, y, sa, mu, nu, st);
   else
-    fd_static_inplane(x, y, src->a, mu, nu, st);
+    fd_static_inplane(x, y, sa, mu, nu, st);
   fd_project(st[0], st[1], st[2], src->s, rcv->s, &kps, &kpn);
   *Kp = (rcv->kind == FD_SEG_SURF_OPEN) ? kpn : kps;
   *Kn = kpn;
-  rr = fmax(hypot(x, y), src->a);
-  env = mu*src->dx*src->dx/(2.0*M_PI*(1.0 - nu)*rr*rr)*dt;
-  rfar = fmax(hypot(x + src->a, y), hypot(x - src->a, y));
+  rr = fmax(hypot(x, y), sa);
+  env = mu*(2.0*sa)*(2.0*sa)/(2.0*M_PI*(1.0 - nu)*rr*rr)*dt;
+  rfar = fmax(hypot(x + sa, y), hypot(x - sa, y));
   lS = (int)ceil(rfar/beta/dt) + 2;
   /* stress history in the source frame, from the cache for opening sources */
   hist = NULL;
@@ -307,7 +310,7 @@ static void dense_entry_open(const struct fd_segment *src, const struct fd_segme
   if(src->kind == FD_SEG_SURF_OPEN){
     kx = llround(x*1e6);
     ky = llround(y*1e6);
-    ka = llround(src->a*1e6);
+    ka = llround(sa*1e6);
 #pragma omp critical(fd_open_cache)
     {
       ce = oc_find(kx, ky, ka, 0);
@@ -331,9 +334,9 @@ static void dense_entry_open(const struct fd_segment *src, const struct fd_segme
     quiet = 0;
     for(l = 1; l <= lend; l++){
       if(src->kind == FD_SEG_SURF_OPEN)
-        fd_seg_ramp_inplane_open(x, y, (et + l - 1)*dt, src->a, alpha, beta, rho, FD_OPEN_TSHIFT*dt, s1);
+        fd_seg_ramp_inplane_open(x, y, (et + l - 1)*dt, sa, alpha, beta, rho, FD_OPEN_TSHIFT*dt, s1);
       else
-        fd_seg_ramp_inplane(x, y, (et + l - 1)*dt, src->a, alpha, beta, rho, s1);
+        fd_seg_ramp_inplane(x, y, (et + l - 1)*dt, sa, alpha, beta, rho, s1);
       for(k = 0; k < 3; k++)
         hist[3*l + k] = s1[k];
       nl = l;

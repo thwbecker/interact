@@ -3280,7 +3280,12 @@ OpenMP (M7 step 2d) is a stop-gap; MPI is the intended parallelisation, as in 3-
   which rank) came first (1806 of 94,500 dumped table entries differed at 1e-11). An opening
   source's entry is now evaluated at its position rounded to 1 micrometre (the cache key), and
   the length of a cached
-  history depends on the position only (not on the receiver or the pair). FD_MPI_ALLROWS=1 builds
+  history depends on the position only (not on the receiver or the pair). The half-length of
+  the source is rounded the same way: in a coarsened Cascadia section (PD13 at 2 km, surface
+  runs of different element sizes) elements of different runs share a key but differ in the
+  last bits of their half-length, which again made 115 of 26,523 cached histories depend on
+  the rank that computed them; with the half-length rounded, serial, 2 MPI ranks and 2 OpenMP
+  threads give identical station series (run_2d_cascadia.sh, part c, compares MPI and OpenMP). FD_MPI_ALLROWS=1 builds
   all rows on every rank (a check that isolates the row split).
 - Check: src/testing/rsf_solve/test_fd_mpi2d.sh (also in run_tests.sh): a curved fault of 60
   elements in a full plane (event at 11 yr) and a 30 degree thrust in a half plane with the
