@@ -110,13 +110,15 @@ fi
 # virtual free surface in the 2-D marcher (fd_plan.md M7 step 2b): spontaneous rupture on a 3 km
 # fault dipping 30 degrees, top 400 m deep, with a surface of +-4 km, against the prototype's
 # test_fs_dyn2d.inplane_rupture (|slip| top / middle / bottom: thrust 0.672 / 1.318 / 0.650 m,
-# normal 0.194 / 0.859 / 0.541 m), within 5 mm; about 1 minute
-for c in "-1 0.672 1.318 0.650" "1 0.194 0.859 0.541"; do
+# normal 0.194 / 0.859 / 0.541 m), within 1 cm; about 2 minutes
+# and the same fault reaching the surface (top 0, trace on a surface element boundary): thrust
+# 2.184 / 2.057 / 0.867 m, normal 1.486 / 1.496 / 0.750 m (test_fs_dyn2d.inplane_rupture, top=0)
+for c in "-1 0.672 1.318 0.650 400" "1 0.194 0.859 0.541 400" "-1 2.184 2.057 0.867 0" "1 1.486 1.496 0.750 0"; do
   set -- $c
-  ( cd tmp_fd_dynamic && ../bin/fd_dynamic fsrup $1 1 > fsrup.out 2>/dev/null )
+  ( cd tmp_fd_dynamic && ../bin/fd_dynamic fsrup $1 1 3000 200 $5 4000 200 3 30 > fsrup.out 2>/dev/null )
   awk -v t=$2 -v m=$3 -v b=$4 '{for(i=1;i<=NF;i++) if($i=="bottom"){split($(i+1),x," "); top=$(i+1); mid=$(i+3); bot=$(i+5)}}
        END {d=0; e=top-t; if(e<0)e=-e; if(e>d)d=e; e=mid-m; if(e<0)e=-e; if(e>d)d=e; e=bot-b; if(e<0)e=-e; if(e>d)d=e;
-            if(d<=0.005) print "fd_dynamic fsrup (free surface, sense " sense "): PASS (largest slip difference to the prototype " d " m)"; else {print "fd_dynamic fsrup: FAIL (" d " m)"; exit 1}}' sense=$1 tmp_fd_dynamic/fsrup.out || fail=1
+            if(d<=0.01) print "fd_dynamic fsrup (free surface, sense " sense ", fault top " ftop " m): PASS (largest slip difference to the prototype " d " m)"; else {print "fd_dynamic fsrup: FAIL (" d " m)"; exit 1}}' sense=$1 ftop=$5 tmp_fd_dynamic/fsrup.out || fail=1
 done
 # dense tables with virtual free-surface elements (fd_plan.md M7 step 2) against densesys.py;
 # needs the prototype's tdd library (TDD_LIB, default /tmp/tdd/libtdd.so: gfortran -O2 -fPIC -shared

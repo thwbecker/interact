@@ -3337,6 +3337,23 @@ Findings so far:
   element size with normal coupling (run_2d_sensitivity.sh, default calc_sigma_dot 1) before
   choosing defaults; -fd_tol 1e-3 for 2-D in-plane runs is the candidate change.
 
+### M7 step 3 (part): a fault reaching the surface, C against the prototype (2026-11-01)
+
+fd_dynamic fsrup with the fault top at 0 puts the trace on a boundary between two surface
+elements (as test_fs_dyn2d.inplane_rupture with stagger). 3 km fault of 200 m dipping 30 degrees,
+surface +-4 km of 200 m, slip weakening with normal coupling, NL, 3 s, full windows:
+
+| case | prototype: slip top / middle / bottom, arrival at the top, peak rate | C |
+|---|---|---|
+| thrust | 2.184 / 2.057 / 0.867 m, 1.241 s, 12.41 m/s | 2.181 / 2.052 / 0.864 m, 1.241 s, 12.44 m/s |
+| normal | 1.486 / 1.496 / 0.750 m, 1.703 s, 4.44 m/s | 1.485 / 1.496 / 0.750 m, 1.703 s, 4.43 m/s |
+
+Slip within 5 mm, the arrival at the trace in the same step and the peak slip rate within 0.3
+percent (for the buried fault, top 400 m, the peak was 3 to 6 percent lower in C, see step 2b).
+Both cases are in run_tests.sh (within 1 cm). Remaining from step 3: an antiplane surface
+against images, and a megathrust with a splay (QD against QD with dynamic phases), now covered
+in practice by the PD13 runs (run_2d_cascadia.sh).
+
 ### WP7, C implementation in rsf_solve: status (2026-10-18)
 Done, each verified in the sandbox before delivery (details in
 fd_c_design.md sections 6 to 10, usage in rsf_solve_fd.md):

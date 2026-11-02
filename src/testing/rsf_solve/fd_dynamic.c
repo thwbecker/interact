@@ -405,6 +405,8 @@ static int run_hd(int argc, char **argv)
 static int run_fsrup(int argc, char **argv)
 {
   double AL, BE, RHO, sense, Lf, hf, top, Ls, hs, T, dip, dt, ang, sd[2], x0s, tol, sl, tt, vpk, rt_top, along;
+  double shift;
+  int kn;
   int surf, nf, ns, nseg, N, i, k, j, nsteps, n, it, ntop, nbot;
   struct fd_segment seg[3];
   struct fd_seglist segs;
@@ -470,6 +472,18 @@ static int run_fsrup(int argc, char **argv)
       seg[k].s[1] = 0.0;
       seg[k].X0[0] = x0s - Ls + 0.5*hs;
       seg[k].X0[1] = 0.0;
+    }
+    if(top == 0.0){
+      /* a fault reaching the surface: the trace (x = 0) on a boundary between two surface
+         elements, as the prototype (a collocation point on the tip would see its singular field) */
+      kn = (int)floor((0.0 - seg[1].X0[0])/hs + 0.5);
+      if(kn < 0)
+        kn = 0;
+      if(kn > ns - 1)
+        kn = ns - 1;
+      shift = (seg[1].X0[0] + kn*hs) - 0.5*hs;
+      seg[1].X0[0] -= shift;
+      seg[2].X0[0] -= shift;
     }
     nseg = 3;
   }
