@@ -3336,6 +3336,23 @@ Findings so far:
   refinement. The base run reproduced itself exactly when repeated. To be repeated at a resolved
   element size with normal coupling (run_2d_sensitivity.sh, default calc_sigma_dot 1) before
   choosing defaults; -fd_tol 1e-3 for 2-D in-plane runs is the candidate change.
+- PD13 at 500 m with the virtual surface DIVERGES in the first dynamic phase (64-core runs,
+  2026-11-01: with and without normal coupling, -fd_tol_surf 1e-3 and 1e-4, MPI and OpenMP alike;
+  the phase stays at k = 1 for 5,365 s and the slip rate grows to 5e21 m/s, after which the QD
+  integration stops). The same section in a full space is stable (peak 0.37 m/s, k up to 64 after
+  2,000 s; sandbox). PD13 at 1 km and 2 km with the surface was stable. Still open: where the
+  growth starts and which setting stabilises it; run_2d_sensitivity.sh now reports the first time
+  a station passes 20 m/s, takes variants as name=options (commas for spaces) and runs on OpenMP
+  threads with the last argument omp (setup about ten times faster than MPI at present).
+- First-order marching (-fd_nl 0) with the surface diverges already at 2 km (309 s into the phase,
+  k = 1), where the second-order scheme is stable: the surface coupling is closer to the stability
+  limit than the fault alone.
+- MPI against OpenMP at 500 m: the setup took 5,538 s on 16 ranks against 558 s on 16 threads.
+  The cached opening histories are shared by the threads but computed separately on each rank,
+  and the fault rows (whose surface entries are all different and so are not cached) sit on the
+  first ranks only. The row split needs balancing by cost and the cache sharing over ranks.
+  The two diverged runs also differed in the 7th digit, which the identity checks at 2 km did
+  not show; to be looked at once the runs are stable.
 
 ### M7 step 3 (part): a fault reaching the surface, C against the prototype (2026-11-01)
 

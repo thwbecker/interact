@@ -14,9 +14,11 @@
 # largest and rms difference of the phase slip per element against the base (fd_phase_1_slip.dat).
 # Results in outdir/sensitivity.txt. Run from the repository root after make bin/rsf_solve.
 #
-# usage: run_2d_sensitivity.sh [h] [np] [mpi command] [years] [outdir] [calc_sigma_dot 0|1] [variants] [section dir]
+# Further variants can be given as name=options with commas for spaces, e.g. ctol10=-fd_ctol,1e-10
+# usage: run_2d_sensitivity.sh [h] [np] [mpi command] [years] [outdir] [calc_sigma_dot 0|1] [variants] [section dir] [mpi|omp]
 #   defaults: 500 16 mpirun 30 2d_sensitivity_out 1 "base tsurf4 tol3 vsw4 vback5 hnear4"
-#             test_twod/cascadia/PD13_nosigma
+#             test_twod/cascadia/PD13_nosigma mpi
+#   omp: one rank with np OpenMP threads (a stop-gap, but faster to set up at present)
 #
 h=${1-500}
 np=${2-16}
@@ -26,6 +28,7 @@ out=${5-2d_sensitivity_out}
 sd=${6-1}
 variants=${7-"base tsurf4 tol3 vsw4 vback5 hnear4"}
 sec=${8-test_twod/cascadia/PD13_nosigma}
+par=${9-mpi}
 root=`pwd`
 bin=$root/bin/rsf_solve
 mkdir -p $out
@@ -50,6 +53,8 @@ for v in $variants; do
     vsw4) opt="-fd_vsw 1e-4 -fd_vback 1e-5" ;;
     vback5) opt="-fd_vback 1e-5" ;;
     hnear4) opt="-fd_surf_h_near `awk -v h=$hmin 'BEGIN {print h/4.0}'`" ;;
+    *=*) opt=`echo ${v#*=} | tr ',' ' '`
+         v=${v%%=*} ;;
     *) echo "unknown variant $v" >> $sum
        continue ;;
   esac
@@ -57,13 +62,24 @@ for v in $variants; do
   mkdir -p $out/$v
   cd $out/$v
   s0=`date +%s`
-  OMP_NUM_THREADS=1 $mpi -np $np $bin $base $opt > run.log 2>&1
+  if [ "$par" = "omp" ]; then
+    OMP_NUM_THREADS=$np $bin $base $opt > run.log 2>&1
+  else
+    OMP_NUM_THREADS=1 $mpi -np $np $bin $base $opt > run.log 2>&1
+  fi
   echo "$v ($opt): rc $?, wall $(( `date +%s` - s0 )) s" >> $sum
   grep 'rsf_fd: phase' run.log | cut -c1-170 | sed "s/^/  $v: /" >> $sum
   grep 'PETSC ERROR\|Segmentation\|Abort' run.log | head -3 | sed "s/^/  $v: /" >> $sum
+  for f in fd_phase_*_st*.dat; do
+    [ -s $f ] && awk -v f=$f -v v=$v '$5 > 20 {printf "  %s: %s: largest slip rate above 20 m/s at %.1f s into the phase (k %d)\n", v, f, $1, $6; exit}' $f >> $sum
+  done
   cd $root
 done
-python3 - $out "$variants" $years << 'PYEOF' >> $sum
+names=""
+for v in $variants; do
+  names="$names ${v%%=*}"
+done
+python3 - $out "$names" $years << 'PYEOF' >> $sum
 import sys, os
 import numpy as np
 out, variants, years = sys.argv[1], sys.argv[2].split(), float(sys.argv[3])
@@ -94,7 +110,7 @@ for v in variants:
         line += f"; mean slip at {min(years, r['t_end']):.2f} yr {r['slip_end']:.5f} m"
         if v != "base" and "slip_end" in b:
             line += f" ({(r['slip_end'] - b['slip_end'])/max(abs(b['slip_end']), 1e-30)*100:+.3f} % of base)"
-    if v in ("tsurf4", "tol3", "hnear4") and "phase_slip" in r and "phase_slip" in b and len(r["phase_slip"]) == len(b["phase_slip"]):
+    if v not in ("base", "vsw4", "vback5") and "phase_slip" in r and "phase_slip" in b and len(r["phase_slip"]) == len(b["phase_slip"]):
         dd = r["phase_slip"] - b["phase_slip"]
         sc = np.abs(b["phase_slip"]).max()
         line += f"; phase 1 slip against base: largest {np.abs(dd).max()/sc*100:.3f} %, rms {np.sqrt(np.mean(dd**2))/sc*100:.3f} % of the largest slip"
