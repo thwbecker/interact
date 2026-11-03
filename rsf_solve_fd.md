@@ -283,7 +283,8 @@ keep straight runs); the dense tables can also be built and applied with OpenMP 
 -fd_tol_surf (default 1e-3; 1e-2 let a long Cascadia phase diverge), and surface elements must
 keep beta dt / h within 0.4 to 2. The surface rates are filtered against a slowly growing
 grid-scale mode of the virtual surface (-fd_surf_filter, default 2, five-point; not near
-traces and shallow tops, -fd_surf_filter_w); see fd_plan.md M9.
+traces, -fd_surf_filter_w, nor near shallow tops with -fd_surf_filter_tops 1); -fd_dump_mode v
+writes the rates once when one first exceeds v; see fd_plan.md M9.
 
 Restrictions in this version, refused with a message at start:
 `-ve_mode 0`; aging law (`-state_law 1`); 2-D elements only, forming

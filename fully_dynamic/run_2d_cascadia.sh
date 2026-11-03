@@ -53,7 +53,7 @@ run () {
   fi
   rc=$?
   echo "$name: rc $rc, wall $(( `date +%s` - s0 )) s" >> $sum
-  grep 'split by receiver rows\|OpenMP threads\|dense pairs\|static gate\|virtual free surface:' run.log | sed "s/^/  $name: /" >> $sum
+  grep 'split by receiver rows\|OpenMP threads\|dense pairs\|static gate\|virtual free surface:\|surface rates filtered' run.log | sed "s/^/  $name: /" >> $sum
   grep 'rsf_fd: phase' run.log | cut -c1-170 | sed "s/^/  $name: /" >> $sum
   grep 'PETSC ERROR\|Segmentation\|Abort' run.log | head -3 | sed "s/^/  $name: /" >> $sum
   cd $root

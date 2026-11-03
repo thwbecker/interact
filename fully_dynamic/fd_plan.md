@@ -3399,6 +3399,16 @@ Findings so far:
   filter): stable, the phase ends after 13,345 s (peak 0.79 m/s, mean slip 9.31 m; 404 of 470
   surface unknowns filtered). test_fd_mpi2d (1, 2, 4 ranks identical) and test_fd_halfplane pass
   with the filter on; run_tests.sh checks the long surface (fsrup, filter on, 300 s).
+- PD13 at 500 m with the filter, shallow tops excluded (64-core machine, 32 threads, 2026-11-03):
+  still diverged, but later (phase of 9,064 s against 5,365 s, 124,353 steps). The refined surface
+  near the four shallow tops (245 m, beta dt / h = 1) was left unfiltered (+-1,960 m). Since the
+  surface slip above a buried top is smooth (the fsrup buried thrust, top 400 m with 200 m
+  elements, filtered everywhere: 0.670 / 1.315 / 0.648 m against 0.672 / 1.318 / 0.650 m), the
+  shallow tops are now filtered by default and only traces are excluded (-fd_surf_filter_tops 1
+  restores the exclusion). PD13 at 1 km, -fd_tol_surf 1e-2, refined surface near the tops, all 530
+  surface unknowns filtered: stable (0.54 m/s peak at 207 s, k = 64 by 3,767 s).
+- -fd_dump_mode v writes all rates with positions to fd_mode_dump.dat the first time any rate
+  exceeds v (the shape of a growing mode, if any).
 - First-order marching (-fd_nl 0) with the surface diverges already at 2 km (309 s into the phase,
   k = 1), where the second-order scheme is stable: the surface coupling is closer to the stability
   limit than the fault alone.

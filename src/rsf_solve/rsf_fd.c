@@ -33,7 +33,10 @@
     -fd_surf_margin <m>   surface beyond the faults' x extent (default twice the deepest fault depth)
     -fd_surf_filter <n>   filter of the surface rates against its grid-scale mode: 0 off, 1 (1 2 1)/4,
                           2 (-1 4 10 4 -1)/16 (default)
-    -fd_surf_filter_w <m> no filtering within this distance of traces and shallow tops (default w_near)
+    -fd_surf_filter_w <m> no filtering within this distance of traces (default w_near)
+    -fd_surf_filter_tops 1 nor of shallow fault tops (default 0: tops are filtered)
+    -fd_dump_mode <v>   diagnostic: when a slip or opening rate first exceeds v m/s in a phase, write all
+                        rates with positions to fd_mode_dump.dat (a growing mode's shape)
     -fd_gate_tol <f>    static gate tolerance (default 0.05; abort at 5x)
     -fd_length_scale    geometry unit in metres (default 1.0)
     -fd_max_steps <n>   abort a dynamic phase beyond this many steps (default 2e6)
@@ -76,6 +79,7 @@ static PetscErrorCode fd_build_tables(struct interact_ctx *par, struct fd_vars *
 static PetscErrorCode fd_gate_static(struct interact_ctx *par, struct fd_vars *fd);
 static PetscErrorCode fd_surface_2d(struct fd_vars *fd, double hf);
 static PetscErrorCode fd_surface_filter_setup(struct fd_vars *fd);
+static void fd_dump_mode(struct fd_vars *fd, struct fd_sys *sy, struct fd_state *st, int k);
 
 PetscErrorCode rsf_fd_setup(struct interact_ctx *par, PetscReal shear_modulus_si, PetscReal s_wave_speed_si)
 {
@@ -153,6 +157,10 @@ PetscErrorCode rsf_fd_setup(struct interact_ctx *par, PetscReal shear_modulus_si
   fd->surf_filt_w = -1.0;
   PetscCall(PetscOptionsGetInt(NULL,NULL,"-fd_surf_filter",&fd->surf_filt,NULL));
   PetscCall(PetscOptionsGetReal(NULL,NULL,"-fd_surf_filter_w",&fd->surf_filt_w,NULL));
+  fd->surf_filt_tops = 0;
+  PetscCall(PetscOptionsGetInt(NULL,NULL,"-fd_surf_filter_tops",&fd->surf_filt_tops,NULL));
+  fd->dump_mode = -1.0;
+  PetscCall(PetscOptionsGetReal(NULL,NULL,"-fd_dump_mode",&fd->dump_mode,NULL));
   PetscCall(PetscOptionsGetReal(NULL,NULL,"-fd_gate_tol",&fd->gate_tol,NULL));
   PetscCall(PetscOptionsGetReal(NULL,NULL,"-fd_length_scale",&fd->length_scale,NULL));
   PetscCall(PetscOptionsGetInt(NULL,NULL,"-fd_max_steps",&fd->max_steps,NULL));
@@ -2702,6 +2710,37 @@ PetscErrorCode fd3d_setup_from_geometry(struct interact_ctx *par, struct fd_vars
    elements) refined as well; surface y = 0, solid y < 0 */
 /* the surface filter (fd_plan.md M9): all surface unknowns except those within surf_filt_w of
    a trace or a shallow fault top */
+/* diagnostic (-fd_dump_mode v): the first time in a run that any rate (fault or surface)
+   exceeds v, all rates with segment, kind and position go to fd_mode_dump.dat (rank 0) */
+static void fd_dump_mode(struct fd_vars *fd, struct fd_sys *sy, struct fd_state *st, int k)
+{
+  double vall, X[2], t[2], a;
+  int i, kd, ld, id;
+  FILE *dm;
+  if(fd->dump_done)
+    return;
+  vall = 0.0;
+  for(i = 0;i < sy->N;i++)
+    if(fabs(st->V[i]) > vall)
+      vall = fabs(st->V[i]);
+  if(vall <= fd->dump_mode)
+    return;
+  fd->dump_done = 1;
+  if(fd->mpi_rank != 0)
+    return;
+  dm = fopen("fd_mode_dump.dat","w");
+  if(!dm)
+    return;
+  fprintf(dm,"# phase time %.6e s, k %d: unknown, segment, kind (0 fault, 1 surface slip, 2 surface opening), x, y, V, delta, tau\n",st->t,k);
+  for(kd = 0;kd < fd->segs->nseg;kd++)
+    for(ld = 0;ld < fd->segs->seg[kd].n;ld++){
+      id = sy->off[kd] + ld;
+      fd_seg_element(fd->segs->seg + kd,ld,X,t,&a);
+      fprintf(dm,"%d %d %d %.6e %.6e %.6e %.6e %.6e\n",id,kd,fd->segs->seg[kd].kind,X[0],X[1],st->V[id],st->delta[id],st->tau[id]);
+    }
+  fclose(dm);
+}
+
 static PetscErrorCode fd_surface_filter_setup(struct fd_vars *fd)
 {
   unsigned char *mask;
@@ -2720,16 +2759,17 @@ static PetscErrorCode fd_surface_filter_setup(struct fd_vars *fd)
       for(m = 0;m < fd->ntr;m++)
         if(fabs(X[0] - fd->xtr[m]) < fd->surf_filt_w)
           mask[i] = 0;
-      for(m = 0;m < fd->nsh;m++)
-        if(fabs(X[0] - fd->xsh[m]) < fd->surf_filt_w)
-          mask[i] = 0;
+      if(fd->surf_filt_tops)                     /* by default the shallow tops are filtered too (smooth surface slip) */
+        for(m = 0;m < fd->nsh;m++)
+          if(fabs(X[0] - fd->xsh[m]) < fd->surf_filt_w)
+            mask[i] = 0;
       nfilt += mask[i];
     }
   }
   fd_sys_set_surface_filter(fd->sys,(int)fd->surf_filt,mask);
   free(mask);
-  PetscCall(PetscPrintf(PETSC_COMM_WORLD,"rsf_fd_setup: surface rates filtered (%s) on %d of %d surface unknowns (not within %g m of traces and shallow tops)\n",
-      fd->surf_filt == 1 ? "(1 2 1)/4" : "(-1 4 10 4 -1)/16",nfilt,fd->sys->Nu,(double)fd->surf_filt_w));
+  PetscCall(PetscPrintf(PETSC_COMM_WORLD,"rsf_fd_setup: surface rates filtered (%s) on %d of %d surface unknowns (not within %g m of traces%s)\n",
+      fd->surf_filt == 1 ? "(1 2 1)/4" : "(-1 4 10 4 -1)/16",nfilt,fd->sys->Nu,(double)fd->surf_filt_w,fd->surf_filt_tops ? " and shallow tops" : ""));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
@@ -3334,6 +3374,8 @@ static PetscErrorCode fd_run_phase(TS ts, struct interact_ctx *par, struct fd_va
     for(i = 0;i < sy->Nf;i++)                     /* fault slip rates only */
       if(st->V[i] > vmax)
         vmax = st->V[i];
+    if(fd->dump_mode > 0.0)
+      fd_dump_mode(fd,sy,st,k);
     if(getenv("FD_DEBUG") && (nsteps <= 3)){
       im_2 = 0;
       hs = 0.0;

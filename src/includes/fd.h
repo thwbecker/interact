@@ -37,9 +37,11 @@ struct fd_vars {
   int mpi_rank, mpi_size;        /* 2-D dense tables split by receiver rows (fd_plan.md M8) */
   PetscReal surf_hnear, surf_wnear, surf_hfar, surf_margin;
   /* filter of the surface rates (fd_plan.md M9): 0 off, 1 three-point, 2 five-point (default);
-     not within surf_filt_w of a trace or shallow top (default surf_wnear) */
-  PetscInt surf_filt;
+     not within surf_filt_w of a trace (default surf_wnear), nor of a shallow top if surf_filt_tops */
+  PetscInt surf_filt, surf_filt_tops;
   PetscReal surf_filt_w;
+  PetscReal dump_mode;          /* diagnostic: rate above which the rates are written once (-fd_dump_mode) */
+  int dump_done;
   int ntr, nsh;
   double *xtr, *xsh;
   int nsurf;
