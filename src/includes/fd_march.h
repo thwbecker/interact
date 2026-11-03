@@ -46,6 +46,11 @@ struct fd_sys {
      values (operators K_k after assembly, the history after the products); NULL on one rank */
   void (*gather)(void *ctx, double *A, int ncol);
   void *gather_ctx;
+  /* filter of the surface rates against the grid-scale mode of the virtual surface (fd_plan.md
+     M9): 0 off, 1 (1 2 1)/4, 2 (-1 4 10 4 -1)/16; filt_mask[i] = 1 for the surface unknowns it
+     may change (not near fault traces and shallow tops) */
+  int filt;
+  unsigned char *filt_mask;
   double *etai;                 /* instantaneous coefficient per unknown: mu/(2 beta), rho alpha/2 for opening */
   double dt, eta, alpha, beta, rho;
   struct fd_seglist *segs;      /* receivers (real segments) */
@@ -173,4 +178,7 @@ void fd_state_free(struct fd_state *st);
 /* one step of k dt_min with slip weakening / rate and state */
 int fd_step_slipweak(struct fd_sys *s, struct fd_state *st, struct fd_slipweak *f, int k);
 int fd_step_rsf(struct fd_sys *s, struct fd_state *st, const struct fd_rsf *f, int k);
+/* the surface filter (fd_plan.md M9): type 0 off, 1 three-point, 2 five-point; mask (N, may be
+   NULL for all surface unknowns) marks the unknowns it may change; the mask is copied */
+void fd_sys_set_surface_filter(struct fd_sys *s, int type, const unsigned char *mask);
 #endif

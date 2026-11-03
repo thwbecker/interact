@@ -3344,6 +3344,61 @@ Findings so far:
   growth starts and which setting stabilises it; run_2d_sensitivity.sh now reports the first time
   a station passes 20 m/s, takes variants as name=options (commas for spaces) and runs on OpenMP
   threads with the last argument omp (setup about ten times faster than MPI at present).
+- Growth of the 500 m instability (station 40, OpenMP run): the rupture peaks at 0.43 m/s
+  at 219 s and decays to 0.30 m/s at 255 s; then 1.3 m/s at 290 s, 940 at 325 s, 7.8e4 at 361 s,
+  1.2e7 at 396 s (a factor of about 100 per 35 s, e-folding time about 7 s or 100 steps), all at
+  k = 1; the 1 km instability with -fd_tol_surf 1e-2 grew in the same way from about 200 s. Space-
+  time BIEMs have such instabilities that appear and disappear with the ratio of the time step to
+  the element size (Peirce and Siebrits 1997; B4 above for the 3-D surface, unstable for cS dt/hs
+  of about 0.85 to 1.05). The surface elements near the shallow tops (hf/2) have cS dt/h = 1.0 at
+  every element size here, which makes them the first suspect.
+- The growing mode (1 km, -fd_tol_surf 1e-2, slip rates of all unknowns dumped when one passed
+  20 m/s at 217 s): a grid-scale checkerboard in the surface's slip unknowns, signs alternating
+  element to element, largest in the middle of a long far-field surface run (x 99 to 112 km,
+  900 m elements); the shear traction there stays zero, the opening unknowns (0.24 m/s) and the
+  fault (1.7 m/s) much smaller.
+- Reproduced in fd_dynamic fsrup with a long surface: 5 km thrust of 500 m elements, top 1 km,
+  surface +-30 km (or +-60 km) of 500 m elements (cS dt/h 0.5), 400 s:
+  windows cut at 1e-2: diverges (1e36 m/s); 1e-3 (+-60 km, 300 s): diverging (3.6e5 m/s);
+  full windows (no cut, 300 s): stable (surface 1.6e-7 m/s, fault locked);
+  surface elements of h/4 (cS dt/h 2) with 1e-2: surface still at 4 m/s at 400 s;
+  collocation offset et 1.5 and 2: much worse (1e97, 1e148);
+  surface +-4 km: stable at every ratio (300 s).
+  So the cut windows of the surface pairs drive it: the 2-D tails after the cut are not small in
+  sum (increments of order 1/t^2, the dropped sum of order the window length times the
+  criterion) and the frictionless surface integrates the error. Putting the extrapolated rest of
+  the tail on the lag after the cut (tail correction) made it worse (51 m/s at 155 s in the 1 km
+  case) and was taken out. Options: windows of the surface pairs to the end of the phase with
+  the tails compressed (cost: the opening kernel's quadrature over many lags; an asymptotic
+  series for the opening source, as fd_series_inplane for slip, would remove that), or a cut
+  late enough to be stable (tolerance study under way).
+- The five sensitivity variants at 500 m on 64 cores (2026-11-03: -fd_tol_surf 1e-4, -fd_tol 1e-3,
+  -fd_vsw 1e-4 with -fd_vback 1e-5, -fd_vback 1e-5, -fd_surf_h_near 123 m) all diverged in the
+  first phase like the base run; none of these settings is the cause.
+- The growing mode (dump at |V| = 20 m/s, PD13 at 1 km, -fd_tol_surf 1e-2): a grid-scale pattern
+  of the surface SLIP rates, alternating in sign from element to element with an amplitude
+  rising towards the middle of a long far-field surface run (x 99 to 112 km), the shear traction
+  zero at every collocation point; the opening rates (0.24 m/s) and the fault (1.7 m/s) much
+  smaller. Reproduced in fd_dynamic fsrup with a long surface: 5 km thrust of 500 m, surface
+  +-30 km or +-60 km; surface elements of beta dt / h = 0.5 diverge within 300 s (also with
+  windows of 1e-3), of beta dt / h = 2 grow more slowly (0.02 m/s at 150 s, 1 m/s at 300 s).
+  A +-4 km surface was stable for 300 s. A correction of the truncated tails (the rest of each
+  window's tail put on the lag after it) made the divergence earlier and was dropped.
+- Remedy: the surface rates are filtered after each solve along each surface segment
+  (-fd_surf_filter: 0 off, 1 (1 2 1)/4, 2 (-1 4 10 4 -1)/16, the default, which removes the
+  alternating pattern and changes smooth rates only at fourth order), except within
+  -fd_surf_filter_w (default w_near) of fault traces and shallow tops, where the surface slip
+  jumps. The fault rates are not filtered. fd_dynamic fsrup (FD_SURF_FILTER, FD_SURF_FILTER_W):
+  the long surface is stable (1.5e-7 m/s at 300 s, with a trace 1e-8 m/s); against the prototype
+  (unfiltered there): buried thrust 0.670 / 1.315 / 0.648 m (prototype 0.672 / 1.318 / 0.650),
+  buried normal 0.193 / 0.859 / 0.541, thrust reaching the surface 2.180 / 2.052 / 0.864 (2.184 /
+  2.057 / 0.867), normal reaching the surface 1.485 / 1.496 / 0.749 (1.486 / 1.496 / 0.750). An
+  unmasked filter at the trace cost 6 percent (five-point) to 10 percent (three-point) of the
+  thrust's slip at the top.
+  rsf_solve, PD13 at 1 km with -fd_tol_surf 1e-2 (which diverged at about 230 s without the
+  filter): stable, the phase ends after 13,345 s (peak 0.79 m/s, mean slip 9.31 m; 404 of 470
+  surface unknowns filtered). test_fd_mpi2d (1, 2, 4 ranks identical) and test_fd_halfplane pass
+  with the filter on; run_tests.sh checks the long surface (fsrup, filter on, 300 s).
 - First-order marching (-fd_nl 0) with the surface diverges already at 2 km (309 s into the phase,
   k = 1), where the second-order scheme is stable: the surface coupling is closer to the stability
   limit than the fault alone.

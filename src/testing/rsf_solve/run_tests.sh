@@ -120,6 +120,11 @@ for c in "-1 0.672 1.318 0.650 400" "1 0.194 0.859 0.541 400" "-1 2.184 2.057 0.
        END {d=0; e=top-t; if(e<0)e=-e; if(e>d)d=e; e=mid-m; if(e<0)e=-e; if(e>d)d=e; e=bot-b; if(e<0)e=-e; if(e>d)d=e;
             if(d<=0.01) print "fd_dynamic fsrup (free surface, sense " sense ", fault top " ftop " m): PASS (largest slip difference to the prototype " d " m)"; else {print "fd_dynamic fsrup: FAIL (" d " m)"; exit 1}}' sense=$1 ftop=$5 tmp_fd_dynamic/fsrup.out || fail=1
 done
+# the grid-scale mode of a long virtual surface (fd_plan.md M9): 5 km thrust, surface +-30 km of
+# 500 m, windows of 1e-2, 300 s; diverges without the surface filter, must stay quiet with it
+( cd tmp_fd_dynamic && FD_SURF_FILTER=2 FD_FSRUP_TOL=1e-2 ../bin/fd_dynamic fsrup -1 1 5000 500 1000 30000 500 300 30 > fsrlong.out 2>/dev/null )
+awk '/at the end largest/ {v = $NF; if($(NF-1) == "m/s") v = $(NF-1)} /on the surface/ {for(i=1;i<=NF;i++) if($i == "surface") vs = $(i+1)}
+     END {if(vs != "" && vs + 0 < 1e-3) print "fd_dynamic fsrup long surface with filter: PASS (surface rate " vs " m/s after 300 s)"; else {print "fd_dynamic fsrup long surface with filter: FAIL (" vs ")"; exit 1}}' tmp_fd_dynamic/fsrlong.out || fail=1
 # dense tables with virtual free-surface elements (fd_plan.md M7 step 2) against densesys.py;
 # needs the prototype's tdd library (TDD_LIB, default /tmp/tdd/libtdd.so: gfortran -O2 -fPIC -shared
 # -Isrc/includes -DUSE_DOUBLE_PRECISION src/green/tdd_coeff.F -o /tmp/tdd/libtdd.so); skipped without it

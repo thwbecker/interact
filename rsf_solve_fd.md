@@ -281,7 +281,9 @@ become polyline segments with dense tables (element sizes within 25 percent; FD_
 keep straight runs); the dense tables can also be built and applied with OpenMP threads
 (OMP_NUM_THREADS) within a rank. Pairs with virtual surface elements use the window tolerance
 -fd_tol_surf (default 1e-3; 1e-2 let a long Cascadia phase diverge), and surface elements must
-keep beta dt / h within 0.4 to 2.
+keep beta dt / h within 0.4 to 2. The surface rates are filtered against a slowly growing
+grid-scale mode of the virtual surface (-fd_surf_filter, default 2, five-point; not near
+traces and shallow tops, -fd_surf_filter_w); see fd_plan.md M9.
 
 Restrictions in this version, refused with a message at start:
 `-ve_mode 0`; aging law (`-state_law 1`); 2-D elements only, forming

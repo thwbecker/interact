@@ -31,6 +31,9 @@
     -fd_surf_w_near <m>   half-width of the refined zone about traces and shallow tops (default 4 hf)
     -fd_surf_h_far <m>    surface elements elsewhere (default hf; beta dt / h within 0.4 to 2 required)
     -fd_surf_margin <m>   surface beyond the faults' x extent (default twice the deepest fault depth)
+    -fd_surf_filter <n>   filter of the surface rates against its grid-scale mode: 0 off, 1 (1 2 1)/4,
+                          2 (-1 4 10 4 -1)/16 (default)
+    -fd_surf_filter_w <m> no filtering within this distance of traces and shallow tops (default w_near)
     -fd_gate_tol <f>    static gate tolerance (default 0.05; abort at 5x)
     -fd_length_scale    geometry unit in metres (default 1.0)
     -fd_max_steps <n>   abort a dynamic phase beyond this many steps (default 2e6)
@@ -72,6 +75,7 @@ extern double fd3d_layer_prof[4];
 static PetscErrorCode fd_build_tables(struct interact_ctx *par, struct fd_vars *fd);
 static PetscErrorCode fd_gate_static(struct interact_ctx *par, struct fd_vars *fd);
 static PetscErrorCode fd_surface_2d(struct fd_vars *fd, double hf);
+static PetscErrorCode fd_surface_filter_setup(struct fd_vars *fd);
 
 PetscErrorCode rsf_fd_setup(struct interact_ctx *par, PetscReal shear_modulus_si, PetscReal s_wave_speed_si)
 {
@@ -145,6 +149,10 @@ PetscErrorCode rsf_fd_setup(struct interact_ctx *par, PetscReal shear_modulus_si
   PetscCall(PetscOptionsGetReal(NULL,NULL,"-fd_surf_w_near",&fd->surf_wnear,NULL));
   PetscCall(PetscOptionsGetReal(NULL,NULL,"-fd_surf_h_far",&fd->surf_hfar,NULL));
   PetscCall(PetscOptionsGetReal(NULL,NULL,"-fd_surf_margin",&fd->surf_margin,NULL));
+  fd->surf_filt = 2;
+  fd->surf_filt_w = -1.0;
+  PetscCall(PetscOptionsGetInt(NULL,NULL,"-fd_surf_filter",&fd->surf_filt,NULL));
+  PetscCall(PetscOptionsGetReal(NULL,NULL,"-fd_surf_filter_w",&fd->surf_filt_w,NULL));
   PetscCall(PetscOptionsGetReal(NULL,NULL,"-fd_gate_tol",&fd->gate_tol,NULL));
   PetscCall(PetscOptionsGetReal(NULL,NULL,"-fd_length_scale",&fd->length_scale,NULL));
   PetscCall(PetscOptionsGetInt(NULL,NULL,"-fd_max_steps",&fd->max_steps,NULL));
@@ -2692,6 +2700,39 @@ PetscErrorCode fd3d_setup_from_geometry(struct interact_ctx *par, struct fd_vars
 /* the virtual free surface of a 2-D in-plane half plane (fd_plan.md M7 step 2c): traces where a
    fault segment ends within 1 percent of an element of the surface, shallow tops (within two
    elements) refined as well; surface y = 0, solid y < 0 */
+/* the surface filter (fd_plan.md M9): all surface unknowns except those within surf_filt_w of
+   a trace or a shallow fault top */
+static PetscErrorCode fd_surface_filter_setup(struct fd_vars *fd)
+{
+  unsigned char *mask;
+  int k, l, i, m, nfilt;
+  double X[2], t[2], a;
+  PetscFunctionBeginUser;
+  mask = (unsigned char *)calloc(fd->sys->N + 1,1);
+  nfilt = 0;
+  for(k = 0;k < fd->segs->nseg;k++){
+    if(fd->segs->seg[k].kind == FD_SEG_FAULT)
+      continue;
+    for(l = 0;l < fd->segs->seg[k].n;l++){
+      i = fd->sys->off[k] + l;
+      fd_seg_element(fd->segs->seg + k,l,X,t,&a);
+      mask[i] = 1;
+      for(m = 0;m < fd->ntr;m++)
+        if(fabs(X[0] - fd->xtr[m]) < fd->surf_filt_w)
+          mask[i] = 0;
+      for(m = 0;m < fd->nsh;m++)
+        if(fabs(X[0] - fd->xsh[m]) < fd->surf_filt_w)
+          mask[i] = 0;
+      nfilt += mask[i];
+    }
+  }
+  fd_sys_set_surface_filter(fd->sys,(int)fd->surf_filt,mask);
+  free(mask);
+  PetscCall(PetscPrintf(PETSC_COMM_WORLD,"rsf_fd_setup: surface rates filtered (%s) on %d of %d surface unknowns (not within %g m of traces and shallow tops)\n",
+      fd->surf_filt == 1 ? "(1 2 1)/4" : "(-1 4 10 4 -1)/16",nfilt,fd->sys->Nu,(double)fd->surf_filt_w));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 static PetscErrorCode fd_surface_2d(struct fd_vars *fd, double hf)
 {
   struct fd_segment *g;
@@ -2735,6 +2776,16 @@ static PetscErrorCode fd_surface_2d(struct fd_vars *fd, double hf)
       "rsf_fd_setup: surface elements of %g and %g m give beta dt / h of %.2f and %.2f with fault elements of %g m: outside 0.4 to 2, where the second-order marching is stable",
       hn,hfar,fd->cfl*hf/hn,fd->cfl*hf/hfar,hf);
   nel = fd_seglist_add_surface(fd->segs,xmin - mg,xmax + mg,ntr,xtr,nsh,xsh,hn,wn,hfar);
+  fd->ntr = ntr;
+  fd->nsh = nsh;
+  fd->xtr = (double *)malloc(sizeof(double)*(ntr + 1));
+  fd->xsh = (double *)malloc(sizeof(double)*(nsh + 1));
+  for(k = 0;k < ntr;k++)
+    fd->xtr[k] = xtr[k];
+  for(k = 0;k < nsh;k++)
+    fd->xsh[k] = xsh[k];
+  if(fd->surf_filt_w < 0.0)
+    fd->surf_filt_w = wn;
   PetscCheck(nel > 0,PETSC_COMM_WORLD,PETSC_ERR_LIB,"rsf_fd_setup: surface construction failed");
   fd->nsurf = nel;
   PetscCall(PetscPrintf(PETSC_COMM_WORLD,"rsf_fd_setup: virtual free surface: x %.4g to %.4g m, %d elements (slip and opening each) in %d runs, %d traces, %d shallow tops, elements %g m near them (+-%g m), %g m elsewhere\n",
@@ -2952,6 +3003,8 @@ static PetscErrorCode fd_build_tables(struct interact_ctx *par, struct fd_vars *
 #endif
   fd->sys = fd_sys_create(fd->segs,fd->pairs,(int)fd->nsrc,fd->src_of,fd->src_rev,fd->mode2d,fd->dt_min,fd->alpha,fd->beta,fd->rho,+1);
   PetscCheck(fd->sys,PETSC_COMM_WORLD,PETSC_ERR_MEM,"rsf_fd_setup: marcher system allocation failed");
+  if(fd->surf2d && (fd->surf_filt > 0))
+    PetscCall(fd_surface_filter_setup(fd));
   if(fd->mpi_size > 1){
     fd->sys->gather = fd_gather_rows;
     fd->sys->gather_ctx = (void *)fd;

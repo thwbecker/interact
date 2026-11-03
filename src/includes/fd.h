@@ -36,6 +36,12 @@ struct fd_vars {
   PetscBool surf2d;
   int mpi_rank, mpi_size;        /* 2-D dense tables split by receiver rows (fd_plan.md M8) */
   PetscReal surf_hnear, surf_wnear, surf_hfar, surf_margin;
+  /* filter of the surface rates (fd_plan.md M9): 0 off, 1 three-point, 2 five-point (default);
+     not within surf_filt_w of a trace or shallow top (default surf_wnear) */
+  PetscInt surf_filt;
+  PetscReal surf_filt_w;
+  int ntr, nsh;
+  double *xtr, *xsh;
   int nsurf;
   PetscReal mu,nu,rho,alpha,beta,dt_min;
   PetscInt  max_steps;		/* abort a phase beyond this many steps */

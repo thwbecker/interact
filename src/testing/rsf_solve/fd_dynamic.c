@@ -407,6 +407,11 @@ static int run_fsrup(int argc, char **argv)
   double AL, BE, RHO, sense, Lf, hf, top, Ls, hs, T, dip, dt, ang, sd[2], x0s, tol, sl, tt, vpk, rt_top, along;
   double shift;
   int kn;
+  double vf_end;
+  double vs_end;
+  unsigned char *fmask;
+  double fw;
+  double xe;
   int surf, nf, ns, nseg, N, i, k, j, nsteps, n, it, ntop, nbot;
   struct fd_segment seg[3];
   struct fd_seglist segs;
@@ -499,7 +504,7 @@ static int run_fsrup(int argc, char **argv)
   tol = getenv("FD_FSRUP_TOL") ? atof(getenv("FD_FSRUP_TOL")) : 1e-12;
   for(k = 0; k < nseg; k++)
     for(j = 0; j < nseg; j++){
-      pairs[k*nseg + j] = fd_pair_build(seg + k, seg + j, FD_MODE_INPLANE, dt, 1.0, AL, BE, RHO, tol, nsteps + 2, 1, 0, err);
+      pairs[k*nseg + j] = fd_pair_build(seg + k, seg + j, FD_MODE_INPLANE, dt, getenv("FD_FSRUP_ET") ? atof(getenv("FD_FSRUP_ET")) : 1.0, AL, BE, RHO, tol, nsteps + 2, 1, 0, err);
       if(!pairs[k*nseg + j]){
         fprintf(stderr, "table build failed: %s\n", err);
         return 1;
@@ -510,6 +515,19 @@ static int run_fsrup(int argc, char **argv)
   if(!s){
     fprintf(stderr, "fd_sys_create failed\n");
     return 1;
+  }
+  /* the surface filter (fd_plan.md M9) with FD_SURF_FILTER = 1 or 2: not within
+     FD_SURF_FILTER_W (default 4 hf) of the fault top when it is shallower than 2 hf */
+  if(surf && getenv("FD_SURF_FILTER")){
+    fmask = (unsigned char *)calloc(N, 1);
+    fw = getenv("FD_SURF_FILTER_W") ? atof(getenv("FD_SURF_FILTER_W")) : 4.0*hf;
+    for(k = 1; k <= 2; k++)
+      for(i = 0; i < ns; i++){
+        xe = seg[k].X0[0] + i*seg[k].dx;
+        fmask[s->off[k] + i] = (top < 2.0*hf && fabs(xe) < fw) ? 0 : 1;
+      }
+    fd_sys_set_surface_filter(s, atoi(getenv("FD_SURF_FILTER")), fmask);
+    free(fmask);
   }
   st = fd_state_create(N);
   st->nl = getenv("FD_FSRUP_FIRST") ? 0 : 1;
@@ -552,6 +570,15 @@ static int run_fsrup(int argc, char **argv)
   for(it = nf; it < N; it++)
     if(fabs(st->tau[it]) > sl)
       sl = fabs(st->tau[it]);
+  vf_end = 0.0;
+  vs_end = 0.0;
+  for(it = 0; it < N; it++){
+    if(it < nf && fabs(st->V[it]) > vf_end)
+      vf_end = fabs(st->V[it]);
+    if(it >= nf && fabs(st->V[it]) > vs_end)
+      vs_end = fabs(st->V[it]);
+  }
+  printf("fd_dynamic fsrup: at the end largest |slip rate| on the fault %.3e, on the surface %.3e m/s\n", vf_end, vs_end);
   printf("fd_dynamic fsrup %s %s surface: dip %g, fault %g km / %g m, top %g m, surface +-%g km / %g m, %d steps: |slip| top / middle / bottom %.3f / %.3f / %.3f m; arrival at the top %.3f s; peak slip rate %.2f m/s; largest surface traction %.1e Pa\n",
          sense < 0.0 ? "thrust" : "normal", surf ? "with" : "without", dip, Lf/1e3, hf, top, Ls/1e3, hs, nsteps,
          fabs(st->delta[ntop]), fabs(st->delta[nf/2]), fabs(st->delta[nbot]), rt_top, vpk, sl);

@@ -203,6 +203,7 @@ void fd_sys_free(struct fd_sys *s)
   free(s->ctV);
   free(s->etai);
   free(s->spec);
+  free(s->filt_mask);
   if(s->conv){
     np = s->nsrc * s->nseg;
     for(k = 0; k < np; k++){
@@ -1330,6 +1331,49 @@ void fd_state_free(struct fd_state *st)
   free(st);
 }
 
+/* the filter of the surface rates (fd_plan.md M9). A virtual surface of piecewise-constant
+   elements carries a grid-scale mode (rates alternating from element to element, the tractions
+   at the collocation points zero) that grows slowly in long phases. After each solve the surface
+   rates along each surface segment are filtered, (1 2 1)/4 or (-1 4 10 4 -1)/16 (which removes
+   the alternating pattern and changes smooth rates only at fourth order), except where the
+   mask excludes them (near fault traces, where the surface slip jumps). The fault rates are not
+   changed; the surface no longer satisfies zero traction exactly, by the filtered part. */
+void fd_sys_set_surface_filter(struct fd_sys *s, int type, const unsigned char *mask)
+{
+  int i;
+  s->filt = type;
+  free(s->filt_mask);
+  s->filt_mask = (unsigned char *)malloc(s->N > 0 ? s->N : 1);
+  for(i = 0; i < s->N; i++)
+    s->filt_mask[i] = (i >= s->Nf) && (!mask || mask[i]);
+}
+
+static void surf_filter(const struct fd_sys *s, double *V)
+{
+  int k, i, a, b;
+  double *w;
+  if(s->filt <= 0 || !s->filt_mask)
+    return;
+  w = (double *)malloc(sizeof(double)*(s->N + 1));
+  for(k = 0; k < s->nseg; k++){
+    a = s->off[k];
+    b = s->off[k + 1];
+    if(a < s->Nf || b - a < 5)
+      continue;
+    for(i = a; i < b; i++)
+      w[i] = V[i];
+    for(i = a + 2; i < b - 2; i++){
+      if(!s->filt_mask[i])
+        continue;
+      if(s->filt == 1)
+        V[i] = 0.25*w[i - 1] + 0.5*w[i] + 0.25*w[i + 1];
+      else
+        V[i] = (-w[i - 2] + 4.0*w[i - 1] + 10.0*w[i] + 4.0*w[i + 1] - w[i + 2])/16.0;
+    }
+  }
+  free(w);
+}
+
 /* the friction solves on the fault with the surface unknowns eliminated (M7 step 2b); without a
    surface they are the plain solves */
 static void surf_solve_sw(struct fd_slipweak *f, struct fd_sys *s, struct fd_ops *op, const double *H, const double *Hn,
@@ -1350,6 +1394,7 @@ static void surf_solve_sw(struct fd_slipweak *f, struct fd_sys *s, struct fd_ops
   fd_slipweak_solve(f, s, op->el, He, Hne, sigma0, normal_coupling, t, dt, delta, Vguess, V, sigma);
   s->N = N;
   surf_recover(s, op, q, V);
+  surf_filter(s, V);
   free(He);
   free(Hne);
   free(q);
@@ -1371,6 +1416,7 @@ static void surf_solve_rsf(const struct fd_rsf *f, struct fd_sys *s, struct fd_o
   fd_rsf_solve(f, s, op->el, He, sigma, psi, Vg, V);
   s->N = N;
   surf_recover(s, op, q, V);
+  surf_filter(s, V);
   free(He);
   free(q);
 }
