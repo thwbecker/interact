@@ -3409,6 +3409,24 @@ Findings so far:
   surface unknowns filtered: stable (0.54 m/s peak at 207 s, k = 64 by 3,767 s).
 - -fd_dump_mode v writes all rates with positions to fd_mode_dump.dat the first time any rate
   exceeds v (the shape of a growing mode, if any).
+- PD13 at 500 m with all 920 surface unknowns filtered (2026-11-04, 32 threads): still diverges,
+  later and more slowly (the station rate 0.34 m/s at 318 s, 10 m/s at 375 s, 3e3 at 460 s: a
+  factor of about 7 per 28 s, e-folding about 14 s, against 7 s unfiltered). The mode (dump at
+  20 m/s, 332 s into the phase) is now in the surface OPENING rates of the long far-field run
+  (339 elements of 490 m from x = 14.8 km), localised around x = 32.4 km (7 km above the
+  megathrust), symmetric, with a wavelength of about 6 elements (3 km): not the grid-scale
+  pattern, so the five-point filter (response 0.94 at that wavelength) leaves it nearly intact.
+  The surface opening rates there reach 21 m/s while the fault's largest rate is 0.53 m/s and the
+  surface slip rates 0.2 m/s. The filtered long surface with a locked fault (fsrup, 5 km thrust,
+  +-30 km of 500 m, windows 1e-2) decays (1.5e-7, 4e-8, 1e-8 m/s at 300, 600, 900 s), so the
+  surface alone is stable with the filter; the remaining growth needs the fault-surface coupling
+  during sustained slip (rate and state, the phase still at k = 1).
+  Next: a small reproducer with sustained fault slip, and the spectral radius of the coupled
+  step operator (fault plus surface, companion matrix of the windows) against beta dt / h, et
+  and the windows, before any further filtering; and, as the robust alternative for 2-D in-plane
+  half planes, exact half-plane elastodynamic kernels (Lamb's problem for a line source, by the
+  Cagniard-de Hoop method, tabulated per pair), which remove the surface unknowns altogether.
+  Until then PD13 runs with the surface are reliable at 1 km (stable over 700 yr) but not at 500 m.
 - First-order marching (-fd_nl 0) with the surface diverges already at 2 km (309 s into the phase,
   k = 1), where the second-order scheme is stable: the surface coupling is closer to the stability
   limit than the fault alone.
