@@ -3454,6 +3454,64 @@ Both cases are in run_tests.sh (within 1 cm). Remaining from step 3: an antiplan
 against images, and a megathrust with a splay (QD against QD with dynamic phases), now covered
 in practice by the PD13 runs (run_2d_cascadia.sh).
 
+### M10: exact half-plane kernels for 2-D in-plane instead of the virtual surface (2026-11-04)
+
+Decision (with Thor, 2026-11-04): the surface filters are a kludge; the virtual surface is to be
+replaced by exact half-plane elastodynamic kernels for 2-D in-plane faults, which leave the
+fault slip as the only unknowns (no surface unknowns, no surface instability, smaller systems,
+simpler MPI), after a short look at the coupled instability.
+Route 1 (short look): a cheap reproducer of the coupled fault-surface growth was not found (a
+12 km thrust of 500 m elements with a surface of +-40 km, unfiltered, -fd_tol_surf 1e-3: stable,
+its phase short, 592 s, the slip decaying quickly; the PD13 phases stay at k = 1 for hundreds of
+seconds with the fault still slipping). Not pursued further for now.
+Route 2, method: the discrete wavenumber method (DWN; plane-wave expansion in the horizontal
+wavenumber k at complex frequency omega), in preference to Cagniard-de Hoop, because the
+free-surface reflection is solved numerically per k (2 x 2 system for the reflected P and S
+potentials) rather than through ray-by-ray contour mappings with head waves and quartic roots,
+and because the segment integral is analytic per k (a dipping segment adds the factor
+2 sinh(c a) / c, c = -i k s_x + nu s_z). Formulation (fully_dynamic/halfplane_dwn.py, x horizontal,
+z depth): the 2-D full-plane Green's tensor G_ij = [k_b^2 delta_ij g_b + d_i d_j (g_b - g_a)] /
+(rho omega^2), g_c = (i/4) H_0(k_c r) = (1/2 pi) int exp(i k x - nu_c |z|) / (2 nu_c) dk; the line
+moment of unit slip mu (s n + n s); the upgoing part's traction at z = 0 cancelled by reflected
+P and S waves; stresses at the receiver from the derivatives (i k, -nu). Time domain: the ramp
+(unit slip rate) has the transform -1 / omega^2; complex frequency omega_I = 18 / T against the
+wrap-around of the growing ramp; sources repeated every L >= 2 alpha T.
+Checks:
+- full plane (DWN against the closed form, inplane.segment_ramp_stress): 3e-4 relative after the
+  first arrivals at N = 2048 frequencies (1.8e-3 at t = 0.2 s, at the S front); errors of a few
+  percent with omega_I T = 6 came from the wrap-around of the growing ramp, not resolution;
+- static (check_halfplane_dwn_static.py): the transfer function at a small frequency against
+  Crouch and Starfield's half-plane solution (tdd_coeff) for horizontal and dipping (30, -50
+  degree) segments at 0.8 to 5 km depth: within 4e-7;
+- dynamic (check_halfplane_dwn.py): unit slip rate on one element of a 30 degree fault (top 750 m,
+  elements of 250 m), traction on an element 500 m further down dip, against the virtual-surface
+  prototype (densesys, kinematic, surface +-10 km of 125 m): the totals agree to 0.5 percent
+  after the reflected arrivals and to 1.4 percent at most (at the reflected P arrival, 0.37 s, where
+  the virtual surface smears the front; doubling the DWN frequencies to 8192 changed nothing,
+  so the remaining difference at the front is the virtual surface's).
+Plan for the C implementation:
+1. Tables: half-plane pair table = the existing exact full-plane table + a reflected part from
+   DWN. Per complex frequency the reflected parts of all pairs are matrix products,
+   P_rows (Nr x Nk) A_cols (Nk x Ns) for the P and the S waves and for the shear and normal
+   traction rows; then one FFT per pair to the lags, the static rate subtracted (Crouch and
+   Starfield, ihalf = 1) and the windows compressed (D2). Cost for PD13 at 1 km (225 elements,
+   windows of about 70 s, Nk about 7,000, 700 frequencies) about 1e12 floating-point operations,
+   split by receiver rows over MPI ranks like the dense tables (M8).
+2. rsf_fd.c: in-plane half planes use these tables (no surface segments); the virtual surface
+   stays available (-fd_halfplane_method surface) for comparisons.
+3. Checks in C: against halfplane_dwn.py per pair; static gate against Is (exact now up to the
+   DWN parameters); the fsrup ruptures and PD13 at 1 km against the virtual surface where both
+   are stable; PD13 at 500 m (which diverged with the surface).
+Open: the DWN parameters (T, omega_I, L, Nk) per pair window; accuracy at reflected fronts for
+shallow elements (a Cagniard-de Hoop evaluation would be exact there if needed).
+Step 1 done (2026-11-04): src/rsf_solve/fd_hpdwn.c, the reflected part in C (fd_hpdwn_reflected:
+sources, receivers, times; port of halfplane_dwn.py, part "refl"), equal to the prototype to
+1e-13 (bin/test_fd_hpdwn, fully_dynamic/test_fd_hpdwn.py, in run_tests.sh). This first version
+loops over frequencies, wavenumbers, sources, receivers and times (cost Nw Nk Ns Nr nt), for the
+checks only. Next: per frequency the matrix products over k (BLAS) with the projected tractions
+of each receiver, the spectra of all pairs kept for one inverse FFT per pair on the lag grid
+(T = N dt), the static rate from interact's exact Is and In, then rsf_fd.c.
+
 ### WP7, C implementation in rsf_solve: status (2026-10-18)
 Done, each verified in the sandbox before delivery (details in
 fd_c_design.md sections 6 to 10, usage in rsf_solve_fd.md):

@@ -110,6 +110,9 @@ for large strip sets (H8).
    PD13 at 1 km runs 700 yr with two stable dynamic events; next PD13 at
    500 m on a multi-core machine, then step 3 (the prototype's checks, a
    megathrust with a splay).
+1h. M10: exact half-plane kernels for 2-D in-plane by DWN (halfplane_dwn.py, checked against
+   Crouch-Starfield statics to 4e-7 and the virtual surface dynamically to 0.5-1.4 percent);
+   next the C tables (matrix products per frequency, MPI by rows) replacing the surface.
 1g. Before a 2-D QD and FD Cascadia comparison (M9): check_2d_resolution.py
    on the inputs used; run_2d_sensitivity.sh at a resolved element size with
    -calc_sigma_dot 1 (about 1 km or finer near shallow tops); decide on

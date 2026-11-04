@@ -102,6 +102,11 @@ if command -v python3 > /dev/null 2>&1; then
   if [ $st -eq 0 ]; then echo "fd3d_test h6step, band preconditioned strip solve against LU: PASS"
   else echo "fd3d_test h6step, band preconditioned strip solve against LU: FAIL ($(cat tmp_fd_dynamic/fd3d.out))"; fail=1; fi
 fi
+# reflected half-plane stresses by DWN (fd_plan.md M10) against the prototype
+if command -v python3 > /dev/null 2>&1; then
+  ( cd tmp_fd_dynamic && python3 ../fully_dynamic/test_fd_hpdwn.py ../bin/test_fd_hpdwn > fd3d.out 2>&1 )
+  tail -1 tmp_fd_dynamic/fd3d.out; grep -q PASS tmp_fd_dynamic/fd3d.out || fail=1
+fi
 # 2-D in-plane opening kernel (fd_plan.md M7 step 1) against the prototype
 if command -v python3 > /dev/null 2>&1; then
   ( cd tmp_fd_dynamic && python3 ../fully_dynamic/test_fd_open.py ../bin/test_fd_open > fd3d.out 2>&1 )
