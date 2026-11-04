@@ -107,6 +107,13 @@ if command -v python3 > /dev/null 2>&1; then
   ( cd tmp_fd_dynamic && python3 ../fully_dynamic/test_fd_hpdwn.py ../bin/test_fd_hpdwn > fd3d.out 2>&1 )
   tail -1 tmp_fd_dynamic/fd3d.out; grep -q PASS tmp_fd_dynamic/fd3d.out || fail=1
 fi
+# batch reflected tables (fd_plan.md M10) against Crouch and Starfield and the prototype; needs the
+# prototype's tdd library (TDD_LIB, as for test_fd_surf.py)
+if command -v python3 > /dev/null 2>&1 && [ -s ${TDD_LIB-/tmp/tdd/libtdd.so} ]; then
+  ( cd tmp_fd_dynamic && ../bin/test_fd_hpdwn_batch 4 250 500 40 > hpb.txt 2>/dev/null && \
+    python3 ../fully_dynamic/test_fd_hpdwn_batch.py hpb.txt > fd3d.out 2>&1 )
+  tail -1 tmp_fd_dynamic/fd3d.out; grep -q PASS tmp_fd_dynamic/fd3d.out || fail=1
+fi
 # 2-D in-plane opening kernel (fd_plan.md M7 step 1) against the prototype
 if command -v python3 > /dev/null 2>&1; then
   ( cd tmp_fd_dynamic && python3 ../fully_dynamic/test_fd_open.py ../bin/test_fd_open > fd3d.out 2>&1 )

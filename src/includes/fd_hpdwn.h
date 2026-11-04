@@ -15,4 +15,19 @@ int fd_hpdwn_reflected(int ns, const double *sx, const double *sz, const double 
                        int nr, const double *rx, const double *rz, int nt, const double *t,
                        double alpha, double beta, double rho, double T, int nw, double wIT, double L, int M,
                        double *oxx, double *oxz, double *ozz);
+/*
+  Batch version for the tables (fd_plan.md M10): the reflected tractions on receiver elements
+  (centres (rx, rz), unit tangents (rtx, rtz) in the (x, z) frame) from unit slip rate on the
+  source segments, at the lags t_l = l dt, l = 0 .. nt - 1, as the shear and normal tractions of
+  fd_project (y-up frame: tangent (rtx, -rtz), normal its rot90); output os, on
+  [((i * ns) + j) * nt + l]. Per complex frequency the sums over the wavenumbers are matrix
+  products (BLAS zgemm); one FFT per pair gives the lags. The window T = N dt with N the FFT size
+  for 2.5 nt, the damping omega_I T = 18, the source period L = alpha T plus twice the extent,
+  wavenumbers to 2 pi / h with h a quarter of the smallest half-length or of the smallest
+  source plus receiver depth. ks, kn (may be NULL): the static reflected tractions (rate of the
+  ramp response for t to infinity), from the same sums at a small frequency. Returns 0 on success.
+*/
+int fd_hpdwn_batch(int ns, const double *sx, const double *sz, const double *stx, const double *stz, const double *sa,
+                   int nr, const double *rx, const double *rz, const double *rtx, const double *rtz,
+                   double alpha, double beta, double rho, double dt, int nt, double *os, double *on, double *ks, double *kn);
 #endif

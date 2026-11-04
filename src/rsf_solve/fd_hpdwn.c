@@ -4,6 +4,7 @@
 #include <math.h>
 #include <complex.h>
 #include "fd_hpdwn.h"
+#include "fd_fft.h"
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
 #endif
@@ -139,5 +140,224 @@ int fd_hpdwn_reflected(int ns, const double *sx, const double *sz, const double 
         ozz[o*nt + l] = creal(acc[(o*3 + 2)*nt + l])*fac;
       }
   free(acc);
+  return 0;
+}
+
+extern void zgemm_(char *ta, char *tb, int *m, int *n, int *k, double complex *alpha, double complex *a, int *lda,
+                   double complex *b, int *ldb, double complex *beta, double complex *c, int *ldc, size_t lta, size_t ltb);
+
+/* the per-wavenumber source amplitudes A (P) and B (S) of the reflected waves for source j,
+   including exp(-i k xs), the ramp transform and 1 / L */
+static void source_amplitudes(double k, double complex w, double alpha, double beta, double rho, double L,
+                              double sxj, double szj, double tx, double tz, double a, double complex *A, double complex *B)
+{
+  double lam, mu;
+  double complex na, nb, PxzA, PzzA, PxzB, PzzB, det, txz, tzz, f;
+  lam = rho*(alpha*alpha - 2.0*beta*beta);
+  mu = rho*beta*beta;
+  na = csqrt_pos(k*k - (w/alpha)*(w/alpha));
+  nb = csqrt_pos(k*k - (w/beta)*(w/beta));
+  PxzA = mu*(I*k*(-na) + (-na)*I*k);
+  PzzA = lam*(I*k*I*k + na*na) + 2.0*mu*na*na;
+  PxzB = mu*(I*k*I*k - nb*nb);
+  PzzB = lam*(I*k*nb - nb*I*k) + 2.0*mu*(-nb*I*k);
+  det = PxzA*PzzB - PxzB*PzzA;
+  incident_traction(k, w, alpha, beta, rho, tx, tz, a, szj, &txz, &tzz);
+  f = cexp(-I*k*sxj)*(-1.0/(w*w))/L;
+  *A = f*(-txz*PzzB + tzz*PxzB)/det;
+  *B = f*(-tzz*PxzA + txz*PzzA)/det;
+}
+
+/* the projected tractions (shear, normal) at receiver i per unit A (P) and per unit B (S),
+   including exp(i k xr - nu zr) */
+static void receiver_factors(double k, double complex w, double alpha, double beta, double rho,
+                             double xr, double zr, double tx, double tz,
+                             double complex *sA, double complex *nA, double complex *sB, double complex *nB)
+{
+  double lam, mu, srx, sry, nrx, nry;
+  double complex na, nb, ea, eb, uxA, uzA, uxB, uzB, sxx, sxz, szz, sxy, syy, trx, try_;
+  int c;
+  lam = rho*(alpha*alpha - 2.0*beta*beta);
+  mu = rho*beta*beta;
+  na = csqrt_pos(k*k - (w/alpha)*(w/alpha));
+  nb = csqrt_pos(k*k - (w/beta)*(w/beta));
+  ea = cexp(I*k*xr - na*zr);
+  eb = cexp(I*k*xr - nb*zr);
+  srx = tx;                                       /* y-up frame */
+  sry = -tz;
+  nrx = -sry;
+  nry = srx;
+  for(c = 0; c < 2; c++){
+    if(c == 0){
+      uxA = I*k;
+      uzA = -na;
+      sxx = ((lam + 2.0*mu)*(I*k*uxA) + lam*(-na*uzA))*ea;
+      sxz = mu*(-na*uxA + I*k*uzA)*ea;
+      szz = (lam*(I*k*uxA) + (lam + 2.0*mu)*(-na*uzA))*ea;
+    }else{
+      uxB = nb;
+      uzB = I*k;
+      sxx = ((lam + 2.0*mu)*(I*k*uxB) + lam*(-nb*uzB))*eb;
+      sxz = mu*(-nb*uxB + I*k*uzB)*eb;
+      szz = (lam*(I*k*uxB) + (lam + 2.0*mu)*(-nb*uzB))*eb;
+    }
+    sxy = -sxz;
+    syy = szz;
+    trx = sxx*nrx + sxy*nry;
+    try_ = sxy*nrx + syy*nry;
+    if(c == 0){
+      *sA = trx*srx + try_*sry;
+      *nA = trx*nrx + try_*nry;
+    }else{
+      *sB = trx*srx + try_*sry;
+      *nB = trx*nrx + try_*nry;
+    }
+  }
+}
+
+/* the reflected tractions of all pairs at one complex frequency: Gs, Gn (nr x ns, column-major) */
+static void spectra_at(double complex w, int ns, const double *sx, const double *sz, const double *stx, const double *stz, const double *sa,
+                       int nr, const double *rx, const double *rz, const double *rtx, const double *rtz,
+                       double alpha, double beta, double rho, double L, int M,
+                       double complex *R, double complex *S, double complex *Gs, double complex *Gn)
+{
+  int nk, m, i, j, two_nk;
+  double k;
+  double complex one, zero;
+  double complex *G;
+  char tn;
+  nk = 2*M + 1;
+  two_nk = 2*nk;
+  /* R: receivers x (A wavenumbers, B wavenumbers), shear then normal (2 nr rows); S: (2 nk) x ns */
+  for(m = 0; m < nk; m++){
+    k = 2.0*M_PI*(m - M)/L;
+    for(j = 0; j < ns; j++)
+      source_amplitudes(k, w, alpha, beta, rho, L, sx[j], sz[j], stx[j], stz[j], sa[j],
+                        &S[(size_t)j*two_nk + m], &S[(size_t)j*two_nk + nk + m]);
+    for(i = 0; i < nr; i++)
+      receiver_factors(k, w, alpha, beta, rho, rx[i], rz[i], rtx[i], rtz[i],
+                       &R[(size_t)m*2*nr + i], &R[(size_t)m*2*nr + nr + i],
+                       &R[(size_t)(nk + m)*2*nr + i], &R[(size_t)(nk + m)*2*nr + nr + i]);
+  }
+  one = 1.0;
+  zero = 0.0;
+  tn = 'N';
+  i = 2*nr;
+  /* (2 nr x 2 nk) (2 nk x ns) = 2 nr x ns: shear rows then normal rows */
+  G = (double complex *)malloc(sizeof(double complex)*(size_t)2*nr*ns);
+  zgemm_(&tn, &tn, &i, &ns, &two_nk, &one, R, &i, S, &two_nk, &zero, G, &i, 1, 1);
+  for(j = 0; j < ns; j++)
+    for(m = 0; m < nr; m++){
+      Gs[(size_t)j*nr + m] = G[(size_t)j*2*nr + m];
+      Gn[(size_t)j*nr + m] = G[(size_t)j*2*nr + nr + m];
+    }
+  free(G);
+}
+
+int fd_hpdwn_batch(int ns, const double *sx, const double *sz, const double *stx, const double *stz, const double *sa,
+                   int nr, const double *rx, const double *rz, const double *rtx, const double *rtz,
+                   double alpha, double beta, double rho, double dt, int nt, double *os, double *on, double *ks, double *kn)
+{
+  int N, nw, M, jw, i, j, l, q;
+  double T, wI, dw, L, xmin, xmax, h, zsum, amin, fac;
+  double complex w, *R, *S, *Gs, *Gn, *specs, *specn, *x, *y;
+  fd_fft_plan plan;
+  size_t np, p;
+  /* the time grid is the lag grid refined q times (the reflected fronts need frequencies well
+     above the Nyquist frequency of the lags; FD_HPDWN_Q, default 8) */
+  q = getenv("FD_HPDWN_Q") ? atoi(getenv("FD_HPDWN_Q")) : 8;
+  if(q < 1)
+    q = 1;
+  N = fd_fft_size_for((int)ceil(2.5*nt*q));
+  T = N*dt/q;
+  wI = 18.0/T;
+  dw = 2.0*M_PI/T;
+  xmin = 1e300;
+  xmax = -1e300;
+  amin = 1e300;
+  zsum = 1e300;
+  for(j = 0; j < ns; j++){
+    xmin = fmin(xmin, sx[j] - sa[j]);
+    xmax = fmax(xmax, sx[j] + sa[j]);
+    amin = fmin(amin, sa[j]);
+  }
+  for(i = 0; i < nr; i++){
+    xmin = fmin(xmin, rx[i]);
+    xmax = fmax(xmax, rx[i]);
+  }
+  for(j = 0; j < ns; j++)
+    for(i = 0; i < nr; i++)
+      zsum = fmin(zsum, fabs(sz[j]) + fabs(rz[i]));
+  L = alpha*T + 2.0*(xmax - xmin);
+  h = 0.25*fmin(amin, zsum);
+  M = (int)ceil(L/h);
+  nw = N/2 + 1;
+  np = (size_t)nr*ns;
+  R = (double complex *)malloc(sizeof(double complex)*(size_t)2*nr*2*(2*M + 1));
+  S = (double complex *)malloc(sizeof(double complex)*(size_t)2*(2*M + 1)*ns);
+  Gs = (double complex *)malloc(sizeof(double complex)*np);
+  Gn = (double complex *)malloc(sizeof(double complex)*np);
+  specs = (double complex *)calloc(np*nw, sizeof(double complex));
+  specn = (double complex *)calloc(np*nw, sizeof(double complex));
+  if(!R || !S || !Gs || !Gn || !specs || !specn)
+    return 1;
+  for(jw = 0; jw < nw; jw++){
+    w = jw*dw + I*wI;
+    spectra_at(w, ns, sx, sz, stx, stz, sa, nr, rx, rz, rtx, rtz, alpha, beta, rho, L, M, R, S, Gs, Gn);
+    fac = (jw == 0) ? 1.0 : 2.0;
+    for(p = 0; p < np; p++){
+      specs[p*nw + jw] = fac*Gs[p];
+      specn[p*nw + jw] = fac*Gn[p];
+    }
+  }
+  /* the lags: Re of sum_j X_j exp(-2 pi i j l / N), times exp(omega_I t) dw / (2 pi) */
+  x = (double complex *)malloc(sizeof(double complex)*N);
+  y = (double complex *)malloc(sizeof(double complex)*N);
+  plan = fd_fft_plan_create(N, FD_FFT_FORWARD);
+  for(p = 0; p < np; p++){
+    i = (int)(p % nr);
+    j = (int)(p / nr);
+    for(l = 0; l < N; l++)
+      x[l] = (l < nw) ? specs[p*nw + l] : 0.0;
+    fd_fft_exec(plan, x, y);
+    for(l = 0; l < nt; l++)
+      os[((size_t)i*ns + j)*nt + l] = creal(y[l*q])*exp(wI*l*dt)*dw/(2.0*M_PI);
+    for(l = 0; l < N; l++)
+      x[l] = (l < nw) ? specn[p*nw + l] : 0.0;
+    fd_fft_exec(plan, x, y);
+    for(l = 0; l < nt; l++)
+      on[((size_t)i*ns + j)*nt + l] = creal(y[l*q])*exp(wI*l*dt)*dw/(2.0*M_PI);
+  }
+  fd_fft_plan_destroy(plan);
+  /* static: the transfer function at a small frequency, without the ramp (unit slip) */
+  if(ks || kn){
+    /* as in check_halfplane_dwn_static.py: period of 4000 km, a small frequency */
+    L = fmax(4e6, 100.0*(xmax - xmin));
+    w = 2.0*M_PI*1e-4 + I*1e-5;
+    M = (int)ceil(L/fmin(h, 100.0));
+    if(M > 400000)
+      M = 400000;
+    free(R);
+    free(S);
+    R = (double complex *)malloc(sizeof(double complex)*(size_t)2*nr*2*(2*M + 1));
+    S = (double complex *)malloc(sizeof(double complex)*(size_t)2*(2*M + 1)*ns);
+    spectra_at(w, ns, sx, sz, stx, stz, sa, nr, rx, rz, rtx, rtz, alpha, beta, rho, L, M, R, S, Gs, Gn);
+    for(i = 0; i < nr; i++)
+      for(j = 0; j < ns; j++){
+        /* spectra_at includes the ramp transform -1 / w^2; the static per unit slip removes it */
+        if(ks)
+          ks[(size_t)i*ns + j] = creal(Gs[(size_t)j*nr + i]*(-(w*w)));
+        if(kn)
+          kn[(size_t)i*ns + j] = creal(Gn[(size_t)j*nr + i]*(-(w*w)));
+      }
+  }
+  free(x);
+  free(y);
+  free(R);
+  free(S);
+  free(Gs);
+  free(Gn);
+  free(specs);
+  free(specn);
   return 0;
 }

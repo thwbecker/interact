@@ -3511,6 +3511,23 @@ loops over frequencies, wavenumbers, sources, receivers and times (cost Nw Nk Ns
 checks only. Next: per frequency the matrix products over k (BLAS) with the projected tractions
 of each receiver, the spectra of all pairs kept for one inverse FFT per pair on the lag grid
 (T = N dt), the static rate from interact's exact Is and In, then rsf_fd.c.
+Step 2 done (2026-11-04): fd_hpdwn_batch, the reflected shear and normal tractions (fd_project's
+convention) of all (receiver, source) element pairs at the lags: per complex frequency the
+wavenumber sums are one zgemm, (2 Nr x 2 Nk)(2 Nk x Ns), with the source amplitudes of the
+reflected P and S waves and the receivers' projected tractions per unit amplitude; the spectra of
+all pairs are kept and one FFT per pair gives the lags. The static reflected tractions come
+from the same sums at a small frequency (period 4,000 km). The lag grid alone is not enough:
+band-limited at the lags' Nyquist frequency the reflected fronts ring (6.5 percent against the
+prototype for a 30 degree fault of 250 m with its top at 500 m); the time grid is refined q
+times (FD_HPDWN_Q, default 8): 1.4 percent at q = 4, 0.7 percent at 8, 0.4 percent at 16. Static
+reflected tractions against Crouch and Starfield (half minus full plane): 1.2e-5.
+(bin/test_fd_hpdwn_batch, fully_dynamic/test_fd_hpdwn_batch.py, in run_tests.sh.)
+Cost: frequencies (N / 2, N = 2.5 q nt) times the zgemm (8 Nr Nk Ns flops). PD13 at 1 km (225
+elements, nt about 600, Nk about 2e4) about 5e13 flops at q = 8, at 500 m about 16 times that;
+fine on a 64-core node up to 500 m, not at 100 to 250 m, where a time-domain evaluation of the
+reflected rays (Cagniard-de Hoop, cost pairs times lags) would be the better choice.
+Next: the half-plane pair tables in fd_tables.c (full-plane entries as now plus the reflected
+batch, the static rate from the batch or from interact's Is/In) and the switch in rsf_fd.c.
 
 ### WP7, C implementation in rsf_solve: status (2026-10-18)
 Done, each verified in the sandbox before delivery (details in
