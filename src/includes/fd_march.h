@@ -28,30 +28,15 @@ struct fd_ops {                 /* operators for one substep multiple k */
      slip rate linear across the k substeps; Ks/Kn/ab hold B_k, Cs/Cn the C_k operators */
   int nl;
   double *Cs, *Cn;
-  /* virtual free surface (fd_plan.md M7 step 2b): the surface unknowns (indices Nf..N-1) are
-     eliminated, V_s = -(q + P V_f) with q = B_ss^-1 H_s; el is the fault's operator
-     B_ff - B_fs P (and Kn_ff - Kn_fs P), Nf x Nf, with its band */
-  struct fd_ops *el;
-  double *lu;                   /* LU of B_ss, Nu x Nu, column-major */
-  int *piv;
-  double *P;                    /* B_ss^-1 B_sf, Nu x Nf, column-major */
-  double *Bfs, *Knfs;           /* Nf x Nu, row-major */
 };
 
 struct fd_sys {
   int N, nseg, nsrc, M, L, Lbuf, mode, has_normal, nsign;
-  int Nf, Nu;                   /* fault unknowns 0..Nf-1, surface unknowns Nf..N-1 (segments of kind FD_SEG_SURF_*, after the faults) */
   /* MPI (fd_plan.md M8): the dense lag tables hold each rank's own receiver rows only; gather(ctx,
      A, ncol) replaces the other ranks' rows of the N x ncol row-major array A by the owners'
      values (operators K_k after assembly, the history after the products); NULL on one rank */
   void (*gather)(void *ctx, double *A, int ncol);
   void *gather_ctx;
-  /* filter of the surface rates against the grid-scale mode of the virtual surface (fd_plan.md
-     M9): 0 off, 1 (1 2 1)/4, 2 (-1 4 10 4 -1)/16; filt_mask[i] = 1 for the surface unknowns it
-     may change (not near fault traces and shallow tops) */
-  int filt;
-  unsigned char *filt_mask;
-  double *etai;                 /* instantaneous coefficient per unknown: mu/(2 beta), rho alpha/2 for opening */
   double dt, eta, alpha, beta, rho;
   struct fd_seglist *segs;      /* receivers (real segments) */
   struct fd_pair **pairs;       /* pairs[src*nseg + rcv], src over nsrc sources */
@@ -62,7 +47,7 @@ struct fd_sys {
   double **histr;               /* real-space ring per source, only with dense pairs (ndense > 0) */
   int *spec;                    /* per source: 1 if it has a Toeplitz (spectral) pair; the spectral ring
                                    hist[k] is kept only then (a source with dense pairs only, such as a
-                                   surface or a single element of a curved fault, has none) */
+                                   single element of a curved fault, has none) */
   int ndense;
   double *ctP;                  /* prefix moments of one source's history (compressed dense pairs, D2) */
   const double **ctV;
@@ -178,7 +163,4 @@ void fd_state_free(struct fd_state *st);
 /* one step of k dt_min with slip weakening / rate and state */
 int fd_step_slipweak(struct fd_sys *s, struct fd_state *st, struct fd_slipweak *f, int k);
 int fd_step_rsf(struct fd_sys *s, struct fd_state *st, const struct fd_rsf *f, int k);
-/* the surface filter (fd_plan.md M9): type 0 off, 1 three-point, 2 five-point; mask (N, may be
-   NULL for all surface unknowns) marks the unknowns it may change; the mask is copied */
-void fd_sys_set_surface_filter(struct fd_sys *s, int type, const unsigned char *mask);
 #endif

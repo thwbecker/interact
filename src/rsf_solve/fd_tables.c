@@ -10,9 +10,11 @@
 #include <math.h>
 #include "fd_kernels.h"
 #include "fd_tables.h"
+#include "fd_hpdwn.h"
 
 static double g_ctol;
 static int g_cexp;
+static int g_hp = 0;                             /* in-plane half plane by exact (DWN) kernels, fd_plan.md M10 */
 static int g_r0 = 0, g_r1 = -1;                  /* receiver rows built by the dense builder (MPI, fd_plan.md M8); r1 < 0: all */
 struct fd_ctab;
 static void ct_init(struct fd_ctab *c, size_t ne);
@@ -55,7 +57,7 @@ struct fd_pair *fd_pair_build(const struct fd_segment *src, const struct fd_segm
     errmsg[0] = 0;
   /* dense pairs: entry by entry and compressed at once when compression is on (polylines always;
      the full-window builder below holds np x lmax values and is kept for FD_CT_OFF and the tests) */
-  if(src->pc || rcv->pc)
+  if(src->pc || rcv->pc || (g_hp && mode == FD_MODE_INPLANE))      /* polylines; the half plane (no Toeplitz pairs) */
     return fd_pair_build_poly(src, rcv, mode, dt, et, alpha, beta, rho, tol, lmax, M, errmsg);
   if((!fd_segments_parallel(src, rcv) || src->kind != FD_SEG_FAULT || rcv->kind != FD_SEG_FAULT || getenv("FD_FORCE_DENSE"))
      && g_ctol > 0.0 && !getenv("FD_CT_OFF"))
@@ -187,208 +189,14 @@ struct fd_pair *fd_pair_build(const struct fd_segment *src, const struct fd_segm
 }
 
 
-/* ---------------- surface elements (fd_plan.md M7 step 2) ----------------
-   Opening sources use the quadrature kernel of fd_kernels_open.c, which is expensive, so the
-   stress histories are cached by the receiver's position in the source frame (on a straight
-   surface the relative positions repeat) and evaluated only until the window criterion has held
-   for FD_OPEN_QUIET lags after the S arrival from the far end of the source. */
-#define FD_OPEN_QUIET 32
-/* the symmetric time average of the opening kernel (as the prototype's tshift), 1.7e-3 of the
-   step rather than the prototype's 1e-4: with surface elements of a whole number of S steps the
-   fronts cross element ends, or touch the source line, exactly at sample times, and the
-   quadrature is ill-conditioned within beta tshift of such a coincidence. The values are stable
-   (to 3e-4 relative) for shifts of 7e-4 to 5e-3 in the cases found (an on-line receiver as an S
-   front passes a segment end, a front tangent to the source line); 1e-4 was 2 percent off in
-   the second case and 1e-3 met another coincidence (a spike of 1e12 Pa) */
-#define FD_OPEN_TSHIFT 1.7e-3
-struct open_cache_entry {
-  long kx;
-  long ky;
-  long ka;
-  int n;                        /* lags evaluated (values beyond are zero increments) */
-  double *s;                    /* 3 x (n + 1) stresses at (et + l - 1) dt, l = 0..n, s[0] at t = 0 */
-};
-static struct open_cache_entry *g_oc = NULL;
-static size_t g_oc_n = 0, g_oc_cap = 0;
+/* the window of an entry ends once the criterion has held for FD_QUIET lags after the S arrival
+   from the far end of the source */
+#define FD_QUIET 32
 
-void fd_tables_open_cache_clear(void)
-{
-  size_t i;
-  for(i = 0; i < g_oc_cap; i++)
-    free(g_oc[i].s);
-  free(g_oc);
-  g_oc = NULL;
-  g_oc_n = 0;
-  g_oc_cap = 0;
-}
-static size_t oc_hash(long kx, long ky, long ka, size_t cap)
-{
-  unsigned long h;
-  h = (unsigned long)kx*1000003UL ^ (unsigned long)ky*998244353UL ^ (unsigned long)ka*19260817UL;
-  return (size_t)(h % cap);
-}
-static struct open_cache_entry *oc_find(long kx, long ky, long ka, int insert)
-{
-  size_t i, j, cap;
-  struct open_cache_entry *old;
-  if(g_oc_cap == 0 || (insert && 2*(g_oc_n + 1) > g_oc_cap)){
-    old = g_oc;
-    cap = g_oc_cap;
-    g_oc_cap = cap ? 2*cap : 1024;
-    g_oc = (struct open_cache_entry *)calloc(g_oc_cap, sizeof(*g_oc));
-    for(i = 0; i < cap; i++)
-      if(old[i].s){
-        j = oc_hash(old[i].kx, old[i].ky, old[i].ka, g_oc_cap);
-        while(g_oc[j].s)
-          j = (j + 1) % g_oc_cap;
-        g_oc[j] = old[i];
-      }
-    free(old);
-  }
-  i = oc_hash(kx, ky, ka, g_oc_cap);
-  while(g_oc[i].s){
-    if(g_oc[i].kx == kx && g_oc[i].ky == ky && g_oc[i].ka == ka)
-      return g_oc + i;
-    i = (i + 1) % g_oc_cap;
-  }
-  if(!insert)
-    return NULL;
-  g_oc[i].kx = kx;
-  g_oc[i].ky = ky;
-  g_oc[i].ka = ka;
-  g_oc_n++;
-  return g_oc + i;
-}
-
-/* one dense entry with a surface element involved (in-plane): the source's stress history
-   (slip: closed-form ramp and series as below; opening: quadrature, cached), projected on the
-   receiver's primary row (shear, or normal for an opening receiver) into W and the normal row
-   into Wn; K: static values of both rows. Increments of lags l = 1..lmax as W[l - 1]. */
-static void dense_entry_open(const struct fd_segment *src, const struct fd_segment *rcv, double x, double y,
-    double dt, double et, double alpha, double beta, double rho, double mu, double nu, double tol, int lmax,
-    double *W, double *Wn, double *Kp, double *Kn)
-{
-  double st[3], s0[3], s1[3], d[3], ts, tn, kps, kpn, rfar, env, rr;
-  int lend;
-  double sa;
-  int l, k, quiet, lS, nl;
-  long kx;
-  long ky;
-  long ka;
-  struct open_cache_entry *ce;
-  double *hist;
-  /* an opening source's history is cached by the position in the source frame rounded to 1 um;
-     it is evaluated at that rounded position (and so is everything else of the entry), so that
-     its values do not depend on which entry computed it first: entries at the same relative
-     position differ in the last bits of x and y, and with the rows split over MPI ranks the
-     first entry differs */
-  sa = src->a;
-  if(src->kind == FD_SEG_SURF_OPEN){
-    x = llround(x*1e6)/1e6;
-    y = llround(y*1e6)/1e6;
-    sa = llround(sa*1e6)/1e6;                   /* the half-length too: elements of different runs differ in the last bits */
-  }
-  /* static */
-  if(src->kind == FD_SEG_SURF_OPEN)
-    fd_static_inplane_open(x, y, sa, mu, nu, st);
-  else
-    fd_static_inplane(x, y, sa, mu, nu, st);
-  fd_project(st[0], st[1], st[2], src->s, rcv->s, &kps, &kpn);
-  *Kp = (rcv->kind == FD_SEG_SURF_OPEN) ? kpn : kps;
-  *Kn = kpn;
-  rr = fmax(hypot(x, y), sa);
-  env = mu*(2.0*sa)*(2.0*sa)/(2.0*M_PI*(1.0 - nu)*rr*rr)*dt;
-  rfar = fmax(hypot(x + sa, y), hypot(x - sa, y));
-  lS = (int)ceil(rfar/beta/dt) + 2;
-  /* stress history in the source frame, from the cache for opening sources */
-  hist = NULL;
-  nl = 0;
-  ce = NULL;
-  kx = 0;
-  ky = 0;
-  ka = 0;
-  if(src->kind == FD_SEG_SURF_OPEN){
-    kx = llround(x*1e6);
-    ky = llround(y*1e6);
-    ka = llround(sa*1e6);
-#pragma omp critical(fd_open_cache)
-    {
-      ce = oc_find(kx, ky, ka, 0);
-      if(ce){
-        hist = ce->s;
-        nl = ce->n;
-      }
-    }
-  }
-  if(!hist){
-    /* a cached (opening) history ends at a bound set by the position alone, not by the pair's
-       lmax, so that it is the same whichever pair, receiver or MPI rank computes it first */
-    lend = lmax;
-    if(src->kind == FD_SEG_SURF_OPEN){
-      lend = 20*lS + 64;
-      if(lend < 256)
-        lend = 256;
-    }
-    hist = (double *)malloc(sizeof(double)*3*(size_t)(lend + 1));
-    hist[0] = hist[1] = hist[2] = 0.0;
-    quiet = 0;
-    for(l = 1; l <= lend; l++){
-      if(src->kind == FD_SEG_SURF_OPEN)
-        fd_seg_ramp_inplane_open(x, y, (et + l - 1)*dt, sa, alpha, beta, rho, FD_OPEN_TSHIFT*dt, s1);
-      else
-        fd_seg_ramp_inplane(x, y, (et + l - 1)*dt, sa, alpha, beta, rho, s1);
-      for(k = 0; k < 3; k++)
-        hist[3*l + k] = s1[k];
-      nl = l;
-      /* stop once the increments minus the static slope stay below the window criterion */
-      for(k = 0; k < 3; k++){
-        d[k] = s1[k] - hist[3*(l - 1) + k];
-        s0[k] = st[k]*dt;
-      }
-      /* the stress components in the source frame, so that the length of a cached history does
-         not depend on the receiver that first needed it (the tables are then the same for any
-         split of the receiver rows over MPI ranks) */
-      if(l > lS && fabs(d[0] - s0[0]) <= tol*env && fabs(d[1] - s0[1]) <= tol*env && fabs(d[2] - s0[2]) <= tol*env)
-        quiet++;
-      else
-        quiet = 0;
-      if(quiet >= FD_OPEN_QUIET)
-        break;
-    }
-    if(src->kind == FD_SEG_SURF_OPEN){
-#pragma omp critical(fd_open_cache)
-      {
-        ce = oc_find(kx, ky, ka, 1);
-        if(ce->s){                               /* another thread got there first */
-          free(hist);
-          hist = ce->s;
-          nl = ce->n;
-        }else{
-          ce->s = hist;
-          ce->n = nl;
-        }
-      }
-    }
-  }
-  for(l = 1; l <= lmax; l++){
-    if(l <= nl){
-      for(k = 0; k < 3; k++)
-        d[k] = hist[3*l + k] - hist[3*(l - 1) + k];
-    }else{
-      for(k = 0; k < 3; k++)
-        d[k] = st[k]*dt;                       /* the static rate: zero increment after the window */
-    }
-    fd_project(d[0], d[1], d[2], src->s, rcv->s, &ts, &tn);
-    W[l - 1] = ((rcv->kind == FD_SEG_SURF_OPEN) ? tn : ts) - (*Kp)*dt;
-    Wn[l - 1] = tn - kpn*dt;
-  }
-  if(src->kind != FD_SEG_SURF_OPEN)
-    free(hist);
-}
 
 /* ---------------- polyline segments (curved faults, fd_plan.md M7) ----------------
    Entries are built one at a time with each element's own centre, tangent and half-length, the
-   window ended once the criterion has held for FD_OPEN_QUIET lags after the far S arrival, and
+   window ended once the criterion has held for FD_QUIET lags after the far S arrival, and
    compressed at once (D2), so no full window of the pair is ever held. */
 static void poly_entry(const struct fd_segment *src, const struct fd_segment *rcv, int i, int j, int mode,
     double dt, double et, double alpha, double beta, double rho, double mu, double nu, double tol, int lmax, int full,
@@ -396,7 +204,6 @@ static void poly_entry(const struct fd_segment *src, const struct fd_segment *rc
 {
   double Xr[2], tr[2], ar, Xs[2], ts_[2], as, dd[2], x, y, st[3], s0[3], s1[3], d[3], ts, tn, rfar, rr, env, a2[2], b2[2], nrg[2], nss[2];
   int l, lsw, lS, quiet, k;
-  struct fd_segment se, re;
   fd_seg_element(rcv, i, Xr, tr, &ar);
   fd_seg_element(src, j, Xs, ts_, &as);
   dd[0] = Xr[0] - Xs[0];
@@ -410,29 +217,9 @@ static void poly_entry(const struct fd_segment *src, const struct fd_segment *rc
     W[l] = 0.0;
     Wn[l] = 0.0;
   }
-  if(mode == FD_MODE_INPLANE && (src->kind == FD_SEG_SURF_OPEN || rcv->kind == FD_SEG_SURF_OPEN)){
-    memset(&se, 0, sizeof(se));
-    memset(&re, 0, sizeof(re));
-    se.kind = src->kind;
-    se.n = 1;
-    se.a = as;
-    se.dx = 2.0*as;
-    se.s[0] = ts_[0];
-    se.s[1] = ts_[1];
-    re.kind = rcv->kind;
-    re.n = 1;
-    re.a = ar;
-    re.dx = 2.0*ar;
-    re.s[0] = tr[0];
-    re.s[1] = tr[1];
-    dense_entry_open(&se, &re, x, y, dt, et, alpha, beta, rho, mu, nu, tol, lmax, W, Wn, Kp, Kn);
-    return;
-  }
   if(mode == FD_MODE_INPLANE){
     fd_static_inplane(x, y, as, mu, nu, st);
     fd_project(st[0], st[1], st[2], ts_, tr, Kp, Kn);
-    if(rcv->kind == FD_SEG_SURF_OPEN)
-      *Kp = *Kn;
     rfar = fmax(hypot(x + as, y), hypot(x - as, y));
     lsw = (int)ceil(10.0*rfar/beta/dt - et) + 2;
     lS = (int)ceil(rfar/beta/dt) + 2;
@@ -457,7 +244,7 @@ static void poly_entry(const struct fd_segment *src, const struct fd_segment *rc
         quiet++;
       else
         quiet = 0;
-      if(quiet >= FD_OPEN_QUIET && !full)
+      if(quiet >= FD_QUIET && !full)
         break;
     }
     return;
@@ -483,7 +270,7 @@ static void poly_entry(const struct fd_segment *src, const struct fd_segment *rc
       quiet++;
     else
       quiet = 0;
-    if(quiet >= FD_OPEN_QUIET)
+    if(quiet >= FD_QUIET)
       break;
   }
 }
@@ -514,6 +301,67 @@ static void ct_append(struct fd_ctab *c, const struct fd_ctab *t, size_t e0)
   c->nlag_win += t->nlag_win;
 }
 
+/* the reflected part of the half-plane tables of a pair (fd_plan.md M10): receiver rows r0 .. r1 - 1,
+   lags 0 .. nt - 1 (ramp responses os, on; static ks, kn), in fd_project's convention */
+static int hp_reflected(const struct fd_segment *src, const struct fd_segment *rcv, int r0, int r1,
+                        double alpha, double beta, double rho, double dt, int nt, double *os, double *on, double *ks, double *kn)
+{
+  int ns, nr, i, j, rc;
+  double X[2], t[2], a;
+  double *sx, *sz, *stx, *stz, *sa, *rx, *rz, *rtx, *rtz;
+  ns = src->n;
+  nr = r1 - r0;
+  sx = (double *)malloc(sizeof(double)*5*ns);
+  sz = sx + ns;
+  stx = sz + ns;
+  stz = stx + ns;
+  sa = stz + ns;
+  rx = (double *)malloc(sizeof(double)*4*(nr > 0 ? nr : 1));
+  rz = rx + nr;
+  rtx = rz + nr;
+  rtz = rtx + nr;
+  for(j = 0; j < ns; j++){                       /* (x, z) frame, z = -y */
+    fd_seg_element(src, j, X, t, &a);
+    sx[j] = X[0];
+    sz[j] = -X[1];
+    stx[j] = t[0];
+    stz[j] = -t[1];
+    sa[j] = a;
+  }
+  for(i = 0; i < nr; i++){
+    fd_seg_element(rcv, r0 + i, X, t, &a);
+    rx[i] = X[0];
+    rz[i] = -X[1];
+    rtx[i] = t[0];
+    rtz[i] = -t[1];
+  }
+  rc = 0;
+  if(nr > 0)
+    rc = fd_hpdwn_batch(ns, sx, sz, stx, stz, sa, nr, rx, rz, rtx, rtz, alpha, beta, rho, dt, nt, os, on, ks, kn);
+  free(sx);
+  free(rx);
+  return rc;
+}
+
+/* the reflected part of one entry added to its full-plane window: static K += k, increments
+   W[l] (lag l + 1) += s(l + 1) - s(l) - k dt for the lags of the reflected window */
+static void hp_add(const double *os, const double *on, const double *ks, const double *kn, size_t eo, int nt, int lmax,
+                   double dt, double *W, double *Wn, double *Ks, double *Kn)
+{
+  int l, lm;
+  const double *a;
+  const double *b;
+  a = os + eo*nt;
+  b = on + eo*nt;
+  *Ks += ks[eo];
+  *Kn += kn[eo];
+  lm = (nt - 1 < lmax) ? nt - 1 : lmax;
+  for(l = 0; l < lm; l++){
+    W[l] += a[l + 1] - a[l] - ks[eo]*dt;
+    Wn[l] += b[l + 1] - b[l] - kn[eo]*dt;
+  }
+}
+
 struct fd_pair *fd_pair_build_poly(const struct fd_segment *src, const struct fd_segment *rcv, int mode,
     double dt, double et, double alpha, double beta, double rho, double tol, int lmax, int M, char *errmsg)
 {
@@ -533,6 +381,15 @@ struct fd_pair *fd_pair_build_poly(const struct fd_segment *src, const struct fd
   double env;
   double *W;
   double *Wn;
+  int hp;
+  int ntr;
+  int hr0;
+  int hr1;
+  double dimg;
+  double *hos;
+  double *hon;
+  double *hks;
+  double *hkn;
   ns = src->n;
   nr = rcv->n;
   np = (size_t)ns*nr;
@@ -550,9 +407,43 @@ struct fd_pair *fd_pair_build_poly(const struct fd_segment *src, const struct fd
     }
   if(lmax <= 0)
     lmax = (int)ceil(dmax/beta/dt*(1.0 + 2.0/sqrt(tol))) + 2;
+  hp = g_hp && mode == FD_MODE_INPLANE && src->kind == FD_SEG_FAULT && rcv->kind == FD_SEG_FAULT;
+  ntr = 0;
+  hos = NULL;
+  hon = NULL;
+  hks = NULL;
+  hkn = NULL;
+  hr0 = (g_r1 >= 0) ? g_r0 : 0;
+  hr1 = (g_r1 >= 0) ? g_r1 : nr;
+  if(hp){
+    /* the reflected waves (fd_plan.md M10): window of three S times along the image paths */
+    dimg = 0.0;
+    for(i = hr0; i < hr1; i++)
+      for(j = 0; j < ns; j++){
+        fd_seg_element(rcv, i, Xr, tr, &ar);
+        fd_seg_element(src, j, Xs, ts_, &as);
+        if(hypot(Xr[0] - Xs[0], Xr[1] + Xs[1]) + as > dimg)
+          dimg = hypot(Xr[0] - Xs[0], Xr[1] + Xs[1]) + as;
+      }
+    ntr = (int)ceil(3.0*dimg/beta/dt) + 64;
+    if(ntr > lmax)
+      lmax = ntr;
+    hos = (double *)malloc(sizeof(double)*(size_t)(hr1 - hr0 + 1)*ns*ntr);
+    hon = (double *)malloc(sizeof(double)*(size_t)(hr1 - hr0 + 1)*ns*ntr);
+    hks = (double *)malloc(sizeof(double)*(size_t)(hr1 - hr0 + 1)*ns);
+    hkn = (double *)malloc(sizeof(double)*(size_t)(hr1 - hr0 + 1)*ns);
+    if(!hos || !hon || !hks || !hkn || hp_reflected(src, rcv, hr0, hr1, alpha, beta, rho, dt, ntr, hos, hon, hks, hkn)){
+      if(errmsg)
+        sprintf(errmsg, "half-plane reflected tables failed (memory?)");
+      free(hos);
+      free(hon);
+      free(hks);
+      free(hkn);
+      return NULL;
+    }
+  }
   ctol = (g_ctol > 0.0 && !getenv("FD_CT_OFF")) ? g_ctol : 1e-14;
   full = getenv("FD_POLY_FULL") ? 1 : 0;
-  fd_kernels_open_init();                         /* the quadrature nodes, before any threads */
   p = (struct fd_pair *)calloc(1, sizeof(*p));
   p->src = src;
   p->rcv = rcv;
@@ -596,6 +487,8 @@ struct fd_pair *fd_pair_build_poly(const struct fd_segment *src, const struct fd
           continue;
         }
         poly_entry(src, rcv, ic, jc, mode, dt, et, alpha, beta, rho, mu, nu, tol, lmax, full, W, Wn, &p->Kd_s[e], &p->Kd_n[e], &env);
+        if(hp)
+          hp_add(hos, hon, hks, hkn, (size_t)(ic - hr0)*ns + jc, ntr, lmax, dt, W, Wn, &p->Kd_s[e], &p->Kd_n[e]);
         /* the window criterion of the pair builders, per entry */
         for(hiL = lmax - 1; hiL >= 0; hiL--)
           if(fabs(W[hiL]) > tol*env || fabs(Wn[hiL]) > tol*env)
@@ -626,6 +519,10 @@ struct fd_pair *fd_pair_build_poly(const struct fd_segment *src, const struct fd
   free(tcs);
   free(tcn);
   free(Lch);
+  free(hos);
+  free(hon);
+  free(hks);
+  free(hkn);
   p->L = L;
   return p;
 }
@@ -689,11 +586,6 @@ struct fd_pair *fd_pair_build_dense(const struct fd_segment *src, const struct f
   for(e = 0; e < np; e++){
     x = xr[e];
     y = yr[e];
-    if(mode == FD_MODE_INPLANE && (src->kind == FD_SEG_SURF_OPEN || rcv->kind == FD_SEG_SURF_OPEN)){
-      /* surface elements (M7 step 2): opening sources and/or normal-traction receivers */
-      dense_entry_open(src, rcv, x, y, dt, et, alpha, beta, rho, mu, nu, tol, lmax, Ws + e*lmax, Wn + e*lmax, &p->Kd_s[e], &p->Kd_n[e]);
-      continue;
-    }
     if(mode == FD_MODE_INPLANE){
       fd_static_inplane(x, y, src->a, mu, nu, st);
       fd_project(st[0], st[1], st[2], ss, sr, &p->Kd_s[e], &p->Kd_n[e]);
@@ -875,6 +767,11 @@ void fd_pair_W_dense(const struct fd_pair *p, int l1, double *Ws, double *Wn)
    verified at every lag against the full increments to ctol times the entry's envelope (the
    normalisation of the window criterion), and the history of a run uses prefix moments of the
    source's history ring, so its cost does not depend on the run's length. */
+
+void fd_tables_set_halfplane(int on)
+{
+  g_hp = on;
+}
 
 void fd_tables_set_rows(int r0, int r1)
 {

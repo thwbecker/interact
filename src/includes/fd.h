@@ -19,7 +19,6 @@ struct fd_vars {
   PetscReal vback;		/* FD to QD return threshold [m/s], held for one window */
   PetscReal tol;		/* window tolerance relative to the static interaction envelope */
   PetscReal ctol;		/* compression tolerance of dense tables (fd_plan.md D2) */
-  PetscReal tol_surf;		/* window tolerance of pairs with virtual surface segments (M7) */
   PetscReal et;			/* collocation offset in units of dt_min (1 end of step, >1 Peirce-Siebrits) */
   PetscReal xi;			/* variable step: dt <= xi dc / V_max */
   PetscInt  kmax;		/* largest substep multiple (power of two) */
@@ -30,20 +29,10 @@ struct fd_vars {
   /* medium */
   int mode2d;			/* FD_MODE_INPLANE or FD_MODE_ANTIPLANE */
   PetscBool halfplane;
-  /* 2-D in-plane half plane: virtual free surface (fd_plan.md M7 step 2c), elements of about
-     surf_hnear within surf_wnear of a trace or shallow fault top, surf_hfar elsewhere, from the
-     faults' x extent -+ surf_margin (defaults: hf/2, 4 hf, hf, twice the deepest fault depth) */
-  PetscBool surf2d;
+  PetscBool hpdwn;              /* in-plane half plane by exact kernels (fd_plan.md M10) */
   int mpi_rank, mpi_size;        /* 2-D dense tables split by receiver rows (fd_plan.md M8) */
-  PetscReal surf_hnear, surf_wnear, surf_hfar, surf_margin;
-  /* filter of the surface rates (fd_plan.md M9): 0 off, 1 three-point, 2 five-point (default);
-     not within surf_filt_w of a trace (default surf_wnear), nor of a shallow top if surf_filt_tops */
-  PetscInt surf_filt, surf_filt_tops;
-  PetscReal surf_filt_w;
   PetscReal dump_mode;          /* diagnostic: rate above which the rates are written once (-fd_dump_mode) */
   int dump_done;
-  int ntr, nsh;
-  double *xtr, *xsh;
   int nsurf;
   PetscReal mu,nu,rho,alpha,beta,dt_min;
   PetscInt  max_steps;		/* abort a phase beyond this many steps */

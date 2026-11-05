@@ -3529,6 +3529,61 @@ reflected rays (Cagniard-de Hoop, cost pairs times lags) would be the better cho
 Next: the half-plane pair tables in fd_tables.c (full-plane entries as now plus the reflected
 batch, the static rate from the batch or from interact's Is/In) and the switch in rsf_fd.c.
 
+### M10 step 3 (in progress): exact half-plane kernels in rsf_solve and fd_dynamic (2026-11-05)
+
+- fd_tables.c: with fd_tables_set_halfplane(1) every in-plane fault pair is dense and gets the
+  reflected tables of fd_hpdwn_batch (window three S times along the image paths, the static
+  reflected part added to Kd); fd_hpdwn_batch works in receiver blocks (FD_HPDWN_MEM) and limits
+  the wavenumbers per frequency to 1.2 omega / beta plus the evanescent decay over the shortest
+  image path (half the cost, the same results). rsf_fd.c uses this for in-plane half planes;
+  -fd_hp_surface 1 selects the virtual surface (for comparisons until it is removed).
+- Static gates (30 degree thrust of 200 m, top 1 km, or 3 km with top 400 m): shear 7.7e-8 and
+  2.9e-7, normal 1.1e-6 and 7.1e-6 against interact's exact half-plane Is and In; the virtual
+  surface gives 4.1e-3 and 2.2e-2 on the second fault.
+- fd_dynamic fsrup with surface 2 (exact kernels) against the virtual surface (slip top / middle /
+  bottom, 3 km fault of 200 m, 30 degrees, 3 s):
+  buried thrust (top 400 m): 0.673 / 1.322 / 0.663 m against 0.671 / 1.317 / 0.650 m;
+  buried normal: 0.229 / 0.916 / 0.563 m; the virtual surface of +-4 km gave 0.193 / 0.859 / 0.541,
+  with +-8 km 0.229 / 0.916 / 0.562 and +-16 km 0.229 / 0.916 / 0.563, the arrival at the top
+  1.905 s in all three exact or long cases: the +-4 km surface of the prototype's tests was too
+  short for the normal stress (without normal coupling the +-4 km surface and the exact kernels
+  agree to 1 to 2 percent), and the exact kernels are confirmed;
+  thrust reaching the surface: 2.305 / 2.087 / 0.898 m against 2.181 / 2.052 / 0.864 (+-4 km) and
+  2.196 / 2.057 / 0.868 (+-16 km, surface elements of hf at the trace, where the prototype found
+  hf / 4 necessary for the statics): 5 percent at the top, to be settled with hf / 4 at the trace;
+  normal reaching the surface: 1.562 / 1.555 / 0.773 m against 1.486 / 1.496 / 0.750 (+-4 km) and
+  1.550 / 1.551 / 0.774 (+-16 km), within 1 percent.
+- The C reflected tables against halfplane_dwn.py for the shallowest elements (top 400 m, 200 m)
+  differ by up to 7 percent of their largest value at q = 8, at the reflected fronts, and 1.2
+  percent at q = 32; the ruptures did not change between q = 8 and 16.
+- Thrust reaching the surface, settled (2026-11-05): the exact kernels at q = 16 give
+  2.304 / 2.085 / 0.899 m (q = 8: 2.305 / 2.087 / 0.898), converged; the virtual surface of
+  +-16 km is not converged at the trace: surface elements of 200 m 2.196 / 2.057 / 0.868, of 100 m
+  2.429 / 2.088 / 0.844 m; of 50 m (+-8 km) 2.302 / 2.079 / 0.851 m, the top within 0.1 percent of
+  the exact kernels.
+- Removed (2026-11-05), at Thor's request once the exact kernels worked: the in-plane virtual
+  free surface (surface segments FD_SEG_SURF_SLIP / FD_SEG_SURF_OPEN and fd_seglist_add_surface,
+  the opening kernel fd_kernels_open.c and fd_kernels_open_gen.c with gen_inplane_open_c.py and
+  test_fd_open, the opening-history cache, the surface tables and test_fd_surf, the elimination
+  of the surface unknowns in fd_march.c, the static gate's Schur complement, the surface filters,
+  the options -fd_surf_h_near, -fd_surf_w_near, -fd_surf_h_far, -fd_surf_margin, -fd_tol_surf,
+  -fd_surf_filter, -fd_surf_filter_w, -fd_surf_filter_tops, the fsrup surface arguments, the
+  prototype's test_fs_dyn2d.py, test_fd_open.py, test_fd_surf.py). The Python prototypes
+  densesys.py and inplane_open.py stay, since the 3-D surface prototypes (fs3d_*.py) and
+  check_halfplane_dwn.py use them. fd_dynamic fsrup now runs the exact half plane (or the full
+  plane): usage fsrup sense halfplane [Lf] [hf] [top] [T] [dip]; run_tests.sh checks the four
+  ruptures against the values above within 1 cm. The sections M7 to M9 above describe the
+  removed approach and are kept as the record.
+- Cost (2026-11-05): the time refinement of the reflected fronts costs q^2 (frequencies times
+  wavenumbers); the default is now q = 4 (FD_HPDWN_Q; 1.4 percent of the largest value at the
+  fronts in test_fd_hpdwn_batch, 0.7 at 8), which moves the top slip of the thrust reaching the
+  surface by 6 mm (2.299 against 2.305 m at q = 8), the other ruptures by at most 1 mm. A window
+  of 1.25 instead of 2 times the lags failed (errors of order 1): the complex frequency that damps
+  the wrap-around (omega_I T = 18, FD_HPDWN_WIT) amplifies the truncation errors by
+  exp(omega_I t) towards the end of the window. Each MPI rank computes the reflected tables of its
+  rows with zgemm; an optimised BLAS may sum in an order that depends on the matrix size, which
+  would break the identity of results across rank numbers (reference BLAS keeps it).
+
 ### WP7, C implementation in rsf_solve: status (2026-10-18)
 Done, each verified in the sandbox before delivery (details in
 fd_c_design.md sections 6 to 10, usage in rsf_solve_fd.md):

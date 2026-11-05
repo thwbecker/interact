@@ -3,7 +3,7 @@
 # 2-D in-plane megathrust test with the fully dynamic extension (fd_plan.md M7, M8): a Cascadia
 # section from test_twod/cascadia resampled to elements of about h m (coarsen_2d.py), run
 #   q  quasi-dynamic alone (reference)
-#   s  setup only (tables, virtual free surface) with MPI on np ranks and with OpenMP on np threads,
+#   s  setup only (tables, with the reflected waves of the free surface) with MPI on np ranks and with OpenMP on np threads,
 #      to compare the times of the table build
 #   m  QD with dynamic phases, MPI on np ranks (one thread each)
 #   o  QD with dynamic phases, OpenMP on np threads (one rank)
@@ -35,7 +35,7 @@ geom=`cd $out/geom && ls geom_*.in | head -1`
 base="-geom_file ../geom/$geom -rsf_file ../geom/rsf_ab.in -rsf_dc_file ../geom/rsf_dc.in -rsf_sigma_file ../geom/rsf_sigma.in \
  -rsf_vpl_file ../geom/rsf_vpl.in -rsf_ic_file ../geom/rsf_ic.in -state_law 1 -shear_modulus 3.0e10 -s_wave_speed 3464 \
  -f0 0.6 -v0 1e-6 -vpl 1.2e-9 -vel_event 1e-3 -track_events 1 -ts_rk_type 3bs -rtol 1e-5"
-fdopt="-fd_mode 1 -fd_surf_margin 10000 -fd_stations 40,200"
+fdopt="-fd_mode 1 -fd_stations 40,200"
 # run name, launcher (mpi ranks, 0 for none), threads, extra options
 run () {
   name=$1
@@ -53,7 +53,7 @@ run () {
   fi
   rc=$?
   echo "$name: rc $rc, wall $(( `date +%s` - s0 )) s" >> $sum
-  grep 'split by receiver rows\|OpenMP threads\|dense pairs\|static gate\|virtual free surface:\|surface rates filtered' run.log | sed "s/^/  $name: /" >> $sum
+  grep 'split by receiver rows\|OpenMP threads\|dense pairs\|static gate\|half plane' run.log | sed "s/^/  $name: /" >> $sum
   grep 'rsf_fd: phase' run.log | cut -c1-170 | sed "s/^/  $name: /" >> $sum
   grep 'PETSC ERROR\|Segmentation\|Abort' run.log | head -3 | sed "s/^/  $name: /" >> $sum
   cd $root

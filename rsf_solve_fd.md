@@ -32,11 +32,13 @@ Capabilities at a glance (2026-10-25):
   direction with one virtual surface (fd_plan.md G3b); check
   src/testing/rsf_solve/test_fd3d_msurf.sh. Faults of different strikes: a surface strip
   per fault (fd_plan.md H6).
-- 2-D in-plane faults in a half plane (fd_plan.md M7): a virtual free surface of slip and
-  opening elements on y = 0, eliminated in every step; options -fd_surf_h_near,
-  -fd_surf_w_near, -fd_surf_h_far, -fd_surf_margin. A fault reaching the surface needs
-  surface elements of about a quarter of the fault elements near its trace (static gate
-  about 1e-2). Building the tables with opening elements is slow for wide surfaces.
+- 2-D in-plane faults in a half plane (fd_plan.md M10): exact half-plane kernels, the
+  full-plane tables plus the waves reflected at the traction-free surface y = 0, computed by
+  the discrete wavenumber method (fd_hpdwn.c); the fault slip is the only unknown. The static
+  limit agrees with interact's half-plane Is and In to about 1e-6. Building the reflected
+  tables costs more than the full-plane ones (fd_plan.md M10 gives estimates: practical up to
+  about 500 m elements for a Cascadia section on one node); FD_HPDWN_Q (default 8) sets the time
+  resolution of the reflected fronts, FD_HPDWN_MEM the memory of a receiver block.
 - MPI (3-D paths; fd_plan.md S2, S3, H7): the planes' tables, the local solves, the virtual
   surface and the dense couplings between planes, faults and strips are split over the
   ranks (the dense couplings by receiver rows, which also divides their memory and build
@@ -279,18 +281,14 @@ and table time divided by the ranks), the results are the same for any number of
 Curved 2-D faults (runs of fewer than four equal collinear elements joined end to start)
 become polyline segments with dense tables (element sizes within 25 percent; FD_NO_POLY=1 to
 keep straight runs); the dense tables can also be built and applied with OpenMP threads
-(OMP_NUM_THREADS) within a rank. Pairs with virtual surface elements use the window tolerance
--fd_tol_surf (default 1e-3; 1e-2 let a long Cascadia phase diverge), and surface elements must
-keep beta dt / h within 0.4 to 2. The surface rates are filtered against a slowly growing
-grid-scale mode of the virtual surface (-fd_surf_filter, default 2, five-point; not near
-traces, -fd_surf_filter_w, nor near shallow tops with -fd_surf_filter_tops 1); -fd_dump_mode v
-writes the rates once when one first exceeds v; see fd_plan.md M9.
+(OMP_NUM_THREADS) within a rank. -fd_dump_mode v writes all slip rates once when one first
+exceeds v (diagnostic).
 
 Restrictions in this version, refused with a message at start:
 `-ve_mode 0`; aging law (`-state_law 1`); 2-D elements only, forming
 straight runs of equal, collinear elements with one common element size
-(non-parallel runs use dense tables); full plane or half plane (virtual
-free surface) for in-plane, full or half plane (vertical segments) for
+(non-parallel runs use dense tables); full plane or half plane (exact
+kernels) for in-plane, full or half plane (vertical segments) for
 antiplane. H-matrix backends for `Is` are fine (the static
 part goes through `MatMult`); the dynamic tables are dense per segment pair.
 

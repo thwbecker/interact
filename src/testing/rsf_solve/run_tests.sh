@@ -73,7 +73,7 @@ for c in "0 90 2 1" "35 -30 2 1" "0 90 2 2" "35 -30 2 2"; do
 done
 ( cd tmp_fd_dynamic && ../bin/fd3d_test multipair > fd3d.out 2>/dev/null ); st=$?
 tail -1 tmp_fd_dynamic/fd3d.out; [ $st -eq 0 ] || fail=1
-# several faults with one virtual surface (G3b): a dipping fault split along dip must reproduce it
+# several faults with one virtual surface (3-D, G3b): a dipping fault split along dip must reproduce it
 for c in 1 2; do
   ( cd tmp_fd_dynamic && ../bin/fd3d_test msurf $c 2 > fd3d.out 2>/dev/null ); st=$?
   tail -1 tmp_fd_dynamic/fd3d.out; [ $st -eq 0 ] || fail=1
@@ -108,43 +108,28 @@ if command -v python3 > /dev/null 2>&1; then
   tail -1 tmp_fd_dynamic/fd3d.out; grep -q PASS tmp_fd_dynamic/fd3d.out || fail=1
 fi
 # batch reflected tables (fd_plan.md M10) against Crouch and Starfield and the prototype; needs the
-# prototype's tdd library (TDD_LIB, as for test_fd_surf.py)
+# tdd library of fs_static2d.py (TDD_LIB, default /tmp/tdd/libtdd.so: gfortran -O2 -fPIC -shared
+# -Isrc/includes -DUSE_DOUBLE_PRECISION src/green/tdd_coeff.F -o /tmp/tdd/libtdd.so); skipped without it
 if command -v python3 > /dev/null 2>&1 && [ -s ${TDD_LIB-/tmp/tdd/libtdd.so} ]; then
   ( cd tmp_fd_dynamic && ../bin/test_fd_hpdwn_batch 4 250 500 40 > hpb.txt 2>/dev/null && \
     python3 ../fully_dynamic/test_fd_hpdwn_batch.py hpb.txt > fd3d.out 2>&1 )
   tail -1 tmp_fd_dynamic/fd3d.out; grep -q PASS tmp_fd_dynamic/fd3d.out || fail=1
 fi
-# 2-D in-plane opening kernel (fd_plan.md M7 step 1) against the prototype
-if command -v python3 > /dev/null 2>&1; then
-  ( cd tmp_fd_dynamic && python3 ../fully_dynamic/test_fd_open.py ../bin/test_fd_open > fd3d.out 2>&1 )
-  tail -1 tmp_fd_dynamic/fd3d.out; grep -q PASS tmp_fd_dynamic/fd3d.out || fail=1
-fi
-# virtual free surface in the 2-D marcher (fd_plan.md M7 step 2b): spontaneous rupture on a 3 km
-# fault dipping 30 degrees, top 400 m deep, with a surface of +-4 km, against the prototype's
-# test_fs_dyn2d.inplane_rupture (|slip| top / middle / bottom: thrust 0.672 / 1.318 / 0.650 m,
-# normal 0.194 / 0.859 / 0.541 m), within 1 cm; about 2 minutes
-# and the same fault reaching the surface (top 0, trace on a surface element boundary): thrust
-# 2.184 / 2.057 / 0.867 m, normal 1.486 / 1.496 / 0.750 m (test_fs_dyn2d.inplane_rupture, top=0)
-for c in "-1 0.672 1.318 0.650 400" "1 0.194 0.859 0.541 400" "-1 2.184 2.057 0.867 0" "1 1.486 1.496 0.750 0"; do
+# 2-D in-plane half plane with exact kernels (fd_plan.md M10): spontaneous rupture on a 3 km fault
+# of 200 m dipping 30 degrees, buried (top 400 m) or reaching the surface, thrust and normal;
+# |slip| top / middle / bottom within 1 cm of the values of 2026-11-05 at FD_HPDWN_Q = 8 (the
+# default q = 4 is 6 mm lower at the top of the thrust reaching the surface; the virtual surface of
+# +-16 km, before its removal, agreed to 1 percent for the normal fault, buried and reaching the
+# surface, and the buried thrust; see fd_plan.md M10 for the thrust reaching the surface); about
+# four minutes
+for c in "-1 0.673 1.322 0.663 400" "1 0.229 0.916 0.563 400" "-1 2.305 2.087 0.898 0" "1 1.562 1.555 0.773 0"; do
   set -- $c
-  ( cd tmp_fd_dynamic && ../bin/fd_dynamic fsrup $1 1 3000 200 $5 4000 200 3 30 > fsrup.out 2>/dev/null )
-  awk -v t=$2 -v m=$3 -v b=$4 '{for(i=1;i<=NF;i++) if($i=="bottom"){split($(i+1),x," "); top=$(i+1); mid=$(i+3); bot=$(i+5)}}
-       END {d=0; e=top-t; if(e<0)e=-e; if(e>d)d=e; e=mid-m; if(e<0)e=-e; if(e>d)d=e; e=bot-b; if(e<0)e=-e; if(e>d)d=e;
-            if(d<=0.01) print "fd_dynamic fsrup (free surface, sense " sense ", fault top " ftop " m): PASS (largest slip difference to the prototype " d " m)"; else {print "fd_dynamic fsrup: FAIL (" d " m)"; exit 1}}' sense=$1 ftop=$5 tmp_fd_dynamic/fsrup.out || fail=1
+  ( cd tmp_fd_dynamic && ../bin/fd_dynamic fsrup $1 1 3000 200 $5 3 30 > fsrup.out 2>/dev/null )
+  awk -v t=$2 -v m=$3 -v b=$4 '{for(i=1;i<=NF;i++) if($i=="bottom"){top=$(i+1); mid=$(i+3); bot=$(i+5)}}
+       END {if(top == ""){print "fd_dynamic fsrup: FAIL (no result)"; exit 1}
+            d=0; e=top-t; if(e<0)e=-e; if(e>d)d=e; e=mid-m; if(e<0)e=-e; if(e>d)d=e; e=bot-b; if(e<0)e=-e; if(e>d)d=e;
+            if(d<=0.01) print "fd_dynamic fsrup (half plane, sense " sense ", fault top " ftop " m): PASS (largest slip difference " d " m)"; else {print "fd_dynamic fsrup (half plane, sense " sense ", fault top " ftop " m): FAIL (" d " m)"; exit 1}}' sense=$1 ftop=$5 tmp_fd_dynamic/fsrup.out || fail=1
 done
-# the grid-scale mode of a long virtual surface (fd_plan.md M9): 5 km thrust, surface +-30 km of
-# 500 m, windows of 1e-2, 300 s; diverges without the surface filter, must stay quiet with it
-( cd tmp_fd_dynamic && FD_SURF_FILTER=2 FD_FSRUP_TOL=1e-2 ../bin/fd_dynamic fsrup -1 1 5000 500 1000 30000 500 300 30 > fsrlong.out 2>/dev/null )
-awk '/at the end largest/ {v = $NF; if($(NF-1) == "m/s") v = $(NF-1)} /on the surface/ {for(i=1;i<=NF;i++) if($i == "surface") vs = $(i+1)}
-     END {if(vs != "" && vs + 0 < 1e-3) print "fd_dynamic fsrup long surface with filter: PASS (surface rate " vs " m/s after 300 s)"; else {print "fd_dynamic fsrup long surface with filter: FAIL (" vs ")"; exit 1}}' tmp_fd_dynamic/fsrlong.out || fail=1
-# dense tables with virtual free-surface elements (fd_plan.md M7 step 2) against densesys.py;
-# needs the prototype's tdd library (TDD_LIB, default /tmp/tdd/libtdd.so: gfortran -O2 -fPIC -shared
-# -Isrc/includes -DUSE_DOUBLE_PRECISION src/green/tdd_coeff.F -o /tmp/tdd/libtdd.so); skipped without it
-if command -v python3 > /dev/null 2>&1 && [ -s ${TDD_LIB-/tmp/tdd/libtdd.so} ]; then
-  ( cd tmp_fd_dynamic && FD_CT_OFF=1 ../bin/test_fd_surf 4 8 30 > surf.txt 2>/dev/null && \
-    python3 ../fully_dynamic/test_fd_surf.py surf.txt 4 8 30 > fd3d.out 2>&1 ); st=$?
-  tail -1 tmp_fd_dynamic/fd3d.out; [ $st -eq 0 ] || fail=1
-fi
 # non-parallel 2-D pairs (fd_plan.md N1): dense tables against the prototype for a kinked pair
 if command -v python3 > /dev/null 2>&1; then
   for a in 30 -45; do for m in 0 1; do
@@ -179,7 +164,7 @@ if [ -n "$mpi" ]; then
        cmp -s tmp_fd_dynamic/h7_$t/n1/dump.txt tmp_fd_dynamic/h7_$t/n4/dump.txt; then echo "fd3d_test MPI dense couplings, $t (1, 2 and 4 ranks identical): PASS"
     else echo "fd3d_test MPI dense couplings, $t (1, 2 and 4 ranks identical): FAIL"; fail=1; fi
   done
-  # 2-D faults on several ranks (fd_plan.md M8): curved fault and half plane with the surface
+  # 2-D faults on several ranks (fd_plan.md M8, M10): curved fault and half plane (exact kernels)
   ( src/testing/rsf_solve/test_fd_mpi2d.sh "$mpi" > tmp_fd_dynamic/mpi2d.out 2>&1 ); st=$?
   cat tmp_fd_dynamic/mpi2d.out; [ $st -eq 0 ] || fail=1
 else

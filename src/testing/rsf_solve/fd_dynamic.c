@@ -396,55 +396,47 @@ static int run_hd(int argc, char **argv)
   return fail;
 }
 
-/* virtual free surface in 2-D in-plane (fd_plan.md M7 step 2b): spontaneous rupture (slip
-   weakening, normal-stress coupling, second-order marching) on a fault of Lf dipping dip
-   degrees with its top at depth top, nucleation by overstress in the bottom 1.2 km, as
-   test_fs_dyn2d.inplane_rupture of the prototype; surface line of +-Ls with elements hs
-   centred above the fault (or none). sense -1: thrust, 1: normal.
-   usage: fd_dynamic fsrup sense surface(0|1) [Lf] [hf] [top] [Ls] [hs] [T] [dip] */
+/* 2-D in-plane half plane (fd_plan.md M10): spontaneous rupture (slip weakening, normal-stress
+   coupling, second-order marching) on a fault of Lf dipping dip degrees with its top at depth
+   top, nucleation by overstress in the bottom 1.2 km (the setup of the earlier prototype's
+   inplane_rupture), in a half plane with exact kernels (halfplane 1) or a full plane (0).
+   sense -1: thrust, 1: normal. FD_FSRUP_TOL window tolerance (default 1e-12), FD_FSRUP_NONORMAL
+   without normal coupling, FD_FSRUP_FIRST first-order marching.
+   usage: fd_dynamic fsrup sense halfplane(0|1) [Lf] [hf] [top] [T] [dip] */
 static int run_fsrup(int argc, char **argv)
 {
-  double AL, BE, RHO, sense, Lf, hf, top, Ls, hs, T, dip, dt, ang, sd[2], x0s, tol, sl, tt, vpk, rt_top, along;
-  double shift;
-  int kn;
-  double vf_end;
-  double vs_end;
-  unsigned char *fmask;
-  double fw;
-  double xe;
-  int surf, nf, ns, nseg, N, i, k, j, nsteps, n, it, ntop, nbot;
-  struct fd_segment seg[3];
+  double AL, BE, RHO, sense, Lf, hf, top, T, dip, dt, ang, sd[2], tol, tt, vpk, rt_top, along;
+  int hp, nf, N, i, nsteps, n, ntop, nbot;
+  struct fd_segment seg[1];
   struct fd_seglist segs;
-  struct fd_pair *pairs[9];
+  struct fd_pair *pairs[1];
   struct fd_sys *s;
   struct fd_state *st;
   struct fd_slipweak fr;
-  int *gidx[3];
+  int *gidx[1];
   char err[256];
   AL = 6000.0;
   BE = 3464.0;
   RHO = 2670.0;
   if(argc < 4){
-    fprintf(stderr, "usage: fd_dynamic fsrup sense surface [Lf] [hf] [top] [Ls] [hs] [T] [dip]\n");
+    fprintf(stderr, "usage: fd_dynamic fsrup sense halfplane [Lf] [hf] [top] [T] [dip]\n");
     return 2;
   }
   sense = atof(argv[2]);
-  surf = atoi(argv[3]);
+  hp = atoi(argv[3]);
   Lf = argc > 4 ? atof(argv[4]) : 3e3;
   hf = argc > 5 ? atof(argv[5]) : 200.0;
   top = argc > 6 ? atof(argv[6]) : 400.0;
-  Ls = argc > 7 ? atof(argv[7]) : 4e3;
-  hs = argc > 8 ? atof(argv[8]) : 200.0;
-  T = argc > 9 ? atof(argv[9]) : 3.0;
-  dip = argc > 10 ? atof(argv[10]) : 30.0;
+  T = argc > 7 ? atof(argv[7]) : 3.0;
+  dip = argc > 8 ? atof(argv[8]) : 30.0;
   dt = 0.5*hf/BE;
   nsteps = (int)floor(T/dt + 0.5);
   ang = -dip*M_PI/180.0;
   nf = (int)floor(Lf/hf + 0.5);
-  /* the marcher's slip weakening slips in the positive direction only. Positive slip on the
-     prototype's fault (dipping towards +x, down-dip tangent) is normal faulting; a thrust is the
-     same fault mirrored at x = 0 with positive slip (the mirror reverses the sense, since the
-     normal is rot90 of the tangent). Element 0 is at the top in both. */
+  /* the marcher's slip weakening slips in the positive direction only. Positive slip on a fault
+     dipping towards +x with a down-dip tangent is normal faulting; a thrust is the same fault
+     mirrored at x = 0 with positive slip (the mirror reverses the sense, since the normal is
+     rot90 of the tangent). Element 0 is at the top in both. */
   sd[0] = cos(ang);
   sd[1] = sin(ang);
   if(sense < 0.0)
@@ -460,78 +452,28 @@ static int run_fsrup(int argc, char **argv)
   seg[0].s[1] = sd[1];
   seg[0].X0[0] = 0.5*hf*sd[0];
   seg[0].X0[1] = -top + 0.5*hf*sd[1];
-  nseg = 1;
-  ns = 0;
-  if(surf){
-    ns = (int)floor(2.0*Ls/hs + 0.5);
-    x0s = 0.5*Lf*sd[0];
-    for(k = 1; k <= 2; k++){
-      seg[k].kind = (k == 1) ? FD_SEG_SURF_SLIP : FD_SEG_SURF_OPEN;
-      seg[k].pc = NULL;
-      seg[k].pt = NULL;
-      seg[k].pa = NULL;
-      seg[k].n = ns;
-      seg[k].dx = hs;
-      seg[k].a = 0.5*hs;
-      seg[k].s[0] = 1.0;
-      seg[k].s[1] = 0.0;
-      seg[k].X0[0] = x0s - Ls + 0.5*hs;
-      seg[k].X0[1] = 0.0;
-    }
-    if(top == 0.0){
-      /* a fault reaching the surface: the trace (x = 0) on a boundary between two surface
-         elements, as the prototype (a collocation point on the tip would see its singular field) */
-      kn = (int)floor((0.0 - seg[1].X0[0])/hs + 0.5);
-      if(kn < 0)
-        kn = 0;
-      if(kn > ns - 1)
-        kn = ns - 1;
-      shift = (seg[1].X0[0] + kn*hs) - 0.5*hs;
-      seg[1].X0[0] -= shift;
-      seg[2].X0[0] -= shift;
-    }
-    nseg = 3;
-  }
-  N = nf + 2*ns;
-  for(k = 0; k < nseg; k++){
-    gidx[k] = malloc(sizeof(int)*seg[k].n);
-    for(i = 0; i < seg[k].n; i++)
-      gidx[k][i] = i;
-  }
-  segs.nseg = nseg;
+  N = nf;
+  gidx[0] = malloc(sizeof(int)*nf);
+  for(i = 0; i < nf; i++)
+    gidx[0][i] = i;
+  segs.nseg = 1;
   segs.seg = seg;
   segs.gidx = gidx;
+  fd_tables_set_halfplane(hp ? 1 : 0);
   tol = getenv("FD_FSRUP_TOL") ? atof(getenv("FD_FSRUP_TOL")) : 1e-12;
-  for(k = 0; k < nseg; k++)
-    for(j = 0; j < nseg; j++){
-      pairs[k*nseg + j] = fd_pair_build(seg + k, seg + j, FD_MODE_INPLANE, dt, getenv("FD_FSRUP_ET") ? atof(getenv("FD_FSRUP_ET")) : 1.0, AL, BE, RHO, tol, nsteps + 2, 1, 0, err);
-      if(!pairs[k*nseg + j]){
-        fprintf(stderr, "table build failed: %s\n", err);
-        return 1;
-      }
-    }
-  fd_tables_open_cache_clear();
-  s = fd_sys_create(&segs, pairs, nseg, NULL, NULL, FD_MODE_INPLANE, dt, AL, BE, RHO, -1);
+  pairs[0] = fd_pair_build(seg, seg, FD_MODE_INPLANE, dt, 1.0, AL, BE, RHO, tol, nsteps + 2, 1, 0, err);
+  if(!pairs[0]){
+    fprintf(stderr, "table build failed: %s\n", err);
+    return 1;
+  }
+  s = fd_sys_create(&segs, pairs, 1, NULL, NULL, FD_MODE_INPLANE, dt, AL, BE, RHO, -1);
   if(!s){
     fprintf(stderr, "fd_sys_create failed\n");
     return 1;
   }
-  /* the surface filter (fd_plan.md M9) with FD_SURF_FILTER = 1 or 2: not within
-     FD_SURF_FILTER_W (default 4 hf) of the fault top when it is shallower than 2 hf */
-  if(surf && getenv("FD_SURF_FILTER")){
-    fmask = (unsigned char *)calloc(N, 1);
-    fw = getenv("FD_SURF_FILTER_W") ? atof(getenv("FD_SURF_FILTER_W")) : 4.0*hf;
-    for(k = 1; k <= 2; k++)
-      for(i = 0; i < ns; i++){
-        xe = seg[k].X0[0] + i*seg[k].dx;
-        fmask[s->off[k] + i] = (top < 2.0*hf && fabs(xe) < fw) ? 0 : 1;
-      }
-    fd_sys_set_surface_filter(s, atoi(getenv("FD_SURF_FILTER")), fmask);
-    free(fmask);
-  }
   st = fd_state_create(N);
   st->nl = getenv("FD_FSRUP_FIRST") ? 0 : 1;
-  st->normal_coupling = 1;
+  st->normal_coupling = getenv("FD_FSRUP_NONORMAL") ? 0 : 1;
   fr.N = N;
   fr.dugdale = 0;
   fr.d0 = 0.40;
@@ -543,10 +485,7 @@ static int run_fsrup(int argc, char **argv)
   for(i = 0; i < N; i++){
     fr.mu_s[i] = 0.677;
     fr.mu_d[i] = 0.525;
-    st->sigma0[i] = (i < nf) ? 120e6 : 0.0;
-    st->tau0[i] = 0.0;
-  }
-  for(i = 0; i < nf; i++){
+    st->sigma0[i] = 120e6;
     along = (i + 0.5)*hf;                       /* distance from the top along dip */
     st->tau0[i] = (along > Lf - 1.2e3) ? 81.6e6 : 70e6;
   }
@@ -566,21 +505,8 @@ static int run_fsrup(int argc, char **argv)
     if(rt_top < 0.0 && fabs(st->V[ntop]) > 0.1)
       rt_top = tt;
   }
-  sl = 0.0;
-  for(it = nf; it < N; it++)
-    if(fabs(st->tau[it]) > sl)
-      sl = fabs(st->tau[it]);
-  vf_end = 0.0;
-  vs_end = 0.0;
-  for(it = 0; it < N; it++){
-    if(it < nf && fabs(st->V[it]) > vf_end)
-      vf_end = fabs(st->V[it]);
-    if(it >= nf && fabs(st->V[it]) > vs_end)
-      vs_end = fabs(st->V[it]);
-  }
-  printf("fd_dynamic fsrup: at the end largest |slip rate| on the fault %.3e, on the surface %.3e m/s\n", vf_end, vs_end);
-  printf("fd_dynamic fsrup %s %s surface: dip %g, fault %g km / %g m, top %g m, surface +-%g km / %g m, %d steps: |slip| top / middle / bottom %.3f / %.3f / %.3f m; arrival at the top %.3f s; peak slip rate %.2f m/s; largest surface traction %.1e Pa\n",
-         sense < 0.0 ? "thrust" : "normal", surf ? "with" : "without", dip, Lf/1e3, hf, top, Ls/1e3, hs, nsteps,
-         fabs(st->delta[ntop]), fabs(st->delta[nf/2]), fabs(st->delta[nbot]), rt_top, vpk, sl);
+  printf("fd_dynamic fsrup %s %s: dip %g, fault %g km / %g m, top %g m, %d steps: |slip| top / middle / bottom %.3f / %.3f / %.3f m; arrival at the top %.3f s; peak slip rate %.2f m/s\n",
+         sense < 0.0 ? "thrust" : "normal", hp ? "half plane" : "full plane", dip, Lf/1e3, hf, top, nsteps,
+         fabs(st->delta[ntop]), fabs(st->delta[nf/2]), fabs(st->delta[nbot]), rt_top, vpk);
   return 0;
 }

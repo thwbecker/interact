@@ -3,12 +3,10 @@
 # Sensitivity of a 2-D QD + FD run to the numerical parameters of the fully dynamic phases
 # (fd_plan.md M9): one resampled section (outdir/geom of run_2d_cascadia.sh, or made here with
 # coarsen_2d.py), run up to years with each variant, compared with the base run:
-#   base    defaults (-fd_tol 1e-2, -fd_tol_surf 1e-3, -fd_vsw 1e-3, -fd_vback 1e-4)
-#   tsurf4  -fd_tol_surf 1e-4      (windows of the pairs with surface elements)
+#   base    defaults (-fd_tol 1e-2, -fd_vsw 1e-3, -fd_vback 1e-4)
 #   tol3    -fd_tol 1e-3           (windows of the fault pairs)
 #   vsw4    -fd_vsw 1e-4 -fd_vback 1e-5 (switch earlier; vback must stay below vsw)
 #   vback5  -fd_vback 1e-5         (hand back to QD later)
-#   hnear4  -fd_surf_h_near h/4    (surface elements a quarter of the fault elements near tops)
 # For each: event onsets, the phases (steps, peak slip rate, mean slip, wall time), the mean slip
 # at the end (from rsf_monitor.dat), and for the variants with the same phase boundaries the
 # largest and rms difference of the phase slip per element against the base (fd_phase_1_slip.dat).
@@ -16,7 +14,7 @@
 #
 # Further variants can be given as name=options with commas for spaces, e.g. ctol10=-fd_ctol,1e-10
 # usage: run_2d_sensitivity.sh [h] [np] [mpi command] [years] [outdir] [calc_sigma_dot 0|1] [variants] [section dir] [mpi|omp]
-#   defaults: 500 16 mpirun 30 2d_sensitivity_out 1 "base tsurf4 tol3 vsw4 vback5 hnear4"
+#   defaults: 500 16 mpirun 30 2d_sensitivity_out 1 "base tol3 vsw4 vback5"
 #             test_twod/cascadia/PD13_nosigma mpi
 #   omp: one rank with np OpenMP threads (a stop-gap, but faster to set up at present)
 #
@@ -26,7 +24,7 @@ mpi=${3-mpirun}
 years=${4-30}
 out=${5-2d_sensitivity_out}
 sd=${6-1}
-variants=${7-"base tsurf4 tol3 vsw4 vback5 hnear4"}
+variants=${7-"base tol3 vsw4 vback5"}
 sec=${8-test_twod/cascadia/PD13_nosigma}
 par=${9-mpi}
 root=`pwd`
@@ -40,19 +38,16 @@ if [ ! -s $out/geom/rsf_ab.in ]; then
 fi
 python3 $root/fully_dynamic/check_2d_resolution.py $out/geom >> $sum
 geom=`cd $out/geom && ls geom_*.in | head -1`
-hmin=`awk 'NR == 1 || 2*$6 < m {m = 2*$6} END {print m}' $out/geom/$geom`
 base="-geom_file ../geom/$geom -rsf_file ../geom/rsf_ab.in -rsf_dc_file ../geom/rsf_dc.in -rsf_sigma_file ../geom/rsf_sigma.in \
  -rsf_vpl_file ../geom/rsf_vpl.in -rsf_ic_file ../geom/rsf_ic.in -state_law 1 -shear_modulus 3.0e10 -s_wave_speed 3464 \
  -f0 0.6 -v0 1e-6 -vpl 1.2e-9 -vel_event 1e-3 -track_events 1 -ts_rk_type 3bs -rtol 1e-5 -calc_sigma_dot $sd \
- -stop_time_yr $years -dt_monitor_yr 0.01 -fd_mode 1 -fd_surf_margin 10000 -fd_stations 10,20"
+ -stop_time_yr $years -dt_monitor_yr 0.01 -fd_mode 1 -fd_stations 10,20"
 for v in $variants; do
   case $v in
     base) opt="" ;;
-    tsurf4) opt="-fd_tol_surf 1e-4" ;;
     tol3) opt="-fd_tol 1e-3" ;;
     vsw4) opt="-fd_vsw 1e-4 -fd_vback 1e-5" ;;
     vback5) opt="-fd_vback 1e-5" ;;
-    hnear4) opt="-fd_surf_h_near `awk -v h=$hmin 'BEGIN {print h/4.0}'`" ;;
     *=*) opt=`echo ${v#*=} | tr ',' ' '`
          v=${v%%=*} ;;
     *) echo "unknown variant $v" >> $sum
@@ -99,7 +94,7 @@ def load(v):
     f = os.path.join(d, "fd_phase_1_slip.dat")
     if os.path.exists(f):
         s = np.loadtxt(f, ndmin=2)
-        r["phase_slip"] = s[s[:, 1] >= 0, 2]          # fault elements (surface rows have index -1)
+        r["phase_slip"] = s[:, 2]
     return r
 R = {v: load(v) for v in variants}
 b = R["base"] if "base" in R else load("base")      # an earlier base run in outdir serves as well

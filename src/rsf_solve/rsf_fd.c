@@ -19,7 +19,6 @@
     -fd_vsw <m/s>       switch threshold (default 1e-3)
     -fd_vback <m/s>     return threshold (default 1e-4)
     -fd_tol <f>         window tolerance (default 1e-2)
-    -fd_tol_surf <f>    window tolerance of pairs with a virtual surface segment (default 1e-3)
     -fd_ctol <f>        compression tolerance of the dense tables of non-parallel pairs,
                         relative to the window envelope (default 1e-5 fd_tol; 0: full windows)
     -fd_et <f>          collocation offset (default 1.0)
@@ -27,16 +26,8 @@
     -fd_kmax <n>        largest substep multiple (default 64)
     -fd_cfl <f>         beta dt_min / dx (default 0.5)
     -fd_lmax <n>        cap on the window in fine-grid lags (default 0: prototype bound)
-    -fd_surf_h_near <m> 2-D in-plane half plane: surface elements near traces (default hf/2)
-    -fd_surf_w_near <m>   half-width of the refined zone about traces and shallow tops (default 4 hf)
-    -fd_surf_h_far <m>    surface elements elsewhere (default hf; beta dt / h within 0.4 to 2 required)
-    -fd_surf_margin <m>   surface beyond the faults' x extent (default twice the deepest fault depth)
-    -fd_surf_filter <n>   filter of the surface rates against its grid-scale mode: 0 off, 1 (1 2 1)/4,
-                          2 (-1 4 10 4 -1)/16 (default)
-    -fd_surf_filter_w <m> no filtering within this distance of traces (default w_near)
-    -fd_surf_filter_tops 1 nor of shallow fault tops (default 0: tops are filtered)
-    -fd_dump_mode <v>   diagnostic: when a slip or opening rate first exceeds v m/s in a phase, write all
-                        rates with positions to fd_mode_dump.dat (a growing mode's shape)
+    -fd_dump_mode <v>   diagnostic: when a slip rate first exceeds v m/s in a phase, write all rates
+                        with positions to fd_mode_dump.dat (the shape of a growing mode)
     -fd_gate_tol <f>    static gate tolerance (default 0.05; abort at 5x)
     -fd_length_scale    geometry unit in metres (default 1.0)
     -fd_max_steps <n>   abort a dynamic phase beyond this many steps (default 2e6)
@@ -77,8 +68,6 @@ extern double fd3d_layer_prof[4];
 
 static PetscErrorCode fd_build_tables(struct interact_ctx *par, struct fd_vars *fd);
 static PetscErrorCode fd_gate_static(struct interact_ctx *par, struct fd_vars *fd);
-static PetscErrorCode fd_surface_2d(struct fd_vars *fd, double hf);
-static PetscErrorCode fd_surface_filter_setup(struct fd_vars *fd);
 static void fd_dump_mode(struct fd_vars *fd, struct fd_sys *sy, struct fd_state *st, int k);
 
 PetscErrorCode rsf_fd_setup(struct interact_ctx *par, PetscReal shear_modulus_si, PetscReal s_wave_speed_si)
@@ -136,8 +125,6 @@ PetscErrorCode rsf_fd_setup(struct interact_ctx *par, PetscReal shear_modulus_si
   PetscCall(PetscOptionsGetReal(NULL,NULL,"-fd_vsw",&fd->vsw,NULL));
   PetscCall(PetscOptionsGetReal(NULL,NULL,"-fd_vback",&fd->vback,NULL));
   PetscCall(PetscOptionsGetReal(NULL,NULL,"-fd_tol",&fd->tol,NULL));
-  fd->tol_surf = 1e-3;
-  PetscCall(PetscOptionsGetReal(NULL,NULL,"-fd_tol_surf",&fd->tol_surf,NULL));
   fd->ctol = 1e-5*fd->tol;
   PetscCall(PetscOptionsGetReal(NULL,NULL,"-fd_ctol",&fd->ctol,NULL));
   PetscCall(PetscOptionsGetReal(NULL,NULL,"-fd_et",&fd->et,NULL));
@@ -145,20 +132,6 @@ PetscErrorCode rsf_fd_setup(struct interact_ctx *par, PetscReal shear_modulus_si
   PetscCall(PetscOptionsGetInt(NULL,NULL,"-fd_kmax",&fd->kmax,NULL));
   PetscCall(PetscOptionsGetReal(NULL,NULL,"-fd_cfl",&fd->cfl,NULL));
   PetscCall(PetscOptionsGetInt(NULL,NULL,"-fd_lmax",&fd->lmax,NULL));
-  fd->surf_hnear = -1.0;
-  fd->surf_wnear = -1.0;
-  fd->surf_hfar = -1.0;
-  fd->surf_margin = -1.0;
-  PetscCall(PetscOptionsGetReal(NULL,NULL,"-fd_surf_h_near",&fd->surf_hnear,NULL));
-  PetscCall(PetscOptionsGetReal(NULL,NULL,"-fd_surf_w_near",&fd->surf_wnear,NULL));
-  PetscCall(PetscOptionsGetReal(NULL,NULL,"-fd_surf_h_far",&fd->surf_hfar,NULL));
-  PetscCall(PetscOptionsGetReal(NULL,NULL,"-fd_surf_margin",&fd->surf_margin,NULL));
-  fd->surf_filt = 2;
-  fd->surf_filt_w = -1.0;
-  PetscCall(PetscOptionsGetInt(NULL,NULL,"-fd_surf_filter",&fd->surf_filt,NULL));
-  PetscCall(PetscOptionsGetReal(NULL,NULL,"-fd_surf_filter_w",&fd->surf_filt_w,NULL));
-  fd->surf_filt_tops = 0;
-  PetscCall(PetscOptionsGetInt(NULL,NULL,"-fd_surf_filter_tops",&fd->surf_filt_tops,NULL));
   fd->dump_mode = -1.0;
   PetscCall(PetscOptionsGetReal(NULL,NULL,"-fd_dump_mode",&fd->dump_mode,NULL));
   PetscCall(PetscOptionsGetReal(NULL,NULL,"-fd_gate_tol",&fd->gate_tol,NULL));
@@ -252,13 +225,15 @@ PetscErrorCode rsf_fd_setup(struct interact_ctx *par, PetscReal shear_modulus_si
       fd->halfplane = PETSC_TRUE;
   if((fd->mode2d == FD_MODE_ANTIPLANE) && (!medium->full_space))
     fd->halfplane = PETSC_TRUE;
-  /* in-plane half plane: a virtual free surface of slip and opening elements (fd_plan.md M7),
-     instead of image sources (which exist for antiplane only) */
-  fd->surf2d = PETSC_FALSE;
+  /* in-plane half plane: exact half-plane kernels, the full-plane tables plus the waves reflected
+     at the traction-free surface (fd_hpdwn.c, fd_plan.md M10); image sources exist for antiplane
+     only */
+  fd->hpdwn = PETSC_FALSE;
   if(fd->halfplane && (fd->mode2d == FD_MODE_INPLANE)){
-    fd->surf2d = PETSC_TRUE;
+    fd->hpdwn = PETSC_TRUE;
     fd->halfplane = PETSC_FALSE;
   }
+  fd_tables_set_halfplane(fd->hpdwn ? 1 : 0);
   PetscCheck(rsf->state_law == RSF_AGING_LAW,PETSC_COMM_WORLD,PETSC_ERR_SUP,"-fd_mode: aging law only (-state_law 1) in this version");
   fd->mu = shear_modulus_si;
   fd->beta = s_wave_speed_si;
@@ -280,7 +255,7 @@ PetscErrorCode rsf_fd_setup(struct interact_ctx *par, PetscReal shear_modulus_si
   PetscCall(PetscPrintf(PETSC_COMM_WORLD,
       "rsf_fd_setup: fully dynamic extension, mode %d, %s%s, %ld segments, dt_min %.3e s, "
       "vsw %.1e vback %.1e m/s, tol %.1e, et %.2f, xi %.2f, kmax %d, tables %.1f MB, fft %s\n",
-      (int)fd->mode,fd->mode2d == FD_MODE_ANTIPLANE ? "antiplane" : "in-plane",fd->halfplane ? " half plane (image sources)" : (fd->surf2d ? " half plane (virtual free surface)" : ""),(long)fd->segs->nseg,(double)fd->dt_min,
+      (int)fd->mode,fd->mode2d == FD_MODE_ANTIPLANE ? "antiplane" : "in-plane",fd->halfplane ? " half plane (image sources)" : (fd->hpdwn ? " half plane (exact kernels, reflected waves by DWN)" : ""),(long)fd->segs->nseg,(double)fd->dt_min,
       (double)fd->vsw,(double)fd->vback,(double)fd->tol,(double)fd->et,(double)fd->xi,(int)fd->kmax,
       (double)fd->nbytes/1048576.0,fd_fft_backend()));
   PetscFunctionReturn(PETSC_SUCCESS);
@@ -2708,131 +2683,6 @@ PetscErrorCode fd3d_setup_from_geometry(struct interact_ctx *par, struct fd_vars
 /* the virtual free surface of a 2-D in-plane half plane (fd_plan.md M7 step 2c): traces where a
    fault segment ends within 1 percent of an element of the surface, shallow tops (within two
    elements) refined as well; surface y = 0, solid y < 0 */
-/* the surface filter (fd_plan.md M9): all surface unknowns except those within surf_filt_w of
-   a trace or a shallow fault top */
-/* diagnostic (-fd_dump_mode v): the first time in a run that any rate (fault or surface)
-   exceeds v, all rates with segment, kind and position go to fd_mode_dump.dat (rank 0) */
-static void fd_dump_mode(struct fd_vars *fd, struct fd_sys *sy, struct fd_state *st, int k)
-{
-  double vall, X[2], t[2], a;
-  int i, kd, ld, id;
-  FILE *dm;
-  if(fd->dump_done)
-    return;
-  vall = 0.0;
-  for(i = 0;i < sy->N;i++)
-    if(fabs(st->V[i]) > vall)
-      vall = fabs(st->V[i]);
-  if(vall <= fd->dump_mode)
-    return;
-  fd->dump_done = 1;
-  if(fd->mpi_rank != 0)
-    return;
-  dm = fopen("fd_mode_dump.dat","w");
-  if(!dm)
-    return;
-  fprintf(dm,"# phase time %.6e s, k %d: unknown, segment, kind (0 fault, 1 surface slip, 2 surface opening), x, y, V, delta, tau\n",st->t,k);
-  for(kd = 0;kd < fd->segs->nseg;kd++)
-    for(ld = 0;ld < fd->segs->seg[kd].n;ld++){
-      id = sy->off[kd] + ld;
-      fd_seg_element(fd->segs->seg + kd,ld,X,t,&a);
-      fprintf(dm,"%d %d %d %.6e %.6e %.6e %.6e %.6e\n",id,kd,fd->segs->seg[kd].kind,X[0],X[1],st->V[id],st->delta[id],st->tau[id]);
-    }
-  fclose(dm);
-}
-
-static PetscErrorCode fd_surface_filter_setup(struct fd_vars *fd)
-{
-  unsigned char *mask;
-  int k, l, i, m, nfilt;
-  double X[2], t[2], a;
-  PetscFunctionBeginUser;
-  mask = (unsigned char *)calloc(fd->sys->N + 1,1);
-  nfilt = 0;
-  for(k = 0;k < fd->segs->nseg;k++){
-    if(fd->segs->seg[k].kind == FD_SEG_FAULT)
-      continue;
-    for(l = 0;l < fd->segs->seg[k].n;l++){
-      i = fd->sys->off[k] + l;
-      fd_seg_element(fd->segs->seg + k,l,X,t,&a);
-      mask[i] = 1;
-      for(m = 0;m < fd->ntr;m++)
-        if(fabs(X[0] - fd->xtr[m]) < fd->surf_filt_w)
-          mask[i] = 0;
-      if(fd->surf_filt_tops)                     /* by default the shallow tops are filtered too (smooth surface slip) */
-        for(m = 0;m < fd->nsh;m++)
-          if(fabs(X[0] - fd->xsh[m]) < fd->surf_filt_w)
-            mask[i] = 0;
-      nfilt += mask[i];
-    }
-  }
-  fd_sys_set_surface_filter(fd->sys,(int)fd->surf_filt,mask);
-  free(mask);
-  PetscCall(PetscPrintf(PETSC_COMM_WORLD,"rsf_fd_setup: surface rates filtered (%s) on %d of %d surface unknowns (not within %g m of traces%s)\n",
-      fd->surf_filt == 1 ? "(1 2 1)/4" : "(-1 4 10 4 -1)/16",nfilt,fd->sys->Nu,(double)fd->surf_filt_w,fd->surf_filt_tops ? " and shallow tops" : ""));
-  PetscFunctionReturn(PETSC_SUCCESS);
-}
-
-static PetscErrorCode fd_surface_2d(struct fd_vars *fd, double hf)
-{
-  struct fd_segment *g;
-  double xe[2], ye[2], xmin, xmax, ymin, *xtr, *xsh, hn, wn, hfar, mg, Xe[2], te[2], ae;
-  int k, e, ntr, nsh, nseg0, nel;
-  PetscFunctionBeginUser;
-  nseg0 = fd->segs->nseg;
-  PetscCall(PetscMalloc2(2*nseg0,&xtr,2*nseg0,&xsh));
-  ntr = 0;
-  nsh = 0;
-  xmin = 1e300;
-  xmax = -1e300;
-  ymin = 0.0;
-  for(k = 0;k < nseg0;k++){
-    g = fd->segs->seg + k;
-    fd_seg_element(g,0,Xe,te,&ae);
-    xe[0] = Xe[0] - ae*te[0];
-    ye[0] = Xe[1] - ae*te[1];
-    fd_seg_element(g,g->n - 1,Xe,te,&ae);
-    xe[1] = Xe[0] + ae*te[0];
-    ye[1] = Xe[1] + ae*te[1];
-    for(e = 0;e < 2;e++){
-      PetscCheck(ye[e] < 1e-6*hf,PETSC_COMM_WORLD,PETSC_ERR_USER,"rsf_fd_setup: a fault segment reaches above the surface (y %g > 0)",ye[e]);
-      xmin = PetscMin(xmin,xe[e]);
-      xmax = PetscMax(xmax,xe[e]);
-      ymin = PetscMin(ymin,ye[e]);
-      if(fabs(ye[e]) < 1e-2*hf)
-        xtr[ntr++] = xe[e];
-      else if(fabs(ye[e]) < 2.0*hf)
-        xsh[nsh++] = xe[e];
-    }
-  }
-  hn = (fd->surf_hnear > 0.0) ? fd->surf_hnear : 0.5*hf;
-  wn = (fd->surf_wnear > 0.0) ? fd->surf_wnear : 4.0*hf;
-  hfar = (fd->surf_hfar > 0.0) ? fd->surf_hfar : hf;
-  mg = (fd->surf_margin > 0.0) ? fd->surf_margin : 2.0*fabs(ymin);
-  /* the second-order marching is stable for beta dt / h of about 0.4 to 2 (prototype,
-     stab_random.py); with dt = cfl hf / beta that bounds the surface elements (a PD13 test with
-     elements of 1.39 hf diverged after 200 s) */
-  PetscCheck((fd->cfl*hf/hn <= 2.0) && (fd->cfl*hf/hfar >= 0.4) && (fd->cfl*hf/hn >= 0.4) && (fd->cfl*hf/hfar <= 2.0),PETSC_COMM_WORLD,PETSC_ERR_USER,
-      "rsf_fd_setup: surface elements of %g and %g m give beta dt / h of %.2f and %.2f with fault elements of %g m: outside 0.4 to 2, where the second-order marching is stable",
-      hn,hfar,fd->cfl*hf/hn,fd->cfl*hf/hfar,hf);
-  nel = fd_seglist_add_surface(fd->segs,xmin - mg,xmax + mg,ntr,xtr,nsh,xsh,hn,wn,hfar);
-  fd->ntr = ntr;
-  fd->nsh = nsh;
-  fd->xtr = (double *)malloc(sizeof(double)*(ntr + 1));
-  fd->xsh = (double *)malloc(sizeof(double)*(nsh + 1));
-  for(k = 0;k < ntr;k++)
-    fd->xtr[k] = xtr[k];
-  for(k = 0;k < nsh;k++)
-    fd->xsh[k] = xsh[k];
-  if(fd->surf_filt_w < 0.0)
-    fd->surf_filt_w = wn;
-  PetscCheck(nel > 0,PETSC_COMM_WORLD,PETSC_ERR_LIB,"rsf_fd_setup: surface construction failed");
-  fd->nsurf = nel;
-  PetscCall(PetscPrintf(PETSC_COMM_WORLD,"rsf_fd_setup: virtual free surface: x %.4g to %.4g m, %d elements (slip and opening each) in %d runs, %d traces, %d shallow tops, elements %g m near them (+-%g m), %g m elsewhere\n",
-      xmin - mg,xmax + mg,nel,(fd->segs->nseg - nseg0)/2,ntr,nsh,hn,wn,hfar));
-  PetscCall(PetscFree2(xtr,xsh));
-  PetscFunctionReturn(PETSC_SUCCESS);
-}
 
 /* ---------------- MPI for the 2-D dense tables (fd_plan.md M8) ----------------
    The unknowns of the marcher (segments in order, faults then surface) are split in blocks of
@@ -2967,8 +2817,6 @@ static PetscErrorCode fd_build_tables(struct interact_ctx *par, struct fd_vars *
             "rsf_fd_setup: straight runs with different element sizes (%g vs %g): one common size required in this version",
             fd->segs->seg[k].dx,fd->segs->seg[l].dx);
   PetscCheck(dxmax <= 1.25*dx0,PETSC_COMM_WORLD,PETSC_ERR_SUP,"rsf_fd_setup: element sizes from %g to %g m: at most 25 percent apart in this version (the second-order marching needs beta dt / h of 0.4 to 2)",dx0,dxmax);
-  if(fd->surf2d)
-    PetscCall(fd_surface_2d(fd,dx0));
   fd->dt_min = fd->cfl*dx0/fd->beta;
   /* sources: the real segments, plus for the antiplane half plane the image of
      each (vertical) segment in the free surface y = 0, same tangent, reversed
@@ -3009,9 +2857,7 @@ static PetscErrorCode fd_build_tables(struct interact_ctx *par, struct fd_vars *
   dwin = 0.0;
   for(k = 0;k < fd->nsrc;k++)			/* source */
     for(l = 0;l < fd->segs->nseg;l++){		/* receiver */
-      /* pairs with a virtual surface segment keep longer windows (-fd_tol_surf): the surface has
-         no friction to damp the truncation error of its tails, and PD13 diverged with 1e-2 */
-      ptol = ((fd->srcseg[k].kind != FD_SEG_FAULT) || (fd->segs->seg[l].kind != FD_SEG_FAULT)) ? PetscMin(fd->tol,fd->tol_surf) : fd->tol;
+      ptol = fd->tol;
       if((fd->mpi_size > 1) && !getenv("FD_MPI_ALLROWS"))   /* MPI: this rank's receiver rows of segment l (FD_MPI_ALLROWS: all, for checks) */
         fd_tables_set_rows(fd_rows_lo(fd,l,fd->mpi_rank),fd_rows_lo(fd,l,fd->mpi_rank + 1));
       p = fd_pair_build(fd->srcseg + k,fd->segs->seg + l,fd->mode2d,fd->dt_min,fd->et,
@@ -3034,7 +2880,6 @@ static PetscErrorCode fd_build_tables(struct interact_ctx *par, struct fd_vars *
   if(dwin > 0.0)
     PetscCall(PetscPrintf(PETSC_COMM_WORLD,"rsf_fd_setup: dense pairs: lag data %.1f MB, full windows %.1f MB (compression tolerance %g of the envelope%s)\n",
         dbytes/1e6,dwin/1e6,(double)fd->ctol,fd->ctol > 0.0 ? "" : ", off"));
-  fd_tables_open_cache_clear();
   fd_tables_set_rows(0,-1);
 #ifdef _OPENMP
   PetscCall(PetscPrintf(PETSC_COMM_WORLD,"rsf_fd_setup: dense tables and their history products on %d OpenMP threads (OMP_NUM_THREADS)\n",omp_get_max_threads()));
@@ -3043,8 +2888,6 @@ static PetscErrorCode fd_build_tables(struct interact_ctx *par, struct fd_vars *
 #endif
   fd->sys = fd_sys_create(fd->segs,fd->pairs,(int)fd->nsrc,fd->src_of,fd->src_rev,fd->mode2d,fd->dt_min,fd->alpha,fd->beta,fd->rho,+1);
   PetscCheck(fd->sys,PETSC_COMM_WORLD,PETSC_ERR_MEM,"rsf_fd_setup: marcher system allocation failed");
-  if(fd->surf2d && (fd->surf_filt > 0))
-    PetscCall(fd_surface_filter_setup(fd));
   if(fd->mpi_size > 1){
     fd->sys->gather = fd_gather_rows;
     fd->sys->gather_ctx = (void *)fd;
@@ -3129,51 +2972,6 @@ static PetscErrorCode fd_gate_one(struct fd_vars *fd, Mat A, const double *K, Pe
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
-/* the static operators of the fault with the virtual surface in static equilibrium:
-   K_ff - K_fs K_ss^-1 K_sf for the shear and normal rows, in N x N arrays (fault block filled) */
-extern void dgetrf_(int *m, int *n, double *a, int *lda, int *ipiv, int *info);
-extern void dgetrs_(char *tr, int *n, int *nrhs, double *a, int *lda, int *ipiv, double *b, int *ldb, int *info, size_t ltr);
-static PetscErrorCode fd_static_eliminated(const struct fd_sys *sy, double **Kse, double **Kne)
-{
-  int N, Nf, Nu, i, j, m, info;
-  double *lu, *P, acc, acn;
-  int *piv;
-  char tr;
-  PetscFunctionBeginUser;
-  N = sy->N;
-  Nf = sy->Nf;
-  Nu = sy->Nu;
-  lu = (double *)malloc(sizeof(double)*(size_t)Nu*Nu);
-  P = (double *)malloc(sizeof(double)*(size_t)Nu*Nf);
-  piv = (int *)malloc(sizeof(int)*Nu);
-  *Kse = (double *)calloc((size_t)N*N,sizeof(double));
-  *Kne = (double *)calloc((size_t)N*N,sizeof(double));
-  for(j = 0;j < Nu;j++)
-    for(i = 0;i < Nu;i++)
-      lu[(size_t)j*Nu + i] = sy->Ks[(size_t)(Nf + i)*N + Nf + j];
-  for(j = 0;j < Nf;j++)
-    for(i = 0;i < Nu;i++)
-      P[(size_t)j*Nu + i] = sy->Ks[(size_t)(Nf + i)*N + j];
-  dgetrf_(&Nu,&Nu,lu,&Nu,piv,&info);
-  PetscCheck(info == 0,PETSC_COMM_SELF,PETSC_ERR_LIB,"rsf_fd_setup: static surface operator singular (%d)",info);
-  tr = 'N';
-  dgetrs_(&tr,&Nu,&Nf,lu,&Nu,piv,P,&Nu,&info,1);
-  for(i = 0;i < Nf;i++)
-    for(j = 0;j < Nf;j++){
-      acc = sy->Ks[(size_t)i*N + j];
-      acn = sy->Kn[(size_t)i*N + j];
-      for(m = 0;m < Nu;m++){
-        acc -= sy->Ks[(size_t)i*N + Nf + m]*P[(size_t)j*Nu + m];
-        acn -= sy->Kn[(size_t)i*N + Nf + m]*P[(size_t)j*Nu + m];
-      }
-      (*Kse)[(size_t)i*N + j] = acc;
-      (*Kne)[(size_t)i*N + j] = acn;
-    }
-  free(lu);
-  free(P);
-  free(piv);
-  PetscFunctionReturn(PETSC_SUCCESS);
-}
 
 static PetscErrorCode fd_gate_static(struct interact_ctx *par, struct fd_vars *fd)
 {
@@ -3182,20 +2980,9 @@ static PetscErrorCode fd_gate_static(struct interact_ctx *par, struct fd_vars *f
   double d2, n2, dev, devn = -1.0, dn2, nn2;
   const double *Ks;
   const double *Kn;
-  double *Kse;
-  double *Kne;
   PetscFunctionBeginUser;
   Ks = fd->sys->Ks;
   Kn = fd->sys->Kn;
-  Kse = NULL;
-  Kne = NULL;
-  if(fd->sys->Nu > 0){
-    /* virtual free surface: the fault's static operators with the surface in static
-       equilibrium (Schur complement), which approximate the half-plane Is and In */
-    PetscCall(fd_static_eliminated(fd->sys,&Kse,&Kne));
-    Ks = Kse;
-    Kn = Kne;
-  }
   PetscCall(fd_gate_one(fd,medium->Is,Ks,medium->nrflt,&d2,&n2));
   dev = sqrt(d2/(n2 + 1e-300));
   PetscCall(PetscPrintf(PETSC_COMM_WORLD,"rsf_fd_setup: static gate: rel dev of Ks(tables) from Is %.3e (tol %g)\n",dev,(double)fd->gate_tol));
@@ -3214,8 +3001,6 @@ static PetscErrorCode fd_gate_static(struct interact_ctx *par, struct fd_vars *f
       "rsf_fd_setup: normal static limit deviates %.3e from the assembled In (a sign flip gives 2)",devn);
   if((dev > fd->gate_tol) || (devn > fd->gate_tol))
     PetscCall(PetscPrintf(PETSC_COMM_WORLD,"rsf_fd_setup: WARNING: static gate deviation exceeds %g\n",(double)fd->gate_tol));
-  free(Kse);
-  free(Kne);
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
@@ -3295,20 +3080,7 @@ static PetscErrorCode fd_run_phase(TS ts, struct interact_ctx *par, struct fd_va
   st->normal_coupling = (fd->mode2d == FD_MODE_INPLANE) && rsf->calc_sigma_dot;
   st->nl = (int)fd->nl;
   PetscCall(fd_full_get(X,&fd->scX,&fd->Xall,&x));   /* the whole state on every rank (MPI) */
-  for(i = sy->Nf;i < N;i++){                      /* virtual free surface (M7): at rest, traction free */
-    fr.a[i] = 0.01;
-    fr.b[i] = 0.01;
-    fr.dc[i] = 1.0;
-    st->psi[i] = 0.0;
-    st->sigma0[i] = 0.0;
-    st->V[i] = 0.0;
-    st->tau0[i] = 0.0;
-    st->taudot[i] = 0.0;
-    st->Hn_dot[i] = 0.0;
-    st->sigma[i] = 0.0;
-    st->tau[i] = 0.0;
-  }
-  for(i = 0;i < sy->Nf;i++){
+  for(i = 0;i < sy->N;i++){
     g = fd->g_of_s[i];
     fr.a[i] = fault[g].mu_sa;
     fr.b[i] = fault[g].mu_db;
@@ -3371,7 +3143,7 @@ static PetscErrorCode fd_run_phase(TS ts, struct interact_ctx *par, struct fd_va
       SETERRQ(PETSC_COMM_WORLD,PETSC_ERR_LIB,"rsf_fd: marcher step failed");
     nsteps++;
     vmax = 0.0;
-    for(i = 0;i < sy->Nf;i++)                     /* fault slip rates only */
+    for(i = 0;i < sy->N;i++)                     /* fault slip rates only */
       if(st->V[i] > vmax)
         vmax = st->V[i];
     if(fd->dump_mode > 0.0)
@@ -3401,7 +3173,7 @@ static PetscErrorCode fd_run_phase(TS ts, struct interact_ctx *par, struct fd_va
 	 fault-wide maximum is below back_vmax */
       quiet = (vmax < fd->back_vmax);
       if(quiet && (below > 0.0))
-        for(i = 0;i < sy->Nf;i++)
+        for(i = 0;i < sy->N;i++)
           if(fabs(st->V[i] - vref[i]) > fd->back_eps*(fabs(vref[i]) + fd->vback)){
             quiet = 0;
             break;
@@ -3435,7 +3207,7 @@ static PetscErrorCode fd_run_phase(TS ts, struct interact_ctx *par, struct fd_va
     }
   }
   /* hand back: psi, tau (= strength at the final slip rate = elastic stress at the end of the last step), sigma, slip */
-  for(i = 0;i < sy->Nf;i++){
+  for(i = 0;i < sy->N;i++){
     g = fd->g_of_s[i];
     x[4*g] = st->psi[i];
     x[4*g+1] = st->tau[i];
@@ -3456,7 +3228,7 @@ static PetscErrorCode fd_run_phase(TS ts, struct interact_ctx *par, struct fd_va
       kk = sy->ops[i].bw;
   PetscCall(PetscPrintf(PETSC_COMM_WORLD,
       "rsf_fd: phase %ld: t %.8f yr, %d steps over %.1f s, peak slip rate %.3f m/s, mean slip %.4f m, max band %d, wall %.1f s\n",
-      (long)fd->nphase + 1,(double)(t/SEC_PER_YEAR),nsteps,(double)st->t,vpeak,slipsum/sy->Nf,kk,(double)(t_wall1 - t_wall0)));
+      (long)fd->nphase + 1,(double)(t/SEC_PER_YEAR),nsteps,(double)st->t,vpeak,slipsum/sy->N,kk,(double)(t_wall1 - t_wall0)));
   PetscCall(PetscFree3(fr.a,fr.b,fr.dc));
   PetscCall(PetscFree(vtmp));
   PetscCall(PetscFree(vref));
@@ -3632,4 +3404,34 @@ PetscErrorCode rsf_fd_finalize(struct interact_ctx *par)
   PetscCall(PetscFree(fd));
   rsf->fd = NULL;
   PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+/* diagnostic (-fd_dump_mode v): the first time in a run that any slip rate exceeds v, all rates with segment, kind and position go to fd_mode_dump.dat (rank 0) */
+static void fd_dump_mode(struct fd_vars *fd, struct fd_sys *sy, struct fd_state *st, int k)
+{
+  double vall, X[2], t[2], a;
+  int i, kd, ld, id;
+  FILE *dm;
+  if(fd->dump_done)
+    return;
+  vall = 0.0;
+  for(i = 0;i < sy->N;i++)
+    if(fabs(st->V[i]) > vall)
+      vall = fabs(st->V[i]);
+  if(vall <= fd->dump_mode)
+    return;
+  fd->dump_done = 1;
+  if(fd->mpi_rank != 0)
+    return;
+  dm = fopen("fd_mode_dump.dat","w");
+  if(!dm)
+    return;
+  fprintf(dm,"# phase time %.6e s, k %d: unknown, segment, kind, x, y, V, delta, tau\n",st->t,k);
+  for(kd = 0;kd < fd->segs->nseg;kd++)
+    for(ld = 0;ld < fd->segs->seg[kd].n;ld++){
+      id = sy->off[kd] + ld;
+      fd_seg_element(fd->segs->seg + kd,ld,X,t,&a);
+      fprintf(dm,"%d %d %d %.6e %.6e %.6e %.6e %.6e\n",id,kd,fd->segs->seg[kd].kind,X[0],X[1],st->V[id],st->delta[id],st->tau[id]);
+    }
+  fclose(dm);
 }
