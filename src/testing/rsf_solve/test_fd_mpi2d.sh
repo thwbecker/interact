@@ -59,10 +59,25 @@ for c in "arc:-full_space 1 -stop_time_yr 13" "hp:-stop_time_yr 26"; do
   done
   ok=1
   nst=`ls $name/n1/fd_phase_*_st*.dat 2> /dev/null | wc -l`
-  [ $nst -gt 0 ] || ok=0
+  if [ $nst -eq 0 ]; then
+    ok=0
+    echo "test_fd_mpi2d $name: no station files on 1 rank; end of $name/n1/run.log:"
+    tail -5 $name/n1/run.log
+  fi
   for n in 2 4; do
     for f in $name/n1/fd_phase_*_st*.dat; do
-      cmp -s $f $name/n$n/`basename $f` || ok=0
+      [ -s $f ] || continue
+      g=$name/n$n/`basename $f`
+      if [ ! -s $g ]; then
+        ok=0
+        echo "test_fd_mpi2d $name: $g missing; end of $name/n$n/run.log:"
+        tail -5 $name/n$n/run.log
+      elif ! cmp -s $f $g; then
+        ok=0
+        # largest difference over all columns, absolute and relative to the column's largest value
+        paste $f $g | awk '{h = NF/2; for(i=1;i<=h;i++){d=$i-$(i+h); if(d<0)d=-d; a=$i; if(a<0)a=-a; if(d>dm[i])dm[i]=d; if(a>am[i])am[i]=a}}
+          END {w=0; for(i in dm){r=(am[i]>0)?dm[i]/am[i]:dm[i]; if(r>w){w=r; c=i}} printf "test_fd_mpi2d: %s differs on %s ranks: largest relative difference %.2e (column %d)\n", fname, n, w, c}' n=$n fname=`basename $f`
+      fi
     done
   done
   if [ $ok -eq 1 ]; then echo "test_fd_mpi2d $name: PASS (1, 2 and 4 ranks identical, $nst station files)"
