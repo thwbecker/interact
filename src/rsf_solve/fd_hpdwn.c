@@ -325,6 +325,14 @@ int fd_hpdwn_batch(int ns, const double *sx, const double *sz, const double *stx
                    int nr, const double *rx, const double *rz, const double *rtx, const double *rtz,
                    double alpha, double beta, double rho, double dt, int nt, double *os, double *on, double *ks, double *kn)
 {
+  return fd_hpdwn_batch_ext(ns, sx, sz, stx, stz, sa, nr, rx, rz, rtx, rtz, nr, rx, rz, alpha, beta, rho, dt, nt, os, on, ks, kn);
+}
+
+int fd_hpdwn_batch_ext(int ns, const double *sx, const double *sz, const double *stx, const double *stz, const double *sa,
+                       int nr, const double *rx, const double *rz, const double *rtx, const double *rtz,
+                       int npr, const double *prx, const double *prz,
+                       double alpha, double beta, double rho, double dt, int nt, double *os, double *on, double *ks, double *kn)
+{
   int N, M, i, j, q, nb, i0, n;
   double T, L, xmin, xmax, h, zsum, amin, mem;
   double complex w, *R, *S, *Gs, *Gn;
@@ -349,13 +357,13 @@ int fd_hpdwn_batch(int ns, const double *sx, const double *sz, const double *stx
     xmax = fmax(xmax, sx[j] + sa[j]);
     amin = fmin(amin, sa[j]);
   }
-  for(i = 0; i < nr; i++){
-    xmin = fmin(xmin, rx[i]);
-    xmax = fmax(xmax, rx[i]);
+  for(i = 0; i < npr; i++){                      /* the parameters from all receivers of the pair */
+    xmin = fmin(xmin, prx[i]);
+    xmax = fmax(xmax, prx[i]);
   }
   for(j = 0; j < ns; j++)
-    for(i = 0; i < nr; i++)
-      zsum = fmin(zsum, fabs(sz[j]) + fabs(rz[i]));
+    for(i = 0; i < npr; i++)
+      zsum = fmin(zsum, fabs(sz[j]) + fabs(prz[i]));
   L = alpha*T + 2.0*(xmax - xmin);
   h = 0.25*fmin(amin, zsum);
   M = (int)ceil(L/h);

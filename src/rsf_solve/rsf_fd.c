@@ -26,6 +26,7 @@
     -fd_kmax <n>        largest substep multiple (default 64)
     -fd_cfl <f>         beta dt_min / dx (default 0.5)
     -fd_lmax <n>        cap on the window in fine-grid lags (default 0: prototype bound)
+    -fd_table_hash      diagnostic: print a hash of the bits of all 2-D tables (identical on any number of ranks)
     -fd_dump_mode <v>   diagnostic: when a slip rate first exceeds v m/s in a phase, write all rates
                         with positions to fd_mode_dump.dat (the shape of a growing mode)
     -fd_gate_tol <f>    static gate tolerance (default 0.05; abort at 5x)
@@ -69,6 +70,7 @@ extern double fd3d_layer_prof[4];
 static PetscErrorCode fd_build_tables(struct interact_ctx *par, struct fd_vars *fd);
 static PetscErrorCode fd_gate_static(struct interact_ctx *par, struct fd_vars *fd);
 static void fd_dump_mode(struct fd_vars *fd, struct fd_sys *sy, struct fd_state *st, int k);
+static PetscErrorCode fd_table_hash(struct fd_vars *fd);
 
 PetscErrorCode rsf_fd_setup(struct interact_ctx *par, PetscReal shear_modulus_si, PetscReal s_wave_speed_si)
 {
@@ -2773,6 +2775,7 @@ static PetscErrorCode fd_build_tables(struct interact_ctx *par, struct fd_vars *
   double hlen;
   struct fd_segment *g0;
   double ptol;
+  PetscBool hash;
   PetscFunctionBeginUser;
   PetscCallMPI(MPI_Comm_size(PETSC_COMM_WORLD,&fd->mpi_size));
   PetscCallMPI(MPI_Comm_rank(PETSC_COMM_WORLD,&fd->mpi_rank));
@@ -2886,6 +2889,10 @@ static PetscErrorCode fd_build_tables(struct interact_ctx *par, struct fd_vars *
 #else
   PetscCall(PetscPrintf(PETSC_COMM_WORLD,"rsf_fd_setup: built without OpenMP: dense tables and history products on one thread\n"));
 #endif
+  hash = PETSC_FALSE;
+  PetscCall(PetscOptionsGetBool(NULL,NULL,"-fd_table_hash",&hash,NULL));
+  if(hash)
+    PetscCall(fd_table_hash(fd));
   fd->sys = fd_sys_create(fd->segs,fd->pairs,(int)fd->nsrc,fd->src_of,fd->src_rev,fd->mode2d,fd->dt_min,fd->alpha,fd->beta,fd->rho,+1);
   PetscCheck(fd->sys,PETSC_COMM_WORLD,PETSC_ERR_MEM,"rsf_fd_setup: marcher system allocation failed");
   if(fd->mpi_size > 1){
@@ -3434,4 +3441,57 @@ static void fd_dump_mode(struct fd_vars *fd, struct fd_sys *sy, struct fd_state 
       fprintf(dm,"%d %d %d %.6e %.6e %.6e %.6e %.6e\n",id,kd,fd->segs->seg[kd].kind,X[0],X[1],st->V[id],st->delta[id],st->tau[id]);
     }
   fclose(dm);
+}
+
+/* diagnostic (-fd_table_hash, fd_plan.md M8 and M10): an order-independent hash of the bits of all
+   2-D tables (static blocks and lag windows of every pair), summed over the ranks, so that runs
+   on different numbers of ranks can be checked for identical tables even where the QD part
+   (MatMult with an optimised BLAS) makes the runs themselves differ in the last bits. The
+   receiver rows of a dense pair live on one rank each (zero elsewhere); the static blocks and
+   the Toeplitz pairs are on all ranks and counted on rank 0. */
+static PetscErrorCode fd_table_hash(struct fd_vars *fd)
+{
+  unsigned long long h, hall, bits, idx;
+  struct fd_pair *p;
+  double *Ws, *Wn, *Ks, *Kn;
+  int k, l, e, ne, np;
+  PetscFunctionBeginUser;
+  h = 0ULL;
+  np = (int)fd->nsrc*fd->segs->nseg;
+  for(k = 0;k < np;k++){
+    p = fd->pairs[k];
+    if(!p)
+      continue;
+    ne = p->src->n*p->rcv->n;
+    Ws = (double *)malloc(sizeof(double)*4*(size_t)ne);
+    Wn = Ws + ne;
+    Ks = Wn + ne;
+    Kn = Ks + ne;
+    if(fd->mpi_rank == 0){
+      fd_pair_static_dense(p,Ks,Kn);
+      for(e = 0;e < ne;e++){
+        memcpy(&bits,&Ks[e],sizeof(bits));
+        h += bits*(unsigned long long)(1 + 2*e + 2*ne*(unsigned long long)k);
+        memcpy(&bits,&Kn[e],sizeof(bits));
+        h += bits*(unsigned long long)(2 + 2*e + 2*ne*(unsigned long long)k);
+      }
+    }
+    if(p->dense || fd->mpi_rank == 0)
+      for(l = 1;l <= p->L;l++){
+        fd_pair_W_dense(p,l,Ws,Wn);
+        for(e = 0;e < ne;e++){
+          idx = 1ULL + (unsigned long long)e + (unsigned long long)ne*((unsigned long long)l + 4096ULL*(unsigned long long)k);
+          memcpy(&bits,&Ws[e],sizeof(bits));
+          h += bits*(3ULL*idx);
+          memcpy(&bits,&Wn[e],sizeof(bits));
+          h += bits*(5ULL*idx);
+        }
+      }
+    free(Ws);
+  }
+  hall = h;
+  if(fd->mpi_size > 1)
+    PetscCallMPI(MPI_Allreduce(&h,&hall,1,MPI_UNSIGNED_LONG_LONG,MPI_SUM,PETSC_COMM_WORLD));
+  PetscCall(PetscPrintf(PETSC_COMM_WORLD,"rsf_fd_setup: table hash %016llx\n",hall));
+  PetscFunctionReturn(PETSC_SUCCESS);
 }

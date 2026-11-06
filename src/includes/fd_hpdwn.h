@@ -30,4 +30,11 @@ int fd_hpdwn_reflected(int ns, const double *sx, const double *sz, const double 
 int fd_hpdwn_batch(int ns, const double *sx, const double *sz, const double *stx, const double *stz, const double *sa,
                    int nr, const double *rx, const double *rz, const double *rtx, const double *rtz,
                    double alpha, double beta, double rho, double dt, int nt, double *os, double *on, double *ks, double *kn);
+/* the same with the discretisation (window, wavenumbers, source period) chosen from the receivers
+   prx, prz (npr of them; all receivers of the pair), so that a subset of the receivers (one MPI
+   rank's rows) gets exactly the values it would get in the full batch */
+int fd_hpdwn_batch_ext(int ns, const double *sx, const double *sz, const double *stx, const double *stz, const double *sa,
+                       int nr, const double *rx, const double *rz, const double *rtx, const double *rtz,
+                       int npr, const double *prx, const double *prz,
+                       double alpha, double beta, double rho, double dt, int nt, double *os, double *on, double *ks, double *kn);
 #endif

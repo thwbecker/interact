@@ -3584,6 +3584,26 @@ batch, the static rate from the batch or from interact's Is/In) and the switch i
   rows with zgemm; an optimised BLAS may sum in an order that depends on the matrix size, which
   would break the identity of results across rank numbers (reference BLAS keeps it).
 
+### M8 note: MPI identity with an optimised BLAS (2026-11-05)
+
+On Thor's 64-core machine test_fd_mpi2d failed: the station series of 2 and 4 ranks differed from
+1 rank by up to 4e-5 relative (curved fault, full plane) and 9e-9 (half plane, 4 ranks only),
+also with OPENBLAS_NUM_THREADS=1; in the sandbox (reference BLAS) all were identical. The 2-D
+FD tables and marcher use no BLAS (the reflected tables use zgemm per rank's rows); the QD part
+does (MatMult of Is on the distributed matrix, each rank's rows by its local product), and an
+optimised BLAS sums in an order that depends on the number of rows, so the QD years before the
+event already differ in the last bits. The test therefore now checks the tables exactly, by an
+order-independent hash of their bits summed over the ranks (rsf_solve -fd_table_hash; equal on 1,
+2 and 4 ranks for the curved fault in the sandbox, and changed by another compression
+tolerance), and the station series to 1e-3 relative (identical with reference BLAS).
+The hash found a real rank dependence in the half-plane tables: each rank chose the reflected
+tables' discretisation (window, wavenumber range, source period, the reflected window ntr) from
+its own receiver rows, so 1 and 2 ranks gave different tables (hash a7955ddb44a0b48c against
+a7955ddd35f27f8d); the runs had still been identical in the sandbox. fd_hpdwn_batch_ext now takes
+the discretisation from all receivers of the pair (and fd_tables.c the reflected window from all
+rows); 1 and 2 ranks then agree (a7955ddb44a0b48c, unchanged on 1 rank). Each rank's zgemm over
+its rows could still sum differently with an optimised BLAS; the hash would show that.
+
 ### WP7, C implementation in rsf_solve: status (2026-10-18)
 Done, each verified in the sandbox before delivery (details in
 fd_c_design.md sections 6 to 10, usage in rsf_solve_fd.md):

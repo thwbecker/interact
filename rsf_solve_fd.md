@@ -282,7 +282,8 @@ Curved 2-D faults (runs of fewer than four equal collinear elements joined end t
 become polyline segments with dense tables (element sizes within 25 percent; FD_NO_POLY=1 to
 keep straight runs); the dense tables can also be built and applied with OpenMP threads
 (OMP_NUM_THREADS) within a rank. -fd_dump_mode v writes all slip rates once when one first
-exceeds v (diagnostic).
+exceeds v (diagnostic); -fd_table_hash prints a hash of all 2-D tables, which must be the same
+on any number of ranks (the runs themselves can differ in the last bits with an optimised BLAS).
 
 Restrictions in this version, refused with a message at start:
 `-ve_mode 0`; aging law (`-state_law 1`); 2-D elements only, forming

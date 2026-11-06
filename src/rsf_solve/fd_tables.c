@@ -308,9 +308,16 @@ static int hp_reflected(const struct fd_segment *src, const struct fd_segment *r
 {
   int ns, nr, i, j, rc;
   double X[2], t[2], a;
-  double *sx, *sz, *stx, *stz, *sa, *rx, *rz, *rtx, *rtz;
+  double *sx, *sz, *stx, *stz, *sa, *rx, *rz, *rtx, *rtz, *px, *pz;
   ns = src->n;
   nr = r1 - r0;
+  px = (double *)malloc(sizeof(double)*2*rcv->n);
+  pz = px + rcv->n;
+  for(i = 0; i < rcv->n; i++){                   /* all receivers: the discretisation independent of the rows */
+    fd_seg_element(rcv, i, X, t, &a);
+    px[i] = X[0];
+    pz[i] = -X[1];
+  }
   sx = (double *)malloc(sizeof(double)*5*ns);
   sz = sx + ns;
   stx = sz + ns;
@@ -337,9 +344,10 @@ static int hp_reflected(const struct fd_segment *src, const struct fd_segment *r
   }
   rc = 0;
   if(nr > 0)
-    rc = fd_hpdwn_batch(ns, sx, sz, stx, stz, sa, nr, rx, rz, rtx, rtz, alpha, beta, rho, dt, nt, os, on, ks, kn);
+    rc = fd_hpdwn_batch_ext(ns, sx, sz, stx, stz, sa, nr, rx, rz, rtx, rtz, rcv->n, px, pz, alpha, beta, rho, dt, nt, os, on, ks, kn);
   free(sx);
   free(rx);
+  free(px);
   return rc;
 }
 
@@ -418,7 +426,7 @@ struct fd_pair *fd_pair_build_poly(const struct fd_segment *src, const struct fd
   if(hp){
     /* the reflected waves (fd_plan.md M10): window of three S times along the image paths */
     dimg = 0.0;
-    for(i = hr0; i < hr1; i++)
+    for(i = 0; i < nr; i++)                     /* all rows: the window independent of the MPI split */
       for(j = 0; j < ns; j++){
         fd_seg_element(rcv, i, Xr, tr, &ar);
         fd_seg_element(src, j, Xs, ts_, &as);
