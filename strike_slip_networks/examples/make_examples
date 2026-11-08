@@ -1,0 +1,57 @@
+#!/bin/bash
+#
+# run the example fault systems and plot them
+#
+# usage: make_examples [tmax_yr] [stride] [rundir]
+#
+#   tmax_yr  model time per run (default 3000)
+#   stride   series output: every n-th accepted step in the dense
+#            phase (default 4)
+#   rundir   where the run directories go (default: current directory)
+#
+# examples, all with one velocity-weakening asperity per fault and 10
+# percent velocity-strengthening ends, reference parameters otherwise
+# (README.md), left-lateral drive:
+#
+#   single        one fault
+#   three_right   three parallel faults, right steps of 4 km with 10 km
+#                 overlap (restraining for left-lateral slip)
+#   three_left    the same with left steps (releasing)
+#   three_angled  right steps, outer faults rotated by +15 and -15
+#                 degrees about their inner ends; the +15 fault is
+#                 clamped by the far-field normal stress rate, the -15
+#                 fault unclamped.  Cells from L_b/5 at sigma_0, i.e.
+#                 about L_b/3 at the normal stress the clamped fault
+#                 reaches after 3000 yr
+#   three_right_ff, three_angled_ff
+#                 the same as three_right and three_angled, but the
+#                 normal stress evolves from the far-field rate only
+#                 (--sigma_interact 0), without the change from slip on
+#                 the other faults
+#
+tmax=${1-3000}
+stride=${2-4}
+rundir=${3-.}
+sdir=$(cd "$(dirname "$0")/.." && pwd)
+common="--vs_margin 0.1"
+three="--nfault 3 --step_x 4e3 --overlap 10e3"
+solve="-- -rsf_series_stride $stride"
+
+mkdir -p "$rundir"
+cd "$rundir" || exit 1
+"$sdir/run_model" single "$tmax" 1 $common $solve
+"$sdir/run_model" three_right "$tmax" 1 $common $three --stepover right $solve
+"$sdir/run_model" three_left "$tmax" 1 $common $three --stepover left $solve
+"$sdir/run_model" three_angled "$tmax" 1 $common $three --stepover right \
+    --strikes 15,0,-15 --pivot inner --cells_per_lb 5 $solve
+"$sdir/run_model" three_right_ff "$tmax" 1 $common $three --stepover right --sigma_interact 0 $solve
+"$sdir/run_model" three_angled_ff "$tmax" 1 $common $three --stepover right \
+    --strikes 15,0,-15 --pivot inner --cells_per_lb 5 --sigma_interact 0 $solve
+
+python3 "$sdir/plot_faults.py" single -o single.png --spacetime
+python3 "$sdir/plot_faults.py" three_right three_left -o three_right_left.png
+python3 "$sdir/plot_faults.py" three_right -o three_right.png --spacetime
+python3 "$sdir/plot_faults.py" three_left -o three_left.png --spacetime
+python3 "$sdir/plot_faults.py" three_angled -o three_angled.png --spacetime
+python3 "$sdir/plot_faults.py" three_right three_right_ff -o three_right_interact_ff.png
+python3 "$sdir/plot_faults.py" three_angled three_angled_ff -o three_angled_interact_ff.png

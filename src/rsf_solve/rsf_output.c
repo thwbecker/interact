@@ -1,3 +1,4 @@
+#include <stdint.h>
 #include "interact.h"
 #include "properties.h"
 #ifdef USE_PETSC
@@ -96,6 +97,261 @@ static int rsf_init_monitor_groups(struct rsf_out_ctx *uc)
    set up the monitor and event tracking environment,
    cf. init_monitor_and_event in ode_solve_test.c
 */
+/*
+   compact all-cell binary time series (-rsf_series_file), helper
+   routines.  File layout: int32 magic 0x52534631 ('RSF1'), int32
+   ncell, int32 nfield (5); then per record a float64 time [s] and five
+   float32[ncell] blocks: log10|v| [m/s], tau [MPa], log10 theta [s],
+   slip [m], sigma [MPa] (compression positive).  Rank 0 writes; the
+   state is only read.
+
+   Two record selection modes, both at accepted steps only:
+   0 (default)  every -rsf_series_stride-th accepted step (default 1)
+                while max|v| > -rsf_series_vdense, counted from the
+                first step of each such phase, else when
+                -rsf_series_dt_yr of model time has passed
+   1            change based: when, since the last record, some cell's
+                log10|v| has changed by -rsf_series_dlogv, or its tau or
+                sigma by -rsf_series_dstress [MPa], or when
+                -rsf_series_dtmax_yr of model time has passed
+   -rsf_series_final additionally writes the final accepted step.
+*/
+static PetscErrorCode rsf_series_init(struct rsf_out_ctx *uc,struct med *medium,
+				      PetscReal t_init)
+{
+  char series_file[STRLEN];
+  PetscReal series_dt_yr,series_dtmax_yr;
+  int32_t hdr[3];
+  size_t nbuf;
+  PetscFunctionBeginUser;
+  series_dt_yr = 1.0;
+  series_dtmax_yr = 5.0;
+  uc->series_enable = PETSC_FALSE;
+  uc->series_f = NULL;
+  uc->series_buf = NULL;
+  uc->series_prev = NULL;
+  uc->series_n = 0;
+  uc->series_vdense = 1e-6;
+  uc->series_mode = 0;
+  uc->series_stride = 1;
+  uc->series_kdense = 0;
+  uc->series_dlogv = 0.1;
+  uc->series_dstress = 0.1;
+  uc->series_final = PETSC_FALSE;
+  uc->series_have_prev = PETSC_FALSE;
+  PetscCall(PetscOptionsGetString(NULL,NULL,"-rsf_series_file",series_file,STRLEN,&uc->series_enable));
+  PetscCall(PetscOptionsGetReal(NULL,NULL,"-rsf_series_dt_yr",&series_dt_yr,NULL));
+  PetscCall(PetscOptionsGetReal(NULL,NULL,"-rsf_series_vdense",&uc->series_vdense,NULL));
+  PetscCall(PetscOptionsGetInt(NULL,NULL,"-rsf_series_mode",&uc->series_mode,NULL));
+  PetscCall(PetscOptionsGetInt(NULL,NULL,"-rsf_series_stride",&uc->series_stride,NULL));
+  PetscCall(PetscOptionsGetReal(NULL,NULL,"-rsf_series_dlogv",&uc->series_dlogv,NULL));
+  PetscCall(PetscOptionsGetReal(NULL,NULL,"-rsf_series_dstress",&uc->series_dstress,NULL));
+  PetscCall(PetscOptionsGetReal(NULL,NULL,"-rsf_series_dtmax_yr",&series_dtmax_yr,NULL));
+  PetscCall(PetscOptionsGetBool(NULL,NULL,"-rsf_series_final",&uc->series_final,NULL));
+  if((uc->series_mode != 0) && (uc->series_mode != 1))
+    SETERRQ(PETSC_COMM_WORLD,PETSC_ERR_ARG_OUTOFRANGE,"-rsf_series_mode must be 0 or 1");
+  if(uc->series_stride < 1)
+    SETERRQ(PETSC_COMM_WORLD,PETSC_ERR_ARG_OUTOFRANGE,"-rsf_series_stride must be at least 1");
+  if((uc->series_mode == 1) && ((uc->series_dlogv <= 0.0) || (uc->series_dstress <= 0.0) ||
+				(series_dtmax_yr <= 0.0)))
+    SETERRQ(PETSC_COMM_WORLD,PETSC_ERR_ARG_OUTOFRANGE,
+	    "-rsf_series_dlogv, -rsf_series_dstress, -rsf_series_dtmax_yr must be positive");
+  uc->series_dt = series_dt_yr*SEC_PER_YEAR;
+  uc->series_dtmax = series_dtmax_yr*SEC_PER_YEAR;
+  uc->series_last = t_init - 2.0*uc->series_dt; /* force a record at the start (mode 0) */
+  if(!uc->series_enable)
+    PetscFunctionReturn(PETSC_SUCCESS);
+  HEADNODE{
+    nbuf = 5*(size_t)medium->nrflt;
+    uc->series_f = myopen(series_file,(uc->restarted)?("ab"):("wb"));
+    uc->series_buf = (float *)malloc(nbuf*sizeof(float));
+    uc->series_prev = (float *)malloc(nbuf*sizeof(float));
+    if((!uc->series_buf) || (!uc->series_prev)){
+      fprintf(stderr,"rsf_series_init: series buffer alloc failed\n");
+      exit(-1);
+    }
+    if(!uc->restarted){
+      hdr[0] = 0x52534631;	/* 'RSF1' */
+      hdr[1] = (int32_t)medium->nrflt;
+      hdr[2] = 5;
+      fwrite(hdr,sizeof(int32_t),3,uc->series_f);
+    }
+    if(uc->series_mode == 0)
+      fprintf(stderr,"rsf_series_init: all-cell series to %s, every %d. step above %.3e m/s, else every %g yr\n",
+	      series_file,(int)uc->series_stride,(double)uc->series_vdense,(double)series_dt_yr);
+    else
+      fprintf(stderr,"rsf_series_init: all-cell series to %s, change based: dlog10v %g, dstress %g MPa, dtmax %g yr\n",
+	      series_file,(double)uc->series_dlogv,(double)uc->series_dstress,(double)series_dtmax_yr);
+    if(uc->series_final)
+      fprintf(stderr,"rsf_series_init: the final accepted step is recorded\n");
+  }
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+/*
+   fill the five record blocks of uc->series_buf from the gathered
+   state sv (rank 0); returns the maximum |v| [m/s] over all cells
+*/
+static PetscReal rsf_series_fill(struct rsf_out_ctx *uc,const PetscScalar *sv,
+				 struct med *medium,struct flt *fault)
+{
+  struct rsf_vars *rsf;
+  PetscReal vv,d1,d2,d3,vmax,bloc,l10th;
+  int ip,nf,k;
+  rsf = medium->rsf;
+  nf = medium->nrflt;
+  vmax = 0.0;
+  for(ip=0;ip < nf;ip++){
+    k = ip*rsf->dim;
+    vv = fabs(vel_from_rsf(sv[k+1],sv[k+2],sv[k+0],fault[ip].mu_sa,rsf->v0,&d1,&d2,&d3,medium));
+    if(vv > vmax)
+      vmax = vv;
+    bloc = fault[ip].mu_db;
+    if(bloc != 0.0)
+      l10th = log10(rsf->dc/rsf->v0) + (sv[k] - rsf->f0)/(bloc*2.302585092994046);
+    else
+      l10th = 0.0;
+    uc->series_buf[       ip] = (float)log10(vv + 1e-300);
+    uc->series_buf[  nf + ip] = (float)(sv[k+1]/1e6);
+    uc->series_buf[2*nf + ip] = (float)l10th;
+    uc->series_buf[3*nf + ip] = (float)sv[k+3];
+    uc->series_buf[4*nf + ip] = (float)(sv[k+2]/1e6);
+  }
+  return vmax;
+}
+
+/*
+   largest change of log10|v| and of tau or sigma [MPa] of any cell
+   between uc->series_buf and the last written record
+*/
+static void rsf_series_change(struct rsf_out_ctx *uc,int nf,PetscReal *dlogv,PetscReal *dstress)
+{
+  int ip;
+  PetscReal d;
+  *dlogv = 0.0;
+  *dstress = 0.0;
+  for(ip=0;ip < nf;ip++){
+    d = fabs((PetscReal)uc->series_buf[ip] - (PetscReal)uc->series_prev[ip]);
+    if(d > *dlogv)
+      *dlogv = d;
+    d = fabs((PetscReal)uc->series_buf[nf+ip] - (PetscReal)uc->series_prev[nf+ip]);
+    if(d > *dstress)
+      *dstress = d;
+    d = fabs((PetscReal)uc->series_buf[4*nf+ip] - (PetscReal)uc->series_prev[4*nf+ip]);
+    if(d > *dstress)
+      *dstress = d;
+  }
+}
+
+/*
+   mode 0 selection: the n-th dense step counter is advanced at every
+   call, so it has to be evaluated exactly once per accepted step
+*/
+static PetscBool rsf_series_due_mode0(struct rsf_out_ctx *uc,PetscReal time,PetscReal vmax)
+{
+  PetscBool dense_due;
+  dense_due = PETSC_FALSE;
+  if(vmax > uc->series_vdense){
+    if(uc->series_kdense % uc->series_stride == 0)
+      dense_due = PETSC_TRUE;
+    uc->series_kdense++;
+  }else{
+    uc->series_kdense = 0;
+  }
+  if(dense_due || ((time - uc->series_last) >= uc->series_dt))
+    return PETSC_TRUE;
+  return PETSC_FALSE;
+}
+
+/* decide whether the filled record is written (rank 0) */
+static PetscBool rsf_series_due(struct rsf_out_ctx *uc,PetscReal time,int nf,
+				PetscReal vmax,PetscBool is_final)
+{
+  PetscReal dlogv,dstress;
+  PetscBool due0;
+  if(uc->series_mode == 0){
+    due0 = rsf_series_due_mode0(uc,time,vmax);
+    if(is_final && uc->series_final)
+      return PETSC_TRUE;
+    return due0;
+  }
+  if(is_final && uc->series_final)
+    return PETSC_TRUE;
+  if(!uc->series_have_prev)
+    return PETSC_TRUE;
+  if((time - uc->series_last) >= uc->series_dtmax)
+    return PETSC_TRUE;
+  rsf_series_change(uc,nf,&dlogv,&dstress);
+  if((dlogv >= uc->series_dlogv) || (dstress >= uc->series_dstress))
+    return PETSC_TRUE;
+  return PETSC_FALSE;
+}
+
+/* write the filled record and remember it (rank 0) */
+static void rsf_series_write(struct rsf_out_ctx *uc,PetscReal time,int nf)
+{
+  double tt;
+  size_t nbuf;
+  nbuf = 5*(size_t)nf;
+  tt = (double)time;
+  fwrite(&tt,sizeof(double),1,uc->series_f);
+  fwrite(uc->series_buf,sizeof(float),nbuf,uc->series_f);
+  memcpy(uc->series_prev,uc->series_buf,nbuf*sizeof(float));
+  uc->series_have_prev = PETSC_TRUE;
+  uc->series_last = time;
+  uc->series_n++;
+}
+
+/*
+   called from the monitor at every accepted step; the gather is
+   collective, so every rank has to call this
+*/
+static PetscErrorCode rsf_series_monitor(struct rsf_out_ctx *uc,TS ts,PetscReal time,Vec X)
+{
+  struct med *medium;
+  struct flt *fault;
+  PetscScalar *sv;
+  PetscReal tmax,vmax;
+  PetscBool is_final;
+  PetscFunctionBeginUser;
+  medium = uc->par->medium;
+  fault = uc->par->fault;
+  PetscCall(TSGetMaxTime(ts,&tmax));
+  is_final = (time >= tmax) ? PETSC_TRUE : PETSC_FALSE;
+  PetscCall(VecScatterBegin(uc->gather,X,uc->gathered,INSERT_VALUES,SCATTER_FORWARD));
+  PetscCall(VecScatterEnd(  uc->gather,X,uc->gathered,INSERT_VALUES,SCATTER_FORWARD));
+  HEADNODE{
+    PetscCall(VecGetArray(uc->gathered,&sv));
+    vmax = rsf_series_fill(uc,sv,medium,fault);
+    if(rsf_series_due(uc,time,medium->nrflt,vmax,is_final))
+      rsf_series_write(uc,time,medium->nrflt);
+    PetscCall(VecRestoreArray(uc->gathered,&sv));
+  }
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+/* close the series file and free the buffers (rank 0) */
+static void rsf_series_finalize(struct rsf_out_ctx *uc,struct med *medium)
+{
+  if(!uc->series_enable)
+    return;
+  HEADNODE{
+    if(uc->series_f){
+      fclose(uc->series_f);
+      uc->series_f = NULL;
+    }
+    if(uc->series_buf){
+      free(uc->series_buf);
+      uc->series_buf = NULL;
+    }
+    if(uc->series_prev){
+      free(uc->series_prev);
+      uc->series_prev = NULL;
+    }
+    fprintf(stderr,"rsf_series_finalize: wrote %ld all-cell series record(s)\n",uc->series_n);
+  }
+}
+
 PetscErrorCode rsf_init_monitor_and_event(struct rsf_out_ctx *uc,struct interact_ctx *par,
 					  PetscReal dt_monitor,PetscReal adx_monitor,
 					  PetscReal rdx_monitor,PetscReal monitor_tmin,
@@ -156,6 +412,8 @@ PetscErrorCode rsf_init_monitor_and_event(struct rsf_out_ctx *uc,struct interact
   PetscCall(PetscOptionsGetBool(NULL,NULL,"-field_slip",&uc->field_slip,NULL));
   uc->field_frame = 0;
   uc->fout_field_times = NULL;
+  /* compact all-cell binary time series (-rsf_series_file) */
+  PetscCall(rsf_series_init(uc,medium,t_init));
   uc->groups = groups;
   uc->ngroup = ngroup;
   uc->vbuf = vbuf;
@@ -265,6 +523,7 @@ PetscErrorCode rsf_finalize_monitor_and_event(struct rsf_out_ctx *uc)
   if(uc->mgrp_lmx){free(uc->mgrp_lmx);uc->mgrp_lmx = NULL;}
   if(uc->mgrp_gmx){free(uc->mgrp_gmx);uc->mgrp_gmx = NULL;}
   uc->mgrp_n = 0;
+  rsf_series_finalize(uc,medium);
   PetscCall(VecDestroy(&uc->Xold));
   PetscCall(VecScatterDestroy(&uc->gather));
   PetscCall(VecDestroy(&uc->gathered));
@@ -924,6 +1183,8 @@ PetscErrorCode rsf_TS_Monitor(TS ts,PetscInt step,PetscReal time,Vec X,void *ptr
     }
     PetscCall(VecRestoreArrayRead(X,&xs_));
   }
+  if(uc->series_enable)  /* collective: every rank enters */
+    PetscCall(rsf_series_monitor(uc,ts,time,X));
   if(time >= uc->monitor_tmin){
     /* change since the last logged state */
     PetscCall(VecNorm(X,NORM_2,&x_norm));

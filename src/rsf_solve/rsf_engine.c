@@ -166,7 +166,7 @@ PetscErrorCode rsf_compute_vel_and_stressing(Vec X, PetscReal time, struct inter
      background backslip loading (sinc) is added by the caller
   */
   PetscCall(MatMult(medium->Is, rsf->vel, rsf->tau_dot));
-  if(rsf->calc_sigma_dot)
+  if(rsf->calc_sigma_dot && rsf->sigma_dot_interact)
     PetscCall(MatMult(medium->In, rsf->vel, rsf->sigma_dot));
   /* visco-elastic hereditary sink (no-op unless -ve_mode is active,
      see rsf_ve.c): tau_dot -= sum_p h_p(t0) e^(-(t-t0)/tau_p)/tau_p */
@@ -266,9 +266,12 @@ PetscErrorCode rsf_ODE_RHSFunction(TS ts,PetscReal time,Vec X,Vec F,void *ptr)
     /* 
        d sigma/dt, compression positive (In was scaled by -1)
     */
-    if(rsf->calc_sigma_dot)
-      sdot = sigma_dot[k] + fault[i].sinc[1];
-    else{
+    if(rsf->calc_sigma_dot){
+      if(rsf->sigma_dot_interact)
+	sdot = sigma_dot[k] + fault[i].sinc[1];
+      else
+	sdot = fault[i].sinc[1];	/* loading rates only */
+    }else{
       sdot = 0.;
     }
     if(rsf->limit_sigma){	/* HBI limitsigma behavior */

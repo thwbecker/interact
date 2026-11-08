@@ -85,9 +85,12 @@ PetscErrorCode rsf_IMEX_RHSFunction(TS ts,PetscReal time,Vec X,Vec G,void *ptr)
     /* state evolution is fully implicit */
     g[j] = 0.0;
     /* d sigma/dt, compression positive (In was scaled by -1) */
-    if(rsf->calc_sigma_dot)
-      sdot = sigma_dot[k] + fault[i].sinc[1];
-    else
+    if(rsf->calc_sigma_dot){
+      if(rsf->sigma_dot_interact)
+	sdot = sigma_dot[k] + fault[i].sinc[1];
+      else
+	sdot = fault[i].sinc[1];	/* loading rates only */
+    }else
       sdot = 0.;
     if(rsf->limit_sigma){	/* HBI limitsigma behavior */
       if((x[j+2] < rsf->min_sigma)||(x[j+2] > rsf->max_sigma))

@@ -122,6 +122,35 @@ struct rsf_out_ctx{
   PetscReal stat_dt;		/* max output interval [s] */
   PetscReal stat_vdense;	/* |v| above which every step is written */
   PetscReal *stat_last;		/* last output time per station */
+  /* compact all-cell time series (-rsf_series_file FILE): one binary
+     file, rank 0 only; header int32 magic, int32 ncell, int32 nfield;
+     then per record double time[s] followed by nfield float32 arrays of
+     length ncell: log10|v|[m/s], tau[MPa], log10(theta[s]), slip[m],
+     sigma[MPa] (normal stress, compression positive).
+     Records are taken at accepted steps only.  series_mode 0 (default):
+     every series_stride-th accepted step while max|v| > series_vdense
+     (stride 1 by default), else every series_dt of model time.  series_mode 1 (-rsf_series_mode 1):
+     change based, a record whenever, since the last record, some
+     cell's log10|v| changed by series_dlogv, or its tau or sigma by
+     series_dstress, or series_dtmax of model time passed.
+     series_final (-rsf_series_final) adds a record of the final
+     accepted step.  Intended as training data */
+  PetscBool series_enable;
+  FILE *series_f;		/* rank 0 handle */
+  PetscReal series_dt;		/* max output interval [s] */
+  PetscReal series_vdense;	/* max|v| above which every step is written */
+  PetscReal series_last;	/* last output time */
+  long series_n;		/* records written */
+  float *series_buf;		/* rank 0: 5*nrflt scratch */
+  PetscInt series_mode;		/* 0: time and vdense, 1: change based */
+  PetscInt series_stride;	/* mode 0: every n-th step while dense */
+  PetscInt series_kdense;	/* mode 0: dense steps since the phase began */
+  PetscReal series_dlogv;	/* mode 1: log10|v| change threshold */
+  PetscReal series_dstress;	/* mode 1: tau, sigma change threshold [MPa] */
+  PetscReal series_dtmax;	/* mode 1: max output interval [s] */
+  PetscBool series_final;	/* write the final accepted step */
+  PetscBool series_have_prev;	/* series_buf holds a written record */
+  float *series_prev;		/* rank 0: 5*nrflt, last written record */
   PetscBool field_slip;		/* likewise signed slip frames
 				   rsf_slip.gGGG.NNNNNN.bin (x,y,slip[m]),
 				   the input for off-fault stress

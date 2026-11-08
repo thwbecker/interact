@@ -1,0 +1,79 @@
+#!/bin/bash
+#
+# run an ensemble of 2.5-D cycle models with randomly drawn parameters,
+# one run directory per member, for training data
+#
+# usage: run_sweep prefix nrun tmax_yr seed0 [nparallel]
+#
+#   prefix     run directories are prefix_0000, prefix_0001, ...
+#   nrun       number of members
+#   tmax_yr    integration time per member
+#   seed0      first seed; member i uses seed0 + i for both the parameter
+#              draw and the model's own random fields
+#   nparallel  runs started concurrently (default 1); each run is serial
+#
+# the parameter ranges are in draw_params below; edit there.  A table
+# prefix.table lists the drawn parameters per member.
+#
+prefix=${1-sweep}
+nrun=${2-10}
+tmax=${3-2000}
+seed0=${4-100}
+npar=${5-1}
+sdir=$(cd "$(dirname "$0")" && pwd)
+
+draw_params() {
+    # prints gen_system.py arguments for seed $1; python for the arithmetic
+    python3 - "$1" <<'EOF'
+import sys
+import numpy as np
+seed = int(sys.argv[1])
+rng = np.random.default_rng(seed)
+nfault = int(rng.choice([1, 1, 3]))
+# a/b between 0.5 and 0.9 with b fixed keeps Lb, and hence the cell size, fixed
+b = 0.015
+a = b * rng.uniform(0.5, 0.9)
+dc = float(10 ** rng.uniform(np.log10(0.01), np.log10(0.04)))
+W = float(rng.uniform(10e3, 20e3))
+L = float(rng.uniform(40e3, 100e3))
+n_asp = int(rng.choice([1, 1, 2, 3, 4, 6]))
+barrier = float(rng.uniform(0.05, 0.3))
+asp_rand = float(rng.uniform(0.0, 0.5))
+vs_margin = float(rng.choice([0.0, 0.05, 0.1]))
+v_eq = float(10 ** rng.uniform(-9.5, -8.5))
+args = ["--nfault %i" % nfault, "--a %.5f" % a, "--b %.5f" % b, "--dc %.4f" % dc,
+        "--W %.0f" % W, "--L %.0f" % L, "--n_asp %i" % n_asp, "--barrier_frac %.3f" % barrier,
+        "--asp_rand %.3f" % asp_rand, "--vs_margin %.3f" % vs_margin, "--v_eq %.3e" % v_eq,
+        "--seed %i" % seed]
+if nfault > 1:
+    step_x = float(rng.uniform(2e3, 10e3))
+    overlap = float(rng.uniform(-0.2, 0.3) * L)
+    if abs(overlap) < 1e3:
+        overlap = -1e3
+    args += ["--step_x %.0f" % step_x, "--overlap %.0f" % overlap]
+print(" ".join(args))
+EOF
+}
+
+table=$prefix.table
+if [ ! -f "$table" ]; then
+    echo "# member seed gen_system.py arguments" > "$table"
+fi
+i=0
+while [ $i -lt $nrun ]; do
+    seed=$((seed0 + i))
+    name=$(printf "%s_%04i" $prefix $i)
+    pars=$(draw_params $seed)
+    echo "$name $seed $pars" >> "$table"
+    if [ -f "$name/rsf_catalog.dat" ]; then
+	echo "$name exists, skipping"
+    else
+	"$sdir/run_model" "$name" "$tmax" 1 $pars > "$name.log" 2>&1 &
+    fi
+    i=$((i + 1))
+    while [ "$(jobs -r | wc -l)" -ge "$npar" ]; do
+	sleep 2
+    done
+done
+wait
+grep -h "exit" ${prefix}_*.log

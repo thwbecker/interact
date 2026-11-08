@@ -3315,8 +3315,14 @@ PetscErrorCode rsf_fd_postevent(TS ts, struct interact_ctx *par, PetscReal t, Ve
     /* the event handler otherwise resumes with its own step (the pre-event one), which after an
        early hand-back (-fd_back_dyn) can be far too long for the still-fast afterslip (the
        error estimate turned NaN and the integration stalled, fd_plan.md L3) */
+#if PETSC_VERSION_GE(3,21,0)
     if(fd->dim3)
       PetscCall(TSSetPostEventStep(ts,fd->dt_restart));   /* 3-D only: 2-D runs unchanged */
+#else
+    /* older PETSc: closest available call, untested for the 3-D FD path */
+    if(fd->dim3)
+      PetscCall(TSSetPostEventIntervalStep(ts,fd->dt_restart));
+#endif
   }else
     PetscCall(PetscPrintf(PETSC_COMM_WORLD,"rsf_fd_postevent: t %.6f yr: switch threshold crossed (mode %d: no phase)\n",
         (double)(t/SEC_PER_YEAR),(int)fd->mode));

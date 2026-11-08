@@ -26,6 +26,7 @@ void init_medium_rsf(struct med *medium)
   rsf->v0 =  RSF_DEFAULT_V0;		/* reference speed [m/s] (HBI: vref) */
   /*  */
   rsf->calc_sigma_dot = FALSE; /* compute normal stress change? */
+  rsf->sigma_dot_interact = PETSC_TRUE; /* ... including from fault slip? */
   /* optional per-cell D_c [m] (geometry order); NULL => use uniform
    rsf->dc.  Used for the BP5 nucleation patch (reduced D_RS) and
    read in the RHS, so it lives at file scope alongside the statics above */
@@ -119,10 +120,28 @@ void rsf_print_help(const char *prog)
   
   fprintf(stderr,"normal-stress evolution and limiter (for dip slip / nonplanar faults)\n");
   fprintf(stderr,"  -calc_sigma_dot <bool>  evolve normal stress via the In matrix (default 0 = off)\n");
+  fprintf(stderr,"  -sigma_dot_interact <bool> with -calc_sigma_dot: 1 (default) include the normal stress\n");
+  fprintf(stderr,"                          change from slip on the faults; 0 evolve sigma from the loading\n");
+  fprintf(stderr,"                          rates only (backslip, -rsf_stress_rate_file); not with -fd_mode\n");
   fprintf(stderr,"  -rsf_stations <file>    SEAS-style per-cell time series: file lines are NAME CELL_INDEX;\n");
   fprintf(stderr,"                          writes fltst_NAME.dat (t slip log10|v| tau sigma log10theta)\n");
   fprintf(stderr,"  -rsf_station_dt_yr <dt> station output interval when quiescent (default 0.1 yr)\n");
   fprintf(stderr,"  -rsf_station_vdense <v> station |v| above which every accepted step is written (default 1e-6)\n");
+  fprintf(stderr,"  -rsf_series_file <f>    compact all-cell binary time series (training data): header int32\n");
+  fprintf(stderr,"                          magic,ncell,5; records double t[s] + 5 float32[ncell] blocks\n");
+  fprintf(stderr,"                          log10|v| tau[MPa] log10theta[s] slip[m] sigma[MPa]\n");
+  fprintf(stderr,"  -rsf_series_dt_yr <dt>  series interval when quiescent (default 1 yr)\n");
+  fprintf(stderr,"  -rsf_series_vdense <v>  max|v| above which every accepted step is written (default 1e-6)\n");
+  fprintf(stderr,"  -rsf_series_stride <n>  every n-th accepted step while max|v| exceeds vdense (default 1)\n");
+  fprintf(stderr,"  -rsf_series_mode <m>    0: records by -rsf_series_dt_yr, -rsf_series_vdense and\n");
+  fprintf(stderr,"                          -rsf_series_stride (default)\n");
+  fprintf(stderr,"                          1: change based, at the first accepted step at which some cell's\n");
+  fprintf(stderr,"                          log10|v| changed by dlogv, or tau or sigma by dstress, since the\n");
+  fprintf(stderr,"                          last record, or dtmax has passed\n");
+  fprintf(stderr,"  -rsf_series_dlogv <d>   mode 1: log10|v| change threshold (default 0.1)\n");
+  fprintf(stderr,"  -rsf_series_dstress <d> mode 1: tau and sigma change threshold [MPa] (default 0.1)\n");
+  fprintf(stderr,"  -rsf_series_dtmax_yr <dt> mode 1: maximum record interval (default 5 yr)\n");
+  fprintf(stderr,"  -rsf_series_final <bool> also record the final accepted step (default 0)\n");
   fprintf(stderr,"  -limit_sigma <bool>     clamp sigma to [min,max], as HBI limitsigma (default 0)\n");
   fprintf(stderr,"  -min_sigma <Pa>         limiter floor (default 1e6)\n");
   fprintf(stderr,"  -max_sigma <Pa>         limiter ceiling (default 300e6)\n");
@@ -549,6 +568,10 @@ PetscErrorCode rsf_get_settings(int argc,char **argv,struct interact_ctx *par,
      default; needed for nonplanar or dipping faults where slip changes the
      normal stress.  Previously only settable in code */
   PetscCall(PetscOptionsGetBool(NULL,NULL,"-calc_sigma_dot",&rsf->calc_sigma_dot,NULL));
+  /* with -calc_sigma_dot, -sigma_dot_interact 0 keeps only the loading
+     rates in d sigma/dt and drops the change from slip on the faults
+     (the In matrix is still built, since the backslip loading uses it) */
+  PetscCall(PetscOptionsGetBool(NULL,NULL,"-sigma_dot_interact",&rsf->sigma_dot_interact,NULL));
   /* slip direction for the rate-and-state solve: 0 strike (default), 1 dip.
      Dip slip is what a thrust or normal fault needs and is the case that
      exercises the normal-stress path meaningfully */

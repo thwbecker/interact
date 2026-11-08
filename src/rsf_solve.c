@@ -783,6 +783,12 @@ PetscErrorCode rsf_solve_run(int argc,char **argv,struct interact_ctx *par,
     PetscCall(VecRestoreArray(rsf->ve_slip_prev,&sp));
     PetscCall(VecRestoreArrayRead(x,&xr));
   }
+  if(rsf->fd && rsf->calc_sigma_dot && (!rsf->sigma_dot_interact))
+    SETERRQ(PETSC_COMM_WORLD,PETSC_ERR_ARG_INCOMP,
+	    "-sigma_dot_interact 0 is not implemented for the fully dynamic phases (-fd_mode)");
+  if(rsf->calc_sigma_dot && (!rsf->sigma_dot_interact))
+    HEADNODE
+      fprintf(stderr,"%s: normal stress evolves from the loading rates only (-sigma_dot_interact 0)\n",argv[0]);
   if(!restart_done){
     if(rsf->fd && !have_restart)		/* initial state already above the FD switch threshold */
       PetscCall(rsf_fd_initial(ts,par,x));

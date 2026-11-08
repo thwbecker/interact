@@ -742,7 +742,7 @@ PetscErrorCode rsf_ve_apply_sink(struct interact_ctx *par, Vec X, PetscReal time
       PetscCall(VecAXPY(rsf->tau_dot,-efac/rsf->ve_tau[p],rsf->ve_h[p]));
       PetscCall(MatMult(rsf->ve_C[p],rsf->ve_vrel,rsf->ve_work));
       PetscCall(VecAXPY(rsf->tau_dot,-(1.0-efac),rsf->ve_work));
-      if(rsf->ve_normal){	/* identical sink on the normal traction */
+      if(rsf->ve_normal && rsf->sigma_dot_interact){	/* identical sink on the normal traction */
 	PetscCall(VecAXPY(rsf->sigma_dot,-efac/rsf->ve_tau[p],rsf->ve_hn[p]));
 	PetscCall(MatMult(rsf->ve_Cn[p],rsf->ve_vrel,rsf->ve_work));
 	PetscCall(VecAXPY(rsf->sigma_dot,-(1.0-efac),rsf->ve_work));
@@ -752,7 +752,7 @@ PetscErrorCode rsf_ve_apply_sink(struct interact_ctx *par, Vec X, PetscReal time
     for(p=0;p < rsf->ve_np;p++){
       efac = PetscExpReal(-dt/rsf->ve_tau[p]);
       PetscCall(VecAXPY(rsf->tau_dot,-efac/rsf->ve_tau[p],rsf->ve_h[p]));
-      if(rsf->ve_normal)
+      if(rsf->ve_normal && rsf->sigma_dot_interact)
 	PetscCall(VecAXPY(rsf->sigma_dot,-efac/rsf->ve_tau[p],rsf->ve_hn[p]));
     }
   }

@@ -165,6 +165,10 @@ struct rsf_vars{
      (created once in rsf_solve, layout matching Is/In rows) */
   Vec vel,tau_dot,sigma_dot;
   PetscBool calc_sigma_dot;
+  /* with calc_sigma_dot: include the normal stress change from slip on
+     the faults (In times slip rate, default); off (-sigma_dot_interact 0)
+     leaves only the loading rates (backslip, -rsf_stress_rate_file) */
+  PetscBool sigma_dot_interact;
   /* optional per-cell D_c [m] (geometry order); NULL => use uniform
      medium->dc.  Used for the BP5 nucleation patch (reduced D_RS) and
      read in the RHS, so it lives at file scope alongside the statics above 

@@ -1,0 +1,69 @@
+#!/bin/bash
+#
+# run one 2.5-D strike-slip earthquake cycle model with rsf_solve
+#
+# usage: run_model name tmax_yr ncore [gen_system.py arguments ...]
+#
+#   name     run directory (created below the current directory)
+#   tmax_yr  integration time in years
+#   ncore    MPI ranks (1: run the binary directly)
+#   rest     passed to gen_system.py, e.g. --nfault 3 --overlap 5e3 --a 0.012;
+#            anything after a literal -- is passed to rsf_solve instead,
+#            e.g. -- -state_law 2 -rtol 1e-5
+#
+# the rsf_solve binary is taken from config.sh next to this script
+# (variable rsf_solve) if that file exists, else from the PATH
+#
+name=${1-single}
+tmax=${2-2000}
+ncore=${3-1}
+if [ $# -ge 3 ]; then
+    shift 3
+else
+    shift $#
+fi
+gen_args=()
+solve_args=()
+past_sep=0
+for arg in "$@"; do
+    if [ "$arg" = "--" ]; then
+	past_sep=1
+    elif [ $past_sep -eq 0 ]; then
+	gen_args+=("$arg")
+    else
+	solve_args+=("$arg")
+    fi
+done
+sdir=$(cd "$(dirname "$0")" && pwd)
+rsf_solve=rsf_solve
+mpirun=mpirun
+rk=3bs
+rtol=1e-4
+series_dt=0.5			# interseismic series cadence [yr]
+series_vdense=1e-6		# accepted steps above this max slip rate are dense [m/s]
+series_stride=1			# write every n-th dense step (rsf_solve -rsf_series_stride)
+monitor_dt=5			# monitor cadence, also caps the time step [yr]
+if [ -f "$sdir/config.sh" ]; then
+    . "$sdir/config.sh"
+fi
+
+mkdir -p "$name"
+cd "$name" || exit 1
+python3 "$sdir/gen_system.py" --out . "${gen_args[@]}" | tee gen.log || exit 1
+opts=$(cat run.opts)
+cmd="$rsf_solve $opts -stop_time_yr $tmax -ts_rk_type $rk -rtol $rtol \
+ -dt_monitor_yr $monitor_dt -rsf_catalog -rsf_monitor_by_group 1 \
+ -rsf_series_file series.bin -rsf_series_dt_yr $series_dt -rsf_series_vdense $series_vdense \
+ -rsf_series_stride $series_stride -rsf_series_final 1 \
+ -rsf_checkpoint_wall 600 ${solve_args[*]}"
+if [ "$ncore" -gt 1 ]; then
+    cmd="$mpirun -np $ncore $cmd"
+fi
+echo "$cmd" > run.cmd
+echo "$name: running $(wc -l < geom.in) cells to $tmax yr"
+/usr/bin/time -f "wall %e s, maxrss %M kB" $cmd > rsf_solve.log 2>&1
+status=$?
+tail -1 rsf_solve.log
+grep -E "RHS function evaluations|rejected steps" rsf_solve.log
+echo "$name: rsf_solve exit $status, $(grep -c -v '^#' rsf_catalog.dat 2>/dev/null) events"
+exit $status
