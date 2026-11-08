@@ -88,7 +88,11 @@ call.
 (the mpirun options were needed in the sandbox, which runs as root on
 one core). In the sandbox, long runs started in the background have to
 be detached with `setsid`; a plain `nohup ... &` job was killed when
-the shell call that started it ended. Check free disk space before
+the shell call that started it ended. The sandbox was also restarted
+between conversation turns twice, which killed running jobs while the
+files survived; `run_model` writes a checkpoint every 10 minutes of
+wall time, and a run can be continued with the command in its
+run.cmd plus `-rsf_restart rsf_checkpoint.bin`. Check free disk space before
 large runs (`df -h`); the per-cell series can be hundreds of MB per
 member (README.md, Series output).
 

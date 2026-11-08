@@ -78,7 +78,9 @@ params.json.  The layout is built for strike 0 and then rotated by
 --rot.
 
 --layout chain instead places the faults tip to tip: fault k starts
---gap beyond the end of fault k-1 (along the strike of k-1) and runs
+--gap beyond the end of fault k-1 (along the strike of k-1, or with
+--gap_dir bisect along the bisector of the strikes of k-1 and k, which
+keeps point-symmetric chains symmetric) and runs
 along its own strike, so --strikes gives the shape of a segmented
 trace; --lengths sets one length per fault (chain only).  --step_x,
 --overlap, --stepover and --pivot are ignored for the chain.
@@ -170,6 +172,9 @@ def main():
                    help="echelon (default): parallel offsets by --step_x, --overlap; chain: each fault "
                         "starts --gap beyond the end of the previous one, along its own strike")
     p.add_argument("--gap", type=float, default=2e3, help="tip-to-tip gap for --layout chain [m]")
+    p.add_argument("--gap_dir", choices=("previous", "bisect"), default="previous",
+                   help="direction of the chain gaps: along the previous fault (default) or along the "
+                        "bisector of the two faults (point-symmetric chains stay symmetric)")
     p.add_argument("--lengths", default="",
                    help="comma separated length per fault [m] (--layout chain only); default all --L")
     p.add_argument("--stepover", choices=("right", "left"), default="right",
@@ -278,8 +283,15 @@ def main():
             ux, uy = math.sin(dl), math.cos(dl)
             if k > 0:
                 dlp = math.radians(strikes_rel[k - 1])
-                px += args.gap * math.sin(dlp)
-                py += args.gap * math.cos(dlp)
+                if args.gap_dir == "bisect":
+                    gx = math.sin(dlp) + ux
+                    gy = math.cos(dlp) + uy
+                    gn = math.hypot(gx, gy)
+                    px += args.gap * gx / gn
+                    py += args.gap * gy / gn
+                else:
+                    px += args.gap * math.sin(dlp)
+                    py += args.gap * math.cos(dlp)
             chain_centres.append((px + 0.5 * lengths[k] * ux, py + 0.5 * lengths[k] * uy))
             px += lengths[k] * ux
             py += lengths[k] * uy

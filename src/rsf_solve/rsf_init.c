@@ -130,6 +130,8 @@ void rsf_print_help(const char *prog)
   fprintf(stderr,"  -rsf_series_file <f>    compact all-cell binary time series (training data): header int32\n");
   fprintf(stderr,"                          magic,ncell,5; records double t[s] + 5 float32[ncell] blocks\n");
   fprintf(stderr,"                          log10|v| tau[MPa] log10theta[s] slip[m] sigma[MPa]\n");
+  fprintf(stderr,"                          (with -rsf_restart the file is cut back to its complete\n");
+  fprintf(stderr,"                          records up to the checkpoint time and continued)\n");
   fprintf(stderr,"  -rsf_series_dt_yr <dt>  series interval when quiescent (default 1 yr)\n");
   fprintf(stderr,"  -rsf_series_vdense <v>  max|v| above which every accepted step is written (default 1e-6)\n");
   fprintf(stderr,"  -rsf_series_stride <n>  every n-th accepted step while max|v| exceeds vdense (default 1)\n");

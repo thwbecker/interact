@@ -101,6 +101,69 @@ segments at -15.5 (C) and +15.5 (D).
   and the cells there end at about L_b/1.5. The normal stress limiter
   (0.5 MPa) was not reached in any run.
 
+## Numerical and initial-condition checks
+
+`run_checks [rundir]` reruns the models with finer cells (res), with
+rtol 1e-5 instead of 1e-4 (tol), and with another random initial
+slip-rate perturbation (seed2, `--seed 2`); for model C also with
+point-symmetric gaps (`--gap_dir bisect`, runs Cs_*) without
+(`--v_pert 0`) and with the perturbation. `compare_checks.py
+bs98_rundir checks_rundir` prints per-fault statistics and writes the
+event rasters checks_modelA.png, checks_modelB.png and
+checks_modelC.png (one row per variant, tick size scaled with moment).
+The runs were made on 2026-11-08 as described above, with the series
+written at every 16th dense step; model B at the finer resolution was
+interrupted twice by sandbox restarts and continued from its
+checkpoints, as was the model B run with the other perturbation; the
+duplicated catalog rows of the interrupted parts were removed before
+the comparison (run_checks does not include these restarts). The model
+B tolerance run was not made.
+
+- Single faults: at half the cell size and at rtol 1e-5 the event
+  sequences of beta = 60.5, 54.6 and 29.5 agree with the base runs to
+  1 to 2 yr; the largest difference is in the last three intervals of
+  beta = 54.6 at the finer cells (174, 184, 194 against 175, 187,
+  199 yr). The slower than predicted recurrence growth on the clamped
+  faults and the end of events on the 29.5 degree fault at 786 yr are
+  therefore not discretization effects.
+- Model A: finer cells (1014 instead of 678) and rtol 1e-5 give the
+  same event counts per fault and mean intervals within 0.4 yr. Another
+  random initial perturbation leaves the main fault and side fault 2
+  nearly unchanged, but side fault 3 then has 19 instead of 16 events,
+  more scatter in the intervals (CV 0.40 against 0.20) and some small
+  events.
+- Model C: finer cells (1805 instead of 1200), rtol 1e-5 and another
+  perturbation give the same event counts and mean intervals within
+  0.3 yr, except the connecting fault 3 at the finer cells (34.8
+  against 32.8 yr). The offset of up to 20 yr between the outer faults
+  5 and 4 in all of these comes from the geometry: with
+  `--gap_dir previous` (used in run_bs98) the connecting segments are
+  about 1.3 km out of point symmetry. With symmetric gaps and no
+  perturbation, faults 5 and 4 stay within 0.13 yr and faults 2 and 3
+  within 0.3 yr of each other over 300 yr; with the perturbation, 5 and
+  4 stay within 0.4 yr while 2 and 3 drift up to 3.7 yr apart. In none
+  of the variants does the middle fault 1 rupture within 1 yr of faults
+  5 and 4; it tends to fail with the connecting faults, 3 to 13 yr
+  apart from the outer faults. The loss of the whole-zone ruptures of
+  the paper is thus a property of these rate-and-state models, not of
+  the numerics or the initial perturbation.
+- Model B: at 1.8 times finer cells (2025 instead of 1128; L_b/2.7
+  instead of L_b/1.5 at the highest normal stress on the clamped side
+  faults) the side faults have the same event counts, mean intervals
+  within 1 yr and the same moment ranges, with event times within about
+  6 yr after 1300 yr. The main fault has 33 instead of 34 events. The
+  first two small main-fault events after the side-fault event at about
+  1145 yr occur in both, with the same moments; after that the
+  sequences differ (four more small events between 1194 and 1250 yr in
+  the base run, a small pair at 1349 yr in the finer run). The onset of
+  this irregular phase is resolved; its details are not.
+  With another random initial perturbation (base resolution; this run
+  was also continued once from a checkpoint) the model B sequence is
+  nearly the same as the base run, including the six small main-fault
+  events between 1157 and 1250 yr (times within 0.5 yr, moments within
+  0.02e20 N m), so the late irregular phase depends on the resolution
+  in its details but not on the initial perturbation.
+
 ## Results, with the comparison to the paper (one run per model)
 
 - Figs 4 and 5: the 45 degree fault gives periodic events every 61 to

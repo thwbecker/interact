@@ -98,6 +98,61 @@ static int rsf_init_monitor_groups(struct rsf_out_ctx *uc)
    cf. init_monitor_and_event in ode_solve_test.c
 */
 /*
+   restart (rank 0): keep only the complete records of an existing
+   series file with time <= t_restart, so that the restarted run appends
+   in step; drops what the interrupted run wrote after the checkpoint
+   and a partial last record, e.g. after a crash.  *have_t is set if the
+   last kept record is at t_restart itself.  Returns the open file
+   positioned at its end
+*/
+static FILE *rsf_series_open_restart(const char *series_file,int ncell,PetscReal t_restart,
+				     PetscBool *have_t)
+{
+  FILE *f;
+  int32_t hdr[3];
+  long recsize,fsize,nrec_file,nkeep,i;
+  double tt;
+  *have_t = PETSC_FALSE;
+  f = fopen(series_file,"r+b");
+  if(!f){			/* nothing to continue: start a new file */
+    f = myopen(series_file,"wb");
+    hdr[0] = 0x52534631;
+    hdr[1] = (int32_t)ncell;
+    hdr[2] = 5;
+    fwrite(hdr,sizeof(int32_t),3,f);
+    fprintf(stderr,"rsf_series_init: restart: %s not found, started a new file\n",series_file);
+    return f;
+  }
+  if((fread(hdr,sizeof(int32_t),3,f) != 3) || (hdr[0] != 0x52534631) || (hdr[1] != ncell)){
+    fprintf(stderr,"rsf_series_init: restart: %s has no matching header\n",series_file);
+    exit(-1);
+  }
+  recsize = (long)sizeof(double) + (long)hdr[2]*(long)ncell*(long)sizeof(float);
+  fseek(f,0L,SEEK_END);
+  fsize = ftell(f);
+  nrec_file = (fsize - 3L*(long)sizeof(int32_t))/recsize;
+  nkeep = 0;
+  for(i=0;i < nrec_file;i++){
+    fseek(f,3L*(long)sizeof(int32_t) + i*recsize,SEEK_SET);
+    if(fread(&tt,sizeof(double),1,f) != 1)
+      break;
+    if(tt > (double)t_restart)
+      break;
+    *have_t = (tt == (double)t_restart) ? PETSC_TRUE : PETSC_FALSE;
+    nkeep++;
+  }
+  fflush(f);
+  if(ftruncate(fileno(f),(off_t)(3L*(long)sizeof(int32_t) + nkeep*recsize)) != 0){
+    fprintf(stderr,"rsf_series_init: restart: could not truncate %s\n",series_file);
+    exit(-1);
+  }
+  fseek(f,0L,SEEK_END);
+  fprintf(stderr,"rsf_series_init: restart: kept %ld of %ld complete record(s) up to t = %.6f yr (%ld bytes dropped)\n",
+	  nkeep,nrec_file,(double)(t_restart/SEC_PER_YEAR),fsize - 3L*(long)sizeof(int32_t) - nkeep*recsize);
+  return f;
+}
+
+/*
    compact all-cell binary time series (-rsf_series_file), helper
    routines.  File layout: int32 magic 0x52534631 ('RSF1'), int32
    ncell, int32 nfield (5); then per record a float64 time [s] and five
@@ -139,6 +194,8 @@ static PetscErrorCode rsf_series_init(struct rsf_out_ctx *uc,struct med *medium,
   uc->series_dstress = 0.1;
   uc->series_final = PETSC_FALSE;
   uc->series_have_prev = PETSC_FALSE;
+  uc->series_skip_first = PETSC_FALSE;
+  uc->series_t_restart = t_init;
   PetscCall(PetscOptionsGetString(NULL,NULL,"-rsf_series_file",series_file,STRLEN,&uc->series_enable));
   PetscCall(PetscOptionsGetReal(NULL,NULL,"-rsf_series_dt_yr",&series_dt_yr,NULL));
   PetscCall(PetscOptionsGetReal(NULL,NULL,"-rsf_series_vdense",&uc->series_vdense,NULL));
@@ -163,7 +220,10 @@ static PetscErrorCode rsf_series_init(struct rsf_out_ctx *uc,struct med *medium,
     PetscFunctionReturn(PETSC_SUCCESS);
   HEADNODE{
     nbuf = 5*(size_t)medium->nrflt;
-    uc->series_f = myopen(series_file,(uc->restarted)?("ab"):("wb"));
+    if(uc->restarted)
+      uc->series_f = rsf_series_open_restart(series_file,medium->nrflt,t_init,&uc->series_skip_first);
+    else
+      uc->series_f = myopen(series_file,"wb");
     uc->series_buf = (float *)malloc(nbuf*sizeof(float));
     uc->series_prev = (float *)malloc(nbuf*sizeof(float));
     if((!uc->series_buf) || (!uc->series_prev)){
@@ -323,8 +383,16 @@ static PetscErrorCode rsf_series_monitor(struct rsf_out_ctx *uc,TS ts,PetscReal 
   HEADNODE{
     PetscCall(VecGetArray(uc->gathered,&sv));
     vmax = rsf_series_fill(uc,sv,medium,fault);
-    if(rsf_series_due(uc,time,medium->nrflt,vmax,is_final))
+    if(uc->series_skip_first && (time == uc->series_t_restart)){
+      /* restart: this record is already in the file; take it as the
+	 last written one instead of writing it again */
+      memcpy(uc->series_prev,uc->series_buf,5*(size_t)medium->nrflt*sizeof(float));
+      uc->series_have_prev = PETSC_TRUE;
+      uc->series_last = time;
+    }else if(rsf_series_due(uc,time,medium->nrflt,vmax,is_final)){
       rsf_series_write(uc,time,medium->nrflt);
+    }
+    uc->series_skip_first = PETSC_FALSE;
     PetscCall(VecRestoreArray(uc->gathered,&sv));
   }
   PetscFunctionReturn(PETSC_SUCCESS);

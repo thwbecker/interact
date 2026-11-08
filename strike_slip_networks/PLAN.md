@@ -351,6 +351,11 @@ rsf_solve (interact), output layer:
   `-rsf_series_dtmax_yr`; defaults unchanged. The choice for the
   ensemble is open.
 - [done] `-rsf_series_final`: record the final accepted step.
+- [done] series file cut back to the checkpoint on `-rsf_restart`
+  (previously a crash could leave a partial record and misalign all
+  appended records). Catalog rows written after the checkpoint by the
+  interrupted run are still kept.
+- [done] `--gap_dir bisect` for point-symmetric chains (gen_system.py).
 - [done] `-sigma_dot_interact 0`: normal stress from the loading rates
   only. The In matrix is still assembled (the backslip loading uses
   it); skipping it when -vpl is 0 would halve the matrix memory for

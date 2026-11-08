@@ -104,7 +104,9 @@ that the geometry at the inner tips stays that of the parallel case.
 `--layout chain` instead places the faults tip to tip along a
 segmented trace: fault k starts `--gap` beyond the end of fault k-1
 and runs along its own strike from `--strikes`; `--lengths` gives one
-length per fault (chain only).  Lists with a negative first value
+length per fault (chain only).  By default the gap points along the
+previous fault; `--gap_dir bisect` points it along the bisector of the
+two strikes, which keeps point-symmetric chains symmetric.  Lists with a negative first value
 have to be written as `--strikes=-15.5,0,-15.5`.
 
 Geometry resolution: the cell size is set from the cohesive zone
@@ -210,8 +212,15 @@ dstress, since the last record, or dtmax has passed.
 The gather is collective, so the option works under MPI; the write
 reads the state only.  theta is computed from psi with the uniform dc
 (as in the station output), so it is approximate if `-rsf_dc_file` is
-used.  Restarts append without a new header; in mode 1 the first step
-after a restart is always recorded.  Records are written at accepted
+used.  On a restart (`-rsf_restart`) the existing series file is cut
+back to its complete records up to the checkpoint time, which removes
+what the interrupted run wrote after the checkpoint and a partial last
+record (as left by a crash), and the restarted run appends from there
+without writing the checkpoint record twice.  A restart test (stop
+after 2500 steps, a partial record appended by hand, restart to the
+end) gave a series identical to that of the uninterrupted run.  The
+catalogs still keep the rows the interrupted run wrote after the
+checkpoint (see `-rsf_restart` in `rsf_solve -h`).  Records are written at accepted
 solver steps only, so while quiescent the spacing is the larger of the
 requested cadence and the step length, which is capped by
 `-dt_monitor_yr` (5 yr in `run_model`).  The final accepted step can

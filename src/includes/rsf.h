@@ -151,6 +151,8 @@ struct rsf_out_ctx{
   PetscBool series_final;	/* write the final accepted step */
   PetscBool series_have_prev;	/* series_buf holds a written record */
   float *series_prev;		/* rank 0: 5*nrflt, last written record */
+  PetscBool series_skip_first;	/* restart: the file already has the record at t_restart */
+  PetscReal series_t_restart;	/* restart time */
   PetscBool field_slip;		/* likewise signed slip frames
 				   rsf_slip.gGGG.NNNNNN.bin (x,y,slip[m]),
 				   the input for off-fault stress

@@ -1,0 +1,36 @@
+#!/bin/bash
+#
+# numerical and initial-condition checks of the run_bs98 models: the
+# same models at finer cells (res), at rtol 1e-5 (tol), with another
+# random initial perturbation (seed2), and for model C with
+# point-symmetric gaps (--gap_dir bisect, Cs_*) with and without the
+# initial perturbation.  Compare with: compare_checks.py bs98_rundir rundir
+#
+# usage: run_checks [rundir]
+#
+rundir=${1-.}
+sdir=$(cd "$(dirname "$0")/.." && pwd)
+p="--G 20e9 --sigma 10e6 --taudot 6.4e-4 --dc 0.01 --a 0.010 --b 0.015 --L 100e3 --W 15e3 --sigma_min 0.5e6"
+st="-rsf_series_stride 16"
+A="--nfault 3 --layout chain --gap 5e3 --strikes=-15.5,0,-15.5"
+B="--nfault 3 --layout chain --gap 5e3 --strikes=15.5,0,15.5"
+C="--nfault 5 --layout chain --gap 5e3 --lengths 100e3,50e3,100e3,50e3,100e3 --strikes=0,-15.5,0,-15.5,0"
+mkdir -p "$rundir"
+cd "$rundir" || exit 1
+"$sdir/run_model" b60.5_res 2000 1 $p --strikes=15.5 --cells_per_lb 19 -- $st
+"$sdir/run_model" b60.5_tol 2000 1 $p --strikes=15.5 --cells_per_lb 9.5 -- $st -rtol 1e-5
+"$sdir/run_model" b54.6_res 2000 1 $p --strikes=9.6 --cells_per_lb 14 -- $st
+"$sdir/run_model" b54.6_tol 2000 1 $p --strikes=9.6 --cells_per_lb 7 -- $st -rtol 1e-5
+"$sdir/run_model" b29.5_res 900 1 $p --strikes=-15.5 --cells_per_lb 6 -- $st
+"$sdir/run_model" b29.5_tol 900 1 $p --strikes=-15.5 --cells_per_lb 3 -- $st -rtol 1e-5
+"$sdir/run_model" C_res 300 1 $p $C --cells_per_lb 6 -- $st
+"$sdir/run_model" C_tol 300 1 $p $C --cells_per_lb 4 -- $st -rtol 1e-5
+"$sdir/run_model" C_seed2 300 1 $p $C --cells_per_lb 4 --seed 2 -- $st
+"$sdir/run_model" Cs_vpert0 300 1 $p $C --gap_dir bisect --cells_per_lb 4 --v_pert 0 -- $st
+"$sdir/run_model" Cs_seed1 300 1 $p $C --gap_dir bisect --cells_per_lb 4 -- $st
+"$sdir/run_model" Cs_seed2 300 1 $p $C --gap_dir bisect --cells_per_lb 4 --seed 2 -- $st
+"$sdir/run_model" A_res 500 1 $p $A --cells_per_lb 4.5 -- $st
+"$sdir/run_model" A_tol 500 1 $p $A --cells_per_lb 3 -- $st -rtol 1e-5
+"$sdir/run_model" A_seed2 500 1 $p $A --cells_per_lb 3 --seed 2 -- $st
+"$sdir/run_model" B_res 1500 1 $p $B --cells_per_lb 9 -- $st
+"$sdir/run_model" B_seed2 1500 1 $p $B --cells_per_lb 5 --seed 2 -- $st
