@@ -228,7 +228,9 @@ static void spectra_at(double complex w, int ns, const double *sx, const double 
   char tn;
   nk = 2*M + 1;
   two_nk = 2*nk;
-  /* R: receivers x (A wavenumbers, B wavenumbers), shear then normal (2 nr rows); S: (2 nk) x ns */
+  /* R: receivers x (A wavenumbers, B wavenumbers), shear then normal (2 nr rows); S: (2 nk) x ns;
+     the wavenumbers are independent (OpenMP threads) */
+#pragma omp parallel for schedule(static) private(k, j, i)
   for(m = 0; m < nk; m++){
     k = 2.0*M_PI*(m - M)/L;
     for(j = 0; j < ns; j++)
@@ -254,16 +256,53 @@ static void spectra_at(double complex w, int ns, const double *sx, const double 
   free(G);
 }
 
+/* the lags of all pairs of a block from their spectra: Re of sum_j X_j exp(-2 pi i j m / N) at
+   m = l q, times exp(omega_I t) dw / (2 pi); the pairs are independent (OpenMP threads, one FFT
+   plan per thread) */
+static void lags_from_spectra(size_t np, int nr, int ns, int nw, int N, int nt, int q, double dt, double wI, double dw,
+                              const double complex *specs, const double complex *specn, double *os, double *on)
+{
+  long pp;
+  int i, j, l;
+  double complex *x, *y;
+  fd_fft_plan plan;
+#pragma omp parallel private(pp, i, j, l, x, y, plan)
+  {
+    x = (double complex *)malloc(sizeof(double complex)*N);
+    y = (double complex *)malloc(sizeof(double complex)*N);
+#pragma omp critical(fd_hpdwn_plan)
+    plan = fd_fft_plan_create(N, FD_FFT_FORWARD);
+#pragma omp for schedule(static)
+    for(pp = 0; pp < (long)np; pp++){
+      i = (int)(pp % nr);
+      j = (int)(pp / nr);
+      for(l = 0; l < N; l++)
+        x[l] = (l < nw) ? specs[(size_t)pp*nw + l] : 0.0;
+      fd_fft_exec(plan, x, y);
+      for(l = 0; l < nt; l++)
+        os[((size_t)i*ns + j)*nt + l] = creal(y[l*q])*exp(wI*l*dt)*dw/(2.0*M_PI);
+      for(l = 0; l < N; l++)
+        x[l] = (l < nw) ? specn[(size_t)pp*nw + l] : 0.0;
+      fd_fft_exec(plan, x, y);
+      for(l = 0; l < nt; l++)
+        on[((size_t)i*ns + j)*nt + l] = creal(y[l*q])*exp(wI*l*dt)*dw/(2.0*M_PI);
+    }
+#pragma omp critical(fd_hpdwn_plan)
+    fd_fft_plan_destroy(plan);
+    free(x);
+    free(y);
+  }
+}
+
 /* one block of receivers: the spectra of its pairs at all frequencies, then the lags by FFT */
 static int batch_block(int ns, const double *sx, const double *sz, const double *stx, const double *stz, const double *sa,
                        int nr, const double *rx, const double *rz, const double *rtx, const double *rtz,
                        double alpha, double beta, double rho, double dt, int nt, int q, int N, double T, double L, int M,
                        double zsum, double *os, double *on)
 {
-  int nw, jw, i, j, l, Mw;
+  int nw, jw, Mw;
   double wI, dw, fac;
-  double complex w, *R, *S, *Gs, *Gn, *specs, *specn, *x, *y;
-  fd_fft_plan plan;
+  double complex w, *R, *S, *Gs, *Gn, *specs, *specn;
   size_t np, p;
   wI = (getenv("FD_HPDWN_WIT") ? atof(getenv("FD_HPDWN_WIT")) : 18.0)/T;
   dw = 2.0*M_PI/T;
@@ -275,9 +314,7 @@ static int batch_block(int ns, const double *sx, const double *sz, const double 
   Gn = (double complex *)malloc(sizeof(double complex)*np);
   specs = (double complex *)malloc(sizeof(double complex)*np*nw);
   specn = (double complex *)malloc(sizeof(double complex)*np*nw);
-  x = (double complex *)malloc(sizeof(double complex)*N);
-  y = (double complex *)malloc(sizeof(double complex)*N);
-  if(!R || !S || !Gs || !Gn || !specs || !specn || !x || !y)
+  if(!R || !S || !Gs || !Gn || !specs || !specn)
     return 1;
   for(jw = 0; jw < nw; jw++){
     w = jw*dw + I*wI;
@@ -294,30 +331,13 @@ static int batch_block(int ns, const double *sx, const double *sz, const double 
     }
   }
   /* the lags: Re of sum_j X_j exp(-2 pi i j m / N) at m = l q, times exp(omega_I t) dw / (2 pi) */
-  plan = fd_fft_plan_create(N, FD_FFT_FORWARD);
-  for(p = 0; p < np; p++){
-    i = (int)(p % nr);
-    j = (int)(p / nr);
-    for(l = 0; l < N; l++)
-      x[l] = (l < nw) ? specs[p*nw + l] : 0.0;
-    fd_fft_exec(plan, x, y);
-    for(l = 0; l < nt; l++)
-      os[((size_t)i*ns + j)*nt + l] = creal(y[l*q])*exp(wI*l*dt)*dw/(2.0*M_PI);
-    for(l = 0; l < N; l++)
-      x[l] = (l < nw) ? specn[p*nw + l] : 0.0;
-    fd_fft_exec(plan, x, y);
-    for(l = 0; l < nt; l++)
-      on[((size_t)i*ns + j)*nt + l] = creal(y[l*q])*exp(wI*l*dt)*dw/(2.0*M_PI);
-  }
-  fd_fft_plan_destroy(plan);
+  lags_from_spectra(np, nr, ns, nw, N, nt, q, dt, wI, dw, specs, specn, os, on);
   free(R);
   free(S);
   free(Gs);
   free(Gn);
   free(specs);
   free(specn);
-  free(x);
-  free(y);
   return 0;
 }
 

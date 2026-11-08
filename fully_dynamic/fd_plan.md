@@ -3584,6 +3584,17 @@ batch, the static rate from the batch or from interact's Is/In) and the switch i
   rows with zgemm; an optimised BLAS may sum in an order that depends on the matrix size, which
   would break the identity of results across rank numbers (reference BLAS keeps it).
 
+### M10 note: threads in the reflected tables (2026-11-08)
+
+PD13 at 500 m with OpenMP (32 threads) ran on one core for a long time: the reflected tables of a
+pair (fd_hpdwn_batch) were built before the builder's threaded loop and were serial apart from
+whatever threads the BLAS used. Now the wavenumbers of each frequency (source amplitudes and
+receiver factors, the bulk of the work besides zgemm) and the per-pair FFTs run on OpenMP threads
+(one FFT plan per thread); fd_hpdwn.o is compiled with OpenMP. The tables are identical on 1 and
+4 threads (test_fd_hpdwn_batch, 6 elements); every value is computed independently of the
+others, so the sums are in the same order. With MPI the receiver rows are split over the ranks,
+which also parallelises the batch (each rank repeats the source amplitudes).
+
 ### M8 note: MPI identity with an optimised BLAS (2026-11-05)
 
 On Thor's 64-core machine test_fd_mpi2d failed: the station series of 2 and 4 ranks differed from

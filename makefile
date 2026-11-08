@@ -1053,6 +1053,7 @@ $(ODIR)/ex_dense_v2.o:	ex_dense_v2.c $(GEN_P_INC)
 # evaluated, with OpenMP threads; rsf_fd.o reports the thread count
 $(ODIR)/fd_tables.o: CFLAGS += $(OPENMP_FLAGS)
 $(ODIR)/rsf_fd.o: CFLAGS += $(OPENMP_FLAGS)
+$(ODIR)/fd_hpdwn.o: CFLAGS += $(OPENMP_FLAGS)
 
 $(ODIR)/%.o:	%.c $(GEN_P_INC)
 	$(CC) $(CFLAGS)  $(OPTIM_FLAGS)  $(MY_PRECISION) -c $< -o $(ODIR)/$*.o
