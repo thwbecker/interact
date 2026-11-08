@@ -372,12 +372,16 @@ gen_system.py:
 
 - [todo] cell size from sigma_max_expected (2.1); run length check
   against the limiter (2.2); write both to params.json.
-- [todo] per-fault lists for L, a, dc, n_asp, W.
+- [todo] per-fault lists for a, dc, n_asp, W (lengths: done for
+  `--layout chain`, `--lengths`).
 - [todo] `--strike_rel`: strike relative to the S1 axis.
 - [done] `--stepover right|left` and `--pivot center|inner`; step types
   (restraining, releasing) in params.json.
 - [done] `--tip_creep`, `--tip_a` (graded VS tips) and
   `--sigma_interact` (far-field-only normal stress).
+- [done] `--layout chain`, `--gap`, `--lengths`: segmented traces with
+  faults placed tip to tip (used for the Becker and Schmeling 1998
+  analogues in becker_and_schmeling98/).
 - [todo] `--max_cells` guard.
 - [todo] tier and drawn parameter vector into params.json.
 - [todo, before tier 5] network layout mode (`--network <file>` or

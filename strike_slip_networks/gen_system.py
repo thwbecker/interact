@@ -77,6 +77,12 @@ the reverse; the type of each step is printed and written to
 params.json.  The layout is built for strike 0 and then rotated by
 --rot.
 
+--layout chain instead places the faults tip to tip: fault k starts
+--gap beyond the end of fault k-1 (along the strike of k-1) and runs
+along its own strike, so --strikes gives the shape of a segmented
+trace; --lengths sets one length per fault (chain only).  --step_x,
+--overlap, --stepover and --pivot are ignored for the chain.
+
 Faults with a strike other than 0 in --strikes are rotated about their
 centre (--pivot center, default) or about their end nearest to the
 middle of the system (--pivot inner), which keeps the stepover
@@ -160,6 +166,12 @@ def main():
     p.add_argument("--cells_per_lb", type=float, default=3.0)
     p.add_argument("--step_x", type=float, default=5e3, help="en echelon step perpendicular to strike [m]")
     p.add_argument("--overlap", type=float, default=0.0, help="along-strike overlap (>0) or gap (<0) [m]")
+    p.add_argument("--layout", choices=("echelon", "chain"), default="echelon",
+                   help="echelon (default): parallel offsets by --step_x, --overlap; chain: each fault "
+                        "starts --gap beyond the end of the previous one, along its own strike")
+    p.add_argument("--gap", type=float, default=2e3, help="tip-to-tip gap for --layout chain [m]")
+    p.add_argument("--lengths", default="",
+                   help="comma separated length per fault [m] (--layout chain only); default all --L")
     p.add_argument("--stepover", choices=("right", "left"), default="right",
                    help="each next fault to the right (default) or left looking along strike")
     p.add_argument("--pivot", choices=("center", "inner"), default="center",
@@ -218,11 +230,25 @@ def main():
         hstar = 2.0 / math.pi * G / (1.0 - nu) * args.dc * args.b / ((args.b - args.a) ** 2 * args.sigma)
     else:
         hstar = float("inf")
-    if args.dx > 0:
-        ncell = max(1, int(round(args.L / args.dx)))
+    if args.lengths:
+        lengths = [float(v) for v in args.lengths.split(",")]
+        if len(lengths) != args.nfault:
+            raise SystemExit("--lengths needs %i values" % args.nfault)
+        if args.layout != "chain":
+            raise SystemExit("--lengths needs --layout chain")
     else:
-        ncell = max(1, int(math.ceil(args.L / (Lb / args.cells_per_lb))))
-    dx = args.L / ncell
+        lengths = [args.L] * args.nfault
+    ncell_list = []
+    dx_list = []
+    for Lk in lengths:
+        if args.dx > 0:
+            nk = max(1, int(round(Lk / args.dx)))
+        else:
+            nk = max(1, int(math.ceil(Lk / (Lb / args.cells_per_lb))))
+        ncell_list.append(nk)
+        dx_list.append(Lk / nk)
+    ncell = ncell_list[0]
+    dx = dx_list[0]
 
     taudot = args.taudot
     if taudot <= 0.0:
@@ -243,6 +269,20 @@ def main():
     strikes = [s + args.rot for s in strikes]
     step_x = args.step_x if args.stepover == "right" else -args.step_x
     kmid = 0.5 * (args.nfault - 1)
+    # chain layout: fault centres before the rotation (strike 0 along +y)
+    chain_centres = []
+    if args.layout == "chain":
+        px, py = 0.0, 0.0
+        for k in range(args.nfault):
+            dl = math.radians(strikes_rel[k])
+            ux, uy = math.sin(dl), math.cos(dl)
+            if k > 0:
+                dlp = math.radians(strikes_rel[k - 1])
+                px += args.gap * math.sin(dlp)
+                py += args.gap * math.cos(dlp)
+            chain_centres.append((px + 0.5 * lengths[k] * ux, py + 0.5 * lengths[k] * uy))
+            px += lengths[k] * ux
+            py += lengths[k] * uy
     args.sr_az += args.rot
     rot = math.radians(args.rot)
     fault_rates = []
@@ -253,7 +293,9 @@ def main():
         # whole layout rotated clockwise by --rot), each fault at its own strike
         xc0 = k * step_x
         yc1 = k * (args.L - args.overlap) + 0.5 * args.L
-        if args.pivot == "inner" and k != kmid:
+        if args.layout == "chain":
+            xc0, yc1 = chain_centres[k]
+        elif args.pivot == "inner" and k != kmid:
             # keep the end nearest to the middle of the system fixed
             side = 1.0 if k < kmid else -1.0
             dl = math.radians(strikes_rel[k])
@@ -269,11 +311,13 @@ def main():
         if not args.ff_normal:
             sig_k = 0.0
         fault_rates.append((strikes[k], tau_k, sig_k))
-        aprof = a_profile(ncell, dx, args, rng)
-        for i in range(ncell):
-            d = (i + 0.5 - 0.5 * ncell) * dx
+        nk = ncell_list[k]
+        dxk = dx_list[k]
+        aprof = a_profile(nk, dxk, args, rng)
+        for i in range(nk):
+            d = (i + 0.5 - 0.5 * nk) * dxk
             geom.append((xc + d * sx, yc0 + d * sy, -0.5 * args.W, strikes[k], 90.0,
-                         0.5 * dx, 0.5 * args.W, k))
+                         0.5 * dxk, 0.5 * args.W, k))
             a = float(aprof[i])
             ab.append((a, args.b))
             vi = v_init * math.exp(args.v_pert * rng.standard_normal()) if args.v_pert > 0 else v_init
@@ -290,6 +334,9 @@ def main():
     # stepover type between consecutive faults from the sense of slip
     step_types = []
     for k in range(args.nfault - 1):
+        if args.layout == "chain":
+            step_types.append("n/a (chain)")
+            continue
         s0 = fault_rates[k][1]
         s1_ = fault_rates[k + 1][1]
         if s0 * s1_ <= 0.0:
@@ -329,13 +376,14 @@ def main():
                 sm = gg == m
                 dd = np.hypot(gx[sk][:, None] - gx[sm][None, :], gy[sk][:, None] - gy[sm][None, :])
                 dmin = min(dmin, float(dd.min()))
-        if dmin < 2.0 * dx:
+        if dmin < 2.0 * max(dx_list):
             print("WARNING: closest cells of different faults are %.0f m apart (cell size %.0f m)" %
-                  (dmin, dx))
+                  (dmin, max(dx_list)))
     a_arr = np.array([x[0] for x in ab])
     n_vw = int(np.sum(a_arr < args.b))
     par = vars(args).copy()
     par.update(dict(ncell_per_fault=ncell, dx=dx, N=N, N_vw=n_vw, Lb=Lb, hstar=hstar,
+                    lengths=lengths, ncell_list=ncell_list, dx_list=dx_list,
                     L_over_hstar=args.L / hstar if hstar < float("inf") else 0.0,
                     taudot=taudot, taudot_kPa_per_yr=taudot * SEC_PER_YEAR / 1e3,
                     v_init=v_init, sr_s1=s1, sr_s3=s3, strikes=strikes, step_types=step_types,
@@ -362,6 +410,8 @@ def main():
           (N, ncell, dx, n_vw, Lb, Lb / dx, hstar / 1e3, par["L_over_hstar"], taudot,
            par["taudot_kPa_per_yr"], s1, s3, args.sr_az, args.sigma_evolve))
     for k, st in enumerate(step_types):
+        if args.layout == "chain":
+            break
         print("  step %i-%i: %s %s step" % (k, k + 1, args.stepover, st))
     for s, t, n in fault_rates:
         print("  strike %6.1f: tau_dot %8.2f (%s) sigma_dot %8.2f kPa/yr" %

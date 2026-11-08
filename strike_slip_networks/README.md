@@ -101,6 +101,11 @@ params.json (`step_types`).  Faults given a non-zero entry in
 `--strikes` are rotated about their centre by default, or with
 `--pivot inner` about their end nearest the middle of the system, so
 that the geometry at the inner tips stays that of the parallel case.
+`--layout chain` instead places the faults tip to tip along a
+segmented trace: fault k starts `--gap` beyond the end of fault k-1
+and runs along its own strike from `--strikes`; `--lengths` gives one
+length per fault (chain only).  Lists with a negative first value
+have to be written as `--strikes=-15.5,0,-15.5`.
 
 Geometry resolution: the cell size is set from the cohesive zone
 Lb = G dc/(b sigma) as Lb/`--cells_per_lb` (default 3), consistent
@@ -138,6 +143,11 @@ h* = 2/pi G/(1-nu) dc b/((b-a)^2 sigma) with the in-plane modulus.
                     HACApK and hmmvp, sandbox specifics)
     examples/       make_examples (runs and plots the example systems)
                     and its figures
+    becker_and_schmeling98/
+                    rsf_solve runs that redo the models of Becker and
+                    Schmeling (1998, GJI) with rate-and-state friction,
+                    the scripts that made them, figures, and a
+                    README.md comparing them with the paper
 
 `run_model` sources an optional `config.sh` next to it (not part of
 the repository) that may set the variables `rsf_solve` and `mpirun`,

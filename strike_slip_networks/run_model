@@ -49,7 +49,11 @@ fi
 
 mkdir -p "$name"
 cd "$name" || exit 1
-python3 "$sdir/gen_system.py" --out . "${gen_args[@]}" | tee gen.log || exit 1
+python3 "$sdir/gen_system.py" --out . "${gen_args[@]}" | tee gen.log
+if [ "${PIPESTATUS[0]}" -ne 0 ]; then
+    echo "$name: gen_system.py failed"
+    exit 1
+fi
 opts=$(cat run.opts)
 cmd="$rsf_solve $opts -stop_time_yr $tmax -ts_rk_type $rk -rtol $rtol \
  -dt_monitor_yr $monitor_dt -rsf_catalog -rsf_monitor_by_group 1 \

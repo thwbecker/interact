@@ -1,0 +1,51 @@
+#!/bin/bash
+#
+# rate-and-state analogues of the models of Becker and Schmeling (1998,
+# GJI 135, 165-176): single faults at angles beta = 29.5, 45, 54.6 and
+# 60.5 degrees to S1 (their Figs 4 to 6), the short leftstep and
+# rightstep systems (models A and B, Figs 7 and 8), and the extended
+# five-fault systems (models C and D, Figs 9 and 10)
+#
+# usage: run_bs98 [rundir] [stride]
+#
+#   rundir  where the run directories go (default: current directory)
+#   stride  series output, every n-th dense step (default 8)
+#
+# parameters follow the paper where they have an analogue: background
+# normal stress 10 MPa, G 20 GPa, shear stressing rate G * 3.2e-14/s
+# (20.2 kPa/yr), friction 0.6 (f0), fault length 100 km (2a), W 15 km.
+# The static-kinetic friction is replaced by rate and state friction
+# (a 0.010, b 0.015, dc 0.01 m), which gives h* of about 10 km at 10 MPa.
+# The angles of the tilted segments in models A to D are not given in
+# the paper; 29.5 and 60.5 degrees (strikes -15.5 and +15.5 relative to
+# the 45 degree fault) are used here.  Cells are sized for the largest
+# normal stress expected from the far-field rate (README.md, PLAN.md 2.1).
+#
+rundir=${1-.}
+stride=${2-8}
+sdir=$(cd "$(dirname "$0")/.." && pwd)
+p="--G 20e9 --sigma 10e6 --taudot 6.4e-4 --dc 0.01 --a 0.010 --b 0.015 --L 100e3 --W 15e3"
+p="$p --sigma_min 0.5e6"
+solve="-- -rsf_series_stride $stride"
+
+mkdir -p "$rundir"
+cd "$rundir" || exit 1
+# single faults; beta = 45 + relative strike
+"$sdir/run_model" beta45 2000 1 $p --strikes=0 --cells_per_lb 3 $solve
+"$sdir/run_model" beta29.5 900 1 $p --strikes=-15.5 --cells_per_lb 3 $solve
+"$sdir/run_model" beta54.6 2000 1 $p --strikes=9.6 --cells_per_lb 7 $solve
+"$sdir/run_model" beta60.5 2000 1 $p --strikes=15.5 --cells_per_lb 9.5 $solve
+# short leftstep (A) and rightstep (B): side faults at the ends of the
+# beta = 45 main fault, 5 km tip gaps
+"$sdir/run_model" modelA 500 1 $p --nfault 3 --layout chain --gap 5e3 \
+    --strikes=-15.5,0,-15.5 --cells_per_lb 3 $solve
+"$sdir/run_model" modelB 1500 1 $p --nfault 3 --layout chain --gap 5e3 \
+    --strikes=15.5,0,15.5 --cells_per_lb 5 $solve
+# extended leftstep (C) and rightstep (D): 100 km faults joined by 50 km
+# tilted segments
+"$sdir/run_model" modelC 300 1 $p --nfault 5 --layout chain --gap 5e3 \
+    --lengths 100e3,50e3,100e3,50e3,100e3 --strikes=0,-15.5,0,-15.5,0 --cells_per_lb 4 $solve
+"$sdir/run_model" modelD 300 1 $p --nfault 5 --layout chain --gap 5e3 \
+    --lengths 100e3,50e3,100e3,50e3,100e3 --strikes=0,15.5,0,15.5,0 --cells_per_lb 4 $solve
+
+python3 "$(dirname "$0")/plot_bs98.py" .
