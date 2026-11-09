@@ -1,14 +1,16 @@
 # Single-fault sweep: friction assumptions and orientation in the far-field loading
 
-`run_single_sweep [rundir] [tmax_yr]` runs one strike-slip strip (L 60
+`run_single_sweep [rundir] [tmax_yr] [variants] [dx_div_two]` runs one
+strike-slip strip (L 60
 km, W 15 km, 10 percent velocity-strengthening ends with a 0.03, sigma_0
 50 MPa, far-field stressing rate 21.5 kPa/yr, normal stress evolving
 with the far-field rate, limiter at 5 MPa) for 3000 yr in 30
 configurations:
 
-- friction: one state variable, aging law, a 0.01, b 0.02; or two state
-  variables, slip law, a = b1 = 0.01, b2 = 0.84 a, dc2 = dc/0.048 as in
-  Becker (2000);
+- friction (`variants`): one state variable, aging law, a 0.01, b 0.02
+  (`one`); the same with the slip law (`slip`); or two state variables,
+  slip law, a = b1 = 0.01, b2 = 0.84 a, dc2 = dc/0.048 as in Becker (2000)
+  (`two`);
 - L/h* of 10, 20, 30 (dc varied). For two state variables, whose
   weakening acts over dc2 because b1 = a, dc is chosen so that the
   spring-slider critical stiffness (0.0803 a sigma/dc) equals the
@@ -20,8 +22,9 @@ configurations:
 
 Cells: L_b/4 at sigma_0 for one state variable (L_b/2 or less at the end
 of the +20 degree runs, where sigma reaches about 90 MPa); for two state
-variables a cell size of G dc2/(b2 sigma)/16, which leaves the first
-variable's L_b = G dc/(b sigma) under-resolved (0.6 to 0.7 cells).
+variables a cell size of G dc2/(b2 sigma) divided by `dx_div_two`
+(16 by default), which leaves the first variable's L_b = G dc/(b sigma)
+under-resolved (0.6 to 0.7 cells at 16, 1.3 at 32).
 
 `plot_sweep.py [rundir]` makes sweep_timeseries.png (mean tau/sigma of
 the velocity-weakening cells per run), sweep_recurrence.png (interval to
@@ -31,6 +34,14 @@ two-state runs have, after nearly every large event, one to four
 re-ruptures of one or two cells within seconds (Mw about 4.3 to 4.7),
 listed as separate events in the catalog, which would otherwise
 dominate the interval statistics.
+
+## Runs shown
+
+The figures and sweep_summary.txt in this directory combine the aging-law
+runs (`run_single_sweep dir 3000 "one two" 16`), the slip-law runs
+(`run_single_sweep dir 3000 "slip two" 32`) and two-state runs at
+`dx_div_two` 32 for L/h* 10 and 20 but 16 for L/h* 30 (the finer runs
+took about 14 min each there and were not completed).
 
 ## Results (2026-11-08, single runs, 3000 yr each)
 
@@ -55,6 +66,21 @@ dominate the interval statistics.
 - Two state variables (with the stiffness matching above) give shorter
   recurrence (about 306 against 404 yr at L/h* 20, optimal orientation)
   and the small re-ruptures, but not a different regime in these runs.
+- The one-state slip law gives nearly the same large-event sequences as
+  the aging law (7, 8 and 10 Mw >= 6 events at the optimal orientation
+  for L/h* 10, 20, 30, against 7, 8 and 11), the same orientation trends,
+  detrended CV of at most 0.073, and no period 2 at L/h* 20 (CV 0.000).
+- Both slip-law variants add many small events (Mw about 3.8 to 5.0):
+  9 to 98 per run for one state variable, rising with L/h*, and 9 to 49
+  for two. In the runs checked (L/h* 20, optimal orientation) they occur
+  within seconds to about 40 min after a large event, at the very ends
+  of the strip (outermost 1 to 3 km, inside the velocity-strengthening
+  ends), i.e. bursts of post-seismic slip at the strip tips that exceed
+  the 1 mm/s catalog threshold. Their number and size depend on the
+  resolution: for the one-state slip law at L_b/8 there were 26 of
+  Mw 4.1 to 4.6 against 36 of Mw 4.3 to 5.0 at L_b/4, while the eight
+  large events kept their onsets within 14 yr over 2600 yr. They are
+  not used in the statistics above (Mw >= 6 only).
 - The permutation entropy values in the table rest on 2 to 24 large
   events and on peak stresses that drift with the normal stress; they
   should not be read as measures of complexity here.

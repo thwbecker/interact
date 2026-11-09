@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
 plot_sweep.py [rundir]: figures and a table for the runs of
-run_single_sweep (one state variable, aging law, against two state
-variables, slip law; L/h* 10, 20, 30; strike -20 ... 20 degrees relative
+run_single_sweep (one state variable, aging or slip law, and two
+state variables, slip law; L/h* 10, 20, 30; strike -20 ... 20 degrees relative
 to the optimal orientation)
 
   sweep_timeseries.png  mean tau/sigma of the velocity-weakening cells
@@ -34,7 +34,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."
 from complexity import extrema, perm_entropy  # noqa: E402
 from rsf_series import Run, cat_columns  # noqa: E402
 
-LAWS = (("one", "one state, aging"), ("two", "two states, slip"))
+LAWS = (("one", "one state, aging"), ("slip", "one state, slip"), ("two", "two states, slip"))
 XS = (10, 20, 30)
 STRIKES = (-20, -10, 0, 10, 20)
 CC = cat_columns(None)
@@ -93,7 +93,8 @@ def main():
                 r = load(rd, law, x, s)
                 if r is not None:
                     res[(law, x, s)] = (r, measures(r))
-    cols = [(law, x) for law, _ in LAWS for x in XS]
+    laws = [law for law, _ in LAWS if any(k[0] == law for k in res)]
+    cols = [(law, x) for law in laws for x in XS]
     colors = plt.cm.coolwarm(np.linspace(0, 1, len(STRIKES)))
     # time series grid
     fig, ax = plt.subplots(len(STRIKES), len(cols), figsize=(3.0 * len(cols), 1.5 * len(STRIKES)),
@@ -116,7 +117,7 @@ def main():
     fig.tight_layout()
     fig.savefig(os.path.join(rd, "sweep_timeseries.png"), dpi=120)
     # recurrence against time
-    fig, ax = plt.subplots(2, 3, figsize=(13, 7), squeeze=False)
+    fig, ax = plt.subplots(len(laws), 3, figsize=(13, 3.5 * len(laws)), squeeze=False)
     for j, (law, x) in enumerate(cols):
         a = ax[j // 3, j % 3]
         for i, s in enumerate(STRIKES):
@@ -135,7 +136,7 @@ def main():
     # summary heat maps
     names = (("n", "events with Mw >= 6"), ("cv", "CV of detrended intervals"), ("pe", "PE of peak tau/sigma [bits]"),
              ("partial", "fraction of partial ruptures"))
-    fig, ax = plt.subplots(1, 4, figsize=(16, 3.8))
+    fig, ax = plt.subplots(1, 4, figsize=(16, 1.2 + 0.45 * len(cols)))
     lines = ["%-4s %3s %4s %5s %6s %6s %5s %7s" % ("law", "L/h*", "strk", "n>=6", "n<6", "CV_dt", "PE", "partial")]
     for k, (key, title) in enumerate(names):
         z = np.full((len(cols), len(STRIKES)), np.nan)

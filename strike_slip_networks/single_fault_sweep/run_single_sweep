@@ -7,10 +7,17 @@
 # one: -20 -10 0 10 20 degrees, i.e. beta = 25 ... 65 degrees to S1;
 # negative unclamping, positive clamping)
 #
-# usage: run_single_sweep [rundir] [tmax_yr]
+# usage: run_single_sweep [rundir] [tmax_yr] [variants] [dx_div_two]
+#
+#   variants    any of one (one state, aging law; default), slip (one state,
+#               slip law), two (two states, slip law; default)
+#   dx_div_two  two-state cell size is G dc2/(b2 sigma) divided by this
+#               (default 16)
 #
 rundir=${1-.}
 tmax=${2-3000}
+variants=${3-"one two"}
+dxdiv=${4-16}
 sdir=$(cd "$(dirname "$0")/.." && pwd)
 common="--L 60e3 --W 15e3 --sigma 50e6 --vs_margin 0.1 --a_vs 0.03 --cells_per_lb 4 --sigma_min 5e6"
 mkdir -p "$rundir"
@@ -23,18 +30,24 @@ for X in 10 20 30; do
     # so dc1 is chosen such that the spring-slider critical stiffness,
     # kappa_c a sigma/dc1 with kappa_c = 0.0803, equals the one-state
     # (b-a) sigma/dc, i.e. dc1 = 0.0803 dc(one state) for the same L/h*;
-    # cells from the weakening length G dc2/(b2 sigma) (7.6e4 dc2 here) over 16
+    # cells from the weakening length G dc2/(b2 sigma) (7.6e4 dc2 here) over dx_div_two
     dc2s=$(python3 -c "print(0.0803*0.5515/$X)")
     dc22=$(python3 -c "print(0.0803*0.5515/$X/0.048)")
-    dx2=$(python3 -c "print(76190.*0.0803*0.5515/$X/0.048/16)")
+    dx2=$(python3 -c "print(76190.*0.0803*0.5515/$X/0.048/$dxdiv)")
     for s in -20 -10 0 10 20; do
         n1=one_X${X}_s${s}
         n2=two_X${X}_s${s}
-        if ! grep -q "^wall" $n1/rsf_solve.log 2>/dev/null; then
+        n3=slip_X${X}_s${s}
+        if [[ " $variants " == *" one "* ]] && ! grep -q "^wall" $n1/rsf_solve.log 2>/dev/null; then
             "$sdir/run_model" $n1 $tmax 1 $common --a 0.01 --b 0.02 --dc $dc1 --strikes=$s \
                 -- -rsf_series_stride 8
         fi
-        if ! grep -q "^wall" $n2/rsf_solve.log 2>/dev/null; then
+        # one state variable, slip law, otherwise as the aging-law runs
+        if [[ " $variants " == *" slip "* ]] && ! grep -q "^wall" $n3/rsf_solve.log 2>/dev/null; then
+            "$sdir/run_model" $n3 $tmax 1 $common --a 0.01 --b 0.02 --dc $dc1 --state_law 2 --strikes=$s \
+                -- -rsf_series_stride 8
+        fi
+        if [[ " $variants " == *" two "* ]] && ! grep -q "^wall" $n2/rsf_solve.log 2>/dev/null; then
             "$sdir/run_model" $n2 $tmax 1 $common --dx $dx2 --a 0.01 --b 0.01 --b2 0.0084 --dc $dc2s --dc2 $dc22 \
                 --state_law 2 --strikes=$s -- -rsf_series_stride 8
         fi

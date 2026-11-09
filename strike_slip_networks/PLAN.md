@@ -645,7 +645,11 @@ state variables, L/h* 10 to 30, strike -20 to 20 degrees from optimal,
 3000 yr, far-field loading: orientation dominates (secular recurrence
 trends), detrended sequences nearly periodic, period 2 at L/h* 20 with
 one state variable (resolved at L_b/8), no partial ruptures under
-far-field loading; two-state runs not yet converged in recurrence.
+far-field loading; two-state runs not yet converged in recurrence. The
+one-state slip law gives nearly the same large-event sequences as the
+aging law; both slip-law variants add small post-seismic bursts at the
+strip tips that are counted as events at the 1 mm/s threshold and
+depend on resolution.
 
 - P0 [done]: two-state law against the nondimensional spring slider.
 - P1: two-state spring slider in rsf_solve over kappa' from 0.95 to
