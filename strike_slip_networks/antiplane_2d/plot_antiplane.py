@@ -55,6 +55,20 @@ def read_series(d, nc):
 
 
 def analyze(d):
+    """events, rupture lengths and nucleation points of one run; cached in
+    events.npz in the run directory, so that series.bin can be removed
+    afterwards to save space"""
+    cache = os.path.join(d, "events.npz")
+    if os.path.exists(cache) and (not os.path.exists(os.path.join(d, "series.bin")) or
+                                  os.path.getmtime(cache) >= os.path.getmtime(os.path.join(d, "series.bin"))):
+        z = np.load(cache)
+        return params(d), dict(on=z["on"], ln=z["ln"], nuc=z["nuc"])
+    p, r = _analyze(d)
+    np.savez(cache, on=r["on"], ln=r["ln"], nuc=r["nuc"])
+    return p, r
+
+
+def _analyze(d):
     p = params(d)
     c = np.loadtxt(os.path.join(d, "rsf_catalog.dat"), ndmin=2)
     tmax = float(open(os.path.join(d, "rsf_solve.log")).read().split("stop ")[1].split()[0]) \
@@ -199,6 +213,9 @@ def main():
             ax[j].axis("off")
             continue
         p, r, s = res[ks[-1]]
+        if "lv" not in r:               # from the events cache, series removed
+            ax[j].axis("off")
+            continue
         lv = r["lv"]
         w = slice(max(0, len(lv) - 4000), len(lv), max(1, len(lv[-4000:]) // 2000))
         im = ax[j].pcolormesh(np.arange(lv[w].shape[0]), (np.arange(lv.shape[1]) + 0.5) * p["ds"], lv[w].T,

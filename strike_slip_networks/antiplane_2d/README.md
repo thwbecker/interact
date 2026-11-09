@@ -118,9 +118,88 @@ and parameter_map_cattania.png in the layout of Cattania's Figure 2a
 (events per full-rupture cycle by colour); the numbers are in
 parameter_maps.txt.
 
-Status (2026-11-09): Wu & Chen setup complete for W/hc 2 to 22 with the
-aging and slip laws; Cattania setup at W/L_inf 2 and 4. The larger runs
-(W/hc 45 and 90, W/L_inf 8 to 32) were not finished in this session.
+`compare_papers.py [rundir]` makes the comparison quantitative:
+for the Wu & Chen setup it predicts each run's regime from their
+boundaries and counts agreement (runs within 10 percent of a boundary
+match either neighbouring regime), and gives per b/a the W/h* interval
+of each transition between neighbouring grid points; for the Cattania
+setup it gives the ratio of events per full-rupture cycle to her
+estimate 0.45 (W/L_inf)^1/2 and the W/L_inf interval of the onset of
+partial ruptures. It writes comparison.txt, comparison_wuchen.png and
+comparison_cattania.png. plot_antiplane.py caches the events of each run
+in events.npz, so that the large series files can be deleted once a run
+has been analysed.
+
+### Results (2026-11-09/10, aging and slip law; single runs)
+
+Runs: Wu & Chen setup W/hc 2 to 45 at b/a 1.33, 2, 3 and W/hc 90 at
+b/a 2 (aging; W/hc 90 at b/a 3 and with the slip law were not finished);
+Cattania setup W/L_inf 2 to 32 at a/b 0.5 and 0.625, 2 to 16 at 0.75,
+2 and 4 at 0.875 (the slip-law run at a/b 0.75, W/L_inf 16 was stopped
+at 13.6 of 38.7 yr because of cost). PRZ runs are not included yet.
+
+Wu & Chen (2014) setup, regime predicted by their boundaries:
+
+| law | runs in the predicted regime |
+|---|---|
+| aging | 10 of 16 |
+| slip | 13 of 15 |
+
+Transition intervals in W/h* (their values 1.2, 5.5, 33):
+
+| b/a | law | events become seismic | nucleation moves to the ends | partial ruptures begin |
+|---|---|---|---|---|
+| 1.33 | aging | 0.5 to 1.2 | 2.8 to 5.5 | 5.5 to 11 |
+| 1.33 | slip | 0.5 to 1.2 | 2.8 to 5.5 | not up to 11 |
+| 2 | aging | 1 to 2.5 | 5.5 to 11 | 11 to 22 |
+| 2 | slip | at or below 1 | 5.5 to 11 | not up to 22 |
+| 3 | aging | at or below 1.3 | 3.3 to 7.3 | 7.3 to 15 |
+| 3 | slip | at or below 1.3 | 3.3 to 7.3 | not up to 30 |
+
+With the aging law the first two transitions agree with Wu & Chen within
+the grid resolution at all three b/a, and partial ruptures begin a
+factor of 2 to 5 below their W/h* = 33; a wide size distribution
+appears at W/h* 30 (b/a 3) and 45 (b/a 2), below their 105. In W/hc
+the onset of partial ruptures lies between about 20 and 45 at all three
+b/a, i.e. it does not follow a constant W/h* as their boundary does
+(the grid is coarse). Possible reasons for the earlier onset, none
+tested: the catalog counts all events above 1 mm/s while their
+classification may consider only larger ones, the buried half space
+standing in for their whole space, and the run length (30 recurrence
+estimates); cell size is unlikely, since the b/a 2 scan at their
+resolution (hc/10) gave the same.
+
+With the slip law, events become seismic at a smaller W/h* (b/a 2:
+events at W/h* 1, where the aging law has slow events, consistent with
+its smaller nucleation size), the nucleation moves to the ends at the
+same W/h*, and no partial ruptures occurred up to the largest W/h* run
+(30 at b/a 3), i.e. at least a factor 2 to 4 later than with the aging
+law.
+
+Cattania (2019) setup:
+
+| a/b | law | events per cycle / her estimate (W/L_inf 8, 16, 32) | onset of partial ruptures |
+|---|---|---|---|
+| 0.5 | aging | 0.79, 0.90, 0.79 | W/L_inf 8 to 16 |
+| 0.625 | aging | 0.79, 1.11, 0.81 | 8 to 16 |
+| 0.75 | aging | 1.03, 1.16 | 4 to 8 |
+| 0.5 | slip | 0.79, 0.56, 0.39 | not up to 32 |
+| 0.625 | slip | 0.79, 0.56, 0.39 | not up to 32 |
+| 0.75 | slip | 0.79, 0.60 | not up to 16 |
+
+(her onset: 5 +- 2; a ratio of 0.79 at W/L_inf 8 means one event per
+cycle where her estimate is 1.27.) With the aging law her estimate
+matches the number of events per cycle to about 20 percent where
+partial ruptures occur, and her onset at a/b 0.75; at a/b 0.5 and 0.625
+the onset lies between W/L_inf 8 and 16, later than her 5 +- 2. With
+the slip law no partial ruptures occurred up to W/L_inf 32.
+
+In both setups the slip law therefore leaves the onset of seismic
+behaviour and the move of nucleation to the ends nearly where the
+aging law has them (or earlier), but delays partial ruptures by at least
+a factor of 2 in fault size, consistent with the 2.5-D strips
+(../single_fault_regimes). The slip-law runs at a/b >= 0.75 are
+expensive (up to 20 min each on one core).
 
 Wu & Chen setup, aging law, against their map:
 

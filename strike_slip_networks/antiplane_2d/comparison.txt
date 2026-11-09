@@ -1,0 +1,39 @@
+Wu & Chen (2014) setup: regime predicted by their boundaries against the regime found
+  aging law: 10 of 16 runs in the predicted regime (62 %; within 10 % of a boundary either neighbour counts)
+    b/a 3.00 W/hc  22.0 (W/h*  14.67): predicted side           found narrow
+    b/a 3.00 W/hc  45.0 (W/h*  30.02): predicted narrow/side    found wide
+    b/a 2.00 W/hc  45.0 (W/h*  22.50): predicted side           found narrow
+    b/a 2.00 W/hc  90.0 (W/h*  45.00): predicted narrow         found wide
+    b/a 1.33 W/hc   2.0 (W/h*   0.50): predicted stable         found slow
+    b/a 1.33 W/hc  45.0 (W/h*  11.25): predicted side           found narrow
+    b/a 3.00, onset of seismic: already at the smallest W/h*, 1.3 (Wu & Chen 1.2)
+    b/a 3.00, onset of side   : between W/h* 3.3 and 7.3         (Wu & Chen 5.5)
+    b/a 3.00, onset of partial: between W/h* 7.3 and 15          (Wu & Chen 33)
+    b/a 2.00, onset of seismic: between W/h* 1 and 2.5           (Wu & Chen 1.2)
+    b/a 2.00, onset of side   : between W/h* 5.5 and 11          (Wu & Chen 5.5)
+    b/a 2.00, onset of partial: between W/h* 11 and 22           (Wu & Chen 33)
+    b/a 1.33, onset of seismic: between W/h* 0.5 and 1.2         (Wu & Chen 1.2)
+    b/a 1.33, onset of side   : between W/h* 2.8 and 5.5         (Wu & Chen 5.5)
+    b/a 1.33, onset of partial: between W/h* 5.5 and 11          (Wu & Chen 33)
+  slip law: 13 of 15 runs in the predicted regime (87 %; within 10 % of a boundary either neighbour counts)
+    b/a 2.00 W/hc   2.0 (W/h*   1.00): predicted slow           found centre
+    b/a 1.33 W/hc   2.0 (W/h*   0.50): predicted stable         found slow
+    b/a 3.00, onset of seismic: already at the smallest W/h*, 1.3 (Wu & Chen 1.2)
+    b/a 3.00, onset of side   : between W/h* 3.3 and 7.3         (Wu & Chen 5.5)
+    b/a 3.00, onset of partial: not reached up to W/h* 30        (Wu & Chen 33)
+    b/a 2.00, onset of seismic: already at the smallest W/h*, 1  (Wu & Chen 1.2)
+    b/a 2.00, onset of side   : between W/h* 5.5 and 11          (Wu & Chen 5.5)
+    b/a 2.00, onset of partial: not reached up to W/h* 22        (Wu & Chen 33)
+    b/a 1.33, onset of seismic: between W/h* 0.5 and 1.2         (Wu & Chen 1.2)
+    b/a 1.33, onset of side   : between W/h* 2.8 and 5.5         (Wu & Chen 5.5)
+    b/a 1.33, onset of partial: not reached up to W/h* 11        (Wu & Chen 33)
+
+Cattania (2019) setup: events per full-rupture cycle against 0.45 (W/L_inf)^1/2
+  aging law, a/b 0.500: W/L_inf [2.0, 4.0, 8.0, 16.0, 32.0], alpha/estimate ['1.00', '1.00', '0.79', '0.90', '0.79']; onset of partial ruptures between W/L_inf 8.0 and 16 (Cattania 5 +- 2)
+  aging law, a/b 0.625: W/L_inf [2.0, 4.0, 8.0, 16.0, 32.0], alpha/estimate ['1.00', '1.00', '0.79', '1.11', '0.81']; onset of partial ruptures between W/L_inf 8.0 and 16 (Cattania 5 +- 2)
+  aging law, a/b 0.750: W/L_inf [2.0, 4.0, 8.0, 16.0], alpha/estimate ['1.00', '1.00', '1.03', '1.16']; onset of partial ruptures between W/L_inf 4.0 and 8 (Cattania 5 +- 2)
+  aging law, a/b 0.875: W/L_inf [2.0, 4.0], alpha/estimate ['1.00', '1.00']; onset of partial ruptures not reached up to W/L_inf 4 (Cattania 5 +- 2)
+  slip law, a/b 0.500: W/L_inf [2.0, 4.0, 8.0, 16.0, 32.0], alpha/estimate ['1.00', '1.00', '0.79', '0.56', '0.39']; onset of partial ruptures not reached up to W/L_inf 32 (Cattania 5 +- 2)
+  slip law, a/b 0.625: W/L_inf [2.0, 4.0, 8.0, 16.0, 32.0], alpha/estimate ['1.00', '1.00', '0.79', '0.56', '0.39']; onset of partial ruptures not reached up to W/L_inf 32 (Cattania 5 +- 2)
+  slip law, a/b 0.750: W/L_inf [2.0, 4.0, 8.0, 16.0], alpha/estimate ['1.00', '1.00', '0.79', '0.60']; onset of partial ruptures not reached up to W/L_inf 16 (Cattania 5 +- 2)
+  slip law, a/b 0.875: W/L_inf [2.0, 4.0], alpha/estimate ['1.00', '1.00']; onset of partial ruptures not reached up to W/L_inf 4 (Cattania 5 +- 2)
