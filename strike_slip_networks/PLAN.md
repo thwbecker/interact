@@ -1,8 +1,14 @@
 # Implementation plan: 2.5-D fault system cycle ensembles for learned embeddings
 
-Revision 6, 2026-11-08. Status markers: [done], [todo], [open].
+Revision 7, 2026-11-08. Status markers: [done], [todo], [open].
 
-Changes from revision 5: options for far-field-only normal stress
+Changes from revision 6: regime mapping and learning program (section
+10), with what Sun & Becker (2026, GJI 247) and Sun, Gilpin & Becker
+(submitted, JGR) imply for it; two-state-variable rate-and-state law in
+rsf_solve, checked against the nondimensional spring slider; new code
+requirements (10.4) and the single-fault pilot (10.5).
+
+Changes from revision 5 to 6: options for far-field-only normal stress
 (rsf_solve -sigma_dot_interact 0, gen_system --sigma_interact 0) and
 creeping tips (--tip_creep); tests show that creeping tips do not
 change the stepover drift and the far-field-only option removes it
@@ -484,3 +490,172 @@ side) for tiers 0 to 4; a fault-by-time raster (`--raster`) for tier 5.
    fault dense pilots, H-matrix validation against dense, then the
    tier 5 ensemble on a cluster.
 7. Latent dynamics models, transformer, GNN.
+
+## 10. Regime mapping, complexity measures and the learning program
+
+### 10.1 Question
+
+Can this model family span periodic, characteristic, period-doubled and
+chaotic sequences, and can learned low-dimensional embeddings of the
+field dynamics recover the structure of those regimes (dimension,
+bifurcations, synchronization) and approach their intrinsic
+predictability? The regime structure has to be established with
+standard nonlinear-dynamics measures first, as ground truth for the
+learned embeddings.
+
+### 10.2 What the runs so far show, and what is missing
+
+- Uniform velocity-weakening strips under uniform far-field loading were
+  periodic and characteristic for L/h* from 5 to 33. Irregularity came
+  from segmentation, fault interaction, and the normal stress drift of
+  oblique faults and stepovers. No clean period-two sequence has been
+  identified, and no run was long enough to characterize chaos.
+- The 2.5-D strips have no depth structure, and the VS margins are not
+  driven at the plate rate, so the edge loading that drives partial
+  ruptures and period doubling in finite-fault models (e.g. Kato 2014;
+  Barbot 2019; Cattania 2019) is absent.
+
+### 10.3 Lessons from Sun & Becker (2026) and Sun, Gilpin & Becker (submitted)
+
+Both use HBI (Ozawa et al. 2023) on a single planar fault, 50 x 20 km,
+triangular elements of 80 m, aging law, backslip loading, constant
+normal stress.
+
+- Controls. W' = W/L_inf (seismogenic width over nucleation length) is
+  the primary control: semiperiodic to irregular sequences for W'
+  above about 20, strongly irregular above about 45. Fault dip (the
+  free-surface asymmetry), the gradient of the down-dip a - b
+  transition and lateral velocity-strengthening bounds also change the
+  regime, and their effect depends on the regime of the reference model
+  (the same change can stabilize or destabilize). Dip acts as a
+  stiffness-like control parameter with period-2, 4 and higher periods
+  and irregular windows, but not a clean Feigenbaum cascade; periodic
+  and irregular windows lie close together in dip.
+- Numerics. Under-resolution changes the regime: L_b/dx of 2.2 gave a
+  spurious cluster-10 sequence, 1.8 a more irregular one, while 6.9 and
+  5.5 agreed statistically. Mesh topology changed recurrence by 1 to 3
+  percent. Irregular runs diverge from round-off (different thread
+  counts) while their statistics hold. Our runs use L_b/3 by default;
+  for regime mapping L_b/6 and a resolution check per regime are
+  needed.
+- Measures. CV of recurrence with classes (periodic < 0.1,
+  semiperiodic < 0.3, irregular < 0.6, highly irregular), cluster-N
+  counting of repeated intervals (5 percent of the median), recurrence
+  return maps (Lorenz maps), distinct stress extrema (prominence 5
+  percent of the stress range, small swings removed, tolerance 3e-5),
+  order-6 permutation entropy of the peak-stress sequence, correlation
+  dimension D2 (Grassberger & Procaccia) of (max log V, mean tau/sigma,
+  mean state) on randomly drawn times with monotone cubic interpolation
+  (removes the over-weighting of coseismic steps), Theiler window of two
+  mean recurrence intervals, checks with TwoNN and DANCo, and PCA of
+  the double-centred slip-rate field with the participation ratio.
+  Lyapunov exponents for the spring slider (Benettin et al.), basins of
+  attraction in the unstable eigenplane.
+- Findings to build on. D2 stays near 1 for periodic orbits of any
+  period and rises to about 1.7 to 1.9 only in irregular regimes; the
+  extrema count and PE resolve the periods. Spatial complexity (PCA
+  modes, PR) and temporal complexity are only partly coupled. The
+  two-state spring slider shows final-state sensitivity (coexisting
+  period-4 and period-6 or chaotic attractors in narrow stiffness
+  ranges, interwoven basins).
+- Implications here. The one-cell-deep strips can only represent the
+  W' control along strike (L/h*) and cannot carry down-dip transitions
+  or dip effects; a dip option for the strips and the multi-row option
+  are therefore needed to connect to these results (10.4). The measures
+  above become the regime labels of the ensemble, and D2 alone is not a
+  sufficient label.
+
+### 10.4 Code requirements
+
+rsf_solve:
+
+- [done] two state variables: `-rsf_two_state 1 -rsf_b2 -rsf_dc2`;
+  friction psi = f0 + b ln(v0 theta1/dc) + b2 ln(v0 theta2/dc2), both
+  variables follow `-state_law`; state vector of five entries per cell
+  (psi total, tau, sigma, slip, psi2 = f0 + phi2); series output gains
+  log10 theta2 as a sixth field. Not with `-imex` or `-fd_mode` (stops
+  with an error). Defaults unchanged; outputs of runs without the
+  option byte-identical to before; 2 MPI ranks identical to 1. Checked
+  against the nondimensional spring slider of Gu et al. (1984) and
+  Becker (2000) on the single-patch test (test_slider/two_state): same
+  number of stress extrema and extrema values to about 1e-3 for
+  kappa' = 0.95, 0.9, 0.86 and 0.8552.
+- [todo] per-group event brackets (multi-fault event labels).
+- [todo] catalog rows of an interrupted run removed on restart (the
+  series is already cut back).
+- [todo] limiter flag in the series.
+- [later] per-cell b2 and dc2; tangent-linear Lyapunov estimates are
+  not planned (twin runs instead).
+
+gen_system.py:
+
+- [done] `--b2`, `--dc2`, `--state_law` (steady-state initial stress
+  with b + b2).
+- [done] `--ic_kick`, `--ic_kick_cell`: perturb one cell's initial
+  stress, for twin runs with otherwise identical inputs.
+- [done] `--load farfield|backslip|both`: uniform plate-rate backslip
+  (rsf_solve -vpl) instead of or with the far-field rate. Backslip on
+  the VS cells alone does not load the locked part (the creeping cells
+  then carry no slip deficit), so the backslip option applies to all
+  cells.
+- [todo] `--dip` for the strips (dipping one-cell-deep faults, strike
+  slip), as the stiffness-like control of Sun et al.
+- [todo] `--nrow` with a depth profile of a - b (VW zone, transition
+  gradient, VS below), for the depth check and for comparison with
+  down-dip transition effects.
+- [todo] frictional bands (VS band of given width and position across a
+  fault).
+
+Analysis (new `complexity.py`):
+
+- [done] complexity.py: recurrence intervals, CV and classes, cluster-N;
+  distinct stress extrema (prominence, small-swing removal, tolerance);
+  order-6 permutation entropy; D2 on randomly drawn, interpolated times
+  with a Theiler window (Lorenz 2.04 against the published 2.05, closed
+  orbit 1.00, `complexity.py --test`); TwoNN; PCA of the double-centred
+  field with participation ratio. Return maps in
+  single_fault_pilot/plot_p2.py.
+- [todo] projection on reference modes; per-fault measures for
+  multi-fault runs.
+- [todo] twin-run divergence: separation in (log V, tau) and in event
+  times against time, largest Lyapunov exponent estimate and
+  predictability horizon in cycles.
+
+Run management:
+
+- [todo] scan driver for one-parameter scans with long runs, resumable
+  from checkpoints (sandbox restarts between sessions kill running
+  jobs), recording wall time per run.
+
+### 10.5 Single-fault pilot
+
+Goal: find out whether the 2.5-D strip family reaches period doubling
+and chaos, and which control parameter does it, before any ensemble.
+
+Status (single_fault_pilot/README.md): P0 done; P1 first pass done
+(cascade 2, 4, 8, then irregular, with a periodic window, and large
+stick-slip events reached from some starts near the accumulation point);
+P2 first pass done at L/h* 5 to 30 (far-field loading: periodic,
+period 2 at L/h* 20, periodic again at 30; backslip loading: partial
+ruptures, irregular at 20, three-event pattern at 30), runs too short
+for 100 cycles.
+
+- P0 [done]: two-state law against the nondimensional spring slider.
+- P1: two-state spring slider in rsf_solve over kappa' from 0.95 to
+  0.85 with long runs (5e4 dc/v0 settling, 5e4 analysis): bifurcation
+  diagram of stress extrema and comparison with Becker (2000) and Sun
+  et al. Tests the analysis tools on a known cascade. Note that at
+  kappa' = 0.85 runs started at 1.001 to 1.05 v0 left the small-
+  amplitude attractor and settled into large stick-slip events (with
+  radiation damping), which needs a look.
+- P2: single strip, aging law, uniform VW with VS ends, L/h* from about
+  5 to 60 (dc or sigma varied at fixed L), L_b/6, at least 100 cycles
+  after spin-up, loading (a) uniform far-field rate, (b) loaded margins.
+  Measures of 10.3 per run; twin runs for a few cases.
+- P3: as P2 with the two-state law (b2, dc2 varied), to see whether the
+  second state variable produces period doubling on an extended fault.
+- P4: dip scan of a single strip (90 to about 10 degrees) at fixed L/h*,
+  the analogue of Sun et al. (needs `--dip`).
+- Resolution: one L_b/3 against L_b/6 comparison per regime found.
+- Cost: single strips of 200 to 700 cells take seconds to minutes per
+  2000 yr at L_b/3 (section 4); L_b/6 roughly quadruples that.

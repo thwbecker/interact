@@ -198,6 +198,14 @@ struct rsf_vars{
      vmin_state floors |v| inside the slip law's ln(|v|/v0) so that v -> 0 is safe. */
   PetscInt  state_law;
   PetscReal vmin_state;
+  /* optional second state variable (-rsf_two_state, cf. Ruina 1983,
+     Gu et al. 1984, Becker 2000): friction psi = f0 + phi1 + phi2 with
+     phi_k = b_k ln(v0 theta_k/dc_k), both following -state_law; b_1 and
+     dc_1 are the usual per-cell b and dc, b2 and dc2 uniform.  The state
+     vector then carries psi2 = f0 + phi2 as a fifth entry per patch
+     (rsf->dim = 5) and the first entry remains the total psi */
+  PetscBool two_state;
+  PetscReal b2,dc2;
   /* extra constants of the two gated (composite) laws, held fixed for now at the
      values used in the MATLAB reference implementation (see rsf_solve.md):
      sato_beta  dimensionless Omega threshold of the Sato-type law

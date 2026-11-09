@@ -97,7 +97,7 @@ PetscErrorCode rsf_solve_run(int argc,char **argv,struct interact_ctx *par,
   struct flt *fault;
   PetscInt m,i,n,j,use_hmatrix = medium->use_hmatrix;
   PetscRandom prand;
-  PetscReal state,patch_l,stable_l,rand_fac,dummy[3];
+  PetscReal state,patch_l,stable_l,rand_fac,dummy[3],vtmp;
   PetscInt event_direction[2] = {0,1},nevents_ts;	/* slip-rate event: both directions; FD switch: upward only */
   PetscBool event_terminate[2] = {PETSC_FALSE,PETSC_FALSE};
   PetscLogDouble tb0,tb1;
@@ -417,6 +417,15 @@ PetscErrorCode rsf_solve_run(int argc,char **argv,struct interact_ctx *par,
     PetscCall(VecSetValue(x, (PetscInt)(j+1),fault[i].s[STRIKE], INSERT_VALUES)); /* shear stress */
     PetscCall(VecSetValue(x, (PetscInt)(j+2),fault[i].s[NORMAL], INSERT_VALUES)); /* normal stress */
     PetscCall(VecSetValue(x, (PetscInt)(j+3),0.0, INSERT_VALUES)); /* total slip */
+    if(rsf->two_state){
+      /* second state variable at steady state for the initial velocity,
+	 psi2 = f0 + phi2 = f0 - b2 ln(|v|/v0); the total psi in j+0 then
+	 implies psi1 = psi - psi2 + f0 */
+      vtmp = fabs(fault[i].u[0]);
+      if(vtmp < rsf->vmin_state)
+	vtmp = rsf->vmin_state;
+      PetscCall(VecSetValue(x, (PetscInt)(j+4),rsf->f0 - rsf->b2*log(vtmp/rsf->v0), INSERT_VALUES));
+    }
     /* check discretization against the quasi-static cohesive zone
        size Lb = G dc/(b sigma), using the smallest patch dimension */
     patch_l = 2.0*((fault[i].l < fault[i].w)?(fault[i].l):(fault[i].w));
@@ -444,6 +453,8 @@ PetscErrorCode rsf_solve_run(int argc,char **argv,struct interact_ctx *par,
     PetscCall(VecSetValue(vatol,(PetscInt)(j+1),RSF_AERROR_TAU,  INSERT_VALUES)); /* tau [Pa] */
     PetscCall(VecSetValue(vatol,(PetscInt)(j+2),RSF_AERROR_SIGMA,  INSERT_VALUES)); /* sigma [Pa] */
     PetscCall(VecSetValue(vatol,(PetscInt)(j+3),atol_slip,INSERT_VALUES)); /* slip [m] */
+    if(rsf->two_state)
+      PetscCall(VecSetValue(vatol,(PetscInt)(j+4),atol_psi, INSERT_VALUES)); /* psi2 */
   }
   PetscCall(VecAssemblyBegin(vatol));PetscCall(VecAssemblyEnd(vatol));
   /*
@@ -783,6 +794,9 @@ PetscErrorCode rsf_solve_run(int argc,char **argv,struct interact_ctx *par,
     PetscCall(VecRestoreArray(rsf->ve_slip_prev,&sp));
     PetscCall(VecRestoreArrayRead(x,&xr));
   }
+  if(rsf->fd && rsf->two_state)
+    SETERRQ(PETSC_COMM_WORLD,PETSC_ERR_ARG_INCOMP,
+	    "-rsf_two_state is not implemented for the fully dynamic phases (-fd_mode)");
   if(rsf->fd && rsf->calc_sigma_dot && (!rsf->sigma_dot_interact))
     SETERRQ(PETSC_COMM_WORLD,PETSC_ERR_ARG_INCOMP,
 	    "-sigma_dot_interact 0 is not implemented for the fully dynamic phases (-fd_mode)");

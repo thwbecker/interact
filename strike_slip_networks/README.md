@@ -101,6 +101,10 @@ params.json (`step_types`).  Faults given a non-zero entry in
 `--strikes` are rotated about their centre by default, or with
 `--pivot inner` about their end nearest the middle of the system, so
 that the geometry at the inner tips stays that of the parallel case.
+`--load backslip` replaces the far-field rate by uniform plate-rate
+backslip (rsf_solve -vpl), and `--ic_kick` adds a shear stress to one
+cell's initial value for twin runs.
+
 `--layout chain` instead places the faults tip to tip along a
 segmented trace: fault k starts `--gap` beyond the end of fault k-1
 and runs along its own strike from `--strikes`; `--lengths` gives one
@@ -141,6 +145,11 @@ h* = 2/pi G/(1-nu) dc b/((b-a)^2 sigma) with the in-plane modulus.
     plot_run.py     older overview figure, all faults in one panel per
                     quantity, plus space-time image of fault 0 and map
     PLAN.md         implementation plan and status
+    complexity.py   cycle complexity measures (CV, cluster-N, distinct
+                    extrema, permutation entropy, D2, TwoNN, PCA)
+    single_fault_pilot/
+                    L/h* scan of a single strip, far-field against
+                    backslip loading (README.md there)
     COMPILE.md      build notes for rsf_solve (PETSc versions, flags,
                     HACApK and hmmvp, sandbox specifics)
     examples/       make_examples (runs and plots the example systems)
@@ -162,6 +171,16 @@ e.g.
 
 All are new options; with their defaults the output of earlier runs
 is reproduced byte for byte.
+
+    -rsf_two_state <bool>, -rsf_b2 <b2>, -rsf_dc2 <m>
+                             second state variable (Ruina 1983; Gu et
+                             al. 1984; Becker 2000), both following
+                             -state_law; the series then has a sixth
+                             field, log10 theta2.  gen_system.py: --b2,
+                             --dc2, --state_law.  Checked against the
+                             nondimensional spring slider in
+                             ../test_slider/two_state.  Not with -imex
+                             or -fd_mode.
 
     -sigma_dot_interact <bool>  with -calc_sigma_dot: 1 (default)
                              normal stress also changes from slip on

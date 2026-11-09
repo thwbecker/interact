@@ -57,7 +57,10 @@ void init_medium_rsf(struct med *medium)
   rsf->min_sigma = 1e6;
   rsf->max_sigma = 300e6; /* Pa */
 
-  rsf->dim = 4;/* psi,tau,sigma,u(slip) per patch */
+  rsf->two_state = PETSC_FALSE;	/* second state variable off */
+  rsf->b2 = 0.0;
+  rsf->dc2 = 0.0;
+  rsf->dim = 4;/* psi,tau,sigma,u(slip) per patch; 5 with -rsf_two_state */
 }
 /*
   print a grouped summary of the rsf_solve command-line options and a few
@@ -158,6 +161,12 @@ void rsf_print_help(const char *prog)
   fprintf(stderr,"                          slip:  d psi/dt = -(|v|/dc) (psi - psi_ss)\n");
   fprintf(stderr,"                          with psi_ss = f0 - b ln(|v|/v0); both share this\n");
   fprintf(stderr,"                          steady state, i.e. f_ss = f0 + (a-b) ln(|v|/v0)\n");
+  fprintf(stderr,"  -rsf_two_state <bool>   second state variable (default 0): psi = f0 + phi1 + phi2,\n");
+  fprintf(stderr,"                          phi_k = b_k ln(v0 theta_k/dc_k), both evolving with -state_law;\n");
+  fprintf(stderr,"                          b_1, dc_1 are the usual b and dc, f_ss = f0 + (a-b-b2) ln(|v|/v0)\n");
+  fprintf(stderr,"                          (Gu et al. 1984; Becker 2000). Not with -imex or -fd_mode\n");
+  fprintf(stderr,"  -rsf_b2 <val>           b of the second state variable (uniform)\n");
+  fprintf(stderr,"  -rsf_dc2 <m>            dc of the second state variable [m] (uniform)\n");
   fprintf(stderr,"                          PRZ (Perrin, Rice and Zheng 1995), theta form\n");
   fprintf(stderr,"                          d theta/dt = 1/2 (1 - (|v| theta/dc)^2):\n");
   fprintf(stderr,"                          d psi/dt = b/(2 dc) (v0 exp((f0-psi)/b)\n");
@@ -595,6 +604,21 @@ PetscErrorCode rsf_get_settings(int argc,char **argv,struct interact_ctx *par,
   /* state evolution law: 1,2,3,4,5, 1 default ageing */
   PetscCall(PetscOptionsGetInt(NULL,NULL,"-state_law",&rsf->state_law,NULL));
   PetscCall(PetscOptionsGetReal(NULL,NULL,"-vmin_state",&rsf->vmin_state,NULL)); /* [m/s] */
+  /* optional second state variable */
+  PetscCall(PetscOptionsGetBool(NULL,NULL,"-rsf_two_state",&rsf->two_state,NULL));
+  PetscCall(PetscOptionsGetReal(NULL,NULL,"-rsf_b2",&rsf->b2,NULL));
+  PetscCall(PetscOptionsGetReal(NULL,NULL,"-rsf_dc2",&rsf->dc2,NULL));
+  if(rsf->two_state){
+    if((rsf->b2 <= 0.0) || (rsf->dc2 <= 0.0)){
+      if(medium->comm_rank == 0)
+	fprintf(stderr,"rsf_get_settings: -rsf_two_state needs -rsf_b2 > 0 and -rsf_dc2 > 0\n");
+      exit(-1);
+    }
+    rsf->dim = 5;		/* psi,tau,sigma,slip,psi2 */
+    if(medium->comm_rank == 0)
+      fprintf(stderr,"rsf_get_settings: two state variables, b2 %g dc2 %g m, law %i for both\n",
+	      (double)rsf->b2,(double)rsf->dc2,(int)rsf->state_law);
+  }
   /* rejection-storm guard, see rsf_domain_check in rsf_engine.c */
   PetscCall(PetscOptionsGetInt(NULL,NULL,"-domain_check_max_reject",&rsf->domain_check_max_reject,NULL));
   PetscCall(PetscOptionsGetReal(NULL,NULL,"-domain_check_vmax",&rsf->domain_check_vmax,NULL));
@@ -644,6 +668,11 @@ PetscErrorCode rsf_get_settings(int argc,char **argv,struct interact_ctx *par,
   PetscCall(PetscOptionsGetBool(NULL,NULL,"-rsf_monitor_by_group",&set->monitor_by_group,NULL));
   set->use_imex = PETSC_FALSE;
   PetscCall(PetscOptionsGetBool(NULL,NULL,"-imex",&set->use_imex,NULL));
+  if(set->use_imex && rsf->two_state){
+    if(medium->comm_rank == 0)
+      fprintf(stderr,"rsf_get_settings: -rsf_two_state is not implemented for -imex\n");
+    exit(-1);
+  }
   /* other outputs */
   PetscCall(PetscOptionsGetBool(NULL,NULL,"-rsf_catalog",&cat_enable,NULL));
   PetscCall(PetscOptionsGetBool(NULL,NULL,"-rsf_rupture_time",&rup_enable,NULL));

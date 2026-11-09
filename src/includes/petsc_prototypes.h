@@ -22,6 +22,8 @@ PetscReal get_near_pc_radius(struct med *, struct flt *, const char *);
 PetscErrorCode time_solves(Mat , Mat , PetscInt , PetscReal *,PetscInt *, KSPConvergedReason *);
 PetscErrorCode rsf_domain_check(TS, PetscReal, Vec, PetscBool*);
 /* shared between the explicit and IMEX paths (rsf_engine.c) */
+PetscReal rsf_state_rate_bd(PetscReal, PetscReal, PetscReal, PetscReal, struct rsf_vars *,
+			    PetscReal *, PetscReal *);
 PetscReal rsf_state_rate(PetscInt, PetscReal, PetscReal, struct interact_ctx *,
 			 PetscReal *, PetscReal *);
 PetscErrorCode rsf_compute_vel_and_stressing(Vec, PetscReal, struct interact_ctx *);

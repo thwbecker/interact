@@ -105,7 +105,7 @@ static int rsf_init_monitor_groups(struct rsf_out_ctx *uc)
    last kept record is at t_restart itself.  Returns the open file
    positioned at its end
 */
-static FILE *rsf_series_open_restart(const char *series_file,int ncell,PetscReal t_restart,
+static FILE *rsf_series_open_restart(const char *series_file,int ncell,int nfield,PetscReal t_restart,
 				     PetscBool *have_t)
 {
   FILE *f;
@@ -118,12 +118,13 @@ static FILE *rsf_series_open_restart(const char *series_file,int ncell,PetscReal
     f = myopen(series_file,"wb");
     hdr[0] = 0x52534631;
     hdr[1] = (int32_t)ncell;
-    hdr[2] = 5;
+    hdr[2] = (int32_t)nfield;
     fwrite(hdr,sizeof(int32_t),3,f);
     fprintf(stderr,"rsf_series_init: restart: %s not found, started a new file\n",series_file);
     return f;
   }
-  if((fread(hdr,sizeof(int32_t),3,f) != 3) || (hdr[0] != 0x52534631) || (hdr[1] != ncell)){
+  if((fread(hdr,sizeof(int32_t),3,f) != 3) || (hdr[0] != 0x52534631) || (hdr[1] != ncell) ||
+     (hdr[2] != nfield)){
     fprintf(stderr,"rsf_series_init: restart: %s has no matching header\n",series_file);
     exit(-1);
   }
@@ -157,7 +158,9 @@ static FILE *rsf_series_open_restart(const char *series_file,int ncell,PetscReal
    routines.  File layout: int32 magic 0x52534631 ('RSF1'), int32
    ncell, int32 nfield (5); then per record a float64 time [s] and five
    float32[ncell] blocks: log10|v| [m/s], tau [MPa], log10 theta [s],
-   slip [m], sigma [MPa] (compression positive).  Rank 0 writes; the
+   slip [m], sigma [MPa] (compression positive).  With -rsf_two_state
+   nfield is 6: theta is that of the first state variable and a sixth
+   block holds log10 theta2 [s].  Rank 0 writes; the
    state is only read.
 
    Two record selection modes, both at accepted steps only:
@@ -196,6 +199,7 @@ static PetscErrorCode rsf_series_init(struct rsf_out_ctx *uc,struct med *medium,
   uc->series_have_prev = PETSC_FALSE;
   uc->series_skip_first = PETSC_FALSE;
   uc->series_t_restart = t_init;
+  uc->series_nfield = (medium->rsf->two_state) ? 6 : 5;
   PetscCall(PetscOptionsGetString(NULL,NULL,"-rsf_series_file",series_file,STRLEN,&uc->series_enable));
   PetscCall(PetscOptionsGetReal(NULL,NULL,"-rsf_series_dt_yr",&series_dt_yr,NULL));
   PetscCall(PetscOptionsGetReal(NULL,NULL,"-rsf_series_vdense",&uc->series_vdense,NULL));
@@ -219,9 +223,10 @@ static PetscErrorCode rsf_series_init(struct rsf_out_ctx *uc,struct med *medium,
   if(!uc->series_enable)
     PetscFunctionReturn(PETSC_SUCCESS);
   HEADNODE{
-    nbuf = 5*(size_t)medium->nrflt;
+    nbuf = (size_t)uc->series_nfield*(size_t)medium->nrflt;
     if(uc->restarted)
-      uc->series_f = rsf_series_open_restart(series_file,medium->nrflt,t_init,&uc->series_skip_first);
+      uc->series_f = rsf_series_open_restart(series_file,medium->nrflt,uc->series_nfield,t_init,
+					     &uc->series_skip_first);
     else
       uc->series_f = myopen(series_file,"wb");
     uc->series_buf = (float *)malloc(nbuf*sizeof(float));
@@ -233,7 +238,7 @@ static PetscErrorCode rsf_series_init(struct rsf_out_ctx *uc,struct med *medium,
     if(!uc->restarted){
       hdr[0] = 0x52534631;	/* 'RSF1' */
       hdr[1] = (int32_t)medium->nrflt;
-      hdr[2] = 5;
+      hdr[2] = (int32_t)uc->series_nfield;
       fwrite(hdr,sizeof(int32_t),3,uc->series_f);
     }
     if(uc->series_mode == 0)
@@ -256,7 +261,7 @@ static PetscReal rsf_series_fill(struct rsf_out_ctx *uc,const PetscScalar *sv,
 				 struct med *medium,struct flt *fault)
 {
   struct rsf_vars *rsf;
-  PetscReal vv,d1,d2,d3,vmax,bloc,l10th;
+  PetscReal vv,d1,d2,d3,vmax,bloc,l10th,psi1;
   int ip,nf,k;
   rsf = medium->rsf;
   nf = medium->nrflt;
@@ -267,10 +272,14 @@ static PetscReal rsf_series_fill(struct rsf_out_ctx *uc,const PetscScalar *sv,
     if(vv > vmax)
       vmax = vv;
     bloc = fault[ip].mu_db;
+    psi1 = (rsf->two_state) ? (sv[k] - sv[k+4] + rsf->f0) : (sv[k]);
     if(bloc != 0.0)
-      l10th = log10(rsf->dc/rsf->v0) + (sv[k] - rsf->f0)/(bloc*2.302585092994046);
+      l10th = log10(rsf->dc/rsf->v0) + (psi1 - rsf->f0)/(bloc*2.302585092994046);
     else
       l10th = 0.0;
+    if(rsf->two_state)
+      uc->series_buf[5*nf + ip] = (float)(log10(rsf->dc2/rsf->v0) +
+					    (sv[k+4] - rsf->f0)/(rsf->b2*2.302585092994046));
     uc->series_buf[       ip] = (float)log10(vv + 1e-300);
     uc->series_buf[  nf + ip] = (float)(sv[k+1]/1e6);
     uc->series_buf[2*nf + ip] = (float)l10th;
@@ -352,7 +361,7 @@ static void rsf_series_write(struct rsf_out_ctx *uc,PetscReal time,int nf)
 {
   double tt;
   size_t nbuf;
-  nbuf = 5*(size_t)nf;
+  nbuf = (size_t)uc->series_nfield*(size_t)nf;
   tt = (double)time;
   fwrite(&tt,sizeof(double),1,uc->series_f);
   fwrite(uc->series_buf,sizeof(float),nbuf,uc->series_f);
@@ -386,7 +395,7 @@ static PetscErrorCode rsf_series_monitor(struct rsf_out_ctx *uc,TS ts,PetscReal 
     if(uc->series_skip_first && (time == uc->series_t_restart)){
       /* restart: this record is already in the file; take it as the
 	 last written one instead of writing it again */
-      memcpy(uc->series_prev,uc->series_buf,5*(size_t)medium->nrflt*sizeof(float));
+      memcpy(uc->series_prev,uc->series_buf,(size_t)uc->series_nfield*(size_t)medium->nrflt*sizeof(float));
       uc->series_have_prev = PETSC_TRUE;
       uc->series_last = time;
     }else if(rsf_series_due(uc,time,medium->nrflt,vmax,is_final)){
@@ -1237,7 +1246,8 @@ PetscErrorCode rsf_TS_Monitor(TS ts,PetscInt step,PetscReal time,Vec X,void *ptr
 	bloc_ = fault[uc->stat_cell[is_]].mu_db;
 	if(bloc_ != 0.0)
 	  l10th_ = log10(rsf->dc/rsf->v0) +
-	    (xs_[js_] - rsf->f0)/(bloc_*2.302585092994046);
+	    (((rsf->two_state) ? (xs_[js_] - xs_[js_+4] + rsf->f0) : (xs_[js_])) - rsf->f0)/
+	    (bloc_*2.302585092994046);
 	else
 	  l10th_ = 0.0;
 	fprintf(uc->stat_f[is_],"%22.14e %15.8e %12.6f %15.8e %15.8e %12.6f\n",

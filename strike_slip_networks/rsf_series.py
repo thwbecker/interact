@@ -4,7 +4,8 @@ rsf_series.py: read the all-cell binary time series written by rsf_solve
 (-rsf_series_file), the event catalogs, and the geometry of one run.
 
 File layout (little endian, written by rsf_output.c):
-  int32 magic 0x52534631, int32 ncell, int32 nfield (5; 4 in older files)
+  int32 magic 0x52534631, int32 ncell, int32 nfield (5; 4 in older files,
+  6 with two state variables, the sixth field log10 theta2 [s])
   records: float64 t[s], float32[ncell] log10|v| [m/s], float32[ncell]
            tau [MPa], float32[ncell] log10 theta [s], float32[ncell] slip [m],
            float32[ncell] sigma [MPa] (nfield 5; older files have 4)
@@ -58,6 +59,9 @@ class Run:
             self.sigma = d["f"][:, 4, :]
         else:
             self.sigma = np.full_like(self.tau, self.par.get("sigma", 0.0) / 1e6)
+        # with two state variables (rsf_solve -rsf_two_state) a sixth
+        # field holds log10 theta2 [s]; logtheta is then theta1
+        self.logtheta2 = d["f"][:, 5, :] if nf >= 6 else None
         self.nfield = nf
         self.nrec = len(self.t)
 

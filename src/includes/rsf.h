@@ -152,6 +152,7 @@ struct rsf_out_ctx{
   PetscBool series_have_prev;	/* series_buf holds a written record */
   float *series_prev;		/* rank 0: 5*nrflt, last written record */
   PetscBool series_skip_first;	/* restart: the file already has the record at t_restart */
+  int series_nfield;		/* 5, or 6 with -rsf_two_state (log10 theta2 added) */
   PetscReal series_t_restart;	/* restart time */
   PetscBool field_slip;		/* likewise signed slip frames
 				   rsf_slip.gGGG.NNNNNN.bin (x,y,slip[m]),

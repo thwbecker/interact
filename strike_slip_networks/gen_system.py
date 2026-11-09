@@ -215,11 +215,25 @@ def main():
                    help="total fraction of the inner fault length taken by VS barriers between asperities")
     p.add_argument("--asp_rand", type=float, default=0.0, help="relative spread of asperity lengths (log-normal)")
     p.add_argument("--dc", type=float, default=0.02)
+    p.add_argument("--b2", type=float, default=0.0,
+                   help="b of a second state variable (rsf_solve -rsf_two_state); 0: one state variable")
+    p.add_argument("--dc2", type=float, default=0.0, help="dc of the second state variable [m]")
+    p.add_argument("--state_law", type=int, default=0,
+                   help="rsf_solve -state_law (1 aging, 2 slip, ...); 0: rsf_solve default (aging)")
     p.add_argument("--f0", type=float, default=0.6)
     p.add_argument("--v0", type=float, default=1e-6)
     p.add_argument("--v_eq", type=float, default=1e-9, help="equivalent deep slip rate for tau_dot [m/s]")
     p.add_argument("--taudot", type=float, default=0.0, help="far-field shear stressing rate [Pa/s], 0: from v_eq")
     p.add_argument("--v_init", type=float, default=0.0, help="initial slip rate [m/s], 0: v_eq")
+    p.add_argument("--load", choices=("farfield", "backslip", "both"), default="farfield",
+                   help="farfield (default): far-field stressing rate; backslip: uniform plate-rate "
+                        "backslip v_eq on all cells (rsf_solve -vpl), no far-field rate, so that "
+                        "creeping velocity-strengthening ends load the locked patch from its edges; "
+                        "both: the two together")
+    p.add_argument("--ic_kick", type=float, default=0.0,
+                   help="add this shear stress [Pa] to the initial stress of one cell (twin runs)")
+    p.add_argument("--ic_kick_cell", type=int, default=-1,
+                   help="cell for --ic_kick; -1: middle cell of fault 0")
     p.add_argument("--v_pert", type=float, default=0.1, help="std of ln(v_init) perturbation per cell")
     p.add_argument("--seed", type=int, default=1)
     args = p.parse_args()
@@ -333,7 +347,8 @@ def main():
             a = float(aprof[i])
             ab.append((a, args.b))
             vi = v_init * math.exp(args.v_pert * rng.standard_normal()) if args.v_pert > 0 else v_init
-            tau = float(steady_state_tau(vi, a, args.b, args.sigma, args.f0, args.v0))
+            # steady state with the total state dependence b + b2
+            tau = float(steady_state_tau(vi, a, args.b + args.b2, args.sigma, args.f0, args.v0))
             # signs of the initial stress and slip rate follow the drive, so
             # the fault starts at steady state in its driven sense (the
             # regularized law is odd in tau and v; rsf_solve inverts
@@ -358,6 +373,10 @@ def main():
         else:
             step_types.append("releasing")
 
+    if args.ic_kick != 0.0:
+        kc = args.ic_kick_cell if args.ic_kick_cell >= 0 else ncell_list[0] // 2
+        tau_k, v_k = ic[kc]
+        ic[kc] = (tau_k + args.ic_kick, v_k)
     with open(os.path.join(args.out, "geom.in"), "w") as f:
         for g in geom:
             f.write("%.6e %.6e %.6e %.1f %.1f %.6e %.6e %i\n" % g)
@@ -369,6 +388,8 @@ def main():
             f.write("%.10e %.8e\n" % (tau, v))
     with open(os.path.join(args.out, "srate.in"), "w") as f:
         for td, sd in srate:
+            if args.load == "backslip":
+                td, sd = 0.0, 0.0
             f.write("%.8e %.8e\n" % (td, sd))
     with open(os.path.join(args.out, "groups.in"), "w") as f:
         for k in groups:
@@ -407,9 +428,16 @@ def main():
         json.dump(par, f, indent=1)
     # option fragment: everything that must match the files
     opts = ("-geom_file geom.in -rsf_file rsf.dat -rsf_ic_file ic.in "
-            "-rsf_stress_rate_file srate.in -vpl 0 -vel_init %.6e -rsf_slip_mode 0 "
+            "-rsf_stress_rate_file srate.in -vpl %s -vel_init %.6e -rsf_slip_mode 0 "
             "-shear_modulus %.6e -sigma_init %.6e -dc %.6e -f0 %g -v0 %.3e"
-            % (v_init, G, args.sigma, args.dc, args.f0, args.v0))
+            % ("0" if args.load == "farfield" else "%.6e" % args.v_eq, v_init, G, args.sigma,
+               args.dc, args.f0, args.v0))
+    if args.b2 > 0:
+        if args.dc2 <= 0:
+            raise SystemExit("--b2 needs --dc2 > 0")
+        opts += " -rsf_two_state 1 -rsf_b2 %.8e -rsf_dc2 %.8e" % (args.b2, args.dc2)
+    if args.state_law > 0:
+        opts += " -state_law %i" % args.state_law
     if args.sigma_evolve:
         opts += (" -calc_sigma_dot 1 -limit_sigma 1 -min_sigma %.6e -max_sigma %.6e"
                  % (args.sigma_min, args.sigma_max))

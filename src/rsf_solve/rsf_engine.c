@@ -45,11 +45,24 @@ PetscReal rsf_state_rate(PetscInt i, PetscReal psi, PetscReal vin,
 			 struct interact_ctx *par,
 			 PetscReal *dSdpsi, PetscReal *dSdvabs)
 {
-  PetscReal S,vabs,psi_ss,epsi,omega,gate,lomega,b,D;
-  PetscBool floored = PETSC_FALSE;
+  PetscReal b,D;
   struct rsf_vars *rsf;
   rsf = par->medium->rsf;
   b = par->fault[i].mu_db;
+  /* fixed or variable D_c? */
+  D = (rsf->dc_vec)?(rsf->dc_vec[i]):(rsf->dc);
+  return rsf_state_rate_bd(psi,vin,b,D,rsf,dSdpsi,dSdvabs);
+}
+/*
+   the state laws for a state contribution psi = f0 + b ln(v0 theta/D)
+   with given b and D; used for the (first) state variable through
+   rsf_state_rate above and for the second state variable with b2, dc2
+*/
+PetscReal rsf_state_rate_bd(PetscReal psi, PetscReal vin, PetscReal b, PetscReal D,
+			    struct rsf_vars *rsf, PetscReal *dSdpsi, PetscReal *dSdvabs)
+{
+  PetscReal S,vabs,psi_ss,epsi,omega,gate,lomega;
+  PetscBool floored = PETSC_FALSE;
   if(b == 0.0){			/* b == 0 guard as in HBI */
     if(dSdpsi)
       *dSdpsi = 0.0;
@@ -57,8 +70,6 @@ PetscReal rsf_state_rate(PetscInt i, PetscReal psi, PetscReal vin,
       *dSdvabs = 0.0;
     return 0.0;
   }
-  /* fixed or variable D_c? */
-  D = (rsf->dc_vec)?(rsf->dc_vec[i]):(rsf->dc);
   switch(rsf->state_law){
   case RSF_AGING_LAW:			/* Dieterich aging  law */
     epsi = exp((rsf->f0 - psi)/b); /* exp((f0-psi)/b), NOT the epsi above */
@@ -262,7 +273,13 @@ PetscErrorCode rsf_ODE_RHSFunction(TS ts,PetscReal time,Vec X,Vec F,void *ptr)
     */
     /* state evolution rate; laws and derivatives implemented once in
        rsf_state_rate (shared with the IMEX path) */
-    f[j] = rsf_state_rate(i,x[j],velr[k],par,NULL,NULL);
+    if(rsf->two_state){
+      /* psi = psi1 + psi2 - f0, psi1 with b, dc and psi2 = x[j+4] with b2, dc2 */
+      f[j+4] = rsf_state_rate_bd(x[j+4],velr[k],rsf->b2,rsf->dc2,rsf,NULL,NULL);
+      f[j] = rsf_state_rate(i,x[j] - x[j+4] + rsf->f0,velr[k],par,NULL,NULL) + f[j+4];
+    }else{
+      f[j] = rsf_state_rate(i,x[j],velr[k],par,NULL,NULL);
+    }
     /* 
        d sigma/dt, compression positive (In was scaled by -1)
     */
