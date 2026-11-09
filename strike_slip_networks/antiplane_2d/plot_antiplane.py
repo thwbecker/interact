@@ -4,7 +4,9 @@ plot_antiplane.py [rundir]: analysis of the 2-D antiplane runs of
 run_antiplane_sweep (directories <model>_<law>_X<X>)
 
 Events from rsf_catalog.dat (threshold 1e-3 m/s); events starting within
-60 s of the end of the previous one are merged; the first quarter of each
+one hour of the end of the previous one are merged (this absorbs the
+slip-rate bursts at the fault ends after large slip-law events and the
+brief threshold crossings about a minute before some events); the first quarter of each
 run is discarded. Rupture length = number of cells above the threshold
 times the cell size; full rupture: at least 0.9 W. The nucleation point
 of an event is the cell of maximum slip rate in the first series record
@@ -65,7 +67,7 @@ def analyze(d):
     on, ar, nc = c[:, 1], c[:, 2], c[:, 4]
     mon, mln, last = [], [], -1e30
     for i in range(len(on)):
-        if mon and (on[i] - last) * YR < 60.0:
+        if mon and (on[i] - last) * YR < 3600.0:
             mln[-1] = max(mln[-1], nc[i] * p["ds"])
             last = max(last, ar[i])
             continue

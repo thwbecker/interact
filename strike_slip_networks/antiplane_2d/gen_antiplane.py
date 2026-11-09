@@ -24,12 +24,16 @@ check of the 2.5-D strip results against the 1-D antiplane literature.
             stated in the paper; here G 30 GPa, cs 3464 m/s, vpl = v0 =
             1e-9 m/s, f0 0.6, and a creeping region of --vs_W W.
 
-The --law option switches to the slip law (rsf_solve -state_law 2) with
-otherwise identical parameters. Cells: --cpl cells per L_b = G dc/(b
+The --law option switches to the slip law (rsf_solve -state_law 2) or the
+PRZ law (-state_law 3) with otherwise identical parameters. Cells: --cpl cells per L_b = G dc/(b
 sigma) (default 4).
 
-usage: gen_antiplane.py model X [--law aging|slip] [--cpl n] [--vs_W f]
-       [--depth_W d] [--out dir]
+usage: gen_antiplane.py model X [--law aging|slip|prz] [--a_over_b r] [--cpl n]
+       [--vs_W f] [--depth_W d] [--out dir]
+
+--a_over_b changes a of the velocity-weakening part at fixed b (Wu &
+Chen varied a and b over their models A to E; Cattania varied a/b at two
+values of b), for the parameter-space maps.
 writes geom.in, rsf.dat, ic.in, run.opts, params.txt in --out
 """
 import argparse
@@ -43,7 +47,11 @@ YR = 365.25 * 86400.0
 p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
 p.add_argument("model", choices=("wuchen", "cattania"))
 p.add_argument("X", type=float, help="W/hc (wuchen) or W/L_inf (cattania)")
-p.add_argument("--law", choices=("aging", "slip"), default="aging")
+p.add_argument("--law", choices=("aging", "slip", "prz"), default="aging",
+               help="state evolution law: aging, slip or PRZ (rsf_solve -state_law 1, 2, 3)")
+p.add_argument("--a_over_b", type=float, default=0.0,
+               help="a/b of the velocity-weakening part (b fixed); 0: paper value (0.5 Wu & Chen model A, "
+                    "0.75 Cattania)")
 p.add_argument("--cpl", type=float, default=4.0, help="cells per L_b")
 p.add_argument("--vs_W", type=float, default=1.0, help="cattania: creeping-region extent / W")
 p.add_argument("--depth_W", type=float, default=50.0, help="wuchen: burial depth of the fault top / W")
@@ -53,7 +61,8 @@ a = p.parse_args()
 
 G, cs, f0, sig = 30e9, 3464.0, 0.6, 50e6
 if a.model == "wuchen":
-    av, bv, dc = 0.008, 0.016, 1e-4
+    bv, dc = 0.016, 1e-4
+    av = (a.a_over_b if a.a_over_b > 0 else 0.5) * bv
     vpl = 0.035 / YR
     v0 = vpl
     hc = 2.0 / math.pi * G * dc / ((bv - av) * sig)
@@ -62,7 +71,7 @@ if a.model == "wuchen":
     lscale = hc
 else:
     bv, dc = 0.02, 1e-4
-    av = bv - 0.005
+    av = (a.a_over_b if a.a_over_b > 0 else 0.75) * bv
     avs = bv + 0.005
     vpl = v0 = 1e-9
     linf = bv * G * dc / (math.pi * (bv - av) ** 2 * sig)
@@ -98,6 +107,8 @@ opts = ("-geom_file geom.in -rsf_file rsf.dat -rsf_ic_file ic.in -dc %.6e -sigma
         % (dc, sig, f0, v0, vpl, G, cs))
 if a.law == "slip":
     opts += " -state_law 2"
+elif a.law == "prz":
+    opts += " -state_law 3"
 with open(os.path.join(a.out, "run.opts"), "w") as f:
     f.write(opts + "\n")
 with open(os.path.join(a.out, "params.txt"), "w") as f:

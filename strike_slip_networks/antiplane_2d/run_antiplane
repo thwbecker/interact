@@ -1,20 +1,24 @@
 #!/bin/bash
 #
-# run_antiplane model X law ncycles [rundir] [extra rsf_solve options]
+# run_antiplane model X law ncycles cpl a_over_b [rundir] [extra rsf_solve options]
 #
-# generates a setup with gen_antiplane.py and runs rsf_solve for ncycles
-# times the recurrence estimate, with catalog and all-cell series
+# generates a setup with gen_antiplane.py (cpl cells per L_b, a_over_b
+# 0 for the paper value) and runs rsf_solve for ncycles times the
+# recurrence estimate, with catalog and all-cell series (every 16th step
+# in events)
 #
 model=${1-wuchen}
 X=${2-8.6}
 law=${3-aging}
-ncyc=${4-60}
-rundir=${5-${model}_${law}_X$X}
-shift 5 2>/dev/null
+ncyc=${4-40}
+cpl=${5-4}
+aob=${6-0}
+rundir=${7-${model}_${law}_ab${aob}_X$X}
+shift 7 2>/dev/null
 sdir=$(cd "$(dirname "$0")/.." && pwd)
 if [ -f "$sdir/config.sh" ]; then . "$sdir/config.sh"; fi
 rsf_solve=${rsf_solve-rsf_solve}
-python3 "$sdir/antiplane_2d/gen_antiplane.py" $model $X --law $law --cpl ${CPL-4} --out "$rundir" || exit 1
+python3 "$sdir/antiplane_2d/gen_antiplane.py" $model $X --law $law --cpl $cpl --a_over_b $aob --out "$rundir" || exit 1
 cd "$rundir" || exit 1
 t=$(awk '{for(i=1;i<=NF;i++) if($i=="t_est_yr") print $(i+1)}' params.txt)
 tmax=$(python3 -c "print(max(0.5, $ncyc*$t))")

@@ -42,8 +42,10 @@ reproduce them directly before comparing with the 2.5-D results
   antiplane_nucleation.png (nucleation position along the fault, which
   separates Wu & Chen's centre- and side-origin regimes),
   antiplane_summary.png, antiplane_spacetime.png and
-  antiplane_summary.txt. Events starting within 60 s of the end of the
-  previous one are merged, and the first quarter of each run is
+  antiplane_summary.txt. Events starting within one hour of the end of
+  the previous one are merged (60 s in the first version, which left
+  brief threshold crossings about a minute before some slip-law events
+  as separate events), and the first quarter of each run is
   discarded.
 
 ## Results so far (2026-11-09, 40 recurrence estimates per run, single runs)
@@ -98,3 +100,50 @@ she found two in her simulations, as here. Positions along this fault
 run from the free surface (0) to the bottom of the velocity-weakening
 part (1); at W/L_inf 3.2 the nucleation zone is a large fraction of the
 fault, so the position is only loosely defined.
+
+## Parameter-space maps (`run_parameter_maps`, `plot_parameter_maps.py`)
+
+`run_parameter_maps [rundir] [laws] [ncycles] [maxcells]` scans the Wu &
+Chen setup over W/hc = 2, 5, 11, 22, 45, 90 and b/a = 1.33, 2, 3 (a
+varied at fixed b), and the Cattania setup over W/L_inf = 2, 4, 8, 16,
+32 and a/b = 0.5, 0.625, 0.75, 0.875, for each state evolution law
+(aging, slip, PRZ selectable), cells L_b/4, 30 recurrence estimates per
+run; cases needing more than maxcells cells are skipped and completed
+runs are skipped on restart. `plot_parameter_maps.py` classifies each
+run as stable, slow, periodic with central or side nucleation, or with
+partial ruptures of a narrow or wide size distribution, and draws
+parameter_map_wuchen.png in the layout of Wu & Chen's regime figure
+(with their boundaries W/h* = 0.6, 1.2, 5.5, 33, 105, h* = hc/(1 - a/b))
+and parameter_map_cattania.png in the layout of Cattania's Figure 2a
+(events per full-rupture cycle by colour); the numbers are in
+parameter_maps.txt.
+
+Status (2026-11-09): Wu & Chen setup complete for W/hc 2 to 22 with the
+aging and slip laws; Cattania setup at W/L_inf 2 and 4. The larger runs
+(W/hc 45 and 90, W/L_inf 8 to 32) were not finished in this session.
+
+Wu & Chen setup, aging law, against their map:
+
+- the slow-event region (no catalog event, slip rate well above the
+  plate rate) at W/hc 2 for b/a 1.33 and 2 and periodic events at b/a 3
+  fall where their boundaries put them (at b/a 1.33 their stable region
+  begins; the run there had maximum slip rates of about 10 vpl);
+- the change from central to side nucleation follows their W/h* = 5.5
+  curve at all three b/a (centre at W/hc 11 for b/a 1.33 and 2, side at
+  11 for b/a 3, side at 22 for all);
+- partial ruptures (narrow distribution) appear at W/hc 22 for b/a 3,
+  i.e. W/h* of about 15, well before their W/h* = 33 curve, as in the
+  single-parameter scan at b/a 2.
+
+Slip law, same setup: seismic events already at W/hc 2 for b/a 2, where
+the aging law gives only slow events (consistent with the smaller
+nucleation size of the slip law, Ampuero & Rubin 2008); the centre-side
+change at the same places as with the aging law; and periodic full
+ruptures at W/hc 22 for b/a 3, where the aging law has partial ruptures.
+The slip law thus makes small faults seismic earlier but delays partial
+ruptures.
+
+Cattania setup: at W/L_inf 2 and 4 all runs with both laws give periodic
+full ruptures. With the slip law at a/b 0.75 the catalog listed a
+one-cell threshold crossing about 60 s before each large event; with
+the one-hour merging these are part of the large events.
