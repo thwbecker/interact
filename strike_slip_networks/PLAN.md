@@ -658,6 +658,13 @@ of Cattania 2019); slip law, one and two state variables, periodic full
 ruptures up to W/h* 32 and 16. W/h* 64 and two-state runs above 16 to
 do.
 
+2-D antiplane checks (antiplane_2d/README.md): Wu & Chen's centre- to
+side-origin transition and Cattania's two-ruptures-per-cycle regime at
+W/L_inf 13 are reproduced with the aging law; partial ruptures appear
+at a smaller W/hc than in Wu & Chen; with the slip law both the move of
+nucleation to the ends and the onset of partial ruptures occur at
+larger W/hc (periodic full ruptures up to W/hc 31.5).
+
 - P0 [done]: two-state law against the nondimensional spring slider.
 - P1: two-state spring slider in rsf_solve over kappa' from 0.95 to
   0.85 with long runs (5e4 dc/v0 settling, 5e4 analysis): bifurcation

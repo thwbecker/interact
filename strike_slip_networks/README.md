@@ -150,6 +150,8 @@ h* = 2/pi G/(1-nu) dc b/((b-a)^2 sigma) with the in-plane modulus.
     single_fault_pilot/
                     L/h* scan of a single strip, far-field against
                     backslip loading (README.md there)
+    antiplane_2d/   2-D antiplane (mode III) reproductions of Wu & Chen
+                    (2014) and Cattania (2019) (README.md there)
     single_fault_regimes/
                     regimes against W/h* (backslip loading) for the
                     aging, slip and two-state slip laws (README.md there)

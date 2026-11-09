@@ -1,0 +1,26 @@
+#!/bin/bash
+#
+# run_antiplane_sweep [rundir] [ncycles] [laws]: Wu & Chen (2014) model A
+# for W/hc = 3 ... 120 and Cattania (2019) for W/L_inf = 3.2 ... 26,
+# aging and/or slip law; completed runs are skipped
+#
+rundir=${1-.}
+ncyc=${2-40}
+laws=${3-"aging slip"}
+sdir=$(cd "$(dirname "$0")" && pwd)
+mkdir -p "$rundir"
+cd "$rundir" || exit 1
+done_run () { grep -q "^wall" $1/rsf_solve.log 2>/dev/null; }
+for law in $laws; do
+    for X in 3 8.6 20 31.5 63; do
+        done_run wuchen_${law}_X$X || CPL=8 "$sdir/run_antiplane" wuchen $X $law $ncyc wuchen_${law}_X$X
+    done
+    for X in 3.2 6.5 13; do
+        done_run cattania_${law}_X$X || CPL=4 "$sdir/run_antiplane" cattania $X $law $ncyc cattania_${law}_X$X
+    done
+done
+for law in $laws; do
+    done_run wuchen_${law}_X120 || CPL=4 "$sdir/run_antiplane" wuchen 120 $law $ncyc wuchen_${law}_X120
+    done_run cattania_${law}_X26 || CPL=4 "$sdir/run_antiplane" cattania 26 $law $ncyc cattania_${law}_X26
+done
+echo SWEEP_DONE
