@@ -1,0 +1,47 @@
+#!/bin/bash
+#
+# regime sweep of a single strike-slip strip loaded by uniform plate-rate
+# backslip (creeping velocity-strengthening ends load the locked
+# velocity-weakening patch from its edges, as in Wu & Chen 2014 and
+# Cattania 2019), optimal orientation (no far-field rate, constant normal
+# stress), for W/h* = 1 ... 64, W the velocity-weakening length (48 km of
+# a 60 km strip, 15 km deep) and h* = (2/pi) G/(1-nu) dc b/((b-a)^2 sigma)
+# (= 2 L_inf of Rubin & Ampuero 2005; the h* of Wu & Chen 2014).
+#
+#   one   one state variable, aging law, a 0.01 b 0.02 (b/a = 2)
+#   slip  the same with the slip law
+#   two   two state variables, slip law, a = b1 = 0.01, b2 = 0.84 a,
+#         dc2 = dc1/0.048 (Becker 2000), dc1 = 0.0803 dc so that the
+#         spring-slider critical stiffness matches the one-state one
+#
+# cells: L_b/4 (L_inf/6.8) for one state variable; G dc2/(b2 sigma)/32 for
+# two (about half the one-state cell size)
+#
+# usage: run_regimes [rundir] [tmax_yr] [variants] [Xlist] [extra rsf_solve options]
+#
+rundir=${1-.}
+tmax=${2-8000}
+variants=${3-"one slip two"}
+xlist=${4-"1 2 4 8 16 32 64"}
+extra=${5-""}
+sdir=$(cd "$(dirname "$0")/.." && pwd)
+common="--L 60e3 --W 15e3 --sigma 50e6 --vs_margin 0.1 --a_vs 0.03 --load backslip --strikes=0"
+mkdir -p "$rundir"
+cd "$rundir" || exit 1
+for X in $xlist; do
+    dc=$(python3 -c "print(48e3/($X*108805.))")
+    for v in $variants; do
+        n=${v}_W$X
+        if grep -q "^wall" $n/rsf_solve.log 2>/dev/null; then continue; fi
+        case $v in
+            one)  args="--a 0.01 --b 0.02 --dc $dc --cells_per_lb 4" ;;
+            slip) args="--a 0.01 --b 0.02 --dc $dc --cells_per_lb 4 --state_law 2" ;;
+            two)  dc1=$(python3 -c "print(0.0803*$dc)")
+                  dc2=$(python3 -c "print(0.0803*$dc/0.048)")
+                  dx=$(python3 -c "print(3.204e10*0.0803*$dc/0.048/(0.0084*50e6)/32)")
+                  args="--a 0.01 --b 0.01 --b2 0.0084 --dc $dc1 --dc2 $dc2 --dx $dx --state_law 2" ;;
+        esac
+        "$sdir/run_model" $n $tmax 1 $common $args -- -rsf_series_stride 8 $extra
+    done
+done
+echo REGIMES_DONE

@@ -247,6 +247,8 @@ def main():
     # Rubin and Ampuero (2005) aging-law nucleation length, in-plane (mode II) modulus G/(1-nu)
     if args.b > args.a:
         hstar = 2.0 / math.pi * G / (1.0 - nu) * args.dc * args.b / ((args.b - args.a) ** 2 * args.sigma)
+    else:
+        hstar = float("inf")
     if args.b2 > 0:
         # two state variables: velocity weakening if a < b + b2; the
         # one-state h* formula is not meaningful there, an estimate from
@@ -254,8 +256,6 @@ def main():
         bt = args.b + args.b2
         hstar = (2.0 / math.pi * G / (1.0 - nu) * args.dc2 * bt / ((bt - args.a) ** 2 * args.sigma)
                  if bt > args.a else float("inf"))
-    else:
-        hstar = float("inf")
     if args.lengths:
         lengths = [float(v) for v in args.lengths.split(",")]
         if len(lengths) != args.nfault:

@@ -651,6 +651,13 @@ aging law; both slip-law variants add small post-seismic bursts at the
 strip tips that are counted as events at the 1 mm/s threshold and
 depend on resolution.
 
+Regime sweep against W/h* with backslip loading
+(single_fault_regimes/README.md): aging law periodic up to W/h* 8,
+partial ruptures from W/h* 16 (about 3 events per cycle, of the order
+of Cattania 2019); slip law, one and two state variables, periodic full
+ruptures up to W/h* 32 and 16. W/h* 64 and two-state runs above 16 to
+do.
+
 - P0 [done]: two-state law against the nondimensional spring slider.
 - P1: two-state spring slider in rsf_solve over kappa' from 0.95 to
   0.85 with long runs (5e4 dc/v0 settling, 5e4 analysis): bifurcation
