@@ -640,6 +640,13 @@ period 2 at L/h* 20, periodic again at 30; backslip loading: partial
 ruptures, irregular at 20, three-event pattern at 30), runs too short
 for 100 cycles.
 
+Single-fault sweep (single_fault_sweep/README.md): one against two
+state variables, L/h* 10 to 30, strike -20 to 20 degrees from optimal,
+3000 yr, far-field loading: orientation dominates (secular recurrence
+trends), detrended sequences nearly periodic, period 2 at L/h* 20 with
+one state variable (resolved at L_b/8), no partial ruptures under
+far-field loading; two-state runs not yet converged in recurrence.
+
 - P0 [done]: two-state law against the nondimensional spring slider.
 - P1: two-state spring slider in rsf_solve over kappa' from 0.95 to
   0.85 with long runs (5e4 dc/v0 settling, 5e4 analysis): bifurcation

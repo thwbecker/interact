@@ -247,6 +247,13 @@ def main():
     # Rubin and Ampuero (2005) aging-law nucleation length, in-plane (mode II) modulus G/(1-nu)
     if args.b > args.a:
         hstar = 2.0 / math.pi * G / (1.0 - nu) * args.dc * args.b / ((args.b - args.a) ** 2 * args.sigma)
+    if args.b2 > 0:
+        # two state variables: velocity weakening if a < b + b2; the
+        # one-state h* formula is not meaningful there, an estimate from
+        # the second variable's weakening (dc2, b + b2) is reported instead
+        bt = args.b + args.b2
+        hstar = (2.0 / math.pi * G / (1.0 - nu) * args.dc2 * bt / ((bt - args.a) ** 2 * args.sigma)
+                 if bt > args.a else float("inf"))
     else:
         hstar = float("inf")
     if args.lengths:
@@ -413,7 +420,7 @@ def main():
             print("WARNING: closest cells of different faults are %.0f m apart (cell size %.0f m)" %
                   (dmin, max(dx_list)))
     a_arr = np.array([x[0] for x in ab])
-    n_vw = int(np.sum(a_arr < args.b))
+    n_vw = int(np.sum(a_arr < args.b + args.b2))
     par = vars(args).copy()
     par.update(dict(ncell_per_fault=ncell, dx=dx, N=N, N_vw=n_vw, Lb=Lb, hstar=hstar,
                     lengths=lengths, ncell_list=ncell_list, dx_list=dx_list,

@@ -1,0 +1,43 @@
+#!/bin/bash
+#
+# single-fault sweep: one state variable (aging law) against two state
+# variables (slip law, beta1 = 1, beta2 = 0.84, dc2 = dc/0.048 as in
+# Becker 2000), three values of L/h*, five orientations of the fault in
+# the far-field stressing-rate field (strike relative to the optimal
+# one: -20 -10 0 10 20 degrees, i.e. beta = 25 ... 65 degrees to S1;
+# negative unclamping, positive clamping)
+#
+# usage: run_single_sweep [rundir] [tmax_yr]
+#
+rundir=${1-.}
+tmax=${2-3000}
+sdir=$(cd "$(dirname "$0")/.." && pwd)
+common="--L 60e3 --W 15e3 --sigma 50e6 --vs_margin 0.1 --a_vs 0.03 --cells_per_lb 4 --sigma_min 5e6"
+mkdir -p "$rundir"
+cd "$rundir" || exit 1
+for X in 10 20 30; do
+    # one state variable, aging law, a 0.01 b 0.02: h* = 1.088e5 m/m * dc
+    dc1=$(python3 -c "print(0.5515/$X)")
+    # two state variables, slip law, a = b1 = 0.01, b2 = 0.84 a, dc2 = dc1/0.048
+    # (Gu et al. 1984; Becker 2000).  With b1 = a the weakening acts over dc2,
+    # so dc1 is chosen such that the spring-slider critical stiffness,
+    # kappa_c a sigma/dc1 with kappa_c = 0.0803, equals the one-state
+    # (b-a) sigma/dc, i.e. dc1 = 0.0803 dc(one state) for the same L/h*;
+    # cells from the weakening length G dc2/(b2 sigma) (7.6e4 dc2 here) over 16
+    dc2s=$(python3 -c "print(0.0803*0.5515/$X)")
+    dc22=$(python3 -c "print(0.0803*0.5515/$X/0.048)")
+    dx2=$(python3 -c "print(76190.*0.0803*0.5515/$X/0.048/16)")
+    for s in -20 -10 0 10 20; do
+        n1=one_X${X}_s${s}
+        n2=two_X${X}_s${s}
+        if ! grep -q "^wall" $n1/rsf_solve.log 2>/dev/null; then
+            "$sdir/run_model" $n1 $tmax 1 $common --a 0.01 --b 0.02 --dc $dc1 --strikes=$s \
+                -- -rsf_series_stride 8
+        fi
+        if ! grep -q "^wall" $n2/rsf_solve.log 2>/dev/null; then
+            "$sdir/run_model" $n2 $tmax 1 $common --dx $dx2 --a 0.01 --b 0.01 --b2 0.0084 --dc $dc2s --dc2 $dc22 \
+                --state_law 2 --strikes=$s -- -rsf_series_stride 8
+        fi
+    done
+done
+echo SWEEP_DONE

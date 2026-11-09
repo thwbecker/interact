@@ -1,0 +1,10 @@
+#!/bin/bash
+# resolution check of two runs of run_single_sweep (run in the same directory)
+S=$(cd "$(dirname "$0")/.." && pwd)
+X=20
+c="--L 60e3 --W 15e3 --sigma 50e6 --vs_margin 0.1 --a_vs 0.03 --sigma_min 5e6"
+dc=$(python3 -c "print(0.0803*0.5515/$X)"); dc2=$(python3 -c "print(0.0803*0.5515/$X/0.048)")
+dx=$(python3 -c "print(76190.*0.0803*0.5515/$X/0.048/32)")
+$S/run_model res_two_X20_s0 3000 1 $c --dx $dx --a 0.01 --b 0.01 --b2 0.0084 --dc $dc --dc2 $dc2 --state_law 2 --strikes=0 -- -rsf_series_stride 8
+$S/run_model res_one_X20_s0 3000 1 $c --cells_per_lb 8 --a 0.01 --b 0.02 --dc $(python3 -c "print(0.5515/$X)") --strikes=0 -- -rsf_series_stride 8
+echo RES_DONE

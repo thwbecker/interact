@@ -150,6 +150,9 @@ h* = 2/pi G/(1-nu) dc b/((b-a)^2 sigma) with the in-plane modulus.
     single_fault_pilot/
                     L/h* scan of a single strip, far-field against
                     backslip loading (README.md there)
+    single_fault_sweep/
+                    one against two state variables, L/h* and fault
+                    orientation in the far-field loading (README.md there)
     COMPILE.md      build notes for rsf_solve (PETSc versions, flags,
                     HACApK and hmmvp, sandbox specifics)
     examples/       make_examples (runs and plots the example systems)

@@ -41,10 +41,9 @@ initial conditions and loading
 
 normal-stress evolution and limiter (for dip slip / nonplanar faults)
   -calc_sigma_dot <bool>  evolve normal stress via the In matrix (default 0 = off)
-  -rsf_stations <file>    SEAS-style per-cell time series: file lines are NAME CELL_INDEX;
-                          writes fltst_NAME.dat (t slip log10|v| tau sigma log10theta)
-  -rsf_station_dt_yr <dt> station output interval when quiescent (default 0.1 yr)
-  -rsf_station_vdense <v> station |v| above which every accepted step is written (default 1e-6)
+  -sigma_dot_interact <bool> with -calc_sigma_dot: 1 (default) include the normal stress
+                          change from slip on the faults; 0 evolve sigma from the loading
+                          rates only (backslip, -rsf_stress_rate_file); not with -fd_mode
   -limit_sigma <bool>     clamp sigma to [min,max], as HBI limitsigma (default 0)
   -min_sigma <Pa>         limiter floor (default 1e6)
   -max_sigma <Pa>         limiter ceiling (default 300e6)
@@ -72,6 +71,12 @@ state evolution
                           raises psi_ss there by b*W(1) = 0.567 b (its known
                           steady-state offset); Sato has no such shift
   -vmin_state <m/s>       |v| floor in the slip law's ln(|v|/v0) (default 1e-16)
+  -rsf_two_state <bool>   second state variable (default 0): psi = f0 + phi1 + phi2,
+                          phi_k = b_k ln(v0 theta_k/dc_k), both evolving with -state_law;
+                          b_1, dc_1 are the usual b and dc, f_ss = f0 + (a-b-b2) ln(|v|/v0)
+                          (Gu et al. 1984; Becker 2000). Not with -imex or -fd_mode
+  -rsf_b2 <val>           b of the second state variable (uniform)
+  -rsf_dc2 <m>            dc of the second state variable [m] (uniform)
 
 time stepping
   -rtol <val>             ODE relative tolerance (default 1e-4)
@@ -91,6 +96,9 @@ time stepping
                           including those from petsc_settings.yaml, do not
                           affect them.
   -stop_time_yr <yr>      integration stop time (default 3000)
+  -domain_check_vmax <m/s> > 0: also reject trial states whose slip rate exceeds this
+                          (e.g. 100; default 0, off). Without it an explicit step can accept
+                          a state with an absurd slip rate whose derivative overflows
   -domain_check_max_reject <n>  abort after n CONSECUTIVE out-of-domain trial
                           steps (default 5000; <= 0 disables). Such rejection
                           storms bypass the PETSc rejection limits and can
@@ -134,6 +142,29 @@ optional outputs (all default off)
   -slip_line_dt_yr <yr>   tmp_rsf slip-line snapshot cadence (default off)
   -rsf_monitor_by_group <bool> also write one monitor file per fault group (default 0);
                           with -rsf_catalog this also splits the event catalog by group
+  -rsf_stations <file>    SEAS-style per-cell time series: file lines are NAME CELL_INDEX;
+                          writes fltst_NAME.dat (t slip log10|v| tau sigma log10theta)
+  -rsf_station_dt_yr <dt> station output interval when quiescent (default 0.1 yr)
+  -rsf_station_vdense <v> station |v| above which every accepted step is written (default 1e-6)
+  -rsf_series_file <f>    compact all-cell binary time series (training data): header int32
+                          magic,ncell,nfield; records double t[s] + nfield float32[ncell] blocks
+                          log10|v| tau[MPa] log10theta[s] slip[m] sigma[MPa], nfield 5
+                          (6 with -rsf_two_state: theta of the first state variable,
+                          then log10 theta2[s])
+                          (with -rsf_restart the file is cut back to its complete
+                          records up to the checkpoint time and continued)
+  -rsf_series_dt_yr <dt>  series interval when quiescent (default 1 yr)
+  -rsf_series_vdense <v>  max|v| above which every accepted step is written (default 1e-6)
+  -rsf_series_stride <n>  every n-th accepted step while max|v| exceeds vdense (default 1)
+  -rsf_series_mode <m>    0: records by -rsf_series_dt_yr, -rsf_series_vdense and
+                          -rsf_series_stride (default)
+                          1: change based, at the first accepted step at which some cell's
+                          log10|v| changed by dlogv, or tau or sigma by dstress, since the
+                          last record, or dtmax has passed
+  -rsf_series_dlogv <d>   mode 1: log10|v| change threshold (default 0.1)
+  -rsf_series_dstress <d> mode 1: tau and sigma change threshold [MPa] (default 0.1)
+  -rsf_series_dtmax_yr <dt> mode 1: maximum record interval (default 5 yr)
+  -rsf_series_final <bool> also record the final accepted step (default 0)
 
 visco-elastic medium (rudimentary; details in src/rsf_solve/rsf_ve.c)
   -ve_mode <1|2|3>        switch on hereditary (Prony) stressing: 1 uniform Maxwell
@@ -164,7 +195,7 @@ fully dynamic coseismic phases (first version; see rsf_solve_fd.md)
   -fd_vsw <m/s>           switch QD to FD at this max slip rate (default 1e-3)
   -fd_vback <m/s>         back to QD after max slip rate below this for one
                           window (default 1e-4)
-  -fd_back_eps <f>        > 0: instead, back to QD once all slip rates change by less
+  -fd_back_eps <f>        > 0 (3-D default 0.05): instead, back to QD once all slip rates change by less
                           than this fraction over one window (default 0 = off)
   -fd_back_vmax <m/s>     max slip rate allowed at that hand-back (default vsw/2)
   -fd_tol <f>             history window tolerance (default 1e-2)
@@ -176,6 +207,29 @@ fully dynamic coseismic phases (first version; see rsf_solve_fd.md)
   -fd_conv <0|1|2>        history convolution: 0 direct, 1 partitioned FFT,
                           2 hybrid (default; about 3x the memory of 0)
   -fd_conv_block <n>      partition length, power of two (default 0 = automatic)
+  -fd_nl <0|1>            1 (default): second-order time marching (Noda, Sato and Kurihara
+                          2020); 0: the earlier first-order scheme. See rsf_solve_fd.md
+  -fd_kmax3 <0|1>         3-D: 1 allows steps of several substeps (experimental, default 0);
+                          for 3-D speed use -fd_back_eps (quasi-steady hand-back)
+  -fd_layer <n>           3-D half space (vertical strike-slip fault reaching the surface):
+                          > 0 completes the mirror image with a layer of opening elements on
+                          the surface, +-n fault elements across the trace (default 0: off)
+  -fd_layer_m <m>         layer elements of dx/m (default 2); -fd_layer_margin <n> beyond the
+                          fault ends (default: as -fd_layer)
+  -fd_back_dyn <Pa>       3-D: hand back to QD once the fully dynamic traction equals the
+                          quasi-dynamic one to within this everywhere (and max V < vsw)
+                          for -fd_back_nwin steps (default 10); 3-D default 1e4, 2-D off
+  -fd_hs_static <0|1>     3-D half space, any fault geometry: whole-space elastodynamics with the
+                          exact half-space statics (no free-surface reflections; fd_plan.md G4)
+  -fd_reentry <f>         after a phase, open the next one only above f vsw until the peak
+                          rate has fallen below -fd_vback (3-D default 10, 2-D 1)
+  -fd_surface <0|1>       3-D half space: a planar fault of any dip (or 1 also for a vertical
+                          strike-slip fault) uses a full virtual free surface (three unknowns
+                          per surface element); -fd_surface_m (default 4: elements of dx/4),
+                          -fd_surface_ext (margin in fault elements, default the fault width);
+                          normal-stress changes need -calc_sigma_dot (exact static In);
+                          -fd_surface_grade <0|1> rows graded by distance to the fault (default 1);
+                          -fd_surface_extend <n> rows continuing the plane above the surface
   -fd_coarse <0|1>        long steps (kmax substeps) start at multiples of kmax and,
                           once a window holds only such steps, the history is summed
                           over aligned blocks (exact, kmax times cheaper; default 1)
@@ -225,18 +279,21 @@ output files (change filename in includes/filenames.h)
   rsf_catalog.g%03d.dat   the same events split by fault group, when
                           -rsf_catalog and -rsf_monitor_by_group are both set
   rsf_geom.gGGG.dat       per-group patch geometry for the field frames
+  fltst_NAME.dat          per-station time series (with -rsf_stations)
+  <-rsf_series_file>      all-cell binary series (log10|v|, tau, log10 theta, slip,
+                          sigma, and log10 theta2 with -rsf_two_state)
 
 examples
   strike-slip BP5 at 2 km, dense, with an event catalog:
-    rsf_solve -geom_file geom_bp5_2km.in -rsf_file rsf_bp5_2km.dat \
+    bin/rsf_solve -geom_file geom_bp5_2km.in -rsf_file rsf_bp5_2km.dat \
        -rsf_ic_file ic_bp5_2km.in -rsf_dc_file dc_bp5_2km.in \
        -sigma_init 25e6 -dc 0.14 -stop_time_yr 240 -rsf_catalog
   dip-slip thrust with evolving normal stress, hmmvp backend:
-    rsf_solve -geom_file geom_thrust.in -rsf_file rsf_thrust.dat -rsf_ic_file ic_thrust.in \
+    bin/rsf_solve -geom_file geom_thrust.in -rsf_file rsf_thrust.dat -rsf_ic_file ic_thrust.in \
        -sigma_init 58e6 -dc 0.02 -rsf_slip_mode 1 -calc_sigma_dot -limit_sigma \
        -use_hmatrix 4 -hmmvp_tol 1e-4 -rsf_catalog
   SEAS BP1 (2-D antiplane half plane) with fully dynamic coseismic phases:
-    rsf_solve -geom_file geom_bp1.in -rsf_file rsf_bp1.dat -rsf_ic_file ic_bp1.in \
+    bin/rsf_solve -geom_file geom_bp1.in -rsf_file rsf_bp1.dat -rsf_ic_file ic_bp1.in \
        -dc 0.008 -sigma_init 50e6 -vpl 1e-9 -stop_time_yr 520 -fd_mode 1 -fd_lmax 6000
        (inputs and the full option set: fully_dynamic/c_port/run_bp1_fd.sh)
 
