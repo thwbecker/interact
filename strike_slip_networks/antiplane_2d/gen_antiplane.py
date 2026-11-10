@@ -25,7 +25,12 @@ check of the 2.5-D strip results against the 1-D antiplane literature.
             1e-9 m/s, f0 0.6, and a creeping region of --vs_W W.
 
 The --law option switches to the slip law (rsf_solve -state_law 2) or the
-PRZ law (-state_law 3) with otherwise identical parameters. Cells: --cpl cells per L_b = G dc/(b
+PRZ law (-state_law 3) with otherwise identical parameters, or (two) to
+two state variables with the slip law: b1 + b2 = b, b2/b1 = 0.84,
+dc2 = dc1/0.048, dc1 such that the two-state spring-slider critical
+stiffness equals the one-state one (X then refers to the one-state hc or
+L_inf); cells G dc2/(b2 sigma)/(8 cpl), which does not resolve the
+first variable's G dc1/(b1 sigma). Cells: --cpl cells per L_b = G dc/(b
 sigma) (default 4).
 
 usage: gen_antiplane.py model X [--law aging|slip|prz] [--a_over_b r] [--cpl n]
@@ -47,8 +52,9 @@ YR = 365.25 * 86400.0
 p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
 p.add_argument("model", choices=("wuchen", "cattania"))
 p.add_argument("X", type=float, help="W/hc (wuchen) or W/L_inf (cattania)")
-p.add_argument("--law", choices=("aging", "slip", "prz"), default="aging",
-               help="state evolution law: aging, slip or PRZ (rsf_solve -state_law 1, 2, 3)")
+p.add_argument("--law", choices=("aging", "slip", "prz", "two"), default="aging",
+               help="state evolution law: aging, slip or PRZ (rsf_solve -state_law 1, 2, 3), or two state "
+                    "variables with the slip law (see below)")
 p.add_argument("--a_over_b", type=float, default=0.0,
                help="a/b of the velocity-weakening part (b fixed); 0: paper value (0.5 Wu & Chen model A, "
                     "0.75 Cattania)")
@@ -80,6 +86,22 @@ else:
     lscale = linf
 Lb = G * dc / (bv * sig)
 ds = Lb / a.cpl
+if a.law == "two":
+    # two state variables (slip law) with b1 + b2 = b and b2/b1 = 0.84,
+    # dc2 = dc1/0.048 (the ratios of Gu et al. 1984 and Becker 2000);
+    # dc1 is chosen so that the critical stiffness of the two-state spring
+    # slider, kappa_c a sigma/dc1, equals the one-state (b - a) sigma/dc,
+    # so that X keeps the meaning of the one-state W/hc or W/L_inf
+    rho = 0.048
+    b1, b2 = bv / 1.84, 0.84 * bv / 1.84
+    be1, be2 = b1 / av, b2 / av
+    k0 = be1 - 1.0
+    kc = (k0 + rho * (2 * be1 + (be2 - 1) * (2 + rho)) +
+          math.sqrt(4 * rho ** 2 * (k0 + be2) + (k0 + rho ** 2 * (be2 - 1)) ** 2)) / (2 * (1 + rho))
+    dc1 = kc * av * dc / (bv - av)
+    dc2 = dc1 / rho
+    # cells: G dc2/(b2 sigma)/(8 cpl), i.e. /32 for the default cpl 4
+    ds = G * dc2 / (b2 * sig) / (8.0 * a.cpl)
 nvw = max(2, int(math.ceil(W / ds)))
 ds = W / nvw
 nvs = 0 if a.model == "wuchen" else int(math.ceil(a.vs_W * W / ds))
@@ -97,14 +119,16 @@ with open(os.path.join(a.out, "geom.in"), "w") as fg, \
         v = vpl * (1.0 + 1e-3 * rng.uniform(-1, 1))
         tau = sig * aa * math.asinh(v / (2 * v0) * math.exp((f0 + bv * math.log(v0 / v)) / aa)) + eta * v
         fg.write("0 %.8e 0 0 -90 %.8e 0 0\n" % (-z, ds / 2.0))
-        fr.write("%.6f %.6f\n" % (aa, bv))
+        fr.write("%.6f %.6f\n" % (aa, b1 if a.law == "two" else bv))
         fi.write("%.10e %.6e\n" % (tau, v))
 # rough recurrence estimate for the run length: stress drop of a few
 # (b-a) sigma over the fault, slip ~ dtau W/G, at vpl
 t_est = 20.0 * (bv - av) * sig * W / G / vpl / YR
 opts = ("-geom_file geom.in -rsf_file rsf.dat -rsf_ic_file ic.in -dc %.6e -sigma_init %.6e -f0 %g "
         "-v0 %.6e -vpl %.6e -shear_modulus %.6e -s_wave_speed %g"
-        % (dc, sig, f0, v0, vpl, G, cs))
+        % (dc1 if a.law == "two" else dc, sig, f0, v0, vpl, G, cs))
+if a.law == "two":
+    opts += " -state_law 2 -rsf_two_state 1 -rsf_b2 %.8e -rsf_dc2 %.8e" % (b2, dc2)
 if a.law == "slip":
     opts += " -state_law 2"
 elif a.law == "prz":

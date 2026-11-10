@@ -226,3 +226,58 @@ Cattania setup: at W/L_inf 2 and 4 all runs with both laws give periodic
 full ruptures. With the slip law at a/b 0.75 the catalog listed a
 one-cell threshold crossing about 60 s before each large event; with
 the one-hour merging these are part of the large events.
+
+## Cattania setup for the aging, slip and two-state slip laws
+
+`gen_antiplane.py --law two` uses two state variables with the slip law:
+b1 + b2 = b, b2/b1 = 0.84, dc2 = dc1/0.048 (the ratios of Gu et al. 1984
+and Becker 2000), and dc1 such that the critical stiffness of the
+two-state spring slider equals the one-state (b - a) sigma/dc, so that
+W/L_inf refers to the same linear-stability length as for one state
+variable (a choice, not an established equivalence). Cells are
+G dc2/(b2 sigma)/32, which does not resolve the first variable's
+G dc1/(b1 sigma); in the 2.5-D check this kept the character of the
+sequences but changed recurrence by about 5 percent.
+
+`run_cattania_space.py [rundir] [maxcells] [ncycles] [laws]` runs the
+Cattania setup at W/L_inf = 2, 3, 4, 6, 8, 11, 16, 23, 32, 45, 64 and
+a/b = 0.5, 0.625, 0.75 for the aging, slip and two-state laws in order of
+estimated cost, skipping runs above maxcells cells (default 800) and
+completed runs. `plot_cattania_space.py [rundir]` draws
+cattania_space.png in the layout of Cattania's figures (W/L_inf-a/b map
+coloured by events per full-rupture cycle, events per cycle against
+0.45 (W/L_inf)^1/2, CV of interevent times, rupture-length survival
+functions) and writes cattania_space.txt.
+
+Results (2026-11-10; single runs, 30 recurrence estimates each; runs
+completed: aging to W/L_inf 45, 32, 16 for a/b 0.5, 0.625, 0.75; slip to
+32, 32, 16; two-state to 16, 8, 4, limited by cost):
+
+| a/b | law | first W/L_inf with partial ruptures | events per cycle at the largest W/L_inf run | CV there |
+|---|---|---|---|---|
+| 0.5 | aging | 16 (11: irregular timing, CV 0.18, all full) | 1.96 (45) | 0.43 |
+| 0.625 | aging | 11 | 2.06 (32) | 0.45 |
+| 0.75 | aging | 8 | 2.08 (16) | 0.45 |
+| 0.5 | slip | none up to 32 | 1.00 | 0.00 |
+| 0.625 | slip | none up to 32 (32: CV 0.15, all full) | 1.00 | 0.15 |
+| 0.75 | slip | 16 (1.08 events per cycle) | 1.08 (16) | 0.16 |
+| 0.5 | two-state | none up to 16 | 1.00 | 0.00 |
+| 0.625 | two-state | none up to 8 | 1.00 | 0.00 |
+| 0.75 | two-state | none up to 4 (CV 0.10 at 4) | 1.00 | 0.10 |
+
+- Aging law: the onset of partial ruptures moves from W/L_inf 6 to 8 at
+  a/b 0.75 to 11 to 16 at a/b 0.5, against a single band of 5 +- 2 in
+  Cattania's figure. Above the onset the number of events per cycle
+  stays near 2 from W/L_inf 16 to 45 while her estimate grows to 3.0,
+  so the ratio drops from about 1 to 0.65 at 45. CV grows to 0.4 to 0.5
+  (she reports up to 1.5 at W/L_inf 415, outside this range).
+- Slip law: periodic full ruptures over almost the whole range; the
+  first partial ruptures at a/b 0.75 and W/L_inf 16, i.e. a factor of
+  about 2 later than with the aging law at the same a/b, and none up to
+  W/L_inf 32 at a/b 0.5 and 0.625. Cattania noted that the slip law's
+  smaller nucleation length favours partial ruptures while its smaller
+  fracture energy favours full ones; here the second effect dominates
+  throughout.
+- Two state variables (slip law): periodic full ruptures wherever runs
+  were affordable, like the one-state slip law; the largest W/L_inf
+  could not be reached because of the finer cells.
