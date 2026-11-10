@@ -59,8 +59,9 @@ def analyze(d):
     events.npz in the run directory, so that series.bin can be removed
     afterwards to save space"""
     cache = os.path.join(d, "events.npz")
-    if os.path.exists(cache) and (not os.path.exists(os.path.join(d, "series.bin")) or
-                                  os.path.getmtime(cache) >= os.path.getmtime(os.path.join(d, "series.bin"))):
+    newest = max(os.path.getmtime(os.path.join(d, f)) for f in ("series.bin", "rsf_catalog.dat")
+                 if os.path.exists(os.path.join(d, f)))
+    if os.path.exists(cache) and os.path.getmtime(cache) >= newest:
         z = np.load(cache)
         return params(d), dict(on=z["on"], ln=z["ln"], nuc=z["nuc"])
     p, r = _analyze(d)
@@ -73,7 +74,12 @@ def _analyze(d):
     c = np.loadtxt(os.path.join(d, "rsf_catalog.dat"), ndmin=2)
     tmax = float(open(os.path.join(d, "rsf_solve.log")).read().split("stop ")[1].split()[0]) \
         if "stop " in open(os.path.join(d, "rsf_solve.log")).read() else None
-    t, lv = read_series(d, int(p["nvw"] + p["nvs"]))
+    have_series = os.path.exists(os.path.join(d, "series.bin"))
+    if have_series:
+        t, lv = read_series(d, int(p["nvw"] + p["nvs"]))
+    else:                               # run without series: events from the catalog only
+        monitor = np.loadtxt(os.path.join(d, "rsf_monitor.dat"), ndmin=2)
+        t, lv = monitor[:, 2], None
     if tmax is None:
         tmax = t[-1]
     if c.size == 0:
@@ -93,6 +99,8 @@ def _analyze(d):
     mon, mln = mon[keep], mln[keep]
     nvw = int(p["nvw"])
     nuc = []
+    if lv is None:
+        return p, dict(on=mon, ln=mln, nuc=np.full(len(mon), np.nan))
     for t0 in mon:
         i = np.searchsorted(t, t0 - 1e-12)
         while i < len(t) and np.max(lv[i]) < -3:

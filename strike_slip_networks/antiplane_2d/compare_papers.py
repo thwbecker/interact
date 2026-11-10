@@ -30,6 +30,9 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import plot_parameter_maps as pm  # noqa: E402
 
 ORDER = ("stable", "slow", "centre", "side", "narrow", "wide")
+# a periodic run without series (nucleation point unknown) matches either
+# periodic regime
+EQUIV = {"periodic": {"centre", "side"}}
 BOUNDS = (0.6, 1.2, 5.5, 33.0, 105.0)
 LAWCOL = {"aging": "C0", "slip": "C3", "prz": "C2"}
 
@@ -69,7 +72,7 @@ def collect(rd):
 
 def transitions(xs, cats):
     """W/hc intervals of the first change into each regime group"""
-    rank = {"stable": 0, "slow": 0, "centre": 1, "side": 2, "narrow": 3, "wide": 3}
+    rank = {"stable": 0, "slow": 0, "centre": 1, "periodic": 1, "side": 2, "narrow": 3, "wide": 3}
     out = {}
     for lev, name in ((1, "seismic"), (2, "side"), (3, "partial")):
         lo, hi = None, None
@@ -95,7 +98,7 @@ def main():
         ks = sorted(k for k in res if k[0] == "wuchen" and k[1] == law)
         if not ks:
             continue
-        match = [res[k][1] in wc_predict(k[3], k[2])[0] for k in ks]
+        match = [bool(({res[k][1]} | EQUIV.get(res[k][1], set())) & wc_predict(k[3], k[2])[0]) for k in ks]
         L.append("  %s law: %i of %i runs in the predicted regime (%.0f %%; within 10 %% of a boundary "
                  "either neighbour counts)" % (law, sum(match), len(ks),
                  100.0 * np.mean(match)))

@@ -11,6 +11,8 @@ Regimes (Wu & Chen style), from the events after the first quarter of
 each run (merged within one hour, as in plot_antiplane.py):
   stable     no catalog event (1e-3 m/s) and max slip rate below 10 vpl
   slow       no catalog event, but max slip rate above 10 vpl
+  periodic   all events full ruptures (>= 0.9 W), interval CV < 0.05,
+             nucleation point unknown (run without series)
   centre     all events full ruptures (>= 0.9 W), interval CV < 0.05,
              nucleation within 0.25 W of the centre
   side       as centre, nucleation farther out
@@ -36,7 +38,8 @@ import numpy as np
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import plot_antiplane as pa  # noqa: E402
 
-CATS = (("stable", "C0", "o"), ("slow", "orange", "o"), ("centre", "red", "o"), ("side", "limegreen", "o"),
+CATS = (("stable", "C0", "o"), ("slow", "orange", "o"), ("periodic", "0.5", "o"), ("centre", "red", "o"),
+        ("side", "limegreen", "o"),
         ("narrow", "cyan", "o"), ("wide", "magenta", "o"))
 LAWS = ("aging", "slip", "prz")
 
@@ -51,7 +54,10 @@ def classify(d):
     if s["n"] == 0:
         cat = "slow" if maxlv > np.log10(10 * vpl) else "stable"
     elif s["ffull"] == 1.0 and s["cv"] < 0.05:
-        cat = "centre" if np.nanmedian(np.abs(r["nuc"] - 0.5)) < 0.25 else "side"
+        if np.all(np.isnan(r["nuc"])):
+            cat = "periodic"            # run without series: nucleation point unknown
+        else:
+            cat = "centre" if np.nanmedian(np.abs(r["nuc"] - 0.5)) < 0.25 else "side"
     else:
         nd = len(np.unique(np.round(r["ln"] / p["W"] / 0.05)))
         cat = "narrow" if nd <= 3 else "wide"

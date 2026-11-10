@@ -239,11 +239,18 @@ G dc2/(b2 sigma)/32, which does not resolve the first variable's
 G dc1/(b1 sigma); in the 2.5-D check this kept the character of the
 sequences but changed recurrence by about 5 percent.
 
-`run_cattania_space.py [rundir] [maxcells] [ncycles] [laws]` runs the
+`run_cattania_space.py [rundir] [maxcells] [ncycles] [laws] [--series]` runs the
 Cattania setup at W/L_inf = 2, 3, 4, 6, 8, 11, 16, 23, 32, 45, 64 and
 a/b = 0.5, 0.625, 0.75 for the aging, slip and two-state laws in order of
 estimated cost, skipping runs above maxcells cells (default 800) and
-completed runs. `plot_cattania_space.py [rundir]` draws
+completed runs; the all-cell series is left out unless `--series` is
+given, since these statistics need only the catalog and monitor (run
+directories then stay at a few hundred kB instead of up to a GB).
+`run_antiplane` takes the same choice as an eighth argument (1, the
+default, writes the series; 0 leaves it out). Without the series the
+nucleation point of events is not known, so plot_parameter_maps.py
+labels such periodic runs "periodic" instead of centre or side, and
+compare_papers.py counts them as matching either. `plot_cattania_space.py [rundir]` draws
 cattania_space.png in the layout of Cattania's figures (W/L_inf-a/b map
 coloured by events per full-rupture cycle, events per cycle against
 0.45 (W/L_inf)^1/2, CV of interevent times, rupture-length survival
