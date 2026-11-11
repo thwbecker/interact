@@ -256,35 +256,47 @@ coloured by events per full-rupture cycle, events per cycle against
 0.45 (W/L_inf)^1/2, CV of interevent times, rupture-length survival
 functions) and writes cattania_space.txt.
 
-Results (2026-11-10; single runs, 30 recurrence estimates each; runs
-completed: aging to W/L_inf 45, 32, 16 for a/b 0.5, 0.625, 0.75; slip to
-32, 32, 16; two-state to 16, 8, 4, limited by cost):
+Results (2026-11-11; single runs, 30 recurrence estimates each, cells
+up to 1500, run on a separate machine; cattania_space.txt and .png):
+W/L_inf up to 64 at a/b 0.5 and 0.625 and 32 at 0.75 for the aging and
+slip laws; two-state runs up to 64, 23 and 11.
 
-| a/b | law | first W/L_inf with partial ruptures | events per cycle at the largest W/L_inf run | CV there |
+| a/b | law | partial ruptures from W/L_inf | events per full-rupture cycle at W/L_inf 16, 32, 64 | CV at 16, 32, 64 |
 |---|---|---|---|---|
-| 0.5 | aging | 16 (11: irregular timing, CV 0.18, all full) | 1.96 (45) | 0.43 |
-| 0.625 | aging | 11 | 2.06 (32) | 0.45 |
-| 0.75 | aging | 8 | 2.08 (16) | 0.45 |
-| 0.5 | slip | none up to 32 | 1.00 | 0.00 |
-| 0.625 | slip | none up to 32 (32: CV 0.15, all full) | 1.00 | 0.15 |
-| 0.75 | slip | 16 (1.08 events per cycle) | 1.08 (16) | 0.16 |
-| 0.5 | two-state | none up to 16 | 1.00 | 0.00 |
-| 0.625 | two-state | none up to 8 | 1.00 | 0.00 |
-| 0.75 | two-state | none up to 4 (CV 0.10 at 4) | 1.00 | 0.10 |
+| 0.5 | aging | 16 (11: all full, CV 0.18) | 1.62, 2.00, 1.97 | 0.27, 0.53, 0.48 |
+| 0.625 | aging | 11 | 2.00, 2.06, 2.95 | 0.35, 0.45, 0.60 |
+| 0.75 | aging | 8 | 2.08, 2.00, - | 0.45, 0.61, - |
+| 0.5 | slip | none up to 64 | 1, 1, 1 | 0, 0, 0 |
+| 0.625 | slip | none up to 64 | 1, 1, 1 | 0, 0.15, 0 |
+| 0.75 | slip | none up to 32 | 1, 1, - | 0.16, 0, - |
+| 0.5 | two-state | none up to 64 | 1, 1, 1 | 0, 0, 0.06 |
+| 0.625 | two-state | none up to 23 | 1 (16) | 0.09 (16) |
+| 0.75 | two-state | none up to 11 | 1 (11) | 0.12 (11) |
 
 - Aging law: the onset of partial ruptures moves from W/L_inf 6 to 8 at
   a/b 0.75 to 11 to 16 at a/b 0.5, against a single band of 5 +- 2 in
   Cattania's figure. Above the onset the number of events per cycle
-  stays near 2 from W/L_inf 16 to 45 while her estimate grows to 3.0,
-  so the ratio drops from about 1 to 0.65 at 45. CV grows to 0.4 to 0.5
-  (she reports up to 1.5 at W/L_inf 415, outside this range).
-- Slip law: periodic full ruptures over almost the whole range; the
-  first partial ruptures at a/b 0.75 and W/L_inf 16, i.e. a factor of
-  about 2 later than with the aging law at the same a/b, and none up to
-  W/L_inf 32 at a/b 0.5 and 0.625. Cattania noted that the slip law's
-  smaller nucleation length favours partial ruptures while its smaller
-  fracture energy favours full ones; here the second effect dominates
-  throughout.
-- Two state variables (slip law): periodic full ruptures wherever runs
-  were affordable, like the one-state slip law; the largest W/L_inf
-  could not be reached because of the finer cells.
+  grows in steps: it stays at about 2 from W/L_inf 16 to 64 at a/b 0.5
+  and reaches 3 (2.95) only at 64 for a/b 0.625, whereas her estimate
+  0.45 (W/L_inf)^1/2 grows to 3.6, so the ratio falls from about 1 near
+  the onset to 0.55 at W/L_inf 64. CV grows to 0.4 to 0.6 for W/L_inf
+  23 to 64 (she reports up to 1.5 at W/L_inf 415, outside this range).
+- Slip law: no partial ruptures anywhere up to W/L_inf 64 (32 at a/b
+  0.75); all events are full ruptures, and the few runs with CV 0.15 to
+  0.16 have irregular timing between full ruptures. (An earlier entry
+  here of 1.08 events per cycle at a/b 0.75, W/L_inf 16 came from a run
+  stopped at a third of its length; the complete run has 1.00.) The
+  number of events per run is similar to the aging law's total number
+  of events (partial plus full; e.g. 66 against 57 at a/b 0.5, W/L_inf
+  64), i.e. events start about as often as with the aging law, but each
+  one breaks the whole fault. In Cattania's terms the slip needed for a
+  full rupture stays below the slip needed to nucleate an event; she
+  noted that the slip law's smaller fracture energy would favour full
+  ruptures, and here that effect wins over the whole range. Her
+  W/L_inf uses the aging-law nucleation length; the slip law nucleates
+  at smaller sizes (Ampuero & Rubin 2008), so measured in its own
+  nucleation length these faults are larger still.
+- Two state variables (slip law): no partial ruptures up to W/L_inf 64
+  (a/b 0.5), like the one-state slip law, with CV up to 0.12 and fewer
+  events per run than the one-state slip law at the same W/L_inf (51
+  against 66 at a/b 0.5, 64).

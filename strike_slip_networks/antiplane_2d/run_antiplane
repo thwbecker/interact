@@ -1,11 +1,13 @@
 #!/bin/bash
 #
-# run_antiplane model X law ncycles cpl a_over_b [rundir] [extra rsf_solve options]
+# run_antiplane model X law ncycles cpl a_over_b [rundir] [series] [extra rsf_solve options]
 #
 # generates a setup with gen_antiplane.py (cpl cells per L_b, a_over_b
 # 0 for the paper value) and runs rsf_solve for ncycles times the
-# recurrence estimate, with catalog and all-cell series (every 16th step
-# in events)
+# recurrence estimate, with catalog, monitor and, if series is 1 (the
+# default), the all-cell series (every 16th step in events); series 0
+# leaves the series out (the nucleation position of events, which comes
+# from the series, is then not available)
 #
 model=${1-wuchen}
 X=${2-8.6}
@@ -14,16 +16,23 @@ ncyc=${4-40}
 cpl=${5-4}
 aob=${6-0}
 rundir=${7-${model}_${law}_ab${aob}_X$X}
-shift 7 2>/dev/null
+series=${8-1}
+# remaining arguments are passed on to rsf_solve
+if [ $# -ge 8 ]; then shift 8; else shift $#; fi
 sdir=$(cd "$(dirname "$0")/.." && pwd)
 if [ -f "$sdir/config.sh" ]; then . "$sdir/config.sh"; fi
 rsf_solve=${rsf_solve-rsf_solve}
 python3 "$sdir/antiplane_2d/gen_antiplane.py" $model $X --law $law --cpl $cpl --a_over_b $aob --out "$rundir" || exit 1
 cd "$rundir" || exit 1
 t=$(awk '{for(i=1;i<=NF;i++) if($i=="t_est_yr") print $(i+1)}' params.txt)
+if [ "$series" -eq 1 ]; then
+    sopts="-rsf_series_file series.bin -rsf_series_stride 16 -rsf_series_final 1"
+    sopts="$sopts -rsf_series_dt_yr $(python3 -c "print($t/50)")"
+else
+    sopts=""
+fi
 tmax=$(python3 -c "print(max(0.5, $ncyc*$t))")
 /usr/bin/time -f "wall %e s" $rsf_solve $(cat run.opts) -stop_time_yr $tmax -rtol 1e-5 -ts_rk_type 3bs \
     -dt_monitor_yr $(python3 -c "print($t/20)") -rsf_catalog -vel_event 1e-3 \
-    -rsf_series_file series.bin -rsf_series_stride 16 -rsf_series_final 1 \
-    -rsf_series_dt_yr $(python3 -c "print($t/50)") -rsf_checkpoint_wall 120 "$@" > rsf_solve.log 2>&1
+    $sopts -rsf_checkpoint_wall 120 "$@" > rsf_solve.log 2>&1
 echo "$rundir: exit $?, $(grep -c -v '^#' rsf_catalog.dat 2>/dev/null) events, $(tail -1 rsf_solve.log)"
