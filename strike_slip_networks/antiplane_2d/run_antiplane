@@ -7,7 +7,8 @@
 # recurrence estimate, with catalog, monitor and, if series is 1 (the
 # default), the all-cell series (every 16th step in events); series 0
 # leaves the series out (the nucleation position of events, which comes
-# from the series, is then not available)
+# from the series, is then not available); station time series
+# (fltst_NAME.dat, from stations.in) are always written
 #
 model=${1-wuchen}
 X=${2-8.6}
@@ -30,6 +31,10 @@ if [ "$series" -eq 1 ]; then
     sopts="$sopts -rsf_series_dt_yr $(python3 -c "print($t/50)")"
 else
     sopts=""
+fi
+# station time series (small): slip at the loading point etc.
+if [ -f stations.in ]; then
+    sopts="$sopts -rsf_stations stations.in -rsf_station_dt_yr $(python3 -c "print($t/500)") -rsf_station_vdense 1e-3"
 fi
 tmax=$(python3 -c "print(max(0.5, $ncyc*$t))")
 /usr/bin/time -f "wall %e s" $rsf_solve $(cat run.opts) -stop_time_yr $tmax -rtol 1e-5 -ts_rk_type 3bs \

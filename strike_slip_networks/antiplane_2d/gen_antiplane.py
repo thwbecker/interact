@@ -39,7 +39,7 @@ usage: gen_antiplane.py model X [--law aging|slip|prz] [--a_over_b r] [--cpl n]
 --a_over_b changes a of the velocity-weakening part at fixed b (Wu &
 Chen varied a and b over their models A to E; Cattania varied a/b at two
 values of b), for the parameter-space maps.
-writes geom.in, rsf.dat, ic.in, run.opts, params.txt in --out
+writes geom.in, rsf.dat, ic.in, run.opts, stations.in, params.txt in --out
 """
 import argparse
 import math
@@ -121,6 +121,15 @@ with open(os.path.join(a.out, "geom.in"), "w") as fg, \
         fg.write("0 %.8e 0 0 -90 %.8e 0 0\n" % (-z, ds / 2.0))
         fr.write("%.6f %.6f\n" % (aa, b1 if a.law == "two" else bv))
         fi.write("%.10e %.6e\n" % (tau, v))
+# stations for rsf_solve -rsf_stations (0-based cell indices): for
+# Cattania the loading point (first creeping cell below the
+# velocity-weakening part), the deepest velocity-weakening cell and the
+# top cell; for Wu & Chen one end and the centre
+with open(os.path.join(a.out, "stations.in"), "w") as f:
+    if a.model == "cattania":
+        f.write("load %i\nvwbot %i\ntop 0\n" % (nvw, nvw - 1))
+    else:
+        f.write("end 0\nmid %i\n" % (nvw // 2))
 # rough recurrence estimate for the run length: stress drop of a few
 # (b-a) sigma over the fault, slip ~ dtau W/G, at vpl
 t_est = 20.0 * (bv - av) * sig * W / G / vpl / YR

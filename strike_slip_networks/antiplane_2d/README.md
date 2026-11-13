@@ -300,3 +300,54 @@ slip laws; two-state runs up to 64, 23 and 11.
   (a/b 0.5), like the one-state slip law, with CV up to 0.12 and fewer
   events per run than the one-state slip law at the same W/L_inf (51
   against 66 at a/b 0.5, 64).
+
+## Slip budget at the loading point (`slip_budget.py`)
+
+Cattania's argument is a slip budget: an event nucleates once the
+creeping region has slipped S_n since the previous one, and the whole
+fault breaks once it has slipped S_full since the last full rupture, so
+alpha = S_full/S_n events per cycle. run_antiplane now always writes
+station time series (`stations.in` from gen_antiplane.py; for the
+Cattania setup the first creeping cell below the velocity-weakening
+part, `load`, plus the deepest velocity-weakening cell and the top cell;
+written at every step above 1e-3 m/s and every 1/500 of the recurrence
+estimate otherwise, about 15 MB for the slip-law runs). `slip_budget.py
+[rundir]` reads the slip at `load` at the onset of each (merged) event
+and reports, after the first quarter of each run, the median slip from a
+full rupture to the next event (S_1, the first nucleation after a full
+rupture), between full ruptures (S_full) and between any two events
+(S_ev), in units of s* = pi (b-a) sigma L_inf / G (a scale, not her
+estimate). It writes slip_budget.txt and slip_budget.png.
+
+Test runs (a/b 0.5, W/L_inf 16 and 32, no series, 30 recurrence
+estimates):
+
+| law | W/L_inf | events per full rupture | S_1/s* | S_full/s* |
+|---|---|---|---|---|
+| aging | 16 | 1.62 | 137 | 172 |
+| aging | 32 | 2.00 | 209 | 288 |
+| slip | 16 | 1 | 104 | 104 |
+| slip | 32 | 1 | 105 | 105 |
+| two-state | 16 | 1 | 167 | 167 |
+| two-state | 32 | 1 | 165 | 165 |
+
+- With the slip law every event is a full rupture and the slip between
+  events is the same at W/L_inf 16 and 32 (104 and 105 s*): events
+  start whenever the loading point has slipped a fixed amount, as
+  Cattania's S_n, and each one breaks the whole fault, i.e. S_full is at
+  most S_n over this range. The same holds for two state variables, at
+  a larger, again W-independent, slip (166 s*).
+- With the aging law S_full grows with W (172 to 288 s*, a factor 1.67
+  for a doubling of W, against 1.41 for her S_full proportional to W^1/2
+  at constant fracture toughness), and so does S_1 (137 to 209 s*),
+  i.e. here the first event after a full rupture does not come after a
+  W-independent slip; the second event of a cycle follows after less
+  slip (alpha = 2 at W/L_inf 32 with S_full/S_1 = 1.38), as expected
+  when afterslip and the stress left by the partial rupture bring the
+  next one forward (her discussion of partial ruptures modifying the
+  stress field).
+- If S_full scales as K_c W^1/2 (her eq. 3), the slip-law runs need a
+  fracture toughness at least a factor 288/105 = 2.7 smaller than the
+  aging-law runs at W/L_inf 32 to stay at one event per cycle, i.e. a
+  fracture energy at least about 7 times smaller; this is an inference
+  from her scaling, not a measurement of the fracture energy.
