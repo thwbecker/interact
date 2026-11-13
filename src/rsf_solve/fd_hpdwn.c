@@ -3,6 +3,8 @@
 #include <string.h>
 #include <math.h>
 #include <complex.h>
+#include <stdio.h>
+#include <unistd.h>
 #include "fd_hpdwn.h"
 #include "fd_fft.h"
 #ifndef M_PI
@@ -146,73 +148,137 @@ int fd_hpdwn_reflected(int ns, const double *sx, const double *sz, const double 
 extern void zgemm_(char *ta, char *tb, int *m, int *n, int *k, double complex *alpha, double complex *a, int *lda,
                    double complex *b, int *ldb, double complex *beta, double complex *c, int *ldc, size_t lta, size_t ltb);
 
-/* the per-wavenumber source amplitudes A (P) and B (S) of the reflected waves for source j,
-   including exp(-i k xs), the ramp transform and 1 / L */
-static void source_amplitudes(double k, double complex w, double alpha, double beta, double rho, double L,
-                              double sxj, double szj, double tx, double tz, double a, double complex *A, double complex *B)
+/* what depends on the complex frequency and the wavenumber only (fd_plan.md M10 note on cost):
+   the vertical wavenumbers, the free-surface system of the reflected P and S waves, the incident
+   upgoing displacement per unit moment component (Gc[c][i][p][q]: wave c, displacement i, moment
+   p q including the source derivative), and the reflected stresses per unit amplitude */
+struct hp_kw {
+  double k;
+  double complex na, nb;
+  double complex PxzA, PzzA, PxzB, PzzB, det;
+  double complex Gc[2][2][2][2];
+  double complex sA[3], sB[3];                   /* sxx, sxz, szz per unit A (P) and B (S) at z = 0 */
+};
+
+static void kw_setup(double k, double complex w, double alpha, double beta, double rho, struct hp_kw *K)
 {
   double lam, mu;
-  double complex na, nb, PxzA, PzzA, PxzB, PzzB, det, txz, tzz, f;
+  double complex kb2, nu, Dr[2], Ds[2], g, Gip, uxA, uzA, uxB, uzB;
+  int c, i, p, q;
   lam = rho*(alpha*alpha - 2.0*beta*beta);
   mu = rho*beta*beta;
-  na = csqrt_pos(k*k - (w/alpha)*(w/alpha));
-  nb = csqrt_pos(k*k - (w/beta)*(w/beta));
-  PxzA = mu*(I*k*(-na) + (-na)*I*k);
-  PzzA = lam*(I*k*I*k + na*na) + 2.0*mu*na*na;
-  PxzB = mu*(I*k*I*k - nb*nb);
-  PzzB = lam*(I*k*nb - nb*I*k) + 2.0*mu*(-nb*I*k);
-  det = PxzA*PzzB - PxzB*PzzA;
-  incident_traction(k, w, alpha, beta, rho, tx, tz, a, szj, &txz, &tzz);
-  f = cexp(-I*k*sxj)*(-1.0/(w*w))/L;
-  *A = f*(-txz*PzzB + tzz*PxzB)/det;
-  *B = f*(-tzz*PxzA + txz*PzzA)/det;
+  K->k = k;
+  K->na = csqrt_pos(k*k - (w/alpha)*(w/alpha));
+  K->nb = csqrt_pos(k*k - (w/beta)*(w/beta));
+  K->PxzA = mu*(I*k*(-K->na) + (-K->na)*I*k);
+  K->PzzA = lam*(I*k*I*k + K->na*K->na) + 2.0*mu*K->na*K->na;
+  K->PxzB = mu*(I*k*I*k - K->nb*K->nb);
+  K->PzzB = lam*(I*k*K->nb - K->nb*I*k) + 2.0*mu*(-K->nb*I*k);
+  K->det = K->PxzA*K->PzzB - K->PxzB*K->PzzA;
+  kb2 = (w/beta)*(w/beta);
+  for(c = 0; c < 2; c++){
+    nu = c ? K->nb : K->na;
+    Dr[0] = I*k;
+    Dr[1] = nu;                                  /* upgoing side: d/dz -> +nu */
+    Ds[0] = -I*k;
+    Ds[1] = -nu;
+    g = 1.0/(2.0*nu);
+    for(i = 0; i < 2; i++)
+      for(p = 0; p < 2; p++){
+        if(c)
+          Gip = (kb2*(i == p ? 1.0 : 0.0) + Dr[i]*Dr[p])*g/(rho*w*w);
+        else
+          Gip = -(Dr[i]*Dr[p])*g/(rho*w*w);
+        for(q = 0; q < 2; q++)
+          K->Gc[c][i][p][q] = Ds[q]*Gip;
+      }
+  }
+  uxA = I*k;
+  uzA = -K->na;
+  K->sA[0] = (lam + 2.0*mu)*(I*k*uxA) + lam*(-K->na*uzA);
+  K->sA[1] = mu*(-K->na*uxA + I*k*uzA);
+  K->sA[2] = lam*(I*k*uxA) + (lam + 2.0*mu)*(-K->na*uzA);
+  uxB = K->nb;
+  uzB = I*k;
+  K->sB[0] = (lam + 2.0*mu)*(I*k*uxB) + lam*(-K->nb*uzB);
+  K->sB[1] = mu*(-K->nb*uxB + I*k*uzB);
+  K->sB[2] = lam*(I*k*uxB) + (lam + 2.0*mu)*(-K->nb*uzB);
 }
 
-/* the projected tractions (shear, normal) at receiver i per unit A (P) and per unit B (S),
-   including exp(i k xr - nu zr) */
-static void receiver_factors(double k, double complex w, double alpha, double beta, double rho,
-                             double xr, double zr, double tx, double tz,
-                             double complex *sA, double complex *nA, double complex *sB, double complex *nB)
+/* the source amplitudes A (P) and B (S) of the reflected waves for one source, including
+   exp(-i k xs), the ramp transform and 1 / L (as incident_traction and the reflection there) */
+static void source_amplitudes_kw(const struct hp_kw *K, double complex w, double alpha, double beta, double rho, double L,
+                                 double sxj, double szj, double tx, double tz, double a, double complex *A, double complex *B)
 {
-  double lam, mu, srx, sry, nrx, nry;
-  double complex na, nb, ea, eb, uxA, uzA, uxB, uzB, sxx, sxz, szz, sxy, syy, trx, try_;
-  int c;
+  double lam, mu, nx, nz, m[2][2], k;
+  double complex nu, u[2], exx, ezz, sxz, szz, cc, seg, ph, txz, tzz, f, Dr0, Dr1;
+  int c, i, p, q;
   lam = rho*(alpha*alpha - 2.0*beta*beta);
   mu = rho*beta*beta;
-  na = csqrt_pos(k*k - (w/alpha)*(w/alpha));
-  nb = csqrt_pos(k*k - (w/beta)*(w/beta));
-  ea = cexp(I*k*xr - na*zr);
-  eb = cexp(I*k*xr - nb*zr);
-  srx = tx;                                       /* y-up frame */
+  k = K->k;
+  nx = tz;
+  nz = -tx;
+  m[0][0] = 2.0*tx*nx*mu;
+  m[0][1] = (tx*nz + tz*nx)*mu;
+  m[1][0] = m[0][1];
+  m[1][1] = 2.0*tz*nz*mu;
+  txz = 0.0;
+  tzz = 0.0;
+  for(c = 0; c < 2; c++){
+    nu = c ? K->nb : K->na;
+    for(i = 0; i < 2; i++){
+      u[i] = 0.0;
+      for(p = 0; p < 2; p++)
+        for(q = 0; q < 2; q++)
+          u[i] += m[p][q]*K->Gc[c][i][p][q];
+    }
+    Dr0 = I*k;
+    Dr1 = nu;
+    exx = Dr0*u[0];
+    ezz = Dr1*u[1];
+    szz = lam*exx + (lam + 2.0*mu)*ezz;
+    sxz = mu*(Dr1*u[0] + Dr0*u[1]);
+    cc = -I*k*tx - nu*tz;
+    if(cabs(cc*a) < 1e-8)
+      seg = 2.0*a;
+    else
+      seg = 2.0*csinh(cc*a)/cc;
+    ph = cexp(-nu*szj);
+    txz += sxz*seg*ph;
+    tzz += szz*seg*ph;
+  }
+  f = cexp(-I*k*sxj)*(-1.0/(w*w))/L;
+  *A = f*(-txz*K->PzzB + tzz*K->PxzB)/K->det;
+  *B = f*(-tzz*K->PxzA + txz*K->PzzA)/K->det;
+}
+
+/* the projected tractions (shear, normal) at one receiver per unit A (P) and per unit B (S),
+   including exp(i k xr - nu zr) */
+static void receiver_factors_kw(const struct hp_kw *K, double xr, double zr, double tx, double tz,
+                                double complex *sA, double complex *nA, double complex *sB, double complex *nB)
+{
+  double srx, sry, nrx, nry;
+  double complex ea, eb, sxx, sxy, syy, trx, try_;
+  srx = tx;                                      /* y-up frame */
   sry = -tz;
   nrx = -sry;
   nry = srx;
-  for(c = 0; c < 2; c++){
-    if(c == 0){
-      uxA = I*k;
-      uzA = -na;
-      sxx = ((lam + 2.0*mu)*(I*k*uxA) + lam*(-na*uzA))*ea;
-      sxz = mu*(-na*uxA + I*k*uzA)*ea;
-      szz = (lam*(I*k*uxA) + (lam + 2.0*mu)*(-na*uzA))*ea;
-    }else{
-      uxB = nb;
-      uzB = I*k;
-      sxx = ((lam + 2.0*mu)*(I*k*uxB) + lam*(-nb*uzB))*eb;
-      sxz = mu*(-nb*uxB + I*k*uzB)*eb;
-      szz = (lam*(I*k*uxB) + (lam + 2.0*mu)*(-nb*uzB))*eb;
-    }
-    sxy = -sxz;
-    syy = szz;
-    trx = sxx*nrx + sxy*nry;
-    try_ = sxy*nrx + syy*nry;
-    if(c == 0){
-      *sA = trx*srx + try_*sry;
-      *nA = trx*nrx + try_*nry;
-    }else{
-      *sB = trx*srx + try_*sry;
-      *nB = trx*nrx + try_*nry;
-    }
-  }
+  ea = cexp(I*K->k*xr - K->na*zr);
+  eb = cexp(I*K->k*xr - K->nb*zr);
+  sxx = K->sA[0]*ea;
+  sxy = -K->sA[1]*ea;
+  syy = K->sA[2]*ea;
+  trx = sxx*nrx + sxy*nry;
+  try_ = sxy*nrx + syy*nry;
+  *sA = trx*srx + try_*sry;
+  *nA = trx*nrx + try_*nry;
+  sxx = K->sB[0]*eb;
+  sxy = -K->sB[1]*eb;
+  syy = K->sB[2]*eb;
+  trx = sxx*nrx + sxy*nry;
+  try_ = sxy*nrx + syy*nry;
+  *sB = trx*srx + try_*sry;
+  *nB = trx*nrx + try_*nry;
 }
 
 /* the reflected tractions of all pairs at one complex frequency: Gs, Gn (nr x ns, column-major) */
@@ -221,6 +287,7 @@ static void spectra_at(double complex w, int ns, const double *sx, const double 
                        double alpha, double beta, double rho, double L, int M,
                        double complex *R, double complex *S, double complex *Gs, double complex *Gn)
 {
+  struct hp_kw K;
   int nk, m, i, j, two_nk;
   double k;
   double complex one, zero;
@@ -230,16 +297,17 @@ static void spectra_at(double complex w, int ns, const double *sx, const double 
   two_nk = 2*nk;
   /* R: receivers x (A wavenumbers, B wavenumbers), shear then normal (2 nr rows); S: (2 nk) x ns;
      the wavenumbers are independent (OpenMP threads) */
-#pragma omp parallel for schedule(static) private(k, j, i)
+#pragma omp parallel for schedule(static) private(k, j, i, K)
   for(m = 0; m < nk; m++){
     k = 2.0*M_PI*(m - M)/L;
+    kw_setup(k, w, alpha, beta, rho, &K);
     for(j = 0; j < ns; j++)
-      source_amplitudes(k, w, alpha, beta, rho, L, sx[j], sz[j], stx[j], stz[j], sa[j],
-                        &S[(size_t)j*two_nk + m], &S[(size_t)j*two_nk + nk + m]);
+      source_amplitudes_kw(&K, w, alpha, beta, rho, L, sx[j], sz[j], stx[j], stz[j], sa[j],
+                           &S[(size_t)j*two_nk + m], &S[(size_t)j*two_nk + nk + m]);
     for(i = 0; i < nr; i++)
-      receiver_factors(k, w, alpha, beta, rho, rx[i], rz[i], rtx[i], rtz[i],
-                       &R[(size_t)m*2*nr + i], &R[(size_t)m*2*nr + nr + i],
-                       &R[(size_t)(nk + m)*2*nr + i], &R[(size_t)(nk + m)*2*nr + nr + i]);
+      receiver_factors_kw(&K, rx[i], rz[i], rtx[i], rtz[i],
+                          &R[(size_t)m*2*nr + i], &R[(size_t)m*2*nr + nr + i],
+                          &R[(size_t)(nk + m)*2*nr + i], &R[(size_t)(nk + m)*2*nr + nr + i]);
   }
   one = 1.0;
   zero = 0.0;
@@ -292,6 +360,17 @@ static void lags_from_spectra(size_t np, int nr, int ns, int nw, int N, int nt, 
     free(x);
     free(y);
   }
+}
+
+/* a quarter of the physical memory (bytes), at least 2e9 */
+static double physical_memory_quarter(void)
+{
+  long pages, psize;
+  double m;
+  pages = sysconf(_SC_PHYS_PAGES);
+  psize = sysconf(_SC_PAGE_SIZE);
+  m = (pages > 0 && psize > 0) ? 0.25*(double)pages*(double)psize : 0.0;
+  return m > 2e9 ? m : 2e9;
 }
 
 /* one block of receivers: the spectra of its pairs at all frequencies, then the lags by FFT */
@@ -387,11 +466,17 @@ int fd_hpdwn_batch_ext(int ns, const double *sx, const double *sz, const double 
   L = alpha*T + 2.0*(xmax - xmin);
   h = 0.25*fmin(amin, zsum);
   M = (int)ceil(L/h);
-  /* receivers in blocks, the spectra of a block within FD_HPDWN_MEM bytes (default 2e9) */
-  mem = getenv("FD_HPDWN_MEM") ? atof(getenv("FD_HPDWN_MEM")) : 2e9;
+  /* receivers in blocks, the spectra of a block within FD_HPDWN_MEM bytes (default a quarter of
+     the physical memory, at least 2e9). Every block repeats the source amplitudes of all
+     frequencies, so few large blocks are much cheaper: a PD13 self pair at 500 m (408 elements,
+     about 12,000 frequencies) needed 32 blocks with 2e9 */
+  mem = getenv("FD_HPDWN_MEM") ? atof(getenv("FD_HPDWN_MEM")) : physical_memory_quarter();
   nb = (int)(mem/(2.0*16.0*ns*(N/2 + 1)));
   if(nb < 1)
     nb = 1;
+  if(getenv("FD_HPDWN_VERBOSE"))
+    fprintf(stderr, "fd_hpdwn: %d sources, %d receivers in blocks of %d, %d lags, %d frequencies, wavenumbers to %d\n",
+            ns, nr, nb, nt, N/2 + 1, M);
   for(i0 = 0; i0 < nr; i0 += nb){
     n = (nr - i0 < nb) ? nr - i0 : nb;
     if(batch_block(ns, sx, sz, stx, stz, sa, n, rx + i0, rz + i0, rtx + i0, rtz + i0, alpha, beta, rho, dt, nt, q, N, T, L, M,
