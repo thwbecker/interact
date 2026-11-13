@@ -3598,6 +3598,15 @@ s, 12 elements 12.8 -> 6.9 s (the zgemm is unchanged); the lag series equal the 
 6e-13 and the prototype to 3e-3 (12 elements, top 300 m, q = 4); the static part, ill-conditioned
 at the small frequency, moved by up to 1.7e-5 relative (it agreed with Crouch and Starfield to
 1.2e-5 before; not rechecked, the sandbox had no Fortran compiler for the tdd library).
+PD13 at 2 km with the exact kernels (jackie, 16 threads, 2026-11-13): setup 3,635 s for 113
+elements (static gate 2.5e-6), then one phase of 1,896 steps over 5,642 s, peak 1.52 m/s, mean slip
+10.68 m, stable. The setup time points to a BLAS without threads doing the zgemm. Two changes:
+(1) the wavenumber products G = R S on OpenMP threads in fixed order (own_product, the default;
+bit for bit equal to a reference BLAS's zgemm; FD_HPDWN_ZGEMM=1 for the BLAS); (2) the source
+period L = 1.1 alpha nt dt + 2 extent instead of alpha T + 2 extent (the images need only arrive
+after the last lag used, not after the window T, which is twice that): 1.1 to 2.5 times faster in
+the batch test, the series changed by at most 7e-7 of their largest value (FD_HPDWN_LFULL=1 for
+the former period).
 
 ### M10 note: threads in the reflected tables (2026-11-08)
 

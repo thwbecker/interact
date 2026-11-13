@@ -281,6 +281,32 @@ static void receiver_factors_kw(const struct hp_kw *K, double xr, double zr, dou
   *nB = trx*nrx + try_*nry;
 }
 
+/* G = R S (column-major, m x n with inner dimension kk) on OpenMP threads, one column of G per
+   thread at a time, the inner sums in a fixed order (the default): with a BLAS without threads
+   (a reference BLAS) it is much faster than zgemm on many cores (PD13 at 2 km took an hour of
+   setup on 16 threads), and the result depends neither on the number of threads nor on the rows
+   per MPI rank; equal to the reference BLAS's zgemm bit for bit. FD_HPDWN_ZGEMM=1 uses the BLAS
+   (faster with a threaded optimised BLAS, but its sums may depend on the matrix sizes) */
+static void own_product(int m, int n, int kk, const double complex *R, const double complex *S, double complex *G)
+{
+  int i, j, k;
+  double complex sk;
+  const double complex *rc;
+  double complex *gc;
+#pragma omp parallel for schedule(dynamic, 1) private(i, k, sk, rc, gc)
+  for(j = 0; j < n; j++){
+    gc = G + (size_t)j*m;
+    for(i = 0; i < m; i++)
+      gc[i] = 0.0;
+    for(k = 0; k < kk; k++){
+      sk = S[(size_t)j*kk + k];
+      rc = R + (size_t)k*m;
+      for(i = 0; i < m; i++)
+        gc[i] += rc[i]*sk;
+    }
+  }
+}
+
 /* the reflected tractions of all pairs at one complex frequency: Gs, Gn (nr x ns, column-major) */
 static void spectra_at(double complex w, int ns, const double *sx, const double *sz, const double *stx, const double *stz, const double *sa,
                        int nr, const double *rx, const double *rz, const double *rtx, const double *rtz,
@@ -315,7 +341,10 @@ static void spectra_at(double complex w, int ns, const double *sx, const double 
   i = 2*nr;
   /* (2 nr x 2 nk) (2 nk x ns) = 2 nr x ns: shear rows then normal rows */
   G = (double complex *)malloc(sizeof(double complex)*(size_t)2*nr*ns);
-  zgemm_(&tn, &tn, &i, &ns, &two_nk, &one, R, &i, S, &two_nk, &zero, G, &i, 1, 1);
+  if(getenv("FD_HPDWN_ZGEMM"))
+    zgemm_(&tn, &tn, &i, &ns, &two_nk, &one, R, &i, S, &two_nk, &zero, G, &i, 1, 1);
+  else
+    own_product(i, ns, two_nk, R, S, G);
   for(j = 0; j < ns; j++)
     for(m = 0; m < nr; m++){
       Gs[(size_t)j*nr + m] = G[(size_t)j*2*nr + m];
@@ -463,7 +492,14 @@ int fd_hpdwn_batch_ext(int ns, const double *sx, const double *sz, const double 
   for(j = 0; j < ns; j++)
     for(i = 0; i < npr; i++)
       zsum = fmin(zsum, fabs(sz[j]) + fabs(prz[i]));
-  L = alpha*T + 2.0*(xmax - xmin);
+  /* the source period: the image sources (repeated every L) reach the receivers no earlier than
+     (L - 2 extent) / alpha, which only has to exceed the last lag used, nt dt (with 10 percent),
+     not the whole window T (arrivals between the last lag and T are never sampled, and later ones
+     wrap round damped by exp(-omega_I T)); this halves the wavenumbers (FD_HPDWN_LFULL: alpha T) */
+  if(getenv("FD_HPDWN_LFULL"))
+    L = alpha*T + 2.0*(xmax - xmin);
+  else
+    L = 1.1*alpha*nt*dt + 2.0*(xmax - xmin);
   h = 0.25*fmin(amin, zsum);
   M = (int)ceil(L/h);
   /* receivers in blocks, the spectra of a block within FD_HPDWN_MEM bytes (default a quarter of
