@@ -38,6 +38,6 @@ if [ -f stations.in ]; then
 fi
 tmax=$(python3 -c "print(max(0.5, $ncyc*$t))")
 /usr/bin/time -f "wall %e s" $rsf_solve $(cat run.opts) -stop_time_yr $tmax -rtol 1e-5 -ts_rk_type 3bs \
-    -dt_monitor_yr $(python3 -c "print($t/20)") -rsf_catalog -vel_event 1e-3 \
+    -dt_monitor_yr $(python3 -c "print($t/20)") -rdx_monitor 0.1 -rsf_catalog -vel_event 1e-3 \
     $sopts -rsf_checkpoint_wall 120 "$@" > rsf_solve.log 2>&1
 echo "$rundir: exit $?, $(grep -c -v '^#' rsf_catalog.dat 2>/dev/null) events, $(tail -1 rsf_solve.log)"

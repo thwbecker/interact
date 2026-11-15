@@ -382,3 +382,66 @@ measured between onsets includes the afterslip of the preceding event,
 which grows with the size of that event, so this part of the budget is
 not W-independent; separating afterslip from interseismic creep at the
 loading point would be needed to compare with Cattania's S_n directly.
+
+## W/L_inf 128 and 100-cycle runs (2026-11-16)
+
+Runs made on a separate machine (a/b 0.5 unless noted, L_b/4, no series):
+
+| law | W/L_inf | cycles | events (full) | events per full-rupture cycle | Cattania estimate | CV |
+|---|---|---|---|---|---|---|
+| aging | 32 | 30 | 32 (16) | 2.00 | 2.55 | 0.529 |
+| aging | 32 | 100 | 106 (53) | 2.00 | 2.55 | 0.517 |
+| aging, a/b 0.625 | 64 | 30 | 59 (20) | 2.95 | 3.60 | 0.600 |
+| aging, a/b 0.625 | 64 | 100 | 198 (66) | 3.00 | 3.60 | 0.585 |
+| aging | 128 | 30 | 90 (30) | 3.00 | 5.09 | 0.770 |
+| slip | 128 | 30 | 114 (114) | 1 | 5.09 | 0.000 |
+
+- The 100-cycle runs reproduce the 30-cycle values (2.00 and 3.00 events
+  per cycle against 2.00 and 2.95; CV within 0.02), so the plateaus are
+  not a short-run effect.
+- With the aging law the number of events per cycle reaches 3 at
+  W/L_inf 64 (a/b 0.625) and 128 (a/b 0.5), against 5.1 from Cattania's
+  estimate at 128; the steps of one event per cycle need roughly a
+  factor 4 in W/L_inf here (2 from about 16, 3 from about 64 to 128),
+  while 0.45 (W/L_inf)^1/2 gains one event per factor of about 2.
+- With the slip law all 114 events at W/L_inf 128 are full ruptures,
+  every 1.02 yr (CV 0.000).
+
+Slip budget at the loading point (in s* = pi (b-a) sigma L_inf / G; the
+slip-law station file was thinned to every 10th line for transfer):
+
+| law | W/L_inf | S_ev (any two events) | S_1 (full rupture to next event) | S_full (between full ruptures) |
+|---|---|---|---|---|
+| aging | 16 | 104 | 137 | 172 |
+| aging | 32 | 209 | 209 | 288 |
+| aging | 128 | 101 | 410 | 605 |
+| slip | 16 | 104 | 104 | 104 |
+| slip | 32 | 105 | 105 | 105 |
+| slip | 64 | 138 | 138 | 138 |
+| slip | 128 | 161 | 161 | 161 |
+
+- Aging law: S_full grows with W, by a factor 2.1 from W/L_inf 32 to 128,
+  close to the factor 2 of Cattania's S_full proportional to W^1/2;
+  the median slip between any two events at W/L_inf 128 (101 s*) is
+  close to the slip-law value at small W (104 s*), as her W-independent
+  S_n would have it.
+- Slip law: one full rupture per event at all W, with the slip between
+  events growing slowly (104 to 161 s* from W/L_inf 16 to 128) and far
+  less than the aging law's S_full (161 against 605 s* at 128). If both
+  follow her S_full proportional to K_c W^1/2, the slip-law runs need a
+  fracture toughness smaller by a factor of at least 3.8 at W/L_inf
+  128, a fracture energy smaller by a factor of at least about 14 (an
+  inference from her scaling, not a measurement).
+
+Restarts: both W/L_inf 128 runs were restarted from checkpoints. The
+catalogs show no repeated or missing events at the restart (merged
+intervals of at least 9.6 days for the aging run and a constant 1.02 yr
+for the slip run). A monitor line cut off by the interruption, with the
+restart marker appended to it, made the monitor unreadable;
+plot_antiplane.read_monitor now skips such lines.
+
+I/O: the monitor file of the slip-law run at W/L_inf 128 had 5.8 million
+lines (870 MB), because the monitor is triggered by relative state
+changes of 1e-4 (-rdx_monitor). run_antiplane now sets -rdx_monitor 0.1;
+for the slip-law run at W/L_inf 16 this reduces the monitor from 41 MB
+to 85 kB and leaves the event statistics and slip budget unchanged.

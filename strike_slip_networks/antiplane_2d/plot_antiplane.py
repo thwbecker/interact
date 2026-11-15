@@ -54,6 +54,26 @@ def read_series(d, nc):
     return np.array(s["t"]) / YR, s["f"][:, 0, :]
 
 
+def read_monitor(d, cols=(2, 4)):
+    """columns of rsf_monitor.dat (default time [yr], log10 max slip rate),
+    skipping comment lines and lines cut off when a run was interrupted
+    (on restart the marker is appended to the cut line)"""
+    fn = os.path.join(d, "rsf_monitor.dat")
+    with open(fn) as f:
+        nf = None
+        for line in f:
+            if not line.startswith("#"):
+                nf = len(line.split())
+                break
+    def good(f):
+        for line in f:
+            w = line.split()
+            if len(w) == nf and "#" not in line:
+                yield line
+    with open(fn) as f:
+        return np.loadtxt(good(f), usecols=cols, ndmin=2)
+
+
 def analyze(d):
     """events, rupture lengths and nucleation points of one run; cached in
     events.npz in the run directory, so that series.bin can be removed
@@ -78,8 +98,7 @@ def _analyze(d):
     if have_series:
         t, lv = read_series(d, int(p["nvw"] + p["nvs"]))
     else:                               # run without series: events from the catalog only
-        monitor = np.loadtxt(os.path.join(d, "rsf_monitor.dat"), ndmin=2)
-        t, lv = monitor[:, 2], None
+        t, lv = read_monitor(d, (2,))[:, 0], None
     if tmax is None:
         tmax = t[-1]
     if c.size == 0:

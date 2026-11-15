@@ -47,9 +47,9 @@ LAWS = ("aging", "slip", "prz")
 def classify(d):
     p, r = pa.analyze(d)
     s = pa.stats(p, r)
-    mon = np.loadtxt(os.path.join(d, "rsf_monitor.dat"), ndmin=2)
-    tmon = mon[:, 2]
-    maxlv = mon[tmon >= 0.25 * tmon[-1], 4].max()
+    mon = pa.read_monitor(d)
+    tmon = mon[:, 0]
+    maxlv = mon[tmon >= 0.25 * tmon[-1], 1].max()
     vpl = p["vpl"]
     if s["n"] == 0:
         cat = "slow" if maxlv > np.log10(10 * vpl) else "stable"
