@@ -351,3 +351,34 @@ estimates):
   aging-law runs at W/L_inf 32 to stay at one event per cycle, i.e. a
   fracture energy at least about 7 times smaller; this is an inference
   from her scaling, not a measurement of the fracture energy.
+
+## Resolution check and slip budget at W/L_inf 64 (2026-11-13)
+
+Runs at twice the cell density (L_b/8, `run_antiplane cattania X law 30
+8 0.5 ...`, run on a separate machine; aging W/L_inf 16, slip W/L_inf 16
+and 64, a/b 0.5) against the L_b/4 runs:
+
+| law | W/L_inf | cells | events (full) | events per cycle | CV | S_1/s* | S_full/s* |
+|---|---|---|---|---|---|---|---|
+| aging | 16 | L_b/4 | 21 (13) | 1.62 | 0.273 | 137.0 | 172.2 |
+| aging | 16 | L_b/8 | 21 (13) | 1.62 | 0.278 | 137.7 | 172.9 |
+| slip | 16 | L_b/4 | 22 (22) | 1 | 0 | 104.1 | 104.1 |
+| slip | 16 | L_b/8 | 22 (22) | 1 | 0 | 103.7 | 103.7 |
+| slip | 64 | L_b/4 | 66 (66) | 1 | 0 | - | - |
+| slip | 64 | L_b/8 | 66 (66) | 1 | 0 | 137.5 | 137.5 |
+
+(the L_b/4 run at W/L_inf 64 was made before station output was added,
+so it has no slip budget.) Doubling the cell density changes the event
+counts, the events per cycle and the slip budget by less than 1 percent,
+and the slip law stays at one full rupture per event at W/L_inf 64, so
+these results are not an effect of the cell size.
+
+At W/L_inf 64 the slip at the loading point between slip-law events is
+137.5 s*, larger than the 104 to 105 s* at W/L_inf 16 and 32. The
+monitor shows no slip-rate transients above 1e-6 m/s between events (the
+maximum stays near 1e-9 m/s outside the first 10 and last 2 percent of
+each interval), so this is not a series of failed nucleations. The slip
+measured between onsets includes the afterslip of the preceding event,
+which grows with the size of that event, so this part of the budget is
+not W-independent; separating afterslip from interseismic creep at the
+loading point would be needed to compare with Cattania's S_n directly.
