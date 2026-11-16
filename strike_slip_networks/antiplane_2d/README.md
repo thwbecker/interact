@@ -445,3 +445,51 @@ lines (870 MB), because the monitor is triggered by relative state
 changes of 1e-4 (-rdx_monitor). run_antiplane now sets -rdx_monitor 0.1;
 for the slip-law run at W/L_inf 16 this reduces the monitor from 41 MB
 to 85 kB and leaves the event statistics and slip budget unchanged.
+
+## Distributions, full-rupture threshold and creeping-region extent (2026-11-16)
+
+`cattania_checks.py rundir ...` (aging-law runs of the Cattania setup)
+writes cattania_checks.txt and cattania_distributions.png: rupture-length
+survival functions (her Figure 3a) and normalized interevent-time
+densities (her Figure 4a), and the events per full-rupture cycle for
+full-rupture thresholds of 0.9, 0.8 and 0.7 W.
+
+- Full-rupture threshold: the events per cycle are the same for 0.9, 0.8
+  and 0.7 W in all 13 runs checked (W/L_inf 8 to 128, a/b 0.5 to 0.75).
+  The partial ruptures are at most 0.67 W long and the full ones longer
+  than W (rupture lengths include the slipping part of the creeping
+  region), so the definition of a full rupture is not the reason for
+  the difference from Cattania's estimate.
+- Rupture lengths: each run has one or two partial-rupture lengths, not
+  a distribution. Relative to W they shrink with W/L_inf (about 0.4 to
+  0.6 W at W/L_inf 8 to 16, about 0.3 W at 32 to 64, 0.15 and 0.24 W at
+  128); in units of L_inf they grow, from about 6 to 8 L_inf at W/L_inf
+  16 to 19 to 31 L_inf at 128. The truncated power law with slope -1/2
+  that Cattania finds needs many events per cycle (more than 10, at
+  W/L_inf of 10^2 to 10^3 in her runs); the runs here reach 3.
+- Interevent times: a few discrete values per run (repeating patterns of
+  two or three events), with the shortest normalized interval falling
+  from about 0.5 to 0.02 between W/L_inf 16 and 128. The Omori-like
+  power law at short times in her Figure 4a for W/L_inf 415 is not
+  reached.
+
+Creeping-region extent (`run_creep_extent`; her paper does not state
+it; the other runs here use W):
+
+| a/b | W/L_inf | creeping region | events (full) | events per cycle | CV |
+|---|---|---|---|---|---|
+| 0.5 | 32 | 0.5 W | 34 (17) | 2.00 | 0.21 |
+| 0.5 | 32 | 1 W | 32 (16) | 2.00 | 0.53 |
+| 0.5 | 32 | 3 W | 30 (15) | 2.00 | 0.71 |
+| 0.75 | 16 | 1 W | 25 (12) | 2.08 | 0.45 |
+| 0.75 | 16 | 3 W | 21 (21) | 1.00 | 0.00 |
+
+- At a/b 0.5 and W/L_inf 32 the extent leaves the number of events per
+  cycle unchanged but raises the CV from 0.21 to 0.71, i.e. a larger
+  creeping region gives more clustered sequences, in line with
+  Cattania's explanation of clustering by afterslip.
+- At a/b 0.75 and W/L_inf 16 a creeping region of 3 W removes the partial
+  ruptures entirely, so the onset of partial ruptures depends on this
+  unstated parameter and moves further from her 5 +- 2 for a deeper
+  creeping region. The runs at W/L_inf 6 and 8 with 3 W (in
+  run_creep_extent) were not finished in this session. Single runs.

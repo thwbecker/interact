@@ -1,0 +1,32 @@
+#!/bin/bash
+#
+# run_creep_extent [rundir]: Cattania setup, aging law, with creeping
+# regions of 0.5, 1 and 3 W below the velocity-weakening part (her paper
+# does not state the extent), as run_antiplane otherwise (30 recurrence
+# estimates, cells L_b/4, catalog, monitor and stations, no series)
+#
+rundir=${1-.}
+sdir=$(cd "$(dirname "$0")" && pwd)
+if [ -f "$sdir/../config.sh" ]; then . "$sdir/../config.sh"; fi
+rsf_solve=${rsf_solve-rsf_solve}
+mkdir -p "$rundir"
+cd "$rundir" || exit 1
+run () {   # X a/b vs_W name
+    tail -1 $4/rsf_solve.log 2>/dev/null | grep -q '^wall' && return
+    python3 "$sdir/gen_antiplane.py" cattania $1 --law aging --cpl 4 --a_over_b $2 --vs_W $3 --out $4 || return
+    (cd $4 &&
+     t=$(awk '{for(i=1;i<=NF;i++) if($i=="t_est_yr") print $(i+1)}' params.txt) &&
+     /usr/bin/time -f "wall %e s" $rsf_solve $(cat run.opts) -stop_time_yr $(python3 -c "print(30*$t)") \
+         -rtol 1e-5 -ts_rk_type 3bs -dt_monitor_yr $(python3 -c "print($t/20)") -rdx_monitor 0.1 \
+         -rsf_catalog -vel_event 1e-3 -rsf_stations stations.in \
+         -rsf_station_dt_yr $(python3 -c "print($t/500)") -rsf_station_vdense 1e-3 > rsf_solve.log 2>&1)
+    echo "$4: $(tail -1 $4/rsf_solve.log)"
+}
+for vs in 0.5 1 3; do
+    run 32 0.5 $vs cattania_aging_ab0.5_X32_vs$vs
+    run 16 0.75 $vs cattania_aging_ab0.75_X16_vs$vs
+done
+for X in 6 8; do
+    run $X 0.75 3 cattania_aging_ab0.75_X${X}_vs3
+done
+echo CREEP_EXTENT_DONE

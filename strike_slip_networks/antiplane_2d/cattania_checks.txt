@@ -1,0 +1,29 @@
+run                                  a/b W/Linf events      alpha(0.9W)      alpha(0.8W)      alpha(0.7W)
+cattania_aging_ab0.5_X16           0.500     16     21   1.62 (13 full)   1.62 (13 full)   1.62 (13 full)
+cattania_aging_ab0.5_X23           0.500     23     32   2.00 (16 full)   2.00 (16 full)   2.00 (16 full)
+long_aging_ab0.5_X32               0.500     32    106   2.00 (53 full)   2.00 (53 full)   2.00 (53 full)
+cattania_aging_ab0.5_X45           0.500     45     45   1.96 (23 full)   1.96 (23 full)   1.96 (23 full)
+cattania_aging_ab0.5_X64           0.500     64     57   1.97 (29 full)   1.97 (29 full)   1.97 (29 full)
+cattania_aging_ab0.5_X128          0.500    128     90   3.00 (30 full)   3.00 (30 full)   3.00 (30 full)
+cattania_aging_ab0.625_X11         0.625     11     19    2.11 (9 full)    2.11 (9 full)    2.11 (9 full)
+cattania_aging_ab0.625_X16         0.625     16     28   2.00 (14 full)   2.00 (14 full)   2.00 (14 full)
+cattania_aging_ab0.625_X32         0.625     32     37   2.06 (18 full)   2.06 (18 full)   2.06 (18 full)
+long_aging_ab0.625_X64             0.625     64    198   3.00 (66 full)   3.00 (66 full)   3.00 (66 full)
+cattania_aging_ab0.75_X8           0.750      8     17   1.31 (13 full)   1.31 (13 full)   1.31 (13 full)
+cattania_aging_ab0.75_X11          0.750     11     19   1.46 (13 full)   1.46 (13 full)   1.46 (13 full)
+cattania_aging_ab0.75_X16          0.750     16     25   2.08 (12 full)   2.08 (12 full)   2.08 (12 full)
+
+rupture lengths / W (sorted) and interevent-time CV:
+cattania_aging_ab0.5_X16           CV 0.273  partial lengths / W: 0.39 0.50
+cattania_aging_ab0.5_X23           CV 0.419  partial lengths / W: 0.29
+long_aging_ab0.5_X32               CV 0.517  partial lengths / W: 0.34
+cattania_aging_ab0.5_X45           CV 0.428  partial lengths / W: 0.32
+cattania_aging_ab0.5_X64           CV 0.484  partial lengths / W: 0.29
+cattania_aging_ab0.5_X128          CV 0.770  partial lengths / W: 0.15 0.24
+cattania_aging_ab0.625_X11         CV 0.161  partial lengths / W: 0.67
+cattania_aging_ab0.625_X16         CV 0.354  partial lengths / W: 0.33
+cattania_aging_ab0.625_X32         CV 0.454  partial lengths / W: 0.36
+long_aging_ab0.625_X64             CV 0.585  partial lengths / W: 0.24 0.32
+cattania_aging_ab0.75_X8           CV 0.171  partial lengths / W: 0.57 0.58
+cattania_aging_ab0.75_X11          CV 0.124  partial lengths / W: 0.52
+cattania_aging_ab0.75_X16          CV 0.450  partial lengths / W: 0.40
