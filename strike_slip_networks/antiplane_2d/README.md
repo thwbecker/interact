@@ -493,3 +493,56 @@ it; the other runs here use W):
   unstated parameter and moves further from her 5 +- 2 for a deeper
   creeping region. The runs at W/L_inf 6 and 8 with 3 W (in
   run_creep_extent) were not finished in this session. Single runs.
+
+## Cattania's Supporting Information and her own settings (2026-11-16)
+
+Her supporting text S1 gives the setup: Fdra (radiation damping
+mu/(2 cs)), aging law, velocity-weakening part of depth W over a
+velocity-strengthening part of depth W (W_vs = W, as in gen_antiplane.py),
+loaded by slip at Vpl = 1e-9 m/s at the bottom of the velocity-
+strengthening part (as the backslip here), sigma 50 MPa, dc 0.1 mm, b =
+0.01 or 0.02 with a varied; earthquakes are slip above 0.1 m/s; cells
+with min(L_inf, L_b)/dx >= 7.7 (half that resolution in the creeping
+part); spin-up removed by inspection. The shear modulus and the wave
+speed are not given (L_inf and L_b scale with the shear modulus, so the
+dimensionless results should not depend on it). She also reports that the
+mean number of ruptures per cycle does not change for creeping regions
+of 0, 1, 2, 5, 8 and 12 W, and that partial ruptures between 0.65 W and
+W should be absent because the stress intensity factor grows with crack
+length there (her Fig. S3).
+
+Runs with her event threshold (0.1 m/s, passed as `-vel_event 0.1`
+after the eighth argument of run_antiplane) and her resolution criterion
+(L_b/8, i.e. min(L_inf, L_b)/dx >= 8 for a/b >= 0.44), against the
+L_b/4, 1e-3 m/s runs:
+
+| a/b | W/L_inf | events per cycle, her settings | events per cycle, L_b/4 and 1e-3 m/s | CV, her settings / ours |
+|---|---|---|---|---|
+| 0.5 | 8 | 1.00 | 1.00 | 0.000 / 0.000 |
+| 0.5 | 16 | 1.62 | 1.62 | 0.278 / 0.273 |
+| 0.5 | 32 | 2.00 | 2.00 | 0.531 / 0.529 |
+| 0.75 | 8 | 1.31 | 1.31 | 0.170 / 0.171 |
+| 0.75 | 11 | 1.54 | 1.46 | 0.128 / 0.124 |
+
+The event threshold and the resolution change the events per cycle by
+at most 0.08; the partial-rupture lengths measured at 0.1 m/s are
+shorter (e.g. 0.20 against 0.57 W at a/b 0.75, W/L_inf 8). All partial
+ruptures in these and the earlier runs are at most 0.67 W long,
+consistent with her energy-balance argument. Our aging-law values lie
+among her simulation points in her Figure 2b for W/L_inf up to 64 and at
+the low edge of them at 128 (an overlay on her figure, not included in
+the repository); the larger differences reported above were against her
+fitted estimate 0.45 (W/L_inf)^1/2, not against her simulations.
+
+Her statement that the creeping-region extent does not change the mean
+number of ruptures per cycle agrees with the a/b 0.5, W/L_inf 32 runs
+here, but not with the a/b 0.75, W/L_inf 16 runs (2.08 events per cycle
+with 1 W, 1.00 with 3 W); that pair lies close to the onset of partial
+ruptures and is a single run each, so it may be sensitive to the initial
+state, which has not been tested.
+
+Remaining differences from her setup: her Figure 2b combines many a/b
+and both values of b, while the runs here use b = 0.02 and a/b 0.5 to
+0.75; her results for large W/L_inf (Figures 3 and 4, a/b 0.75 up to
+W/L_inf 415) need about 5000 to 17000 cells at her resolution, beyond
+the dense single-core runs used here.
