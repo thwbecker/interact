@@ -8,7 +8,8 @@ one hour of the end of the previous one are merged (this absorbs the
 slip-rate bursts at the fault ends after large slip-law events and the
 brief threshold crossings about a minute before some events); the first quarter of each
 run is discarded. Rupture length = number of cells above the threshold
-times the cell size; full rupture: at least 0.9 W. The nucleation point
+times the cell size; full rupture: at least 0.9 W (or 0.9 times the
+longest event if none reaches W, e.g. at a 0.1 m/s threshold). The nucleation point
 of an event is the cell of maximum slip rate in the first series record
 after onset with max |v| above 1e-3 m/s, given as position along the
 velocity-weakening part (0 = top or one end, 1 = bottom or other end).
@@ -130,7 +131,11 @@ def _analyze(d):
 
 def stats(p, r):
     on, ln = r["on"], r["ln"]
-    full = ln >= 0.9 * p["W"]
+    # full rupture: at least 0.9 W, or 0.9 times the longest event if no
+    # event reaches W (at a high catalog threshold such as 0.1 m/s the
+    # length above the threshold can be shorter than the slipping region)
+    lfull = 0.9 * min(p["W"], ln.max()) if len(ln) else 0.9 * p["W"]
+    full = ln >= lfull
     s = dict(n=len(on), nfull=int(full.sum()), alpha=np.nan, cv=np.nan, cvfull=np.nan,
              ffull=full.mean() if len(on) else np.nan,
              fcenter=np.mean(np.abs(r["nuc"] - 0.5) < 0.25) if len(on) else np.nan)

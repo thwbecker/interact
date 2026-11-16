@@ -546,3 +546,34 @@ and both values of b, while the runs here use b = 0.02 and a/b 0.5 to
 0.75; her results for large W/L_inf (Figures 3 and 4, a/b 0.75 up to
 W/L_inf 415) need about 5000 to 17000 cells at her resolution, beyond
 the dense single-core runs used here.
+
+## Her settings for the aging, slip and two-state slip laws (2026-11-17)
+
+`run_cattania_si.py [rundir] [maxcells] [ncycles] [laws]` runs the
+Cattania setup with the settings of her S1 for all three laws, keeping
+everything else the same: events above 0.1 m/s, cells with
+min(L_inf, L_b)/dx = 7.7 (`gen_antiplane.py --cmin 7.7`; two state
+variables keep G dc2/(b2 sigma)/32), b = 0.02 and 0.01
+(`gen_antiplane.py --b`), a/b = 0.3, 0.5, 0.625, 0.75 and W/L_inf = 1 to
+32, cost-ordered and restartable. `plot_cattania_si.py [rundir]` draws
+cattania_si.png (her Figures 2a, 2b and 4b, one column per law; circles
+b = 0.02, diamonds b = 0.01) and writes cattania_si.txt.
+
+At the 0.1 m/s threshold the length above the threshold of a system-size
+event can be shorter than W (0.75 W for b = 0.01, a/b 0.75, W/L_inf 8),
+so a full rupture is now at least 0.9 W or 0.9 times the longest event
+of the run if none reaches W (plot_antiplane.stats); results of runs
+whose longest events exceed W are unchanged.
+
+First results (2026-11-17, 98 of the runs up to 1300 cells, mostly
+W/L_inf <= 16; the larger runs were not finished in this session):
+
+- W/L_inf = 1: no catalog events with the aging law at any a/b and b, as
+  in her Figure 2a; the slip law and two state variables already give
+  periodic seismic events there for a/b >= 0.625, i.e. the slip laws make
+  small faults seismic at smaller W/L_inf, as in the Wu & Chen setup.
+- Partial ruptures with the aging law: b = 0.02, a/b 0.5 at W/L_inf 16
+  (1.62 events per cycle) and a/b 0.75 at 8 (1.31); b = 0.01, a/b 0.5 at
+  16 (1.53); with b = 0.01, a/b 0.75 there are none at W/L_inf 8.
+- Slip law and two state variables: no partial ruptures in the runs
+  completed so far.

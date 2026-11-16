@@ -59,6 +59,11 @@ p.add_argument("--a_over_b", type=float, default=0.0,
                help="a/b of the velocity-weakening part (b fixed); 0: paper value (0.5 Wu & Chen model A, "
                     "0.75 Cattania)")
 p.add_argument("--cpl", type=float, default=4.0, help="cells per L_b")
+p.add_argument("--cmin", type=float, default=0.0,
+               help="if > 0, cells per min(L_inf, L_b) instead of --cpl (Cattania used 7.7 or more; "
+                    "one state variable only)")
+p.add_argument("--b", type=float, default=0.0,
+               help="cattania: b of the velocity-weakening part (default 0.02; she also used 0.01)")
 p.add_argument("--vs_W", type=float, default=1.0, help="cattania: creeping-region extent / W")
 p.add_argument("--depth_W", type=float, default=50.0, help="wuchen: burial depth of the fault top / W")
 p.add_argument("--seed", type=int, default=1)
@@ -76,7 +81,7 @@ if a.model == "wuchen":
     ztop = a.depth_W * W
     lscale = hc
 else:
-    bv, dc = 0.02, 1e-4
+    bv, dc = (a.b if a.b > 0 else 0.02), 1e-4
     av = (a.a_over_b if a.a_over_b > 0 else 0.75) * bv
     avs = bv + 0.005
     vpl = v0 = 1e-9
@@ -86,6 +91,9 @@ else:
     lscale = linf
 Lb = G * dc / (bv * sig)
 ds = Lb / a.cpl
+if a.cmin > 0:
+    ds = min(lscale if a.model == "cattania" else
+             bv * G * dc / (math.pi * (bv - av) ** 2 * sig), Lb) / a.cmin
 if a.law == "two":
     # two state variables (slip law) with b1 + b2 = b and b2/b1 = 0.84,
     # dc2 = dc1/0.048 (the ratios of Gu et al. 1984 and Becker 2000);
