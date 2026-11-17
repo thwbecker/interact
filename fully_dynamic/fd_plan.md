@@ -3622,6 +3622,25 @@ evanescent cutoff over the shortest image path (40 / zsum with zsum 2.3 km for t
 top at 1.15 km, beyond the S-wave number at the highest frequency): now FD_HPDWN_EVA, default 25
 (exp(-25) = 1.4e-11), which changes the batch test's series by 3e-7 and saves about 20 percent.
 
+### PD13 at 1 km with the exact kernels, and the window default (2026-11-17)
+
+With the locked-element fix, PD13 at 1 km (226 elements, 32 threads, FD_HPDWN_WIN 1.5,
+FD_HPDWN_Q 2) ran its 700 years: setup about 28 min, static gate 6.9e-7, phase 1 at 15.89 yr
+(2,303 steps over 3,664 s, peak 0.93 m/s, mean slip 10.70 m), phase 2 at 596.31 yr (2,164 steps
+over 2,112 s, peak 1.57 m/s, mean slip 13.20 m), 1,890 s in all.
+The four half-plane ruptures of run_tests.sh (references at q 8, window 3), slip top / middle /
+bottom in m:
+| case | window 1.5, q 4 | window 1.5, q 2 | q 3 |
+|---|---|---|---|
+| buried thrust 0.673 / 1.322 / 0.663 | 0.673 / 1.322 / 0.663 | 0.672 / 1.320 / 0.662 | |
+| buried normal 0.229 / 0.916 / 0.563 | 0.229 / 0.916 / 0.563 | 0.229 / 0.916 / 0.563 | |
+| thrust to the surface 2.305 / 2.087 / 0.898 | 2.300 / 2.084 / 0.892 | 2.309 / 2.094 / 0.879 | 2.297 / 2.076 / 0.881 |
+| normal to the surface 1.562 / 1.555 / 0.773 | 1.564 / 1.556 / 0.773 | 1.565 / 1.557 / 0.773 | |
+The window 1.5 is now the default (within 6 mm everywhere); q stays 4, since q 2 moves the bottom
+of the thrust reaching the surface by 19 mm (2 percent), where the reflected fronts are sharpest.
+For sections whose faults stay well below the surface (PD13, megathrust top at 1.15 km) q 2 changed
+the 2 km phase by 0.4 percent in peak slip rate and may be set with FD_HPDWN_Q=2.
+
 ### Bug: the aging-law update for a locked element (2026-11-16)
 
 PD13 at 1 km with the exact kernels (32 threads, FD_HPDWN_WIN 1.5, FD_HPDWN_Q 2): setup 28 min,

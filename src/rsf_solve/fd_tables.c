@@ -433,9 +433,11 @@ struct fd_pair *fd_pair_build_poly(const struct fd_segment *src, const struct fd
         if(hypot(Xr[0] - Xs[0], Xr[1] + Xs[1]) + as > dimg)
           dimg = hypot(Xr[0] - Xs[0], Xr[1] + Xs[1]) + as;
       }
-    /* FD_HPDWN_WIN times the S time along the longest image path (default 3); the cost of the
-       reflected tables grows with the square of this window (frequencies times wavenumbers) */
-    ntr = (int)ceil((getenv("FD_HPDWN_WIN") ? atof(getenv("FD_HPDWN_WIN")) : 3.0)*dimg/beta/dt) + 64;
+    /* FD_HPDWN_WIN times the S time along the longest image path (default 1.5, formerly 3); the
+       cost of the reflected tables grows with the square of this window (frequencies times
+       wavenumbers). 1.5 changed the half-plane ruptures of run_tests.sh by at most 6 mm and PD13
+       at 2 km not at all (fd_plan.md M10, 2026-11-17) */
+    ntr = (int)ceil((getenv("FD_HPDWN_WIN") ? atof(getenv("FD_HPDWN_WIN")) : 1.5)*dimg/beta/dt) + 64;
     if(ntr > lmax)
       lmax = ntr;
     hos = (double *)malloc(sizeof(double)*(size_t)(hr1 - hr0 + 1)*ns*ntr);
