@@ -565,15 +565,39 @@ so a full rupture is now at least 0.9 W or 0.9 times the longest event
 of the run if none reaches W (plot_antiplane.stats); results of runs
 whose longest events exceed W are unchanged.
 
-First results (2026-11-17, 98 of the runs up to 1300 cells, mostly
-W/L_inf <= 16; the larger runs were not finished in this session):
+Results (2026-11-17, all 130 runs up to 1300 cells, run on a separate
+machine; W/L_inf up to 32 except a/b 0.75 with the aging and slip laws
+and a/b 0.625 and 0.75 with two state variables, which exceed 1300 cells
+at the largest W/L_inf):
 
-- W/L_inf = 1: no catalog events with the aging law at any a/b and b, as
-  in her Figure 2a; the slip law and two state variables already give
-  periodic seismic events there for a/b >= 0.625, i.e. the slip laws make
-  small faults seismic at smaller W/L_inf, as in the Wu & Chen setup.
-- Partial ruptures with the aging law: b = 0.02, a/b 0.5 at W/L_inf 16
-  (1.62 events per cycle) and a/b 0.75 at 8 (1.31); b = 0.01, a/b 0.5 at
-  16 (1.53); with b = 0.01, a/b 0.75 there are none at W/L_inf 8.
-- Slip law and two state variables: no partial ruptures in the runs
-  completed so far.
+W/L_inf interval in which partial ruptures begin (between neighbouring
+grid points; "none" up to the largest W/L_inf run):
+
+| a/b | aging, b 0.02 | aging, b 0.01 | slip, b 0.02 / 0.01 | two-state, b 0.02 / 0.01 |
+|---|---|---|---|---|
+| 0.3 | 16 to 32 | 16 to 32 | none to 32 / 32 | none to 32 / 32 |
+| 0.5 | 8 to 16 | 8 to 16 | none to 32 / 32 | none to 32 / 32 |
+| 0.625 | 8 to 16 | 8 to 16 | none to 16 / 32 | none to 8 / 8 |
+| 0.75 | 4 to 8 | 8 to 16 | none to 16 / 16 | none to 8 / 8 |
+
+- Aging law: no events at W/L_inf 1 for any a/b and b (as in her Figure
+  2a), periodic full ruptures from W/L_inf 2, and about 2 events per
+  full-rupture cycle at W/L_inf 32 for all a/b and both b (1.94 to 2.06),
+  inside the range of her simulations (her Figure 2b has 2 events per
+  cycle from about 8 to 100). The onset of partial ruptures moves to
+  larger W/L_inf as a/b decreases (4 to 8 at a/b 0.75, b 0.02, to 16 to
+  32 at a/b 0.3); b changes it only at a/b 0.75 (8 to 16 with b 0.01).
+  CV at W/L_inf 32 is 0.18 to 0.70.
+- Slip law: no partial ruptures in any of the 45 runs, up to W/L_inf 32;
+  seismic events already at W/L_inf 1 for a/b >= 0.5 (b 0.02) and >=
+  0.625 (b 0.01), where the aging law has none; CV up to 0.17, from
+  irregular timing of full ruptures.
+- Two state variables (slip law): no partial ruptures in any of the 40
+  runs, up to W/L_inf 32 at a/b 0.3 and 0.5 and 8 at 0.625 and 0.75;
+  seismic at W/L_inf 1 for a/b >= 0.625; CV up to 0.11.
+
+With everything else as in Cattania's S1, the slip laws (one or two
+state variables) therefore shift the onset of seismic events to smaller
+W/L_inf and remove partial ruptures over the whole range tested, which
+for the aging law covers the onset of partial ruptures at every a/b and
+b.

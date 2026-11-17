@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-plot_cattania_si.py [rundir]: the runs of run_cattania_si.py (Cattania
+plot_cattania_si.py [rundir | table.txt]: the runs of run_cattania_si.py (Cattania
 setup with her S1 settings, b 0.02 and 0.01, aging, slip and two-state
 slip laws), one column per law:
 
@@ -12,7 +12,9 @@ slip laws), one column per law:
   row 3  CV of the interevent times against W/L_inf (her Figure 4b)
 
 Events as in plot_antiplane.py (merged within one hour, first quarter
-discarded). Writes cattania_si.png and cattania_si.txt.
+discarded). Writes cattania_si.png and cattania_si.txt in rundir; given
+a cattania_si.txt written earlier instead, it redraws cattania_si.png
+from that table (in the directory of the table).
 """
 import glob
 import os
@@ -34,6 +36,12 @@ ABCOL = {0.3: "C7", 0.5: "C0", 0.625: "C1", 0.75: "C2"}
 def main():
     rd = sys.argv[1] if len(sys.argv) > 1 else "."
     res = {}
+    if rd.endswith(".txt"):
+        for line in open(rd).readlines()[1:]:
+            w = line.split()
+            res[(w[0], float(w[1]), float(w[2]), float(w[3]))] = dict(n=int(w[4]), nfull=int(w[5]),
+                                                                     alpha=float(w[6]), cv=float(w[7]))
+        rd = os.path.dirname(os.path.abspath(rd))
     for d in sorted(glob.glob(os.path.join(rd, "si_*_b*_ab*_X*"))):
         try:
             ll = open(os.path.join(d, "rsf_solve.log")).read().splitlines()
@@ -93,6 +101,9 @@ def main():
                 ax[2, j].plot([k[3] for k in kk], [res[k]["cv"] for k in kk], **kw)
         ax[1, j].set_yscale("log")
         ax[1, j].set_ylim(0.8, 6)
+        ax[1, j].set_yticks([1, 2, 3, 4, 5])
+        ax[1, j].set_yticklabels(["1", "2", "3", "4", "5"])
+        ax[1, j].minorticks_off()
         ax[1, j].set_ylabel("events per full-rupture cycle")
         ax[2, j].set_ylabel("CV of interevent times")
         ax[2, j].set_ylim(-0.05, 1.2)
