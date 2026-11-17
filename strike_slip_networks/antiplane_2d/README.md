@@ -601,3 +601,22 @@ state variables) therefore shift the onset of seismic events to smaller
 W/L_inf and remove partial ruptures over the whole range tested, which
 for the aging law covers the onset of partial ruptures at every a/b and
 b.
+
+## Extending the slip-law parameter space (`run_slip_space.py`, `plot_slip_space.py`)
+
+`run_slip_space.py` runs the Cattania setup with her S1 settings (as
+run_cattania_si.py) over any combination of laws, b, a/b, W/L_inf and,
+for two state variables, the ratios dc1/dc2 (`--rho`, default 0.048) and
+b2/b1 (`--b2b1`, default 0.84; both also new options of gen_antiplane.py),
+cost-ordered and restartable, optionally with MPI (`--np`; a 2-rank run
+reproduced the serial catalog exactly). `plot_slip_space.py` plots, per
+a/b, the events per full-rupture cycle, the CV of the interevent times
+and the number of distinct rupture lengths against W/L_inf for every law
+variant found, and writes slip_space.txt.
+
+Directions not covered so far, where the slip law might become more
+complex: smaller a/b (where L_inf < L_b, so that runs stay cheap up to
+large W/L_inf: 7.7 cells per L_inf, about 4000 cells at W/L_inf 256),
+larger W/L_inf at a/b 0.5 and 0.75, a/b close to 1, and other ratios of
+the two state variables. First runs (b 0.02, slip law, W/L_inf 16): a/b
+0.1, 0.2, 0.3 give periodic full ruptures (one rupture length, CV 0).

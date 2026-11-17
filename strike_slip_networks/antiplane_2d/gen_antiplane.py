@@ -27,7 +27,7 @@ check of the 2.5-D strip results against the 1-D antiplane literature.
 The --law option switches to the slip law (rsf_solve -state_law 2) or the
 PRZ law (-state_law 3) with otherwise identical parameters, or (two) to
 two state variables with the slip law: b1 + b2 = b, b2/b1 = 0.84,
-dc2 = dc1/0.048, dc1 such that the two-state spring-slider critical
+dc2 = dc1/0.048 (--b2_b1 and --rho change these ratios), dc1 such that the two-state spring-slider critical
 stiffness equals the one-state one (X then refers to the one-state hc or
 L_inf); cells G dc2/(b2 sigma)/(8 cpl), which does not resolve the
 first variable's G dc1/(b1 sigma). Cells: --cpl cells per L_b = G dc/(b
@@ -67,6 +67,8 @@ p.add_argument("--b", type=float, default=0.0,
 p.add_argument("--vs_W", type=float, default=1.0, help="cattania: creeping-region extent / W")
 p.add_argument("--depth_W", type=float, default=50.0, help="wuchen: burial depth of the fault top / W")
 p.add_argument("--seed", type=int, default=1)
+p.add_argument("--rho", type=float, default=0.048, help="two state variables: dc1/dc2 (default 0.048)")
+p.add_argument("--b2_b1", type=float, default=0.84, help="two state variables: b2/b1 (default 0.84)")
 p.add_argument("--out", default=".")
 a = p.parse_args()
 
@@ -100,8 +102,8 @@ if a.law == "two":
     # dc1 is chosen so that the critical stiffness of the two-state spring
     # slider, kappa_c a sigma/dc1, equals the one-state (b - a) sigma/dc,
     # so that X keeps the meaning of the one-state W/hc or W/L_inf
-    rho = 0.048
-    b1, b2 = bv / 1.84, 0.84 * bv / 1.84
+    rho = a.rho
+    b1, b2 = bv / (1.0 + a.b2_b1), a.b2_b1 * bv / (1.0 + a.b2_b1)
     be1, be2 = b1 / av, b2 / av
     k0 = be1 - 1.0
     kc = (k0 + rho * (2 * be1 + (be2 - 1) * (2 + rho)) +
