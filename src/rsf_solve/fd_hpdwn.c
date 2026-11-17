@@ -408,10 +408,15 @@ static int batch_block(int ns, const double *sx, const double *sz, const double 
                        double alpha, double beta, double rho, double dt, int nt, int q, int N, double T, double L, int M,
                        double zsum, double *os, double *on)
 {
+  double eva;
   int nw, jw, Mw;
   double wI, dw, fac;
   double complex w, *R, *S, *Gs, *Gn, *specs, *specn;
   size_t np, p;
+  /* the evanescent cutoff: wavenumbers up to eva / zsum beyond the S-wave number, exp(-eva) of the
+     amplitude at the shallowest image path (FD_HPDWN_EVA, default 25, 1.4e-11; it was 40, which
+     set the wavenumbers at all frequencies for a shallow megathrust top) */
+  eva = getenv("FD_HPDWN_EVA") ? atof(getenv("FD_HPDWN_EVA")) : 25.0;
   wI = (getenv("FD_HPDWN_WIT") ? atof(getenv("FD_HPDWN_WIT")) : 18.0)/T;
   dw = 2.0*M_PI/T;
   nw = N/2 + 1;
@@ -428,7 +433,7 @@ static int batch_block(int ns, const double *sx, const double *sz, const double 
     w = jw*dw + I*wI;
     /* wavenumbers to the S-wave number of this frequency plus the evanescent decay over the
        shortest image path (exp(-k zsum) below 1e-17), not beyond the M of the block */
-    Mw = (int)ceil((1.2*jw*dw/beta + 40.0/zsum)*L/(2.0*M_PI));
+    Mw = (int)ceil((1.2*jw*dw/beta + eva/zsum)*L/(2.0*M_PI));
     if(Mw > M)
       Mw = M;
     spectra_at(w, ns, sx, sz, stx, stz, sa, nr, rx, rz, rtx, rtz, alpha, beta, rho, L, Mw, R, S, Gs, Gn);

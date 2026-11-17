@@ -3608,6 +3608,20 @@ after the last lag used, not after the window T, which is twice that): 1.1 to 2.
 the batch test, the series changed by at most 7e-7 of their largest value (FD_HPDWN_LFULL=1 for
 the former period).
 
+### M10 note: settings of the reflected tables at 2 km (2026-11-16)
+
+PD13 at 2 km (113 elements), exact kernels, one phase at 15.83 yr (16 threads):
+| setting | setup + run wall | phase: steps, peak, mean slip |
+|---|---|---|
+| q = 4 (jackie) | 3,226 s | 1,896, 1.520 m/s, 10.6819 m |
+| q = 2 (walter) | 1,734 s | 1,897, 1.526 m/s, 10.6819 m |
+The static gate is 2.544e-6 in both. q = 2 changes the peak slip rate by 0.4 percent; the two
+machines differ, so the time ratio is only indicative. The window option (FD_HPDWN_WIN) was not
+yet in that binary (720 lags in both). The wavenumbers were set at all frequencies by the
+evanescent cutoff over the shortest image path (40 / zsum with zsum 2.3 km for the megathrust
+top at 1.15 km, beyond the S-wave number at the highest frequency): now FD_HPDWN_EVA, default 25
+(exp(-25) = 1.4e-11), which changes the batch test's series by 3e-7 and saves about 20 percent.
+
 ### M10 note: threads in the reflected tables (2026-11-08)
 
 PD13 at 500 m with OpenMP (32 threads) ran on one core for a long time: the reflected tables of a
