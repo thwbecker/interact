@@ -3622,6 +3622,19 @@ evanescent cutoff over the shortest image path (40 / zsum with zsum 2.3 km for t
 top at 1.15 km, beyond the S-wave number at the highest frequency): now FD_HPDWN_EVA, default 25
 (exp(-25) = 1.4e-11), which changes the batch test's series by 3e-7 and saves about 20 percent.
 
+### Bug: the aging-law update for a locked element (2026-11-16)
+
+PD13 at 1 km with the exact kernels (32 threads, FD_HPDWN_WIN 1.5, FD_HPDWN_Q 2): setup 28 min,
+static gate 6.9e-7, phase 1 at 15.89 yr normal (2,303 steps over 3,663 s, peak 0.93 m/s, mean
+slip 10.70 m); then the QD integration rejected every step after the hand-back (also with
+-fd_vback 1e-5). RSF_DEBUG_DOMAIN: patch 223 (the last element of a splay) with psi = -inf,
+shear stress -8.8 MPa, slip 8e-9 m. An element under negative stress is locked in the dynamic
+phase (rsf_local returns V = 0), and fd_rsf_psi_advance, with V floored at 1e-30, computed
+theta' = dc/V + (theta - dc/V) exp(-V dt/dc), where theta is lost against dc/V = 8e27: theta' = 0,
+psi = -inf. Now theta' = theta exp(-x) + dt (1 - exp(-x)) / x, x = V dt / dc (series below 1e-8):
+equal to the former to all printed digits for V from 1e-9 to 10 m/s, finite for V = 0 (theta grows
+by dt, healing). It had not shown before because no element was locked over a whole phase.
+
 ### M10 note: threads in the reflected tables (2026-11-08)
 
 PD13 at 500 m with OpenMP (32 threads) ran on one core for a long time: the reflected tables of a

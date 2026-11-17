@@ -1266,11 +1266,18 @@ double fd_rsf_dtau(const struct fd_rsf *f, int i, double V, double psi, double s
    theta = dc/v0 exp((psi - f0)/b); theta' = dc/V + (theta - dc/V) exp(-V dt/dc) */
 double fd_rsf_psi_advance(const struct fd_rsf *f, int i, double psi, double Va, double Vb, double dt)
 {
-  double V = 0.5 * (fabs(Va) + fabs(Vb)), th, thn;
-  if(V < 1e-30)
-    V = 1e-30;
+  double V, th, thn, x;
+  V = 0.5 * (fabs(Va) + fabs(Vb));
   th = f->dc[i] / f->v0 * exp((psi - f->f0) / f->b[i]);
-  thn = f->dc[i] / V + (th - f->dc[i] / V) * exp(-V * dt / f->dc[i]);
+  /* theta' = theta exp(-x) + dt (1 - exp(-x)) / x with x = V dt / dc: the same solution as
+     dc/V + (theta - dc/V) exp(-x), but without the cancellation of dc/V against itself, which
+     for a locked element (V = 0, floored at 1e-30) lost theta and gave theta' = 0, psi = -inf
+     (PD13 at 1 km, a splay element under negative shear stress, 2026-11-16) */
+  x = V * dt / f->dc[i];
+  if(x < 1e-8)
+    thn = th * (1.0 - x) + dt * (1.0 - 0.5 * x);
+  else
+    thn = th * exp(-x) - dt * expm1(-x) / x;
   return f->f0 + f->b[i] * log(f->v0 * thn / f->dc[i]);
 }
 
