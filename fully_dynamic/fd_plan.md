@@ -3622,6 +3622,22 @@ evanescent cutoff over the shortest image path (40 / zsum with zsum 2.3 km for t
 top at 1.15 km, beyond the S-wave number at the highest frequency): now FD_HPDWN_EVA, default 25
 (exp(-25) = 1.4e-11), which changes the batch test's series by 3e-7 and saves about 20 percent.
 
+### PD13 at 500 m with the exact kernels; the event tracker after a phase (2026-11-17)
+
+PD13 at 500 m (453 elements, 64 threads, FD_HPDWN_Q 2, window 1.5): 700 years in 10,998 s
+(setup about 2.7 h; the megathrust pair 408 x 408 with 1,304 lags, 4,097 frequencies, up to
+15,829 wavenumbers), static gate 4.9e-7; phase 1 at 16.02 yr (3,774 steps over 3,384 s, peak 0.94
+m/s, mean slip 10.75 m), phase 2 at 594.92 yr (3,714 steps over 2,112 s, peak 1.39 m/s, mean slip
+13.07 m). QD alone: events at 16.02 and 607.71 yr, event slip (mean slip at arrest minus at onset)
+11.05 and 13.26 m. FD: event 1 slip 10.75 m (2.7 percent less), event 2 13.07 m (1.4 percent less)
+and 12.8 yr (2.1 percent of the cycle) earlier. At 1 km the FD events were at 15.89 and 596.31 yr.
+The FD rsf_events.dat lacked the arrests: the tracker (rsf_post_event) toggles uc->slipping at
+each TS event, and the arrest falls inside the dynamic phase, which the TS event detection never
+sees; the next event's rise through the arrest threshold (vel_event times vel_event_hyst, about
+5e-4 m/s) was then logged as the arrest of the previous event. rsf_phase_then_track now runs the
+phase and, if the tracker is still in an event and the peak rate after the phase is below the
+arrest threshold, logs the arrest at the phase's end and closes the catalog row.
+
 ### PD13 at 1 km with the exact kernels, and the window default (2026-11-17)
 
 With the locked-element fix, PD13 at 1 km (226 elements, 32 threads, FD_HPDWN_WIN 1.5,

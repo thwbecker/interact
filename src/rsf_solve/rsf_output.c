@@ -1512,6 +1512,63 @@ PetscErrorCode rsf_TS_Monitor(TS ts,PetscInt step,PetscReal time,Vec X,void *ptr
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+/*
+  Run the fully dynamic phase (rsf_fd.c) and keep the slip-rate tracker in step with it.
+  A dynamic phase usually ends the event: the slip rate falls below the arrest threshold
+  (vel_event times vel_event_hyst) inside the phase, a crossing that the TS event detection
+  never sees, since the phase replaces the solution. Without this, uc->slipping stayed set
+  through the interseismic period, and the next event's rise through the arrest threshold was
+  logged as the arrest of the previous event (PD13 at 500 m, fd_plan.md M10, 2026-11-17).
+  After the phase, if the tracker is still in an event and the peak rate is below the arrest
+  threshold, the arrest is logged here at the phase's end time, and the catalog row closed.
+*/
+static PetscErrorCode rsf_phase_then_track(TS ts,struct rsf_out_ctx *uc,PetscReal t,Vec X)
+{
+  const PetscScalar *x;
+  struct med *medium;
+  struct flt *fault;
+  struct rsf_vars *rsf;
+  PetscInt i,j;
+  PetscReal tn,v,lsum[2],gsum[2],lvmax,gvmax,d1,d2,d3;
+  PetscFunctionBeginUser;
+  PetscCall(rsf_fd_postevent(ts,uc->par,t,X));
+  if((!uc->track_events) || (!uc->slipping))
+    PetscFunctionReturn(PETSC_SUCCESS);
+  medium = uc->par->medium;
+  fault = uc->par->fault;
+  rsf = medium->rsf;
+  PetscCall(TSGetTime(ts,&tn));
+  lsum[0] = lsum[1] = 0.0;
+  lvmax = 0.0;
+  PetscCall(VecGetArrayRead(X,&x));
+  for(i = medium->rs, j = 0;i < medium->re;i++, j += rsf->dim){
+    v = fabs(vel_from_rsf(x[j+1],x[j+2],x[j],fault[i].mu_sa,rsf->v0,&d1,&d2,&d3,medium));
+    if(v > lvmax)
+      lvmax = v;
+    lsum[0] += x[j+3];
+    lsum[1] += x[j+1]/x[j+2];
+  }
+  PetscCall(VecRestoreArrayRead(X,&x));
+  PetscCallMPI(MPI_Allreduce(&lvmax,&gvmax,1,MPIU_REAL,MPI_MAX,PETSC_COMM_WORLD));
+  if(gvmax >= uc->vel_event*uc->vel_event_hyst)
+    PetscFunctionReturn(PETSC_SUCCESS);		/* still in the event: QD sees the arrest */
+  uc->slipping = PETSC_FALSE;
+  PetscCallMPI(MPI_Reduce(lsum,gsum,2,MPIU_REAL,MPI_SUM,0,PETSC_COMM_WORLD));
+  if(tn >= uc->event_tmin){
+    uc->nevent++;
+    if((medium->comm_rank == 0) && uc->fout_event){
+      fprintf(uc->fout_event,"%20.8e %17.10f %2i %12.7f %15.8e %10.6f\n",
+	      tn,tn/SEC_PER_YEAR,-1,
+	      log10((gvmax > 1e-300)?(gvmax):(1e-300)),
+	      gsum[0]/(PetscReal)medium->nrflt,gsum[1]/(PetscReal)medium->nrflt);
+      fflush(uc->fout_event);
+    }
+  }
+  if((uc->cat_enable || uc->rup_enable) && uc->ev_open)
+    PetscCall(rsf_finalize_event(uc,tn,X));
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
 /* 
    log the event, cf. myPostEventFunction in ode_solve_test.c: write
    time, onset/arrest flag, and the global state summary
@@ -1540,7 +1597,7 @@ PetscErrorCode rsf_post_event(TS ts,PetscInt nevents,PetscInt event_list[],
     }
     if(!vel_fired){
       if(fd_fired)
-	PetscCall(rsf_fd_postevent(ts,uc->par,t,X));
+	PetscCall(rsf_phase_then_track(ts,uc,t,X));
       PetscFunctionReturn(PETSC_SUCCESS);
     }
     /* both fired: the tracker logs and captures the pre-phase state below,
@@ -1604,7 +1661,7 @@ PetscErrorCode rsf_post_event(TS ts,PetscInt nevents,PetscInt event_list[],
     }
   }
   if(fd_fired)			/* fully dynamic phase on the state the tracker just logged */
-    PetscCall(rsf_fd_postevent(ts,uc->par,t,X));
+    PetscCall(rsf_phase_then_track(ts,uc,t,X));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
