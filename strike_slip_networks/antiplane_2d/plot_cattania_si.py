@@ -41,6 +41,8 @@ def main():
             w = line.split()
             res[(w[0], float(w[1]), float(w[2]), float(w[3]))] = dict(n=int(w[4]), nfull=int(w[5]),
                                                                      alpha=float(w[6]), cv=float(w[7]))
+            if len(w) > 9:              # tables with nlen and period
+                res[(w[0], float(w[1]), float(w[2]), float(w[3]))].update(nlen=w[8], period=w[9])
         rd = os.path.dirname(os.path.abspath(rd))
     for d in sorted(glob.glob(os.path.join(rd, "si_*_b*_ab*_X*"))):
         try:
@@ -59,10 +61,12 @@ def main():
         except Exception:               # noqa: BLE001
             continue
         res[(law, b, ab, x)] = pa.stats(p, r)
-    lines = ["%-6s %5s %6s %6s %6s %5s %6s %6s" % ("law", "b", "a/b", "W/Linf", "events", "full", "alpha", "CV")]
+    lines = ["%-6s %5s %6s %6s %6s %5s %6s %6s %5s %6s" % ("law", "b", "a/b", "W/Linf", "events", "full", "alpha", "CV",
+                                                          "nlen", "period")]
     for k in sorted(res):
         s = res[k]
-        lines.append("%-6s %5.2f %6.3f %6.0f %6i %5i %6.2f %6.3f" % (k + (s["n"], s["nfull"], s["alpha"], s["cv"])))
+        lines.append("%-6s %5.2f %6.3f %6.0f %6i %5i %6.2f %6.3f %5s %6s" % (
+            k + (s["n"], s["nfull"], s["alpha"], s["cv"], s.get("nlen", "-"), s.get("period", "-"))))
     open(os.path.join(rd, "cattania_si.txt"), "w").write("\n".join(lines) + "\n")
     print("\n".join(lines))
     fig, ax = plt.subplots(3, 3, figsize=(16, 13))

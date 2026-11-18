@@ -620,3 +620,25 @@ large W/L_inf: 7.7 cells per L_inf, about 4000 cells at W/L_inf 256),
 larger W/L_inf at a/b 0.5 and 0.75, a/b close to 1, and other ratios of
 the two state variables. First runs (b 0.02, slip law, W/L_inf 16): a/b
 0.1, 0.2, 0.3 give periodic full ruptures (one rupture length, CV 0).
+
+## Distinct rupture lengths and repeat period (2026-11-18)
+
+plot_antiplane.stats, used by all plot scripts here, now also returns
+`nlen`, the number of distinct rupture lengths (sorted lengths, relative
+to W or to the longest event if none reaches W, split where neighbours
+differ by more than 0.05), and `period`, the smallest p such that over
+the second half of the event sequence (at least 3 p values) the
+interevent times repeat after p events to within 1 percent of their
+mean and the rupture lengths to within 1 percent of the length scale; 0
+if no p up to 16 does. plot_slip_space.py, plot_cattania_si.py and
+plot_cattania_space.py write both columns (plot_slip_space.py also plots
+the period); tables written earlier do not have them, so they have to be
+regenerated from the run directories. Tested on synthetic sequences
+(period 4 found, random sequence 0, alternating partial and full
+ruptures 2) and on the aging-law runs of run_cattania_si.py up to
+W/L_inf 16 available here: periodic full ruptures have period 1; the
+partial-rupture runs have periods 2 to 5 (e.g. b 0.01, a/b 0.625,
+W/L_inf 16: 2; b 0.02, a/b 0.5, W/L_inf 16: 5); b 0.01, a/b 0.3,
+W/L_inf 16 (all full ruptures, CV 0.07) has no period up to 16. With the
+slip law at a/b 0.3, b 0.02, the W/L_inf 32 and 64 runs have period 4
+(full ruptures of slightly different length and timing).

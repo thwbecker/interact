@@ -50,13 +50,13 @@ def main():
         except Exception:               # noqa: BLE001
             continue
         res[(law, ab, p["X"])] = (p, r, pa.stats(p, r))
-    lines = ["%-6s %6s %6s %6s %5s %6s %6s %8s" % ("law", "a/b", "W/Linf", "events", "full", "alpha", "CV",
-                                                  "alpha/est")]
+    lines = ["%-6s %6s %6s %6s %5s %6s %6s %8s %5s %6s" % ("law", "a/b", "W/Linf", "events", "full", "alpha", "CV",
+                                                          "alpha/est", "nlen", "period")]
     for k in sorted(res):
         s = res[k][2]
         est = max(1.0, 0.45 * np.sqrt(k[2]))
-        lines.append("%-6s %6.3f %6.1f %6i %5i %6.2f %6.3f %8.2f" % (k[0], k[1], k[2], s["n"], s["nfull"],
-                     s["alpha"], s["cv"], s["alpha"] / est))
+        lines.append("%-6s %6.3f %6.1f %6i %5i %6.2f %6.3f %8.2f %5i %6i" % (k[0], k[1], k[2], s["n"], s["nfull"],
+                     s["alpha"], s["cv"], s["alpha"] / est, s["nlen"], s["period"]))
     open(os.path.join(rd, "cattania_space.txt"), "w").write("\n".join(lines) + "\n")
     print("\n".join(lines))
     fig, ax = plt.subplots(4, 3, figsize=(16, 16))

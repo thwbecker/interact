@@ -7,7 +7,9 @@ two-r<rho>-q<b2/b1>) and b:
 
   row 1  events per full-rupture cycle
   row 2  CV of the interevent times
-  row 3  number of distinct rupture lengths (rounded to 0.05 W)
+  row 3  number of distinct rupture lengths (sorted lengths split where
+         neighbours differ by more than 0.05 W)
+  row 4  repeat period of the event sequence (0: no period up to 16)
 
 Events as in plot_antiplane.py (merged within one hour, first quarter
 discarded, full rupture at least 0.9 W or 0.9 times the longest event).
@@ -45,22 +47,19 @@ def main():
             p, r = pa.analyze(d)
         except Exception:               # noqa: BLE001
             continue
-        s = pa.stats(p, r)
-        lmax = r["ln"].max() if len(r["ln"]) else 1.0
-        s["nlen"] = len(np.unique(np.round(r["ln"] / min(p["W"], lmax) / 0.05))) if len(r["ln"]) else 0
-        res[(law, b, ab, x)] = s
-    lines = ["%-16s %5s %6s %6s %6s %5s %6s %6s %5s" % ("law", "b", "a/b", "W/Linf", "events", "full", "alpha", "CV",
-                                                      "nlen")]
+        res[(law, b, ab, x)] = pa.stats(p, r)
+    lines = ["%-16s %5s %6s %6s %6s %5s %6s %6s %5s %6s" % ("law", "b", "a/b", "W/Linf", "events", "full", "alpha",
+                                                           "CV", "nlen", "period")]
     for k in sorted(res):
         s = res[k]
-        lines.append("%-16s %5.2f %6.3f %6.0f %6i %5i %6.2f %6.3f %5i" % (k + (s["n"], s["nfull"], s["alpha"],
-                                                                           s["cv"], s["nlen"])))
+        lines.append("%-16s %5.2f %6.3f %6.0f %6i %5i %6.2f %6.3f %5i %6i" % (k + (s["n"], s["nfull"], s["alpha"],
+                                                                                s["cv"], s["nlen"], s["period"])))
     open(os.path.join(rd, "slip_space.txt"), "w").write("\n".join(lines) + "\n")
     print("\n".join(lines))
     abs_ = sorted(set(k[2] for k in res))
     series = sorted(set((k[0], k[1]) for k in res))
     cols = {s: plt.cm.tab10(i % 10) for i, s in enumerate(series)}
-    fig, ax = plt.subplots(3, len(abs_), figsize=(4.2 * len(abs_), 10), squeeze=False, sharex=True)
+    fig, ax = plt.subplots(4, len(abs_), figsize=(4.2 * len(abs_), 13), squeeze=False, sharex=True)
     for j, ab in enumerate(abs_):
         for law, b in series:
             ks = sorted(k for k in res if k[0] == law and k[1] == b and k[2] == ab and res[k]["n"] > 2)
@@ -71,13 +70,15 @@ def main():
             ax[0, j].plot(x, [res[k]["alpha"] for k in ks], **kw)
             ax[1, j].plot(x, [res[k]["cv"] for k in ks], **kw)
             ax[2, j].plot(x, [res[k]["nlen"] for k in ks], **kw)
+            ax[3, j].plot(x, [res[k]["period"] for k in ks], **kw)
         ax[0, j].set_title("a/b %g" % ab, fontsize=11)
-        ax[2, j].set_xlabel("W/L_inf")
-        for i in range(3):
+        ax[3, j].set_xlabel("W/L_inf")
+        for i in range(4):
             ax[i, j].set_xscale("log")
     ax[0, 0].set_ylabel("events per full-rupture cycle")
     ax[1, 0].set_ylabel("CV of interevent times")
     ax[2, 0].set_ylabel("distinct rupture lengths")
+    ax[3, 0].set_ylabel("repeat period (0: none up to 16)")
     ax[0, -1].legend(fontsize=7)
     fig.tight_layout()
     fig.savefig(os.path.join(rd, "slip_space.png"), dpi=110)

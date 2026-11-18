@@ -129,6 +129,32 @@ def _analyze(d):
     return p, dict(on=mon, ln=mln, nuc=np.array(nuc), t=t, lv=lv)
 
 
+def n_lengths(ln, scale, gap=0.05):
+    """number of distinct rupture lengths: sorted lengths / scale split
+    where neighbours differ by more than gap"""
+    if len(ln) == 0:
+        return 0
+    v = np.sort(np.asarray(ln) / scale)
+    return 1 + int(np.sum(np.diff(v) > gap))
+
+
+def repeat_period(on, ln, scale, tol=0.01, pmax=16):
+    """smallest p such that, over the second half of the sequence (at least
+    3 p values), interevent times repeat after p events to tol times their
+    mean and rupture lengths to tol times scale; 0 if no such p <= pmax"""
+    dt = np.diff(on)
+    ln = np.asarray(ln)[:-1]
+    for per in range(1, pmax + 1):
+        m = max(3 * per, len(dt) // 2)
+        if len(dt) < m + per:
+            return 0
+        a, b = dt[-m - per:-per], dt[-m:]
+        c, d = ln[-m - per:-per], ln[-m:]
+        if np.max(np.abs(b - a)) <= tol * dt.mean() and np.max(np.abs(d - c)) <= tol * scale:
+            return per
+    return 0
+
+
 def stats(p, r):
     on, ln = r["on"], r["ln"]
     # full rupture: at least 0.9 W, or 0.9 times the longest event if no
@@ -145,6 +171,11 @@ def stats(p, r):
     if full.sum() > 2:
         s["cvfull"] = np.diff(on[full]).std(ddof=1) / np.diff(on[full]).mean()
         s["alpha"] = len(on) / full.sum()
+    # distinct rupture lengths and repeat period of the event sequence,
+    # lengths relative to W or the longest event if none reaches W
+    scale = min(p["W"], ln.max()) if len(ln) else p["W"]
+    s["nlen"] = n_lengths(ln, scale)
+    s["period"] = repeat_period(on, ln, scale) if len(on) > 3 else 0
     return s
 
 
