@@ -56,6 +56,8 @@ void init_medium_rsf(struct med *medium)
   rsf->kt_vc     = -1.0;		/* set from v0 below, after -v0 has been read */
   rsf->min_sigma = 1e6;
   rsf->max_sigma = 300e6; /* Pa */
+  rsf->sigma_floor = 1e6; /* Pa, with -calc_sigma_dot */
+  rsf->nfloor_qd = rsf->nfloor_fd = 0;
 
   rsf->two_state = PETSC_FALSE;	/* second state variable off */
   rsf->b2 = 0.0;
@@ -129,6 +131,9 @@ void rsf_print_help(const char *prog)
   fprintf(stderr,"  -limit_sigma <bool>     clamp sigma to [min,max], as HBI limitsigma (default 0)\n");
   fprintf(stderr,"  -min_sigma <Pa>         limiter floor (default 1e6)\n");
   fprintf(stderr,"  -max_sigma <Pa>         limiter ceiling (default 300e6)\n");
+  fprintf(stderr,"  -sigma_floor <Pa>       with -calc_sigma_dot: sigma does not decrease below this (QD and fully\n");
+  fprintf(stderr,"                          dynamic phases; opening is not modelled); elements at the floor are\n");
+  fprintf(stderr,"                          counted and reported (default 1e6, 0 switches it off)\n");
 
   fprintf(stderr,"\n");
 
@@ -606,6 +611,7 @@ PetscErrorCode rsf_get_settings(int argc,char **argv,struct interact_ctx *par,
   PetscCall(PetscOptionsGetBool(NULL,NULL,"-limit_sigma",&rsf->limit_sigma,NULL));
   PetscCall(PetscOptionsGetReal(NULL,NULL,"-min_sigma",&rsf->min_sigma,NULL)); /* [Pa] */
   PetscCall(PetscOptionsGetReal(NULL,NULL,"-max_sigma",&rsf->max_sigma,NULL)); /* [Pa] */
+  PetscCall(PetscOptionsGetReal(NULL,NULL,"-sigma_floor",&rsf->sigma_floor,NULL)); /* [Pa] */
   /* state evolution law: 1,2,3,4,5, 1 default ageing */
   PetscCall(PetscOptionsGetInt(NULL,NULL,"-state_law",&rsf->state_law,NULL));
   PetscCall(PetscOptionsGetReal(NULL,NULL,"-vmin_state",&rsf->vmin_state,NULL)); /* [m/s] */

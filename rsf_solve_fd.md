@@ -348,3 +348,15 @@ Harris, R. A., Day, S. M. (1993), J. Geophys. Res. 98, 4461.
 Lapusta, N., Rice, J. R., Ben-Zion, Y., Zheng, G. (2000), J. Geophys. Res.
 105, 23765.
 Tada, T., Madariaga, R. (2001), Int. J. Numer. Meth. Engng. 50, 227.
+
+## Slip direction and normal-stress floor (2026-11-18)
+
+The dynamic phases solve rate-and-state friction for slip in both directions, as the QD solver
+does (an element's rate has the sign of its stress with the element at rest). With
+`-calc_sigma_dot 1`, the normal stress does not decrease below `-sigma_floor` (default 1 MPa,
+0 switches it off) in either solver; opening is not modelled. The floor should lie below the
+initial normal stresses: the QD solver only stops a further decrease, whereas a dynamic phase
+sets values below the floor to it, so an element that started below the floor jumps up to it
+at the first switch. Elements at the floor are counted:
+the QD monitor prints a warning when the count grows, each dynamic phase one with its largest
+count. See fd_plan.md.

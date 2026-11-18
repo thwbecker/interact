@@ -3622,6 +3622,38 @@ evanescent cutoff over the shortest image path (40 / zsum with zsum 2.3 km for t
 top at 1.15 km, beyond the S-wave number at the highest frequency): now FD_HPDWN_EVA, default 25
 (exp(-25) = 1.4e-11), which changes the batch test's series by 3e-7 and saves about 20 percent.
 
+### Slip in both directions and the normal-stress floor (2026-11-18)
+
+Slip direction: the rate-and-state solve of the dynamic phase (fd_rsf_solve) worked in u = ln V
+and held an element with negative stress at rest locked (rsf_local returned V = 0). The friction
+law is odd in V, so V now has the sign of the element's stress at rest (H + K V - K_ii V_i, the
+others at their current rates): the banded Newton works in u = ln |V| with V = sg exp(u) and the
+signs sg fixed (rsf_newton); after convergence the signs are checked against the stresses at
+rest and disagreeing elements flipped and restarted from rest (up to four rounds); the
+elementwise fallback (rsf_local) solves on |Hloc| and restores the sign. As in the QD solver.
+Peak rates in rsf_fd.c are taken in absolute value. test_fd_rsf (in run_tests.sh): 12 and 40
+elements, every third with reversed stress: residual 3e-16, every rate with the sign of its
+stress at rest, V(-H) = -V(H) exactly, all-positive stresses give positive rates (11 Newton
+iterations, as before); the same with the fallback forced (TFR_MAXIT=1). The former solver gave
+residual 1.0 (the reversed elements locked). The slip-weakening solve (fd_slipweak_solve, tests
+only) still slips in the positive direction only.
+Normal-stress floor (-sigma_floor, default 1 MPa, with -calc_sigma_dot; 0 switches it off):
+QD: the sigma rate is set to 0 where sigma is at or below the floor and would decrease further
+(one-sided, unlike HBI's -limit_sigma, which holds sigma outside [min, max] in both directions);
+the monitor counts the elements at the floor and warns when the count exceeds the largest so
+far. FD: after each step sigma below the floor is set to it, the elements counted, and the phase
+line is followed by a warning with the largest count. Opening is not modelled.
+Checks (2026-11-18/19): run_tests.sh (53 checks before the MPI part, all PASS), test_fd_mpi2d
+(curved fault and half plane, tables and runs identical on 1, 2 and 4 ranks), test_fd_halfplane
+(7.8e-8), test_fd_sequence (unchanged); the QD harness regress_rsf.sh against the master build
+(identity PASS), and QD with -calc_sigma_dot 1 on a small subduction section bit-identical to
+the master (the floor not reached). A straight fault 1.5 km above the megathrust in its stress
+shadow (-0.84 to -0.92 MPa per m of megathrust slip), started at 0.5 MPa shear stress: in the
+event the new solver gives backward slip rates (-1e-23 m/s, the fault healed over 4 yr) where the
+master's solver held it at exactly 0. QD against FD with normal coupling on the same section
+without that fault (compare_runs_2d.py, sub-events within a day merged): events 2 and 3 0.6 and
+0.5 yr (0.8 and 0.6 percent of the 79 yr recurrence) earlier with inertia, slip within 4 percent.
+
 ### Status of the 2-D in-plane path, and the scripts for subduction runs (2026-11-18)
 
 Working (2-D in-plane, rsf_solve -fd_mode 1, aging law):

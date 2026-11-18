@@ -1138,6 +1138,24 @@ int fd_slipweak_solve(struct fd_slipweak *f, struct fd_sys *s, struct fd_ops *op
 }
 
 /* ---------------- state and step ---------------- */
+/* the normal-stress floor of the dynamic phase (st->sigma_floor > 0): sigma below it is set to it,
+   the elements at it counted (st->nfloor, the largest count in st->nfloor_max) */
+static void sigma_apply_floor(struct fd_state *st)
+{
+  int i, n;
+  if(st->sigma_floor <= 0.0)
+    return;
+  n = 0;
+  for(i = 0; i < st->N; i++)
+    if(st->sigma[i] < st->sigma_floor){
+      st->sigma[i] = st->sigma_floor;
+      n++;
+    }
+  st->nfloor = n;
+  if(n > st->nfloor_max)
+    st->nfloor_max = n;
+}
+
 struct fd_state *fd_state_create(int N)
 {
   struct fd_state *st = (struct fd_state *)calloc(1, sizeof(*st));
@@ -1281,14 +1299,19 @@ double fd_rsf_psi_advance(const struct fd_rsf *f, int i, double psi, double Va, 
   return f->f0 + f->b[i] * log(f->v0 * thn / f->dc[i]);
 }
 
-/* elementwise bracketed Newton in u = ln V on Hloc + k11 V = tau_f(V): g is
-   strictly decreasing in u since k11 < 0 */
+/* elementwise bracketed Newton in u = ln |V| on Hloc + k11 V = tau_f(V): g is
+   strictly decreasing in u since k11 < 0. The friction law is odd in V, so the slip rate has the
+   sign of Hloc (the stress with the element at rest) and the solve works on |Hloc|; slip in both
+   directions, as in the QD solver (formerly an element with Hloc <= 0 was held locked) */
 static double rsf_local(const struct fd_rsf *f, int i, double Hloc, double k11, double sigma, double psi, double Vg)
 {
-  double u, lo = -700.0, hi = 50.0, g, dg, un, V;
+  double u, lo = -700.0, hi = 50.0, g, dg, un, V, sg;
   int it;
-  if(Hloc <= 0.0)
+  if(Hloc == 0.0)
     return 0.0;
+  sg = (Hloc < 0.0) ? -1.0 : 1.0;
+  Hloc = fabs(Hloc);
+  Vg = fabs(Vg);
   u = log(Vg > 1e-300 ? Vg : 1e-300);
   if(u < -700.0)
     u = -700.0;
@@ -1314,31 +1337,42 @@ static double rsf_local(const struct fd_rsf *f, int i, double Hloc, double k11, 
     }
     u = un;
   }
-  return exp(u);
+  return sg * exp(u);
 }
 
-int fd_rsf_solve(const struct fd_rsf *f, struct fd_sys *s, struct fd_ops *op, const double *H, const double *sigma,
-    const double *psi, const double *Vg, double *V)
+/* the sign of each element's slip rate: that of its stress with the element at rest and the others
+   at V (H + K V - K_ii V_i), since the friction law is odd in V (0 counts as positive) */
+static void rsf_signs(const struct fd_sys *s, const struct fd_ops *op, const double *H, const double *V,
+                      double *tmp, double *sg)
 {
-  int N = s->N, bw = op->bw, ldab = 3 * bw + 1, i, j, it, converged = 0;
-  double *u = (double *)malloc(sizeof(double) * N), *g = (double *)malloc(sizeof(double) * N), *du = (double *)malloc(sizeof(double) * N);
-  double *ab = (double *)malloc(sizeof(double) * (size_t)ldab * N), *tmp = (double *)malloc(sizeof(double) * N), *k11 = (double *)malloc(sizeof(double) * N);
-  double dmax, Vi;
-  double d;
+  int i, N;
+  double r;
+  N = s->N;
+  fd_band_mult(N, op->bw, op->ab, V, tmp);
   for(i = 0; i < N; i++){
-    u[i] = log(Vg[i] > 1e-30 ? Vg[i] : 1e-30);
-    if(u[i] < -70.0)
-      u[i] = -70.0;
-    if(u[i] > 10.0)
-      u[i] = 10.0;
+    r = H[i] + tmp[i] - op->Ks[(size_t)i * N + i] * V[i];
+    sg[i] = (r < 0.0) ? -1.0 : 1.0;
   }
+}
+
+/* Newton on the banded system in u = ln |V|, V = sg exp(u), with the signs sg held fixed:
+   returns 1 if converged (V set), 0 otherwise (u left at the last iterate) */
+static int rsf_newton(const struct fd_rsf *f, struct fd_sys *s, struct fd_ops *op, const double *H, const double *sigma,
+    const double *psi, const double *sg, double *u, double *V, double *g, double *du, double *ab, double *tmp, int *nit)
+{
+  int N, bw, ldab, i, j, it;
+  double dmax, d;
+  N = s->N;
+  bw = op->bw;
+  ldab = 3 * bw + 1;
   for(it = 0; it < f->max_iter; it++){
     for(i = 0; i < N; i++)
-      V[i] = exp(u[i]);
+      V[i] = sg[i] * exp(u[i]);
     fd_band_mult(N, op->bw, op->ab, V, tmp);
     for(i = 0; i < N; i++)
       g[i] = H[i] + tmp[i] - fd_rsf_tau(f, i, V[i], psi[i], sigma[i]);
-    /* Jacobian in u: (K - diag(dtau/dV)) diag(V), band storage: column j scaled by V_j */
+    /* Jacobian in u: (K - diag(dtau/dV)) diag(V), band storage: column j scaled by V_j (dtau/dV
+       is even in V, V carries the sign) */
     for(j = 0; j < N; j++)
       for(i = (j - bw > 0 ? j - bw : 0); i <= (j + bw < N - 1 ? j + bw : N - 1); i++)
         ab[(2 * bw + i - j) + (size_t)j * ldab] = op->ab[(2 * bw + i - j) + (size_t)j * ldab] * V[j];
@@ -1374,33 +1408,84 @@ int fd_rsf_solve(const struct fd_rsf *f, struct fd_sys *s, struct fd_ops *op, co
     if(!isfinite(dmax))
       break;
     if(dmax < f->tol){
-      converged = 1;
-      break;
+      for(i = 0; i < N; i++)
+        V[i] = sg[i] * exp(u[i]);
+      *nit = it;
+      return 1;
     }
   }
-  if(converged){
+  *nit = it;
+  return 0;
+}
+
+int fd_rsf_solve(const struct fd_rsf *f, struct fd_sys *s, struct fd_ops *op, const double *H, const double *sigma,
+    const double *psi, const double *Vg, double *V)
+{
+  int N, i, it, round, flips, ok, nit;
+  double *u, *g, *du, *ab, *tmp, *k11, *sg, *sg2;
+  double dmax, Vi, d0;
+  N = s->N;
+  u = (double *)malloc(sizeof(double) * N);
+  g = (double *)malloc(sizeof(double) * N);
+  du = (double *)malloc(sizeof(double) * N);
+  ab = (double *)malloc(sizeof(double) * (size_t)(3 * op->bw + 1) * N);
+  tmp = (double *)malloc(sizeof(double) * N);
+  k11 = (double *)malloc(sizeof(double) * N);
+  sg = (double *)malloc(sizeof(double) * N);
+  sg2 = (double *)malloc(sizeof(double) * N);
+  for(i = 0; i < N; i++){
+    u[i] = log(fabs(Vg[i]) > 1e-30 ? fabs(Vg[i]) : 1e-30);
+    if(u[i] < -70.0)
+      u[i] = -70.0;
+    if(u[i] > 10.0)
+      u[i] = 10.0;
+  }
+  /* the signs from the guess; after convergence they must agree with the stress at rest of each
+     element, else the disagreeing ones are flipped and Newton runs again (a few rounds) */
+  rsf_signs(s, op, H, Vg, tmp, sg);
+  ok = 0;
+  it = 0;
+  for(round = 0; round < 4; round++){
+    ok = rsf_newton(f, s, op, H, sigma, psi, sg, u, V, g, du, ab, tmp, &nit);
+    it += nit;
+    if(!ok)
+      break;
+    rsf_signs(s, op, H, V, tmp, sg2);
+    flips = 0;
     for(i = 0; i < N; i++)
-      V[i] = exp(u[i]);
+      if(sg2[i] != sg[i]){
+        sg[i] = sg2[i];
+        u[i] = -70.0;                            /* restart that element from rest */
+        flips++;
+      }
+    if(flips == 0)
+      break;
+    ok = 0;
+  }
+  if(ok){
     free(u);
     free(g);
     free(du);
     free(ab);
     free(tmp);
     free(k11);
+    free(sg);
+    free(sg2);
     return it;
   }
-  /* fallback: fixed point of the elementwise solve with lagged neighbours */
+  /* fallback: fixed point of the elementwise solve with lagged neighbours (signed) */
   for(i = 0; i < N; i++){
     k11[i] = op->Ks[(size_t)i * N + i];
-    V[i] = exp(u[i]);
+    V[i] = sg[i] * exp(u[i]);
   }
   for(it = 0; it < 60; it++){
     fd_band_mult(N, op->bw, op->ab, V, tmp);
     dmax = 0.0;
     for(i = 0; i < N; i++){
       Vi = rsf_local(f, i, H[i] + tmp[i] - k11[i] * V[i], k11[i], sigma[i], psi[i], V[i]);
-      if(fabs(Vi - V[i]) / (V[i] > 1e-30 ? V[i] : 1e-30) > dmax)
-        dmax = fabs(Vi - V[i]) / (V[i] > 1e-30 ? V[i] : 1e-30);
+      d0 = fabs(V[i]) > 1e-30 ? fabs(V[i]) : 1e-30;
+      if(fabs(Vi - V[i]) / d0 > dmax)
+        dmax = fabs(Vi - V[i]) / d0;
       g[i] = Vi;
     }
     memcpy(V, g, sizeof(double) * N);
@@ -1413,6 +1498,8 @@ int fd_rsf_solve(const struct fd_rsf *f, struct fd_sys *s, struct fd_ops *op, co
   free(ab);
   free(tmp);
   free(k11);
+  free(sg);
+  free(sg2);
   return -(it + 1);
 }
 
@@ -1479,6 +1566,7 @@ static int fd_step_rsf_nl(struct fd_sys *s, struct fd_state *st, const struct fd
   } else
     for(i = 0; i < N; i++)
       st->sigma[i] = st->sigma0[i];
+  sigma_apply_floor(st);
   fd_sys_push_lin(s, Vold, st->V, k);
   tp1 = fd_now();
   fd_prof[3] += tp1 - tp0;
@@ -1555,6 +1643,7 @@ int fd_step_rsf(struct fd_sys *s, struct fd_state *st, const struct fd_rsf *f, i
   } else
     for(i = 0; i < N; i++)
       st->sigma[i] = st->sigma0[i];
+  sigma_apply_floor(st);
   tp1 = fd_now();
   fd_prof[5] += tp1 - tp0;
   tp0 = tp1;

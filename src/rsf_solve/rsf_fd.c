@@ -3085,6 +3085,7 @@ static PetscErrorCode fd_run_phase(TS ts, struct interact_ctx *par, struct fd_va
   PetscCall(PetscMalloc1(N,&vtmp));
   PetscCall(PetscMalloc1(N,&vref));
   st->normal_coupling = (fd->mode2d == FD_MODE_INPLANE) && rsf->calc_sigma_dot;
+  st->sigma_floor = st->normal_coupling ? rsf->sigma_floor : 0.0;
   st->nl = (int)fd->nl;
   PetscCall(fd_full_get(X,&fd->scX,&fd->Xall,&x));   /* the whole state on every rank (MPI) */
   for(i = 0;i < sy->N;i++){
@@ -3102,8 +3103,8 @@ static PetscErrorCode fd_run_phase(TS ts, struct interact_ctx *par, struct fd_va
     st->Hn_dot[i] = rsf->calc_sigma_dot ? fault[g].sinc[1] : 0.0;
     st->sigma[i] = st->sigma0[i];
     st->tau[i] = x[4*g+1];
-    if(st->V[i] > vmax)
-      vmax = st->V[i];
+    if(fabs(st->V[i]) > vmax)
+      vmax = fabs(st->V[i]);
   }
   /* seed the fine-grid history from the accepted-step record */
   fd_sys_reset_history(sy);
@@ -3121,8 +3122,8 @@ static PetscErrorCode fd_run_phase(TS ts, struct interact_ctx *par, struct fd_va
       r = st->tau0[i] - sy->eta*st->V[i] - fd_rsf_tau(&fr,i,st->V[i],st->psi[i],st->sigma0[i]);
       if(fabs(r) > rmax)
         rmax = fabs(r);
-      if(st->V[i] > vm){
-        vm = st->V[i];
+      if(fabs(st->V[i]) > vm){
+        vm = fabs(st->V[i]);
         im = i;
       }
     }
@@ -3151,8 +3152,8 @@ static PetscErrorCode fd_run_phase(TS ts, struct interact_ctx *par, struct fd_va
     nsteps++;
     vmax = 0.0;
     for(i = 0;i < sy->N;i++)                     /* fault slip rates only */
-      if(st->V[i] > vmax)
-        vmax = st->V[i];
+      if(fabs(st->V[i]) > vmax)
+        vmax = fabs(st->V[i]);
     if(fd->dump_mode > 0.0)
       fd_dump_mode(fd,sy,st,k);
     if(getenv("FD_DEBUG") && (nsteps <= 3)){
@@ -3236,6 +3237,12 @@ static PetscErrorCode fd_run_phase(TS ts, struct interact_ctx *par, struct fd_va
   PetscCall(PetscPrintf(PETSC_COMM_WORLD,
       "rsf_fd: phase %ld: t %.8f yr, %d steps over %.1f s, peak slip rate %.3f m/s, mean slip %.4f m, max band %d, wall %.1f s\n",
       (long)fd->nphase + 1,(double)(t/SEC_PER_YEAR),nsteps,(double)st->t,vpeak,slipsum/sy->N,kk,(double)(t_wall1 - t_wall0)));
+  if(st->nfloor_max > 0){
+    PetscCall(PetscPrintf(PETSC_COMM_WORLD,"rsf_fd: WARNING: phase %ld: normal stress at the floor (-sigma_floor %g MPa) on up to %d elements, %d at the end\n",
+        (long)fd->nphase + 1,(double)(rsf->sigma_floor/1e6),st->nfloor_max,st->nfloor));
+    if(st->nfloor_max > rsf->nfloor_fd)
+      rsf->nfloor_fd = st->nfloor_max;
+  }
   PetscCall(PetscFree3(fr.a,fr.b,fr.dc));
   PetscCall(PetscFree(vtmp));
   PetscCall(PetscFree(vref));

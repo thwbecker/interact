@@ -295,6 +295,9 @@ PetscErrorCode rsf_ODE_RHSFunction(TS ts,PetscReal time,Vec X,Vec F,void *ptr)
       if((x[j+2] < rsf->min_sigma)||(x[j+2] > rsf->max_sigma))
 	sdot = 0.0;
     }
+    /* normal-stress floor (-sigma_floor): no further decrease at or below it */
+    if(rsf->calc_sigma_dot && (rsf->sigma_floor > 0.0) && (x[j+2] <= rsf->sigma_floor) && (sdot < 0.0))
+      sdot = 0.0;
     f[j+2] = sdot;
     /* 
        d tau/dt from the quasi-dynamic strength = stress condition,

@@ -102,6 +102,10 @@ if command -v python3 > /dev/null 2>&1; then
   if [ $st -eq 0 ]; then echo "fd3d_test h6step, band preconditioned strip solve against LU: PASS"
   else echo "fd3d_test h6step, band preconditioned strip solve against LU: FAIL ($(cat tmp_fd_dynamic/fd3d.out))"; fail=1; fi
 fi
+# the coupled rate-and-state solve of the dynamic phase with slip in both directions (2026-11-18),
+# Newton and the elementwise fallback
+( cd tmp_fd_dynamic && ../bin/test_fd_rsf > rsf.out 2>&1 && TFR_MAXIT=1 ../bin/test_fd_rsf >> rsf.out 2>&1 ); st=$?
+grep 'PASS\|FAIL' tmp_fd_dynamic/rsf.out | sed 's/^/  /' | tail -2; [ $st -eq 0 ] || fail=1
 # reflected half-plane stresses by DWN (fd_plan.md M10) against the prototype
 if command -v python3 > /dev/null 2>&1; then
   ( cd tmp_fd_dynamic && python3 ../fully_dynamic/test_fd_hpdwn.py ../bin/test_fd_hpdwn > fd3d.out 2>&1 )

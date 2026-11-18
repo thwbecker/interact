@@ -6,7 +6,9 @@ the FD events in sequence: onset time differences (in years and in percent of th
 recurrence) and slip differences. Optionally a figure of the mean slip against time
 (rsf_monitor.dat) with the events marked.
 
-Usage: compare_runs_2d.py outdir [qd_run] [fd_run ...] [--plot file.png]
+Usage: compare_runs_2d.py outdir [qd_run] [fd_run ...] [--plot file.png] [--merge seconds]
+  onsets that follow the previous arrest within --merge seconds (default one day: the slip rate
+  flickering about the threshold, or short dynamic phases after the main one) count as one event
   outdir: a run_2d_cascadia.sh output directory; runs default to qd and fd_omp (and fd_mpi if
   present). Writes the comparison to stdout."""
 import sys
@@ -14,8 +16,24 @@ import os
 import numpy as np
 
 
+MERGE_S = 86400.0          # sub-events (re-crossings of the threshold) closer than this are merged
+
+
+def merge(ev, gap_s):
+    """events whose onset follows the previous arrest within gap_s seconds are one event"""
+    out = []
+    for e in ev:
+        if out and not np.isnan(out[-1][2]) and (e[0] - out[-1][2])*3.15576e7 < gap_s:
+            out[-1][2] = e[2]
+            out[-1][3] = e[3]
+        else:
+            out.append(list(e))
+    return out
+
+
 def events(d):
-    """[(t_onset_yr, slip_onset, t_arrest_yr or nan, slip_arrest or nan, log10 vmax at onset)]"""
+    """[(t_onset_yr, slip_onset, t_arrest_yr or nan, slip_arrest or nan, log10 vmax at onset)],
+    sub-events within MERGE_S merged"""
     f = os.path.join(d, "rsf_events.dat")
     if not os.path.exists(f):
         return None
@@ -34,7 +52,7 @@ def events(d):
             cur = None
     if cur is not None:
         ev.append(cur)
-    return ev
+    return merge(ev, MERGE_S)
 
 
 def phases(d):
@@ -79,6 +97,10 @@ def main():
     if "--plot" in sys.argv:
         png = sys.argv[sys.argv.index("--plot") + 1]
         args = [a for a in args if a != png]
+    global MERGE_S
+    if "--merge" in sys.argv:
+        MERGE_S = float(sys.argv[sys.argv.index("--merge") + 1])
+        args = [a for a in args if a != sys.argv[sys.argv.index("--merge") + 1]]
     out = args[0]
     qd = args[1] if len(args) > 1 else "qd"
     fds = args[2:] if len(args) > 2 else [r for r in ("fd_omp", "fd_mpi") if os.path.isdir(os.path.join(out, r))]

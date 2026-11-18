@@ -193,6 +193,11 @@ struct rsf_vars{
   */
   PetscBool limit_sigma;
   PetscReal min_sigma , max_sigma;
+  /* normal-stress floor with -calc_sigma_dot (one-sided: sigma does not decrease below it; opening
+     is not modelled): QD in the RHS, FD in the dynamic phases; elements at the floor are counted
+     and reported (largest number seen, QD and FD) */
+  PetscReal sigma_floor;
+  int nfloor_qd, nfloor_fd;
   /* state evolution law: 0 = aging (default), 1 = slip law. Both share the same
      steady state psi_ss = f0 - b ln(|v|/v0); they differ in how psi relaxes to it.
      vmin_state floors |v| inside the slip law's ln(|v|/v0) so that v -> 0 is safe. */

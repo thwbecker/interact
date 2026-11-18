@@ -157,6 +157,10 @@ struct fd_state {
   double *H, *Hn, *hs, *hn, *work;
   int normal_coupling;
   int nl;                       /* 1: second-order marching (fd_sys_ops_nl, fd_sys_push_lin) */
+  /* normal-stress floor (rsf_solve -sigma_floor, with normal coupling; 0: none): sigma below it is
+     set to it after each step; nfloor elements were at it after the last step, nfloor_max at most */
+  double sigma_floor;
+  int nfloor, nfloor_max;
 };
 struct fd_state *fd_state_create(int N);
 void fd_state_free(struct fd_state *st);

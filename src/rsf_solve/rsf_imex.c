@@ -96,6 +96,9 @@ PetscErrorCode rsf_IMEX_RHSFunction(TS ts,PetscReal time,Vec X,Vec G,void *ptr)
       if((x[j+2] < rsf->min_sigma)||(x[j+2] > rsf->max_sigma))
 	sdot = 0.0;
     }
+    /* normal-stress floor (-sigma_floor): no further decrease at or below it */
+    if(rsf->calc_sigma_dot && (rsf->sigma_floor > 0.0) && (x[j+2] <= rsf->sigma_floor) && (sdot < 0.0))
+      sdot = 0.0;
     g[j+2] = sdot;
     /* explicit part of d tau/dt (no dv/dpsi S term here) */
     mu = x[j+1]/x[j+2];				/* tau/sigma */

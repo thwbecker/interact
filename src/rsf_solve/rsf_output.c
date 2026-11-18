@@ -4,6 +4,7 @@
 #ifdef USE_PETSC
 #include "petsc_prototypes.h"
 #include "rsf.h"
+static PetscErrorCode rsf_count_floor(struct rsf_out_ctx *,Vec,PetscReal);
 
 
 
@@ -1309,6 +1310,7 @@ PetscErrorCode rsf_TS_Monitor(TS ts,PetscInt step,PetscReal time,Vec X,void *ptr
 	}
       }
       PetscCall(VecRestoreArrayRead(X,&x));
+      PetscCall(rsf_count_floor(uc,X,time));
       PetscCallMPI(MPI_Reduce(lsum,gsum,MGRP_NSUM,MPIU_REAL,MPI_SUM,0,PETSC_COMM_WORLD));
       PetscCallMPI(MPI_Reduce(lminmax,gminmax,3,MPIU_REAL,MPI_MAX,0,PETSC_COMM_WORLD));
       if(uc->mgrp_n > 0){
@@ -1508,6 +1510,37 @@ PetscErrorCode rsf_TS_Monitor(TS ts,PetscInt step,PetscReal time,Vec X,void *ptr
       PetscCall(VecRestoreArray(uc->gathered,&fvals));
       uc->field_frame++;
     }
+  }
+  PetscFunctionReturn(PETSC_SUCCESS);
+}
+
+/*
+  The normal-stress floor (-sigma_floor with -calc_sigma_dot): the number of elements at or below it,
+  at each monitor output; a warning when it exceeds the largest number seen so far
+*/
+static PetscErrorCode rsf_count_floor(struct rsf_out_ctx *uc,Vec X,PetscReal time)
+{
+  const PetscScalar *x;
+  struct med *medium;
+  struct rsf_vars *rsf;
+  PetscInt i,j;
+  int nl,ng;
+  PetscFunctionBeginUser;
+  medium = uc->par->medium;
+  rsf = medium->rsf;
+  if((!rsf->calc_sigma_dot) || (rsf->sigma_floor <= 0.0))
+    PetscFunctionReturn(PETSC_SUCCESS);
+  nl = 0;
+  PetscCall(VecGetArrayRead(X,&x));
+  for(i = medium->rs, j = 0;i < medium->re;i++, j += rsf->dim)
+    if(x[j+2] <= rsf->sigma_floor*(1.0 + 1e-9))
+      nl++;
+  PetscCall(VecRestoreArrayRead(X,&x));
+  PetscCallMPI(MPI_Allreduce(&nl,&ng,1,MPI_INT,MPI_SUM,PETSC_COMM_WORLD));
+  if(ng > rsf->nfloor_qd){
+    rsf->nfloor_qd = ng;
+    PetscCall(PetscPrintf(PETSC_COMM_WORLD,"rsf_solve: WARNING: normal stress at the floor (-sigma_floor %g MPa) on %d elements at t %.6f yr\n",
+			  (double)(rsf->sigma_floor/1e6),ng,(double)(time/SEC_PER_YEAR)));
   }
   PetscFunctionReturn(PETSC_SUCCESS);
 }
