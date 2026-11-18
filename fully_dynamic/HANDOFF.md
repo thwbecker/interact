@@ -110,6 +110,9 @@ for large strip sets (H8).
    PD13 at 1 km runs 700 yr with two stable dynamic events; next PD13 at
    500 m on a multi-core machine, then step 3 (the prototype's checks, a
    megathrust with a splay).
+1j. 2-D subduction runs (2026-11-18): make_2d_subduction.py (idealized sections with splays),
+   run_2d_cascadia.sh (options such as -calc_sigma_dot 1, automatic stations), compare_runs_2d.py;
+   status and limits in fd_plan.md ("Status of the 2-D in-plane path").
 1i. M10 done (2026-11-05): rsf_solve uses the exact half-plane kernels for 2-D in-plane half
    planes; the virtual surface and its filters are removed. Next: PD13 at 1 km and 500 m with
    the exact kernels (setup cost of the reflected tables), the sensitivity runs, then the QD and

@@ -11,8 +11,17 @@
 #      tables and the history sums are the same for any split over ranks or threads); wall times
 # Results go to outdir/summary.txt. Run from the repository root after make bin/rsf_solve.
 #
-# usage: run_2d_cascadia.sh [parts] [h] [np] [mpi command] [years] [section dir] [outdir]
-#   defaults: "q s m o c" 500 16 mpirun 700 test_twod/cascadia/PD13_nosigma 2d_cascadia_out
+# usage: run_2d_cascadia.sh [parts] [h] [np] [mpi command] [years] [section dir] [outdir] [options] [stations]
+#   defaults: "q s m o c" 500 16 mpirun 700 test_twod/cascadia/PD13_nosigma 2d_cascadia_out "" auto
+#   section dir: any directory in the format of test_twod/cascadia/PD13_nosigma (geom_*.in and the
+#     rsf_*.in files), e.g. one written by make_2d_subduction.py (idealized megathrust and splays)
+#   options: further rsf_solve options for all runs (QD and FD alike), e.g. "-calc_sigma_dot 1" for
+#     normal-stress coupling, which a QD against FD comparison of a dipping fault should have
+#   stations: FD station elements (-fd_stations), auto: a fifth and a half of the megathrust
+# The reflected half-plane tables take FD_HPDWN_* from the environment (FD_HPDWN_Q=2 is adequate
+# for faults whose tops stay about a kilometre below the surface, fd_plan.md M10), e.g.
+#   OPENBLAS_NUM_THREADS=1 FD_HPDWN_Q=2 fully_dynamic/run_2d_cascadia.sh "q o c" 1000 32 mpirun 700 \
+#     test_twod/cascadia/PD13_nosigma 2d_pd13_1km_sd "-calc_sigma_dot 1"
 #
 parts=${1-"q s m o c"}
 h=${2-500}
@@ -21,21 +30,31 @@ mpi=${4-mpirun}
 years=${5-700}
 sec=${6-test_twod/cascadia/PD13_nosigma}
 out=${7-2d_cascadia_out}
+xopt=${8-""}
+stations=${9-auto}
 root=`pwd`
 bin=$root/bin/rsf_solve
 mkdir -p $out
 out=`cd $out && pwd`
 sum=$out/summary.txt
-echo "run_2d_cascadia `date`, `hostname`: parts '$parts', h $h m, $np ranks/threads, $years yr, $sec" >> $sum
+echo "run_2d_cascadia `date`, `hostname`: parts '$parts', h $h m, $np ranks/threads, $years yr, $sec, options '$xopt'" >> $sum
+env | grep '^FD_HPDWN' | sed 's/^/  environment: /' >> $sum
 # the resampled section
 if [ ! -s $out/geom/rsf_ab.in ]; then
-  python3 $root/fully_dynamic/coarsen_2d.py $root/$sec $out/geom $h | tee -a $sum
+  case $sec in
+    /*) secp=$sec ;;
+    *) secp=$root/$sec ;;
+  esac
+  python3 $root/fully_dynamic/coarsen_2d.py $secp $out/geom $h | tee -a $sum
 fi
 geom=`cd $out/geom && ls geom_*.in | head -1`
 base="-geom_file ../geom/$geom -rsf_file ../geom/rsf_ab.in -rsf_dc_file ../geom/rsf_dc.in -rsf_sigma_file ../geom/rsf_sigma.in \
  -rsf_vpl_file ../geom/rsf_vpl.in -rsf_ic_file ../geom/rsf_ic.in -state_law 1 -shear_modulus 3.0e10 -s_wave_speed 3464 \
- -f0 0.6 -v0 1e-6 -vpl 1.2e-9 -vel_event 1e-3 -track_events 1 -ts_rk_type 3bs -rtol 1e-5"
-fdopt="-fd_mode 1 -fd_stations 40,200"
+ -f0 0.6 -v0 1e-6 -vpl 1.2e-9 -vel_event 1e-3 -track_events 1 -ts_rk_type 3bs -rtol 1e-5 $xopt"
+if [ "$stations" = "auto" ]; then
+  stations=`awk '$8 == 0 {n++} END {a = int(n/5); b = int(n/2); if(a < 1) a = 1; print a "," b}' $out/geom/$geom`
+fi
+fdopt="-fd_mode 1 -fd_stations $stations"
 # run name, launcher (mpi ranks, 0 for none), threads, extra options
 run () {
   name=$1
@@ -65,26 +84,11 @@ for p in $parts; do
        run setup_omp 0 $np $fdopt -stop_time_yr 1e-9 ;;
     m) run fd_mpi $np 1 $fdopt -stop_time_yr $years ;;
     o) run fd_omp 0 $np $fdopt -stop_time_yr $years ;;
-    c) python3 - $out << 'PYEOF' >> $sum
+    c) python3 $root/fully_dynamic/compare_runs_2d.py $out | sed 's/^/c: /' >> $sum
+       python3 - $out << 'PYEOF' >> $sum
 import sys, os, glob, filecmp
 import numpy as np
 out = sys.argv[1]
-def events(d):
-    f = os.path.join(out, d, "rsf_events.dat")
-    if not os.path.exists(f):
-        return None
-    a = np.loadtxt(f, comments="#", ndmin=2)
-    if a.size == 0:
-        return []
-    on = a[a[:, 2] == 1]
-    off = a[a[:, 2] == -1]
-    return [(on[i, 1], off[i, 4] if i < len(off) else np.nan) for i in range(len(on))]
-for d in ("qd", "fd_mpi", "fd_omp"):
-    e = events(d)
-    if e is None:
-        print(f"c: {d}: no events file")
-        continue
-    print(f"c: {d}: {len(e)} events, onsets (yr) / mean slip at arrest (m): " + ", ".join(f"{t:.2f} / {s:.3f}" for t, s in e))
 fm = sorted(glob.glob(os.path.join(out, "fd_mpi", "fd_phase_*_st*.dat")))
 fo = sorted(glob.glob(os.path.join(out, "fd_omp", "fd_phase_*_st*.dat")))
 if fm and fo:

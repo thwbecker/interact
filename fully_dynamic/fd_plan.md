@@ -3622,6 +3622,41 @@ evanescent cutoff over the shortest image path (40 / zsum with zsum 2.3 km for t
 top at 1.15 km, beyond the S-wave number at the highest frequency): now FD_HPDWN_EVA, default 25
 (exp(-25) = 1.4e-11), which changes the batch test's series by 3e-7 and saves about 20 percent.
 
+### Status of the 2-D in-plane path, and the scripts for subduction runs (2026-11-18)
+
+Working (2-D in-plane, rsf_solve -fd_mode 1, aging law):
+- full plane and half plane (exact half-plane kernels: full-plane tables plus the waves
+  reflected at the free surface by DWN, fd_hpdwn.c), curved faults as polylines (dense tables),
+  several faults (megathrust and splays), MPI by receiver rows and OpenMP; static gates against
+  interact's Is (shear) and In (normal) at 1e-6 to 1e-7;
+- PD13 (Cascadia, megathrust and four splays) at 2 km, 1 km and 500 m through 700 years and two
+  events each; at 500 m the FD events are 2.7 and 1.4 percent smaller in slip than QD and the
+  second comes 12.8 yr (2.2 percent of the cycle) earlier;
+- setup cost of the reflected tables (q = 2, window 1.5): 2 km about 7 min (16 threads), 1 km
+  28 min (32 threads), 500 m 2.7 h (64 threads).
+Not yet done or known limits:
+- normal-stress coupling (-calc_sigma_dot 1) not yet run on a section with the exact kernels (the
+  comparison should have it; check that sigma stays positive on the shallow splays);
+- 250 m and finer: the DWN tables cost too much (about 15 to 60 times 500 m); an exact time-domain
+  evaluation of the reflected waves (Cagniard-de Hoop, cost pairs times lags) would be needed;
+- resolution: 500 m resolves Lambda0 but h* only to 14.6 elements for 199 VW elements of PD13;
+- splay junctions: splays end about one fine element from the megathrust, much less than a coarse
+  element after resampling (the junction treatment of TPV14 at 250 m did not converge in 3-D);
+- only the aging law; slip in one direction only in the dynamic phases (a locked element under
+  negative stress stays locked).
+Scripts (fully_dynamic/):
+- make_2d_subduction.py: idealized sections (megathrust whose dip increases with depth, VS / VW
+  / VS a - b with tapers, sigma = min(sigma_max, gradient z), optional planar splays, VS or with the
+  megathrust's profile), written in the Cascadia section format; checked: tangents equal the
+  centre steps to 0.015 degrees, splay ends one element from the megathrust, resampled by
+  coarsen_2d.py and censused by check_2d_resolution.py;
+- run_2d_cascadia.sh: now takes any section dir (absolute or relative), further rsf_solve options
+  for all runs (e.g. "-calc_sigma_dot 1") and automatic stations (a fifth and a half of the
+  megathrust); part c calls compare_runs_2d.py;
+- compare_runs_2d.py: events of each run (onset, event slip, duration, recurrence), the FD phases,
+  and QD against FD in sequence (onset differences in years and percent of the QD recurrence,
+  slip differences), optionally a mean-slip figure (--plot).
+
 ### PD13 at 500 m with the exact kernels; the event tracker after a phase (2026-11-17)
 
 PD13 at 500 m (453 elements, 64 threads, FD_HPDWN_Q 2, window 1.5): 700 years in 10,998 s
