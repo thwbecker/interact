@@ -4,8 +4,10 @@ compares five entries (self, neighbours, farthest) at every fourth lag (shear an
 fd_project's convention) with the prototype, the tail beyond 40 first arrivals excluded (the
 prototype has none there), and the static tractions with
 Crouch and Starfield's half minus full plane (fs_static2d.py, needs TDD_LIB). PASS if both agree to
-1e-8 of the largest value.
-Usage: python3 test_fd_hpcdh.py file"""
+1e-8 of the largest value. The first file must be written with FD_HPCDH_EVERY=1 (every lag
+evaluated); a second file, written with the default anchors and cubic interpolation after the last
+arrival, must agree with it to 1e-5 of the largest value at every entry and lag.
+Usage: python3 test_fd_hpcdh.py file_every_lag [file_default]"""
 import sys
 import os
 import numpy as np
@@ -75,4 +77,13 @@ if os.path.exists(os.environ.get("TDD_LIB", "/tmp/tdd/libtdd.so")):
         ws = max(ws, np.abs(k - proj((d[0], -d[1], d[2]))).max()/ks)
     ok = ok and ws < 1e-8
     print(f"test_fd_hpcdh: static against Crouch and Starfield {ws:.1e}")
+if len(sys.argv) > 2:
+    A = {}
+    for l in open(sys.argv[2]):
+        w = l.split()
+        if w and w[0] == "S":
+            A.setdefault((int(w[1]), int(w[2])), []).append((float(w[4]), float(w[5])))
+    wa = max(np.abs(np.array(S[k]) - np.array(A[k])).max() for k in S)/scale
+    ok = ok and wa < 1e-5
+    print(f"test_fd_hpcdh: anchors and interpolation against every lag {wa:.1e}")
 print("test_fd_hpcdh: " + ("PASS" if ok else "FAIL"))

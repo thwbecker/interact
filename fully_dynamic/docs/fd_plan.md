@@ -3661,6 +3661,29 @@ interpolation. Estimated 1e4 to 1e5 flops per entry and lag, i.e. about 4e13 for
 (900 elements, about 800 lags per entry on average), minutes on 64 threads, against tens of
 hours for DWN at q = 2.
 
+### M11: anchors after the last arrival; one element size for straight splays (2026-11-20)
+
+fd_hpcdh.c: after the last arrival over the segment (all four rays, from the arrival grid) plus
+two lags the response is smooth, so only anchors are evaluated, their spacing 0.1 of the time
+since the last arrival (at most 32 lags), the lags between them by cubic Lagrange interpolation
+through four anchors (shifted inward at the ends: with three at the end of the window the error
+was 1.6e-5 of the largest value). FD_HPCDH_EVERY=1 evaluates every lag. Against every lag:
+2.8e-7 of the largest value (4 elements of 250 m, 40 lags), 1.4e-6 (30 elements of 200 m, 300
+lags), 3.2 times faster there (6.2 against 20.0 s); spacing 0.2 (at most 64) was 3.9 times faster
+but 1.6e-5 before the end fix. The four half-plane ruptures unchanged to the printed mm.
+test_fd_hpcdh.py compares a file written with FD_HPCDH_EVERY=1 with the prototype (1e-8) and the
+default file with it (1e-5).
+make_2d_subduction.py: straight faults (the splays) get elements of exactly h from their top, the
+remainder dropped at the bottom (the gap to the megathrust grows by less than h); curved ones
+keep nearly equal lengths. rsf_solve requires one element size for all straight runs not joined
+into polylines; two splays of 1005.8 and 992.4 m had stopped the setup. A section with two
+splays (280 elements of 1 km) now passes it.
+Idealized section at 1 km (megathrust to 60 km and one splay, 257 elements; one core): all tables
+458 s against 1134 s before the anchors, static gate unchanged (1.552e-8).
+Prototype tests (run_proto_tests.sh all): all pass except test_hd.py, which fails on the master
+too: case D's fault-1 end time is 5.28 s against Harris and Day's 5.6 s with a tolerance of 0.3 s
+(the C test fd_dynamic hd compares with stored prototype traces and passes). Not investigated.
+
 ### Layout of 2026-11-20 (tests and fully_dynamic reorganized)
 
 No change to the C solver. Entries above this one use the former flat layout; the mapping:

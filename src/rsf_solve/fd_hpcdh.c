@@ -456,19 +456,48 @@ static void cdh_static(const struct cdh_med *m, const struct cdh_geo *e, double 
   cdh_project(sg, rtx, rtz, kst, knt);
 }
 
-/* one entry: the lag series (shear, normal) with the late tail from the static rates */
+/* cubic Lagrange interpolation at lag l from the anchors ia[k0..k0+np-1] (np 2 to 4) */
+static double cdh_lagrange(const int *ia, const double *y, int k0, int np_, int l)
+{
+  double v, wgt;
+  int j, k;
+  v = 0.0;
+  for(j = 0; j < np_; j++){
+    wgt = 1.0;
+    for(k = 0; k < np_; k++)
+      if(k != j)
+        wgt *= (double)(l - ia[k0 + k])/(double)(ia[k0 + j] - ia[k0 + k]);
+    v += wgt*y[ia[k0 + j]];
+  }
+  return v;
+}
+
+/* one entry: the lag series (shear, normal) with the late tail from the static rates. Lags up to
+   the last arrival over the segment (all rays) plus two are evaluated directly; after it the
+   response is smooth and only anchors are evaluated, their spacing growing with the time since
+   the last arrival (CDH_SMOOTH of it, at most CDH_STRIDE lags; FD_HPCDH_EVERY=1 evaluates every
+   lag), the lags between them by cubic interpolation */
+#define CDH_SMOOTH 0.1
+#define CDH_STRIDE 32
 static void cdh_entry(const struct cdh_med *m, const struct cdh_geo *e, double rtx, double rtz, double dt, int nt,
-                      double kst, double knt, double *os, double *on)
+                      double kst, double knt, double *os, double *on, int every)
 {
   struct cdh_ws *w;
-  double t0, tc, t1, t, sg[3], s1, n1, s2, n2, bs, bn, cs_, cn;
-  int i, l;
+  double t0, tc, t1, tl, t, sg[3], s1, n1, s2, n2, bs, bn, cs_, cn;
+  int i, r, l, lm, na, k, k0, np_, st;
+  int *ia;
   w = (struct cdh_ws *)malloc(sizeof(struct cdh_ws));
+  ia = (int *)malloc(sizeof(int)*(size_t)(nt + 1));
   cdh_ws_init(m, e, w);
   t0 = 1e300;
-  for(i = 0; i <= CDH_NGRID; i++)
+  tl = 0.0;
+  for(i = 0; i <= CDH_NGRID; i++){
     if(w->t0g[0][i] < t0)
       t0 = w->t0g[0][i];
+    for(r = 0; r < 4; r++)
+      if(w->t0g[r][i] > tl)
+        tl = w->t0g[r][i];
+  }
   tc = CDH_TAIL*t0;
   t1 = 0.75*tc;
   bs = bn = cs_ = cn = 0.0;
@@ -488,19 +517,55 @@ static void cdh_entry(const struct cdh_med *m, const struct cdh_geo *e, double r
     for(i = 0; i < 4; i++)
       w->npc[i] = -1;                          /* no warm start from these times */
   }
+  /* the last lag evaluated by CdH (before the tail) */
+  lm = -1;
+  for(l = 0; l < nt; l++)
+    if((l*dt > t0) && (l*dt <= tc))
+      lm = l;
+  /* anchors: every lag up to the last arrival plus two, then growing steps */
+  na = 0;
+  st = 1;
+  for(l = 0; l <= lm; l++){
+    t = l*dt;
+    if(t <= t0)
+      continue;
+    if(every || (t <= tl + 2.0*dt) || (na < 4) || (l == lm) || (l >= ia[na - 1] + st)){
+      ia[na++] = l;
+      cdh_seg_total(m, e, w, t, sg);
+      cdh_project(sg, rtx, rtz, os + l, on + l);
+    }
+    st = (int)floor(CDH_SMOOTH*(t - tl)/dt);
+    if(st < 1)
+      st = 1;
+    if(st > CDH_STRIDE)
+      st = CDH_STRIDE;
+  }
+  /* the lags between anchors */
+  for(k = 0; k + 1 < na; k++){
+    if(ia[k + 1] - ia[k] < 2)
+      continue;
+    np_ = (na < 4) ? na : 4;                     /* four anchors, shifted inward at the ends */
+    k0 = k - 1;
+    if(k0 + np_ > na)
+      k0 = na - np_;
+    if(k0 < 0)
+      k0 = 0;
+    for(l = ia[k] + 1; l < ia[k + 1]; l++){
+      os[l] = cdh_lagrange(ia, os, k0, np_, l);
+      on[l] = cdh_lagrange(ia, on, k0, np_, l);
+    }
+  }
   for(l = 0; l < nt; l++){
     t = l*dt;
     if(t <= t0){
       os[l] = 0.0;
       on[l] = 0.0;
-    }else if(t <= tc){
-      cdh_seg_total(m, e, w, t, sg);
-      cdh_project(sg, rtx, rtz, os + l, on + l);
-    }else{
+    }else if(t > tc){
       os[l] = kst*t + cs_ - bs/t;
       on[l] = knt*t + cn - bn/t;
     }
   }
+  free(ia);
   free(w);
 }
 
@@ -512,7 +577,8 @@ int fd_hpcdh_batch(int ns, const double *sx, const double *sz, const double *stx
   struct cdh_med m;
   struct cdh_geo e;
   long p, np;
-  int i, j;
+  int i, j, every;
+  every = getenv("FD_HPCDH_EVERY") ? atoi(getenv("FD_HPCDH_EVERY")) : 0;
   m.alpha = alpha;
   m.beta = beta;
   m.rho = rho;
@@ -532,7 +598,7 @@ int fd_hpcdh_batch(int ns, const double *sx, const double *sz, const double *stx
     e.a = sa[j];
     cdh_static(&m, &e, rtx[i], rtz[i], ks + (size_t)i*ns + j, kn + (size_t)i*ns + j);
     cdh_entry(&m, &e, rtx[i], rtz[i], dt, nt, ks[(size_t)i*ns + j], kn[(size_t)i*ns + j],
-              os + (size_t)p*nt, on + (size_t)p*nt);
+              os + (size_t)p*nt, on + (size_t)p*nt, every);
   }
   return 0;
 }

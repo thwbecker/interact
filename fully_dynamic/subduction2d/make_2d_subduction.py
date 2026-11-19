@@ -46,13 +46,19 @@ def megathrust_line(a):
     return np.array(pts)
 
 
-def resample(pts, h):
-    """elements of nearly equal length about h along a polyline (x, z): centres, unit tangents
-    (x, y up), half-lengths"""
+def resample(pts, h, exact=False):
+    """elements along a polyline (x, z): of nearly equal length about h (curved lines), or with
+    exact=True of length h from the first point on, the remainder (less than h) dropped at the end
+    (straight lines: rsf_solve's dynamic phases need one common element size for all straight
+    faults); returns centres, unit tangents (x, y up), half-lengths"""
     seg = np.diff(pts, axis=0)
     s = np.concatenate([[0.0], np.cumsum(np.hypot(seg[:, 0], seg[:, 1]))])
-    n = max(1, int(round(s[-1]/h)))
-    sb = np.linspace(0.0, s[-1], n + 1)
+    if exact:
+        n = max(1, int(np.floor(s[-1]/h + 1e-9)))
+        sb = np.arange(n + 1)*h
+    else:
+        n = max(1, int(round(s[-1]/h)))
+        sb = np.linspace(0.0, s[-1], n + 1)
     xb = np.interp(sb, s, pts[:, 0])
     zb = np.interp(sb, s, pts[:, 1])
     cx = 0.5*(xb[1:] + xb[:-1])
@@ -63,6 +69,16 @@ def resample(pts, h):
     tx = dx/ln
     ty = -dz/ln                                  # y up
     return cx, -cz, tx, ty, 0.5*ln
+
+
+def is_straight(pts):
+    """all points of the polyline on the line through its ends (within 1e-9 of its length)"""
+    d = pts[-1] - pts[0]
+    L = np.hypot(d[0], d[1])
+    if L == 0.0:
+        return True
+    off = np.abs((pts[:, 0] - pts[0, 0])*d[1] - (pts[:, 1] - pts[0, 1])*d[0])/L
+    return bool(off.max() <= 1e-9*L)
 
 
 def ab_profile(z, a):
@@ -140,7 +156,7 @@ def main():
     vpl = []
     names = []
     for gi, (name, pts) in enumerate(groups):
-        cx, cy, tx, ty, hl = resample(pts, a.h)
+        cx, cy, tx, ty, hl = resample(pts, a.h, exact=is_straight(pts))
         z = -cy
         strike = (90.0 - np.degrees(np.arctan2(ty, tx))) % 360.0
         if gi == 0 or a.splay_vw:

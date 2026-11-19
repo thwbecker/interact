@@ -126,7 +126,7 @@ if want unit; then
     # batch reflected tables: DWN (M10) and Cagniard-de Hoop (M11) against the prototypes and
     # Crouch and Starfield
     check "half plane DWN batch tables" "../bin/test_fd_hpdwn_batch 4 250 500 40 > hpb.txt && python3 ../$d/py/test_fd_hpdwn_batch.py hpb.txt"
-    check "half plane Cagniard-de Hoop batch tables" "../bin/test_fd_hpdwn_batch 4 250 500 40 cdh > hpc.txt && python3 ../$d/py/test_fd_hpcdh.py hpc.txt"
+    check "half plane Cagniard-de Hoop batch tables" "FD_HPCDH_EVERY=1 ../bin/test_fd_hpdwn_batch 4 250 500 40 cdh > hpc.txt && ../bin/test_fd_hpdwn_batch 4 250 500 40 cdh > hpc_a.txt && python3 ../$d/py/test_fd_hpcdh.py hpc.txt hpc_a.txt"
   else
     skip "half plane batch tables (DWN, Cagniard-de Hoop)" "no TDD_LIB"
   fi
