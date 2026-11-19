@@ -11,6 +11,8 @@
 
 extern void dgbsv_(int *n, int *kl, int *ku, int *nrhs, double *ab, int *ldab, int *ipiv, double *b, int *ldb, int *info);
 
+/* the half bandwidth of the dense N x N matrix A (row major): the largest |i - j| with
+   |A_ij| > thr. O(N^2), once per operator assembly */
 int fd_band_width(int N, const double *A, double thr)
 {
   int i, j, bw = 0;
@@ -21,6 +23,8 @@ int fd_band_width(int N, const double *A, double thr)
   return bw;
 }
 
+/* copy the band |i - j| <= bw of the dense A (row major) into LAPACK band storage ab
+   (ldab = 3 bw + 1, zeroed first; the rows 0 .. bw - 1 stay free for dgbsv's fill-in) */
 void fd_band_from_dense(int N, int bw, const double *A, double *ab)
 {
   int i, j, ldab = 3 * bw + 1;
@@ -30,6 +34,8 @@ void fd_band_from_dense(int N, int bw, const double *A, double *ab)
       ab[(2 * bw + i - j) + (size_t)j * ldab] = A[(size_t)i * N + j];
 }
 
+/* solve A x = rhs for the band matrix ab by LAPACK dgbsv (partial pivoting) on a copy, so ab
+   is kept for the next right-hand side; returns dgbsv's info (0: success) */
 int fd_band_solve(int N, int bw, const double *ab, const double *rhs, double *x)
 {
   int ldab = 3 * bw + 1, kl = bw, ku = bw, nrhs = 1, info, n = N, ldb = N;
@@ -43,6 +49,7 @@ int fd_band_solve(int N, int bw, const double *ab, const double *rhs, double *x)
   return info;
 }
 
+/* y = A x for the band matrix ab (the rows bw .. 3 bw of the storage) */
 void fd_band_mult(int N, int bw, const double *ab, const double *x, double *y)
 {
   int i, j, ldab = 3 * bw + 1;

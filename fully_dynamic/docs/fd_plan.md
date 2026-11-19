@@ -3661,6 +3661,30 @@ interpolation. Estimated 1e4 to 1e5 flops per entry and lag, i.e. about 4e13 for
 (900 elements, about 800 lags per entry on average), minutes on 64 threads, against tens of
 hours for DWN at q = 2.
 
+### Audit of 2026-11-20: benchmarks, documentation, efficiency (in progress)
+
+Asked by Thor: match all benchmark comparisons with the fastest settings that keep them within
+reasonable tolerances; document all code; reassess efficiency and accuracy.
+- test_hd.py now checks the current prototype (fault-1 end 5.283 s, trigger 5.788 s at 15.45 km,
+  fault 2 ruptures 19 km; no trigger at 1 km), Harris and Day's values in its docstring. The C
+  reference ref_hd_D_W500_dx100.txt regenerated with dump_hd.py is identical to the stored one,
+  so the C tests compare with the current prototype.
+- fully_dynamic/benchmarks/README.md lists the benchmarks, references, drivers, recorded results
+  and tolerances; TPV205-2D and BP1 need the untracked series (proto/ref), TPV14/15 the SCEC
+  station files.
+- Complex arithmetic: gcc checks every complex product for NaN (C99 Annex G) and calls __muldc3
+  on that path, which keeps the batched FFT and the convolution loops of fd_march.c from
+  vectorising. The makefile now adds -fcx-limited-range to fd_fft, fd_march, fd3d, fd_hpdwn,
+  fd_hpcdh and rsf_fd if the compiler accepts it: the cycle test's dynamic phases 6.6 and 7.5 s
+  -> 5.7 and 6.6 s, slip files bit-identical (a product's formula is unchanged); the DWN batch
+  static moves from 1.1e-5 to 1.2e-5 against Crouch and Starfield (its divisions now use the
+  plain formula). unit,ruptures: 54 PASS in 435 s (629 s before).
+- Documentation census (routines without a comment above their definition): fd3d.c 80 of 167,
+  fd_march.c 15 of 34, fd_tables.c 18 of 31, rsf_fd.c 15 of 38, fd_kernels.c 9 of 12,
+  fd_series_coeffs.c 9 of 9 (generated), fd_fft.c 10 of 10, fd_segments.c 5 of 7, fd_band.c 4
+  of 4 (now commented), fd_hpdwn.c 4 of 13, fd_hpcdh.c 5 of 21; 174 of 346 in all (some are
+  documented in their headers). To do file by file, with the efficiency and accuracy review.
+
 ### M11: anchors after the last arrival; one element size for straight splays (2026-11-20)
 
 fd_hpcdh.c: after the last arrival over the segment (all four rays, from the arrival grid) plus

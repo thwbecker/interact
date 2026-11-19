@@ -1058,6 +1058,12 @@ $(ODIR)/fd_tables.o: CFLAGS += $(OPENMP_FLAGS)
 $(ODIR)/rsf_fd.o: CFLAGS += $(OPENMP_FLAGS)
 $(ODIR)/fd_hpdwn.o: CFLAGS += $(OPENMP_FLAGS)
 $(ODIR)/fd_hpcdh.o: CFLAGS += $(OPENMP_FLAGS)
+# complex products without C99 Annex G's inf/nan recovery in the fully dynamic code: the
+# compiler otherwise checks every product for NaN and calls __muldc3, which keeps the FFT and
+# convolution loops from vectorising (13 percent of a dynamic phase; results bit-identical, since
+# the formula of a product is the same). Added only if the compiler accepts the flag.
+FD_CX_FLAGS := $(shell $(CC) -fcx-limited-range -x c -c /dev/null -o /dev/null > /dev/null 2>&1 && echo -fcx-limited-range)
+$(ODIR)/fd_fft.o $(ODIR)/fd_march.o $(ODIR)/fd3d.o $(ODIR)/fd_hpdwn.o $(ODIR)/fd_hpcdh.o $(ODIR)/rsf_fd.o: CFLAGS += $(FD_CX_FLAGS)
 
 $(ODIR)/%.o:	%.c $(GEN_P_INC)
 	$(CC) $(CFLAGS)  $(OPTIM_FLAGS)  $(MY_PRECISION) -c $< -o $(ODIR)/$*.o
