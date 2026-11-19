@@ -144,11 +144,14 @@ static void cdh_ray(const struct cdh_med *m, double complex q, int c1, int c2, d
   sg[2] = lam*(I*k*ux) + (lam + 2.0*mu)*(-nu*uz);
 }
 
+/* the travel-time function tau(q) = q X + eta1 h1 + eta2 h2 of a ray (source depth h1 at speed
+   c1, receiver depth h2 at speed c2, horizontal offset X); the Cagniard path is tau(q) = t */
 static double complex cdh_tau(double complex q, double X, double h1, double c1, double h2, double c2)
 {
   return q*X + cdh_eta(q, c1)*h1 + cdh_eta(q, c2)*h2;
 }
 
+/* d tau / d q (zero at the Snell-law saddle) */
 static double complex cdh_dtau(double complex q, double X, double h1, double c1, double h2, double c2)
 {
   return X - cdh_div(q*h1, cdh_eta(q, c1)) - cdh_div(q*h2, cdh_eta(q, c2));
@@ -415,6 +418,7 @@ static void cdh_seg_ray(const struct cdh_med *m, const struct cdh_geo *e, struct
   w->tp[r] = t;
 }
 
+/* the reflected stresses (sxx, sxz, szz) of the segment at time t: the sum of the four rays */
 static void cdh_seg_total(const struct cdh_med *m, const struct cdh_geo *e, struct cdh_ws *w, double t, double out[3])
 {
   double r[3];
@@ -589,6 +593,9 @@ static void cdh_entry(const struct cdh_med *m, const struct cdh_geo *e, double r
   free(w);
 }
 
+/* the batch (fd_hpcdh.h): per receiver-source entry the exact static (Crouch and Starfield) and the
+   lag series (cdh_entry); entries are independent, so OpenMP over them (dynamic schedule, since
+   their cost varies with the window), and the result does not depend on threads or MPI ranks */
 int fd_hpcdh_batch(int ns, const double *sx, const double *sz, const double *stx, const double *stz, const double *sa,
                    int nr, const double *rx, const double *rz, const double *rtx, const double *rtz,
                    int npr, const double *prx, const double *prz,

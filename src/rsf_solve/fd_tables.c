@@ -24,6 +24,8 @@ static void ct_compress_pair(struct fd_pair *p, const double *xr, const double *
 static void ct_free(struct fd_ctab *c);
 static void ct_append(struct fd_ctab *c, const struct fd_ctab *t, size_t e0);
 
+/* two straight segments of equal element size and the same orientation: their pair is a Toeplitz
+   table (a function of the element offset only) */
 int fd_segments_parallel(const struct fd_segment *a, const struct fd_segment *b)
 {
   double tol = 1e-12;
@@ -43,6 +45,10 @@ static void offset_point(const struct fd_segment *src, const struct fd_segment *
   *yr = (Xg[0] - src->X0[0]) * ns[0] + (Xg[1] - src->X0[1]) * ns[1];
 }
 
+/* the Toeplitz pair of two parallel straight segments (fd_tables.h): per element offset m the static
+   value and the lag increments W_l = K_l - K dt, by the closed form up to the switch lag and the
+   large-time series beyond, the window ending where the increments stay below tol of the static
+   envelope; spectra along the offsets for the history products of fd_march.c */
 struct fd_pair *fd_pair_build(const struct fd_segment *src, const struct fd_segment *rcv, int mode,
     double dt, double et, double alpha, double beta, double rho,
     double tol, int lmax, int cap_ok, int M, char *errmsg)
@@ -376,6 +382,9 @@ static void hp_add(const double *os, const double *on, const double *ks, const d
   }
 }
 
+/* the dense pair of two segments of any geometry (fd_tables.h), built entry by entry (poly_entry:
+   rotated closed-form kernels), with the half-plane reflected part added (hp_reflected) and the lag
+   increments compressed (ct_compress_pair); only the rows r0 .. r1 of this MPI rank are filled */
 struct fd_pair *fd_pair_build_poly(const struct fd_segment *src, const struct fd_segment *rcv, int mode,
     double dt, double et, double alpha, double beta, double rho, double tol, int lmax, int M, char *errmsg)
 {
@@ -684,6 +693,7 @@ struct fd_pair *fd_pair_build_dense(const struct fd_segment *src, const struct f
   return p;
 }
 
+/* free a pair and its tables (Toeplitz, dense and compressed) */
 void fd_pair_free(struct fd_pair *p)
 {
   if(!p)
@@ -708,11 +718,13 @@ void fd_pair_free(struct fd_pair *p)
   free(p);
 }
 
+/* the Toeplitz offset of receiver i and source j */
 static int row_index(const struct fd_pair *p, int i, int j)
 {
   return (i - j) + (p->src->n - 1);
 }
 
+/* the static operator of a pair as a dense nr x ns matrix (shear, and normal if Kn) */
 void fd_pair_static_dense(const struct fd_pair *p, double *Ks, double *Kn)
 {
   int i, j, ns = p->src->n, nr = p->rcv->n;
@@ -730,6 +742,8 @@ void fd_pair_static_dense(const struct fd_pair *p, double *Ks, double *Kn)
     }
 }
 
+/* the lag-l1 increments W_l1 of a pair as dense nr x ns matrices (used for the first-lag and
+   NL operators of fd_march.c) */
 void fd_pair_W_dense(const struct fd_pair *p, int l1, double *Ws, double *Wn)
 {
   int i, j, k, ns = p->src->n, nr = p->rcv->n, m, idx;
@@ -791,6 +805,7 @@ void fd_tables_set_halfplane(int on)
   g_hp = on;
 }
 
+/* the receiver rows this MPI rank builds in the next dense pair (M8; r1 < 0: all) */
 void fd_tables_set_rows(int r0, int r1)
 {
   g_r0 = r0;
@@ -801,6 +816,7 @@ static double g_ctol = 1e-7;                    /* default: 1e-5 of the default 
 
 static int g_cexp = 1;                          /* lags 1..g_cexp stay explicit (FD_CT_EXPLICIT) */
 
+/* compression tolerance of the dense lag tables (relative to the static envelope; 0: none) */
 void fd_tables_set_compress(double ctol)
 {
   g_ctol = ctol;
@@ -808,11 +824,13 @@ void fd_tables_set_compress(double ctol)
     g_cexp = atoi(getenv("FD_CT_EXPLICIT"));
 }
 
+/* lags 1..nexp of every entry stay explicit (FD_CT_EXPLICIT overrides) */
 void fd_tables_set_compress_explicit(int nexp)
 {
   g_cexp = getenv("FD_CT_EXPLICIT") ? atoi(getenv("FD_CT_EXPLICIT")) : nexp;
 }
 
+/* the current compression tolerance */
 double fd_tables_get_compress(void)
 {
   return g_ctol;
@@ -885,6 +903,7 @@ static int ct_fit(const double *w, int a, int b, double tol, double *cf)
 }
 
 #define FD_CT_MINRUN 6
+/* an empty compressed table of ne entries (explicit values W and quadratic runs grow by doubling) */
 static void ct_init(struct fd_ctab *c, size_t ne)
 {
   memset(c, 0, sizeof(*c));
@@ -898,6 +917,7 @@ static void ct_init(struct fd_ctab *c, size_t ne)
   c->nruncap = 2*ne + 16;
   c->run = (struct fd_crun *)malloc(sizeof(struct fd_crun)*c->nruncap);
 }
+/* free a compressed table */
 static void ct_free(struct fd_ctab *c)
 {
   free(c->hi);
@@ -908,6 +928,7 @@ static void ct_free(struct fd_ctab *c)
   free(c->run);
   memset(c, 0, sizeof(*c));
 }
+/* append one explicit lag value */
 static void ct_push_w(struct fd_ctab *c, double v)
 {
   if(c->nw >= c->nwcap){
@@ -917,6 +938,7 @@ static void ct_push_w(struct fd_ctab *c, double v)
   c->W[c->nw] = v;
   c->nw++;
 }
+/* append one quadratic run over the lags a..b with coefficients cf (1, y, y^2) */
 static void ct_push_run(struct fd_ctab *c, int a, int b, const double *cf)
 {
   if(c->nrun >= c->nruncap){
@@ -1000,6 +1022,7 @@ static void ct_entry(struct fd_ctab *c, size_t e, const double *w, int L, double
   c->nm[e] = (unsigned short)n;
 }
 
+/* the increment of entry e at lag l (fd_tables.h): explicit value or the run's quadratic */
 double fd_ctab_value(const struct fd_ctab *c, size_t e, int l)
 {
   int k, pos, u;
@@ -1054,6 +1077,7 @@ static void ct_compress_pair(struct fd_pair *p, const double *xr, const double *
   p->compressed = 1;
 }
 
+/* bytes of a dense pair's lag data, and in win those of the uncompressed windows (setup report) */
 double fd_pair_dense_bytes(const struct fd_pair *p, double *win)
 {
   double b;
@@ -1073,6 +1097,9 @@ double fd_pair_dense_bytes(const struct fd_pair *p, double *win)
   return b;
 }
 
+/* prefix moments of a source's slip-rate history (fd_tables.h): a quadratic run of a compressed
+   entry contributes c0 S0 + c1 S1 + c2 S2 over its lags, the S_k being differences of these
+   prefix sums, so a run costs three products however long it is */
 void fd_ctab_prefix(const double *ring, int Lbuf, long pos0, int lag0, int lav, int L, int n, double *P, const double **vl)
 {
   int l, k, j;
@@ -1145,6 +1172,8 @@ static double ctab_row(const struct fd_ctab *c, int i, int ns, const double *P0,
   return a;
 }
 
+/* the history product of a compressed dense pair (fd_tables.h): explicit lags directly, runs
+   through the prefix moments of fd_ctab_prefix */
 void fd_ctab_hist(const struct fd_ctab *c, int nr, int ns, const double *P, const double *const *vl, int lag0, int lav, int L, double *out)
 {
   int i;

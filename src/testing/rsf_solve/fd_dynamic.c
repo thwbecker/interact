@@ -266,6 +266,7 @@ static int run_hd(int argc, char **argv)
   int q;
   double d;
   double m2;
+  double t_end1, t_trig2, x_trig2, len2;
   if(argc < 3){
     fprintf(stderr, "usage: fd_dynamic hd W_m [dx] [tend] [ref_file]\n");
     return 2;
@@ -349,8 +350,22 @@ static int run_hd(int argc, char **argv)
       return 1;
   }   /* header */
   fprintf(stderr, "fd_dynamic hd: W %g m, dx %g, N %d, steps %d, window %d\n", W, dx, N, nsteps, s->L);
+  t_end1 = -1.0;
+  t_trig2 = -1.0;
+  x_trig2 = 0.0;
   for(k = 0; k < nsteps; k++){
     fd_step_slipweak(s, st, &fr, 1);
+    /* as the prototype's run_hd.py: fault 1's end reached (last element slipped 1 cm), fault 2
+       triggered (first slip rate above 1 mm/s) and where */
+    if((t_end1 < 0.0) && (st->delta[n - 1] > 1e-2))
+      t_end1 = st->t;
+    if(t_trig2 < 0.0)
+      for(i = n; i < N; i++)
+        if(st->V[i] > 1e-3){
+          t_trig2 = st->t;
+          x_trig2 = L/2.0 - ov + (i - n + 0.5)*dx;
+          break;
+        }
     c[0] = st->t;
     for(j = 0; j < 4; j++){
       c[1 + j] = st->delta[pts[j]];
@@ -384,6 +399,12 @@ static int run_hd(int argc, char **argv)
       if(st->delta[i] > m2)
         m2 = st->delta[i];
     fprintf(stderr, "fd_dynamic hd: final max slip on segment 2 %.6f m\n", m2);
+    len2 = 0.0;
+    for(i = n; i < N; i++)
+      if(st->delta[i] > 1e-2)
+        len2 += dx/1e3;
+    printf("fd_dynamic hd W %g dx %g: fault 1 end at %.4f s, fault 2 triggered at %.4f s at x %.2f km (%.4f s later), fault 2 ruptured %.2f km\n",
+           W, dx, t_end1, t_trig2, x_trig2/1e3, (t_trig2 >= 0.0 && t_end1 >= 0.0) ? t_trig2 - t_end1 : -1.0, len2);
   }
   if(fr_){
     fclose(fr_);

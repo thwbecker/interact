@@ -170,6 +170,7 @@ struct fd_sys *fd_sys_create(struct fd_seglist *segs, struct fd_pair **pairs, in
   return s;
 }
 
+/* free the system: operators, pair references, histories and the convolution buffers */
 void fd_sys_free(struct fd_sys *s)
 {
   int k;
@@ -249,6 +250,8 @@ void fd_sys_free(struct fd_sys *s)
   free(s);
 }
 
+/* zero the slip-rate history of all sources (ring buffers, the spectral windows of the partitioned
+   convolution and the coarse-history marker): the start of a dynamic phase */
 void fd_sys_reset_history(struct fd_sys *s)
 {
   int k;
@@ -272,6 +275,7 @@ void fd_sys_reset_history(struct fd_sys *s)
   }
 }
 
+/* append the slip rates V of one fine substep to the history */
 void fd_sys_push(struct fd_sys *s, const double *V)
 {
   fd_sys_push_k(s, V, 1);
@@ -322,6 +326,8 @@ void fd_sys_push_k(struct fd_sys *s, const double *V, int kk)
   }
 }
 
+/* append kk substep slices with the slip rate linear in time from Vold to V (second-order
+   marching, fd_march.h); the coarse history is suspended for such a step */
 void fd_sys_push_lin(struct fd_sys *s, const double *Vold, const double *V, int kk)
 {
   int k, i, r, n, q;
@@ -372,6 +378,8 @@ void fd_sys_push_lin(struct fd_sys *s, const double *Vold, const double *V, int 
   }
 }
 
+/* coarse history (fd_march.h): sum the tables over groups of K lags so that runs of aligned steps
+   of K substeps convolve on the coarse grid */
 int fd_sys_set_coarse(struct fd_sys *s, int K)
 {
   int np = s->nsrc * s->nseg, k, j, l, m, comp;
@@ -418,6 +426,7 @@ int fd_sys_set_coarse(struct fd_sys *s, int K)
   return 0;
 }
 
+/* the memory of the history and the tables, in bytes (reported at setup) */
 double fd_sys_bytes(const struct fd_sys *s)
 {
   double b = 16.0 * s->nsrc * (double)s->Lbuf * s->M;
@@ -441,6 +450,7 @@ double fd_sys_bytes(const struct fd_sys *s)
   return b;
 }
 
+/* switch to the partitioned convolution (fd_march.h, M6): fd_sys_set_conv with mode 1 */
 int fd_sys_set_partitioned(struct fd_sys *s, int B, int kmax)
 {
   return fd_sys_set_conv(s, 1, B, kmax);
@@ -808,6 +818,8 @@ void fd_sys_history(struct fd_sys *s, int lag0, double *ts, double *tn)
   }
 }
 
+/* the static tractions ts, tn of the slip delta (the pairs' static operators): the part of the
+   stress that the history tables, which hold W = K_l - K dt, leave out */
 void fd_sys_static(struct fd_sys *s, const double *delta, double *ts, double *tn)
 {
   int i, j;
@@ -1156,6 +1168,7 @@ static void sigma_apply_floor(struct fd_state *st)
     st->nfloor_max = n;
 }
 
+/* the marcher state of N elements, all fields zero */
 struct fd_state *fd_state_create(int N)
 {
   struct fd_state *st = (struct fd_state *)calloc(1, sizeof(*st));
@@ -1177,6 +1190,7 @@ struct fd_state *fd_state_create(int N)
   st->work = calloc(N, sizeof(double));
   return st;
 }
+/* free a marcher state */
 void fd_state_free(struct fd_state *st)
 {
   if(!st)
@@ -1200,6 +1214,8 @@ void fd_state_free(struct fd_state *st)
 
 
 
+/* one second-order step of k substeps with slip weakening: the slip rate linear over the step
+   (operators B_k, C_k of fd_sys_ops_nl), history pushed by fd_sys_push_lin */
 static int fd_step_slipweak_nl(struct fd_sys *s, struct fd_state *st, struct fd_slipweak *f, int k)
 {
   int i, N = s->N;
@@ -1239,6 +1255,9 @@ static int fd_step_slipweak_nl(struct fd_sys *s, struct fd_state *st, struct fd_
   return 0;
 }
 
+/* one step of k substeps with slip weakening (fd_march.h): static, loading and the history beyond
+   the step form H, the first-lag operator K_k couples the unknown rates, fd_slipweak_solve finds
+   them; first order (rate constant over the step) unless st->nl */
 int fd_step_slipweak(struct fd_sys *s, struct fd_state *st, struct fd_slipweak *f, int k)
 {
   int i, N = s->N;
@@ -1275,6 +1294,7 @@ double fd_rsf_tau(const struct fd_rsf *f, int i, double V, double psi, double si
 {
   return f->a[i] * sigma * asinh(V / (2.0 * f->v0) * exp(psi / f->a[i]));
 }
+/* d tau / d V of the regularized friction law (even in V) */
 double fd_rsf_dtau(const struct fd_rsf *f, int i, double V, double psi, double sigma)
 {
   double e = exp(psi / f->a[i]), z = V / (2.0 * f->v0) * e;
@@ -1418,6 +1438,8 @@ static int rsf_newton(const struct fd_rsf *f, struct fd_sys *s, struct fd_ops *o
   return 0;
 }
 
+/* the coupled solve of one step (fd_march.h): signs, Newton (rsf_newton) with sign check and
+   restarts of flipped elements, else the elementwise fixed point */
 int fd_rsf_solve(const struct fd_rsf *f, struct fd_sys *s, struct fd_ops *op, const double *H, const double *sigma,
     const double *psi, const double *Vg, double *V)
 {
@@ -1505,6 +1527,7 @@ int fd_rsf_solve(const struct fd_rsf *f, struct fd_sys *s, struct fd_ops *op, co
 
 /* one step of k dt_min: predictor-corrector in psi (exact aging update at the
    mean slip rate), coupled solve for V twice (stepper.RateState.solve) */
+/* one second-order step of k substeps with rate and state (as fd_step_slipweak_nl) */
 static int fd_step_rsf_nl(struct fd_sys *s, struct fd_state *st, const struct fd_rsf *f, int k)
 {
   int i, N = s->N;
@@ -1582,17 +1605,21 @@ static int fd_step_rsf_nl(struct fd_sys *s, struct fd_state *st, const struct fd
   return 0;
 }
 
+/* one step of k substeps with rate and state (fd_march.h): H as for slip weakening, the coupled
+   solve fd_rsf_solve (signed rates), the aging-law state advanced exactly over the step
+   (fd_rsf_psi_advance with the rates at both ends); first order unless st->nl */
 int fd_step_rsf(struct fd_sys *s, struct fd_state *st, const struct fd_rsf *f, int k)
 {
   int i, N = s->N;
   double dt = s->dt * k, t1 = st->t + dt, *psi_s = st->work, *Vs, *sig;
+  double tp0, tp1;
   struct fd_ops *op;
   if(st->nl)
     return fd_step_rsf_nl(s, st, f, k);
   op = fd_sys_ops(s, k);
   if(!op)
     return -1;
-  double tp0 = fd_now(), tp1;
+  tp0 = fd_now();
   Vs = (double *)calloc((size_t)N, sizeof(double));
   sig = (double *)calloc((size_t)N, sizeof(double));
   for(i = 0; i < N; i++)

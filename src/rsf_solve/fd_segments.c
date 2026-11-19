@@ -9,12 +9,16 @@ struct item {
   int g;
   double along, across;
 };
+/* qsort order of the elements of a candidate run: by position along the run's tangent */
 static int cmp_along(const void *a, const void *b)
 {
   double d = ((const struct item *)a)->along - ((const struct item *)b)->along;
   return d < 0 ? -1 : (d > 0 ? 1 : 0);
 }
 
+/* runs of equal, collinear, contiguous elements (fd_segments.h): each unplaced element seeds a run
+   of all elements with its tangent and half-length on its line, sorted along it and split where
+   the spacing is not 2 hl. O(n^2) in the number of elements, once per setup */
 struct fd_seglist *fd_detect_segments(int n, const double *cx, const double *cy, const double *tx, const double *ty,
     const double *hl, double rtol, char *errmsg)
 {
@@ -88,6 +92,7 @@ struct fd_seglist *fd_detect_segments(int n, const double *cx, const double *cy,
   return S;
 }
 
+/* free a segment list and its index arrays */
 void fd_seglist_free(struct fd_seglist *s)
 {
   int k;
@@ -104,6 +109,7 @@ void fd_seglist_free(struct fd_seglist *s)
   free(s);
 }
 
+/* centre X, unit tangent t and half-length a of element i of segment g (straight run or polyline) */
 void fd_seg_element(const struct fd_segment *g, int i, double X[2], double t[2], double *a)
 {
   if(g->pc){
@@ -149,6 +155,10 @@ static void poly_append(const struct fd_segment *g, const int *gi, int rev, doub
   }
 }
 
+/* join fault runs end to start into polylines (fd_segments.h): chains are grown forwards and
+   backwards from each unused run by matching end points within tol element lengths; a chain
+   becomes one polyline segment if it contains a run shorter than minrun elements (a curved fault
+   resolved into short straight pieces), else its runs stay separate Toeplitz segments */
 int fd_seglist_merge_polylines(struct fd_seglist *S, double tol, int minrun)
 {
   int n0, k, j, e, f, cur, nchain, len, m, *used, *order, *revs, done, found, best, bestrev, shortrun;

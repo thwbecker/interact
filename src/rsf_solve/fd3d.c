@@ -6,6 +6,7 @@
 #include "fd3d.h"
 
 /* ---------------- Tada (2006) Appendix A ---------------- */
+/* Heaviside step (0 at 0) and sign, as in fd_kernels.c */
 static double H(double x)
 {
   return x > 0.0 ? 1.0 : 0.0;
@@ -14,11 +15,13 @@ static double sgn(double x)
 {
   return x > 0.0 ? 1.0 : (x < 0.0 ? -1.0 : 0.0);
 }
+/* square root of the positive part (the kernels' sqrt(t^2 - r^2/c^2) before the arrival) */
 static double sq(double a)
 {
   return a > 0.0 ? sqrt(a) : 0.0;
 }
 
+/* the auxiliary functions g1 .. g4 of Tada (2006), Appendix A, for wave speed c (cL or cT) */
 static double g1(double x1, double x2, double x3, double t, double c)
 {
   double chi1 = sqrt(x1*x1 + x3*x3), R = sqrt(x1*x1 + x2*x2 + x3*x3), s = sq(t*t - chi1*chi1/(c*c));
@@ -42,6 +45,8 @@ static double g4(double R, double t, double c)
   return (t*t*t - R*R/(c*c)*t)*H(t - R/c);
 }
 
+/* L_31/1 of Tada (2006): the 31 stress of a quadrant of unit slip rate along x1 (the strike-slip
+   traction on the fault plane), the building block of the square-element ramp response */
 double fd3d_L31(double x1, double x2, double x3, double t, double cL, double cT)
 {
   double p = cT/cL, chi1 = sqrt(x1*x1 + x3*x3), chi2 = sqrt(x2*x2 + x3*x3), R = sqrt(x1*x1 + x2*x2 + x3*x3);
@@ -59,6 +64,7 @@ static double g5(double R, double t, double c)
 {
   return (t - R/c)*H(t - R/c);
 }
+/* all six components L_ij/1 (slip along x1) of the quadrant response, s = (11, 22, 33, 12, 31, 32) */
 static void L1_all(double x1, double x2, double x3, double t, double cL, double cT, double s[6])
 {
   double p = cT/cL, chi1 = sqrt(x1*x1 + x3*x3), chi2 = sqrt(x2*x2 + x3*x3), R = sqrt(x1*x1 + x2*x2 + x3*x3);
@@ -72,6 +78,7 @@ static void L1_all(double x1, double x2, double x3, double t, double cL, double 
   s[5] = c3/(pi*R5)*(x3*x3 - R*R/3.0)*dg4 + cT/(pi*R)*(2.0*p*p/3.0*g5(R, t, cL) - g5(R, t, cT)/6.0);
   s[2] = 2.0*c3*x3*(3.0*x1*x1 - x3*x3)/(3.0*pi*chi1_2*chi1_2*chi1_2)*dg1 - c3*x2*x3*x3*x3/(pi*R5*chi1_2)*dg4 - cT*x3/(pi*chi1_2)*((1.0 - 2.0*p*p + 2.0*p*p*x3*x3/chi1_2)*g2L + (1.0 - 2.0*x3*x3/chi1_2)*g2T);
 }
+/* L_11/3: the 11 stress of a quadrant of unit opening rate (used for L_11/3 and L_22/3) */
 static double L11_3(double x1, double x2, double x3, double t, double cL, double cT)
 {
   double p = cT/cL, chi1 = sqrt(x1*x1 + x3*x3), chi2 = sqrt(x2*x2 + x3*x3), R = sqrt(x1*x1 + x2*x2 + x3*x3);
@@ -79,6 +86,7 @@ static double L11_3(double x1, double x2, double x3, double t, double cL, double
   double dg1 = g1(x1, x2, x3, t, cL) - g1(x1, x2, x3, t, cT), dg4 = g4(R, t, cL) - g4(R, t, cT);
   return (1.0 - 2.0*p*p)/p*H(x1)*H(x2)*H(t - fabs(x3)/cL) - (1.0 - 2.0*p*p)/(2.0*pi*p)*(g3(x1, x2, x3, t, cL) + g3(x2, x1, x3, t, cL)) - 2.0*c3*x1*(3.0*x3*x3 - x1*x1)/(3.0*pi*chi1_2*chi1_2*chi1_2)*dg1 - c3*x1*x2*x3*x3/(pi*R5*chi1_2)*dg4 - 2.0*cT*x1*x3*x3/(pi*chi1_2*chi1_2)*(p*p*g2(x1, x2, x3, t, cL) - g2(x1, x2, x3, t, cT)) + (1.0 - 2.0*p*p)*cT*x2/(pi*chi2*chi2)*g2(x2, x1, x3, t, cL);
 }
+/* all six components L_ij/3 (opening) of the quadrant response, by L11_3 and symmetry with L1_all */
 static void L3_all(double x1, double x2, double x3, double t, double cL, double cT, double s[6])
 {
   double p = cT/cL, chi1 = sqrt(x1*x1 + x3*x3), chi2 = sqrt(x2*x2 + x3*x3), R = sqrt(x1*x1 + x2*x2 + x3*x3);
@@ -92,6 +100,8 @@ static void L3_all(double x1, double x2, double x3, double t, double cL, double 
   s[5] = b[2];          /* L_32/3 by symmetry */
   s[2] = 1.0/p*H(x1)*H(x2)*H(t - fabs(x3)/cL) - 1.0/(2.0*pi*p)*(g3(x1, x2, x3, t, cL) + g3(x2, x1, x3, t, cL)) + 2.0*c3*x1*(3.0*x3*x3 - x1*x1)/(3.0*pi*pow(chi1, 6))*(g1(x1, x2, x3, t, cL) - g1(x1, x2, x3, t, cT)) + 2.0*c3*x2*(3.0*x3*x3 - x2*x2)/(3.0*pi*pow(chi2, 6))*(g1(x2, x1, x3, t, cL) - g1(x2, x1, x3, t, cT)) + c3*x1*x2*x3*x3/(pi*R5)*(1.0/(chi1*chi1) + 1.0/(chi2*chi2))*dg4 + cT*x1/(pi*chi1*chi1)*((2.0*(1.0 - p*p) + 2.0*p*p*x3*x3/(chi1*chi1))*g2(x1, x2, x3, t, cL) - 2.0*x3*x3/(chi1*chi1)*g2(x1, x2, x3, t, cT)) + cT*x2/(pi*chi2*chi2)*((2.0*(1.0 - p*p) + 2.0*p*p*x3*x3/(chi2*chi2))*g2(x2, x1, x3, t, cL) - 2.0*x3*x3/(chi2*chi2)*g2(x2, x1, x3, t, cT));
 }
+/* the stress tensor of a rectangle |x1| <= a1, |x2| <= a2 of unit slip rate (comp 1, 2: along x1,
+   x2; 3: opening) since t = 0, as the signed sum of its four corner quadrants */
 static void rect_tensor0(double x1, double x2, double x3, double t, double a1, double a2, double cL, double cT, double rho, int comp, double s[6])
 {
   double mu = rho*cT*cT, q[6];
@@ -189,6 +199,8 @@ static void from_half(const struct fd3d_tab *t, double _Complex *full)
       full[(size_t)i*Mz + j] = conj(full[(size_t)((Mx - i) % Mx)*Mz + (Mz - j)]);
 }
 
+/* place a table of element offsets (2 nx - 1) x (2 nz - 1) into the zero-padded FFT grid
+   Mx x Mz (negative offsets wrapped) for the circulant products */
 static void put_offsets(const struct fd3d_tab *t, const double *A, double _Complex *dst)
 {
   /* A: (2 nx - 1) x (2 nz - 1), offset (di, dj) at [di + nx - 1][dj + nz - 1] -> FFT order */
@@ -209,6 +221,7 @@ static double tab_kernel(int comp, double x1, double x2, double t, double a, dou
   return s[5];
 }
 static int tab_comp = 1;
+/* fd3d_tab_create for slip along grid axis comp (1 or 2; tab_comp selects the kernel) */
 struct fd3d_tab *fd3d_tab_create_c(int nx, int nz, double dx, double dt, double cL, double cT, double rho, int lmax, int comp)
 {
   struct fd3d_tab *t;
@@ -222,6 +235,7 @@ struct fd3d_tab *fd3d_tab_create_c(int nx, int nz, double dx, double dt, double 
 #ifdef FD3D_MPI
 static int g_fd3d_use_mpi = 0;
 static MPI_Comm g_fd3d_comm;
+/* the communicator of the 3-D marchers (FD3D_MPI): rows of the lattice split over its ranks */
 void fd3d_set_comm(MPI_Comm comm)
 {
   g_fd3d_comm = comm;
@@ -269,6 +283,9 @@ static void tab_allgather(const struct fd3d_tab *t, double _Complex *half)
 #endif
 }
 
+/* the Toeplitz lag tables of an nx x nz lattice of squares (fd3d.h): static values and increments
+   W_l per element offset, the window ending where they stay below the tolerance of the static
+   envelope, and their 2-D spectra for the history products */
 struct fd3d_tab *fd3d_tab_create(int nx, int nz, double dx, double dt, double cL, double cT, double rho, int lmax)
 {
   size_t jm;
@@ -447,6 +464,7 @@ struct fd3d_tab *fd3d_tab_create(int nx, int nz, double dx, double dt, double cL
   return t;
 }
 
+/* free a table and its FFT plans */
 void fd3d_tab_free(struct fd3d_tab *t)
 {
   if(!t)
@@ -471,6 +489,7 @@ struct fd3d *fd3d_create(struct fd3d_tab *t)
 }
 
 struct fd3d *fd3d_create3(struct fd3d_tab *t, int nzp, int mirror, int next);
+/* a marcher on nzp rows of the table's lattice (mirror: image of a vertical fault at the surface) */
 struct fd3d *fd3d_create2(struct fd3d_tab *t, int nzp, int mirror)
 {
   return fd3d_create3(t, nzp, mirror, 0);
@@ -528,6 +547,7 @@ struct fd3d *fd3d_create3(struct fd3d_tab *t, int nzp, int mirror, int next)
   return f;
 }
 
+/* free a marcher and its operators */
 void fd3d_free(struct fd3d *f)
 {
   int q;
@@ -558,6 +578,7 @@ void fd3d_free(struct fd3d *f)
   free(f);
 }
 
+/* spectrum of a field on the lattice (zero padded to Mx x Mz; with the mirror, the image rows) */
 static void field_hat(const struct fd3d *f, const double *x, double _Complex *out)
 {
   const struct fd3d_tab *t = f->t;
@@ -679,6 +700,8 @@ static void apply_k1(const struct fd3d *f, const double *V, double *out)
     }
 }
 
+/* regularized rate-and-state strength a sigma asinh(v/(2 V0) exp((f0 + b ln(V0 theta/Lc))/a)) and
+   its derivative in v (aging law, state theta in seconds) */
 static double rs_strength(const struct fd3d *f, int i, double v, double theta)
 {
   return f->a[i]*f->sigma[i]*asinh(v/(2.0*f->V0)*exp((f->f0 + f->b[i]*log(f->V0*theta/f->Lc[i]))/f->a[i]));
@@ -688,12 +711,22 @@ static double rs_dstrength(const struct fd3d *f, int i, double v, double theta)
   double e = exp((f->f0 + f->b[i]*log(f->V0*theta/f->Lc[i]))/f->a[i])/(2.0*f->V0), z = v*e;
   return f->a[i]*f->sigma[i]*e/sqrt(1.0 + z*z);
 }
+/* aging-law state advanced over dt at the mean slip rate of the step, exactly for a constant rate:
+   theta' = theta exp(-x) + dt (1 - exp(-x))/x, x = v dt / Lc. Written this way rather than as
+   Lc/v + (theta - Lc/v) exp(-x), which cancels catastrophically for a nearly locked element (v
+   floored at 1e-30 made Lc/v 1e28 times theta; the 2-D marcher had the same form and lost the state
+   of locked elements, fd_plan.md 2026-11-16); the two agree to rounding elsewhere */
 static double theta_adv(const struct fd3d *f, int i, double th, double va, double vb, double dt)
 {
-  double v = 0.5*(fabs(va) + fabs(vb));
-  if(v < 1e-30)
-    v = 1e-30;
-  return f->Lc[i]/v + (th - f->Lc[i]/v)*exp(-v*dt/f->Lc[i]);
+  double v, x, e, g;
+  v = 0.5*(fabs(va) + fabs(vb));
+  x = v*dt/f->Lc[i];
+  e = exp(-x);
+  if(x > 1e-8)
+    g = (1.0 - e)/x;
+  else
+    g = 1.0 - 0.5*x;
+  return th*e + dt*g;
 }
 
 /* local solve at element i: Hp + k V = strength(V) sign(V), scalar */
@@ -707,6 +740,8 @@ static double local_sw(const struct fd3d *f, int i, double Hp, double k, double 
     return 0.0;
   return sgn(Hp)*(fabs(Hp) - str0)/A;
 }
+/* the element's slip rate from H + k V = strength(V): bracketed Newton in ln |V|, the sign from H
+   (k < 0: the instantaneous response) */
 static double local_rs(const struct fd3d *f, int i, double Hp, double k, double theta, double vguess)
 {
   double h = fabs(Hp), A = -k, lo = -80.0, hi, u, un, v, F, g, dg;
@@ -831,6 +866,7 @@ static void step_begin(struct fd3d *f, const double *load)
 }
 
 static int step_solve_g(struct fd3d *f, const double *Hx, const double *guess, const char *mask);
+/* the coupled solve of one fine step from the known part Hx (step_solve_g without a guess) */
 static int step_solve(struct fd3d *f, const double *Hx)
 {
   return step_solve_g(f, Hx, NULL, NULL);
@@ -989,6 +1025,7 @@ static int step_solve_g(struct fd3d *f, const double *Hx, const double *guess, c
   return itot;
 }
 
+/* end of a fine step: tractions, slip by the trapezoid rule, state advanced, slip rates pushed */
 static void step_end(struct fd3d *f)
 {
   struct fd3d_tab *t = f->t;
@@ -1024,6 +1061,7 @@ static void step_end(struct fd3d *f)
 
 static int fd3d_step_layer_fft(struct fd3d *f, const double *load);
 static int fd3d_step_surf(struct fd3d *f, const double *load);
+/* one fine step (fd3d.h): dispatches to the surface paths, else known part and coupled solve */
 int fd3d_step(struct fd3d *f, const double *load)
 {
   int it;
@@ -1067,6 +1105,7 @@ static int ilog2i(int k)
   return i;
 }
 
+/* the operators of a step of k = 2^ik substeps (first-lag sums K_k), built on first use */
 static void fd3d_kops(struct fd3d *f, int k)
 {
   struct fd3d_tab *t = f->t;
@@ -1177,6 +1216,7 @@ static void nk_resid(struct fd3d *f, int ik, const double *Hc, const double *th,
     F[i] = Hc[i] + conv[i] - sgn(V[i])*rs_strength(f, i, fabs(V[i]), th[i]);
   }
 }
+/* Euclidean norm */
 static double nk_norm2(int n, const double *x)
 {
   double s = 0.0;
@@ -1185,6 +1225,9 @@ static double nk_norm2(int n, const double *x)
     s += x[i]*x[i];
   return sqrt(s);
 }
+/* Newton-Krylov (GMRES with up to 40 Krylov vectors and 4 restarts, diagonal preconditioner) for the
+   coupled rate-and-state solve of a step of k substeps, instead of the damped Jacobi iteration
+   (f->nk, fd_plan.md L1) */
 static int nk_solve(struct fd3d *f, int ik, const double *Hc, const double *th, double *V)
 {
   int N = f->N, i, j, it, newton, m = 40, restarts = 4;
@@ -1602,6 +1645,7 @@ static int lu_factor(int n, double *A, int *piv)
   }
   return 0;
 }
+/* forward and back substitution with an LU factorisation and its pivots (small dense blocks) */
 static void lu_solve(int n, const double *A, const int *piv, double *b)
 {
   int i, j;
@@ -1623,6 +1667,8 @@ static void lu_solve(int n, const double *A, const int *piv, double *b)
   }
 }
 
+/* the free-surface layer of a vertical fault (fd3d.h), dense version: nxs x nys surface cells of
+   hx x hy from (xs0, ys0), dense fault-surface and surface-surface lag tables (window L) */
 struct fd3d_layer *fd3d_layer_create(struct fd3d *f, double x0f, int nxs, int nys, double hx, double hy,
     double xs0, double ys0, int L)
 {
@@ -1726,6 +1772,7 @@ struct fd3d_layer *fd3d_layer_create(struct fd3d *f, double x0f, int nxs, int ny
 }
 
 static void surf_free(struct fd3d_layer *ly);
+/* free a surface layer (either kind) */
 void fd3d_layer_free(struct fd3d_layer *ly)
 {
   if(!ly)
@@ -1775,6 +1822,7 @@ void fd3d_layer_free(struct fd3d_layer *ly)
   free(ly);
 }
 
+/* dense matrix-vector product y += w A x */
 static void mv(int nr, int nc, const double *A, const double *x, double w, double *y)   /* y += w A x */
 {
   int i, j;
@@ -1787,6 +1835,8 @@ static void mv(int nr, int nc, const double *A, const double *x, double w, doubl
   }
 }
 
+/* one fine step of a fault with the dense surface layer: the fault and the surface solves
+   alternate until the surface stays traction free and the fault satisfies friction */
 int fd3d_step_layer(struct fd3d *f, const double *load)
 {
   struct fd3d_layer *ly = f->layer;
@@ -1892,6 +1942,7 @@ int fd3d_step_layer(struct fd3d *f, const double *load)
 
 /* ---------------- free-surface layer, FFT-structured ---------------- */
 #include <time.h>
+/* monotonic wall clock (profiling of the layer steps, fd3d_layer_prof) */
 static double ly_now(void)
 {
   struct timespec ts;
@@ -2008,6 +2059,8 @@ static void l2_inv(const struct fd3d_layer *ly, const double _Complex *in, doubl
   free(o);
 }
 
+/* the FFT-structured surface layer of a vertical fault (fd3d.h): rows of surface cells hx = dx/m,
+   tables Toeplitz along strike, so products are FFTs along x and dense across rows */
 struct fd3d_layer *fd3d_layer_create_fft(struct fd3d *f, double x0f, int m, int nxs, int nys, double xs0, int L)
 {
   const struct fd3d_tab *t = f->t;
@@ -2203,11 +2256,13 @@ static void fault_rows_hat(const struct fd3d_layer *ly, const double *V, double 
   lx_fwd(ly, ly->nz, ly->nx, ly->m, r, 1, out);
   free(r);
 }
+/* along-strike spectra of the surface rows of a field V */
 static void layer_rows_hat(const struct fd3d_layer *ly, const double *V, double _Complex *out)
 {
   lx_fwd(ly, ly->nys, ly->nxs, 1, V, 0, out);              /* V in element order p*nys + q: column-major for rows */
 }
 
+/* one fine step of a fault with the FFT surface layer (as fd3d_step_layer) */
 static int fd3d_step_layer_fft(struct fd3d *f, const double *load)
 {
   struct fd3d_layer *ly = f->layer;
@@ -2524,6 +2579,7 @@ static void surf_resp(const struct fd3d_tab *t, double F[3][3], int src_fault, i
 #undef SURF_TR
 }
 
+/* along-strike FFT of one real row */
 static void fft_x_inplace(const struct fd3d_layer *ly, const double *in, double _Complex *out, double _Complex *buf)
 {
   double _Complex *a = malloc(sizeof(double _Complex)*ly->Mx);
@@ -2541,6 +2597,8 @@ struct fd3d_layer *fd3d_surf_create_rows(struct fd3d *f, double x0f, double ytop
 /* several faults sharing one virtual surface (fd_plan.md G3b): the second and further faults
    need only their fault <-> surface tables; the surface-surface tables are built once */
 static int g_surf_skip_T2 = 0;
+/* the virtual free surface of a planar fault of any dip (fd3d.h): uniform rows of width dx/m
+   (fd3d_surf_create_rows does the work) */
 struct fd3d_layer *fd3d_surf_create(struct fd3d *f, double x0f, double ytop, double ztop, double dip_deg, int fcomp,
     int m, int nxs, int nys, double xs0, double ys0, int L, double fsign)
 {
@@ -2864,6 +2922,7 @@ struct fd3d_layer *fd3d_surf_create_rows(struct fd3d *f, double x0f, double ytop
   return ly;
 }
 
+/* free the tables, preconditioner and rings of a virtual surface */
 static void surf_free(struct fd3d_layer *ly)
 {
   int p, r, c, s;
@@ -2933,6 +2992,8 @@ static void surf_reduce(const struct fd3d_layer *ly, double _Complex *Y, size_t 
 }
 /* Y_r[k][q'] += w sum_c T[r][c][k][q'][q] X_c[k][q] for the surface-surface tables (row spectra) */
 static const int SP_R[5] = {0, 0, 1, 1, 2}, SP_S[5] = {0, 1, 0, 1, 2};
+/* surface-surface product for one lag (row spectra, three traction components), added with
+   weight w */
 static void surf_apply_rows(const struct fd3d_layer *ly, int slot_kind, int lag, const double _Complex *X3, double w, double _Complex *Y3)
 {
   size_t nss = (size_t)ly->nys*ly->nys, Mh = ly->Mh, Q = Mh*ly->nys, k;
@@ -2971,6 +3032,7 @@ static void surf_apply_rows(const struct fd3d_layer *ly, int slot_kind, int lag,
    (3 nys x 3 nys) are factorised once; FD_SURF_JACOBI=1 restores the old iteration. */
 extern void zgetrf_(int *m, int *n, double _Complex *a, int *lda, int *ipiv, int *info);
 extern void zgetrs_(char *tr, int *n, int *nrhs, double _Complex *a, int *lda, int *ipiv, double _Complex *b, int *ldb, int *info);
+/* the surface operator A v of the zero-traction solve (see the note above) */
 static void surf_A(struct fd3d_layer *ly, int nl, double hw, const double Es[3], const double *v, double *out, double _Complex *S3, double _Complex *P3)
 {
   int ns = ly->ns, nys = ly->nys, c, i;
@@ -2988,6 +3050,7 @@ static void surf_A(struct fd3d_layer *ly, int nl, double hw, const double Es[3],
         out[(size_t)c*ns + i] -= 0.5*Es[c]*v[(size_t)c*ns + i];
   }
 }
+/* factorise the per-wavenumber blocks (3 nys x 3 nys) of the circulant preconditioner (zgetrf) */
 static void surf_precond_setup(struct fd3d_layer *ly, int nl, double hw, const double Es[3])
 {
   static const int pr[5] = {0, 0, 1, 1, 2}, ps[5] = {0, 1, 0, 1, 2};
@@ -3015,6 +3078,7 @@ static void surf_precond_setup(struct fd3d_layer *ly, int nl, double hw, const d
     zgetrf_(&n, &n, M, &n, ly->pre_piv + (size_t)k*n, &info);
   }
 }
+/* apply the circulant preconditioner: FFT along x, block solves (zgetrs), inverse FFT */
 static void surf_precond(struct fd3d_layer *ly, const double *r, double *z, double _Complex *S3)
 {
   int ns = ly->ns, nys = ly->nys, n = 3*nys, c, k, qr, one = 1, info;
@@ -3211,6 +3275,8 @@ static int surf_solve(struct fd3d_layer *ly, int nl, double hw, const double Es[
   }
   return it;
 }
+/* one fine step of a fault with the virtual surface: fault solve and preconditioned GMRES for the
+   surface's zero traction, alternated to convergence; then slip, state and both histories */
 static int fd3d_step_surf(struct fd3d *f, const double *load)
 {
   struct fd3d_layer *ly = f->layer;
@@ -3601,6 +3667,8 @@ static void cross_build(struct fd3d_tab *t, double x3, int comp, fd3d_cplx **Wsh
 #undef CROSS_K
 }
 
+/* two parallel planes W apart on one table (fd3d.h): the cross tables between them (Toeplitz in
+   the in-plane offsets) and the coupled two-plane step */
 struct fd3d_pair *fd3d_pair_create(struct fd3d *f0, struct fd3d *f1, double W, int comp)
 {
   struct fd3d_pair *pp;
@@ -3630,6 +3698,7 @@ struct fd3d_pair *fd3d_pair_create(struct fd3d *f0, struct fd3d *f1, double W, i
   return pp;
 }
 
+/* free a plane pair (not the marchers) */
 void fd3d_pair_free(struct fd3d_pair *pp)
 {
   int k;
@@ -3712,12 +3781,15 @@ static void pair_static_out0(void *ctx, const double *delta, double *out)
   (void)delta;
   memcpy(out, pp->sbuf[0], sizeof(double)*pp->f[0]->N);
 }
+/* static callbacks that hand out the precomputed exact static tractions of plane 0 and 1 */
 static void pair_static_out1(void *ctx, const double *delta, double *out)
 {
   struct fd3d_pair *pp = (struct fd3d_pair *)ctx;
   (void)delta;
   memcpy(out, pp->sbuf[1], sizeof(double)*pp->f[1]->N);
 }
+/* one fine step of two coupled parallel planes: each plane's step with the other's contribution
+   (cross tables and the exact static coupling) in its known part, alternated to convergence */
 int fd3d_pair_step(struct fd3d_pair *pp, const double *load0, const double *load1)
 {
   int p, i, it = 0;
@@ -3792,6 +3864,8 @@ static void mat_rot(const double E[3][3], const double s6[6], double S[3][3])
       S[a][b] = v;
     }
 }
+/* global centre of cell (i, j) of a plane (origin O, in-plane axes E[0] along strike, E[1] up dip,
+   rows counted down dip) */
 static void plane_centre(const struct fd3d_mplane *g, int i, int j, double X[3])
 {
   int k;
@@ -3830,6 +3904,8 @@ static void cross_resp1(const struct fd3d_mplane *gq, int iq, int jq, const stru
   *ts = d[0]*Sn[0] + d[1]*Sn[1] + d[2]*Sn[2];
   *tn = n[0]*Sn[0] + n[1]*Sn[1] + n[2]*Sn[2];
 }
+/* shear and normal traction at X on plane gp from unit slip rate on cell (iq, jq) of plane gq at
+   time t (cross_resp1 in gq's frame; with its image for a half space) */
 static void cross_resp(const struct fd3d_mplane *gq, int iq, int jq, const struct fd3d_mplane *gp, const double X[3],
     double t, double cL, double cT, double rho, double *ts, double *tn)
 {
@@ -3853,6 +3929,7 @@ static void cross_resp(const struct fd3d_mplane *gq, int iq, int jq, const struc
 #else
 #define COMM_PTR(x) NULL
 #endif
+/* first element of block r of n elements split into P nearly equal blocks (MPI rows) */
 static int blk_lo(int n, int r, int P)
 {
   return (int)(((long)n*r)/P);
@@ -3898,6 +3975,7 @@ static void multi_gather(const struct fd3d_multi *m, int p, double *v)
 {
   dense_allgather(v, m->rcnt[p], m->rdsp[p], 1, m->mpi_size, COMM_PTR(m));
 }
+/* this rank's rows i0 .. i1 - 1 of plane p */
 static void multi_rows(const struct fd3d_multi *m, int p, int *i0, int *i1)
 {
   *i0 = m->rdsp[p][m->mpi_rank];
@@ -3915,6 +3993,7 @@ static void multi_rows(const struct fd3d_multi *m, int p, int *i0, int *i1)
    increment, default 1e-10); FD3D_DP=0 keeps all lags (the dense windows). */
 static int g_dp = -1;
 static double g_dp_tol = 1e-10;
+/* partitioned dense tables on (FD3D_DP, default 1) and their tolerance (FD3D_DP_TOL) */
 static int dp_enabled(void)
 {
   if(g_dp < 0){
@@ -4074,6 +4153,7 @@ static void dtab_alloc(struct fd3d_dtab *d, int nr, const int *ridx, int nc, con
   d->nw = 0;
   d->W = malloc(sizeof(double)*d->nwcap);
 }
+/* free a partitioned dense table */
 static void dtab_free(struct fd3d_dtab *d)
 {
   free(d->ridx);
@@ -4243,6 +4323,7 @@ static void dpref_build(struct fd3d_dpref *pr, const double *ring, int Lb, long 
     }
   }
 }
+/* free the prefix moments of a partitioned table's history */
 static void dpref_free(struct fd3d_dpref *pr)
 {
   free(pr->P);
@@ -4311,6 +4392,8 @@ static void dtab_hist(const struct fd3d_dtab *d, const struct fd3d_dpref *pr, in
   }
 }
 
+/* several planes of any orientation (fd3d.h, G1): per ordered pair of planes a dense coupling
+   table (partitioned in lags, rows split over ranks), the planes' own Toeplitz tables kept */
 struct fd3d_multi *fd3d_multi_create(int np, struct fd3d **f, const struct fd3d_mplane *geom)
 {
   struct fd3d_multi *m = calloc(1, sizeof(*m));
@@ -4516,6 +4599,7 @@ struct fd3d_multi *fd3d_multi_create(int np, struct fd3d **f, const struct fd3d_
   return m;
 }
 
+/* free a multi-plane system (not the marchers) */
 void fd3d_multi_free(struct fd3d_multi *m)
 {
   int p, q;
@@ -4541,6 +4625,7 @@ void fd3d_multi_free(struct fd3d_multi *m)
   free(m);
 }
 
+/* zero the histories of all planes and couplings (start of a phase) */
 void fd3d_multi_reset(struct fd3d_multi *m)
 {
   int p;
@@ -4562,6 +4647,7 @@ void fd3d_multi_push(struct fd3d_multi *m, double **V)
   m->hk++;
 }
 
+/* static callback handing out plane p's precomputed exact static traction */
 static void multi_sbuf_out(void *ctx, const double *delta, double *out)
 {
   struct fd3d_multi_slot *s = (struct fd3d_multi_slot *)ctx;
@@ -4620,6 +4706,8 @@ double fd3d_multi_memory(const struct fd3d_multi *m, double *win)
     }
   return mem;
 }
+/* one fine step of the coupled planes: each plane's known part gets the cross histories and
+   statics, the planes' solves alternate until the cross terms of the current step converge */
 int fd3d_multi_step(struct fd3d_multi *m, double **load)
 {
   int np = m->np, p, q, i, j, it, itot = 0;
@@ -4930,6 +5018,7 @@ struct fd3d_msurf *fd3d_msurf_create(int nf, struct fd3d **f, const double *ytop
   return s;
 }
 
+/* free a several-fault system with one virtual surface */
 void fd3d_msurf_free(struct fd3d_msurf *s)
 {
   if(!s)
@@ -4939,6 +5028,8 @@ void fd3d_msurf_free(struct fd3d_msurf *s)
   free(s);
 }
 
+/* one fine step of several faults sharing one virtual surface (G3b): fault solves and the surface's
+   zero-traction GMRES alternate to convergence, as in fd3d_step_surf */
 int fd3d_msurf_step(struct fd3d_msurf *s, double **load)
 {
   struct fd3d_layer *L0 = s->ly[0];
@@ -5611,6 +5702,7 @@ static void strip_l2g(const struct fd3d_strips *s, int k, const double xl[3], do
   X[1] = s->O[k][1] + xl[0]*st + xl[1]*ct;
   X[2] = s->O[k][2] + xl[2];
 }
+/* a vector from fault k's strip frame to the global frame (rotation by its strike) */
 static void strip_v2g(const struct fd3d_strips *s, int k, const double vl[3], double v[3])
 {
   double ct, st;
@@ -6046,6 +6138,9 @@ static void strips_dense_pair(struct fd3d_strips *s, int q, int k, const double 
   free(K);
 }
 
+/* per-fault surface strips for faults of different strikes (fd3d.h, H6): each fault's strip in its
+   own frame, the cells inside other strips deactivated, and the dense couplings between faults and
+   strips (partitioned in lags) */
 struct fd3d_strips *fd3d_strips_create(int nf, struct fd3d **f, const double *th_deg, const double (*O)[3],
     const double *x0f, const double *ytop, const double *ztop, const double *dip_deg,
     const double *fsign, int fcomp, int m, const int *nxs, const int *nys,
@@ -6129,6 +6224,7 @@ double fd3d_strips_memory(const struct fd3d_strips *s)
   return mem;
 }
 
+/* free the strips (with the solver statistics if FD_STRIPS_DIAG) */
 void fd3d_strips_free(struct fd3d_strips *s)
 {
   int k, q;
@@ -6198,6 +6294,8 @@ static double dtab_lagval(const struct fd3d_dtab *d, size_t e, int l)
   y0 = u + (l - pos);
   return d->W[d->woff[e] + y0];
 }
+/* the value of a partitioned dense table at full row rfull, column cfull and lag l (tests and
+   diagnostics; the steps use the partitioned products) */
 static double dtab_value(const struct fd3d_dtab *d, int rfull, int cfull, int l, double dt)
 {
   int r, c;
@@ -6400,6 +6498,7 @@ struct strips_ctx {
   double _Complex *S3[FD3D_MULTI_MAX], *P3[FD3D_MULTI_MAX];
   double *tmp;
 };
+/* zero the inactive strip cells of v (they belong to another fault's strip) */
 static void strips_mask(struct strips_ctx *x, double *v)
 {
   int k, c, i;
@@ -6431,6 +6530,7 @@ static void strips_A_g(struct strips_ctx *x, const double *v, double *out, int g
   strips_mask(x, out);
   free(vm);
 }
+/* the strips' zero-traction operator A v (first-lag surface tables, inactive cells masked) */
 static void strips_A(struct strips_ctx *x, const double *v, double *out)
 {
   strips_A_g(x, v, out, 1);
@@ -6548,6 +6648,8 @@ static void strips_bj_probe(struct strips_ctx *x, int k, const int *bmap, int pa
           }
       }
 }
+/* the band block-Jacobi preconditioner (H8): per strip the band of A around the diagonal in
+   along-strike order, factorised by dgbtrf */
 static void strips_bj_setup(struct strips_ctx *x)
 {
   struct fd3d_strips *s = x->s;
@@ -6597,6 +6699,7 @@ static void strips_bj_setup(struct strips_ctx *x)
     free(out);
   }
 }
+/* apply the band block-Jacobi preconditioner (dgbtrs per strip) */
 static void strips_P(struct strips_ctx *x, const double *r, double *z)
 {
   struct fd3d_strips *s = x->s;
@@ -6702,6 +6805,7 @@ static void strips_assemble_mpi(struct strips_ctx *x, double *e, double *col)
 extern void dgetrf_(int *m, int *n, double *a, int *lda, int *ipiv, int *info);
 /* the trailing size_t is the hidden length of the character argument (gfortran ABI) */
 extern void dgetrs_(char *tr, int *n, int *nrhs, double *a, int *lda, int *ipiv, double *b, int *ldb, int *info, size_t ltr);
+/* the strip solve by dense LU of A (small systems, up to FD3D_STRIPS_LU_MAX active unknowns) */
 static int strips_direct(struct strips_ctx *x, const double *rhs, double *V)
 {
   struct fd3d_strips *s = x->s;
@@ -6875,6 +6979,8 @@ static int strips_solve(struct strips_ctx *x, const double *rhs, double *V)
   return it;
 }
 
+/* one fine step of several faults with per-fault strips: fault solves and the strips' zero-traction
+   solve alternate to convergence (as fd3d_msurf_step) */
 int fd3d_strips_step(struct fd3d_strips *s, double **load)
 {
   const struct fd3d_tab *t = s->f[0]->t;
@@ -7631,6 +7737,7 @@ void fd3d_dump_state(const char *fn, const char *mode, int nf, struct fd3d **f)
       fprintf(o, "f %d %d %a %a %a %a\n", k, i, f[k]->V[i], f[k]->delta[i], f[k]->tau[i], f[k]->sigma[i]);
   fclose(o);
 }
+/* append a vector in exact (hexadecimal) form to a dump file (byte comparisons in the tests) */
 void fd3d_dump_vec(const char *fn, const char *tag, int n, const double *v)
 {
   FILE *o;

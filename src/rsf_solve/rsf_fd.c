@@ -72,6 +72,10 @@ static PetscErrorCode fd_gate_static(struct interact_ctx *par, struct fd_vars *f
 static void fd_dump_mode(struct fd_vars *fd, struct fd_sys *sy, struct fd_state *st, int k);
 static PetscErrorCode fd_table_hash(struct fd_vars *fd);
 
+/* set up the fully dynamic phases (-fd_mode 1): read the options, group the elements into segments
+   (2-D: straight runs and polylines; 3-D: planes, strips or the multi-plane path), build the lag
+   tables, check their static limit against interact's Is and In (the static gate), and allocate
+   the marcher; called once after the QD system is assembled */
 PetscErrorCode rsf_fd_setup(struct interact_ctx *par, PetscReal shear_modulus_si, PetscReal s_wave_speed_si)
 {
   PetscBool set3;
@@ -292,6 +296,8 @@ static PetscErrorCode fd_full_get_read(Vec X, VecScatter *sc, Vec *Xall, PetscSc
   }
   return fd_full_scatter(X,sc,Xall,x);
 }
+/* read access to the whole QD state on every rank (one rank: the vector itself, else a scatter to
+   all, fd_full_scatter) */
 static PetscErrorCode fd_full_put_read(Vec X, VecScatter *sc, Vec *Xall, PetscScalar **x)
 {
   PetscMPIInt size;
@@ -305,6 +311,7 @@ static PetscErrorCode fd_full_put_read(Vec X, VecScatter *sc, Vec *Xall, PetscSc
   PetscCall(VecRestoreArray(*Xall,x));
   PetscFunctionReturn(PETSC_SUCCESS);
 }
+/* gather the whole QD state onto every rank (the scatter is created on first use and kept) */
 static PetscErrorCode fd_full_scatter(Vec X, VecScatter *sc, Vec *Xall, PetscScalar **x)
 {
   PetscFunctionBeginUser;
@@ -333,6 +340,7 @@ static PetscErrorCode fd_full_put(Vec X, VecScatter *sc, Vec *Xall, PetscScalar 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+/* the static shear tractions of slip delta by interact's Is (callback of the 3-D static gate) */
 static void fd3d_static_is(void *ctx, const double *delta, double *out)
 {
   struct interact_ctx *par = (struct interact_ctx *)ctx;
@@ -615,11 +623,13 @@ static void fd3d_multi_apply(struct interact_ctx *par, Mat A, double **din, doub
       }
   PetscCallAbort(PETSC_COMM_WORLD,fd_full_put_read(fd->v3b,&fd->sc3,&fd->v3all,&b));
 }
+/* the static shear tractions by Is for several planes (callback of the multi-plane gate) */
 static void fd3d_multi_static_is(void *ctx, double **delta, double **out)
 {
   struct interact_ctx *par = (struct interact_ctx *)ctx;
   fd3d_multi_apply(par,par->medium->Is,delta,out,0);
 }
+/* the static normal tractions on plane p by In (callback of the multi-plane gate) */
 static void fd3d_multi_static_in(void *ctx, int p, double **delta, double *out)
 {
   struct interact_ctx *par = (struct interact_ctx *)ctx;
@@ -1016,6 +1026,8 @@ static PetscErrorCode fd3d_setup_strips(struct fd_vars *fd, int np, struct fd3d 
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+/* 3-D setup for several planes of any orientation (fd_plan.md G1, H6): each fault group becomes a
+   plane or strip lattice, the dense couplings between them are built and gated against Is and In */
 static PetscErrorCode fd3d_setup_multi(struct interact_ctx *par, struct fd_vars *fd)
 {
   PetscInt gi, cg, ncols;
@@ -1581,6 +1593,8 @@ static PetscErrorCode fd3d_run_phase_multi(TS ts, struct interact_ctx *par, stru
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+/* one 3-D dynamic phase: hand-over from the QD state, marching until the hand-back criterion,
+   hand-back of slip, state and stresses, and the phase report */
 static PetscErrorCode fd3d_run_phase(TS ts, struct interact_ctx *par, struct fd_vars *fd, PetscReal t, Vec X, PetscReal *t_end)
 {
   double tl;
@@ -1854,11 +1868,13 @@ static void fd3d_pair_apply(struct interact_ctx *par, Mat A, double sgn, const d
     }
   PetscCallAbort(PETSC_COMM_WORLD,fd_full_put_read(fd->v3b,&fd->sc3,&fd->v3all,&b));
 }
+/* the static shear tractions of the two planes by Is (callback of the two-plane gate) */
 static void fd3d_pair_static_is(void *ctx, const double *d0, const double *d1, double *o0, double *o1)
 {
   struct interact_ctx *par = (struct interact_ctx *)ctx;
   fd3d_pair_apply(par,par->medium->Is,1.0,d0,d1,o0,o1);
 }
+/* the static normal tractions on plane p by In (callback of the two-plane gate) */
 static void fd3d_pair_static_in(void *ctx, int p, const double *d_other, const double *d_own, double *out)
 {
   struct interact_ctx *par = (struct interact_ctx *)ctx;
@@ -2157,6 +2173,10 @@ static PetscErrorCode fd3d_setup_pair(struct interact_ctx *par, struct fd_vars *
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+/* 3-D setup from interact's patches: -fd_hs_static goes to the multi-plane path (whole-space
+   dynamics, exact half-space statics); otherwise one plane (lattice: whole space, mirror image for a
+   vertical strike-slip fault at the surface, or the virtual surface), two parallel planes
+   (fd3d_setup_pair) or several planes (fd3d_setup_multi) */
 PetscErrorCode fd3d_setup_from_geometry(struct interact_ctx *par, struct fd_vars *fd)
 {
   struct med *medium = par->medium;
@@ -2700,6 +2720,7 @@ static int fd_seg_off(const struct fd_vars *fd, int l)
     off += fd->segs->seg[m].n;
   return off;
 }
+/* the number of 2-D unknowns of all segments (faults, then the surface) */
 static int fd_ntot(const struct fd_vars *fd)
 {
   return fd_seg_off(fd,fd->segs->nseg);
@@ -2758,6 +2779,9 @@ static void fd_gather_rows(void *ctx, double *A, int ncol)
   free(dsp);
 }
 
+/* 2-D tables: every receiver-source pair of segments (Toeplitz for parallel straight runs, dense
+   and compressed otherwise, the half-plane reflections added for in-plane faults below the surface),
+   then the marcher's system */
 static PetscErrorCode fd_build_tables(struct interact_ctx *par, struct fd_vars *fd)
 {
   struct med *medium = par->medium;
@@ -2980,6 +3004,9 @@ static PetscErrorCode fd_gate_one(struct fd_vars *fd, Mat A, const double *K, Pe
 }
 
 
+/* 2-D static gate: the relative Frobenius deviation of the tables' static operator Ks from
+   interact's Is (and Kn from In with normal coupling); a warning above -fd_gate_tol, an error above
+   five times it */
 static PetscErrorCode fd_gate_static(struct interact_ctx *par, struct fd_vars *fd)
 {
   struct med *medium = par->medium;
@@ -3376,6 +3403,8 @@ PetscErrorCode rsf_fd_initial(TS ts, struct interact_ctx *par, Vec X)
   PetscFunctionReturn(PETSC_SUCCESS);
 }
 
+/* the end-of-run report (accepted steps above the switch rate, number of phases) and freeing of
+   the tables and marcher */
 PetscErrorCode rsf_fd_finalize(struct interact_ctx *par)
 {
   struct rsf_vars *rsf = par->medium->rsf;

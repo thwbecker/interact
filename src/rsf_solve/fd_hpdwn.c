@@ -74,6 +74,8 @@ static void incident_traction(double k, double complex w, double alpha, double b
   }
 }
 
+/* the reflected stresses at receiver points by DWN, frequency by frequency (fd_hpdwn.h); the
+   reference implementation, the batches below are the fast path */
 int fd_hpdwn_reflected(int ns, const double *sx, const double *sz, const double *stx, const double *stz, const double *sa,
                        int nr, const double *rx, const double *rz, int nt, const double *t,
                        double alpha, double beta, double rho, double T, int nw, double wIT, double L, int M,
@@ -160,6 +162,8 @@ struct hp_kw {
   double complex sA[3], sB[3];                   /* sxx, sxz, szz per unit A (P) and B (S) at z = 0 */
 };
 
+/* the quantities of one (wavenumber, frequency) pair shared by all sources and receivers: vertical
+   wavenumbers, the surface reflection system and the receiver stresses per unit P and S amplitude */
 static void kw_setup(double k, double complex w, double alpha, double beta, double rho, struct hp_kw *K)
 {
   double lam, mu;
@@ -454,6 +458,7 @@ static int batch_block(int ns, const double *sx, const double *sz, const double 
   return 0;
 }
 
+/* the batch with the receivers' own positions as the discretisation points (fd_hpdwn.h) */
 int fd_hpdwn_batch(int ns, const double *sx, const double *sz, const double *stx, const double *stz, const double *sa,
                    int nr, const double *rx, const double *rz, const double *rtx, const double *rtz,
                    double alpha, double beta, double rho, double dt, int nt, double *os, double *on, double *ks, double *kn)
@@ -461,6 +466,10 @@ int fd_hpdwn_batch(int ns, const double *sx, const double *sz, const double *stx
   return fd_hpdwn_batch_ext(ns, sx, sz, stx, stz, sa, nr, rx, rz, rtx, rtz, nr, rx, rz, alpha, beta, rho, dt, nt, os, on, ks, kn);
 }
 
+/* the batch (fd_hpdwn.h): the wavenumber and frequency grids from all npr points of the receiver
+   segment (so a rank's rows give the same tables as the whole segment), the static part at a
+   small frequency, the series by receiver blocks sized from memory, own_product per frequency
+   and FFTs to lags; nt = 0 gives the static part only */
 int fd_hpdwn_batch_ext(int ns, const double *sx, const double *sz, const double *stx, const double *stz, const double *sa,
                        int nr, const double *rx, const double *rz, const double *rtx, const double *rtz,
                        int npr, const double *prx, const double *prz,

@@ -19,11 +19,13 @@ struct fd_fft_plan_s {
   fftw_complex *in, *out;
 };
 
+/* the transform size for n samples (FFTW: n itself; built-in: the next power of two) */
 int fd_fft_size_for(int n)
 {
   return n < 1 ? 1 : n;
 }
 
+/* a plan for complex transforms of size n, sign -1 forward, +1 backward (unnormalised) */
 fd_fft_plan fd_fft_plan_create(int n, int sign)
 {
   fd_fft_plan p = (fd_fft_plan)malloc(sizeof(*p));
@@ -34,12 +36,14 @@ fd_fft_plan fd_fft_plan_create(int n, int sign)
   p->plan = fftw_plan_dft_1d(n, p->in, p->out, sign < 0 ? FFTW_FORWARD : FFTW_BACKWARD, FFTW_ESTIMATE);
   return p;
 }
+/* out = transform of in (in and out may not overlap) */
 void fd_fft_exec(fd_fft_plan p, const double _Complex *in, double _Complex *out)
 {
   memcpy(p->in, in, sizeof(fftw_complex) * p->n);
   fftw_execute(p->plan);
   memcpy(out, p->out, sizeof(fftw_complex) * p->n);
 }
+/* free a plan */
 void fd_fft_plan_destroy(fd_fft_plan p)
 {
   if(!p)
@@ -49,6 +53,7 @@ void fd_fft_plan_destroy(fd_fft_plan p)
   fftw_free(p->out);
   free(p);
 }
+/* the backend's name (setup report) */
 const char *fd_fft_backend(void)
 {
   return "fftw3";
@@ -62,6 +67,7 @@ struct fd_fft_plan_s {
   int *rev;
 };
 
+/* the transform size for n samples (FFTW: n itself; built-in: the next power of two) */
 int fd_fft_size_for(int n)
 {
   int m = 1;
@@ -70,6 +76,7 @@ int fd_fft_size_for(int n)
   return m;
 }
 
+/* a plan for complex transforms of size n, sign -1 forward, +1 backward (unnormalised) */
 fd_fft_plan fd_fft_plan_create(int n, int sign)
 {
   int i, j, bit, l2 = 0;
@@ -95,6 +102,7 @@ fd_fft_plan fd_fft_plan_create(int n, int sign)
   return p;
 }
 
+/* out = transform of in (in and out may not overlap) */
 void fd_fft_exec(fd_fft_plan p, const double _Complex *in, double _Complex *out)
 {
   int n = p->n, len, half, step, i, j;
@@ -116,6 +124,7 @@ void fd_fft_exec(fd_fft_plan p, const double _Complex *in, double _Complex *out)
   }
 }
 
+/* free a plan */
 void fd_fft_plan_destroy(fd_fft_plan p)
 {
   if(!p)
@@ -124,6 +133,7 @@ void fd_fft_plan_destroy(fd_fft_plan p)
   free(p->rev);
   free(p);
 }
+/* the backend's name (setup report) */
 const char *fd_fft_backend(void)
 {
   return "builtin radix-2";

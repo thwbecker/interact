@@ -3685,6 +3685,48 @@ reasonable tolerances; document all code; reassess efficiency and accuracy.
   of 4 (now commented), fd_hpdwn.c 4 of 13, fd_hpcdh.c 5 of 21; 174 of 346 in all (some are
   documented in their headers). To do file by file, with the efficiency and accuracy review.
 
+### Audit (2): Harris and Day resolved, BP1 re-run, comments (2026-11-20)
+
+Harris and Day case D: the prototype's 0.51 s trigger delay at 100 m was a resolution effect, not
+an error. fd_dynamic hd now prints fault 1's end, the trigger time and position on fault 2 and its
+ruptured length (as run_hd.py). W = +500 m, C (equal to the prototype at 50 m):
+| dx | fault 1 end | trigger | delay | position | fault 2 ruptured |
+| 100 m | 5.283 s | 5.788 s | 0.505 s | 15.45 km | 19.00 km |
+| 50 m | 5.261 s | 7.051 s | 1.790 s | 14.88 km | 18.65 km |
+| 25 m | 5.258 s | 7.044 s | 1.786 s | 14.81 km | 18.40 km |
+W = +1000 m: no trigger at 100 and 50 m. Harris and Day: 5.6 s, 1.5 s later at about 14.6 km.
+The converged delay and position are within 0.3 s and 0.2 km of theirs; fault 1 ends 0.34 s
+earlier (our nucleation, forced over 2.5 km at 0.5 c_s, differs from theirs; not checked further).
+At 100 m the cohesive zone (about 400 m at the start, shrinking with propagation) has a few
+elements and fault 2 is triggered early by the stopping phase; the old 100 m agreement with their
+5.6 s held only with the history-indexing error. test_hd.py now runs at 50 m (about 3 minutes)
+with these values.
+SEAS BP1 at 50 m with rsf_solve (benchmarks/run_bp1_fd.sh, one core, wall for the three phases):
+QD events 196.360, 271.962, 349.767, 428.049, 506.380 yr (group 4: 196.36, 271.97, 349.78,
+428.07, 506.40). FD with -fd_nl 1 (the default): phases at 196.360, 302.551, 421.425 yr, peak slip
+rates 15.68, 13.02, 14.25 m/s, mean slip 1.565, 1.316, 1.464 m, phases 98.7, 77.6, 89.4 s; with
+-fd_nl 0: 196.360, 301.692, 420.481 yr, 12.54, 10.82, 11.64 m/s, 64.5, 54.5, 58.5 s. Both equal
+the values recorded on 2026-10-25 (table above), so nothing has drifted. Group 5: 302.21, 420.93
+yr; the first-order extrapolation to zero element size gave about 302.47 and 421.24 yr and 15.8,
+13.3, 14.3 m/s: NL at 50 m is within 0.1 to 0.2 yr and 1 to 2 percent of it for 1.5 times the cost
+of first order, which is 0.8 yr and 20 percent off. NL stays the default.
+Comments added to every routine of fd_band.c, fd_kernels.c, fd_segments.c, fd_tables.c,
+fd_hpdwn.c, fd_hpcdh.c, fd_march.c and rsf_fd.c that had none (the census of audit (1)); the header
+comment of fd_rsf_solve now describes the signed solve. fd_step_rsf declared its timers mid
+routine (moved to the top).
+fd3d.c: comments for 70 of its 80 uncommented routines (the rest are grouped under one comment,
+e.g. g1 .. g4, or described where declared); fd_fft.c commented. Census now 33 of 346 routines
+without a comment of their own, most of them in groups or the generated fd_series_coeffs.c.
+Accuracy fix found in the review: the 3-D aging-law update theta_adv used
+Lc/v + (theta - Lc/v) exp(-v dt/Lc) with v floored at 1e-30, the form that lost the state of
+locked elements in 2-D (2026-11-16): for a nearly locked cell Lc/v is about 1e28 times theta and
+the difference cancels. Now theta exp(-x) + dt (1 - exp(-x))/x (series below x = 1e-8), equal
+to rounding otherwise; TPV101 against the prototype unchanged (1e-8 test).
+TPV14/15 against the SCEC stations was not re-run: at 500 m it takes about 8 minutes on 16 ranks
+(an hour or more on the sandbox's one core) and the 1 km results are recorded (H13); for the
+workstation: FD3D_TPV14_STATIONS="0:2000:0,1:2000:0" fd3d_test tpv14 500 14 12 and
+benchmarks/tpv14_stcmp.py with the SCEC files.
+
 ### M11: anchors after the last arrival; one element size for straight splays (2026-11-20)
 
 fd_hpcdh.c: after the last arrival over the segment (all four rays, from the arrival grid) plus

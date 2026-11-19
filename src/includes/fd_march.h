@@ -106,7 +106,7 @@ int fd_sys_set_coarse(struct fd_sys *s, int K);
 double fd_sys_bytes(const struct fd_sys *s);
 void fd_sys_reset_history(struct fd_sys *s);
 void fd_sys_push(struct fd_sys *s, const double *V);
-void fd_sys_push_k(struct fd_sys *s, const double *V, int k);     /* same slice k times */                /* one fine-grid slice */
+void fd_sys_push_k(struct fd_sys *s, const double *V, int k);     /* the same slice k times (a step of k substeps) */
 void fd_sys_history(struct fd_sys *s, int lag0, double *ts, double *tn); /* sum over lags >= lag0 */
 struct fd_ops *fd_sys_ops(struct fd_sys *s, int k);                /* K_k, built on first use */
 struct fd_ops *fd_sys_ops_nl(struct fd_sys *s, int k);             /* B_k, C_k for second-order marching */
@@ -144,8 +144,10 @@ struct fd_rsf {
 double fd_rsf_tau(const struct fd_rsf *f, int i, double V, double psi, double sigma);
 double fd_rsf_dtau(const struct fd_rsf *f, int i, double V, double psi, double sigma);
 double fd_rsf_psi_advance(const struct fd_rsf *f, int i, double psi, double Va, double Vb, double dt);
-/* coupled solve H + K V = tau_f(V, psi, sigma): banded Newton in log V with a bracketed
-   elementwise fallback; returns the number of Newton iterations (negative if the fallback ran) */
+/* coupled solve H + K V = tau_f(V, psi, sigma), slip in both directions: banded Newton in
+   log |V| with the signs from each element's stress at rest (rechecked after convergence), a
+   bracketed elementwise fallback; returns the number of Newton iterations (negative if the
+   fallback ran) */
 int fd_rsf_solve(const struct fd_rsf *f, struct fd_sys *s, struct fd_ops *op, const double *H, const double *sigma,
                  const double *psi, const double *Vg, double *V);
 

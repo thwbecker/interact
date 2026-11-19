@@ -26,15 +26,21 @@
 #include <stdlib.h>
 #include "fd_kernels.h"
 
+/* Heaviside step, 0 at x = 0 (the wave fronts are open: the kernel vanishes at the arrival) */
 static double heav(double x)
 {
   return x > 0.0 ? 1.0 : 0.0;
 }
+/* sign, 0 at 0 */
 static double sgn(double x)
 {
   return x > 0.0 ? 1.0 : (x < 0.0 ? -1.0 : 0.0);
 }
 
+/* Tada and Madariaga (2001) A4-A6: the dimensionless functions I11, I12, I22 (in I[0], I[1],
+   I[2]) of a half-infinite in-plane slip-rate step x' < x1 seen at offset (x1, x2) and time t;
+   the P (HL) and S (HT) fronts and the head-wave-free term arc for the shear component; a segment
+   is the difference of two of them (fd_seg_ramp_inplane) */
 void fd_I_inplane(double x1, double x2, double t, double alpha, double beta, double I[3])
 {
   double r = hypot(x1, x2), p = beta / alpha, HL, HT, gL, gT, gL3, gT3, q, q2, a1, a2, Hpl, arg, arc, ax;
@@ -72,6 +78,8 @@ void fd_I_inplane(double x1, double x2, double t, double alpha, double beta, dou
   I[1] = Hpl - (1.0 / M_PI) * sgn(x1) * HL * (2.0 * ax / r) * p * (q2 * p * p * gL3 + 2.0 * a2 * p * p * gL) + (1.0 / M_PI) * sgn(x1) * HT * ((2.0 * ax / r) * (q2 * gT3 + 2.0 * a2 * gT) - arc);
 }
 
+/* stresses (sxx, sxy, syy) at (xr, yr) in the source frame from unit slip rate on |x| <= a since
+   t = 0 (the ramp response the tables sample at the lags) */
 void fd_seg_ramp_inplane(double xr, double yr, double t, double a, double alpha, double beta, double rho, double s[3])
 {
   double mu = rho * beta * beta, Ip[3], Im[3], f = -(mu / (2.0 * beta));
@@ -82,6 +90,7 @@ void fd_seg_ramp_inplane(double xr, double yr, double t, double a, double alpha,
     s[k] = f * (Ip[k] - Im[k]);
 }
 
+/* Ando et al. (2007) 30-31: the antiplane counterparts (s31, s32 functions) of fd_I_inplane */
 void fd_I_antiplane(double x1, double x2, double t, double beta, double I[2])
 {
   double r = hypot(x1, x2), Hs, gb, Hpl, arg, arc;
@@ -104,6 +113,7 @@ void fd_I_antiplane(double x1, double x2, double t, double beta, double I[2])
   I[1] = Hpl + (1.0 / M_PI) * sgn(x1) * Hs * ((fabs(x1) / r) * gb - arc);  /* eq. 31 */
 }
 
+/* stresses (s31, s32) at (xr, yr) from unit slip rate on |x| <= a since t = 0 (antiplane) */
 void fd_seg_ramp_antiplane(double xr, double yr, double t, double a, double beta, double rho, double s[2])
 {
   double mu = rho * beta * beta, Ip[2], Im[2], f = -(mu / (2.0 * beta));
@@ -114,6 +124,8 @@ void fd_seg_ramp_antiplane(double xr, double yr, double t, double a, double beta
 }
 
 /* static limits */
+/* static stresses of a unit edge dislocation at the origin (plane strain), for the segment as the
+   difference of two (fd_static_inplane) */
 static void edge(double x, double y, double mu, double nu, double s[3])
 {
   double D = mu / (2.0 * M_PI * (1.0 - nu)), r2 = x * x + y * y;
@@ -121,6 +133,7 @@ static void edge(double x, double y, double mu, double nu, double s[3])
   s[1] =  D * x * (x * x - y * y) / (r2 * r2);
   s[2] =  D * y * (x * x - y * y) / (r2 * r2);
 }
+/* static limit of fd_seg_ramp_inplane per unit slip: edge dislocations at -a and +a */
 void fd_static_inplane(double xr, double yr, double a, double mu, double nu, double s[3])
 {
   double p1[3], p2[3];
@@ -130,6 +143,7 @@ void fd_static_inplane(double xr, double yr, double a, double mu, double nu, dou
   for(k = 0; k < 3; k++)
     s[k] = p1[k] - p2[k];
 }
+/* static limit per unit slip, antiplane: screw dislocations at -a and +a */
 void fd_static_antiplane(double xr, double yr, double a, double mu, double s[2])
 {
   double x, y, r2;
@@ -155,6 +169,8 @@ double fd_c_12p_m1(double, double, double, double);
 double fd_c_12p_m3(double, double, double, double);
 double fd_c_12p_m5(double, double, double, double);
 
+/* the generated large-time coefficient (fd_series_coeffs.c) of component name (0: 11, 1: 22,
+   2: 12) and order k (1, 3, 5: the t^-1, t^-3, t^-5 terms) at the offset (x1, x2) */
 static double cm(int name, int k, double x1, double x2, double alpha, double beta)
 {
   double v, X;
@@ -170,6 +186,9 @@ static double cm(int name, int k, double x1, double x2, double alpha, double bet
 
 /* dynamic correction over [t, t + dt] at large beta t / r, physical (sxx, sxy, syy):
    -(mu/(2 beta)) sum_k [c_k(x+a) - c_k(x-a)] [(t+dt)^-k - t^-k], k = 1, 3, 5 */
+/* the increment of the ramp response between t and t + dt (one lag of the table) by the large-time
+   series (t^-1, t^-3, t^-5 terms, coefficients generated in fd_series_coeffs.c); the tables switch
+   to it from the closed form at the lag lsw (fd_tables.c) */
 void fd_series_inplane(double xr, double yr, double t, double dt, double a, double alpha, double beta, double rho, double s[3])
 {
   double mu = rho * beta * beta, f = -(mu / (2.0 * beta)), acc, dc;
@@ -187,6 +206,9 @@ void fd_series_inplane(double xr, double yr, double t, double dt, double a, doub
 /* rotate a source-frame tensor to global and return shear and normal
    traction on a receiver with tangent sr (normal rot90(sr) = (-sr_y, sr_x));
    source frame axes in global: ss and rot90(ss) */
+/* shear and normal traction on a receiver with unit tangent sr from stresses given in the frame of
+   a source with unit tangent ss (rotated to the global frame first); normal = sr rotated by +90
+   degrees */
 void fd_project(double sxx, double sxy, double syy, const double ss[2], const double sr[2], double *ts, double *tn)
 {
   double ns[2] = {-ss[1], ss[0]}, nr[2] = {-sr[1], sr[0]};
