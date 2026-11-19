@@ -3680,9 +3680,25 @@ into polylines; two splays of 1005.8 and 992.4 m had stopped the setup. A sectio
 splays (280 elements of 1 km) now passes it.
 Idealized section at 1 km (megathrust to 60 km and one splay, 257 elements; one core): all tables
 458 s against 1134 s before the anchors, static gate unchanged (1.552e-8).
+Profile (gprof, 30 elements of 200 m, 300 lags): half the time in the C library's complex
+division (__divdc3, with its overflow guards). Now: cdh_div (multiplication by the conjugate over
+the squared modulus; the moduli stay far from overflow), omega^2 = -1 used directly in the
+incident Green's function, tau and tau' sharing their square roots in Newton (bit-identical to
+before), and the path point predicted from the previous lag's point and dq/dt. 20.0 s for every
+lag, 6.2 s with the anchors, 3.7 s with cdh_div, 2.8 s with the shared roots, 2.5 s with the
+prediction. The prediction changes the late lags of short-t0 entries by up to 6.5e-7 of the
+largest value (near 40 t0 the four rays cancel to about 1e-8, so q's last digits matter; the tail
+was accurate to about 5e-5 anyway). A rewrite of the incident algebra (sums over p, r written out)
+gained nothing and was dropped. 1 km idealized section: all tables 233 s on one core (1134 s
+before the anchors, 458 s with them), static gate 1.552e-8.
 Prototype tests (run_proto_tests.sh all): all pass except test_hd.py, which fails on the master
 too: case D's fault-1 end time is 5.28 s against Harris and Day's 5.6 s with a tolerance of 0.3 s
-(the C test fd_dynamic hd compares with stored prototype traces and passes). Not investigated.
+(the C test fd_dynamic hd compares with stored prototype traces and passes). Bisected: it passed
+when added (7bc1cc3, 2026-10-11) and fails from a4950d9 (2026-10-18, "fixed bug"), the fix of the
+history indexing in shells.System.history_stress (lag l refers to the slice pushed at
+k + lag0 - 1 - l), which also regenerated ref_tpv205_dx100.txt. So the 5.6 +- 0.3 s held with the
+indexing error; with the fix the end time is 5.28 s. Whether to widen the tolerance (Harris and Day's
+5.6 s is itself at their resolution) is left open.
 
 ### Layout of 2026-11-20 (tests and fully_dynamic reorganized)
 

@@ -34,6 +34,8 @@ struct cdh_ws {                /* one entry's arrival grid and the previous lag'
   double t0g[4][CDH_NGRID + 1];
   int npc[4];                                   /* pieces evaluated at the previous lag, -1 none */
   double complex qp[4][CDH_NPIECE][CDH_NQ];
+  double complex dqp[4][CDH_NPIECE][CDH_NQ];    /* their dq/dt, for a linear prediction */
+  double tp[4];                                 /* the time of the previous lag */
   unsigned char ok[4][CDH_NPIECE][CDH_NQ];
 };
 
@@ -47,6 +49,17 @@ static const double cdh_gw[CDH_NQ] = {
    0.1495959888165767, 0.1691565193950025, 0.1826034150449236, 0.1894506104550685,
    0.1894506104550685, 0.1826034150449236, 0.1691565193950025, 0.1495959888165767,
    0.1246289712555339, 0.0951585116824928, 0.0622535239386479, 0.0271524594117541};
+
+/* complex division without the overflow guards of the C library (__divdc3, half the time of the
+   table builder): the moduli here stay far from overflow and underflow */
+static inline double complex cdh_div(double complex a, double complex b)
+{
+  double br, bi, d;
+  br = creal(b);
+  bi = cimag(b);
+  d = 1.0/(br*br + bi*bi);
+  return CMPLX((creal(a)*br + cimag(a)*bi)*d, (cimag(a)*br - creal(a)*bi)*d);
+}
 
 /* sqrt(1/c^2 - q^2) with a non-negative real part */
 static double complex cdh_eta(double complex q, double c)
@@ -80,14 +93,14 @@ static void cdh_incident(const struct cdh_med *m, double complex q, int c1, doub
   Dr[1] = nu;
   Ds[0] = -I*k;
   Ds[1] = -nu;
-  g = 1.0/(2.0*nu);
+  g = cdh_div(1.0, 2.0*nu);
   for(i = 0; i < 2; i++){
     u[i] = 0.0;
     for(p = 0; p < 2; p++){
       if(c1)
-        Gip = (kb2*(i == p ? 1.0 : 0.0) + Dr[i]*Dr[p])*g/(m->rho*w*w);
+        Gip = -(kb2*(i == p ? 1.0 : 0.0) + Dr[i]*Dr[p])*g/m->rho;      /* w^2 = -1 */
       else
-        Gip = -(Dr[i]*Dr[p])*g/(m->rho*w*w);
+        Gip = (Dr[i]*Dr[p])*g/m->rho;
       for(r = 0; r < 2; r++)
         u[i] += mm[p][r]*Ds[r]*Gip;
     }
@@ -116,12 +129,12 @@ static void cdh_ray(const struct cdh_med *m, double complex q, int c1, int c2, d
   det = PxzA*PzzB - PxzB*PzzA;
   cdh_incident(m, q, c1, tx, tz, &txz, &tzz);
   if(c2 == 0){
-    A = (-txz*PzzB + tzz*PxzB)/det;
+    A = cdh_div(-txz*PzzB + tzz*PxzB, det);
     ux = I*k*A;
     uz = -na*A;
     nu = na;
   }else{
-    A = (-tzz*PxzA + txz*PzzA)/det;
+    A = cdh_div(-tzz*PxzA + txz*PzzA, det);
     ux = nb*A;
     uz = I*k*A;
     nu = nb;
@@ -138,7 +151,7 @@ static double complex cdh_tau(double complex q, double X, double h1, double c1, 
 
 static double complex cdh_dtau(double complex q, double X, double h1, double c1, double h2, double c2)
 {
-  return X - q*h1/cdh_eta(q, c1) - q*h2/cdh_eta(q, c2);
+  return X - cdh_div(q*h1, cdh_eta(q, c1)) - cdh_div(q*h2, cdh_eta(q, c2));
 }
 
 /* the real stationary point (Snell's law) and the arrival time of a ray: Newton on tau'(q) = 0
@@ -180,11 +193,13 @@ static void cdh_saddle(double X, double h1, double c1, double h2, double c2, dou
 /* Newton on tau(q) = t from g (upper half plane); returns 1 if converged */
 static int cdh_newton(double t, double X, double h1, double c1, double h2, double c2, double complex *g)
 {
-  double complex f, dg;
+  double complex f, dg, e1, e2;
   int it;
   for(it = 0; it < 60; it++){
-    f = cdh_tau(*g, X, h1, c1, h2, c2) - t;
-    dg = f/cdh_dtau(*g, X, h1, c1, h2, c2);
+    e1 = cdh_eta(*g, c1);                       /* tau and tau' share the square roots */
+    e2 = cdh_eta(*g, c2);
+    f = *g*X + e1*h1 + e2*h2 - t;
+    dg = cdh_div(f, X - cdh_div(*g*h1, e1) - cdh_div(*g*h2, e2));
     *g -= dg;
     if(cimag(*g) < 0.0)
       *g = creal(*g) + 1e-30*I;
@@ -207,7 +222,7 @@ static int cdh_path(double t, double X, double h1, double c1, double h2, double 
     g = *qw;
     if(cdh_newton(t, X, h1, c1, h2, c2, &g) && (cimag(g) > 0.0)){
       *q = g;
-      *dq = 1.0/cdh_dtau(g, X, h1, c1, h2, c2);
+      *dq = cdh_div(1.0, cdh_dtau(g, X, h1, c1, h2, c2));
       return 1;
     }
   }
@@ -221,7 +236,7 @@ static int cdh_path(double t, double X, double h1, double c1, double h2, double 
     cdh_newton(tt, X, h1, c1, h2, c2, &g);
   }
   *q = g;
-  *dq = 1.0/cdh_dtau(g, X, h1, c1, h2, c2);
+  *dq = cdh_div(1.0, cdh_dtau(g, X, h1, c1, h2, c2));
   return 1;
 }
 
@@ -354,8 +369,8 @@ static void cdh_seg_ray(const struct cdh_med *m, const struct cdh_geo *e, struct
 {
   double br[2*CDH_NGRID + 4];
   double ta, tb, th, tau, jac, X, h1;
-  double complex q, dq, sg[3];
-  int i, nb, k, n, r, np_, warm;
+  double complex q, dq, sg[3], qg;
+  int i, nb, k, n, r, np_, warm, use;
   r = 2*c1 + c2;
   out[0] = out[1] = out[2] = 0.0;
   nb = cdh_breakpoints(m, e, w, t, c1, c2, br);
@@ -376,14 +391,18 @@ static void cdh_seg_ray(const struct cdh_med *m, const struct cdh_geo *e, struct
       jac = (tb - ta)*0.5*sin(th)*0.5*M_PI;
       X = e->xr - (e->xs + tau*e->tx);
       h1 = e->zs + tau*e->tz;
+      use = warm && (k < CDH_NPIECE) && w->ok[r][k][n];
+      if(use)
+        qg = w->qp[r][k][n] + w->dqp[r][k][n]*(t - w->tp[r]);    /* predicted from the previous lag */
       if(!cdh_path(t, X, h1, c1 ? m->beta : m->alpha, e->zr, c2 ? m->beta : m->alpha, &q, &dq,
-                   (warm && (k < CDH_NPIECE) && w->ok[r][k][n]) ? &w->qp[r][k][n] : NULL)){
+                   use ? &qg : NULL)){
         if(k < CDH_NPIECE)
           w->ok[r][k][n] = 0;
         continue;
       }
       if(k < CDH_NPIECE){
         w->qp[r][k][n] = q;
+        w->dqp[r][k][n] = dq;
         w->ok[r][k][n] = 1;
       }
       cdh_ray(m, q, c1, c2, e->tx, e->tz, sg);
@@ -393,6 +412,7 @@ static void cdh_seg_ray(const struct cdh_med *m, const struct cdh_geo *e, struct
     np_++;
   }
   w->npc[r] = nb - 1;
+  w->tp[r] = t;
 }
 
 static void cdh_seg_total(const struct cdh_med *m, const struct cdh_geo *e, struct cdh_ws *w, double t, double out[3])
