@@ -55,6 +55,19 @@ def read_series(d, nc):
     return np.array(s["t"]) / YR, s["f"][:, 0, :]
 
 
+def run_finished(d):
+    """True if rsf_solve.log ends with the /usr/bin/time line of a run that
+    exited normally (a failed or killed run also gets a "wall" line, after
+    "Command exited with non-zero status" or "Command terminated by signal")"""
+    try:
+        tail = open(os.path.join(d, "rsf_solve.log")).read().splitlines()[-3:]
+    except OSError:
+        return False
+    if not tail or not tail[-1].startswith("wall"):
+        return False
+    return not any("non-zero status" in t or "terminated by signal" in t for t in tail)
+
+
 def read_monitor(d, cols=(2, 4)):
     """columns of rsf_monitor.dat (default time [yr], log10 max slip rate),
     skipping comment lines and lines cut off when a run was interrupted
@@ -185,9 +198,8 @@ def main():
     for d in sorted(glob.glob(os.path.join(rd, "*_X*"))):
         if not os.path.exists(os.path.join(d, "rsf_catalog.dat")):
             continue
-        lines_log = open(os.path.join(d, "rsf_solve.log")).read().splitlines()
-        if not lines_log or not lines_log[-1].startswith("wall"):
-            continue                    # run not finished
+        if not run_finished(d):
+            continue                    # run not finished or failed
         p, r = analyze(d)
         res[(p["model"], p["law"], p["X"])] = (p, r, stats(p, r))
     lines = ["%-9s %-6s %6s %6s %5s %6s %6s %6s %6s %6s" % ("model", "law", "X", "events", "full", "alpha", "CV",

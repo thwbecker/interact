@@ -12,7 +12,8 @@ rsf_solve=${rsf_solve-rsf_solve}
 mkdir -p "$rundir"
 cd "$rundir" || exit 1
 run () {   # X a/b vs_W name
-    tail -1 $4/rsf_solve.log 2>/dev/null | grep -q '^wall' && return
+    tail -1 $4/rsf_solve.log 2>/dev/null | grep -q '^wall' &&
+        ! tail -3 $4/rsf_solve.log | grep -q 'non-zero status\|terminated by signal' && return
     python3 "$sdir/gen_antiplane.py" cattania $1 --law aging --cpl 4 --a_over_b $2 --vs_W $3 --out $4 || return
     (cd $4 &&
      t=$(awk '{for(i=1;i<=NF;i++) if($i=="t_est_yr") print $(i+1)}' params.txt) &&

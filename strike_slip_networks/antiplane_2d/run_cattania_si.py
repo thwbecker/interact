@@ -43,10 +43,15 @@ def gen(law, b, ab, x, out):
 
 
 def done(d):
+    """finished and exited normally (a failed or killed run also ends with
+    the "wall" line of /usr/bin/time, after a non-zero status or a signal)"""
     try:
-        return open(os.path.join(d, "rsf_solve.log")).read().splitlines()[-1].startswith("wall")
-    except (OSError, IndexError):
+        tail = open(os.path.join(d, "rsf_solve.log")).read().splitlines()[-3:]
+    except OSError:
         return False
+    if not tail or not tail[-1].startswith("wall"):
+        return False
+    return not any("non-zero status" in t or "terminated by signal" in t for t in tail)
 
 
 os.makedirs(rundir, exist_ok=True)
@@ -72,6 +77,7 @@ for cost, law, b, ab, x, n in sorted(jobs):
     with open(os.path.join(d, "rsf_solve.log"), "w") as log:
         subprocess.run(["/usr/bin/time", "-f", "wall %e s", rsf_solve] + opts, cwd=d, stdout=log,
                        stderr=subprocess.STDOUT)
-    last = open(os.path.join(d, "rsf_solve.log")).read().splitlines()[-1]
+    tail = open(os.path.join(d, "rsf_solve.log")).read().splitlines()
+    last = " | ".join(tail[-2:]) if tail else "(empty log)"
     print("%s (%i cells): %s" % (d, n, last), flush=True)
 print("CATTANIA_SI_DONE", flush=True)

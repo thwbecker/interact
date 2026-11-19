@@ -10,7 +10,10 @@ laws=${3-"aging slip"}
 sdir=$(cd "$(dirname "$0")" && pwd)
 mkdir -p "$rundir"
 cd "$rundir" || exit 1
-done_run () { tail -1 $1/rsf_solve.log 2>/dev/null | grep -q "^wall"; }
+# finished and exited normally (a failed or killed run also ends with the
+# "wall" line of /usr/bin/time, after a non-zero status or a signal)
+done_run () { tail -1 $1/rsf_solve.log 2>/dev/null | grep -q "^wall" &&
+              ! tail -3 $1/rsf_solve.log | grep -q "non-zero status\|terminated by signal"; }
 for law in $laws; do
     for X in 3 8.6 20 31.5 63; do
         done_run wuchen_${law}_X$X || "$sdir/run_antiplane" wuchen $X $law $ncyc 8 0 wuchen_${law}_X$X

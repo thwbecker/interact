@@ -13,7 +13,10 @@ maxcells=${4-700}
 sdir=$(cd "$(dirname "$0")" && pwd)
 mkdir -p "$rundir"
 cd "$rundir" || exit 1
-done_run () { tail -1 $1/rsf_solve.log 2>/dev/null | grep -q "^wall"; }
+# finished and exited normally (a failed or killed run also ends with the
+# "wall" line of /usr/bin/time, after a non-zero status or a signal)
+done_run () { tail -1 $1/rsf_solve.log 2>/dev/null | grep -q "^wall" &&
+              ! tail -3 $1/rsf_solve.log | grep -q "non-zero status\|terminated by signal"; }
 ncells () { python3 "$sdir/gen_antiplane.py" $1 $2 --a_over_b $3 --cpl 4 --out /tmp/ncells_$$ | \
                 awk '{for(i=1;i<=NF;i++) if($i=="VW") v=$(i-1); else if($i=="VS") s=$(i-1)} END{print v+s}'; }
 wuchen_scan () {

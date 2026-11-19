@@ -71,8 +71,7 @@ def main():
         if not os.path.exists(os.path.join(d, "fltst_load.dat")):
             continue
         try:
-            ll = open(os.path.join(d, "rsf_solve.log")).read().splitlines()
-            if not ll or not ll[-1].startswith("wall"):
+            if not pa.run_finished(d):
                 continue
             b = budget(d)
         except Exception as e:          # noqa: BLE001

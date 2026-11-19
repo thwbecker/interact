@@ -45,11 +45,7 @@ def main():
                 res[(w[0], float(w[1]), float(w[2]), float(w[3]))].update(nlen=w[8], period=w[9])
         rd = os.path.dirname(os.path.abspath(rd))
     for d in sorted(glob.glob(os.path.join(rd, "si_*_b*_ab*_X*"))):
-        try:
-            ll = open(os.path.join(d, "rsf_solve.log")).read().splitlines()
-        except OSError:
-            continue
-        if not ll or not ll[-1].startswith("wall"):
+        if not pa.run_finished(d):
             continue
         name = os.path.basename(d)
         law = name.split("_")[1]

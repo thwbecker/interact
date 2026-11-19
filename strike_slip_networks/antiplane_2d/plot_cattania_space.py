@@ -36,11 +36,7 @@ def main():
     rd = sys.argv[1] if len(sys.argv) > 1 else "."
     res = {}
     for d in sorted(glob.glob(os.path.join(rd, "cattania_*_ab*_X*"))):
-        try:
-            ll = open(os.path.join(d, "rsf_solve.log")).read().splitlines()
-        except OSError:
-            continue
-        if not ll or not ll[-1].startswith("wall"):
+        if not pa.run_finished(d):
             continue
         name = os.path.basename(d)
         law = name.split("_")[1]

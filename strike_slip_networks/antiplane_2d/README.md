@@ -642,3 +642,40 @@ W/L_inf 16: 2; b 0.02, a/b 0.5, W/L_inf 16: 5); b 0.01, a/b 0.3,
 W/L_inf 16 (all full ruptures, CV 0.07) has no period up to 16. With the
 slip law at a/b 0.3, b 0.02, the W/L_inf 32 and 64 runs have period 4
 (full ruptures of slightly different length and timing).
+
+## Failed runs counted as finished (fixed 2026-11-18)
+
+/usr/bin/time also writes its "wall" line when rsf_solve fails or is
+killed (after "Command exited with non-zero status" or "Command
+terminated by signal"), so runs that stopped at once were taken as
+complete by the drivers (and skipped on restart) and by the plot scripts
+(and listed with 0 or 1 events). All drivers and plot scripts now use
+the same test (plot_antiplane.run_finished; done_run in the bash drivers):
+the log ends with "wall" and the last three lines contain neither of
+those messages. Runs that failed are therefore rerun on the next start
+of the driver. The Python drivers also no longer stop when a run leaves
+an empty log.
+
+## Final slip-law study (`run_slip_final`)
+
+`run_slip_final [np] [rundir]` runs `run_slip_space.py --plan final` (104
+runs, Cattania setup with her S1 settings) and writes the summary with
+plot_slip_space.py:
+
+- slip law, b 0.02, a/b 0.1, 0.2, 0.3, 0.4, 0.5, W/L_inf 16 to 256; a/b
+  0.625 to 128 and 0.75 to 64;
+- slip law, b 0.01, a/b 0.3 and 0.5, W/L_inf 16 to 256;
+- aging law at the same settings as reference, b 0.02, a/b 0.1 to 0.5,
+  W/L_inf 16 to 128;
+- two state variables, b 0.02, a/b 0.3 and 0.5, W/L_inf 16 to 128, and at
+  a/b 0.5, W/L_inf 4 to 32, dc1/dc2 = 0.048, 0.2, 0.5 and b2/b1 = 0.5,
+  0.84, 2.
+
+The largest runs have about 5000 cells. Before running, every existing run
+directory is classified: finished runs are skipped, runs stopped by a
+signal are continued from rsf_checkpoint.bin (the earlier log is kept as
+rsf_solve.log.<n>), runs with a non-zero exit status, an empty log or no
+checkpoint are deleted and run again, and runs that are the working
+directory of a running rsf_solve are left alone (`--dry` lists this
+without running). Tested here on a finished, a killed (continued from
+its checkpoint at 4.8 yr) and a failed run (rerun from the start).

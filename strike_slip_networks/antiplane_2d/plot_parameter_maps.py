@@ -68,11 +68,7 @@ def main():
     rd = sys.argv[1] if len(sys.argv) > 1 else "."
     res = {}
     for d in sorted(glob.glob(os.path.join(rd, "*_ab*_X*"))):
-        log = os.path.join(d, "rsf_solve.log")
-        if not os.path.exists(log):
-            continue
-        ll = open(log).read().splitlines()
-        if not ll or not ll[-1].startswith("wall"):
+        if not pa.run_finished(d):
             continue
         name = os.path.basename(d)
         model, law = name.split("_")[:2]

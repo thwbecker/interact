@@ -1,0 +1,17 @@
+#!/bin/bash
+#
+# run_slip_final [np] [rundir]: the final slip-law study (run_slip_space.py
+# --plan final, about 104 runs, Cattania setup with her S1 settings): first
+# lists what will be done, then cleans up and runs. Finished runs are
+# skipped, runs stopped by a signal are continued from their checkpoint,
+# failed runs are deleted and run again, runs in use by another rsf_solve
+# are left alone. Writes the summary table and figure at the end
+# (plot_slip_space.py); can be restarted at any time.
+#
+np=${1-16}
+rundir=${2-slip_space}
+sdir=$(cd "$(dirname "$0")" && pwd)
+"$sdir/run_slip_space.py" --plan final --np $np --dir "$rundir" --dry
+"$sdir/run_slip_space.py" --plan final --np $np --dir "$rundir"
+"$sdir/plot_slip_space.py" "$rundir" > /dev/null
+echo "summary in $rundir/slip_space.txt and $rundir/slip_space.png"
