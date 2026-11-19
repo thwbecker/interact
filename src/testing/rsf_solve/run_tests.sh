@@ -119,6 +119,13 @@ if command -v python3 > /dev/null 2>&1 && [ -s ${TDD_LIB-/tmp/tdd/libtdd.so} ]; 
     python3 ../fully_dynamic/test_fd_hpdwn_batch.py hpb.txt > fd3d.out 2>&1 )
   tail -1 tmp_fd_dynamic/fd3d.out; grep -q PASS tmp_fd_dynamic/fd3d.out || fail=1
 fi
+# reflected tables by Cagniard-de Hoop (fd_plan.md M11): C against the prototype halfplane_cdh.py
+# and the static against Crouch and Starfield (same tdd library)
+if command -v python3 > /dev/null 2>&1 && [ -s ${TDD_LIB-/tmp/tdd/libtdd.so} ]; then
+  ( cd tmp_fd_dynamic && ../bin/test_fd_hpdwn_batch 4 250 500 40 cdh > hpc.txt 2>/dev/null && \
+    python3 ../fully_dynamic/test_fd_hpcdh.py hpc.txt > fd3d.out 2>&1 )
+  tail -1 tmp_fd_dynamic/fd3d.out; grep -q PASS tmp_fd_dynamic/fd3d.out || fail=1
+fi
 # 2-D in-plane half plane with exact kernels (fd_plan.md M10): spontaneous rupture on a 3 km fault
 # of 200 m dipping 30 degrees, buried (top 400 m) or reaching the surface, thrust and normal;
 # |slip| top / middle / bottom within 1 cm of the values of 2026-11-05 at FD_HPDWN_Q = 8 (the
@@ -133,6 +140,17 @@ for c in "-1 0.673 1.322 0.663 400" "1 0.229 0.916 0.563 400" "-1 2.305 2.087 0.
        END {if(top == ""){print "fd_dynamic fsrup: FAIL (no result)"; exit 1}
             d=0; e=top-t; if(e<0)e=-e; if(e>d)d=e; e=mid-m; if(e<0)e=-e; if(e>d)d=e; e=bot-b; if(e<0)e=-e; if(e>d)d=e;
             if(d<=0.01) print "fd_dynamic fsrup (half plane, sense " sense ", fault top " ftop " m): PASS (largest slip difference " d " m)"; else {print "fd_dynamic fsrup (half plane, sense " sense ", fault top " ftop " m): FAIL (" d " m)"; exit 1}}' sense=$1 ftop=$5 tmp_fd_dynamic/fsrup.out || fail=1
+done
+# the same ruptures with the Cagniard-de Hoop tables (FD_HP_METHOD=cdh, fd_plan.md M11), within 1 cm
+# of their values of 2026-11-19; they differ from the DWN values above by up to 15 mm (bottom of the
+# thrust reaching the surface), where DWN, band-limited, smooths the arrivals; seconds each
+for c in "-1 0.672 1.323 0.657 400" "1 0.229 0.916 0.563 400" "-1 2.300 2.090 0.883 0" "1 1.561 1.555 0.770 0"; do
+  set -- $c
+  ( cd tmp_fd_dynamic && FD_HP_METHOD=cdh ../bin/fd_dynamic fsrup $1 1 3000 200 $5 3 30 > fsrup.out 2>/dev/null )
+  awk -v t=$2 -v m=$3 -v b=$4 '{for(i=1;i<=NF;i++) if($i=="bottom"){top=$(i+1); mid=$(i+3); bot=$(i+5)}}
+       END {if(top == ""){print "fd_dynamic fsrup cdh: FAIL (no result)"; exit 1}
+            d=0; e=top-t; if(e<0)e=-e; if(e>d)d=e; e=mid-m; if(e<0)e=-e; if(e>d)d=e; e=bot-b; if(e<0)e=-e; if(e>d)d=e;
+            if(d<=0.01) print "fd_dynamic fsrup cdh (half plane, sense " sense ", fault top " ftop " m): PASS (largest slip difference " d " m)"; else {print "fd_dynamic fsrup cdh (half plane, sense " sense ", fault top " ftop " m): FAIL (" d " m)"; exit 1}}' sense=$1 ftop=$5 tmp_fd_dynamic/fsrup.out || fail=1
 done
 # non-parallel 2-D pairs (fd_plan.md N1): dense tables against the prototype for a kinked pair
 if command -v python3 > /dev/null 2>&1; then

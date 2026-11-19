@@ -322,7 +322,7 @@ INTERACT_OBJS_SGL = $(INTERACT_OBJS:.o=.sgl.o)
 # objects for rsf_solve
 # the rsf_* sources live in src/rsf_solve/ (VPATH); rsf_fd.o and fd_fft.o
 # are the fully dynamic extension, inert unless -fd_mode is given
-FD_OBJS = $(ODIR)/fd_fft.o $(ODIR)/fd_kernels.o $(ODIR)/fd_hpdwn.o $(ODIR)/fd_series_coeffs.o \
+FD_OBJS = $(ODIR)/fd_fft.o $(ODIR)/fd_kernels.o $(ODIR)/fd_hpdwn.o $(ODIR)/fd_hpcdh.o $(ODIR)/tdd_coeff.o $(ODIR)/fd_series_coeffs.o \
 	$(ODIR)/fd_tables.o $(ODIR)/fd_segments.o $(ODIR)/fd_march.o $(ODIR)/fd_band.o $(ODIR)/fd3d.o
 RSF_SOLVE_OBJS = $(ODIR)/rsf_solve.o $(ODIR)/rsf_engine.o $(ODIR)/rsf_imex.o \
 	$(ODIR)/rsf_init.o $(ODIR)/rsf_output.o $(ODIR)/rsf_ve.o \
@@ -1057,6 +1057,7 @@ $(ODIR)/ex_dense_v2.o:	ex_dense_v2.c $(GEN_P_INC)
 $(ODIR)/fd_tables.o: CFLAGS += $(OPENMP_FLAGS)
 $(ODIR)/rsf_fd.o: CFLAGS += $(OPENMP_FLAGS)
 $(ODIR)/fd_hpdwn.o: CFLAGS += $(OPENMP_FLAGS)
+$(ODIR)/fd_hpcdh.o: CFLAGS += $(OPENMP_FLAGS)
 
 $(ODIR)/%.o:	%.c $(GEN_P_INC)
 	$(CC) $(CFLAGS)  $(OPTIM_FLAGS)  $(MY_PRECISION) -c $< -o $(ODIR)/$*.o

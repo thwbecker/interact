@@ -505,7 +505,7 @@ int fd_hpdwn_batch_ext(int ns, const double *sx, const double *sz, const double 
     L = alpha*T + 2.0*(xmax - xmin);
   else
     L = 1.1*alpha*nt*dt + 2.0*(xmax - xmin);
-  h = 0.25*fmin(amin, zsum);
+  h = (getenv("FD_HPDWN_HFRAC") ? atof(getenv("FD_HPDWN_HFRAC")) : 0.25)*fmin(amin, zsum);   /* wavenumbers to 2 pi / h */
   M = (int)ceil(L/h);
   /* receivers in blocks, the spectra of a block within FD_HPDWN_MEM bytes (default a quarter of
      the physical memory, at least 2e9). Every block repeats the source amplitudes of all
@@ -518,7 +518,7 @@ int fd_hpdwn_batch_ext(int ns, const double *sx, const double *sz, const double 
   if(getenv("FD_HPDWN_VERBOSE"))
     fprintf(stderr, "fd_hpdwn: %d sources, %d receivers in blocks of %d, %d lags, %d frequencies, wavenumbers to %d\n",
             ns, nr, nb, nt, N/2 + 1, M);
-  for(i0 = 0; i0 < nr; i0 += nb){
+  for(i0 = 0; (nt > 0) && (i0 < nr); i0 += nb){    /* nt = 0: the static part only (fd_hpcdh.c) */
     n = (nr - i0 < nb) ? nr - i0 : nb;
     if(batch_block(ns, sx, sz, stx, stz, sa, n, rx + i0, rz + i0, rtx + i0, rtz + i0, alpha, beta, rho, dt, nt, q, N, T, L, M,
                    zsum, os + (size_t)i0*ns*nt, on + (size_t)i0*ns*nt))

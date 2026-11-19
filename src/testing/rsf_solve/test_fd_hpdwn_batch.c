@@ -1,12 +1,14 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+#include <string.h>
 #include "fd_hpdwn.h"
+#include "fd_hpcdh.h"
 /* test of fd_hpdwn_batch (fd_plan.md M10): a 30 degree fault of n elements of h, top at depth top, all
    pairs, nt lags of dt = 0.5 h / beta; writes the static reflected tractions (K i j shear normal)
    and the lag series (S i j l shear normal); fully_dynamic/test_fd_hpdwn_batch.py compares them with
    Crouch and Starfield and with halfplane_dwn.py.
-   usage: test_fd_hpdwn_batch [n] [h] [top] [nt] */
+   usage: test_fd_hpdwn_batch [n] [h] [top] [nt] [dwn|cdh] (cdh: fd_hpcdh_batch, Cagniard-de Hoop) */
 int main(int argc, char **argv)
 {
   int n, nt, i, j, l;
@@ -23,7 +25,9 @@ int main(int argc, char **argv)
     x[i] = (i + 0.5)*h*tx[i]; z[i] = top + (i + 0.5)*h*tz[i];
   }
   os = malloc(sizeof(double)*n*n*nt); on = malloc(sizeof(double)*n*n*nt); ks = malloc(sizeof(double)*n*n); kn = malloc(sizeof(double)*n*n);
-  if(fd_hpdwn_batch(n, x, z, tx, tz, a, n, x, z, tx, tz, 6000.0, 3464.0, 2670.0, dt, nt, os, on, ks, kn)){
+  if((argc > 5 && !strcmp(argv[5], "cdh")) ?
+     fd_hpcdh_batch(n, x, z, tx, tz, a, n, x, z, tx, tz, n, x, z, 6000.0, 3464.0, 2670.0, dt, nt, os, on, ks, kn) :
+     fd_hpdwn_batch(n, x, z, tx, tz, a, n, x, z, tx, tz, 6000.0, 3464.0, 2670.0, dt, nt, os, on, ks, kn)){
     fprintf(stderr, "failed\n");
     return 1;
   }

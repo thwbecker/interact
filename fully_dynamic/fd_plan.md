@@ -3661,6 +3661,48 @@ interpolation. Estimated 1e4 to 1e5 flops per entry and lag, i.e. about 4e13 for
 (900 elements, about 800 lags per entry on average), minutes on 64 threads, against tens of
 hours for DWN at q = 2.
 
+### M11 in C: fd_hpcdh.c (2026-11-19/20)
+
+fd_hpcdh_batch (src/rsf_solve/fd_hpcdh.c, fd_hpcdh.h): the same arguments and outputs as
+fd_hpdwn_batch_ext, selected in fd_tables.c by FD_HP_METHOD=cdh (DWN stays the default until
+the comparisons on larger sections). Per entry: the arrival times of the four rays on a grid of
+65 points along the source segment (once), per lag the breakpoints (regula falsi on the exact
+arrival time; a grid value equal to t counts, and an interior minimum between grid points is
+located by golden section), 16 Gauss nodes per piece with the cosine substitution, the path at
+each node by Newton from the previous lag's point at the same node (the saddle and the
+continuation from it only without one), beyond 40 first arrivals the tail K t + c - b / t.
+Static tractions K by Crouch and Starfield (interact's tdd_coeff, half minus full plane; now in
+FD_OBJS), exact, instead of the DWN static evaluation (which differs from it by 2e-5 for the
+rupture-test fault and 2e-4 for a fault from 300 m depth). OpenMP over entries.
+Bugs found on the way: the breakpoint test missed an arrival time equal to t on a grid point
+(self-pairs at the S arrival, 15 percent); a minimum of the arrival time between grid points was
+missed (an O(1) error just after it, since the integral of 1 / sqrt over a minimum does not
+vanish with its width); the Newton saddle could exit at a bisection midpoint (arrival times off by
+up to 96 percent; now 5e-16 against bisection over 80,000 random cases). The prototype has the
+same breakpoint logic now.
+Checks: test_fd_hpcdh.py (run_tests.sh): C against the prototype 1.9e-11 of the largest value
+over all entries and lags before the tail, static against Crouch and Starfield 1.6e-13; tables
+identical on 1 and 3 threads; test_fd_mpi2d.sh with FD_HP_METHOD=cdh: tables and runs identical on 1, 2 and 4 ranks (curved fault and half plane); rsf_solve static gate 1.7e-9 (DWN 7.8e-8). Half-plane ruptures
+(fd_dynamic fsrup, |slip| top / middle / bottom, run_tests.sh with their own references): buried
+thrust 0.672 / 1.323 / 0.657 m (DWN at q = 8: 0.673 / 1.322 / 0.663), buried normal identical,
+thrust to the surface 2.300 / 2.090 / 0.883 (2.305 / 2.087 / 0.898), normal to the surface 1.561 /
+1.555 / 0.770 (1.562 / 1.555 / 0.773); about 1 s each against minutes. The tables differ at lags
+inside fronts: an S-S front 0.835 to 0.846 s wide over the segment sits on lag 29 of entry
+(12, 1), CdH 171,024 Pa, DWN -224,296 Pa (q = 16), neighbours within 3 percent. CdH samples the
+ramp response exactly there (the time stepping is exact for piecewise linear slip with exact
+samples, as the full-plane closed-form tables are); DWN, band-limited, smooths fronts: at a
+front the Python DWN moved toward CdH as wavenumbers were added (60 to 99 kPa against 127 kPa at
+the onset itself, the remaining difference within 0.3 ms of it), and agrees away from it. So the
+15 mm at the bottom of the thrust reaching the surface is taken as DWN's error. FD_HPDWN_HFRAC
+(diagnostic): the wavenumber limit 2 pi / h, h this fraction of min(a, depth sum), default 0.25;
+0.08 left the ruptures unchanged (the frequency-dependent limit binds first).
+Small subduction section (85 elements of 500 m, normal coupling, one core): setup and the QD run
+to the first event 55 s; first event mean slip 1.9010 m (DWN 1.9000), duration 1353.6 s (1358.2),
+peak slip rate 1.745 m/s (1.798).
+Cost: about 26 microseconds per entry and lag on one core in the batch test (12 elements, 400
+lags; approximate); projected about 6 h on one core for PD13 at 250 m (about 8e5 entries, about
+1000 lags), i.e. minutes on 64 threads, to be measured.
+
 ### Slip in both directions and the normal-stress floor (2026-11-18)
 
 Slip direction: the rate-and-state solve of the dynamic phase (fd_rsf_solve) worked in u = ln V

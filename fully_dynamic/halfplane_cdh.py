@@ -165,32 +165,57 @@ def gl(n):
     return x, w
 
 
+def _root(key, t, xr, zr, xs, zs, st, lo, hi):
+    flo = arrival(lo, xr, zr, xs, zs, st, key) - t
+    for it in range(60):
+        m = 0.5*(lo + hi)
+        fm = arrival(m, xr, zr, xs, zs, st, key) - t
+        if (fm <= 0) == (flo <= 0):
+            lo, flo = m, fm
+        else:
+            hi = m
+    return 0.5*(lo + hi)
+
+
+def _argmin(key, xr, zr, xs, zs, st, lo, hi):
+    gr = 0.5*(np.sqrt(5.0) - 1.0)
+    x1, x2 = hi - gr*(hi - lo), lo + gr*(hi - lo)
+    f1, f2 = arrival(x1, xr, zr, xs, zs, st, key), arrival(x2, xr, zr, xs, zs, st, key)
+    for it in range(80):
+        if f1 < f2:
+            hi, x2, f2 = x2, x1, f1
+            x1 = hi - gr*(hi - lo)
+            f1 = arrival(x1, xr, zr, xs, zs, st, key)
+        else:
+            lo, x1, f1 = x1, x2, f2
+            x2 = lo + gr*(hi - lo)
+            f2 = arrival(x2, xr, zr, xs, zs, st, key)
+    return 0.5*(lo + hi)
+
+
 def seg_ray(key, t, xr, zr, xs, zs, st, a, ngrid=64, nq=24):
-    """sxx, sxz, szz of one ray at time t"""
+    """sxx, sxz, szz of one ray at time t; breakpoints where the arrival time equals t (a grid
+    value equal to t counts), also around an interior minimum of the arrival time between grid
+    points (as fd_hpcdh.c)"""
     tg = np.linspace(-a, a, ngrid + 1)
-    t0g = np.array([arrival(v, xr, zr, xs, zs, st, key) for v in tg])
-    f = t0g - t                                   # < 0: the ray has arrived from there
-    # breakpoints: segment ends and roots of t0 = t
-    pts = [(-a, False)]
+    f = np.array([arrival(v, xr, zr, xs, zs, st, key) for v in tg]) - t
+    pts = [-a]
     for i in range(ngrid):
-        if f[i]*f[i + 1] < 0:
-            lo, hi = tg[i], tg[i + 1]
-            for it in range(60):
-                m = 0.5*(lo + hi)
-                fm = arrival(m, xr, zr, xs, zs, st, key) - t
-                if fm*f[i] > 0:
-                    lo = m
+        if (f[i] <= 0) != (f[i + 1] <= 0):
+            pts.append(_root(key, t, xr, zr, xs, zs, st, tg[i], tg[i + 1]))
+        elif i > 0 and f[i] < f[i - 1] and f[i] <= f[i + 1] and f[i] > 0:
+            tm = _argmin(key, xr, zr, xs, zs, st, tg[i - 1], tg[i + 1])
+            if arrival(tm, xr, zr, xs, zs, st, key) - t < 0:
+                if tm < tg[i]:
+                    pts += [_root(key, t, xr, zr, xs, zs, st, tg[i - 1], tm), _root(key, t, xr, zr, xs, zs, st, tm, tg[i])]
                 else:
-                    hi = m
-            pts.append((0.5*(lo + hi), True))
-    pts.append((a, False))
+                    pts += [_root(key, t, xr, zr, xs, zs, st, tg[i], tm), _root(key, t, xr, zr, xs, zs, st, tm, tg[i + 1])]
+    pts.append(a)
     x, w = gl(nq)
     out = np.zeros(3)
-    for (ta, ra), (tb, rb) in zip(pts[:-1], pts[1:]):
-        mid = 0.5*(ta + tb)
-        if arrival(mid, xr, zr, xs, zs, st, key) >= t:
+    for ta, tb in zip(pts[:-1], pts[1:]):
+        if tb <= ta or arrival(0.5*(ta + tb), xr, zr, xs, zs, st, key) >= t:
             continue
-        # cosine substitution tau = ta + (tb - ta)(1 - cos th)/2 removes 1/sqrt at both ends
         th = 0.5*np.pi*(x + 1.0)
         tau = ta + (tb - ta)*0.5*(1.0 - np.cos(th))
         jac = (tb - ta)*0.5*np.sin(th)*0.5*np.pi

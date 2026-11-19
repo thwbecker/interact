@@ -360,3 +360,11 @@ sets values below the floor to it, so an element that started below the floor ju
 at the first switch. Elements at the floor are counted:
 the QD monitor prints a warning when the count grows, each dynamic phase one with its largest
 count. See fd_plan.md.
+
+## Reflected tables by Cagniard-de Hoop (2026-11-20)
+
+`FD_HP_METHOD=cdh` builds the reflected half-plane tables in the time domain (fd_hpcdh.c) instead of
+by the discrete wavenumber method (fd_hpdwn.c, the default for now). It samples the response exactly
+at the lags, including within wave fronts, which DWN smooths; the FD_HPDWN_* settings do not apply
+to it. The cost grows with entries times lags rather than with the square of the window. See
+fd_plan.md M11 for the checks and the remaining comparisons.

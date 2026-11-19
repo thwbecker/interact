@@ -11,6 +11,7 @@
 #include "fd_kernels.h"
 #include "fd_tables.h"
 #include "fd_hpdwn.h"
+#include "fd_hpcdh.h"
 
 static double g_ctol;
 static int g_cexp;
@@ -306,6 +307,7 @@ static void ct_append(struct fd_ctab *c, const struct fd_ctab *t, size_t e0)
 static int hp_reflected(const struct fd_segment *src, const struct fd_segment *rcv, int r0, int r1,
                         double alpha, double beta, double rho, double dt, int nt, double *os, double *on, double *ks, double *kn)
 {
+  int cdh;
   int ns, nr, i, j, rc;
   double X[2], t[2], a;
   double *sx, *sz, *stx, *stz, *sa, *rx, *rz, *rtx, *rtz, *px, *pz;
@@ -343,7 +345,11 @@ static int hp_reflected(const struct fd_segment *src, const struct fd_segment *r
     rtz[i] = -t[1];
   }
   rc = 0;
-  if(nr > 0)
+  /* FD_HP_METHOD: cdh (Cagniard-de Hoop, fd_hpcdh.c, fd_plan.md M11) or dwn (fd_hpdwn.c, default) */
+  cdh = getenv("FD_HP_METHOD") && !strcmp(getenv("FD_HP_METHOD"), "cdh");
+  if((nr > 0) && cdh)
+    rc = fd_hpcdh_batch(ns, sx, sz, stx, stz, sa, nr, rx, rz, rtx, rtz, rcv->n, px, pz, alpha, beta, rho, dt, nt, os, on, ks, kn);
+  else if(nr > 0)
     rc = fd_hpdwn_batch_ext(ns, sx, sz, stx, stz, sa, nr, rx, rz, rtx, rtz, rcv->n, px, pz, alpha, beta, rho, dt, nt, os, on, ks, kn);
   free(sx);
   free(rx);
