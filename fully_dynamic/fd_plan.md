@@ -3622,6 +3622,45 @@ evanescent cutoff over the shortest image path (40 / zsum with zsum 2.3 km for t
 top at 1.15 km, beyond the S-wave number at the highest frequency): now FD_HPDWN_EVA, default 25
 (exp(-25) = 1.4e-11), which changes the batch test's series by 3e-7 and saves about 20 percent.
 
+### M11: reflected waves by Cagniard-de Hoop (time domain), prototype (2026-11-19)
+
+Aim: the reflected half-plane tables at 250 m and finer, where the DWN tables (fd_hpdwn.c) cost
+too much (window squared: frequencies times wavenumbers). fully_dynamic/halfplane_cdh.py,
+check_halfplane_cdh.py.
+- Rays: the reflected field splits into (P,P) (P,S) (S,P) (S,S) (incident up-going type, reflected
+  type); in the Laplace domain the four summed equal the DWN reflected spectrum to 1e-10 (k =
+  i q s, omega = i s). Each ray's amplitude F(q) (stress per unit slip without exp(-s tau)) is
+  homogeneous of degree 1 in s, so the ramp response of a point source is (1/pi) Im[F(q) dq/dt]
+  on the Cagniard path tau(q) = q X + eta1 zs + eta2 zr = t (an early version off by a factor s:
+  the degree was misread; the Laplace-domain check found it).
+- Paths: from the Snell-law saddle (geometric arrival) into the upper half plane; closed form for
+  (P,P) and (S,S), Newton continuation for the converted rays (equal to the closed form to 1e-17
+  where both apply, also at 640 s).
+- Ray by ray against DWN with the same ray amplitudes (200 m segment, 30 degrees, X 700 m, source
+  1.5 km, receiver 0.9 km deep): 7e-5 to 1.2e-4 for all four rays, also for X -3 km, 0.6 and 0.15
+  km deep (1e-5 to 2e-4).
+- Segment: point responses along the segment, midpoint rule first: totals 1 to 54 percent off,
+  since the rays are much larger than their sum (largest ray / total 480 at 2 s, 8e7 at 40 s,
+  growing like t^4; each ray like t^5) and the midpoint rule is poor at the 1/sqrt fronts. Now
+  the breakpoints where the arrival time t0(tau) equals t are found (on a grid of 64 and by
+  bisection) and each piece is integrated with a cosine substitution (Gauss-Legendre, 16 = 32
+  nodes to the printed digits): totals against DWN (8192 frequencies) 4.1e-4 and 9.2e-4 of the
+  largest value, DWN itself not converged at that level (8.8e-3 at 4096 frequencies, 2.2e-3 at
+  16384, with fixed T and L). No separate head-wave treatment was needed for these geometries.
+- Late times: the slope approaches the reflected static rate (Crouch and Starfield, half minus
+  full plane) as 1/t^2: 1.7e-2 at 10 t0, 5e-3 at 20 t0, 1.2e-3 at 40 t0, then the cancellation of
+  the rays wins (4e-3 at 80 t0, 0.2 to 0.4 at 160 t0). Beyond 40 t0: R = K t + c - b / t, c and b
+  fitted at 30 and 40 t0; fitted at 15 and 20 t0 it reproduces direct CdH at 30 and 40 t0 to
+  5e-5 of R (1 to 4 percent of R - K t). A fit c + d/t + e/t^2 over 0.7 to 1 times 6 t0 extrapolated
+  badly (10 percent of R - K t).
+Plan for C (fd_hpcdh.c, replacing fd_hpdwn_batch where the window is long; DWN stays as reference):
+per entry the arrival times t0(tau) of the four rays once (Newton instead of bisection for the
+saddles), per lag the breakpoints and 16 nodes per piece, the path at each node from the previous
+lag's (warm start), the tail beyond 40 t0; after the last front, every m-th lag and cubic
+interpolation. Estimated 1e4 to 1e5 flops per entry and lag, i.e. about 4e13 for PD13 at 250 m
+(900 elements, about 800 lags per entry on average), minutes on 64 threads, against tens of
+hours for DWN at q = 2.
+
 ### Slip in both directions and the normal-stress floor (2026-11-18)
 
 Slip direction: the rate-and-state solve of the dynamic phase (fd_rsf_solve) worked in u = ln V
