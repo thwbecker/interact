@@ -1,6 +1,6 @@
 /*
   test of fd_kernels/fd_tables against table dumps of the Python prototype
-  (fully_dynamic/dump_tables.py). usage: test_fd_tables ref_file [tol]
+  (fully_dynamic/proto/dump_tables.py). usage: test_fd_tables ref_file [tol]
   compares the window length, static rows and every W entry; exit 0 on PASS
 */
 #include <stdio.h>

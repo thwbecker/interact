@@ -2,7 +2,7 @@
   fully dynamic extension of rsf_solve: 2-D elastodynamic kernels
 
   Pure C, no PETSc dependency, so that the tables can be unit tested
-  against the Python prototype (fully_dynamic/inplane.py, antiplane.py,
+  against the Python prototype (fully_dynamic/proto/inplane.py, antiplane.py,
   ref_ando2007.py, inplane_series.py).
 
   Conventions (prototype): source segment along its own x axis with

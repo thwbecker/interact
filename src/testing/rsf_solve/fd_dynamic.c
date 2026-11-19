@@ -18,7 +18,7 @@
     prototype right-lateral convention, +W compressional), forced nucleation
     over 2.5 km at 0.5 c_s, normal-stress coupling (prototype sign
     convention, nsign = -1). Writes hd_trace.dat (t, slip, slip rate and
-    normal stress at four points); with ref_file (fully_dynamic/dump_hd.py)
+    normal stress at four points); with ref_file (fully_dynamic/proto/dump_hd.py)
     compares every step at 1e-8 relative. This exercises the cross-segment
     tables and the normal coupling at roundoff level.
 */

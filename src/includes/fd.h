@@ -1,7 +1,7 @@
 /*
   fully dynamic extension of rsf_solve: data hung off rsf->fd
   (src/rsf_solve/rsf_fd.c). NULL unless -fd_mode is given. See
-  fully_dynamic/fd_c_design.md for the design and milestones.
+  fully_dynamic/docs/fd_c_design.md for the design and milestones.
 */
 #ifndef FD_H
 #define FD_H

@@ -60,7 +60,7 @@ static int compare(const char *ref, int nst, const char **nm, double *rec, int n
 }
 
 /* SCEC TPV101 (rate and state, aging law, whole space), fixed rake, as in
-   fully_dynamic/run_tpv101.py: fault x in [-21, 21] km, y in [-6, 21] km */
+   fully_dynamic/proto/run_tpv101.py: fault x in [-21, 21] km, y in [-6, 21] km */
 static int run_tpv101(int argc, char **argv)
 {
   double cL = 6000, cT = 3464, rho = 2670, dx = atof(argv[2]), tend = argc > 4 ? atof(argv[4]) : 12.0, dt;
@@ -306,7 +306,7 @@ static int run_mirror(int argc, char **argv)
 
 /* free-surface layer check: vertical fault 2 x 1 km of 500 m reaching the surface, mirror
    plus a 16 x 16 layer of 250 m opening elements, prescribed slip rate 1 for 0.4 s, NL;
-   fault traction history against fully_dynamic/fs3d_dyn.py */
+   fault traction history against fully_dynamic/proto/fs3d_dyn.py */
 static int run_layer(const char *ref)
 {
   double cL = 6000, cT = 3464, rho = 2670, dx = 500.0, dt = 0.5*dx/cT, *vp, emax = 0.0, smax = 0.0, r;
@@ -360,7 +360,7 @@ static int run_layer(const char *ref)
 
 /* full-surface check: 2 x 1 km fault of 500 m dipping 30 degrees, top at 500 m, dip slip, a
    24 x 35 surface of 250 m with three unknowns per element, prescribed slip rate 1 for 0.4 s,
-   NL; shear and normal traction histories against fully_dynamic/fs3d_dip.py */
+   NL; shear and normal traction histories against fully_dynamic/proto/fs3d_dip.py */
 static int run_surf(const char *ref)
 {
   double cL = 6000, cT = 3464, rho = 2670, dx = 500.0, dt = 0.5*dx/cT, *vp, es = 0.0, ss = 0.0, en = 0.0, sn = 0.0, r;
@@ -455,7 +455,7 @@ static int run_surfstab(int m)
 
 /* surface stability analysis data: for a surface with elements dx/m at the given CFL, write the
    symbols of the x-slip -> xz-traction tables (Ks dt and W(l), l = 1..L) at wavenumbers
-   (i/8, j/8) of Nyquist, i = 0..8, j = 0..4, for fully_dynamic/fs3d_surf_stability.py */
+   (i/8, j/8) of Nyquist, i = 0..8, j = 0..4, for fully_dynamic/proto/fs3d_surf_stability.py */
 static int run_surfsym(double cfl, int m, const char *out)
 {
   double dx = 1000.0, dt = cfl*dx/3464.0, dip = 30.0, c = cos(dip*M_PI/180.0), s = sin(dip*M_PI/180.0);

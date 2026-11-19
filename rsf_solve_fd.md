@@ -10,8 +10,8 @@ without the option are unchanged, bit for bit.
 This document gives the formulation, what it was checked against, the
 options, and the current limits. Development notes and the Python prototype
 that the C code was verified against are in `fully_dynamic/` (status summary
-in `fully_dynamic/fd_plan.md`, section 0; how to resume the work in
-`fully_dynamic/HANDOFF.md`).
+in `fully_dynamic/docs/fd_plan.md`, section 0; how to resume the work in
+`fully_dynamic/docs/HANDOFF.md`).
 
 Capabilities at a glance (2026-10-25):
 
@@ -23,14 +23,14 @@ Capabilities at a glance (2026-10-25):
 - 3-D, several planes of any orientation (bends, branches, dipping and turned planes;
   strike or dip slip; fd_plan.md G2): whole space, or half space for vertical strike-slip
   planes reaching the surface (free-surface images, G3a); dense cross tables
-  cost L nr ns per step. Check: src/testing/rsf_solve/test_fd3d_multi.sh.
+  cost L nr ns per step. Check: src/testing/rsf_solve/e2e/test_fd3d_multi.sh.
   Any other fault system in a half space: -fd_hs_static 1 (whole-space dynamics, exact
   half-space statics; within a few percent for buried faults; for ruptures reaching the
   surface 10 to 15 percent low in slip and a factor of 2 low in slip rate near the trace;
   fd_plan.md G4).
   Dipping faults (and dip slip) in a half space: several faults sharing the strike
   direction with one virtual surface (fd_plan.md G3b); check
-  src/testing/rsf_solve/test_fd3d_msurf.sh. Faults of different strikes: a surface strip
+  src/testing/rsf_solve/e2e/test_fd3d_msurf.sh. Faults of different strikes: a surface strip
   per fault (fd_plan.md H6).
 - 2-D in-plane faults in a half plane (fd_plan.md M10): exact half-plane kernels, the
   full-plane tables plus the waves reflected at the traction-free surface y = 0, computed by
@@ -43,7 +43,7 @@ Capabilities at a glance (2026-10-25):
   surface and the dense couplings between planes, faults and strips are split over the
   ranks (the dense couplings by receiver rows, which also divides their memory and build
   time). The results do not depend on the number of ranks: the checks
-  (src/testing/rsf_solve/test_fd3d_mpi.sh, and run_tests.sh) compare station files and
+  (src/testing/rsf_solve/e2e/test_fd3d_mpi.sh, and run_tests.sh) compare station files and
   final states byte for byte on 1, 2 and 4 ranks. The direct solve of the strips assembles
   and factorises the strips' first-lag operator on every rank. Speed-ups have not yet been
   measured on a multi-core machine.
@@ -54,7 +54,7 @@ Capabilities at a glance (2026-10-25):
 - 3-D, two parallel planes (stepovers, strike slip): one lattice for both, whole
   space or half space by the mirror image, exact statics (Is, and In with
   -calc_sigma_dot) for both planes; check with
-  src/testing/rsf_solve/test_fd3d_pair.sh. The planes must be farther apart than
+  src/testing/rsf_solve/e2e/test_fd3d_pair.sh. The planes must be farther apart than
   the P-wave reach of one step (about 0.9 element at the default CFL).
 - 3-D (one planar fault of squares, strike or dip slip): full space; half
   space with a mirror image for vertical strike-slip faults (BP5-FD first
@@ -137,14 +137,14 @@ and the prototype was checked against:
   25 m gave FD events at 196.36, 302.10 and 420.80 yr, the prototype's
   196.36, 302.11 and 420.81 yr, with the same step counts and peak slip
   rates (both before the history alignment fix of 2026-10-20, which moves
-  the 50 m event times by 0.1 yr; fully_dynamic/fd_c_design.md section 13).
+  the 50 m event times by 0.1 yr; fully_dynamic/docs/fd_c_design.md section 13).
 
 `rsf_solve`'s own QD on the BP1 half-plane geometry agrees with the prototype
 and with group 4's reference to 0.01 yr, and the FD tables' static limit
 agrees with the assembled `Is`/`In` to 1e-16 (checked at every start,
 `static gate` lines).
 
-Added since (details and numbers in `fully_dynamic/fd_plan.md`):
+Added since (details and numbers in `fully_dynamic/docs/fd_plan.md`):
 
 - second-order time marching (Noda, Sato and Kurihara 2020): equal to the
   prototype's version to 1e-10; BP1-FD converges 3 to 5 times faster than
@@ -246,7 +246,7 @@ to keep cS dt/hs >= 2 (dx/4 at the default CFL). Rows are graded by default
 (`-fd_surface_grade 1`): widths of at most half the distance to the fault, from
 dx/m near the trace up to dx far away. A fault whose top edge lies in the surface
 continues one row above it (`-fd_surface_extend`, tied to the top row). Check with
-src/testing/rsf_solve/test_fd3d_dip.sh. For faults that reach the surface the full
+src/testing/rsf_solve/e2e/test_fd3d_dip.sh. For faults that reach the surface the full
 surface converges slowly at the trace (fd_plan.md, step B5); for vertical strike-slip
 faults the mirror image is exact there and should be used. `-fd_table_statics 1`
 replaces interact's exact Is by the tables' own statics (experiments only).
@@ -276,7 +276,7 @@ short and should be checked at finer resolution. See fd_plan.md.
 
 2-D faults run on several MPI ranks: the dense tables are split by receiver rows (memory
 and table time divided by the ranks), the results are the same for any number of ranks
-(src/testing/rsf_solve/test_fd_mpi2d.sh); OpenMP threads within a rank remain as a stop-gap.
+(src/testing/rsf_solve/e2e/test_fd_mpi2d.sh); OpenMP threads within a rank remain as a stop-gap.
 
 Curved 2-D faults (runs of fewer than four equal collinear elements joined end to start)
 become polyline segments with dense tables (element sizes within 25 percent; FD_NO_POLY=1 to
@@ -295,17 +295,17 @@ part goes through `MatMult`); the dynamic tables are dense per segment pair.
 
 ## 4. Example
 
-Ready-made drivers in `fully_dynamic/c_port/` (run from the repository
-root): `run_bp1_fd.sh [dz] [tend] [lmax]` writes the BP1 files, runs QD and
-FD, prints the event times and phase lines; `run_step_fd.sh W overlap margin
-[tend] [qd|fd|both]` runs a two-segment stepover sequence and
-`summarize_rsf_step.py` tabulates the jumps (delay of the second segment's
+Ready-made drivers (run from the repository root): `fully_dynamic/benchmarks/run_bp1_fd.sh
+[dz] [tend] [lmax]` writes the BP1 files, runs QD and FD, prints the event times and phase
+lines; `fully_dynamic/stepover/run_step_fd.sh W overlap margin [tend] [qd|fd|both]` runs a
+two-segment stepover sequence and `fully_dynamic/stepover/summarize_rsf_step.py` tabulates the
+jumps (delay of the second segment's
 rupture after the first, binned as immediate, minutes, hours, days).
 
 ### Stepover sequence
 
-    fully_dynamic/c_port/run_step_fd.sh 1.0 2.0 0.5 1400 both
-    python3 fully_dynamic/c_port/summarize_rsf_step.py step_*_W1.0_ov2.0_vs0.5
+    fully_dynamic/stepover/run_step_fd.sh 1.0 2.0 0.5 1400 both
+    python3 fully_dynamic/stepover/summarize_rsf_step.py step_*_W1.0_ov2.0_vs0.5
 
 Two parallel 24 km in-plane segments (100 m elements, velocity-weakening
 except for the margins), step width W in km (positive W puts the second
@@ -320,14 +320,14 @@ receiver's position in its own cycle varies from event to event; the
 summary then reports the fraction of source events followed by a receiver
 rupture within one day and within 30 days:
 
-    fully_dynamic/c_port/run_step_fd.sh 1.0 2.0 0.5 2500 both 16 0.004
+    fully_dynamic/stepover/run_step_fd.sh 1.0 2.0 0.5 2500 both 16 0.004
 
 ### BP1 by hand
 
 SEAS BP1 (antiplane half plane, 40 km, 50 m):
 
     python3 - << 'EOF'
-    # geom_bp1.in / rsf_bp1.dat / ic_bp1.in as in fully_dynamic/bp1.py
+    # geom_bp1.in / rsf_bp1.dat / ic_bp1.in as in fully_dynamic/proto/bp1.py
     EOF
     rsf_solve -geom_file geom_bp1.in -rsf_file rsf_bp1.dat -rsf_ic_file ic_bp1.in \
        -dc 0.008 -sigma_init 50e6 -v0 1e-6 -f0 0.6 -vpl 1e-9 -shear_modulus 3.204e10 \

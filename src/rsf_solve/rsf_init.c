@@ -396,7 +396,7 @@ void rsf_print_help(const char *prog)
   fprintf(stderr,"  SEAS BP1 (2-D antiplane half plane) with fully dynamic coseismic phases:\n");
   fprintf(stderr,"    %s -geom_file geom_bp1.in -rsf_file rsf_bp1.dat -rsf_ic_file ic_bp1.in \\\n",prog);
   fprintf(stderr,"       -dc 0.008 -sigma_init 50e6 -vpl 1e-9 -stop_time_yr 520 -fd_mode 1 -fd_lmax 6000\n");
-  fprintf(stderr,"       (inputs and the full option set: fully_dynamic/c_port/run_bp1_fd.sh)\n");
+  fprintf(stderr,"       (inputs and the full option set: fully_dynamic/benchmarks/run_bp1_fd.sh)\n");
   fprintf(stderr,"\n");
 }
 

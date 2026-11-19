@@ -4,7 +4,7 @@
   Reflected part of the 2-D in-plane half-plane response (fd_plan.md M10), by the discrete
   wavenumber method: the stresses at receivers from unit slip rate (a slip ramp since t = 0) on
   straight source segments, minus the full-plane part, in the half plane z > 0 (z depth) with a
-  traction-free surface z = 0. Port of fully_dynamic/halfplane_dwn.py (part "refl").
+  traction-free surface z = 0. Port of fully_dynamic/proto/halfplane_dwn.py (part "refl").
   Sources j: centre (sx[j], sz[j]), unit tangent (stx[j], stz[j]) in the (x, z) frame, half-length
   sa[j]; receivers i: points (rx[i], rz[i]). Output: sxx, sxz, szz (x, z frame) at times t[l],
   arrays [((i * ns) + j) * nt + l].

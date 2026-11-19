@@ -1,7 +1,7 @@
 /*
   fully dynamic extension, 3-D: one planar fault of equal square elements on a
   regular grid in a whole space, slip along one fixed in-plane direction
-  (rsf_solve's fixed rake). Port of fully_dynamic/tada_quad.py and fd3d.py.
+  (rsf_solve's fixed rake). Port of fully_dynamic/proto/tada_quad.py and fd3d.py.
 
   Kernels: stress response to a constant slip rate on a quadrantal fault
   (Tada 2006, GJI 164, Appendix A); a square element is four quadrants.

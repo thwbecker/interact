@@ -6,7 +6,7 @@
 #include "fd_hpcdh.h"
 /* test of fd_hpdwn_batch (fd_plan.md M10): a 30 degree fault of n elements of h, top at depth top, all
    pairs, nt lags of dt = 0.5 h / beta; writes the static reflected tractions (K i j shear normal)
-   and the lag series (S i j l shear normal); fully_dynamic/test_fd_hpdwn_batch.py compares them with
+   and the lag series (S i j l shear normal); src/testing/rsf_solve/py/test_fd_hpdwn_batch.py compares them with
    Crouch and Starfield and with halfplane_dwn.py.
    usage: test_fd_hpdwn_batch [n] [h] [top] [nt] [dwn|cdh] (cdh: fd_hpcdh_batch, Cagniard-de Hoop) */
 int main(int argc, char **argv)

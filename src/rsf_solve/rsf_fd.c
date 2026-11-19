@@ -8,7 +8,7 @@
   correction tables per segment pair (fd_tables.c, FFT storage), gate of
   the tables' static limit against the assembled Is operator (sign and
   convention check, as rsf_ve does for external kernels). The dynamic
-  marcher arrives with M3/M4; see fully_dynamic/fd_c_design.md.
+  marcher arrives with M3/M4; see fully_dynamic/docs/fd_c_design.md.
 
   Contract: with -fd_mode absent nothing here is called from the time
   stepping (rsf_fd_setup leaves rsf->fd NULL and the monitor is not

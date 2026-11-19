@@ -2,7 +2,7 @@
   dense (non-parallel) pair tables of the 2-D fully dynamic code (fd_plan.md N1): a source
   segment along x and a receiver segment rotated by an angle, kinked at a common end point;
   writes the static blocks and W[l] for a few lags (receiver x source) for comparison with
-  the prototype's inplane.W_table / antiplane (fully_dynamic/test_fd_dense.py).
+  the prototype's inplane.W_table / antiplane (src/testing/rsf_solve/py/test_fd_dense.py).
   usage: test_fd_dense <angle_deg> <mode 0 in-plane | 1 antiplane> <outfile>
 */
 #include <stdio.h>

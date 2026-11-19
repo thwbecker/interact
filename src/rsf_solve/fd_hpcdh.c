@@ -1,4 +1,4 @@
-/* see fd_hpcdh.h; the Python prototype is fully_dynamic/halfplane_cdh.py */
+/* see fd_hpcdh.h; the Python prototype is fully_dynamic/proto/halfplane_cdh.py */
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
