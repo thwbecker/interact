@@ -3685,6 +3685,25 @@ reasonable tolerances; document all code; reassess efficiency and accuracy.
   of 4 (now commented), fd_hpdwn.c 4 of 13, fd_hpcdh.c 5 of 21; 174 of 346 in all (some are
   documented in their headers). To do file by file, with the efficiency and accuracy review.
 
+### Audit (4): 3-D profile, shared corners in the 3-D tables (2026-11-21)
+
+Full profile with valgrind's callgrind (it sees libm and LAPACK, gprof did not) of fd3d_test
+tpv101 at 1 km for 6 s, instructions: table set-up 61 percent (fd3d_tab_create: the element ramp
+fd3d_square_ramp, four quadrant kernels L_31/1 per offset and lag, their atan calls 18 percent of
+all), marching 38 percent (the friction solve step_solve_g 26, of it local_rs 13; the 2-D FFTs 15;
+apply_k1 10; exp, log and asinh 10 together).
+Shared corners: neighbouring element offsets share corners, so tab_slice evaluates L_31/1 once per
+corner of the (2 nx) x (2 nz) corner lattice per lag and combines them (four times fewer kernel
+evaluations) for strike slip (comp 1); dip slip (comp 2, fd3d_rect_ramp_tensor) still per offset.
+The corner coordinate is computed as (p - (nx - 1)) dx - a instead of x1 +- a (at most the last
+bit). TPV101 at 500 m, 12 s, one core: 4.12 -> 2.55 s, rupture-time file identical to the printed
+digits (largest difference 0.0); unit and rupture tiers 54 PASS.
+Next candidate: the dense couplings of several planes (fd3d_multi_create, cross_resp per entry
+and lag, four corners each, L1_all or L3_all): TPV14 at 1 km takes 90 s on one core whether it runs
+0.2 or 4 s, i.e. almost all set-up. The same corner sharing applies per receiver and lag over the
+source plane's corner lattice, but the image (free-surface) cells and receivers on the extension
+of a cell edge (handled by fd3d_rect_ramp_tensor's shifted average) need care; not done yet.
+
 ### Audit (3): efficiency of the dynamic phases (2026-11-21)
 
 2-D, BP1-FD at 50 m, first phase (800 elements, window 2144 lags, image 4291 lags, second order,

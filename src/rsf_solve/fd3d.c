@@ -221,6 +221,41 @@ static double tab_kernel(int comp, double x1, double x2, double t, double a, dou
   return s[5];
 }
 static int tab_comp = 1;
+
+/* the ramp response at time t for all element offsets of the table, S[i oz + j] at offset
+   (i - (nx - 1), j - (nz - 1)) elements. For slip along axis 1 (fd3d_square_ramp: four quadrant
+   kernels L_31/1 at the element's corners) neighbouring offsets share corners, so L_31/1 is
+   evaluated once per corner of the (ox + 1) x (oz + 1) corner lattice and combined, four times
+   fewer kernel evaluations (they were most of the table set-up). The corner coordinates are
+   computed as (p - (nx - 1)) dx - a instead of x1 +- a, which differs in the last bit at most.
+   For axis 2 the element kernel is evaluated per offset (tab_kernel). */
+static void tab_slice(int comp, int nx, int nz, double dx, double t, double a, double cL, double cT, double rho, double *S)
+{
+  int ox, oz, i, j;
+  double *G, mu, xc, zc;
+  ox = 2*nx - 1;
+  oz = 2*nz - 1;
+  if(comp != 1){
+    for(i = 0; i < ox; i++)
+      for(j = 0; j < oz; j++)
+        S[(size_t)i*oz + j] = tab_kernel(comp, (i - (nx - 1))*dx, (j - (nz - 1))*dx, t, a, cL, cT, rho);
+    return;
+  }
+  mu = rho*cT*cT;
+  G = (double *)malloc(sizeof(double)*(size_t)(ox + 1)*(oz + 1));
+  for(i = 0; i <= ox; i++){
+    xc = (i - (nx - 1))*dx - a;
+    for(j = 0; j <= oz; j++){
+      zc = (j - (nz - 1))*dx - a;
+      G[(size_t)i*(oz + 1) + j] = fd3d_L31(xc, zc, 0.0, t, cL, cT);
+    }
+  }
+  for(i = 0; i < ox; i++)
+    for(j = 0; j < oz; j++)
+      S[(size_t)i*oz + j] = -mu/(2.0*cT)*(G[(size_t)(i + 1)*(oz + 1) + j + 1] - G[(size_t)i*(oz + 1) + j + 1]
+                                          - G[(size_t)(i + 1)*(oz + 1) + j] + G[(size_t)i*(oz + 1) + j]);
+  free(G);
+}
 /* fd3d_tab_create for slip along grid axis comp (1 or 2; tab_comp selects the kernel) */
 struct fd3d_tab *fd3d_tab_create_c(int nx, int nz, double dx, double dt, double cL, double cT, double rho, int lmax, int comp)
 {
@@ -353,12 +388,10 @@ struct fd3d_tab *fd3d_tab_create(int nx, int nz, double dx, double dt, double cL
   rmax = sqrt(2.0)*(nx > nz ? nx : nz)*dx + dx;
   T1 = 1.5*rmax/cT + 10.0*dt;
   T2 = 2.0*T1;
-  for(i = 0; i < ox; i++)
-    for(j = 0; j < oz; j++){
-      x1 = (i - (nx - 1))*dx;
-      x2 = (j - (nz - 1))*dx;
-      A[(size_t)i*oz + j] = (tab_kernel(tab_comp, x1, x2, T2, a, cL, cT, rho) - tab_kernel(tab_comp, x1, x2, T1, a, cL, cT, rho))/(T2 - T1);
-    }
+  tab_slice(tab_comp, nx, nz, dx, T2, a, cL, cT, rho, A);
+  tab_slice(tab_comp, nx, nz, dx, T1, a, cL, cT, rho, S1);
+  for(i = 0; i < ox*oz; i++)
+    A[i] = (A[i] - S1[i])/(T2 - T1);
   t->ks_self = A[(size_t)(nx - 1)*oz + (nz - 1)];
   t->ks_off = (double *)malloc(sizeof(double)*(size_t)ox*oz);
   memcpy(t->ks_off, A, sizeof(double)*(size_t)ox*oz);
@@ -380,18 +413,11 @@ struct fd3d_tab *fd3d_tab_create(int nx, int nz, double dx, double dt, double cL
     nl = lb - la;
     mine = (double _Complex *)malloc(sizeof(double _Complex)*((size_t)(nl > 0 ? nl : 1))*t->Mx*Mh);
     if(la > 1)
-      for(i = 0; i < ox; i++)
-        for(j = 0; j < oz; j++)
-          S0[(size_t)i*oz + j] = tab_kernel(tab_comp, (i - (nx - 1))*dx, (j - (nz - 1))*dx, (la - 1)*dt, a, cL, cT, rho);
+      tab_slice(tab_comp, nx, nz, dx, (la - 1)*dt, a, cL, cT, rho, S0);
     for(l = la; l < lb; l++){
       Ks = (double *)malloc(sizeof(double)*(size_t)ox*oz);
       memcpy(Ks, A, sizeof(double)*(size_t)ox*oz);
-      for(i = 0; i < ox; i++)
-        for(j = 0; j < oz; j++){
-          x1_2 = (i - (nx - 1))*dx;
-          x2_2 = (j - (nz - 1))*dx;
-          S1[(size_t)i*oz + j] = tab_kernel(tab_comp, x1_2, x2_2, l*dt, a, cL, cT, rho);
-        }
+      tab_slice(tab_comp, nx, nz, dx, l*dt, a, cL, cT, rho, S1);
       if(l == 1){
         for(di = -1; di <= 1; di++)
           for(dj = -1; dj <= 1; dj++)
