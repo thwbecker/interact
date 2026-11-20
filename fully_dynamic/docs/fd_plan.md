@@ -3685,6 +3685,26 @@ reasonable tolerances; document all code; reassess efficiency and accuracy.
   of 4 (now commented), fd_hpdwn.c 4 of 13, fd_hpcdh.c 5 of 21; 174 of 346 in all (some are
   documented in their headers). To do file by file, with the efficiency and accuracy review.
 
+### Audit (5): 3-D marching; dip slip in the shared corners (2026-11-21)
+
+Profile after audit (4), fd3d_test tpv101 at 1 km for 12 s (callgrind, instructions): marching 76
+percent: the Jacobi solve step_solve_g 45 (local_rs 23, inside it exp, log and asinh), the 2-D
+FFTs 25 (field_hat 13, the inverse in known_k 12), the stencil product apply_k1 18; tables 23.
+- The state factor E = exp((f0 + b ln(V0 theta/Lc))/a) depends on the state, which is fixed for a
+  pass of the Jacobi sweeps: computed once per cell and pass (Ep) instead of in every local solve
+  of every sweep (local_rs_E; local_rs keeps the theta interface for the other callers).
+- apply_k1 for the active cells only (apply_k1_mask): the later sweeps recompute only cells whose
+  stencil changed, so the product is needed there only; the active set is now formed before the
+  product. step_end recomputes the full product, so the tractions are unchanged.
+- Partial 2-D FFTs (fd3d_fft2_part): the forward transform of a field skips the zero rows beyond
+  nx, the inverse in known_k transforms only the columns read; the operations done are those of the
+  full transform, so the values are bit-identical.
+tpv101 at 500 m, 12 s, one core: 3.8 s before (audit 4 tables) -> 2.05 s with Ep and the masked
+product -> 2.1 s with the partial FFTs as well (no gain measurable at this grid; kept since it is
+bit-identical and the saving grows with the padding); rupture-time file identical throughout.
+Dip slip in tab_slice: the 32 traction is the corner sum of L_31/1 with the in-plane coordinates
+swapped; against tab_kernel per offset 1.5e-16 of the largest value (strike slip: identical).
+
 ### Audit (4): 3-D profile, shared corners in the 3-D tables (2026-11-21)
 
 Full profile with valgrind's callgrind (it sees libm and LAPACK, gprof did not) of fd3d_test

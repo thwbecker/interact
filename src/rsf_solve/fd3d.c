@@ -172,14 +172,24 @@ double fd3d_square_ramp(double x1, double x2, double x3, double t, double a, dou
 /* ---------------- 2-D FFT from the 1-D plans ---------------- */
 void fd3d_fft2(const struct fd3d_tab *t, double _Complex *a, int sign)
 {
+  fd3d_fft2_part(t, a, sign, t->Mx, 0, t->Mz);
+}
+
+/* fd3d_fft2 restricted to what the caller has or needs: the row transforms only for rows
+   0 .. nrow - 1 (the others must be zero: a field on the lattice in a zero-padded grid), the column
+   transforms only for columns j0 .. j0 + nj - 1 (the others are left after the row stage: for an
+   inverse transform whose output is read in those columns only). The operations on the rows and
+   columns done are those of the full transform, so the values there are bit-identical */
+void fd3d_fft2_part(const struct fd3d_tab *t, double _Complex *a, int sign, int nrow, int j0, int nj)
+{
   int i, j, Mx = t->Mx, Mz = t->Mz;
   double _Complex *col = (double _Complex *)malloc(sizeof(double _Complex)*(Mx > Mz ? Mx : Mz));
   double _Complex *out = (double _Complex *)malloc(sizeof(double _Complex)*(Mx > Mz ? Mx : Mz));
-  for(i = 0; i < Mx; i++){                       /* rows: index j contiguous */
+  for(i = 0; i < nrow; i++){                     /* rows: index j contiguous */
     fd_fft_exec(sign < 0 ? t->pz : t->iz, a + (size_t)i*Mz, out);
     memcpy(a + (size_t)i*Mz, out, sizeof(double _Complex)*Mz);
   }
-  for(j = 0; j < Mz; j++){
+  for(j = j0; j < j0 + nj; j++){
     for(i = 0; i < Mx; i++)
       col[i] = a[(size_t)i*Mz + j];
     fd_fft_exec(sign < 0 ? t->px : t->ix, col, out);
@@ -228,14 +238,16 @@ static int tab_comp = 1;
    evaluated once per corner of the (ox + 1) x (oz + 1) corner lattice and combined, four times
    fewer kernel evaluations (they were most of the table set-up). The corner coordinates are
    computed as (p - (nx - 1)) dx - a instead of x1 +- a, which differs in the last bit at most.
-   For axis 2 the element kernel is evaluated per offset (tab_kernel). */
+   Slip along axis 2 (the 32 traction of fd3d_rect_ramp_tensor) is the same sum with the in-plane
+   coordinates of the corner kernel swapped; offsets on the lattice never meet a cell edge line, so
+   fd3d_rect_ramp_tensor's shifted average does not arise here. */
 static void tab_slice(int comp, int nx, int nz, double dx, double t, double a, double cL, double cT, double rho, double *S)
 {
   int ox, oz, i, j;
   double *G, mu, xc, zc;
   ox = 2*nx - 1;
   oz = 2*nz - 1;
-  if(comp != 1){
+  if(comp != 1 && comp != 2){
     for(i = 0; i < ox; i++)
       for(j = 0; j < oz; j++)
         S[(size_t)i*oz + j] = tab_kernel(comp, (i - (nx - 1))*dx, (j - (nz - 1))*dx, t, a, cL, cT, rho);
@@ -247,7 +259,8 @@ static void tab_slice(int comp, int nx, int nz, double dx, double t, double a, d
     xc = (i - (nx - 1))*dx - a;
     for(j = 0; j <= oz; j++){
       zc = (j - (nz - 1))*dx - a;
-      G[(size_t)i*(oz + 1) + j] = fd3d_L31(xc, zc, 0.0, t, cL, cT);
+      /* slip along axis 2: the 32 traction is L_31/1 with the in-plane axes swapped */
+      G[(size_t)i*(oz + 1) + j] = (comp == 1) ? fd3d_L31(xc, zc, 0.0, t, cL, cT) : fd3d_L31(zc, xc, 0.0, t, cL, cT);
     }
   }
   for(i = 0; i < ox; i++)
@@ -622,7 +635,7 @@ static void field_hat(const struct fd3d *f, const double *x, double _Complex *ou
       }else
         out[(size_t)i*t->Mz + j] = x[i*nzp + j];
     }
-  fd3d_fft2(t, out, -1);
+  fd3d_fft2_part(t, out, -1, t->nx, 0, t->Mz);    /* rows nx .. Mx - 1 are zero */
 }
 
 /* tau0 + Ks delta + history (lags >= 2) */
@@ -674,7 +687,7 @@ static void known_k(struct fd3d *f, int k)
     free(ah);
   }
   from_half(t, f->acc);
-  fd3d_fft2(t, f->acc, +1);
+  fd3d_fft2_part(t, f->acc, +1, t->Mx, row0, nzp);   /* only the columns read below */
   for(i = 0; i < t->nx; i++)
     for(j = 0; j < nzp; j++)
       f->H[i*nzp + j] = f->tau0[i*nzp + j] + creal(f->acc[(size_t)i*t->Mz + row0 + j])/M;
@@ -693,7 +706,14 @@ static double kdiag(const struct fd3d *f, int j)
 }
 
 /* first-lag traction from neighbours (excluding self) */
+static void apply_k1_mask(const struct fd3d *f, const double *V, double *out, const char *only);
 static void apply_k1(const struct fd3d *f, const double *V, double *out)
+{
+  apply_k1_mask(f, V, out, NULL);
+}
+/* apply_k1 for the cells with only[i] set (all if only is NULL; the others keep their value):
+   the later Jacobi sweeps need it for the active cells only */
+static void apply_k1_mask(const struct fd3d *f, const double *V, double *out, const char *only)
 {
   const struct fd3d_tab *t = f->t;
   int i, j, di, dj, nx = t->nx, nz = f->nzp;
@@ -702,6 +722,8 @@ static void apply_k1(const struct fd3d *f, const double *V, double *out)
   int sj;
   for(i = 0; i < nx; i++)
     for(j = 0; j < nz; j++){
+      if(only && !only[i*nz + j])
+        continue;
       s = 0.0;
       for(di = -1; di <= 1; di++)
         for(dj = -1; dj <= 1; dj++){
@@ -777,16 +799,15 @@ static double local_sw(const struct fd3d *f, int i, double Hp, double k, double 
   return sgn(Hp)*(fabs(Hp) - str0)/A;
 }
 /* the element's slip rate from H + k V = strength(V): bracketed Newton in ln |V|, the sign from H
-   (k < 0: the instantaneous response) */
-static double local_rs(const struct fd3d *f, int i, double Hp, double k, double theta, double vguess)
+   (k < 0: the instantaneous response); E = rs_E(theta), the state factor, fixed during the solve */
+static double local_rs_E(const struct fd3d *f, int i, double Hp, double k, double E, double vguess)
 {
-  double h = fabs(Hp), A = -k, lo = -80.0, hi, u, un, v, F, g, dg, E;
+  double h = fabs(Hp), A = -k, lo = -80.0, hi, u, un, v, F, g, dg;
   int it;
   if(f->locked && f->locked[i])
     return 0.0;
   if(h <= 0.0)
     return 0.0;
-  E = rs_E(f, i, theta);
   hi = log(h/A) + 1.0;
   u = log(fabs(vguess) > 1e-30 ? fabs(vguess) : 1e-30);
   if(u > hi - 0.5)
@@ -814,6 +835,11 @@ static double local_rs(const struct fd3d *f, int i, double Hp, double k, double 
   fd3d_cnt[1]++;
   fd3d_cnt[2] += it + 1;
   return sgn(Hp)*exp(u);
+}
+/* local_rs with the state given as theta (the state factor E computed here) */
+static double local_rs(const struct fd3d *f, int i, double Hp, double k, double theta, double vguess)
+{
+  return local_rs_E(f, i, Hp, k, rs_E(f, i, theta), vguess);
 }
 
 /* push one fine-step slice of slip rate into the history ring */
@@ -916,7 +942,7 @@ static int step_solve_g(struct fd3d *f, const double *Hx, const double *guess, c
   struct fd3d_tab *t = f->t;
   int N = f->N, i, it, pass, itot = 0;
   double dt = t->dt, *Vn = (double *)malloc(sizeof(double)*N), *Vold = f->Vold;
-  double *th_p = NULL, *Vs = NULL, eta = 0.5*t->rho*t->cT, hw = f->nl ? 0.5 : 1.0;
+  double *th_p = NULL, *Ep = NULL, *Vs = NULL, eta = 0.5*t->rho*t->cT, hw = f->nl ? 0.5 : 1.0;
   double *H = (double *)malloc(sizeof(double)*N);
   double *V;
   char *chg;
@@ -952,14 +978,17 @@ static int step_solve_g(struct fd3d *f, const double *Hx, const double *guess, c
   }
   if(f->law == 1){
     th_p = (double *)malloc(sizeof(double)*N);
+    Ep = (double *)malloc(sizeof(double)*N);
     Vs = (double *)malloc(sizeof(double)*N);
   }
   for(pass = 0; pass < (f->law == 1 ? 2 : 1); pass++){
     V = (double *)malloc(sizeof(double)*N);
     memcpy(V, pass == 0 ? (guess ? guess : Vold) : Vs, sizeof(double)*N);
     if(f->law == 1)
-      for(i = 0; i < N; i++)
+      for(i = 0; i < N; i++){
         th_p[i] = theta_adv(f, i, f->theta[i], Vold[i], pass == 0 ? Vold[i] : Vs[i], dt);
+        Ep[i] = rs_E(f, i, th_p[i]);              /* fixed during the sweeps of this pass */
+      }
     /* active set: after the first sweep, a cell is recomputed only if its own rate or a stencil
        neighbour's changed in the previous sweep (otherwise its known part is unchanged and so is
        its solution); this removes most of the cost of the later sweeps */
@@ -975,7 +1004,6 @@ static int step_solve_g(struct fd3d *f, const double *Hx, const double *guess, c
       ch = 0.0;
       vm = 0.0;
       fd3d_cnt[0]++;
-      apply_k1(f, V, f->work);
       if(use_act && it > 0){
         memset(act, 0, N);
         for(i = 0; i < N; i++)
@@ -989,6 +1017,8 @@ static int step_solve_g(struct fd3d *f, const double *Hx, const double *guess, c
           }
       }else
         memset(act, 1, N);
+      /* the stencil product for the active cells only (the others are not recomputed) */
+      apply_k1_mask(f, V, f->work, (use_act && it > 0) ? act : NULL);
       for(i = 0; i < N; i++){
         if((mask && !mask[i]) || !act[i] || i < i_lo || i >= i_hi){
           Vn[i] = V[i];
@@ -1022,7 +1052,7 @@ static int step_solve_g(struct fd3d *f, const double *Hx, const double *guess, c
             }
           }
         }else
-          Vn[i] = local_rs(f, i, Hp, kd, th_p[i], V[i]);
+          Vn[i] = local_rs_E(f, i, Hp, kd, Ep[i], V[i]);
         if(fabs(Vn[i] - V[i]) > ch)
           ch = fabs(Vn[i] - V[i]);
       }
@@ -1057,6 +1087,7 @@ static int step_solve_g(struct fd3d *f, const double *Hx, const double *guess, c
   }
   free(Vn);
   free(th_p);
+  free(Ep);
   free(Vs);
   free(H);
   return itot;

@@ -64,6 +64,8 @@ struct fd3d_tab *fd3d_tab_create(int nx, int nz, double dx, double dt, double cL
 struct fd3d_tab *fd3d_tab_create_c(int nx, int nz, double dx, double dt, double cL, double cT, double rho, int lmax, int comp);
 void fd3d_tab_free(struct fd3d_tab *t);
 void fd3d_fft2(const struct fd3d_tab *t, double _Complex *a, int sign);   /* in place, unnormalised */
+/* the rows 0 .. nrow - 1 (the others zero) and the columns j0 .. j0 + nj - 1 only (fd3d.c) */
+void fd3d_fft2_part(const struct fd3d_tab *t, double _Complex *a, int sign, int nrow, int j0, int nj);
 #ifdef FD3D_MPI
 /* communicator for the tables created next (default: one rank, no MPI calls) */
 void fd3d_set_comm(MPI_Comm comm);
