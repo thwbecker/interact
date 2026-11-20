@@ -327,8 +327,6 @@ struct fd3d_tab *fd3d_tab_create(int nx, int nz, double dx, double dt, double cL
   struct fd3d_tab *t = (struct fd3d_tab *)calloc(1, sizeof(*t));
   int ox = 2*nx - 1, oz = 2*nz - 1, i, j, l, Lmax = 0;
   double a = dx/2, *S0, *S1, *A, rmax, T1, T2;
-  double x1;
-  double x2;
   int P;
   int r;
   int la;
@@ -338,8 +336,6 @@ struct fd3d_tab *fd3d_tab_create(int nx, int nz, double dx, double dt, double cL
   size_t Mh;
   _Complex double *mine;
   double *Ks;
-  double x1_2;
-  double x2_2;
   int di;
   int dj;
   int ii;
@@ -3913,12 +3909,29 @@ static void plane_centre(const struct fd3d_mplane *g, int i, int j, double X[3])
   for(k = 0; k < 3; k++)
     X[k] = g->O[k] + (i + 0.5)*g->dx*g->E[0][k] - (j + 0.5)*g->dx*g->E[1][k];
 }
+/* shear (along the receiver's slip) and normal traction on plane gp of the stress tensor s6
+   (s11 s22 s33 s12 s13 s23) given in the frame of plane gq */
+static void cross_project(const struct fd3d_mplane *gq, const struct fd3d_mplane *gp, const double s6[6], double *ts, double *tn)
+{
+  double S[3][3], d[3], n[3], Sn[3];
+  int k, a;
+  mat_rot(gq->E, s6, S);
+  for(k = 0; k < 3; k++){
+    d[k] = gp->E[gp->comp - 1][k];
+    n[k] = gp->E[2][k];
+  }
+  for(a = 0; a < 3; a++)
+    Sn[a] = S[a][0]*n[0] + S[a][1]*n[1] + S[a][2]*n[2];
+  *ts = d[0]*Sn[0] + d[1]*Sn[1] + d[2]*Sn[2];
+  *tn = n[0]*Sn[0] + n[1]*Sn[1] + n[2]*Sn[2];
+}
+
 /* traction (shear along the receiver's slip, normal) on receiver plane gp at X from a unit-rate
    ramp of the source cell (iq, jq) of plane gq, at time t */
 static void cross_resp1(const struct fd3d_mplane *gq, int iq, int jq, const struct fd3d_mplane *gp, const double X[3],
     double t, double cL, double cT, double rho, int image, double *ts, double *tn)
 {
-  double Y[3], r[3], x[3], s6[6], S[3][3], d[3], n[3], Sn[3];
+  double Y[3], r[3], x[3], s6[6];
   int k, a;
   plane_centre(gq, iq, jq, Y);
   if(image)
@@ -3935,15 +3948,7 @@ static void cross_resp1(const struct fd3d_mplane *gq, int iq, int jq, const stru
     return;
   }
   fd3d_rect_ramp_tensor(x[0], x[1], x[2], t, 0.5*gq->dx, 0.5*gq->dx, cL, cT, rho, gq->comp, s6);
-  mat_rot(gq->E, s6, S);
-  for(k = 0; k < 3; k++){
-    d[k] = gp->E[gp->comp - 1][k];
-    n[k] = gp->E[2][k];
-  }
-  for(a = 0; a < 3; a++)
-    Sn[a] = S[a][0]*n[0] + S[a][1]*n[1] + S[a][2]*n[2];
-  *ts = d[0]*Sn[0] + d[1]*Sn[1] + d[2]*Sn[2];
-  *tn = n[0]*Sn[0] + n[1]*Sn[1] + n[2]*Sn[2];
+  cross_project(gq, gp, s6, ts, tn);
 }
 /* shear and normal traction at X on plane gp from unit slip rate on cell (iq, jq) of plane gq at
    time t (cross_resp1 in gq's frame; with its image for a half space) */
@@ -3957,6 +3962,118 @@ static void cross_resp(const struct fd3d_mplane *gq, int iq, int jq, const struc
     cross_resp1(gq, iq, jq, gp, X, t, cL, cT, rho, 1, &ts2, &tn2);
     *ts += ts2;
     *tn += tn2;
+  }
+}
+
+/* the tractions at X on plane gp from every cell of source plane gq (nxq x nzq cells, cell
+   index iq nzq + jq) at time t, added into ts[] and tn[] (zeroed first): cross_resp for all cells
+   at once. Neighbouring cells share corners, so the quadrant tensors of rect_tensor0 are evaluated
+   once per point of the (nxq + 1) x (nzq + 1) corner lattice and combined per cell, four times
+   fewer evaluations (the cross tables were almost all of the set-up of several planes). In the
+   frame of gq the receiver relative to cell (iq, jq) is x = B - (iq + 1/2) dx u0 + (jq + 1/2) dx u1,
+   B = E (X - O), u0 = E e1, u1 = E e2 (for the image: X - M O, M e1, M e2, M = diag(1, 1, -1));
+   the corners form a lattice when u0 = (s0, 0, 0) and u1 = (0, s1, 0), s = +-1 (always for the
+   plane itself, for the image of a vertical plane), with corner coordinates B1 - s0 P dx and
+   B2 + s1 Q dx. Cells with a corner coordinate within 1e-9 a of zero (the receiver on the extension
+   of a cell edge, where fd3d_rect_ramp_tensor averages two shifted evaluations), and an image
+   that is not a lattice, go through cross_resp1. work: 6 (nxq + 1)(nzq + 1) + 2 (nxq + nzq + 2)
+   doubles. */
+static void cross_resp_all(const struct fd3d_mplane *gq, int nxq, int nzq, const struct fd3d_mplane *gp, const double X[3],
+    double t, double cL, double cT, double rho, double *ts, double *tn, double *work)
+{
+  double M[3] = {1.0, 1.0, -1.0};
+  double R[3], B[3], u0[3], u1[3], x3, dx, a, e, mu, s6[6], q[6], r[6], sg, s0, s1, u, v, t1, t2;
+  double *C, *eu, *ev;
+  int img, nimg, k, P, Q, iq, jq, i1, i2, slow, lat;
+  int ns, nq;
+  ns = nxq*nzq;
+  for(k = 0; k < ns; k++){
+    ts[k] = 0.0;
+    tn[k] = 0.0;
+  }
+  if(t <= 0.0)
+    return;
+  dx = gq->dx;
+  a = 0.5*dx;
+  e = 1e-9*a;
+  mu = rho*cT*cT;
+  nq = nzq + 1;
+  C = work;
+  eu = C + (size_t)6*(nxq + 1)*nq;
+  ev = eu + nxq + 1;
+  nimg = gq->mirror ? 2 : 1;
+  for(img = 0; img < nimg; img++){
+    for(k = 0; k < 3; k++)
+      R[k] = X[k] - (img ? M[k] : 1.0)*gq->O[k];
+    for(k = 0; k < 3; k++){
+      B[k] = gq->E[k][0]*R[0] + gq->E[k][1]*R[1] + gq->E[k][2]*R[2];
+      u0[k] = gq->E[k][0]*(img ? M[0] : 1.0)*gq->E[0][0] + gq->E[k][1]*(img ? M[1] : 1.0)*gq->E[0][1] + gq->E[k][2]*(img ? M[2] : 1.0)*gq->E[0][2];
+      u1[k] = gq->E[k][0]*(img ? M[0] : 1.0)*gq->E[1][0] + gq->E[k][1]*(img ? M[1] : 1.0)*gq->E[1][1] + gq->E[k][2]*(img ? M[2] : 1.0)*gq->E[1][2];
+    }
+    lat = (fabs(fabs(u0[0]) - 1.0) < 1e-12) && (fabs(u0[1]) < 1e-12) && (fabs(u0[2]) < 1e-12)
+       && (fabs(fabs(u1[1]) - 1.0) < 1e-12) && (fabs(u1[0]) < 1e-12) && (fabs(u1[2]) < 1e-12);
+    if(!lat){
+      for(iq = 0; iq < nxq; iq++)
+        for(jq = 0; jq < nzq; jq++){
+          cross_resp1(gq, iq, jq, gp, X, t, cL, cT, rho, img, &t1, &t2);
+          ts[iq*nzq + jq] += t1;
+          tn[iq*nzq + jq] += t2;
+        }
+      continue;
+    }
+    s0 = u0[0] > 0.0 ? 1.0 : -1.0;
+    s1 = u1[1] > 0.0 ? 1.0 : -1.0;
+    x3 = B[2];
+    if(fabs(x3) < 1e-9*dx)
+      x3 = 0.0;                          /* as cross_resp1: in-plane receivers stay in-plane */
+    for(P = 0; P <= nxq; P++){
+      u = B[0] - s0*P*dx;
+      eu[P] = (fabs(u) < e) ? 1.0 : 0.0;
+      for(Q = 0; Q <= nzq; Q++){
+        v = B[1] + s1*Q*dx;
+        if(P == 0)
+          ev[Q] = (fabs(v) < e) ? 1.0 : 0.0;
+        if(gq->comp == 3)
+          L3_all(u, v, x3, t, cL, cT, C + 6*((size_t)P*nq + Q));
+        else if(gq->comp == 2){
+          L1_all(v, u, x3, t, cL, cT, r);
+          q[0] = r[1];
+          q[1] = r[0];
+          q[2] = r[2];
+          q[3] = r[3];
+          q[4] = r[5];
+          q[5] = r[4];
+          memcpy(C + 6*((size_t)P*nq + Q), q, sizeof(q));
+        }else
+          L1_all(u, v, x3, t, cL, cT, C + 6*((size_t)P*nq + Q));
+      }
+    }
+    for(iq = 0; iq < nxq; iq++)
+      for(jq = 0; jq < nzq; jq++){
+        slow = 0;
+        for(k = 0; k < 6; k++)
+          s6[k] = 0.0;
+        for(i1 = 0; i1 < 2; i1++)
+          for(i2 = 0; i2 < 2; i2++){
+            /* corner c1 = (i1 ? a : -a), c2 = (i2 ? a : -a) of rect_tensor0 */
+            P = iq + (int)lround(0.5*(1.0 + s0*(i1 ? 1.0 : -1.0)));
+            Q = jq + (int)lround(0.5*(1.0 - s1*(i2 ? 1.0 : -1.0)));
+            if(eu[P] != 0.0 || ev[Q] != 0.0)
+              slow = 1;
+            sg = (i1 == i2) ? 1.0 : -1.0;
+            for(k = 0; k < 6; k++)
+              s6[k] += sg*C[6*((size_t)P*nq + Q) + k];
+          }
+        if(slow){
+          cross_resp1(gq, iq, jq, gp, X, t, cL, cT, rho, img, &t1, &t2);
+        }else{
+          for(k = 0; k < 6; k++)
+            s6[k] *= -mu/(2.0*cT);
+          cross_project(gq, gp, s6, &t1, &t2);
+        }
+        ts[iq*nzq + jq] += t1;
+        tn[iq*nzq + jq] += t2;
+      }
   }
 }
 
@@ -4437,6 +4554,9 @@ static void dtab_hist(const struct fd3d_dtab *d, const struct fd3d_dpref *pr, in
    table (partitioned in lags, rows split over ranks), the planes' own Toeplitz tables kept */
 struct fd3d_multi *fd3d_multi_create(int np, struct fd3d **f, const struct fd3d_mplane *geom)
 {
+  /* cross tables by shared corners (cross_resp_all; FD3D_CORNERS=0: cell by cell, the reference) */
+  int corners, nxq;
+  double *cw, *ca1, *cb1, *ca2, *cb2, *cs, *cn;
   struct fd3d_multi *m = calloc(1, sizeof(*m));
   int p, q, Lmax = 0;
   double cL = f[0]->t->cL, cT = f[0]->t->cT, rho = f[0]->t->rho, dt = f[0]->t->dt;
@@ -4575,6 +4695,43 @@ struct fd3d_multi *fd3d_multi_create(int np, struct fd3d **f, const struct fd3d_
       dtab_alloc(&c->hn, nr, rid, ns, cid, L, rwn, m->mpi_rank);
       kis = malloc(sizeof(double)*L);
       kin = malloc(sizeof(double)*L);
+      corners = !(getenv("FD3D_CORNERS") && atoi(getenv("FD3D_CORNERS")) == 0);
+      if(corners){
+        /* all source cells per receiver and time at once (cross_resp_all, shared corners): the
+           ramp values of every cell at T1, T2 and each lag, then the entries as before */
+        nxq = ns/f[q]->nzp;
+        cw = (double *)malloc(sizeof(double)*((size_t)6*(nxq + 1)*(f[q]->nzp + 1) + 2*(nxq + f[q]->nzp + 2)));
+        ca1 = (double *)malloc(sizeof(double)*(size_t)ns*4);
+        cb1 = ca1 + ns;
+        ca2 = cb1 + ns;
+        cb2 = ca2 + ns;
+        cs = (double *)malloc(sizeof(double)*(size_t)ns*(L + 1)*2);
+        cn = cs + (size_t)ns*(L + 1);
+        for(i = i0; i < i1; i++){
+          plane_centre(&m->g[p], i/f[p]->nzp, i%f[p]->nzp, X_2);
+          cross_resp_all(&m->g[q], nxq, f[q]->nzp, &m->g[p], X_2, T1, cL, cT, rho, ca1, cb1, cw);
+          cross_resp_all(&m->g[q], nxq, f[q]->nzp, &m->g[p], X_2, T2, cL, cT, rho, ca2, cb2, cw);
+          for(j = 0; j < ns; j++){
+            cs[j] = 0.0;
+            cn[j] = 0.0;
+          }
+          for(l = 1; l <= L; l++)
+            cross_resp_all(&m->g[q], nxq, f[q]->nzp, &m->g[p], X_2, l*dt, cL, cT, rho, cs + (size_t)l*ns, cn + (size_t)l*ns, cw);
+          for(j = 0; j < ns; j++){
+            As = (ca2[j] - ca1[j])/(T2 - T1);
+            An = (cb2[j] - cb1[j])/(T2 - T1);
+            for(l = 1; l <= L; l++){
+              kis[l - 1] = cs[(size_t)l*ns + j] - cs[(size_t)(l - 1)*ns + j];
+              kin[l - 1] = cn[(size_t)l*ns + j] - cn[(size_t)(l - 1)*ns + j];
+            }
+            dtab_fill(&c->hs, f[p]->t, j, i, kis, As, 1.0);
+            dtab_fill(&c->hn, f[p]->t, j, i, kin, An, 1.0);
+          }
+        }
+        free(cw);
+        free(ca1);
+        free(cs);
+      }else
       for(i = i0; i < i1; i++){
         plane_centre(&m->g[p], i/f[p]->nzp, i%f[p]->nzp, X_2);
         for(j = 0; j < ns; j++){

@@ -3698,11 +3698,23 @@ evaluations) for strike slip (comp 1); dip slip (comp 2, fd3d_rect_ramp_tensor) 
 The corner coordinate is computed as (p - (nx - 1)) dx - a instead of x1 +- a (at most the last
 bit). TPV101 at 500 m, 12 s, one core: 4.12 -> 2.55 s, rupture-time file identical to the printed
 digits (largest difference 0.0); unit and rupture tiers 54 PASS.
-Next candidate: the dense couplings of several planes (fd3d_multi_create, cross_resp per entry
-and lag, four corners each, L1_all or L3_all): TPV14 at 1 km takes 90 s on one core whether it runs
-0.2 or 4 s, i.e. almost all set-up. The same corner sharing applies per receiver and lag over the
-source plane's corner lattice, but the image (free-surface) cells and receivers on the extension
-of a cell edge (handled by fd3d_rect_ramp_tensor's shifted average) need care; not done yet.
+Dense couplings of several planes (fd3d_multi_create): cross_resp_all evaluates all source cells
+for one receiver and time at once over the source plane's corner lattice, in the plane's frame
+x = B - (iq + 1/2) dx u0 + (jq + 1/2) dx u1 (B, u0, u1 from the receiver, the plane origin and
+axes; for the free-surface image with M = diag(1, 1, -1)); a lattice when u0 = (+-1, 0, 0) and
+u1 = (0, +-1, 0), which holds for the plane itself and the image of a vertical plane. Cells with a
+corner coordinate within 1e-9 a of zero (receiver on the extension of a cell edge, where
+fd3d_rect_ramp_tensor averages two shifted evaluations) and images that are not a lattice go
+through cross_resp1 as before. FD3D_CORNERS=0 keeps the cell-by-cell path (the reference).
+Against it (one core; FD3D_DUMP files, largest difference relative to each quantity's maximum):
+| case | cells | corners | dumps |
+| fd3d_test multi 30 90 2 1 (bend 30 degrees) | 3.6 s | 1.2 s | V 2.7e-9, slip 3.0e-10, tau 3.3e-10 |
+| fd3d_test multi 35 -30 2 2 (dip slip, dipping) | 2.6 s | 1.2 s | V 8.1e-12, slip 2.8e-12 |
+| fd3d_test msurf 1 2 | 10.2 s | 9.6 s | V 1.2e-11 |
+| fd3d_test tpv14 1000 14 2 (images) | 33 s | 12 s | V 0, slip 0, tau 1.8e-16, tn1 1.1e-14 |
+(the normal tractions of multi 35 -30 are about 1e-9 Pa, zero by symmetry up to rounding, so
+their relative differences mean nothing). Differences come from the corner coordinates (no
+cleaning of x1 and x2 to zero at cell centres) and summation order.
 
 ### Audit (3): efficiency of the dynamic phases (2026-11-21)
 
