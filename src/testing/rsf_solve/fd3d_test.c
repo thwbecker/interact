@@ -7,6 +7,14 @@
 #include <math.h>
 #include <unistd.h>
 #include "fd3d.h"
+#include "macros.h"
+/* informational output from rank 0 only, by interact's HEADNODE (macros.h), which tests
+   medium->comm_rank: this driver has no medium, so a stand-in holding the rank */
+struct fd3d_test_med {
+  int comm_rank;
+};
+static struct fd3d_test_med fd3d_test_rank;
+static struct fd3d_test_med *medium = &fd3d_test_rank;
 /* cells for a station at x on a grid starting at edge lo: the cell containing x,
    or the two cells sharing an edge at x */
 static int near2(double x, double lo, double dx, int n, int *c)
@@ -113,7 +121,8 @@ static int run_tpv101(int argc, char **argv)
   dt = 0.5*dx/cT;
   N = nx*nz;
   t = fd3d_tab_create(nx, nz, dx, dt, cL, cT, rho, 0);
-  fprintf(stderr, "fd3d_test tpv101: %d x %d elements, dt %.4f s, window %d lags, FFT %d x %d\n", nx, nz, dt, t->L, t->Mx, t->Mz);
+  HEADNODE
+    fprintf(stderr, "fd3d_test tpv101: %d x %d elements, dt %.4f s, window %d lags, FFT %d x %d\n", nx, nz, dt, t->L, t->Mx, t->Mz);
   f = fd3d_create(t);
   f->law = 1;
   f->f0 = 0.6;
@@ -185,7 +194,8 @@ static int run_tpv101(int argc, char **argv)
         for(k = 0; k < N; k++)
           if(fabs(f->V[k]) > vm)
             vm = fabs(f->V[k]);
-        fprintf(stderr, "  t %6.3f max V %.3e\n", f->time, vm);
+        HEADNODE
+          fprintf(stderr, "  t %6.3f max V %.3e\n", f->time, vm);
       }
       for(s = 0; s < 4; s++){
         d = 0;
@@ -223,9 +233,10 @@ static int run_tpv101(int argc, char **argv)
     }
     {
       if(getenv("FD3D_PROF"))
-        fprintf(stderr, "profile: %d steps; per step known part %.3f ms, solve %.3f ms, finish %.3f ms; per step %.1f Jacobi sweeps, %.0f local solves, %.2f Newton iterations each\n",
-            (int)fd3d_prof3[3], 1e3*fd3d_prof3[0]/fd3d_prof3[3], 1e3*fd3d_prof3[1]/fd3d_prof3[3], 1e3*fd3d_prof3[2]/fd3d_prof3[3],
-            fd3d_cnt[0]/fd3d_prof3[3], fd3d_cnt[1]/fd3d_prof3[3], (double)fd3d_cnt[2]/(fd3d_cnt[1] > 0 ? fd3d_cnt[1] : 1));
+        HEADNODE
+          fprintf(stderr, "profile: %d steps; per step known part %.3f ms, solve %.3f ms, finish %.3f ms; per step %.1f Jacobi sweeps, %.0f local solves, %.2f Newton iterations each\n",
+              (int)fd3d_prof3[3], 1e3*fd3d_prof3[0]/fd3d_prof3[3], 1e3*fd3d_prof3[1]/fd3d_prof3[3], 1e3*fd3d_prof3[2]/fd3d_prof3[3],
+              fd3d_cnt[0]/fd3d_prof3[3], fd3d_cnt[1]/fd3d_prof3[3], (double)fd3d_cnt[2]/(fd3d_cnt[1] > 0 ? fd3d_cnt[1] : 1));
     }
     {
       fo = fopen("tpv101_rt.dat", "w");       /* x y rupture_time final_slip (km, s, m) */
@@ -237,6 +248,10 @@ static int run_tpv101(int argc, char **argv)
     i = (argc > 3 && strcmp(argv[3], "-")) ? compare(argv[3], 3, nm, rec, nsteps, dt*K, 1e-8, "tpv101") : 0;
   }
   free(rt);
+  free(f->a);                                    /* the friction arrays set here are the caller's */
+  free(f->b);
+  free(f->Lc);
+  free(f->theta);
   fd3d_free(f);
   fd3d_tab_free(t);
   free(rec);
@@ -346,8 +361,9 @@ static int run_layer(const char *ref)
   fclose(fr);
   {
     if(getenv("FD3D_PROF"))
-      fprintf(stderr, "layer profile: known %.3f s, fault solves %.3f s, layer solves %.3f s, finish %.3f s\n",
-          fd3d_layer_prof[0], fd3d_layer_prof[1], fd3d_layer_prof[2], fd3d_layer_prof[3]);
+      HEADNODE
+        fprintf(stderr, "layer profile: known %.3f s, fault solves %.3f s, layer solves %.3f s, finish %.3f s\n",
+            fd3d_layer_prof[0], fd3d_layer_prof[1], fd3d_layer_prof[2], fd3d_layer_prof[3]);
   }
   fail = !(cnt == nsteps*N && emax <= 1e-8*smax);
   printf("fd3d_test layer: %d values, max |tau diff| %.2e of %.3e\n", cnt, emax, smax);
@@ -637,7 +653,8 @@ static int run_tpv10(double dx, double Ls, int q2d, int mg, const char *out)
     if(getenv("TPV10_NONC"))
       f->layer->normal_coupling = 0;
   }
-  fprintf(stderr, "tpv10: %d x %d elements of %g m, %d steps of %.4f s, surface %d x %d of %g m, %d lags\n", nx, nz, dx, nsteps, dt, nxs, nys, hs, L);
+  HEADNODE
+    fprintf(stderr, "tpv10: %d x %d elements of %g m, %d steps of %.4f s, surface %d x %d of %g m, %d lags\n", nx, nz, dx, nsteps, dt, nxs, nys, hs, L);
   for(i = 0; i < nx; i++)
     for(j = 0; j < nz; j++){
       e = i*nz + j;
@@ -695,7 +712,8 @@ static int run_tpv10(double dx, double Ls, int q2d, int mg, const char *out)
   for(q = 0; q < nst; q++)
     fclose(fo[q]);
   if(f->layer)
-    fprintf(stderr, "tpv10: done; outer/inner iterations per step %.1f / %.1f\n", (double)f->layer->n_outer/f->layer->n_steps, (double)f->layer->n_inner/f->layer->n_steps);
+    HEADNODE
+      fprintf(stderr, "tpv10: done; outer/inner iterations per step %.1f / %.1f\n", (double)f->layer->n_outer/f->layer->n_steps, (double)f->layer->n_inner/f->layer->n_steps);
   fd3d_free(f);
   fd3d_tab_free(t);
   free(yc);
@@ -835,7 +853,8 @@ static int run_stepover(double W, double dx, double tend, double d0, double mus)
   for(p = 0; p < 2; p++)
     for(i = 0; i < N; i++)
       pp->sig0[p][i] = sig;
-  fprintf(stderr, "stepover: W %+g m, dx %g m, %d x %d lattice (segments %d columns, overlap %d), %d steps, window %d lags\n", W, dx, nx, nz, n1, nov, nsteps, t->L);
+  HEADNODE
+    fprintf(stderr, "stepover: W %+g m, dx %g m, %d x %d lattice (segments %d columns, overlap %d), %d steps, window %d lags\n", W, dx, nx, nz, n1, nov, nsteps, t->L);
   for(n = 0; n < nsteps; n++){
     fd3d_pair_step(pp, NULL, NULL);
     for(p = 0; p < 2; p++)
@@ -1118,8 +1137,9 @@ static int run_tpv14(double dx, int which, double tend, double gap)
       rt[p][i] = -1.0;
     }
   }
-  fprintf(stderr, "tpv%d: dx %g m, main %d x %d, branch %d x %d cells, %d steps of %.4f s, cross windows %d / %d lags\n",
-          which, dx, nxm, nz, nxb, nz, ns, dt, m->c[0][1].L, m->c[1][0].L);
+  HEADNODE
+    fprintf(stderr, "tpv%d: dx %g m, main %d x %d, branch %d x %d cells, %d steps of %.4f s, cross windows %d / %d lags\n",
+            which, dx, nxm, nz, nxb, nz, ns, dt, m->c[0][1].L, m->c[1][0].L);
   tnmax = 0.0;
   xst[0] = -16000.0;
   xst[1] = x0b;
@@ -1319,9 +1339,11 @@ static int run_tpv14s(double dx, int which, double tend, double gap, int m, doub
   for(p = 0; p < 2; p++)
     for(i = 0; i < fa[p]->N; i++)
       st->ly[p]->sig0[i] = 120e6;
-  fprintf(stderr, "tpv%ds: smallest distance between cell centres of the two faults %.0f m\n", which, tpv14s_dmin(nx, nz, dx, th, O, dip));
-  fprintf(stderr, "tpv%ds: dx %g m, strips dx/%d, band %g m (grade %g), branch dip %g, gap %g m, %d steps of %.4f s, L %d, strips %d x %d and %d x %d, dense couplings %.0f MB\n",
-          which, dx, m, band, grade, dipb, gap, ns, dt, L, nxs[0], nys[0], nxs[1], nys[1], fd3d_strips_memory(st)/1e6);
+  HEADNODE
+    fprintf(stderr, "tpv%ds: smallest distance between cell centres of the two faults %.0f m\n", which, tpv14s_dmin(nx, nz, dx, th, O, dip));
+  HEADNODE
+    fprintf(stderr, "tpv%ds: dx %g m, strips dx/%d, band %g m (grade %g), branch dip %g, gap %g m, %d steps of %.4f s, L %d, strips %d x %d and %d x %d, dense couplings %.0f MB\n",
+            which, dx, m, band, grade, dipb, gap, ns, dt, L, nxs[0], nys[0], nxs[1], nys[1], fd3d_strips_memory(st)/1e6);
   for(p = 0; p < 2; p++){
     rt[p] = malloc(sizeof(double)*fa[p]->N);
     slip[p] = calloc(fa[p]->N, sizeof(double));
@@ -1427,8 +1449,10 @@ static void tpv14one_run(double dx, double tend, int m, double band, int surf, d
     if(f->layer->sig0)                           /* the opening layer may not couple the normal traction */
       for(i = 0; i < f->N; i++)
         f->layer->sig0[i] = 120e6;
-    fprintf(stderr, "tpv14one: mirror plus opening layer (normal coupling %s)", f->layer->sig0 ? "yes" : "no");
-    fprintf(stderr, ", dx/%d, %d x %d, band %g m, L %d\n", m, nxs, nys, band, L);
+    HEADNODE{
+      fprintf(stderr, "tpv14one: mirror plus opening layer (normal coupling %s)", f->layer->sig0 ? "yes" : "no");
+      fprintf(stderr, ", dx/%d, %d x %d, band %g m, L %d\n", m, nxs, nys, band, L);
+    }
   }
   if(surf == 1){
     hs = dx/m;
@@ -1448,7 +1472,8 @@ static void tpv14one_run(double dx, double tend, int m, double band, int surf, d
       f->layer->sig0[i] = 120e6;
     if(getenv("FD3D_TPV14S_NONORMAL"))             /* as the reference: no normal coupling */
       f->layer->normal_coupling = 0;
-    fprintf(stderr, "tpv14one: surface cells dx/%d, %d x %d, band %g m, grade %g, end %g m, L %d\n", m, nxs, nys, band, grade, end, L);
+    HEADNODE
+      fprintf(stderr, "tpv14one: surface cells dx/%d, %d x %d, band %g m, grade %g, end %g m, L %d\n", m, nxs, nys, band, grade, end, L);
   }
   for(i = 0; i < f->N; i++){
     rt[i] = -1.0;
@@ -1607,7 +1632,8 @@ static int run_multi(double ang, double dip, double tend, int comp, int mir)
     return 1;
   }
   report_multi_memory(m);
-  fprintf(stderr, "multi: turn %g deg, dip %g deg, cross first lag %s, cross windows %d / %d lags\n", ang, dip, m->implicit ? "kept (implicit)" : "zero", m->c[0][1].L, m->c[1][0].L);
+  HEADNODE
+    fprintf(stderr, "multi: turn %g deg, dip %g deg, cross first lag %s, cross windows %d / %d lags\n", ang, dip, m->implicit ? "kept (implicit)" : "zero", m->c[0][1].L, m->c[1][0].L);
   for(n = 0; n < ns; n++){
     fd3d_step(f1, NULL);
     fd3d_multi_step(m, NULL);
@@ -1784,7 +1810,8 @@ static int run_msurf(int comp, double tend)
     fprintf(stderr, "msurf failed\n");
     return 1;
   }
-  fprintf(stderr, "msurf: comp %d, cross first lag %s\n", comp, ms->mx ? (ms->mx->implicit ? "kept" : "zero") : "none");
+  HEADNODE
+    fprintf(stderr, "msurf: comp %d, cross first lag %s\n", comp, ms->mx ? (ms->mx->implicit ? "kept" : "zero") : "none");
   for(n = 0; n < ns; n++){
     fd3d_step(f1, NULL);
     fd3d_msurf_step(ms, NULL);
@@ -1897,6 +1924,7 @@ int main(int argc, char **argv)
   MPI_Init(&argc, &argv);
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
   MPI_Comm_size(MPI_COMM_WORLD, &size);
+  medium->comm_rank = rank;
   if(size > 1){
     fd3d_set_comm(MPI_COMM_WORLD);
     if(rank > 0){
@@ -2123,8 +2151,9 @@ static int main0(int argc, char **argv)
   nz = (int)floor(15e3/dx + 0.5);
   dt = 0.5*dx/cT;
   t = fd3d_tab_create(nx, nz, dx, dt, cL, cT, rho, 0);
-  fprintf(stderr, "fd3d_test tpv3: %d x %d elements, dt %.4f s, window %d lags, FFT %d x %d, tables %.0f MB, k1 self %.6e, ks self %.6e\n",
-      nx, nz, dt, t->L, t->Mx, t->Mz, 16.0*t->L*t->Mx*t->Mz/1e6, t->k1[1][1], t->ks_self);
+  HEADNODE
+    fprintf(stderr, "fd3d_test tpv3: %d x %d elements, dt %.4f s, window %d lags, FFT %d x %d, tables %.0f MB, k1 self %.6e, ks self %.6e\n",
+        nx, nz, dt, t->L, t->Mx, t->Mz, 16.0*t->L*t->Mx*t->Mz/1e6, t->k1[1][1], t->ks_self);
   f = fd3d_create(t);
   f->law = 0;
   f->mu_s = 0.677;

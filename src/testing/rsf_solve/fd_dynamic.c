@@ -100,6 +100,7 @@ int main(int argc, char **argv)
   seg.s[1] = 0.0;
   seg.X0[0] = -L / 2 + dx / 2;
   seg.X0[1] = 0.0;
+  fail = 0;
   gidx = malloc(sizeof(int) * n);
   for(i = 0; i < n; i++)
     gidx[i] = i;
@@ -238,9 +239,19 @@ int main(int argc, char **argv)
     if(cnt == 0 || md > 1e-8 * sd || mv > 1e-8 * sv || mt > 1e-8 * stau)
       fail = 1;
     printf("fd_dynamic tpv205: %s\n", fail ? "FAIL" : "PASS");
-    return fail;
+    for(j = 0; j < nst; j++)
+      free(rec[j]);
+    free(rec);
+    free(nrec);
   }
-  return 0;
+  /* free everything (valgrind --leak-check=full clean) */
+  fd_state_free(st);
+  fd_sys_free(s);
+  fd_pair_free(pair);
+  free(gidx);
+  free(fr.mu_s);
+  free(fr.mu_d);
+  return fail;
 }
 
 static int run_hd(int argc, char **argv)
@@ -414,6 +425,16 @@ static int run_hd(int argc, char **argv)
       fail = 1;
     printf("fd_dynamic hd: %s\n", fail ? "FAIL" : "PASS");
   }
+  /* free everything (valgrind --leak-check=full clean) */
+  fd_state_free(st);
+  fd_sys_free(s);
+  for(k = 0; k < 4; k++)
+    fd_pair_free(pairs[k]);
+  for(j = 0; j < 2; j++)
+    free(gidx[j]);
+  free(fr.mu_s);
+  free(fr.mu_d);
+  free(fr.force_time);
   return fail;
 }
 

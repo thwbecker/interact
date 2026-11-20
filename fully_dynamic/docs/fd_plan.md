@@ -3685,6 +3685,27 @@ reasonable tolerances; document all code; reassess efficiency and accuracy.
   of 4 (now commented), fd_hpdwn.c 4 of 13, fd_hpcdh.c 5 of 21; 174 of 346 in all (some are
   documented in their headers). To do file by file, with the efficiency and accuracy review.
 
+### Audit (6): TPV14/15 rerun, one header line under MPI, memory checks (2026-11-21)
+
+Thor's rerun of TPV14 and TPV15 at 500 m on 16 ranks after audits (1) to (5): station rupture
+times, slips and outcomes equal the H13 row for 500 m to the printed digits (TPV14 main 5.63 s
+4.31 m, branch 5.85 s 1.66 m; TPV15 main 4.84 s -6.53 m; outcomes 100 (100) / 100 and 57 (0) /
+100 percent). This also confirms the station spec 0:-2000:0 against the SCEC TPV15 file.
+fd3d_test printed its informational stderr lines on every rank (stdout is discarded on ranks > 0,
+stderr is not): they are now under interact's HEADNODE (macros.h), with a file-scope stand-in
+for medium holding the rank (the driver has no struct med). Under mpirun -np 3 the TPV14 header
+appears once. Error messages still print on every rank.
+Memory checks (valgrind memcheck; the default build's -march=native emits AVX-512 instructions
+valgrind cannot decode, so the drivers were rebuilt with -O1 -g for this): no invalid reads or
+writes and no use of uninitialised values in fd_dynamic tpv205, hd, fsrup (2-D, half plane with
+both table paths' code) and fd3d_test tpv101, tpv3, mirror, multi, surf. The leaks were all in
+the drivers (tables and systems not freed at the end): fd_dynamic tpv205 and hd now free
+everything and are leak-free; fd3d_test's run_tpv101 now frees the friction arrays it sets
+(a, b, Lc, theta: the caller's, fd3d_free leaves them) and is leak-free; run_multi still leaves
+its marchers and the multi-plane system (the library's destructors exist; the driver does not call
+them; harmless in a test driver). fd_dynamic tpv205 also had
+'fail' uninitialised on the path without a reference file (it returned 0 there; now set first).
+
 ### Audit (5): 3-D marching; dip slip in the shared corners (2026-11-21)
 
 Profile after audit (4), fd3d_test tpv101 at 1 km for 12 s (callgrind, instructions): marching 76
