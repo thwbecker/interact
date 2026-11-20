@@ -32,6 +32,11 @@ struct fd_ops {                 /* operators for one substep multiple k */
 
 struct fd_sys {
   int N, nseg, nsrc, M, L, Lbuf, mode, has_normal, nsign;
+  /* workspace of the coupled friction solves (fd_rsf_solve), kept between steps: the band of
+     (3 bw + 1) N doubles is above the malloc threshold, so allocating it per solve cost an mmap
+     and its page faults every time */
+  double *ws;
+  size_t ws_n;
   /* MPI (fd_plan.md M8): the dense lag tables hold each rank's own receiver rows only; gather(ctx,
      A, ncol) replaces the other ranks' rows of the N x ncol row-major array A by the owners'
      values (operators K_k after assembly, the history after the products); NULL on one rank */
@@ -95,13 +100,12 @@ struct fd_sys {
 struct fd_sys *fd_sys_create(struct fd_seglist *segs, struct fd_pair **pairs, int nsrc, const int *src_of, const int *src_rev,
                              int mode, double dt, double alpha, double beta, double rho, int nsign);
 void fd_sys_free(struct fd_sys *s);
-/* switch to the partitioned convolution (M6); call once after fd_sys_create,
-   before any push. B: partition length (power of two, 0 = automatic),
-   kmax: largest substep multiple the caller will use. Returns 0 on success. */
-int fd_sys_set_partitioned(struct fd_sys *s, int B, int kmax);
-int fd_sys_set_conv(struct fd_sys *s, int mode, int B, int kmax);   /* mode 1 partitioned, 2 hybrid */
-/* enable the coarse history for steps of exactly K substeps (call before
-   fd_sys_set_conv with mode 1, which releases the full tables) */
+/* switch to the hybrid partitioned convolution (M6); call once after fd_sys_create, before any
+   push. B: partition length (power of two, 0 = automatic), kmax: largest substep multiple the
+   caller will use. Returns 0 on success (also when the windows are too short to gain: then the
+   direct sum stays). */
+int fd_sys_set_conv(struct fd_sys *s, int B, int kmax);
+/* enable the coarse history for steps of exactly K substeps */
 int fd_sys_set_coarse(struct fd_sys *s, int K);
 double fd_sys_bytes(const struct fd_sys *s);
 void fd_sys_reset_history(struct fd_sys *s);
@@ -120,6 +124,7 @@ void fd_sys_static(struct fd_sys *s, const double *delta, double *ts, double *tn
 int  fd_band_width(int N, const double *A, double thr);
 void fd_band_from_dense(int N, int bw, const double *A, double *ab);  /* ab: (3 bw + 1) x N */
 int  fd_band_solve(int N, int bw, const double *ab, const double *rhs, double *x);
+int  fd_band_solve_inplace(int N, int bw, double *ab, const double *rhs, double *x);   /* ab destroyed */
 void fd_band_mult(int N, int bw, const double *ab, const double *x, double *y); /* y = A x from the band */
 
 /* friction: slip weakening (linear or Dugdale, optional forced weakening) */

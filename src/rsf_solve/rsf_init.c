@@ -302,8 +302,8 @@ void rsf_print_help(const char *prog)
   fprintf(stderr,"  -fd_xi <f>              variable step dt <= xi D_c / max v (default 0.25)\n");
   fprintf(stderr,"  -fd_kmax <n>            largest step in fine steps, power of two (default 64)\n");
   fprintf(stderr,"  -fd_et <f>              collocation offset in steps (default 1, end of step)\n");
-  fprintf(stderr,"  -fd_conv <0|1|2>        history convolution: 0 direct, 1 partitioned FFT,\n");
-  fprintf(stderr,"                          2 hybrid (default; about 3x the memory of 0)\n");
+  fprintf(stderr,"  -fd_conv <0|2>          history convolution: 0 direct, 2 hybrid partitioned FFT\n");
+  fprintf(stderr,"                          (default; about 3x the memory of 0)\n");
   fprintf(stderr,"  -fd_conv_block <n>      partition length, power of two (default 0 = automatic)\n");
   fprintf(stderr,"  -fd_nl <0|1>            1 (default): second-order time marching (Noda, Sato and Kurihara\n");
   fprintf(stderr,"                          2020); 0: the earlier first-order scheme. See rsf_solve_fd.md\n");

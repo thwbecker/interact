@@ -177,6 +177,7 @@ void fd_sys_free(struct fd_sys *s)
   int np;
   if(!s)
     return;
+  free(s->ws);
   for(k = 0; k < s->nsrc; k++){
     free(s->hist[k]);
     free(s->histr[k]);
@@ -320,8 +321,6 @@ void fd_sys_push_k(struct fd_sys *s, const double *V, int kk)
       }else
         memcpy(slot, first, sizeof(double _Complex) * s->M);
       s->hk[k]++;
-      if((s->conv == 1) && (s->hk[k] % s->B == 0))
-        form_window(s, k, s->hk[k] / s->B - 1);      /* complete now; the ring will not keep its inputs */
     }
   }
 }
@@ -372,8 +371,6 @@ void fd_sys_push_lin(struct fd_sys *s, const double *Vold, const double *V, int 
         }
       }
       s->hk[k]++;
-      if((s->conv == 1) && (s->hk[k] % s->B == 0))
-        form_window(s, k, s->hk[k] / s->B - 1);
     }
   }
 }
@@ -388,7 +385,7 @@ int fd_sys_set_coarse(struct fd_sys *s, int K)
   _Complex double *A;
   _Complex double *Bm;
   double w;
-  if(K < 2 || s->conv == 1)
+  if(K < 2)
     return 1;
   s->Kc = K;
   s->coarse_from = -1;
@@ -435,7 +432,7 @@ double fd_sys_bytes(const struct fd_sys *s)
   int lt;
   for(k = 0; k < s->nsrc * s->nseg; k++){
     p = s->pairs[k];
-    lt = (s->conv == 1) ? (p->L < s->D ? p->L : s->D) : p->L;
+    lt = p->L;
     if(p->dense){
       b += fd_pair_dense_bytes(p, NULL);       /* compressed (D2) or full windows */
       continue;
@@ -450,18 +447,13 @@ double fd_sys_bytes(const struct fd_sys *s)
   return b;
 }
 
-/* switch to the partitioned convolution (fd_march.h, M6): fd_sys_set_conv with mode 1 */
-int fd_sys_set_partitioned(struct fd_sys *s, int B, int kmax)
-{
-  return fd_sys_set_conv(s, 1, B, kmax);
-}
-
-/* mode 1: partitioned only (tables beyond lag D and the ring beyond D + 2B
-   + kmax are released: about twice the memory of the direct sum); mode 2:
-   hybrid, direct representation kept as well (about three times the memory)
-   and used for steps with 2k > B, where a far block would serve fewer than
-   two outputs */
-int fd_sys_set_conv(struct fd_sys *s, int mode, int B, int kmax)
+/* the hybrid partitioned convolution (fd_march.h, M6): lags 1..D summed directly, the lags beyond
+   by FFT blocks of B lags for steps with 2k <= B; steps with 2k > B (where a far block would serve
+   fewer than two outputs) use the direct sum, so the time-domain tables are kept (about three
+   times the memory of the direct sum). B = 0: chosen by cost. The partitioned-only mode (which
+   released the tables beyond D) was removed on 2026-11-21: it differed from the direct sum by 0.1
+   to 1 percent for steps of several substeps and was slower. */
+int fd_sys_set_conv(struct fd_sys *s, int B, int kmax)
 {
   int qq;
   struct fd_pair *pr;
@@ -470,11 +462,13 @@ int fd_sys_set_conv(struct fd_sys *s, int mode, int B, int kmax)
   const _Complex double *W;
   _Complex double *H;
   int pm;
-  struct fd_pair *pr_2;
+  int np, k, p, q, a, b, best;
+  double cost, cbest;
+  np = s->nsrc * s->nseg;
+  best = 0;
+  cbest = 1e300;
   if(s->ndense)
     return 0;                          /* partitioned convolution needs Toeplitz pairs: off */
-  int np = s->nsrc * s->nseg, k, p, q, a, b, Lmax, best = 0;
-  double cost, cbest = 1e300;
   if(s->conv)
     return 0;
   if(kmax < 1)
@@ -500,7 +494,7 @@ int fd_sys_set_conv(struct fd_sys *s, int mode, int B, int kmax)
   s->D = s->q0 * B - 1;
   if(s->D >= s->L)
     return 0;               /* window shorter than the direct part: nothing to gain */
-  s->conv = mode;
+  s->conv = 2;
   s->tf = fd_fft_plan_create(s->F, FD_FFT_FORWARD);
   s->tb = fd_fft_plan_create(s->F, FD_FFT_BACKWARD);
   s->tw1 = malloc(sizeof(double _Complex) * s->F);
@@ -552,28 +546,6 @@ int fd_sys_set_conv(struct fd_sys *s, int mode, int B, int kmax)
     s->nslot[a] = pm + s->q0 + 2;
     s->X[a] = calloc((size_t)s->nslot[a] * s->M * s->F, sizeof(double _Complex));
     s->Xj[a] = malloc(sizeof(long) * (size_t)s->nslot[a]);
-  }
-  /* time-domain tables are only needed up to lag D now; the ring only up to
-     D + 2B + kmax back (partitioned-only mode) */
-  if(mode == 2){
-    fd_sys_reset_history(s);
-    return 0;
-  }
-  for(k = 0; k < np; k++){
-    pr_2 = s->pairs[k];
-    if(pr_2->L > s->D){
-      pr_2->Ws_hat = realloc(pr_2->Ws_hat, sizeof(double _Complex) * (size_t)s->D * pr_2->M);
-      if(pr_2->has_normal)
-        pr_2->Wn_hat = realloc(pr_2->Wn_hat, sizeof(double _Complex) * (size_t)s->D * pr_2->M);
-    }
-  }
-  Lmax = s->D + 2 * B + kmax + 1;
-  if(Lmax < s->Lbuf){
-    for(a = 0; a < s->nsrc; a++){
-      free(s->hist[a]);
-      s->hist[a] = calloc((size_t)Lmax * s->M, sizeof(double _Complex));
-    }
-    s->Lbuf = Lmax;
   }
   fd_sys_reset_history(s);
   return 0;
@@ -763,7 +735,7 @@ void fd_sys_history(struct fd_sys *s, int lag0, double *ts, double *tn)
         continue;
       }
       lmax = p->L < hk + sh ? p->L : hk + sh;
-      use_far = s->conv && s->P[a * s->nseg + b] > 0 && (s->conv == 1 || 2 * sh <= s->B);
+      use_far = s->conv && s->P[a * s->nseg + b] > 0 && (2 * sh <= s->B);
       if(use_far && lmax > s->D)
         lmax = s->D;
       if(lmax < lag0)
@@ -1094,7 +1066,7 @@ int fd_slipweak_solve(struct fd_slipweak *f, struct fd_sys *s, struct fd_ops *op
         rhs[i] = 0.0;
       }
     }
-    if(fd_band_solve(N, bw, ab, rhs, Vn) != 0){
+    if(fd_band_solve_inplace(N, bw, ab, rhs, Vn) != 0){
       fprintf(stderr, "fd_slipweak_solve: band solve failed\n");
       break;
     }
@@ -1404,7 +1376,7 @@ static int rsf_newton(const struct fd_rsf *f, struct fd_sys *s, struct fd_ops *o
     }
     if(i < N)
       break;
-    if(fd_band_solve(N, bw, ab, g, du) != 0)
+    if(fd_band_solve_inplace(N, bw, ab, g, du) != 0)
       break;
     dmax = 0.0;
     for(i = 0; i < N; i++){
@@ -1446,15 +1418,23 @@ int fd_rsf_solve(const struct fd_rsf *f, struct fd_sys *s, struct fd_ops *op, co
   int N, i, it, round, flips, ok, nit;
   double *u, *g, *du, *ab, *tmp, *k11, *sg, *sg2;
   double dmax, Vi, d0;
+  size_t need;
   N = s->N;
-  u = (double *)malloc(sizeof(double) * N);
-  g = (double *)malloc(sizeof(double) * N);
-  du = (double *)malloc(sizeof(double) * N);
-  ab = (double *)malloc(sizeof(double) * (size_t)(3 * op->bw + 1) * N);
-  tmp = (double *)malloc(sizeof(double) * N);
-  k11 = (double *)malloc(sizeof(double) * N);
-  sg = (double *)malloc(sizeof(double) * N);
-  sg2 = (double *)malloc(sizeof(double) * N);
+  /* the workspace of the system, grown on demand (8 vectors and the band) */
+  need = (size_t)8 * N + (size_t)(3 * op->bw + 1) * N;
+  if(need > s->ws_n){
+    free(s->ws);
+    s->ws = (double *)malloc(sizeof(double) * need);
+    s->ws_n = need;
+  }
+  u = s->ws;
+  g = u + N;
+  du = g + N;
+  tmp = du + N;
+  k11 = tmp + N;
+  sg = k11 + N;
+  sg2 = sg + N;
+  ab = sg2 + N;
   for(i = 0; i < N; i++){
     u[i] = log(fabs(Vg[i]) > 1e-30 ? fabs(Vg[i]) : 1e-30);
     if(u[i] < -70.0)
@@ -1485,14 +1465,6 @@ int fd_rsf_solve(const struct fd_rsf *f, struct fd_sys *s, struct fd_ops *op, co
     ok = 0;
   }
   if(ok){
-    free(u);
-    free(g);
-    free(du);
-    free(ab);
-    free(tmp);
-    free(k11);
-    free(sg);
-    free(sg2);
     return it;
   }
   /* fallback: fixed point of the elementwise solve with lagged neighbours (signed) */
@@ -1514,14 +1486,6 @@ int fd_rsf_solve(const struct fd_rsf *f, struct fd_sys *s, struct fd_ops *op, co
     if(dmax < f->tol)
       break;
   }
-  free(u);
-  free(g);
-  free(du);
-  free(ab);
-  free(tmp);
-  free(k11);
-  free(sg);
-  free(sg2);
   return -(it + 1);
 }
 

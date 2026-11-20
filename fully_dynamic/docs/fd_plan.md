@@ -3685,6 +3685,60 @@ reasonable tolerances; document all code; reassess efficiency and accuracy.
   of 4 (now commented), fd_hpdwn.c 4 of 13, fd_hpcdh.c 5 of 21; 174 of 346 in all (some are
   documented in their headers). To do file by file, with the efficiency and accuracy review.
 
+### Audit (3): efficiency of the dynamic phases (2026-11-21)
+
+2-D, BP1-FD at 50 m, first phase (800 elements, window 2144 lags, image 4291 lags, second order,
+FD_PROFILE=1, one core, quiet machine): 34.4 s wall = history 14.2 s, solve 13.7 s, push 2.9 s,
+static 2.7 s. The solve: 11352 coupled solves (two per step, predictor and corrector), 36072
+band factorisations (3.2 Newton iterations per solve) of N = 800, half band 32, about 0.37 ms
+each with the reference LAPACK of the sandbox (OpenBLAS's will be faster).
+- fd_band_solve copied the band (97 x 800 doubles) before every dgbsv although both callers
+  rebuild it before every solve: fd_band_solve_inplace factorises in place. Solve 14.0 -> 13.5 s,
+  results identical (same factorisation of the same matrix).
+- History convolution, -fd_conv and -fd_conv_block (same phase; the runs marked * shared the
+  core with other jobs, so their times are high):
+  | setting | history | phase wall | peak slip rate |
+  | hybrid (default), automatic block 64 | 14.2 s | 34.4 s | 15.680 m/s |
+  | hybrid, block 32 * | 43.2 s | 71.3 s | 15.680 |
+  | hybrid, block 128 * | 23.1 s | 59.1 s | 15.680 |
+  | direct sum (-fd_conv 0) | 77.3 s | 99.8 s | 15.680 |
+  | partitioned only (-fd_conv 1) * | 331.8 s | 377.7 s | 15.527 |
+  The automatic choice is the fastest of these. -fd_conv 1 is not only slow here (long steps go
+  through the partitioned path) but also gives a different peak slip rate (15.527 against 15.680
+  m/s, mean slip the same); it should be exact. On the cycle test fault (100 m, 2 yr, one phase):
+  peak 2.475 against 2.473 m/s (first order) and 2.826 against 2.828 (second order), phase
+  1370.6 against 1370.7 s and 1377.9 against 1377.2 s, wall 35 to 38 s against 8.7 s. So the
+  partitioned-only path differs by 0.1 to 1 percent, most likely in how it handles steps of several
+  substeps (the hybrid sends those to the direct sum). Removed on Thor's decision (2026-11-21):
+  fd_sys_set_conv(s, B, kmax) now sets up the hybrid only (fd_sys_set_partitioned is gone, the
+  table and ring release of mode 1 too), -fd_conv accepts 0 and 2 (1 is an error with a message).
+  fd_dynamic's FD_CONV_B tests now run the hybrid: TPV205-2D and Harris and Day against the
+  prototype unchanged (slip 5.3e-11, slip rate 3.6e-10 of the largest value); cycle test
+  unchanged.
+Workspace: fd_rsf_solve allocated eight vectors and the band ((3 bw + 1) N doubles, 620 kB for
+BP1 at 50 m, above glibc's mmap threshold, so a fresh mmap with page faults per solve) for each of
+the 11352 solves of the phase; now one workspace in struct fd_sys, grown on demand. The timing
+difference was within the machine's noise during the measurement (solve 13.5 to 15.5 s between
+runs of the same binary); the change removes the allocations either way. The other per-step
+allocations (three vectors of N in fd_step_rsf) are below the threshold and were left.
+Tolerances and step control, BP1-FD at 50 m, first phase (peak slip rate, steps, wall):
+| setting | window | peak | steps | wall |
+| defaults (-fd_tol 1e-2, -fd_xi 0.25) | 2144 lags | 15.680 m/s | 5676 | 37.5 s |
+| -fd_tol 3e-2 | 1744 | 15.486 | 5666 | 34.5 s |
+| -fd_tol 3e-3 | 3236 | 15.685 | 5700 | 45.0 s |
+| -fd_xi 0.5 | 2144 | 15.610 | 5515 | 35.0 s |
+| -fd_xi 0.125 | 2144 | 15.648 | 5995 | 43.1 s |
+(mean slip 1.5649 to 1.5651 m in all). The window tolerance is converged at its default (three times
+tighter: +0.03 percent, 20 percent slower; three times looser: -1.2 percent for 8 percent less
+time); the step factor moves the peak by 0.2 to 0.5 percent either way (the step control's own
+uncertainty), 0.25 costs 7 percent more than 0.5. Defaults kept.
+
+3-D, fd3d_test tpv101 500 m, 12 s: the rate-and-state strength recomputed exp((f0 + b ln(V0
+theta/Lc))/a) in every Newton iteration of local_rs although the state is fixed there; now once per
+local solve (rs_E). 7.9 -> 7.3 s, rupture-time file bit-identical. gprof sampled only 2.9 of
+29 s of the profiled run (the rest in libm and LAPACK, which it does not see), so the 3-D profile
+needs a sampling profiler on the workstation.
+
 ### Audit (2): Harris and Day resolved, BP1 re-run, comments (2026-11-20)
 
 Harris and Day case D: the prototype's 0.51 s trigger delay at 100 m was a resolution effect, not

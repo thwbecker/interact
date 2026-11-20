@@ -181,10 +181,12 @@ Options (defaults in parentheses):
 - `-fd_length_scale <m>` (1) geometry unit in metres.
 - `-fd_max_steps <n>` (2e6) abort a phase beyond this; `-fd_dt_restart <s>`
   (1e-2) first QD step after a phase.
-- `-fd_conv <0|1|2>` (2) history convolution: direct sum; partitioned FFT
-  (about twice the memory); hybrid, partitioned for short substeps and direct
-  for long ones (about three times the memory, fastest). Results agree to
-  roundoff. `-fd_conv_block <n>` (0 = automatic) partition length in lags.
+- `-fd_conv <0|2>` (2) history convolution: 0 direct sum; 2 hybrid, partitioned
+  FFT for short substeps and direct for long ones (about three times the memory,
+  fastest: BP1-FD at 50 m, history 14 s against 77 s). Results agree to roundoff.
+  `-fd_conv_block <n>` (0 = automatic, fastest in the BP1 test) partition length
+  in lags. The partitioned-only mode 1 was removed on 2026-11-21 (it differed by
+  0.1 to 1 percent for steps of several substeps and was slower).
 - `-fd_coarse <0|1>` (1) steps of `-fd_kmax` substeps start at multiples of
   `-fd_kmax`; once a window holds only such steps, the history term is summed
   over the aligned blocks with block-aggregated kernels, which is exact and

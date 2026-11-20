@@ -339,7 +339,8 @@ exactly
     A[j] = sum_{l = jK+1}^{(j+1)K} W[l],
 
 with K times fewer terms. Implemented as fd_sys_set_coarse (aggregated
-tables built once from the full time-domain tables, so not with -fd_conv 1)
+tables built once from the full time-domain tables; the -fd_conv 1 mode that released them was
+removed on 2026-11-21)
 and a step selector that only grows k when the current fine index is a
 multiple of the new k (-fd_coarse 1, default).
 

@@ -61,3 +61,23 @@ void fd_band_mult(int N, int bw, const double *ab, const double *x, double *y)
     y[i] = s;
   }
 }
+
+/* as fd_band_solve, but factorising ab in place (ab is destroyed): for callers that rebuild the
+   band before every solve (the Newton iterations of fd_march.c), which saves the copy of the
+   (3 bw + 1) x N band per solve (about a sixth of the solve time of BP1-FD at 50 m) */
+int fd_band_solve_inplace(int N, int bw, double *ab, const double *rhs, double *x)
+{
+  int ldab, kl, ku, nrhs, info, n, ldb;
+  int *ipiv;
+  ldab = 3*bw + 1;
+  kl = bw;
+  ku = bw;
+  nrhs = 1;
+  n = N;
+  ldb = N;
+  ipiv = (int *)malloc(sizeof(int)*N);
+  memcpy(x, rhs, sizeof(double)*N);
+  dgbsv_(&n, &kl, &ku, &nrhs, ab, &ldab, ipiv, x, &ldb, &info);
+  free(ipiv);
+  return info;
+}

@@ -33,9 +33,9 @@
     -fd_length_scale    geometry unit in metres (default 1.0)
     -fd_max_steps <n>   abort a dynamic phase beyond this many steps (default 2e6)
     -fd_dt_restart <s>  TS step after a phase (default 1e-2)
-    -fd_conv <0|1|2>    history convolution: 0 direct sum, 1 partitioned FFT (about twice
-                        the memory), 2 hybrid: partitioned for short substeps, direct for
-                        long ones (about three times the memory; default)
+    -fd_conv <0|2>      history convolution: 0 direct sum, 2 hybrid: partitioned FFT for
+                        short substeps, direct for long ones (about three times the memory;
+                        default); the partitioned-only mode 1 was removed (2026-11-21)
     -fd_conv_block <n>  partition length in lags, a power of two (default 0: automatic)
     -fd_coarse <0|1>    1 (default): steps of kmax substeps start at multiples of kmax,
                         and once a pair's whole window consists of such steps its history
@@ -2929,8 +2929,8 @@ static PetscErrorCode fd_build_tables(struct interact_ctx *par, struct fd_vars *
     PetscCall(PetscPrintf(PETSC_COMM_WORLD,"rsf_fd_setup: coarse history for aligned steps of %d substeps\n",(int)fd->kmax));
   }
   if(fd->conv){
-    PetscCheck((fd->conv == 1) || (fd->conv == 2),PETSC_COMM_WORLD,PETSC_ERR_ARG_OUTOFRANGE,"-fd_conv must be 0, 1 or 2");
-    PetscCheck(fd_sys_set_conv(fd->sys,(int)fd->conv,(int)fd->conv_block,(int)fd->kmax) == 0,PETSC_COMM_WORLD,PETSC_ERR_ARG_OUTOFRANGE,
+    PetscCheck(fd->conv == 2,PETSC_COMM_WORLD,PETSC_ERR_ARG_OUTOFRANGE,"-fd_conv must be 0 (direct) or 2 (hybrid); the partitioned-only mode 1 was removed");
+    PetscCheck(fd_sys_set_conv(fd->sys,(int)fd->conv_block,(int)fd->kmax) == 0,PETSC_COMM_WORLD,PETSC_ERR_ARG_OUTOFRANGE,
         "rsf_fd_setup: -fd_conv_block must be a power of two (or 0 for automatic)");
     if(fd->sys->conv)
       PetscCall(PetscPrintf(PETSC_COMM_WORLD,"rsf_fd_setup: %s convolution: blocks of %d lags, lags 1..%d direct, FFT length %d\n",

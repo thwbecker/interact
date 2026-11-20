@@ -113,7 +113,7 @@ int main(int argc, char **argv)
   }
   s = fd_sys_create(&segs, &pair, 1, NULL, NULL, FD_MODE_INPLANE, dt, AL, BE, RHO, -1);
   if(getenv("FD_CONV_B") && getenv("FD_CONV_B")[0]){
-    e = fd_sys_set_partitioned(s, atoi(getenv("FD_CONV_B")), 1);
+    e = fd_sys_set_conv(s, atoi(getenv("FD_CONV_B")), 1);
     fprintf(stderr, "partitioned convolution: %s, B %d, D %d\n", e ? "failed" : (s->conv ? "on" : "not needed"), s->B, s->D);
   }
   st = fd_state_create(n);
@@ -313,7 +313,7 @@ static int run_hd(int argc, char **argv)
     }
   s = fd_sys_create(&segs, pairs, 2, NULL, NULL, FD_MODE_INPLANE, dt, AL, BE, RHO, -1);
   if(getenv("FD_CONV_B") && getenv("FD_CONV_B")[0]){
-    e = fd_sys_set_partitioned(s, atoi(getenv("FD_CONV_B")), 1);
+    e = fd_sys_set_conv(s, atoi(getenv("FD_CONV_B")), 1);
     fprintf(stderr, "partitioned convolution: %s, B %d, D %d\n", e ? "failed" : (s->conv ? "on" : "not needed"), s->B, s->D);
   }
   st = fd_state_create(N);

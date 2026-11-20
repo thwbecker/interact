@@ -700,16 +700,30 @@ static void apply_k1(const struct fd3d *f, const double *V, double *out)
     }
 }
 
-/* regularized rate-and-state strength a sigma asinh(v/(2 V0) exp((f0 + b ln(V0 theta/Lc))/a)) and
-   its derivative in v (aging law, state theta in seconds) */
+/* regularized rate-and-state strength a sigma asinh(v/(2 V0) E) with E = exp((f0 + b ln(V0 theta/Lc))/a)
+   and its derivative in v (aging law, state theta in seconds). E depends on the state only, so the
+   Newton iteration of local_rs computes it once (rs_E) rather than in every strength evaluation
+   (the exp and log were most of the 3-D rate-and-state solve); same expressions, so bit-identical */
+static double rs_E(const struct fd3d *f, int i, double theta)
+{
+  return exp((f->f0 + f->b[i]*log(f->V0*theta/f->Lc[i]))/f->a[i]);
+}
+static double rs_strength_E(const struct fd3d *f, int i, double v, double E)
+{
+  return f->a[i]*f->sigma[i]*asinh(v/(2.0*f->V0)*E);
+}
+static double rs_dstrength_E(const struct fd3d *f, int i, double v, double E)
+{
+  double e = E/(2.0*f->V0), z = v*e;
+  return f->a[i]*f->sigma[i]*e/sqrt(1.0 + z*z);
+}
 static double rs_strength(const struct fd3d *f, int i, double v, double theta)
 {
-  return f->a[i]*f->sigma[i]*asinh(v/(2.0*f->V0)*exp((f->f0 + f->b[i]*log(f->V0*theta/f->Lc[i]))/f->a[i]));
+  return rs_strength_E(f, i, v, rs_E(f, i, theta));
 }
 static double rs_dstrength(const struct fd3d *f, int i, double v, double theta)
 {
-  double e = exp((f->f0 + f->b[i]*log(f->V0*theta/f->Lc[i]))/f->a[i])/(2.0*f->V0), z = v*e;
-  return f->a[i]*f->sigma[i]*e/sqrt(1.0 + z*z);
+  return rs_dstrength_E(f, i, v, rs_E(f, i, theta));
 }
 /* aging-law state advanced over dt at the mean slip rate of the step, exactly for a constant rate:
    theta' = theta exp(-x) + dt (1 - exp(-x))/x, x = v dt / Lc. Written this way rather than as
@@ -744,12 +758,13 @@ static double local_sw(const struct fd3d *f, int i, double Hp, double k, double 
    (k < 0: the instantaneous response) */
 static double local_rs(const struct fd3d *f, int i, double Hp, double k, double theta, double vguess)
 {
-  double h = fabs(Hp), A = -k, lo = -80.0, hi, u, un, v, F, g, dg;
+  double h = fabs(Hp), A = -k, lo = -80.0, hi, u, un, v, F, g, dg, E;
   int it;
   if(f->locked && f->locked[i])
     return 0.0;
   if(h <= 0.0)
     return 0.0;
+  E = rs_E(f, i, theta);
   hi = log(h/A) + 1.0;
   u = log(fabs(vguess) > 1e-30 ? fabs(vguess) : 1e-30);
   if(u > hi - 0.5)
@@ -758,9 +773,9 @@ static double local_rs(const struct fd3d *f, int i, double Hp, double k, double 
     u = lo + 1.0;
   for(it = 0; it < 100; it++){
     v = exp(u);
-    F = rs_strength(f, i, v, theta);
+    F = rs_strength_E(f, i, v, E);
     g = h - F - A*v;                                   /* decreasing in v */
-    dg = -(rs_dstrength(f, i, v, theta) + A)*v;
+    dg = -(rs_dstrength_E(f, i, v, E) + A)*v;
     if(g > 0)
       lo = u;
     else
