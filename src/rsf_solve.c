@@ -441,6 +441,8 @@ PetscErrorCode rsf_solve_run(int argc,char **argv,struct interact_ctx *par,
     }
   }
   PetscCall(VecAssemblyBegin(x));PetscCall(VecAssemblyEnd(x));
+  free(ic_tau);			/* the per-cell initial values are in the state now */
+  free(ic_vel);
   PetscCall(PetscRandomDestroy(&prand));
   /* 
      absolute tolerance vector: essentially zero for psi,tau,sigma

@@ -3695,6 +3695,12 @@ fd3d_test printed its informational stderr lines on every rank (stdout is discar
 stderr is not): they are now under interact's HEADNODE (macros.h), with a file-scope stand-in
 for medium holding the rank (the driver has no struct med). Under mpirun -np 3 the TPV14 header
 appears once. Error messages still print on every rank.
+Thor's rerun at 250 m (16 ranks; before the HEADNODE change, so the header still repeats): equal
+to the H13 row for 250 m to the printed digits (TPV14 main 4.94 s 4.47 m, branch 5.12 s 1.63 m;
+TPV15 main 4.19 s -6.40 m; outcomes 100 (100) / 100 and 59 (3) / 100 percent), against SCEC 4.72
+s 4.69 m, 4.99 s 0.62 m, 3.98 s -5.84 m. Peak slip rates 5.07 (SCEC 5.76), 5.65 (4.89) and
+7.57 (9.96) m/s. Memory: cross-table lag data 65.7 GB, dense windows 157.2 GB in all (about 4 GB
+of lag data per rank on 16 ranks).
 Memory checks (valgrind memcheck; the default build's -march=native emits AVX-512 instructions
 valgrind cannot decode, so the drivers were rebuilt with -O1 -g for this): no invalid reads or
 writes and no use of uninitialised values in fd_dynamic tpv205, hd, fsrup (2-D, half plane with
@@ -3705,6 +3711,17 @@ everything and are leak-free; fd3d_test's run_tpv101 now frees the friction arra
 its marchers and the multi-plane system (the library's destructors exist; the driver does not call
 them; harmless in a test driver). fd_dynamic tpv205 also had
 'fail' uninitialised on the path without a reference file (it returned 0 there; now set first).
+rsf_solve itself under valgrind (a separate -O1 -g build; the cycle-test fault in a full plane to
+1.2 yr: QD, the 2-D tables, static gate and the first dynamic phase, 2020 steps, 345 s under
+valgrind): no invalid reads or writes and no use of uninitialised values. Leaks: 16 kB, nearly all
+in PetscInitialize and Open MPI (not ours); the per-cell initial-condition arrays of rsf_solve_run
+(ic_tau, ic_vel, read with -rsf_ic_file) were never freed, now after the state is set (cycle test
+unchanged). 3-D under rsf_solve was not run under valgrind (fd3d_test covers the library).
+Two 3-D speed ideas measured and dropped: FFTW instead of the built-in radix-2 FFT (fd3d_test
+tpv101 500 m: 2.42 against 2.47 s, so the r2c packing, at most a quarter of the FFT time, is not
+worth it here either), and a looser local Newton tolerance in local_rs_E (1e-11 to 1e-7 instead
+of 1e-13 cuts the Newton iterations from 6.5 to 1.8 per local solve but the Jacobi sweeps grow
+from 34 to 450 per step, since the outer iteration then stalls on the local noise).
 
 ### Audit (5): 3-D marching; dip slip in the shared corners (2026-11-21)
 
